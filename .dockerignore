@@ -1,0 +1,15 @@
+.git
+.gitignore
+artwork/
+demo/
+docs/
+extras/
+installer/
+lib/
+testing/
+timer/
+templates/
+website/local/
+*.md
+README.txt
+build.xml

@@ -41,7 +41,7 @@ function make_link_button($label, $link, $permission, $button_class) {
 
 function make_spacer_if($cond) {
   if ($cond) {
-    echo "<div class='index_spacer'>&nbsp;</div>\n";
+    echo "<div class='index_spacer' aria-hidden='true'></div>\n";
   }
 }
 
@@ -54,40 +54,35 @@ function make_spacer_if($cond) {
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/modal.js"></script>
 <style type="text/css">
-div.index_spacer {
-  height: 40px;
+.index_background {
+  max-width: min(1100px, 94vw);
+  margin: clamp(2rem, 6vw, 4rem) auto;
+  padding: clamp(1.75rem, 4vw, 3rem);
+  background: var(--color-surface);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-elevated);
 }
 
-div.index_background {
-  width: 100%;
+.index_columns {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 2.5rem);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
-div.index_column {
-  width: 50%;
-  display: inline-block;
-  float: left;
+.index_column .block_buttons {
+  gap: 1.15rem;
 }
 
-.block_buttons a.button_link {
-  width: 238px;
-  height: 30px;
+.index_spacer {
+  height: 1px;
+  background: rgba(15, 23, 42, 0.18);
+  margin: 1.6rem 0;
 }
 
-.block_buttons a.button_link.before_button,
-.block_buttons input.before_button[type='submit'] {
-  color: #ffffcc;
-}
-.block_buttons a.button_link.during_button,
-.block_buttons input.during_button[type='submit'] {
-  color: #ddffdd;
-}
-.block_buttons a.button_link.after_button,
-.block_buttons input.after_button[type='submit'] {
-  color: #ddddff;
-}
-.block_buttons a.button_link.other_button,
-.block_buttons input.other_button[type='submit'] {
-  color: #ffddff;
+@media (max-width: 720px) {
+  .index_background {
+    padding: 1.6rem;
+  }
 }
 </style>
 </head>
@@ -100,12 +95,13 @@ div.index_column {
  // This is a heuristic more than a hard rule -- when are there so many buttons that we need a second column?
  $two_columns = have_permission(SET_UP_PERMISSION);
 
-echo "<div class='index_background'>\n";
+echo "<main class='index_background' role='main'>\n";
 
 if ($two_columns) {
-  echo "<div class='index_column'>\n";
+  echo "<div class='index_columns'>\n";
 }
 
+echo "<section class='index_column'>\n";
 echo "<div class='block_buttons'>\n";
 
 // *********** Before ***************
@@ -144,9 +140,9 @@ $need_spacer = make_link_button('Results By Racer', 'racer-results.php', VIEW_RA
 
 if ($two_columns) {
   echo "</div>\n";  // block_buttons
-  echo "</div>\n";  // index_column
+  echo "</section>\n";
 
-  echo "<div class='index_column'>\n";
+  echo "<section class='index_column'>\n";
   echo "<div class='block_buttons'>\n";
 }
 
@@ -170,11 +166,12 @@ if (@$_SESSION['role']) {
 }
 
 echo "</div>\n";  // block_buttons
+echo "</section>\n";
 if ($two_columns) {
-  echo "</div>\n";  // index_column
+  echo "</div>\n";  // index_columns
 }
 
-echo "</div>\n";  // index_background
+echo "</main>\n";
 echo "</body>\n";
 echo "</html>\n";
 ?>
