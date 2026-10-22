@@ -1,0 +1,9 @@
+{
+  "name": "derbynet-testing",
+  "private": true,
+  "description": "Node dependencies for the DerbyNet test suite",
+  "dependencies": {
+    "esprima-next": "6.0.3",
+    "puppeteer": "24.43.1"
+  }
+}
