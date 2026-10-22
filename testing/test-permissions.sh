@@ -11,6 +11,27 @@ cat >anonymous.index.tmp <<EOF
         <a class="button_link other_button" href="login.php">Log in</a>
 EOF
 
+# Which pages each role can open comes from fixtures/role-pages.json: an
+# allowed page answers 200, a denied one redirects to the login page.  Whatever
+# the server's navigation looks like, this is the contract.
+FIXTURE="`dirname $0`/fixtures/role-pages.json"
+
+# check_role_pages <role>, for whoever is logged in now.  Denied pages come
+# first: PHP's kiosk.php adds the permission to present awards to the session, so
+# once a kiosk page has been opened, awards-presentation.php opens too.
+check_role_pages() {
+    local PAGE RESULT
+    for PAGE in $(jq -r --arg r "$1" '.[$r].denied[]' "$FIXTURE") ; do
+        RESULT=$(curl_status $PAGE)
+        [[ "$RESULT" =~ ^30[0-9]\ .*login ]] || \
+            test_fails $1 is not redirected to login from $PAGE: $RESULT
+    done
+    for PAGE in $(jq -r --arg r "$1" '.[$r].allowed[]' "$FIXTURE") ; do
+        RESULT=$(curl_status $PAGE)
+        [[ "$RESULT" == "200 "* ]] || test_fails $1 cannot open $PAGE: $RESULT
+    done
+}
+
 ## Every page, and every action
 
 user_logout
@@ -21,6 +42,8 @@ if [ $OK -eq 0 ]; then
     curl_get index.php | grep '<a' | grep button_link
     test_fails Anonymous index page
 fi
+check_role_pages anonymous
+user_logout
 
 curl_postj action.php "action=kiosk.assign" | check_jfailure
 
@@ -75,6 +98,7 @@ if [ $OK -eq 0 ]; then
     curl_get index.php | grep '<a' | grep button_link
     test_fails Coordinator index page
 fi
+check_role_pages RaceCoordinator
 user_logout
 
 ( curl_get index.php | grep '<a' | grep button_link | diff -b - anonymous.index.tmp ) || OK=0
@@ -103,6 +127,7 @@ if [ $OK -eq 0 ]; then
     curl_get index.php | grep '<a' | grep button_link
     test_fails Race crew index page
 fi
+check_role_pages RaceCrew
 user_logout
 
 ( curl_get index.php | grep '<a' | grep button_link | diff -b - anonymous.index.tmp ) || OK=0

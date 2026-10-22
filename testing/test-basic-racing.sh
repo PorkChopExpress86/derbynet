@@ -107,6 +107,10 @@ user_login_coordinator
 ### Editing racers
 
 [ `curl_get checkin.php | grep '"racerid":5,' | grep -c '"class":"Arrows'` -eq 1 ] || test_fails Initial class
+EDITED_RACERID=$(racerid_of 405)
+curl_getj "action.php?query=racer.list" | \
+    jq -e --argjson id $EDITED_RACERID '.racers | map(select(.racerid == $id)) | length == 1 and
+        (.[0].class | startswith("Arrows"))' >/dev/null || test_fails Initial class by racer.list
 curl_postj action.php "action=racer.edit&racer=5&firstname=Zuzu&lastname=Zingelo&carno=999&carname=Z-Car&rankid=4&note_from=Suburbia" | check_jsuccess
 ## To construct the checkin table, checkin.php includes a bunch of javascript
 ## addRow0 calls manufactured by PHP code.
@@ -119,6 +123,22 @@ curl_postj action.php "action=racer.edit&racer=5&firstname=Zuzu&lastname=Zingelo
 curl_get checkin.php | expect_count '"note":null' 0
 # Not sure how many, but the pattern is:
 #   curl_get checkin.php | expect_count '"note":""' 10
+
+# The same facts through racer.list, looking the racer up by its new car number
+# and checking that it is still the racer we edited
+function edited_racer_has() {
+    curl_getj "action.php?query=racer.list" | \
+        jq -e --argjson id $EDITED_RACERID \
+           ".racers | map(select(.carnumber == 999)) | length == 1 and .[0].racerid == \$id and
+            (.[0] | $1)" >/dev/null
+}
+edited_racer_has '.firstname == "Zuzu"' || test_fails Firstname change by racer.list
+edited_racer_has '.lastname == "Zingelo"' || test_fails Lastname change by racer.list
+edited_racer_has '.class | startswith("Webelos")' || test_fails Class change by racer.list
+edited_racer_has '.note_from == "Suburbia"' || test_fails note_from change by racer.list
+curl_getj "action.php?query=racer.list" | \
+    jq -e '.racers | map(select(.note_from == null)) | length == 0' >/dev/null || \
+    test_fails Racers without a note by racer.list
 
 
 ### Overwriting manual heat results: Clobber Dereck Dreier's results to all be 8.888
@@ -196,11 +216,20 @@ curl_getj "action.php?query=award.current" | expect_one Asher
 # Issue#87: make sure the awards presentation page populates for speed awards
 curl_get awards-presentation.php | expect_one "<option data-classid=.1.>Lions &amp; Tigers</option>"
 curl_get awards-presentation.php | expect_count ">3rd Fastest in " 6
+curl_getj "action.php?query=award.list" | \
+    jq -e '.classes | map(select(.name == "Lions & Tigers")) | length == 1' >/dev/null || \
+    test_fails Lions \& Tigers by award.list
+curl_getj "action.php?query=award.list" | \
+    jq -e '.["speed-awards"] | map(select(.place == 3)) | length == 6' >/dev/null || \
+    test_fails 3rd place speed awards by award.list
 
 curl_postj action.php "action=settings.write&one-trophy-per=1&one-trophy-per-checkbox" | check_jsuccess
 # There are only 3 racers in Webelos, and one of them gets a pack-level award.  So only
 # five 3rd-place trophies in this case.
 curl_get awards-presentation.php | expect_count ">3rd Fastest in " 5
+curl_getj "action.php?query=award.list" | \
+    jq -e '.["speed-awards"] | map(select(.place == 3)) | length == 5' >/dev/null || \
+    test_fails 3rd place speed awards with one trophy per racer, by award.list
 
 curl_postj action.php "action=award.present&key=speed-1" | check_jsuccess
 curl_getj "action.php?query=award.current" | expect_one Elliot
@@ -220,4 +249,10 @@ curl_get history.php | expect_one "<td>1.867 sample variance.</td>"
 curl_get history.php | expect_one "<td>1.832 sample variance.</td>"
 curl_get history.php | expect_one "<td>1.966 sample variance.</td>"
 curl_get history.php | expect_one "<p>F statistic is 0.090 with df1=3 and df2=85</p>"
+
+curl_page history.php | page_text | expect_sentence "1.757 sample variance."
+curl_page history.php | page_text | expect_sentence "1.867 sample variance."
+curl_page history.php | page_text | expect_sentence "1.832 sample variance."
+curl_page history.php | page_text | expect_sentence "1.966 sample variance."
+curl_page history.php | page_text | expect_sentence "F statistic is 0.090 with df1=3 and df2=85"
 

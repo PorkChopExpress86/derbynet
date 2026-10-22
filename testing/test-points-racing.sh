@@ -5,6 +5,17 @@ BASE_URL=$1
 set -e -E -o pipefail
 source `dirname $0`/common.sh
 
+# The same facts the standings.php scraping below checks, read from the
+# workbook that export-json.php serves.
+#
+# expect_points <carnumber> <heats> <points>
+expect_points() {
+    standings_row Pack $1 | \
+        jq -e --argjson h $2 --argjson p $3 \
+           '.Heats == $h and (to_entries | map(select(.key | startswith("Total Points")))[0].value) == $p' \
+           >/dev/null || test_fails Car $1 should have $2 heats and $3 points
+}
+
 user_login_coordinator
 
 RESET_SOURCE=points-racing `dirname $0`/reset-database.sh "$BASE_URL"
@@ -42,6 +53,10 @@ curl_text "standings.php" | grep 121 | expect_one "<td>3</td><td>6</td>"
 curl_text "standings.php" | grep 141 | expect_one "<td>2</td><td>4</td>"
 curl_text "standings.php" | grep 111 | expect_one "<td>3</td><td>12</td>"
 curl_text "standings.php" | grep 131 | expect_one "<td>2</td><td>3</td>"
+expect_points 121 3 6
+expect_points 141 2 4
+expect_points 111 3 12
+expect_points 131 2 3
 curl_postj action.php "action=heat.rerun&heat=last" | check_jsuccess
 user_login_timer
 
@@ -53,6 +68,10 @@ curl_text "standings.php" | grep 121 | expect_one "<td>3</td><td>6</td>"
 curl_text "standings.php" | grep 141 | expect_one "<td>2</td><td>5</td>"
 curl_text "standings.php" | grep 111 | expect_one "<td>3</td><td>12</td>"
 curl_text "standings.php" | grep 131 | expect_one "<td>2</td><td>2</td>"
+expect_points 121 3 6
+expect_points 141 2 5
+expect_points 111 3 12
+expect_points 131 2 2
 curl_postj action.php "action=heat.rerun&heat=last" | check_jsuccess
 user_login_timer
 
@@ -64,6 +83,10 @@ curl_text "standings.php" | grep 121 | expect_one "<td>3</td><td>6</td>"
 curl_text "standings.php" | grep 141 | expect_one "<td>2</td><td>4</td>"
 curl_text "standings.php" | grep 111 | expect_one "<td>3</td><td>12</td>"
 curl_text "standings.php" | grep 131 | expect_one "<td>2</td><td>2</td>"
+expect_points 121 3 6
+expect_points 141 2 4
+expect_points 111 3 12
+expect_points 131 2 2
 user_login_timer
 
 run_heat -place 1 4   131:4 101:1 121:2 141:3
@@ -123,6 +146,7 @@ curl_text "standings.php" | grep Asher   | expect_one "<td class=.col-insuper.>2
 curl_text "standings.php" | grep Derick  | expect_one "<td class=.col-insuper.>T3</td>"
 curl_text "standings.php" | grep Jesse   | expect_one "<td class=.col-insuper.>T3</td>"
 curl_text "standings.php" | grep Felton  | expect_one "<td class=.col-insuper.>5</td>"
+expect_places Pack Place 111 1 101 2 121 T3 141 T3 131 5
 
 
 curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
@@ -135,6 +159,11 @@ curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head 
     expect_one '["T3","141","Jesse Jara","","Lions \u0026 Tigers","T3","4","9","2nd","4th"]'
 curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
     expect_one '[5,"131","Felton Fouche","","Lions \u0026 Tigers",5,"4","4","4th","4th"]'
+expect_row Pack 111 '[1,111,"Carroll Cybulski","Vroom","Lions & Tigers",1,4,16,"1st","1st"]'
+expect_row Pack 101 '[2,101,"Adolfo \"Dolf\" Asher","","Lions & Tigers",2,4,12,"1st","3rd"]'
+expect_row Pack 121 '["T3",121,"Derick Dreier","","Lions & Tigers","T3",4,9,"2nd","3rd"]'
+expect_row Pack 141 '["T3",141,"Jesse Jara","","Lions & Tigers","T3",4,9,"2nd","4th"]'
+expect_row Pack 131 '[5,131,"Felton Fouche","","Lions & Tigers",5,4,4,"4th","4th"]'
 
 # award presentation when there's a tie for 3rd
 curl_postj action.php "action=award.present&key=speed-3a-1" | check_jsuccess
@@ -211,6 +240,14 @@ cat $ROUND1_TMP | expect_one Felton
 cat $ROUND1_TMP | grep Felton | expect_one "<div class=.inround.>5</div>"
 cat $ROUND1_TMP | grep Felton | expect_one "<td class=.col-insuper.></td>"
 
+# Round 1's own standings, and which racers the pack-wide standings now attribute
+# to a later round
+expect_places "Lions & Tigers, Round 1" Place 111 1 101 2 121 T3 141 T3 131 5
+standings_sheet "Lions & Tigers, Round 1" | jq -e 'length == 5' >/dev/null || \
+    test_fails Round 1 standings should have 5 racers
+standings_sheet Pack | jq -e 'map(.["Car Number"]) | sort == [101,111,121,141]' >/dev/null || \
+    test_fails Only the finalists should appear in the pack standings
+
 rm $ROUND1_TMP
 
 curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
@@ -223,6 +260,11 @@ curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head 
     expect_one '["T3","141","Jesse Jara","","Lions \u0026 Tigers","T3","T3","4","9","2nd","4th"]'
 curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
     expect_one '[5,"131","Felton Fouche","","Lions \u0026 Tigers",5,5,"4","4","4th","4th"]'
+expect_row "Lions & Tigers, Round 1" 111 '[1,111,"Carroll Cybulski","Vroom","Lions & Tigers","",4,16,"1st","1st"]'
+expect_row "Lions & Tigers, Round 1" 101 '[2,101,"Adolfo \"Dolf\" Asher","","Lions & Tigers","",4,12,"1st","3rd"]'
+expect_row "Lions & Tigers, Round 1" 121 '["T3",121,"Derick Dreier","","Lions & Tigers","",4,9,"2nd","3rd"]'
+expect_row "Lions & Tigers, Round 1" 141 '["T3",141,"Jesse Jara","","Lions & Tigers","",4,9,"2nd","4th"]'
+expect_row "Lions & Tigers, Round 1" 131 '[5,131,"Felton Fouche","","Lions & Tigers","",4,4,"4th","4th"]'
 
 ROUND6_TMP=`mktemp`
 curl_text "standings.php" | for_roundid 6 > $ROUND6_TMP
@@ -253,6 +295,12 @@ cat $ROUND6_TMP | grep Derick | expect_one "<td class=.col-ingroup.>T3</td>"
 cat $ROUND6_TMP | grep Derick | expect_one "<div class=.insuper.>T3</div>"
 cat $ROUND6_TMP | grep Derick | expect_one "<td class=.col-insuper.>T3</td>"
 
+# In the pack: Place is the pack-wide standing and "In Den" the standing in the round.
+# In the group (Lions & Tigers): Place is the standing in the group.
+expect_places Pack Place 101 T1 141 T1 111 T3 121 T3
+expect_places Pack "In Den" 101 T1 141 T1 111 T3 121 T3
+expect_places "Lions & Tigers" Place 101 T1 141 T1 111 T3 121 T3
+
 rm $ROUND6_TMP
 
 curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
@@ -263,3 +311,7 @@ curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head 
     expect_one '["T3","111","Carroll Cybulski","Vroom","Lions \u0026 Tigers","T3","4","8","2nd","4th"]'
 curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
     expect_one '["T3","121","Derick Dreier","","Lions \u0026 Tigers","T3","4","8","2nd","4th"]'
+expect_row Pack 101 '["T1",101,"Adolfo \"Dolf\" Asher","","Lions & Tigers","T1",4,12,"1st","3rd"]'
+expect_row Pack 141 '["T1",141,"Jesse Jara","","Lions & Tigers","T1",4,12,"1st","3rd"]'
+expect_row Pack 111 '["T3",111,"Carroll Cybulski","Vroom","Lions & Tigers","T3",4,8,"2nd","4th"]'
+expect_row Pack 121 '["T3",121,"Derick Dreier","","Lions & Tigers","T3",4,8,"2nd","4th"]'
