@@ -109,7 +109,9 @@ run_tests() {
     `dirname $0`/test-messaging.sh "$BASE_URL"
 
 ############################## Racing Groups and Partitions ##############################
-    RESET_SOURCE=ex1 `dirname $0`/reset-database.sh "$BASE_URL"
+    # checkin-empty-test.js reads the partition's ID from the page (#div-1), and
+    # the Puppeteer tests are outside the shifted-ID run, so this reset doesn't shift
+    DERBYNET_SHIFT_IDS= RESET_SOURCE=ex1 `dirname $0`/reset-database.sh "$BASE_URL"
     puppeteer_test checkin-empty-test.js
 
     # Resets database

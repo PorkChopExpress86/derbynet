@@ -408,15 +408,20 @@ run_heat $ROUND 15 171:3.340 - 181:1.379 111:2.618
 run_heat $ROUND 16 176:1.963 - 101:2.289 262:2.197
 run_heat $ROUND 17 101:2.581 - 146:1.692 116:3.143 x
 
-# Racer 41's lone heat in roundid 1 would make it fastest in the round if it
-# were counted in standings.  This is to confirm it's not.
+# Car 141's lone heat in the first round of Lions & Tigers would make it fastest
+# in the round if it were counted in standings.  This is to confirm it's not.
+# A round's standings are under the key "st-r" and the round's ID.
 curl_getj "action.php?query=standings" | \
-    jq -e ".standings | .["'"'"st-r1"'"'"][0][0] == 46 and
-                        .["'"'"st-r1"'"'"][1][0] == 51 and
-                        .["'"'"st-r1"'"'"][2][0] == 6 and
-                        .["'"'"st-r2"'"'"][0][0] == 57 and
-                        .["'"'"st-r2"'"'"][1][0] == 22 and
-                        .["'"'"st-r2"'"'"][2][0] == 17" \
+    jq -e --arg lions "st-r$(roundid_of Lions 1)" --arg white "st-r$(roundid_of White 1)" \
+          --argjson car146 $(racerid_of 146) --argjson car151 $(racerid_of 151) \
+          --argjson car106 $(racerid_of 106) --argjson car257 $(racerid_of 257) \
+          --argjson car222 $(racerid_of 222) --argjson car217 $(racerid_of 217) \
+          '.standings | .[$lions][0][0] == $car146 and
+                        .[$lions][1][0] == $car151 and
+                        .[$lions][2][0] == $car106 and
+                        .[$white][0][0] == $car257 and
+                        .[$white][1][0] == $car222 and
+                        .[$white][2][0] == $car217' \
         >/dev/null || test_fails
 
 echo ============= 4 lanes 17 racers roundid 2 ======================
