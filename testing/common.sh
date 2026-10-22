@@ -40,26 +40,18 @@ function stacktrace() {
     while caller $((n++)); do :; done;
 }
 
-function curl_get() {
+# The XML endpoints, snapshot.get and timer-message, are the only responses the
+# suite parses as XML.  A page is fetched with curl_page, JSON with curl_getj.
+function curl_get_xml() {
 	echo ' ' ' ' ' ' $1 >&2
 	echo    >> $OUTPUT_CURL
 	echo $1 >> $OUTPUT_CURL
 	echo    >> $OUTPUT_CURL
 	curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/$1 | tee $DEBUG_CURL \
-        | sed -e 's/&nbsp;/ /g' | xmllint --format - | tee -a $OUTPUT_CURL
-    #curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/$1 | sed -e 's/&nbsp;/ /g' | xmllint --format -
+        | xmllint --format - | tee -a $OUTPUT_CURL
 }
 
-function curl_get_amper() {
-	echo '     ' $1 >&2
-	echo    >> $OUTPUT_CURL
-	echo $1 >> $OUTPUT_CURL
-	echo    >> $OUTPUT_CURL
-	curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/$1 | tee $DEBUG_CURL \
-		| grep -v '&' | xmllint --format - | tee -a $OUTPUT_CURL
-}
-
-# Fetch a page, but don't try to parse it as XML/HTML
+# Fetch text without parsing it as XML, HTML or JSON
 function curl_text() {
 	echo ' ' ' ' ' ' $1 >&2
 	echo    >> $OUTPUT_CURL
@@ -118,6 +110,7 @@ function curl_getj() {
         | tee -a $OUTPUT_CURL
 }
 
+# POST to an XML endpoint
 function curl_post() {
 	echo ' ' ' ' ' ' post $1 $2 >&2
 	echo    >> $OUTPUT_CURL

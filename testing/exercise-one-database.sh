@@ -150,7 +150,7 @@ run_tests() {
 
     SNAPSHOT=$(mktemp /tmp/derby-snapshot.xml.XXXXX)
     echo Taking snapshot in $SNAPSHOT
-    curl_get "action.php?query=snapshot.get" > $SNAPSHOT
+    curl_get_xml "action.php?query=snapshot.get" > $SNAPSHOT
 
     # Resets database
     `dirname $0`/test-import-results.sh "$BASE_URL"

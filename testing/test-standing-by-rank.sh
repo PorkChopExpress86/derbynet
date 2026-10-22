@@ -122,31 +122,15 @@ run_heat 1 20  319:2.519 101:1.010 315:3.015 206:5.506 x
 
 user_login_coordinator
 
-curl_get "standings.php" | grep '<tr' | expect_count "data-rankid=.3." 5
-# Because Harold is ineligible, only 4 show up
-curl_get "standings.php" | grep '<tr' | expect_count "data-rankid=.2." 4
-
-curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
-    expect_one '[1,"101","Jewell Jeansonne","Lions",1,"4","1.010","1.010","1.010"]'
-curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
-    expect_one '[16,"206","Ernest Edelman","Tigers",2,"4","5.506","5.506","5.506"]'
-curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
-    expect_one '[17,"214","Thanh Turner","Tigers",3,"4","5.514","5.514","5.514"]'
-curl_text "export.php" | sed -n -e '/START_JSON/,/END_JSON/ p' | tail -2 | head -1 | \
-    expect_one '[18,"218","Sterling Spalla","Tigers",4,"4","5.518","5.518","5.518"]'
-
-# curl_get would parse the HTML and leave one tag per line
-# Thanh came in 4th by time, but with Harold ineligible, he becomes 3rd, and Sterling is 4th
-curl_text "standings.php" | grep '<tr' | grep "data-rankid=.2." | grep "col-insubgroup.>4<" | expect_one "Sterling Spalla"
-
-# The same facts from the workbook that export-json.php serves: one sheet per
-# subgroup, with one row for each racer who is in it
+# One standings sheet per subgroup, with one row for each racer who is in it.
+# Because Harold is ineligible, only 4 Tigers show up.
 standings_sheet "All Racers / Bears" | jq -e 'length == 5' >/dev/null || test_fails Bears standings
 standings_sheet "All Racers / Tigers" | jq -e 'length == 4' >/dev/null || test_fails Tigers standings
 expect_row Pack 101 '[1,101,"Jewell Jeansonne","Lions",1,4,1.010,1.010,1.010]'
 expect_row Pack 206 '[16,206,"Ernest Edelman","Tigers",2,4,5.506,5.506,5.506]'
 expect_row Pack 214 '[17,214,"Thanh Turner","Tigers",3,4,5.514,5.514,5.514]'
 expect_row Pack 218 '[18,218,"Sterling Spalla","Tigers",4,4,5.518,5.518,5.518]'
+# Thanh came in 4th by time, but with Harold ineligible, he becomes 3rd, and Sterling is 4th
 expect_places "All Racers / Tigers" Place 218 4
 
 # Rank-specific awards:

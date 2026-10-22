@@ -45,12 +45,12 @@ manipulate_local_directory() {
     mv $WEBDIR/local $WEBDIR/xlocalx
 
     # Redirects to set-up page
-    curl_get index.php | expect_one 'You need to create'
+    curl_text index.php | expect_one 'You need to create'
     
     ## ----------------------------------
     echo '   ' With unwritable directory
     mkdir -m 0555 $WEBDIR/local
-    curl_get index.php | expect_one "but isn't writable"
+    curl_text index.php | expect_one "but isn't writable"
 
     ## ----------------------------------
     # echo '   ' With writable empty directory but no default path
@@ -105,7 +105,7 @@ if [ "$BASE_URL" = "localhost" ]; then
     sleep 1
 
     
-    curl_get index.php | expect_one 'configure the database first'
+    curl_text index.php | expect_one 'configure the database first'
     curl_postj action.php "action=setup.nodata&ez-new=this-will-succeed" | check_jsuccess
 
     # confirm config-database and config-roles
@@ -122,7 +122,7 @@ if [ "$BASE_URL" = "localhost" ]; then
     echo '   ' Removing database file
     rm -rf $DATADIR/$YEAR/this-will-succeed
     
-    curl_get index.php | expect_one 'a problem opening the database'
+    curl_text index.php | expect_one 'a problem opening the database'
 
     restore_configs    
 
