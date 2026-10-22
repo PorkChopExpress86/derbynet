@@ -17,6 +17,7 @@ replay/build/
 testing/*.curl
 testing/cookies.*
 testing/*.passwords
+testing/puppeteer/node_modules/
 
 timer/build/
 timer/out/
