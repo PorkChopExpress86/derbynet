@@ -277,7 +277,9 @@ function expect_one {
 # appears in it exactly once, as whole words.
 function expect_sentence {
     local N
-    N=$(grep -o -E "(^| )$(printf '%s' "$1" | sed -e 's#[][\.*^$/+?(){}|]#\\&#g')( |\$)" | wc -l)
+    # grep finds nothing, wc still counts, and pipefail would end the test
+    # before the message
+    N=$(grep -o -E "(^| )$(printf '%s' "$1" | sed -e 's#[][\.*^$/+?(){}|]#\\&#g')( |\$)" | wc -l || true)
     if [ "$N" -ne 1 ]; then
         test_fails expecting one occurrence of the sentence "$1", but found $N
     fi
