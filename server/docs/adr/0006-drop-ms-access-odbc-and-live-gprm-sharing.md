@@ -6,7 +6,7 @@ Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress8
 
 ## Context
 
-The PHP server can open GPRM and MS Access databases through ODBC, and `docs/Sharing a Database With GPRM.fodt` describes sharing one database file with GPRM. ADR-01 gives the Django server its own managed schema, which GPRM cannot read.
+The PHP server can open GPRM and MS Access databases through ODBC, and `docs/Sharing a Database With GPRM.fodt` describes sharing one database file with GPRM. ADR-01 gives the Django server its own managed schema.
 
 ## Decision
 

@@ -6,7 +6,7 @@ Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress8
 
 ## Context
 
-The manager pages are forms and lists that volunteers use on phones and laptops. The alternative was a single-page app with a JavaScript build. It was rejected because it adds Node to packaging, and server-rendered pages cover these forms and lists.
+The manager pages are forms and lists. The alternative was a single-page app with a JavaScript build. It was rejected because it adds Node to packaging, and server-rendered pages cover these forms and lists.
 
 ## Decision
 

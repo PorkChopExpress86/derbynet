@@ -6,9 +6,9 @@ Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress8
 
 ## Context
 
-The schema is GPRM compatible, at version 10 (`website/inc/schema_version.inc`). No table declares a foreign key. `RaceInfo` is a key-value table that holds settings and live race state. 33 PHP files call `schema_version()` to support older databases.
+The schema is GPRM compatible, at version 10 (`website/inc/schema_version.inc`). No table declares a foreign key. `RaceInfo` is a key-value table that holds settings and live race state. 40 PHP files call `schema_version()`, most of them to branch on older database versions.
 
-The alternative was unmanaged models on the GPRM schema. It was rejected because it keeps tables without primary keys and the 33 files of version branches.
+The alternative was unmanaged models on the GPRM schema. It was rejected because it keeps tables without primary keys and the version branches spread across 40 files.
 
 ## Decision
 

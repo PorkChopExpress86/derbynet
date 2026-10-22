@@ -6,7 +6,7 @@ Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress8
 
 ## Context
 
-Every dynamic operation goes through `website/action.php`. It has 107 handlers (82 actions, 25 queries) and encodes JSON with `JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK` (`website/action.php:107`). Field clients depend on its exact bytes.
+Every dynamic operation goes through `website/action.php`. It has 107 handlers (83 actions, 24 queries) and encodes JSON with `JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK` (`website/action.php:107`). Field clients depend on its exact bytes.
 
 The alternative was versioned legacy URLs with a deprecation window. It was rejected because nobody can update the clients in the field.
 

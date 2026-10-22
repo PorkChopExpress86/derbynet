@@ -20,4 +20,4 @@ PHP stays the production server until cutover. Data moves through the importer (
 
 ## Evidence
 
-PHP writes `RaceInfo` without transactions or a unique key. A second writer on the same file would race with it. Managed Django models change the schema, which PHP cannot read.
+A second writer on the same file would race with the PHP `RaceInfo` writes. Managed Django models change the schema, which PHP cannot read.

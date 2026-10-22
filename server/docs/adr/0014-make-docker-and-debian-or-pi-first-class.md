@@ -6,7 +6,7 @@ Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress8
 
 ## Context
 
-DerbyNet ships today as a Docker image, Debian packages, a Mac package, and a Windows build. ADR-06 retires the Windows build's ODBC path, and the Django server no longer needs PHP.
+DerbyNet ships today as a Docker image, Debian packages, a Mac package, and a Windows build. ADR-06 retires the Windows build's ODBC path.
 
 ## Decision
 

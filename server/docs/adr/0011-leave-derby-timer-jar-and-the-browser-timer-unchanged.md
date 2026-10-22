@@ -6,7 +6,7 @@ Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress8
 
 ## Context
 
-ADR-02 keeps the wire contract that the timer clients use. Two timer clients exist: `derby-timer.jar`, built from `timer/`, and the browser timer that `timer.php` serves.
+ADR-02 keeps the wire contract that the timer clients use. Two timer clients exist. They are `derby-timer.jar`, built from `timer/`, and the browser timer that `timer.php` serves.
 
 ## Decision
 
