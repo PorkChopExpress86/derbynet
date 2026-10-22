@@ -13,8 +13,8 @@
 #   - the number in an award key or standings key that names a group: speed-1-4,
 #     award-3, st-r1
 #   - run_heat's first argument, which is a roundid
-#   - jq comparing an ID field with a number: .roundid == 3, or a golden
-#     response with "classid": 1 in it
+#   - jq comparing an ID field with a number: .roundid == 3, 3 == .roundid, or
+#     a golden response with "classid": 1 in it
 #   - an ID list: votes=[12,36], classids=2,3, class_and_rank=3,3
 # 0 and -1 are not IDs: they mean "none" and "invalid", and are allowed.  Neither
 # are sceneid and awardtypeid: the server starts with a fixed set of scenes and
@@ -32,10 +32,11 @@ ALLOWLIST=check-no-literal-ids.allowlist
 if [ $# -gt 0 ]; then
     FILES="$@"
 else
-    # The scripts that exercise-one-database.sh runs, and the helpers they call.
+    # exercise-one-database.sh, the scripts it runs, and the helpers they call.
     # The demo scripts (demo*.sh, checkin-all.sh, setup-*.sh) feed a demo
     # server and gate nothing, so they're not checked.
-    FILES=$(ls test-*.sh import-roster.sh run-scout-heats.sh photo-setup.sh)
+    FILES=$(ls exercise-one-database.sh reset-database.sh shift-ids.sh test-*.sh \
+               import-roster.sh run-scout-heats.sh photo-setup.sh)
 fi
 
 IDNAME='(racer|racerid|roundid|classid|rankid|partitionid|awardid|resultid)'
@@ -47,8 +48,9 @@ PATTERNS=(
     "\\bkey=(speed-[0-9]+[a-z]?-${NUM}|award-${NUM})"
     "\\bst-(r|q|rr)${NUM}\\b"
     "\\]\\[0\\] *== *${NUM}\\b"
-    "\\brun_heat( -place)? ${NUM} "
-    "\\.${IDNAME} *(==|!=|<=|>=|<|>) *${NUM}\\b"
+    "\\brun_heat( +-place)? +[\"']?${NUM}[\"']?( |\$)"
+    "\\.${IDNAME} *(==|!=|<=|>=|<|>) *(\\( *)?${NUM}\\b"
+    "\\b${NUM}( *\\))? *(==|!=|<=|>=|<|>) *\\.${IDNAME}\\b"
     "\"${IDNAME}\": *${NUM}\\b"
     "\\bvotes=\\[[0-9]"
     "\\bclassids=[0-9]"
@@ -56,7 +58,7 @@ PATTERNS=(
     "\\bclass_and_rank=${NUM},"
     "\\bclass_and_rank=[0-9]+,${NUM}"
     "\\b${IDNAME}[a-z_]* *== *\\[[0-9]"
-    "\\(\\.${IDNAME}\\) *\\| *sort *==( *\\[[0-9]|\$)"
+    "\\(\\.${IDNAME}\\) *(\\| *sort *)?==( *\\[ *[0-9]|\$)"
     "^[[:space:]]*\\[(null|[1-9][0-9]?)(, *(null|[1-9][0-9]?))*\\],?[[:space:]]*\$"
 )
 
