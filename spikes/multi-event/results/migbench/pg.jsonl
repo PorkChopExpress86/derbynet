@@ -1,0 +1,20 @@
+{"db": "pg", "racers": 100, "results": 400, "rep": 0, "create_db_s": 0.0882, "migrate_0001_to_head_s": 0.1788, "migrate_noop_s": 0.0507, "data_migration_ran": true}
+{"db": "pg", "rep": 0, "new_event_create_and_migrate_s": 0.2558}
+{"db": "pg", "racers": 1000, "results": 4000, "rep": 0, "create_db_s": 0.0647, "migrate_0001_to_head_s": 0.5886, "migrate_noop_s": 0.1199, "data_migration_ran": true}
+{"db": "pg", "rep": 0, "new_event_create_and_migrate_s": 0.2502}
+{"db": "pg", "racers": 100, "results": 400, "rep": 1, "create_db_s": 0.0584, "migrate_0001_to_head_s": 0.1195, "migrate_noop_s": 0.0385, "data_migration_ran": true}
+{"db": "pg", "rep": 1, "new_event_create_and_migrate_s": 0.2247}
+{"db": "pg", "racers": 1000, "results": 4000, "rep": 1, "create_db_s": 0.0611, "migrate_0001_to_head_s": 0.6549, "migrate_noop_s": 0.0493, "data_migration_ran": true}
+{"db": "pg", "rep": 1, "new_event_create_and_migrate_s": 0.2175}
+{"db": "pg", "racers": 100, "results": 400, "rep": 2, "create_db_s": 0.0564, "migrate_0001_to_head_s": 0.1709, "migrate_noop_s": 0.0465, "data_migration_ran": true}
+{"db": "pg", "rep": 2, "new_event_create_and_migrate_s": 0.1977}
+{"db": "pg", "racers": 1000, "results": 4000, "rep": 2, "create_db_s": 0.055, "migrate_0001_to_head_s": 0.5554, "migrate_noop_s": 0.0359, "data_migration_ran": true}
+{"db": "pg", "rep": 2, "new_event_create_and_migrate_s": 0.2285}
+{"db": "pg", "racers": 100, "results": 400, "rep": 3, "create_db_s": 0.0553, "migrate_0001_to_head_s": 0.1226, "migrate_noop_s": 0.0401, "data_migration_ran": true}
+{"db": "pg", "rep": 3, "new_event_create_and_migrate_s": 0.1905}
+{"db": "pg", "racers": 1000, "results": 4000, "rep": 3, "create_db_s": 0.0422, "migrate_0001_to_head_s": 0.522, "migrate_noop_s": 0.0762, "data_migration_ran": true}
+{"db": "pg", "rep": 3, "new_event_create_and_migrate_s": 0.2191}
+{"db": "pg", "racers": 100, "results": 400, "rep": 4, "create_db_s": 0.0308, "migrate_0001_to_head_s": 0.1017, "migrate_noop_s": 0.0244, "data_migration_ran": true}
+{"db": "pg", "rep": 4, "new_event_create_and_migrate_s": 0.1211}
+{"db": "pg", "racers": 1000, "results": 4000, "rep": 4, "create_db_s": 0.0314, "migrate_0001_to_head_s": 0.2655, "migrate_noop_s": 0.0291, "data_migration_ran": true}
+{"db": "pg", "rep": 4, "new_event_create_and_migrate_s": 0.182}

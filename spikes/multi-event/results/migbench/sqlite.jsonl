@@ -1,0 +1,20 @@
+{"db": "sqlite", "racers": 100, "results": 400, "rep": 0, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.1211, "migrate_noop_s": 0.0131, "data_migration_ran": true}
+{"db": "sqlite", "rep": 0, "new_event_create_and_migrate_s": 0.0707}
+{"db": "sqlite", "racers": 1000, "results": 4000, "rep": 0, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.5253, "migrate_noop_s": 0.0181, "data_migration_ran": true}
+{"db": "sqlite", "rep": 0, "new_event_create_and_migrate_s": 0.0827}
+{"db": "sqlite", "racers": 100, "results": 400, "rep": 1, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.1053, "migrate_noop_s": 0.0142, "data_migration_ran": true}
+{"db": "sqlite", "rep": 1, "new_event_create_and_migrate_s": 0.076}
+{"db": "sqlite", "racers": 1000, "results": 4000, "rep": 1, "create_db_s": 0.0003, "migrate_0001_to_head_s": 0.5583, "migrate_noop_s": 0.0132, "data_migration_ran": true}
+{"db": "sqlite", "rep": 1, "new_event_create_and_migrate_s": 0.0829}
+{"db": "sqlite", "racers": 100, "results": 400, "rep": 2, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.137, "migrate_noop_s": 0.02, "data_migration_ran": true}
+{"db": "sqlite", "rep": 2, "new_event_create_and_migrate_s": 0.1014}
+{"db": "sqlite", "racers": 1000, "results": 4000, "rep": 2, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.5757, "migrate_noop_s": 0.0177, "data_migration_ran": true}
+{"db": "sqlite", "rep": 2, "new_event_create_and_migrate_s": 0.066}
+{"db": "sqlite", "racers": 100, "results": 400, "rep": 3, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.1271, "migrate_noop_s": 0.0192, "data_migration_ran": true}
+{"db": "sqlite", "rep": 3, "new_event_create_and_migrate_s": 0.0801}
+{"db": "sqlite", "racers": 1000, "results": 4000, "rep": 3, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.5241, "migrate_noop_s": 0.0162, "data_migration_ran": true}
+{"db": "sqlite", "rep": 3, "new_event_create_and_migrate_s": 0.0647}
+{"db": "sqlite", "racers": 100, "results": 400, "rep": 4, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.0991, "migrate_noop_s": 0.0129, "data_migration_ran": true}
+{"db": "sqlite", "rep": 4, "new_event_create_and_migrate_s": 0.0748}
+{"db": "sqlite", "racers": 1000, "results": 4000, "rep": 4, "create_db_s": 0.0001, "migrate_0001_to_head_s": 0.5383, "migrate_noop_s": 0.0164, "data_migration_ran": true}
+{"db": "sqlite", "rep": 4, "new_event_create_and_migrate_s": 0.0708}

@@ -1,0 +1,2 @@
+      4 django.db.utils.OperationalError: table "eventapp_award" already exists
+      4 sqlite3.OperationalError: table "eventapp_award" already exists

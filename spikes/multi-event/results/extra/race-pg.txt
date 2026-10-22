@@ -1,0 +1,5 @@
+200 200 old1 kiosk now serves old1
+500 200 old2 kiosk now serves old2
+500 200 old3 kiosk now serves old3
+500 200 old4 kiosk now serves old4
+500 200 old5 kiosk now serves old5

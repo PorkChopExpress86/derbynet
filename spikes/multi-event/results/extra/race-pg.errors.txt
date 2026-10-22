@@ -1,0 +1,2 @@
+      4 django.db.utils.ProgrammingError: column "note" of relation "eventapp_racer" already exists
+      4 psycopg.errors.DuplicateColumn: column "note" of relation "eventapp_racer" already exists
