@@ -29,6 +29,10 @@ curl_postj action.php "action=award.edit&awardid=2&ballot_depth=0" | check_jsucc
 curl_postj action.php "action=award.edit&awardid=3&sort=2&ballot_depth=2" | check_jsuccess
 curl_postj action.php "action=award.edit&awardid=4&sort=3&ballot_depth=1" | check_jsuccess
 
+# A voter asks for the ballot (with the ballot password, which is empty) before
+# casting votes
+curl_getj "action.php?query=ballot.get&password=" | jq -e 'has("ballot")' >/dev/null || test_fails
+
 # Voting not yet open
 curl_postj action.php "action=vote.cast&awardid=3&votes=[12,36]" | check_jfailure
 
@@ -44,7 +48,11 @@ curl_postj action.php "action=vote.cast&awardid=4&votes=[12,13]" | check_jfailur
 # Delete the session cookie in order to change voters
 rm $COOKIES_CURL
 
+curl_getj "action.php?query=ballot.get&password=" | jq -e 'has("ballot")' >/dev/null || test_fails
 curl_postj action.php "action=vote.cast&awardid=3&votes=[19,37]" | check_jsuccess
+
+# Only the coordinator can see the results
+user_login_coordinator
 
 curl_getj "action.php?query=ballot.results" | \
     jq '.awards | .[].candidates | .[] | select(.score == 2).firstname' | \

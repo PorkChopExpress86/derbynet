@@ -22,6 +22,15 @@
 # through the web server, we have to know or assume what the directory structure
 # is.
 
+# PHP only.  This script runs only on the server's own machine, and it moves PHP's
+# configuration files (local/ and config-database.inc) around to check the
+# set-up pages, so it can't run against another server.  The suite for a Django
+# server sets DERBYNET_BACKEND=django, which skips it.
+if [ "$DERBYNET_BACKEND" = django ] ; then
+    echo "Skipping test-ab-initio-setup.sh: it moves the PHP server's configuration files on the server's own machine, so it only runs against the PHP server."
+    exit 0
+fi
+
 BASE_URL=$1
 set -e -E -o pipefail
 source `dirname $0`/common.sh

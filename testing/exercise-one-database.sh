@@ -148,6 +148,9 @@ run_tests() {
     # Resets database
     `dirname $0`/test-balloting.sh "$BASE_URL"
 
+    # test-balloting.sh deleted the cookie jar, and a snapshot is for the coordinator
+    user_login_coordinator
+
     SNAPSHOT=$(mktemp /tmp/derby-snapshot.xml.XXXXX)
     echo Taking snapshot in $SNAPSHOT
     curl_get_xml "action.php?query=snapshot.get" > $SNAPSHOT
