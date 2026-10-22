@@ -28,6 +28,10 @@ reset_database
 run_script import-roster.sh
 record_script suite/den-changes-basic "" 1 test-den-changes.sh
 run_script test-each-role.sh
+# test-basic-racing.sh expects a replay client that polled within the last ten
+# seconds, and test-each-role.sh made the last such poll.  Poll again now, so a
+# slow machine does not push the expected "HELLO" into the next command list.
+curl_postj action.php "action=replay.message&status=-1&finished-replay=0" >/dev/null
 record_script suite/basic-racing "replay.message,heat.rerun,heat.reinstate" 0 test-basic-racing.sh
 run_script test-awards.sh basic
 standings_matrix standings/suite-basic-racing-and-awards

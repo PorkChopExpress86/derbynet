@@ -31,7 +31,8 @@ OUTDIR="$(cd "$OUTDIR" && pwd)"
 BASE_URL="${BASE_URL:-http://localhost}"
 RECORDER_PORT=8081
 RAW="$(mktemp -d /tmp/golden-raw.XXXXXX)"
-trap 'kill $RECORDER_PID 2>/dev/null || true; rm -rf "$RAW"' EXIT
+# GOLDEN_KEEP_RAW=<dir> keeps the raw, unnormalized transcripts there, to debug a rule.
+trap 'kill $RECORDER_PID 2>/dev/null || true; [ -z "$GOLDEN_KEEP_RAW" ] || cp -r "$RAW/." "$GOLDEN_KEEP_RAW/"; rm -rf "$RAW"' EXIT
 
 export NOANNOUNCE=1
 export PASSWORDS_FILE="$ROOT/testing/default.passwords"

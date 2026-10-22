@@ -36,10 +36,34 @@ export const RULES = [
   },
   {
     id: 'timer-contact-age',
-    doc: 'The seconds since the last contact in the timer message "CONNECTED (N sec.)", and the "age" of a kiosk.',
+    doc: 'The seconds since the last contact in a state message such as "CONNECTED (5 sec.)" or "Ready (5 sec.)", which become "(<n> sec.)", and the "age" of a kiosk.',
     apply: (ex, text) => isJson(ex)
-      ? text.replace(/CONNECTED \(\d+ sec\.\)/g, 'CONNECTED (<n> sec.)').replace(/("age": )\d+/g, '$1"<seconds>"')
+      ? text.replace(/\(\d+ sec\.\)/g, '(<n> sec.)').replace(/("age": )\d+/g, '$1"<seconds>"')
       : text,
+  },
+  {
+    id: 'completed-timestamp',
+    doc: 'A "YYYY-MM-DD HH:MM:SS" string in a JSON body, which is when a heat result was written (RaceChart.completed), becomes "<timestamp>".',
+    apply: (ex, text) => isJson(ex)
+      ? text.replace(/"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d"/g, '"<timestamp>"')
+      : text,
+  },
+  {
+    id: 'export-results-order',
+    doc: 'The Results sheet of export-json.php lists heats ORDER BY completed, heat, lane, and completed has one-second resolution, so rows that finished in different seconds from run to run swap places.  The rows are sorted by class, round, heat, lane instead.',
+    apply: (ex, text) => {
+      if (!isJson(ex)) return text;
+      return text.replace(/("Results",\n {8}\[\n)([\s\S]*?)(\n {8}\]\n {4}\])/, (m, head, rows, tail) => {
+        const [header, ...data] = rows.split(/(?<=\n {12}\]),\n(?= {12}\[\n)/);
+        const key = (r) => JSON.parse(r);
+        data.sort((a, b) => {
+          const [x, y] = [key(a), key(b)];
+          for (const i of [0, 1, 2, 3]) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+          return 0;
+        });
+        return head + [header, ...data].join(',\n') + tail;
+      });
+    },
   },
   {
     id: 'award-duration',
@@ -54,12 +78,12 @@ export const RULES = [
 export const EXCHANGE_RULES = [
   {
     id: 'reschedule-timing',
-    doc: 'The seconds schedule.reschedule reports in "timing" and in the adjuster trace.  A search that hit its wall-clock deadline is not deterministic, so the capture stops instead of recording it; every other reschedule gets a "deterministic" note.',
+    doc: 'The seconds schedule.reschedule reports in "timing" and in the adjuster trace.  A search that hit its wall-clock deadline is not deterministic, so its exchange is left out and listed in a .omitted.txt beside the transcript; every other reschedule gets a "deterministic" note.',
     apply: (ex) => {
       if (!/(^|&)action=schedule\.reschedule(&|$)/.test(ex.requestBody ?? '') || !isJson(ex)) return ex;
       let text = ex.body.toString('utf8');
       if (/"run-\d+-timed-out"/.test(text)) {
-        throw new Error(`${ex.name}: the reschedule search ran into its deadline, so its result is not deterministic`);
+        return { omit: `${ex.name} (${ex.requestBody}): the search ran into its deadline, so its result is not deterministic` };
       }
       const mask = (block) => block.replace(/: \d+/g, ': "<seconds>"');
       text = text
@@ -80,7 +104,10 @@ export function normalizeExchange(ex) {
     for (const rule of RULES) text = rule.apply(ex, text);
     ex = { ...ex, body: Buffer.from(text, 'utf8') };
   }
-  for (const rule of EXCHANGE_RULES) ex = rule.apply(ex);
+  for (const rule of EXCHANGE_RULES) {
+    ex = rule.apply(ex);
+    if (ex.omit) return ex;
+  }
   return ex;
 }
 
@@ -112,7 +139,13 @@ function main(argv) {
   for (const file of walk(rawdir)) {
     const rel = path.relative(rawdir, file);
     if (file.endsWith('.http')) {
-      writeFile(path.join(outdir, rel), parse(fs.readFileSync(file)).map(normalizeExchange));
+      const all = parse(fs.readFileSync(file)).map(normalizeExchange);
+      const kept = all.filter((e) => !e.omit);
+      writeFile(path.join(outdir, rel), kept);
+      if (kept.length < all.length) {
+        const omitted = all.filter((e) => e.omit).map((e) => `${e.omit}\n`).join('');
+        fs.writeFileSync(path.join(outdir, rel.replace(/\.http$/, '.omitted.txt')), omitted);
+      }
     } else {
       fs.mkdirSync(path.dirname(path.join(outdir, rel)), { recursive: true });
       fs.copyFileSync(file, path.join(outdir, rel));

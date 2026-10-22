@@ -3,8 +3,13 @@
 # the race moves along.  The queue only fills while a client has polled within
 # the last ten seconds.
 
-use_session coord
+# The replay queue can live in a file that a database reset does not empty, so
+# earlier scenarios may have left commands in it.  Drain it, then reset again so
+# the first poll below is the first replay contact.
 reset_database
+curl_postj action.php "action=replay.message&status=0&finished-replay=0" >/dev/null
+reset_database
+use_session coord
 user_login_coordinator
 use_session timer
 user_login_timer
