@@ -82,6 +82,12 @@ render or number:
 - `check-no-literal-ids.sh` fails when a script contains a literal ID.  An
   exception goes in `check-no-literal-ids.allowlist`, with its reason.
 
+The suite also runs with the IDs shifted.  `DERBYNET_SHIFT_IDS=1
+testing/docker/run-suite.sh` makes the server's SQLite tables never reuse an ID,
+the way Django's don't, and creates and deletes throwaway rows after every
+database reset (`shift-ids.sh`), so that nothing created in the suite gets its
+usual ID.
+
 `test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
 
 ## macOS

@@ -11,6 +11,8 @@
 #   assets   Build the gitignored files the PHP pages need (banner.inc, timer.php, ...)
 #   server   Build the server image from installer/docker/Dockerfile and start it
 #   timeout  Raise the PHP and nginx timeouts, for test-extended-scheduling.sh
+#   autoincrement
+#            Make the server's SQLite tables never reuse an ID, as Django's don't
 #   suite    Run test-face-detection.sh, js-syntax-check.sh, exercise-one-database.sh
 #   logs     Print the server container's log
 #   clean    Remove the server container and its data volume
@@ -21,6 +23,11 @@
 # container, and volume, so concurrent users of one Docker daemon don't collide.
 # DERBYNET_TEST_PORT, if set, also publishes the server on that port of localhost,
 # for running individual test scripts from the host.
+#
+# DERBYNET_SHIFT_IDS, if set, makes the "suite" step shift the IDs that the
+# database hands out, by creating and deleting throwaway rows after each database
+# reset (testing/shift-ids.sh).  Run the "autoincrement" step too, or the IDs
+# that SQLite reuses won't shift.  "all" runs it when DERBYNET_SHIFT_IDS is set.
 
 set -e -E -o pipefail
 
@@ -35,7 +42,7 @@ VOLUME="$PREFIX-data"
 # URL http://localhost exactly as it does on a developer machine.  It runs as the
 # invoking user so the files it writes in the checkout aren't owned by root.
 harness_run() {
-  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e DERBYNET_SHIFT_IDS \
          -v "$ROOT:/derbynet" "$@"
 }
 
@@ -87,6 +94,18 @@ step_timeout() {
   docker exec "$SERVER" set-timeout.sh
 }
 
+step_autoincrement() {
+  # PHP's SQLite tables declare "INTEGER PRIMARY KEY", which reuses the ID of a
+  # deleted last row.  With AUTOINCREMENT an ID is never handed out twice, which
+  # is how Django's tables behave (ADR-12).  The tables are created from these
+  # scripts, so change them before the suite creates the database.  A line that
+  # already says AUTOINCREMENT stays as it is, so the step can run twice.
+  docker exec "$SERVER" sh -c \
+         "sed -i '/AUTOINCREMENT/! s/INTEGER PRIMARY KEY/INTEGER PRIMARY KEY AUTOINCREMENT/' /var/www/html/sql/sqlite/*.inc"
+  # php-fpm may have the scripts cached.  See set-timeout.sh about the signal.
+  docker exec "$SERVER" pkill -USR2 -f 'php-fpm.*master process'
+}
+
 step_suite() {
   # test-face-detection.sh needs the PHP CLI, which only the server image has.
   # It runs first so that the log ends with the output of the main suite.
@@ -120,6 +139,7 @@ step_all() {
   step_assets
   step_server
   step_timeout
+  [ -z "$DERBYNET_SHIFT_IDS" ] || step_autoincrement
   step_suite
 }
 
@@ -128,7 +148,7 @@ if [ $# -eq 0 ]; then
 fi
 for step in "$@"; do
   case "$step" in
-    harness|assets|server|timeout|suite|logs|clean|all) "step_$step" ;;
+    harness|assets|server|timeout|autoincrement|suite|logs|clean|all) "step_$step" ;;
     *) echo "Unknown step: $step" >&2; exit 2 ;;
   esac
 done

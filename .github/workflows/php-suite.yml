@@ -3,6 +3,10 @@ name: php-suite
 # Runs the shell test suite in testing/ against the PHP server image built from
 # this commit.  Every step is a step of testing/docker/run-suite.sh, so a
 # developer can run the same thing locally; see testing/README.md.
+#
+# The suite runs twice.  The second run makes the server's SQLite tables never
+# reuse an ID and shifts the IDs that the database hands out, as Django's would,
+# so a test that depends on an ID fails there.
 
 on:
   push:
@@ -12,8 +16,19 @@ on:
 
 jobs:
   php-suite:
+    name: php-suite (${{ matrix.ids }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ids: fresh IDs
+            shift: ''
+          - ids: shifted IDs
+            shift: '1'
+    env:
+      DERBYNET_SHIFT_IDS: ${{ matrix.shift }}
     steps:
       - uses: actions/checkout@v7
 
@@ -32,6 +47,10 @@ jobs:
       - name: Raise PHP and nginx timeouts
         run: testing/docker/run-suite.sh timeout
 
+      - name: Make the SQLite tables never reuse an ID
+        if: matrix.shift != ''
+        run: testing/docker/run-suite.sh autoincrement
+
       - name: Run the test suite
         run: testing/docker/run-suite.sh suite
 
@@ -43,7 +62,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: suite-output
+          name: suite-output-${{ matrix.shift == '' && 'fresh-ids' || 'shifted-ids' }}
           path: |
             testing/output.curl
             testing/debug.curl
