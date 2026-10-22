@@ -72,7 +72,7 @@ run_tests() {
     `dirname $0`/test-scenes.sh "$BASE_URL"
 
     `dirname $0`/test-photo-manipulations.sh "$BASE_URL"
-    `dirname $0`/test-photo-assignments.sh "$BASE_URL"
+    `dirname $0`/test-photo-assignments.sh "$BASE_URL" basic
     `dirname $0`/test-slide-next.sh "$BASE_URL"
 
     `dirname $0`/test-racer-query.sh "$BASE_URL"
@@ -109,7 +109,9 @@ run_tests() {
     `dirname $0`/test-messaging.sh "$BASE_URL"
 
 ############################## Racing Groups and Partitions ##############################
-    RESET_SOURCE=ex1 `dirname $0`/reset-database.sh "$BASE_URL"
+    # checkin-empty-test.js reads the partition's ID from the page (#div-1), and
+    # the Puppeteer tests are outside the shifted-ID run, so this reset doesn't shift
+    DERBYNET_SHIFT_IDS= RESET_SOURCE=ex1 `dirname $0`/reset-database.sh "$BASE_URL"
     puppeteer_test checkin-empty-test.js
 
     # Resets database
@@ -128,7 +130,7 @@ run_tests() {
     `dirname $0`/test-new-rounds.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
     `dirname $0`/test-photo-manipulations.sh "$BASE_URL"
-    `dirname $0`/test-photo-assignments.sh "$BASE_URL"
+    `dirname $0`/test-photo-assignments.sh "$BASE_URL" master
     `dirname $0`/test-photo-upload.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
 
@@ -148,9 +150,12 @@ run_tests() {
     # Resets database
     `dirname $0`/test-balloting.sh "$BASE_URL"
 
+    # test-balloting.sh deleted the cookie jar, and a snapshot is for the coordinator
+    user_login_coordinator
+
     SNAPSHOT=$(mktemp /tmp/derby-snapshot.xml.XXXXX)
     echo Taking snapshot in $SNAPSHOT
-    curl_get "action.php?query=snapshot.get" > $SNAPSHOT
+    curl_get_xml "action.php?query=snapshot.get" > $SNAPSHOT
 
     # Resets database
     `dirname $0`/test-import-results.sh "$BASE_URL"

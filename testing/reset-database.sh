@@ -36,3 +36,9 @@ if [ "$LOG_DIR" ] ; then
     curl_postj action.php "action=settings.write&log-dir=$LOG_DIR" | check_jsuccess
 fi
 
+
+# Shift the IDs that the next racers, classes, rounds and awards get, to check that
+# nothing depends on them.  See shift-ids.sh.
+if [ -n "$DERBYNET_SHIFT_IDS" ] ; then
+    `dirname $0`/shift-ids.sh "$BASE_URL"
+fi
