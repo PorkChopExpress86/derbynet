@@ -90,7 +90,10 @@ step_timeout() {
 step_suite() {
   # test-face-detection.sh needs the PHP CLI, which only the server image has.
   # It runs first so that the log ends with the output of the main suite.
-  docker exec "$SERVER" mkdir -p /tmp/derbynet
+  # Start from nothing, so that a second run doesn't nest a copy of testing/
+  # inside the first one's.
+  docker exec "$SERVER" rm -rf /tmp/derbynet
+  docker exec "$SERVER" mkdir /tmp/derbynet
   docker cp "$ROOT/testing" "$SERVER:/tmp/derbynet/testing"
   docker exec "$SERVER" ln -s /var/www/html /tmp/derbynet/website
   docker exec "$SERVER" bash /tmp/derbynet/testing/test-face-detection.sh
