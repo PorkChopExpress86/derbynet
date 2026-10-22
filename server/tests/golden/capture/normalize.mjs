@@ -74,16 +74,48 @@ export const RULES = [
   },
 ];
 
+// A schedule.reschedule search runs once per run per lane, each with a deadline
+// of intdiv(INJECTION_TIME_LIMIT, n_runs_per_lane) seconds, and stops at it only
+// once time() > deadline, which is more than that many seconds after it began
+// (website/ajax/action.schedule.reschedule.inc).  The response cannot say whether
+// that happened: "run-N-timed-out" is also set when a search stops on a perfect
+// score, and the seconds it reports are whole.  The request's wall time bounds
+// every search in it, so an exchange is kept only when its wall time is under
+// 1/DEADLINE_MARGIN of the per-run deadline: a machine DEADLINE_MARGIN times
+// slower still ends every search before its deadline.  An omitted reschedule
+// that was not a dry run wrote the schedule every later one starts from, so
+// main() omits the rest of that transcript too.
+const INJECTION_TIME_LIMIT = 10;
+const DEADLINE_MARGIN = 2;
+
+function rescheduleRunLimit(json) {
+  const runs = Object.keys(json.timing?.internal ?? {})
+    .map((k) => /^run-(\d+)-/.exec(k)).filter(Boolean).map((m) => Number(m[1]));
+  const nRuns = json.adjuster?.n_runs_per_lane ?? (runs.length ? Math.max(...runs) + 1 : null);
+  return nRuns === null ? null : Math.trunc(INJECTION_TIME_LIMIT / nRuns);
+}
+
 // Rules that look at a whole exchange, not just its body, and can add notes.
 export const EXCHANGE_RULES = [
   {
     id: 'reschedule-timing',
-    doc: 'The seconds schedule.reschedule reports in "timing" and in the adjuster trace.  A search that hit its wall-clock deadline is not deterministic, so its exchange is left out and listed in a .omitted.txt beside the transcript; every other reschedule gets a "deterministic" note.',
+    doc: 'The seconds schedule.reschedule reports in "timing" and in the adjuster trace.  A reschedule whose request took half its search deadline or longer could be cut off by the deadline on a slower machine, so its exchange, and every later exchange in the transcript if it changed the schedule, is left out and listed in a .omitted.txt beside the transcript; every other reschedule gets a "deterministic" note.',
     apply: (ex) => {
       if (!/(^|&)action=schedule\.reschedule(&|$)/.test(ex.requestBody ?? '') || !isJson(ex)) return ex;
       let text = ex.body.toString('utf8');
-      if (/"run-\d+-timed-out"/.test(text)) {
-        return { omit: `${ex.name} (${ex.requestBody}): the search ran into its deadline, so its result is not deterministic` };
+      if (ex.elapsedMs === undefined) throw new Error(`${ex.name}: a schedule.reschedule exchange has no elapsed-ms`);
+      const json = JSON.parse(text);
+      const limit = rescheduleRunLimit(json);
+      if (limit === null) throw new Error(`${ex.name}: cannot tell the search deadline from the response`);
+      const flagged = Object.keys(json.timing?.internal ?? {}).filter((k) => /^run-\d+-timed-out$/.test(k));
+      const kept = ex.elapsedMs * DEADLINE_MARGIN < limit * 1000;
+      console.error(`reschedule ${ex.name}: ${ex.elapsedMs} ms, ${limit} s deadline per run, ` +
+                    `${flagged.length ? flagged.join(' ') : 'no timed-out flag'}: ${kept ? 'kept' : 'omitted'}`);
+      if (!kept) {
+        return {
+          omit: `${ex.name} (${ex.requestBody}): the request took ${limit / DEADLINE_MARGIN} s or longer, 1/${DEADLINE_MARGIN} of its ${limit} s search deadline, so a slower machine could cut the search off`,
+          changedState: !/(^|&)dry-run=1(&|$)/.test(ex.requestBody),
+        };
       }
       const mask = (block) => block.replace(/: \d+/g, ': "<seconds>"');
       text = text
@@ -93,7 +125,7 @@ export const EXCHANGE_RULES = [
       // to 900 KB.  Keep its SHA-256 and size, and everything else in full.
       text = text.replace(/\n    "adjuster": \{[\s\S]*?\n    \}(,?)/, (m, comma) =>
         `\n    "adjuster": "<sha256 ${crypto.createHash('sha256').update(m).digest('hex')} of ${Buffer.byteLength(m)} bytes>"${comma}`);
-      return { ...ex, body: Buffer.from(text, 'utf8'), notes: [...(ex.notes ?? []), 'deterministic: the search ended before its deadline'] };
+      return { ...ex, body: Buffer.from(text, 'utf8'), notes: [...(ex.notes ?? []), `deterministic: the request took under 1/${DEADLINE_MARGIN} of its ${limit} s search deadline`] };
     },
   },
 ];
@@ -108,7 +140,8 @@ export function normalizeExchange(ex) {
     ex = rule.apply(ex);
     if (ex.omit) return ex;
   }
-  return ex;
+  const { elapsedMs, ...kept } = ex;
+  return kept;
 }
 
 function* walk(dir) {
@@ -139,7 +172,13 @@ function main(argv) {
   for (const file of walk(rawdir)) {
     const rel = path.relative(rawdir, file);
     if (file.endsWith('.http')) {
-      const all = parse(fs.readFileSync(file)).map(normalizeExchange);
+      let changedBy = null;
+      const all = parse(fs.readFileSync(file)).map((ex) => {
+        if (changedBy) return { omit: `${ex.name} (${ex.requestBody ?? ex.request}): starts from the schedule that ${changedBy} wrote` };
+        const out = normalizeExchange(ex);
+        if (out.changedState) changedBy = ex.name;
+        return out;
+      });
       const kept = all.filter((e) => !e.omit);
       writeFile(path.join(outdir, rel), kept);
       if (kept.length < all.length) {

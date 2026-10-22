@@ -10,6 +10,7 @@
 //   content-type: <value>          (when present)
 //   location: <value>              (when present)
 //   note: <free text>              (zero or more)
+//   elapsed-ms: <milliseconds>     (raw transcripts only; normalize.mjs reads and drops it)
 //   length: <number of body bytes>
 //   body:
 //   <exactly that many bytes>
@@ -29,6 +30,7 @@ export function serialize(ex) {
   if (ex.contentType) head.push(`content-type: ${ex.contentType}`);
   if (ex.location) head.push(`location: ${ex.location}`);
   for (const n of ex.notes ?? []) head.push(`note: ${n}`);
+  if (ex.elapsedMs !== undefined) head.push(`elapsed-ms: ${ex.elapsedMs}`);
   head.push(`length: ${body.length}`, 'body:');
   return Buffer.concat([Buffer.from(head.join('\n') + '\n', 'utf8'), body, Buffer.from('\n')]);
 }
@@ -56,6 +58,7 @@ export function parse(buf) {
         case 'content-type:': ex.contentType = value; break;
         case 'location:': ex.location = value; break;
         case 'note:': ex.notes.push(value); break;
+        case 'elapsed-ms:': ex.elapsedMs = Number(value); break;
         case 'length:': ex.length = Number(value); break;
         default: throw new Error(`unknown transcript key ${key}`);
       }

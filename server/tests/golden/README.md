@@ -102,13 +102,31 @@ Files, by directory (`find http -type f` lists them all):
 | `last-contact` | A non-zero `"last-contact"` or `"last_contact"` (timer, replay or kiosk contact, epoch seconds) becomes `"<epoch>"`. |
 | `timer-contact-age` | `CONNECTED (N sec.)` becomes `CONNECTED (<n> sec.)`, and a kiosk `"age"` becomes `"<seconds>"`. |
 | `award-duration` | The `"duration"` in `query=award.current` becomes `"<seconds>"`. |
-| `reschedule-timing` | The seconds in `schedule.reschedule`'s `"timing"` and trace become `"<seconds>"`, and the exchange gets a `note: deterministic` line. If a search hit its deadline the capture stops instead of recording it, because that result is not deterministic. |
+| `reschedule-timing` | The seconds in `schedule.reschedule`'s `"timing"` and trace become `"<seconds>"`, and the exchange gets a `note: deterministic` line. A reschedule whose request took half its search deadline or longer is left out and listed in a `.omitted.txt`, and so is every later exchange in that transcript when the omitted one changed the schedule. See [Reschedules](#reschedules). |
 | `completed-timestamp` | A `"YYYY-MM-DD HH:MM:SS"` string in a JSON body (when a heat result was written, `RaceChart.completed`) becomes `"<timestamp>"`. |
 | `export-results-order` | The Results sheet of `export-json.php` is listed `ORDER BY completed, heat, lane`, and `completed` has one-second resolution, so rows swap places from run to run. The rows are sorted by class, round, heat, lane instead. |
 
 Values the capture does not need to mask because it never records them: session cookies (only `Set-Cookie`-independent fields, status, content type and `Location` are kept), other response headers, and photo bytes (issue #8).
 
 Fixed by construction: the server image sets `TZ=America/New_York`, so `RaceChart.completed` is a local-time string wherever it is captured. Race times come from a function of car number and lane, never from a clock.
+
+## Reschedules
+
+`ScheduleAdjuster` in `website/ajax/action.schedule.reschedule.inc` searches once per run per lane. Each search has a deadline of `intdiv(10, n_runs_per_lane)` seconds and stops once `time() > deadline`, so a search cut off by its deadline ran for more than that many seconds. A cut-off search returns the best proposal found so far, which depends on the machine.
+
+The response cannot show whether that happened. `"run-N-timed-out"` is also set when a search stops on a perfect score, and `"timing"` counts whole seconds. So the recording proxy measures each request's wall time, which bounds every search the request ran, and `normalize.mjs` keeps an exchange only when that time is under half the per-run deadline. Kept exchanges get the note `deterministic: the request took under 1/2 of its N s search deadline`. The capture log prints one `reschedule` line per exchange with its time in milliseconds, so a CI run shows how close each one came.
+
+An omitted reschedule that was not a dry run wrote the schedule that every later call in `test-reschedule.sh` starts from, so the rest of that transcript is left out too.
+
+On the capture machine (8 cores), the 50 calls in `test-reschedule.sh` took:
+
+| Exchanges | Wall time | Deadline | Kept |
+|---|---|---|---|
+| 001 to 044 | 59 ms to 2.1 s (the slowest are 016 to 021, which reschedule a whole round with `trace=1`, and 039) | 10 s, or 5 s for 010 to 015 | yes |
+| 045, the first 6-lane latecomer, not a dry run | 11.5 s, cut off by its deadline | 10 s | no |
+| 046 to 050 | under 1.1 s, but they start from the schedule 045 wrote | 10 s | no |
+
+The slowest kept exchange took 2.1 s of a 10 s deadline. A runner would have to be 2.4 times slower for it to cross the 5 s line and be omitted, which `--check` reports as a changed fixture, and 4.7 times slower for its search to reach the deadline. `http/suite/reschedule.omitted.txt` lists the omitted exchanges and why.
 
 ## Things the fixtures show about PHP
 
@@ -119,7 +137,7 @@ These are recorded as found and are not fixed here:
 - `schedule.generate` reports success when the schedule cannot be made (`cant-fulfill`), because `json_success()` overwrites the failure.
 - `action.php?query[]=poll` answers 500 with an empty body.
 - `timer-message` with `IDENTIFIED&nlanes=4` (what the suite sends) does not set the lane count, which the server reads from `lane_count`.
-- Four of the `schedule.reschedule` calls in `testing/test-reschedule.sh` run into their 10-second search deadline, so their results depend on how far the search got. They are left out of `http/suite/reschedule.http` and listed in `http/suite/reschedule.omitted.txt`.
+- `schedule.reschedule` reports `"run-N-timed-out": true` both when a search reached its deadline and when it stopped early on a perfect score (`$score == 0`, which a `null` score also passes). Exchanges 004, 009 and 010 of `http/suite/reschedule.http` carry the flag for the second reason.
 - A `FINISHED` for the wrong heat answers `<failure code='wrong-heat'>` and then `<success/>`.
 
 ## Adding a case

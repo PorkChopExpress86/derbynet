@@ -184,7 +184,9 @@ async function handle(req, res) {
   const headers = { ...req.headers };
   delete headers.host;
   headers.connection = 'close';
+  const started = performance.now();
   const up = await upstream(req.method, rest, { headers, body: body.length ? body : null });
+  const elapsedMs = Math.round(performance.now() - started);
 
   const relay = { ...up.headers };
   delete relay['transfer-encoding'];
@@ -201,6 +203,7 @@ async function handle(req, res) {
       name: `${String(++rec.seq).padStart(3, '0')} ${name ?? rest}`,
       request: `${req.method} ${rest.replace(/^\//, '')}`,
       status: up.status, contentType: up.headers['content-type'], location: up.headers.location, body: up.body,
+      elapsedMs,
     };
     if (req.method === 'POST') ex.requestBody = bodyText;
     rec.exchanges.push(ex);
