@@ -65,6 +65,9 @@ function expect_photo_shape() {
     [ "$actual" = "$2" ] || test_fails Photo $1 is "$actual", expected "$2"
 }
 
+command -v identify >/dev/null && command -v convert >/dev/null || \
+    test_fails test-photo-manipulations.sh needs ImageMagick identify and convert
+
 PHOTO_CURL="`dirname $0`/photo.curl"
 PATTERN_O6="`dirname $0`/data/carphotos/pattern-o6.jpg"
 
@@ -87,3 +90,6 @@ fi
 
 # The suite runs this script twice, and PHP renames a second upload of the same name.
 curl_postj action.php "action=photo.delete&repo=car&photo=pattern-o6.jpg" | check_jsuccess
+# photo.delete succeeds even when it deletes nothing, so check the file is gone.
+[ $(curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/photo.php/car/file/original/pattern-o6.jpg/$RANDOM | wc -c) -lt 1000 ] || \
+    test_fails pattern-o6.jpg is still served after photo.delete
