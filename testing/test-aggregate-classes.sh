@@ -93,21 +93,53 @@ test "`xmllint --xpath "//option[@value='st-q7']/text()" $TMP_STANDINGS`" = "You
 test "`xmllint --xpath "//div[@class='st-q7']/ancestor::tr/td[3]" $TMP_STANDINGS | tr -d "\n"`" \
      = "<td>Edgardo Easterwood</td><td>Pat Petrone</td><td>Adolfo \"Dolf\" Asher</td><td>Felton Fouche</td><td>Carroll Cybulski</td><td>Ben Bittinger</td><td>Danial Depaolo</td><td>Kelvin Knapp</td><td>Darrell &amp; Darrell Delaughter</td><td>Levi Lahr</td><td>Tracey Trapp</td><td>Lewis Levitsky</td><td>Kelvin Kinman</td><td>Owen O'Leary</td><td>Michal Melendrez</td><td>Angelo Alas</td><td>Willard Woolfolk</td><td>Ian Ives</td><td>Blake Burling</td><td>Freddie Font</td><td>Toby Teed</td><td>Mohamed McGrew</td><td>Raymon Ruffner</td><td>Jesse Jara</td><td>Josh Jose</td><td>Dexter Dawes</td><td>Renaldo Raposo</td><td>Christoper Chauncey</td><td>Herb Halfacre</td><td>Royce Rohman</td><td>Elliot Eastman</td><td>Rodrigo Rencher</td><td>Willard Wile</td><td>Derick Dreier</td>" || test_fails Younger class rankings
 
+# The same facts from the workbook that export-json.php serves
+EXPECTED=$(cat <<'EOF'
+["Edgardo Easterwood", "Pat Petrone", "Adolfo \"Dolf\" Asher", "Felton Fouche", "Carroll Cybulski", "Ben Bittinger", "Danial Depaolo", "Kelvin Knapp", "Darrell & Darrell Delaughter", "Levi Lahr", "Tracey Trapp", "Lewis Levitsky", "Kelvin Kinman", "Owen O'Leary", "Michal Melendrez", "Angelo Alas", "Willard Woolfolk", "Ian Ives", "Blake Burling", "Freddie Font", "Toby Teed", "Mohamed McGrew", "Raymon Ruffner", "Jesse Jara", "Josh Jose", "Dexter Dawes", "Renaldo Raposo", "Christoper Chauncey", "Herb Halfacre", "Royce Rohman", "Elliot Eastman", "Rodrigo Rencher", "Willard Wile", "Derick Dreier"]
+EOF
+)
+standings_sheet "Younger" | jq -e --argjson e "$EXPECTED" 'map(.Name) == $e' >/dev/null || \
+    test_fails Younger class rankings by export-json
+
 
 test "`xmllint --xpath "//option[@value='st-q8']/text()" $TMP_STANDINGS`" = "Older" || test_fails Older option
 
 test "`xmllint --xpath "//div[@class='st-q8']/ancestor::tr/td[3]" $TMP_STANDINGS | tr -d "\n"`" \
      = "<td>Rex Rosalez</td><td>Derek Dantonio</td><td>Denny Deering</td><td>Nelson No</td><td>Sean Strasburg</td><td>Pete Pinkney</td><td>Julian Jarrard</td><td>Darrin Denny</td><td>Lanny Lavigne</td><td>Travis Toothaker</td><td>Byron Billy</td><td>Freeman Fizer</td><td>Harley Howell</td><td>Judson Joynt</td><td>Jamison Jeffress</td><td>Jackson Juliano</td><td>Norbert Nightingale</td><td>Earnest Evangelista</td><td>Emory Ertel</td><td>Barney Bainter</td><td>Cletus Creager</td><td>Ethan Enye</td><td>Robbie Roush</td><td>Gregg Grove</td><td>Bruce Boissonneault</td><td>Markus Muncy</td><td>Vincent Vinci</td><td>Weston Whigham</td><td>Dorian Dunkle</td><td>Arden Aziz</td><td>Jed Jaquez</td><td>Kris Kaba</td><td>Philip Prum</td><td>Marlon McGray</td><td>Numbers Nish</td><td>Juan Jacobsen</td><td>Reuben Rockhill</td><td>Porter Papke</td><td>Enoch Eccles</td><td>Domingo Doles</td><td>Lyman Liller</td><td>Carey Craney</td><td>Scottie Servais</td><td>Timmy Tomei</td><td>Clark Chesnutt</td><td>Kory Kilgo</td><td>Antoine Akiyama</td><td>Cañumil Calero</td>" || test_fails Older class rankings
 
+# The same facts from the workbook that export-json.php serves
+EXPECTED=$(cat <<'EOF'
+["Rex Rosalez", "Derek Dantonio", "Denny Deering", "Nelson No", "Sean Strasburg", "Pete Pinkney", "Julian Jarrard", "Darrin Denny", "Lanny Lavigne", "Travis Toothaker", "Byron Billy", "Freeman Fizer", "Harley Howell", "Judson Joynt", "Jamison Jeffress", "Jackson Juliano", "Norbert Nightingale", "Earnest Evangelista", "Emory Ertel", "Barney Bainter", "Cletus Creager", "Ethan Enye", "Robbie Roush", "Gregg Grove", "Bruce Boissonneault", "Markus Muncy", "Vincent Vinci", "Weston Whigham", "Dorian Dunkle", "Arden Aziz", "Jed Jaquez", "Kris Kaba", "Philip Prum", "Marlon McGray", "Numbers Nish", "Juan Jacobsen", "Reuben Rockhill", "Porter Papke", "Enoch Eccles", "Domingo Doles", "Lyman Liller", "Carey Craney", "Scottie Servais", "Timmy Tomei", "Clark Chesnutt", "Kory Kilgo", "Antoine Akiyama", "Cañumil Calero"]
+EOF
+)
+standings_sheet "Older" | jq -e --argjson e "$EXPECTED" 'map(.Name) == $e' >/dev/null || \
+    test_fails Older class rankings by export-json
+
 test "`xmllint --xpath "//option[@value='st-q9']/text()" $TMP_STANDINGS`" = "Scouts" || test_fails Scouts option
 
 test "`xmllint --xpath "//div[@class='st-q9']/ancestor::tr/td[3]" $TMP_STANDINGS | tr -d "\n"`" \
      = "<td>Rex Rosalez</td><td>Derek Dantonio</td><td>Denny Deering</td><td>Edgardo Easterwood</td><td>Pat Petrone</td><td>Nelson No</td><td>Adolfo \"Dolf\" Asher</td><td>Sean Strasburg</td><td>Pete Pinkney</td><td>Felton Fouche</td><td>Carroll Cybulski</td><td>Julian Jarrard</td><td>Darrin Denny</td><td>Ben Bittinger</td><td>Danial Depaolo</td><td>Kelvin Knapp</td><td>Lanny Lavigne</td><td>Travis Toothaker</td><td>Darrell &amp; Darrell Delaughter</td><td>Levi Lahr</td><td>Tracey Trapp</td><td>Byron Billy</td><td>Freeman Fizer</td><td>Harley Howell</td><td>Lewis Levitsky</td><td>Judson Joynt</td><td>Jamison Jeffress</td><td>Jackson Juliano</td><td>Norbert Nightingale</td><td>Earnest Evangelista</td><td>Emory Ertel</td><td>Kelvin Kinman</td><td>Barney Bainter</td><td>Cletus Creager</td><td>Ethan Enye</td><td>Robbie Roush</td><td>Owen O'Leary</td><td>Gregg Grove</td><td>Bruce Boissonneault</td><td>Markus Muncy</td><td>Vincent Vinci</td><td>Michal Melendrez</td><td>Weston Whigham</td><td>Dorian Dunkle</td><td>Arden Aziz</td><td>Jed Jaquez</td><td>Kris Kaba</td><td>Angelo Alas</td><td>Willard Woolfolk</td><td>Ian Ives</td><td>Philip Prum</td><td>Marlon McGray</td><td>Blake Burling</td><td>Freddie Font</td><td>Numbers Nish</td><td>Toby Teed</td><td>Mohamed McGrew</td><td>Juan Jacobsen</td><td>Reuben Rockhill</td><td>Raymon Ruffner</td><td>Porter Papke</td><td>Jesse Jara</td><td>Enoch Eccles</td><td>Josh Jose</td><td>Dexter Dawes</td><td>Domingo Doles</td><td>Renaldo Raposo</td><td>Lyman Liller</td><td>Christoper Chauncey</td><td>Carey Craney</td><td>Herb Halfacre</td><td>Scottie Servais</td><td>Royce Rohman</td><td>Elliot Eastman</td><td>Timmy Tomei</td><td>Rodrigo Rencher</td><td>Clark Chesnutt</td><td>Kory Kilgo</td><td>Antoine Akiyama</td><td>Cañumil Calero</td><td>Willard Wile</td><td>Derick Dreier</td>" || test_fails Scouts class rankings
 
+# The same facts from the workbook that export-json.php serves
+EXPECTED=$(cat <<'EOF'
+["Rex Rosalez", "Derek Dantonio", "Denny Deering", "Edgardo Easterwood", "Pat Petrone", "Nelson No", "Adolfo \"Dolf\" Asher", "Sean Strasburg", "Pete Pinkney", "Felton Fouche", "Carroll Cybulski", "Julian Jarrard", "Darrin Denny", "Ben Bittinger", "Danial Depaolo", "Kelvin Knapp", "Lanny Lavigne", "Travis Toothaker", "Darrell & Darrell Delaughter", "Levi Lahr", "Tracey Trapp", "Byron Billy", "Freeman Fizer", "Harley Howell", "Lewis Levitsky", "Judson Joynt", "Jamison Jeffress", "Jackson Juliano", "Norbert Nightingale", "Earnest Evangelista", "Emory Ertel", "Kelvin Kinman", "Barney Bainter", "Cletus Creager", "Ethan Enye", "Robbie Roush", "Owen O'Leary", "Gregg Grove", "Bruce Boissonneault", "Markus Muncy", "Vincent Vinci", "Michal Melendrez", "Weston Whigham", "Dorian Dunkle", "Arden Aziz", "Jed Jaquez", "Kris Kaba", "Angelo Alas", "Willard Woolfolk", "Ian Ives", "Philip Prum", "Marlon McGray", "Blake Burling", "Freddie Font", "Numbers Nish", "Toby Teed", "Mohamed McGrew", "Juan Jacobsen", "Reuben Rockhill", "Raymon Ruffner", "Porter Papke", "Jesse Jara", "Enoch Eccles", "Josh Jose", "Dexter Dawes", "Domingo Doles", "Renaldo Raposo", "Lyman Liller", "Christoper Chauncey", "Carey Craney", "Herb Halfacre", "Scottie Servais", "Royce Rohman", "Elliot Eastman", "Timmy Tomei", "Rodrigo Rencher", "Clark Chesnutt", "Kory Kilgo", "Antoine Akiyama", "Cañumil Calero", "Willard Wile", "Derick Dreier"]
+EOF
+)
+standings_sheet "Scouts" | jq -e --argjson e "$EXPECTED" 'map(.Name) == $e' >/dev/null || \
+    test_fails Scouts class rankings by export-json
+
 test "`xmllint --xpath "//option[@value='st-q10']/text()" $TMP_STANDINGS`" = "Firsts and Families" || test_fails Firsts-and-Families option
 
 test "`xmllint --xpath "//div[@class='st-q10']/ancestor::tr/td[3]" $TMP_STANDINGS | tr -d "\n"`" \
      = "<td>Belle Starr</td><td>Pearl Hart</td><td>Sundance Kid</td><td>Sam Bass</td><td>Cherokee Bill</td><td>Apache Kid</td><td>Fred Waite</td><td>Hoodoo Brown</td><td>Billy Kid</td><td>John Wesley Hardin</td><td>Edgardo Easterwood</td><td>Adolfo \"Dolf\" Asher</td><td>Felton Fouche</td><td>Carroll Cybulski</td><td>Ben Bittinger</td><td>Danial Depaolo</td><td>Levi Lahr</td><td>Kelvin Kinman</td><td>Owen O'Leary</td><td>Michal Melendrez</td><td>Toby Teed</td><td>Raymon Ruffner</td><td>Jesse Jara</td><td>Herb Halfacre</td><td>Rodrigo Rencher</td><td>Willard Wile</td><td>Derick Dreier</td>" || test_fails Firsts-and-Families class rankings
+
+# The same facts from the workbook that export-json.php serves
+EXPECTED=$(cat <<'EOF'
+["Belle Starr", "Pearl Hart", "Sundance Kid", "Sam Bass", "Cherokee Bill", "Apache Kid", "Fred Waite", "Hoodoo Brown", "Billy Kid", "John Wesley Hardin", "Edgardo Easterwood", "Adolfo \"Dolf\" Asher", "Felton Fouche", "Carroll Cybulski", "Ben Bittinger", "Danial Depaolo", "Levi Lahr", "Kelvin Kinman", "Owen O'Leary", "Michal Melendrez", "Toby Teed", "Raymon Ruffner", "Jesse Jara", "Herb Halfacre", "Rodrigo Rencher", "Willard Wile", "Derick Dreier"]
+EOF
+)
+standings_sheet "Firsts and Families" | jq -e --argjson e "$EXPECTED" 'map(.Name) == $e' >/dev/null || \
+    test_fails Firsts-and-Families class rankings by export-json
 
 # Test generating a round from an aggregate class by subgroup
 RANK_FINAL=`mktemp`
