@@ -39,31 +39,31 @@ curl_postj action.php "action=racer.import&firstname=Sterling&lastname=Spalla&ca
 curl_postj action.php "action=racer.import&firstname=Delmar&lastname=Donnelly&carnumber=319&partition=Bears" | check_jsuccess
 curl_postj action.php "action=racer.import&firstname=Stanton&lastname=Salmon&carnumber=420&partition=Wolves" | check_jsuccess
 
-curl_postj action.php "action=racer.pass&value=1&racer=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=2" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=3" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=4" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=5" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=6" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=7" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=8" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=9" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=10" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=11" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=12" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=13" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=14" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=15" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=16" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=17" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=18" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=19" | check_jsuccess
-curl_postj action.php "action=racer.pass&value=1&racer=20" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 101)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 202)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 303)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 404)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 105)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 206)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 307)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 408)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 109)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 210)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 311)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 412)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 113)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 214)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 315)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 416)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 117)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 218)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 319)" | check_jsuccess
+curl_postj action.php "action=racer.pass&value=1&racer=$(racerid_of 420)" | check_jsuccess
 
 curl_postj action.php "action=settings.write&n-lanes=4" | check_jsuccess
-curl_postj action.php "action=schedule.generate&roundid=1" | check_jsuccess
+curl_postj action.php "action=schedule.generate&roundid=$(roundid_of "All Racers" 1)" | check_jsuccess
 
-curl_postj action.php "action=heat.select&roundid=1&now_racing=1" | check_jsuccess
+curl_postj action.php "action=heat.select&roundid=$(roundid_of "All Racers" 1)&now_racing=1" | check_jsuccess
 
 # Fast Lions    1.100
 # Slow Tigers   5.500
@@ -76,26 +76,27 @@ curl_post action.php "action=timer-message&message=HELLO" | check_success
 curl_post action.php "action=timer-message&message=IDENTIFIED&nlanes=4" | check_success
 cat $DEBUG_CURL | expect_one "<heat-ready[ />]"
 
-run_heat 1  1  101:1.010 303:2.503 117:1.170 408:2.508
-run_heat 1  2  202:5.502 404:2.504 218:5.518 109:1.09
-run_heat 1  3  303:2.503 105:1.050 319:2.519 210:5.510
-run_heat 1  4  404:2.504 206:5.506 420:3.020 311:3.011
-run_heat 1  5  105:1.050 307:2.507 101:1.010 412:3.012
-run_heat 1  6  113:1.130 315:3.015 109:1.090 420:3.020
-run_heat 1  7  412:3.012 214:5.514 408:2.508 319:2.519
-run_heat 1  8  311:3.011 113:1.130 307:2.507 218:5.518
-run_heat 1  9  214:5.514 416:3.016 210:5.510 101:1.01
-run_heat 1 10  315:3.015 117:1.170 311:3.011 202:5.502
-run_heat 1 11  416:3.016 218:5.518 412:3.012 303:2.503
-run_heat 1 12  206:5.506 408:2.508 202:5.502 113:1.13
-run_heat 1 13  307:2.507 109:1.090 303:2.503 214:5.514
-run_heat 1 14  408:2.508 210:5.510 404:2.504 315:3.015
-run_heat 1 15  109:1.090 311:3.011 105:1.050 416:3.016
-run_heat 1 16  210:5.510 412:3.012 206:5.506 117:1.17
-run_heat 1 17  218:5.518 420:3.020 214:5.514 105:1.05
-run_heat 1 18  117:1.170 319:2.519 113:1.130 404:2.504
-run_heat 1 19  420:3.020 202:5.502 416:3.016 307:2.507
-run_heat 1 20  319:2.519 101:1.010 315:3.015 206:5.506 x
+ROUND=$(roundid_of "All Racers" 1)
+run_heat $ROUND  1  101:1.010 303:2.503 117:1.170 408:2.508
+run_heat $ROUND  2  202:5.502 404:2.504 218:5.518 109:1.09
+run_heat $ROUND  3  303:2.503 105:1.050 319:2.519 210:5.510
+run_heat $ROUND  4  404:2.504 206:5.506 420:3.020 311:3.011
+run_heat $ROUND  5  105:1.050 307:2.507 101:1.010 412:3.012
+run_heat $ROUND  6  113:1.130 315:3.015 109:1.090 420:3.020
+run_heat $ROUND  7  412:3.012 214:5.514 408:2.508 319:2.519
+run_heat $ROUND  8  311:3.011 113:1.130 307:2.507 218:5.518
+run_heat $ROUND  9  214:5.514 416:3.016 210:5.510 101:1.01
+run_heat $ROUND 10  315:3.015 117:1.170 311:3.011 202:5.502
+run_heat $ROUND 11  416:3.016 218:5.518 412:3.012 303:2.503
+run_heat $ROUND 12  206:5.506 408:2.508 202:5.502 113:1.13
+run_heat $ROUND 13  307:2.507 109:1.090 303:2.503 214:5.514
+run_heat $ROUND 14  408:2.508 210:5.510 404:2.504 315:3.015
+run_heat $ROUND 15  109:1.090 311:3.011 105:1.050 416:3.016
+run_heat $ROUND 16  210:5.510 412:3.012 206:5.506 117:1.17
+run_heat $ROUND 17  218:5.518 420:3.020 214:5.514 105:1.05
+run_heat $ROUND 18  117:1.170 319:2.519 113:1.130 404:2.504
+run_heat $ROUND 19  420:3.020 202:5.502 416:3.016 307:2.507
+run_heat $ROUND 20  319:2.519 101:1.010 315:3.015 206:5.506 x
 
 
 # Standings by times:
@@ -140,16 +141,16 @@ curl_postj action.php "action=award.import&awardname=Most%20Tigerific&awardtype=
 curl_postj action.php "action=award.import&awardname=The%20Pack%20Design&awardtype=Design%20Trophy" | check_jsuccess
 curl_postj action.php "action=award.import&awardname=Bad%20Subgroup%20Name&awardtype=Design%20Trophy&subgroup=Typo" | check_jfailure
 
-curl_postj action.php "action=award.winner&awardid=1&racerid=2" | check_jfailure
-curl_postj action.php "action=award.winner&awardid=1&racerid=1" | check_jsuccess
+curl_postj action.php "action=award.winner&awardid=$(awardid_of "Most Lionic")&racerid=$(racerid_of 202)" | check_jfailure
+curl_postj action.php "action=award.winner&awardid=$(awardid_of "Most Lionic")&racerid=$(racerid_of 101)" | check_jsuccess
 
 curl_postj action.php "action=settings.write&n-rank-trophies=3" | check_jsuccess
 
-curl_postj action.php "action=award.present&key=speed-3-1-2" | check_jsuccess
+curl_postj action.php "action=award.present&key=speed-3-$(classid_of "All Racers")-$(rankid_of Tigers)" | check_jsuccess
 curl_getj "action.php?query=award.current" | expect_one '3rd Fastest in Tigers'
 curl_getj "action.php?query=award.current" | expect_one Thanh
 
-curl_postj action.php "action=award.present&key=speed-3-1" | check_jsuccess
+curl_postj action.php "action=award.present&key=speed-3-$(classid_of "All Racers")" | check_jsuccess
 curl_getj "action.php?query=award.current" | expect_one '3rd Fastest in All Racers'
 curl_getj "action.php?query=award.current" | expect_one Jefferys
 

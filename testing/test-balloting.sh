@@ -17,39 +17,37 @@ curl_postj action.php "action=award.import&awardname=Sore%20Loser&awardtype=Desi
 
 curl_postj action.php "action=award.import&awardname=Best%20Wolf&classname=White's%20Wolves&awardtype=Design%20Trophy" | check_jsuccess
 
+curl_postj action.php "action=award.edit&awardid=$(awardid_of "Best in Show")&sort=1&ballot_depth=3" | check_jsuccess
+curl_postj action.php "action=award.edit&awardid=$(awardid_of "Consolation Prize")&ballot_depth=3" | check_jsuccess
+curl_postj action.php "action=award.edit&awardid=$(awardid_of "Consolation Prize")&ballot_depth=0" | check_jsuccess
+curl_postj action.php "action=award.edit&awardid=$(awardid_of "Sore Loser")&sort=2&ballot_depth=2" | check_jsuccess
+curl_postj action.php "action=award.edit&awardid=$(awardid_of "Best Wolf")&sort=3&ballot_depth=1" | check_jsuccess
 
-# awardid 1 : Best in Show
-# awardid 2 : Consolation Prize
-# awardid 3 : Sore Loser
-# awardid 4 : Best Wolf
-
-curl_postj action.php "action=award.edit&awardid=1&sort=1&ballot_depth=3" | check_jsuccess
-curl_postj action.php "action=award.edit&awardid=2&ballot_depth=3" | check_jsuccess
-curl_postj action.php "action=award.edit&awardid=2&ballot_depth=0" | check_jsuccess
-curl_postj action.php "action=award.edit&awardid=3&sort=2&ballot_depth=2" | check_jsuccess
-curl_postj action.php "action=award.edit&awardid=4&sort=3&ballot_depth=1" | check_jsuccess
+BEST_IN_SHOW=$(awardid_of "Best in Show")
+SORE_LOSER=$(awardid_of "Sore Loser")
+BEST_WOLF=$(awardid_of "Best Wolf")
 
 # A voter asks for the ballot (with the ballot password, which is empty) before
 # casting votes
 curl_getj "action.php?query=ballot.get&password=" | jq -e 'has("ballot")' >/dev/null || test_fails
 
 # Voting not yet open
-curl_postj action.php "action=vote.cast&awardid=3&votes=[12,36]" | check_jfailure
+curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 212),$(racerid_of 136)]" | check_jfailure
 
 curl_postj action.php "action=ballot.open&state=open" | check_jsuccess
 
-curl_postj action.php "action=vote.cast&awardid=3&votes=[16,42]" | check_jsuccess
+curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 116),$(racerid_of 242)]" | check_jsuccess
 # The same voter selecting different candidates doesn't add to the original choices
-curl_postj action.php "action=vote.cast&awardid=3&votes=[13,37]" | check_jsuccess
-curl_postj action.php "action=vote.cast&awardid=1&votes=[11,12]" | check_jsuccess
+curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 313),$(racerid_of 237)]" | check_jsuccess
+curl_postj action.php "action=vote.cast&awardid=$BEST_IN_SHOW&votes=[$(racerid_of 111),$(racerid_of 212)]" | check_jsuccess
 
-curl_postj action.php "action=vote.cast&awardid=4&votes=[12,13]" | check_jfailure # Too many choices
+curl_postj action.php "action=vote.cast&awardid=$BEST_WOLF&votes=[$(racerid_of 212),$(racerid_of 313)]" | check_jfailure # Too many choices
 
 # Delete the session cookie in order to change voters
 rm $COOKIES_CURL
 
 curl_getj "action.php?query=ballot.get&password=" | jq -e 'has("ballot")' >/dev/null || test_fails
-curl_postj action.php "action=vote.cast&awardid=3&votes=[19,37]" | check_jsuccess
+curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 504),$(racerid_of 237)]" | check_jsuccess
 
 # Only the coordinator can see the results
 user_login_coordinator
@@ -66,12 +64,12 @@ curl_getj "action.php?query=ballot.results" | \
     jq '.awards | any( .candidates |  any( .carnumber == 242 ))' | \
     expect_eq false  # racer 42 (vote overwritten)
 
-curl_postj action.php "action=vote.cast&awardid=3&votes=[36]" | check_jsuccess
+curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 136)]" | check_jsuccess
 curl_getj "action.php?query=ballot.results" | \
     jq '.awards | any( .candidates |  any( .carnumber == 136 ))' | \
     expect_eq true
 
-curl_postj action.php "action=vote.cast&awardid=3&votes=[42]" | check_jsuccess
+curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 242)]" | check_jsuccess
 curl_getj "action.php?query=ballot.results" | \
     jq '.awards | any( .candidates |  any( .carnumber == 242 ))' | \
     expect_eq true

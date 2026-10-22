@@ -72,7 +72,7 @@ run_tests() {
     `dirname $0`/test-scenes.sh "$BASE_URL"
 
     `dirname $0`/test-photo-manipulations.sh "$BASE_URL"
-    `dirname $0`/test-photo-assignments.sh "$BASE_URL"
+    `dirname $0`/test-photo-assignments.sh "$BASE_URL" basic
     `dirname $0`/test-slide-next.sh "$BASE_URL"
 
     `dirname $0`/test-racer-query.sh "$BASE_URL"
@@ -128,7 +128,7 @@ run_tests() {
     `dirname $0`/test-new-rounds.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
     `dirname $0`/test-photo-manipulations.sh "$BASE_URL"
-    `dirname $0`/test-photo-assignments.sh "$BASE_URL"
+    `dirname $0`/test-photo-assignments.sh "$BASE_URL" master
     `dirname $0`/test-photo-upload.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
 
