@@ -29,7 +29,7 @@ Each ADR has one of these statuses:
 - **Accepted.** The owner accepted the decision. Later specs and code follow it.
 - **Superseded by ADR-NN.** A later ADR replaced the decision. The old file stays in place, and its status links to the new ADR.
 
-The owner accepted all 14 ADRs on 2026-10-21, after answering every open question in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). An accepted ADR does not change its decision. To change an accepted decision, write a new ADR with the next free number, and set the old ADR's status to `Superseded by ADR-NN`. The new ADR names the ADR that it supersedes in its Context section.
+The owner answered every open question in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4) on 2026-10-21 and approved merging all 14 ADRs on 2026-10-22. An accepted ADR does not change its decision. To change an accepted decision, write a new ADR with the next free number, and set the old ADR's status to `Superseded by ADR-NN`. The new ADR names the ADR that it supersedes in its Context section.
 
 ## Owner decisions
 
