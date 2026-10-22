@@ -10,6 +10,9 @@
 # or
 #    docker exec ((docker image name))  set-timeout.sh 900
 #
+# A failure of any step fails the script.
+
+set -e
 
 TIMEOUT=600
 
@@ -31,6 +34,7 @@ sed -i \
 nginx -s reload
 
 # php-fpm reads php.ini only when it starts, so the new max_execution_time needs
-# more than a reload of nginx.  SIGUSR2 makes the php-fpm master restart itself
-# gracefully.
+# more than a reload of nginx.  SIGUSR2 makes the php-fpm master restart itself.
+# The Dockerfile sets process_control_timeout, so requests in flight finish
+# first; with php-fpm's default of 0 they would be killed.
 pkill -USR2 -f 'php-fpm.*master process'
