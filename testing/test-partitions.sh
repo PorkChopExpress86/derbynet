@@ -83,19 +83,27 @@ curl_getj "action.php?query=poll&values=partitions" | \
 
 curl_postj action.php "action=partition.apply-rule&rule=one-group" | check_jsuccess
 
-curl_getj "action.php?query=poll&values=classes" | \
-    jq -e --argjson r_div2 $R_DIV2 --argjson r_default $R_DEFAULT --argjson r_div3 $R_DIV3 '.classes | length == 1
+# Each subgroup is the rank that the partition of the same name refers to.  The
+# server may make new ranks when the rule changes, so the ranks' IDs are looked
+# up again afterward.
+curl_getj "action.php?query=poll&values=classes,partitions" | \
+    jq -e '. as $d
+        | def partrank(n): $d.partitions | map(select(.name == n))[0].rankids[0];
+        .classes | length == 1
         and .[0].name == "All Racers" and .[0].count == 49 and (.[0].subgroups | length == 3)
         and .[0].subgroups[0].name == "Div 2"
-        and .[0].subgroups[0].rankid == $r_div2
+        and .[0].subgroups[0].rankid == partrank("Div 2")
         and .[0].subgroups[0].count == 19
         and .[0].subgroups[1].name == "Default"
-        and .[0].subgroups[1].rankid == $r_default
+        and .[0].subgroups[1].rankid == partrank("Default")
         and .[0].subgroups[1].count == 20
         and .[0].subgroups[2].name == "Div 3"
-        and .[0].subgroups[2].rankid == $r_div3
+        and .[0].subgroups[2].rankid == partrank("Div 3")
         and .[0].subgroups[2].count == 10
 ' >/dev/null || test_fails
+R_DEFAULT=$(rankid_of Default)
+R_DIV2=$(rankid_of "Div 2")
+R_DIV3=$(rankid_of "Div 3")
 
 # With one-group rule, reordering subdgroups should reorder partitions
 curl_postj action.php "action=rank.order&rankid_1=$R_DEFAULT&rankid_2=$R_DIV2&rankid_3=$R_DIV3" | check_jsuccess
@@ -130,22 +138,24 @@ curl_getj "action.php?query=poll&values=classes" | \
 
 curl_postj action.php "action=partition.apply-rule&rule=custom" | check_jsuccess
 
-curl_getj "action.php?query=poll&values=classes" | \
-    jq -e --argjson r_default $R_DEFAULT --argjson r_div2 $R_DIV2 --argjson r_div3 $R_DIV3 '.classes | length == 3 
+curl_getj "action.php?query=poll&values=classes,partitions" | \
+    jq -e '. as $d
+        | def partrank(n): $d.partitions | map(select(.name == n))[0].rankids[0];
+        .classes | length == 3
         and .[0].name == "Default" and .[0].count == 20 and (.[0].subgroups | length == 1)
         and .[0].subgroups[0].name == "Default"
         and .[0].subgroups[0].count == 20
-        and .[0].subgroups[0].rankid == $r_default
+        and .[0].subgroups[0].rankid == partrank("Default")
         and .[1].name == "Div 2"
         and (.[1].subgroups | length == 1)
         and .[1].subgroups[0].name == "Div 2"
         and .[1].subgroups[0].count == 19
-        and .[1].subgroups[0].rankid == $r_div2
+        and .[1].subgroups[0].rankid == partrank("Div 2")
         and .[2].name == "Div 3"
         and (.[2].subgroups | length == 1)
         and .[2].subgroups[0].name == "Div 3"
         and .[2].subgroups[0].count == 10
-        and .[2].subgroups[0].rankid == $r_div3
+        and .[2].subgroups[0].rankid == partrank("Div 3")
 ' >/dev/null || test_fails
 
 curl_postj action.php "action=partition.apply-rule&rule=by-partition" | check_jsuccess
@@ -477,7 +487,7 @@ curl_getj "action.php?query=poll&values=classes" | \
         and .[3].subgroups[1].name == "Empty"
 ' >/dev/null || test_fails
 
-curl_postj action.php "action=rank.move&rankid=$R_DIV3&classid=-1" | check_jsuccess
+curl_postj action.php "action=rank.move&rankid=$(rankid_of "Div 3")&classid=-1" | check_jsuccess
 curl_getj "action.php?query=poll&values=classes" | \
     jq -e '.classes | length == 4
         and .[0].name == "Div 2"
