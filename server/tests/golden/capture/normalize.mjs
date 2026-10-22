@@ -116,6 +116,13 @@ function rescheduleRunLimit(json) {
 // Rules that look at a whole exchange, not just its body, and can add notes.
 export const EXCHANGE_RULES = [
   {
+    id: 'set-cookie-value',
+    doc: 'The value of each Set-Cookie header becomes "<value>" ("PHPSESSID=<value>; path=/").  The cookie name and every attribute are kept.',
+    apply: (ex) => ex.setCookies?.length
+      ? { ...ex, setCookies: ex.setCookies.map((c) => c.replace(/^([^=;]*)=[^;]*/, '$1=<value>')) }
+      : ex,
+  },
+  {
     id: 'reschedule-timing',
     doc: 'The seconds schedule.reschedule reports in "timing" and in the adjuster trace.  A reschedule whose request took half its search deadline or longer could be cut off by the deadline on a slower machine, so its exchange, and every later exchange in the transcript if it changed the schedule, is left out and listed in a .omitted.txt beside the transcript; every other reschedule gets a "deterministic" note.',
     apply: (ex) => {

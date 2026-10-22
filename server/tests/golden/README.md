@@ -35,7 +35,7 @@ The committed fixtures were captured against the image built from `installer/doc
 | `engine/ordinals.json` | `ordinal()` and `nth_fastest()` for 0 to 120 (and `T0` to `T120`) | same |
 | `engine/lane-bias.json`, `engine/critical-f-value.json` | `lane_bias_analysis()` over fixed time sets for 2 to 8 lanes, the `history.php` sentences, and `critical_f_value()` | same |
 | `engine/summary.txt` | The case counts the tool printed | same |
-| `http/**/*.http` | HTTP transcripts: request, status, content type, body | `capture/capture-http.sh` and its `scenarios/` |
+| `http/**/*.http` | HTTP transcripts: request, status, content type, `Location`, `Set-Cookie`, `Cache-Control`, body | `capture/capture-http.sh` and its `scenarios/` |
 | `http/**/*.by-car.json` | Standings ladders with racer IDs replaced by car number and name | `standings_by_car` in `capture-http.sh` |
 
 ADR-12 makes tests ID-agnostic, so a port should not compare row IDs. Transcripts carry the IDs PHP assigned on an empty database, so they are reproducible, but the `step-N` state snapshots and the `.by-car.json` standings are keyed by car number, name, class, rank and partition. Use those where IDs would get in the way.
@@ -102,11 +102,12 @@ Files, by directory (`find http -type f` lists them all):
 | `last-contact` | A non-zero `"last-contact"` or `"last_contact"` (timer, replay or kiosk contact, epoch seconds) becomes `"<epoch>"`. |
 | `timer-contact-age` | `CONNECTED (N sec.)` becomes `CONNECTED (<n> sec.)`, and a kiosk `"age"` becomes `"<seconds>"`. |
 | `award-duration` | The `"duration"` in `query=award.current` becomes `"<seconds>"`. |
+| `set-cookie-value` | The value of every `Set-Cookie` header becomes `<value>`, so `PHPSESSID=0f3c...; path=/` is recorded as `PHPSESSID=<value>; path=/`. The cookie name and every attribute are kept, because they are the cookie contract (#16). |
 | `reschedule-timing` | The seconds in `schedule.reschedule`'s `"timing"` and trace become `"<seconds>"`, and the exchange gets a `note: deterministic` line. A reschedule whose request took half its search deadline or longer is left out and listed in a `.omitted.txt`, and so is every later exchange in that transcript when the omitted one changed the schedule. See [Reschedules](#reschedules). |
 | `completed-timestamp` | A `"YYYY-MM-DD HH:MM:SS"` string in a JSON body (when a heat result was written, `RaceChart.completed`) becomes `"<timestamp>"`. |
 | `export-results-order` | The Results sheet of `export-json.php` is listed `ORDER BY completed, heat, lane`, and `completed` has one-second resolution, so rows swap places from run to run. The rule first checks, on the unmasked `Completed` values, that PHP listed every row in that order (a heat not yet raced, with `Completed` null, comes first), and fails the capture if not. Then it sorts the rows by class, round, heat, lane. It also fails the capture if an `export-json.php` response has a Results sheet it does not recognize, so it can never pass rows through unsorted. |
 
-Values the capture does not need to mask because it never records them: session cookies (only `Set-Cookie`-independent fields, status, content type and `Location` are kept), other response headers, and photo bytes (issue #8).
+A transcript keeps these response headers: `Content-Type`, `Location`, every `Set-Cookie` (value masked) and `Cache-Control`. Values the capture does not need to mask because it never records them: other response headers (`Date`, `Expires`, `Pragma`, `X-Powered-By`, `Server`), and photo bytes (issue #8).
 
 The committed order of the Results rows is therefore not PHP's: which rows share a second, and so the order across heats and rounds, changes from run to run, and the fixture cannot pin it. What PHP guarantees, and what a port must keep, is `ORDER BY completed, heat, lane` with null first. A port's harness that runs its export through `normalize.mjs` gets the same check.
 

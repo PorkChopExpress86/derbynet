@@ -79,9 +79,10 @@ capture() {
   curl "${args[@]}" "$BASE_URL/$path"
 
   CAPTURE_STATUS="$(head -n 1 "$headers" | tr -d '\r' | cut -d' ' -f2)"
-  local ctype location
+  local ctype location cache_control
   ctype="$(grep -i '^content-type:' "$headers" | head -n 1 | tr -d '\r' | cut -d' ' -f2- || true)"
   location="$(grep -i '^location:' "$headers" | head -n 1 | tr -d '\r' | cut -d' ' -f2- || true)"
+  cache_control="$(grep -i '^cache-control:' "$headers" | head -n 1 | tr -d '\r' | cut -d' ' -f2- || true)"
   local seq=$((CAPTURE_SEQS[$CAPTURE_FILE] + 1))
   CAPTURE_SEQS[$CAPTURE_FILE]=$seq
   {
@@ -92,6 +93,8 @@ capture() {
     printf 'status: %s\n' "$CAPTURE_STATUS"
     [ -z "$ctype" ] || printf 'content-type: %s\n' "$ctype"
     [ -z "$location" ] || printf 'location: %s\n' "$location"
+    grep -i '^set-cookie:' "$headers" | tr -d '\r' | cut -d' ' -f2- | sed 's/^/set-cookie: /' || true
+    [ -z "$cache_control" ] || printf 'cache-control: %s\n' "$cache_control"
     printf 'length: %s\nbody:\n' "$(wc -c < "$CAPTURE_BODY")"
     cat "$CAPTURE_BODY"
     printf '\n'

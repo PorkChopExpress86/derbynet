@@ -202,8 +202,9 @@ async function handle(req, res) {
     const ex = {
       name: `${String(++rec.seq).padStart(3, '0')} ${name ?? rest}`,
       request: `${req.method} ${rest.replace(/^\//, '')}`,
-      status: up.status, contentType: up.headers['content-type'], location: up.headers.location, body: up.body,
-      elapsedMs,
+      status: up.status, contentType: up.headers['content-type'], location: up.headers.location,
+      setCookies: [].concat(up.headers['set-cookie'] ?? []), cacheControl: up.headers['cache-control'],
+      body: up.body, elapsedMs,
     };
     if (req.method === 'POST') ex.requestBody = bodyText;
     rec.exchanges.push(ex);

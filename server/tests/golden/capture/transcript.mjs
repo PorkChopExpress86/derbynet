@@ -9,6 +9,8 @@
 //   status: <HTTP status>
 //   content-type: <value>          (when present)
 //   location: <value>              (when present)
+//   set-cookie: <value>            (one per Set-Cookie header, in order)
+//   cache-control: <value>         (when present)
 //   note: <free text>              (zero or more)
 //   elapsed-ms: <milliseconds>     (raw transcripts only; normalize.mjs reads and drops it)
 //   length: <number of body bytes>
@@ -29,6 +31,8 @@ export function serialize(ex) {
   head.push(`status: ${ex.status}`);
   if (ex.contentType) head.push(`content-type: ${ex.contentType}`);
   if (ex.location) head.push(`location: ${ex.location}`);
+  for (const c of ex.setCookies ?? []) head.push(`set-cookie: ${c}`);
+  if (ex.cacheControl) head.push(`cache-control: ${ex.cacheControl}`);
   for (const n of ex.notes ?? []) head.push(`note: ${n}`);
   if (ex.elapsedMs !== undefined) head.push(`elapsed-ms: ${ex.elapsedMs}`);
   head.push(`length: ${body.length}`, 'body:');
@@ -39,7 +43,7 @@ export function parse(buf) {
   const exchanges = [];
   let pos = 0;
   while (pos < buf.length) {
-    const ex = { notes: [] };
+    const ex = { notes: [], setCookies: [] };
     for (;;) {
       const eol = buf.indexOf(0x0a, pos);
       if (eol < 0) throw new Error('truncated transcript header');
@@ -57,6 +61,8 @@ export function parse(buf) {
         case 'status:': ex.status = Number(value); break;
         case 'content-type:': ex.contentType = value; break;
         case 'location:': ex.location = value; break;
+        case 'set-cookie:': ex.setCookies.push(value); break;
+        case 'cache-control:': ex.cacheControl = value; break;
         case 'note:': ex.notes.push(value); break;
         case 'elapsed-ms:': ex.elapsedMs = Number(value); break;
         case 'length:': ex.length = Number(value); break;
