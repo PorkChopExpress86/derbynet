@@ -79,22 +79,31 @@ step_clean() {
   [ -n "$keep" ] || "$RUN_SUITE" clean
 }
 
+# With --check, compare right after each half, so an engine difference is
+# reported without waiting for the HTTP capture (or being hidden by its failure).
+check_fixtures() {
+  local changed
+  changed="$(git -C "$ROOT" status --porcelain -- server/tests/golden)"
+  if [ -n "$changed" ]; then
+    echo "The capture differs from the committed fixtures:" >&2
+    echo "$changed" | head -n 40 >&2
+    git -C "$ROOT" --no-pager diff --stat -- server/tests/golden | tail -n 40 >&2
+    git -C "$ROOT" --no-pager diff -U1 -- server/tests/golden | head -n 120 >&2
+    exit 1
+  fi
+  echo "The capture matches the committed fixtures." >&2
+}
+
 trap step_clean EXIT
 step_server
-[ -z "$do_engine" ] || step_engine
+if [ -n "$do_engine" ]; then
+  step_engine
+  [ -z "$check" ] || check_fixtures
+fi
 [ -z "$do_http" ] || step_http
 
 echo "== summary" >&2
 [ ! -f "$GOLDEN/engine/summary.txt" ] || cat "$GOLDEN/engine/summary.txt" >&2
 echo "files: $(find "$GOLDEN" -type f | wc -l), size: $(du -sh "$GOLDEN" | cut -f1)" >&2
 
-if [ -n "$check" ]; then
-  changed="$(git -C "$ROOT" status --porcelain -- server/tests/golden)"
-  if [ -n "$changed" ]; then
-    echo "The capture differs from the committed fixtures:" >&2
-    echo "$changed" >&2
-    git -C "$ROOT" --no-pager diff --stat -- server/tests/golden >&2
-    exit 1
-  fi
-  echo "The capture matches the committed fixtures." >&2
-fi
+[ -z "$check" ] || check_fixtures
