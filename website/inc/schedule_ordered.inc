@@ -116,6 +116,13 @@ function make_ordered_schedule($nlanes, $ncars, $n_times_per_lane,
     }
   }
 
+  // SCRATCH: deliberately swap the first two heats, to prove the golden-fixtures job fails.
+  if (count($ordered) >= 2) {
+    $tmp = $ordered[0];
+    $ordered[0] = $ordered[1];
+    $ordered[1] = $tmp;
+  }
+
   return $ordered;
 }
 
