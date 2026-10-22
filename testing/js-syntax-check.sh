@@ -1,5 +1,9 @@
 #! /bin/bash
 
+# Without these, the script's exit status is that of its last command (popd), so
+# a syntax error found by node would not make it fail.
+set -e -o pipefail
+
 # Setup:
 #
 # npm install esprima-next
