@@ -24,17 +24,20 @@ TMP=$(mktemp)
 
 jq >$TMP <<EOF
 {"schedule": [
-[1, 6, null, null, null, null],
-[6, null, null, null, null, 1],
-[null, null, null, null, 1, 6],
-[null, null, null, 1, 6, null],
-[null, null, 1, 6, null, null],
-[null, 1, 6, null, null, null]
+[101, 106, null, null, null, null],
+[106, null, null, null, null, 101],
+[null, null, null, null, 101, 106],
+[null, null, null, 101, 106, null],
+[null, null, 101, 106, null, null],
+[null, 101, 106, null, null, null]
     ]
 }
 EOF
 
-( curl_getj "action.php?query=poll&values=schedule" | jq | diff $TMP - ) || test_fails
+# The schedule names racers by ID.  Compare car numbers.
+( curl_getj "action.php?query=poll&values=schedule" | \
+      jq --argjson cars "$(racer_carnumbers)" \
+         '.schedule |= map(map(if . == null then null else $cars[tostring] end))' | diff $TMP - ) || test_fails
 
 curl_postj action.php "action=schedule.unschedule&roundid=$(roundid_of Lions 1)" | check_jsuccess
 # Now some more racers
@@ -52,21 +55,23 @@ curl_postj action.php "action=heat.select&roundid=$(roundid_of Lions 1)&now_raci
 
 jq >$TMP <<EOF
 {"schedule":[
-[1, 6, 11, 16, 21, 26],
-[6, 11, 16, 21, 26, 31],
-[11, 16, 21, 26, 31, 36],
-[16, 21, 26, 31, 36, 41],
-[21, 26, 31, 36, 41, 46],
-[26, 31, 36, 41, 46, 1],
-[31, 36, 41, 46, 1, 6],
-[36, 41, 46, 1, 6, 11],
-[41, 46, 1, 6, 11, 16],
-[46, 1, 6, 11, 16, 21]
+[101, 106, 111, 116, 121, 126],
+[106, 111, 116, 121, 126, 131],
+[111, 116, 121, 126, 131, 136],
+[116, 121, 126, 131, 136, 141],
+[121, 126, 131, 136, 141, 146],
+[126, 131, 136, 141, 146, 101],
+[131, 136, 141, 146, 101, 106],
+[136, 141, 146, 101, 106, 111],
+[141, 146, 101, 106, 111, 116],
+[146, 101, 106, 111, 116, 121]
     ]
 }
 EOF
 
-curl_getj "action.php?query=poll&values=schedule" | jq | diff $TMP - || test_fails
+curl_getj "action.php?query=poll&values=schedule" | \
+    jq --argjson cars "$(racer_carnumbers)" \
+       '.schedule |= map(map(if . == null then null else $cars[tostring] end))' | diff $TMP - || test_fails
 
 
 rm $TMP
