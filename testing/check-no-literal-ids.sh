@@ -38,7 +38,7 @@ else
     FILES=$(ls test-*.sh import-roster.sh run-scout-heats.sh photo-setup.sh)
 fi
 
-IDNAME='(racer|racerid|roundid|classid|rankid|partitionid|awardid)'
+IDNAME='(racer|racerid|roundid|classid|rankid|partitionid|awardid|resultid)'
 NUM='[1-9][0-9]*'
 PATTERNS=(
     "\\b${IDNAME}=${NUM}\\b"

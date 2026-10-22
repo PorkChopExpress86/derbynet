@@ -115,10 +115,15 @@ user_login_coordinator
 curl_postj action.php "action=award.present&key=speed-2-$(classid_of Lions)" | check_jsuccess
 curl_getj "action.php?query=award.current" | expect_one Asher
 
-curl_getj "action.php?query=poll&values=ondeck" | \
-    jq -r '.ondeck.chart | map(select(.resultid == 1))[0].result' | expect_eq z2nd
-curl_getj "action.php?query=poll&values=ondeck" | \
-    jq -r '.ondeck.chart | map(select(.resultid == 4))[0].result' | expect_eq z1st
+# ondeck_result <heat> <carnumber>: the result shown for the car in that heat of $ROUND
+ondeck_result() {
+    curl_getj "action.php?query=poll&values=ondeck" | \
+        jq -r --arg r $ROUND --arg h $1 --arg c $2 \
+           '.ondeck.chart | map(select((.roundid|tostring) == $r and (.heat|tostring) == $h
+                                       and (.carnumber|tostring) == $c))[0].result'
+}
+ondeck_result 1 101 | expect_eq z2nd
+ondeck_result 1 111 | expect_eq z1st
 
 # Test the tie in the standings
 expect_places Pack Place 111 1 101 2 121 T3 141 T3 131 5
