@@ -161,6 +161,14 @@ To widen the sample, add car counts or `n_times_per_lane` values to the loops in
 
 **The lane-bias `sentences` are a copy of `history.php`.** The `sentences` field in `engine/lane-bias.json` is built by `history_sentences()` in `capture-engine.php`, which repeats `history.php`'s wording and its `sprintf("%5.3f", ...)` formats. Its guard only checks that `history.php` still contains the five phrases in `HISTORY_PHRASES`, such as `"F statistic is "`. A change to a number format, or to the `df1=` and `df2=` part, passes the guard, and the `sentences` then describe text PHP no longer prints. Only one page is captured from PHP itself, `http/standings/edge-cases-history-lane-bias.html`, on 2 lanes. It catches such a change for that case, but not for the 8-lane `0.000` critical value, which only the copy records. When `history.php`'s lane-bias paragraph changes, update `history_sentences()` to match it.
 
+**Some captures depend on the server's whole-second clock.** A stall of a second or more on a loaded runner, such as a paused php-fpm worker, can change these fixtures, and `--check` then fails with no code change:
+
+- `http/timer/competing-timers.http`. `action.timer-message.inc` treats a second timer as competing only while `$last_contact + 1 >= time()`. The scenario in `capture/scenarios/03-timer.sh` sends five timer messages from two `User-Agent` values, and each must arrive within about a second of the one before, or a `<competing>` reply turns into a plain one.
+- `http/replay/command-sequence.http` and the replay exchanges in `http/suite/basic-racing.http`. The server forgets a replay client that has not polled for more than `REPLAY_TIMEOUT_LIMIT` (10 s, `website/inc/replay.inc`), and greets it again with `HELLO`. A gap over 10 s between polls changes the command list. `09-replay.sh` sleeps 11 s on purpose to record the greeting, and `08-suite-scripts.sh` polls just before `test-basic-racing.sh`, so the gap stays short.
+- `http/suite/reschedule.http`, which [Reschedules](#reschedules) covers: a 2.4 times slower runner moves exchange 039 into the omitted list.
+
+If one of these fails in CI, rerun the job before you treat the diff as real. A real change reproduces.
+
 ## Adding a case
 
 A ticket that needs a case this tool lacks adds it here: a `capture` line in a scenario, or a new file in `capture/scenarios/`, or a case in `capture-engine.php`. Then rerun `capture.sh` and commit the new fixtures with the change.
