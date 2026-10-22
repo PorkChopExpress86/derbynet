@@ -16,6 +16,21 @@ OUTPUT_CURL="`dirname $0`/output.curl"
 DEBUG_CURL="`dirname $0`/debug.curl"
 COOKIES_CURL="`dirname $0`/cookies.curl"
 
+# Colors are cosmetic.  tput fails when there's no terminal (e.g., TERM is unset
+# under CI), and that must not fail the test.
+function tput() {
+    command tput "$@" 2>/dev/null || true
+}
+
+# macOS has md5, elsewhere it's md5sum.  Either way, just the hex digest.
+function md5_digest() {
+    if command -v md5 >/dev/null ; then
+        md5
+    else
+        md5sum | cut -d' ' -f1
+    fi
+}
+
 function header() {
     echo '###################### ' `caller 1 | cut -f3 -d\ ` ' #######################'
 }
@@ -96,7 +111,7 @@ function curl_photo() {
     echo photo $1 $2 >> $OUTPUT_CURL
     echo    >> $OUTPUT_CURL
     OK=1
-	PHOTO_MD5=`curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/photo.php/$1 | md5`
+	PHOTO_MD5=`curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/photo.php/$1 | md5_digest`
     echo $PHOTO_MD5 | tee $DEBUG_CURL | tee -a $OUTPUT_CURL | grep -c $2 > /dev/null || OK=0
     if [ $OK -eq 0 ]; then
         test_fails Wrong photo result: $PHOTO_MD5

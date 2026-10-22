@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 # Executes PHP code directly from the command line, rather than sending to a web server.
 
