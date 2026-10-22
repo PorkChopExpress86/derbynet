@@ -68,7 +68,7 @@ Counts printed by the tool and recorded in `engine/summary.txt`: see that file. 
     lane-bias cases: 140
     critical-f-value cases: 1242
 
-The `history.php` sentences are mirrored in `history_sentences()` in the capture, and the capture refuses to run if `history.php` stops containing them. The HTTP capture also records the real `history.php` lane-bias block in `http/standings/edge-cases-history-lane-bias.html`.
+The `history.php` sentences are mirrored in `history_sentences()` in the capture, and the capture refuses to run if `history.php` stops containing them. The HTTP capture also records the real `history.php` lane-bias block in `http/standings/edge-cases-history-lane-bias.html`. The mirror is a copy, not PHP's output; see [Known risks](#known-risks).
 
 ## HTTP fixtures
 
@@ -158,6 +158,8 @@ To widen the sample, add car counts or `n_times_per_lane` values to the loops in
     docker cp derbynet-golden-server:/tmp/golden-out/engine server/tests/golden/engine
     git status --porcelain server/tests/golden/engine     # prints nothing if the JIT agrees
     DERBYNET_TEST_PREFIX=derbynet-golden testing/docker/run-suite.sh clean
+
+**The lane-bias `sentences` are a copy of `history.php`.** The `sentences` field in `engine/lane-bias.json` is built by `history_sentences()` in `capture-engine.php`, which repeats `history.php`'s wording and its `sprintf("%5.3f", ...)` formats. Its guard only checks that `history.php` still contains the five phrases in `HISTORY_PHRASES`, such as `"F statistic is "`. A change to a number format, or to the `df1=` and `df2=` part, passes the guard, and the `sentences` then describe text PHP no longer prints. Only one page is captured from PHP itself, `http/standings/edge-cases-history-lane-bias.html`, on 2 lanes. It catches such a change for that case, but not for the 8-lane `0.000` critical value, which only the copy records. When `history.php`'s lane-bias paragraph changes, update `history_sentences()` to match it.
 
 ## Adding a case
 
