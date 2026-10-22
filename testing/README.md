@@ -90,6 +90,21 @@ usual ID.
 
 `test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
 
+## Test photos
+
+`data/carphotos/pattern-o6.jpg` stands in for a phone photo taken in portrait:
+four colored quarters, stored turned 90 degrees, with EXIF orientation 6 to
+turn them back.  `data/carphotos/make-pattern-o6.py` made it.  To make it
+again, run the script with Pillow 11.0.0, which gives the same bytes:
+
+    docker run --rm -v "$PWD/testing/data/carphotos:/d" python:3.12-slim \
+        sh -c 'pip install -q pillow==11.0.0 && python /d/make-pattern-o6.py /d/pattern-o6.jpg'
+    git status testing/data/carphotos     # prints no change
+
+Check the tag with a reader that prints its number, such as
+`exiftool -n -Orientation` or Pillow's `getexif()[0x112]`.  `file` prints
+`orientation=upper-right` for tag 6.
+
 ## macOS
 
 `suite-local-mac.sh` runs the suite against a DerbyNet installed on the local
