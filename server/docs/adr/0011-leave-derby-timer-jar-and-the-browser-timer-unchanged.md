@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
+Accepted. The owner accepted it on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
 
 ## Context
 
@@ -14,7 +14,7 @@ The server adapts to the timer clients. Neither timer changes in this program.
 
 ## Consequences
 
-Django serves `timer.php` from a template with the same JavaScript. The build still generates `profiles.js` from the jar. [#32](https://github.com/PorkChopExpress86/derbynet/issues/32) proves byte parity against the transcripts from [#7](https://github.com/PorkChopExpress86/derbynet/issues/7).
+Django serves `timer.php` from a template with the same JavaScript. The build still generates `profiles.js` from the jar. [#32](https://github.com/PorkChopExpress86/derbynet/issues/32) proves byte parity against the transcripts from [#7](https://github.com/PorkChopExpress86/derbynet/issues/7). The browser timer is the supported timer client (owner decision D4). `derby-timer.jar` keeps working only because ADR-02 keeps the wire contract, and v1 builds no container image for it.
 
 ## Evidence
 

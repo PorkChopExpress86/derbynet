@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
+Accepted. The owner accepted it on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
 
 ## Context
 
@@ -15,6 +15,8 @@ Keep role logins with one shared password per role. Store roles in the database 
 ## Consequences
 
 A command imports `config-roles.inc`. New installs seed the same default passwords, so the docs and tests stay true. An empty password stays valid for `Timer`. When `config-roles.inc` is missing, `website/inc/roles.inc` grants the anonymous role permissions `-1`. Django does not copy that fallback. There are no per-person accounts in v1. [#15](https://github.com/PorkChopExpress86/derbynet/issues/15) owns the details.
+
+**Anonymous access (owner decision D5).** A visitor with no login reaches only the kiosk pages and standings, plus the data those pages fetch. That is `kiosk.php`, `poll.kiosk`, the `poll` values the now-racing and on-deck pages show, `poll.results`, `award.current`, `slide.next`, and the racer photos, slides, and images that kiosks display. `standings.php` becomes public. Today it requires `VIEW_RACE_RESULTS`. Every other page and action requires a logged-in role. That includes the replay page, the remote camera, the browser timer (the `Timer` role, as today), check-in, photo upload, and settings. Every hole listed in the owner's answer to question 3 closes. When balloting is built ([#54](https://github.com/PorkChopExpress86/derbynet/issues/54), in the backlog), a voter logs in with the ballot password, as today. That last rule is a default the owner can change.
 
 ## Evidence
 

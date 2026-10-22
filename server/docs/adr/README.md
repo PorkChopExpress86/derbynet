@@ -6,20 +6,20 @@ These architecture decision records (ADRs) record how the DerbyNet server moves 
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [ADR-01](0001-build-in-parallel-and-cut-over-once.md) | Build in parallel and cut over once | Proposed |
-| [ADR-02](0002-keep-the-legacy-wire-contract-permanently.md) | Keep the legacy wire contract permanently | Proposed |
-| [ADR-03](0003-use-django-5-2-lts-on-python-3-11-or-later.md) | Use Django 5.2 LTS on Python 3.11 or later | Proposed |
-| [ADR-04](0004-use-managed-models-with-fresh-migrations-and-a-one-way-importer.md) | Use managed models with fresh migrations and a one-way importer | Proposed |
-| [ADR-05](0005-default-to-sqlite-in-wal-mode-and-support-postgres.md) | Default to SQLite in WAL mode, and support Postgres | Proposed |
-| [ADR-06](0006-drop-ms-access-odbc-and-live-gprm-sharing.md) | Drop MS Access, ODBC, and live GPRM sharing | Proposed |
-| [ADR-07](0007-keep-shared-password-roles-stored-hashed-in-the-database.md) | Keep shared-password roles, stored hashed in the database | Proposed |
-| [ADR-08](0008-keep-polling-for-v1-and-add-push-later.md) | Keep polling for v1, and add push later | Proposed |
-| [ADR-09](0009-build-the-manager-ui-with-django-templates-and-htmx.md) | Build the manager UI with Django templates, htmx, Alpine.js, Tailwind, and SortableJS | Proposed |
-| [ADR-10](0010-keep-the-kiosk-tv-pages-as-they-look-today.md) | Keep the kiosk TV pages as they look today | Proposed |
-| [ADR-11](0011-leave-derby-timer-jar-and-the-browser-timer-unchanged.md) | Leave derby-timer.jar and the browser timer unchanged | Proposed |
-| [ADR-12](0012-make-tests-id-agnostic-instead-of-copying-sqlite-rowid-reuse.md) | Make tests ID-agnostic instead of copying SQLite rowid reuse | Proposed |
-| [ADR-13](0013-put-new-code-in-server-and-delete-website-at-cutover.md) | Put new code in `server/`, and delete `website/` at cutover | Proposed |
-| [ADR-14](0014-make-docker-and-debian-or-pi-first-class.md) | Make Docker and Debian or Pi first-class, and serve Mac and Windows through Docker Desktop | Proposed |
+| [ADR-01](0001-build-in-parallel-and-cut-over-once.md) | Build in parallel and cut over once | Accepted |
+| [ADR-02](0002-keep-the-legacy-wire-contract-permanently.md) | Keep the legacy wire contract permanently | Accepted |
+| [ADR-03](0003-use-django-5-2-lts-on-python-3-14.md) | Use Django 5.2 LTS on Python 3.14 | Accepted |
+| [ADR-04](0004-use-managed-models-with-fresh-migrations-and-a-one-way-importer.md) | Use managed models with fresh migrations and a one-way importer | Accepted |
+| [ADR-05](0005-default-to-sqlite-in-wal-mode-and-support-postgres.md) | Default to SQLite in WAL mode, and support Postgres | Accepted |
+| [ADR-06](0006-drop-ms-access-odbc-and-all-gprm-support.md) | Drop MS Access, ODBC, and all GPRM support | Accepted |
+| [ADR-07](0007-keep-shared-password-roles-stored-hashed-in-the-database.md) | Keep shared-password roles, stored hashed in the database | Accepted |
+| [ADR-08](0008-keep-polling-for-v1-and-add-push-later.md) | Keep polling for v1, and add push later | Accepted |
+| [ADR-09](0009-build-the-manager-ui-with-django-templates-and-htmx.md) | Build the manager UI with Django templates, htmx, Alpine.js, Tailwind, and SortableJS | Accepted |
+| [ADR-10](0010-rebuild-the-built-in-kiosk-pages-in-a-modern-front-end.md) | Rebuild the built-in kiosk pages in a modern front end | Accepted |
+| [ADR-11](0011-leave-derby-timer-jar-and-the-browser-timer-unchanged.md) | Leave derby-timer.jar and the browser timer unchanged | Accepted |
+| [ADR-12](0012-make-tests-id-agnostic-instead-of-copying-sqlite-rowid-reuse.md) | Make tests ID-agnostic instead of copying SQLite rowid reuse | Accepted |
+| [ADR-13](0013-put-new-code-in-server-and-delete-website-at-cutover.md) | Put new code in `server/`, and delete `website/` at cutover | Accepted |
+| [ADR-14](0014-ship-docker-images-as-the-only-deployment.md) | Ship Docker images as the only deployment | Accepted |
 
 ## Status lifecycle
 
@@ -29,19 +29,28 @@ Each ADR has one of these statuses:
 - **Accepted.** The owner accepted the decision. Later specs and code follow it.
 - **Superseded by ADR-NN.** A later ADR replaced the decision. The old file stays in place, and its status links to the new ADR.
 
-The owner accepts an ADR by merging the pull request that adds it and then committing a change that sets its status to Accepted. An accepted ADR does not change its decision. To change an accepted decision, write a new ADR with the next free number, and set the old ADR's status to `Superseded by ADR-NN`. The new ADR names the ADR that it supersedes in its Context section.
+The owner accepted all 14 ADRs on 2026-10-21, after answering every open question in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). An accepted ADR does not change its decision. To change an accepted decision, write a new ADR with the next free number, and set the old ADR's status to `Superseded by ADR-NN`. The new ADR names the ADR that it supersedes in its Context section.
 
-## Open questions for the owner
+## Owner decisions
 
-The owner answers each question, or accepts its recommended default, in a comment on [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
+This section copies the answers from [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4), dated 2026-10-21. Each answer names its owner decision (D1 to D12).
 
-1. **How are events stored?** [#9](https://github.com/PorkChopExpress86/derbynet/issues/9) answers this with a prototype. The recommended default is the outcome of that spec, which provisionally favors an `Event` row on every event-scoped model.
-2. **How do GPRM users bring their data in?** The recommended default is a CSV export of the roster from GPRM, loaded through the roster import. Add a Windows-only `pyodbc` import command later only if users ask.
-3. **Which anonymous endpoints get permission checks?** The recommended default is to close every hole that no field client needs. That covers `session.write`, `snapshot.get`, `settings.list` secrets, `file.directory.nodata`, `file.stat`, `photo.php/info`, `render-document.php`, `video.upload`, the `PRESENT_AWARDS` grant in `kiosk.php`, and `phpinfo()` on `about.php`. Keep anonymous access where kiosks, the jar, and the photo stand need it. [#15](https://github.com/PorkChopExpress86/derbynet/issues/15) holds the final list.
-4. **Must printables match pixel for pixel?** The recommended default is no. Match the layout so Avery labels line up within 0.5 mm, checked by printing each document once. Names in any script then render correctly.
-5. **Must external replay apps keep working?** `docs/Developers- Replay Messages.fodt` describes an XML `replay-message` action that the code no longer serves. The recommended default is to support only the JSON `replay.message` protocol that `website/replay.php` uses.
-6. **Must custom kiosk pages keep working?** Users may have PHP pages in `local/kiosks/`, and the seeded Wrap-Up scene in `website/sql/sqlite/scene-tables.inc` names `local/kiosks/feedback.kiosk`. The recommended default is no PHP. Load Django templates from a configured kiosk folder, and have the importer flag scenes that name a missing page.
-7. **Is hosted multi-group mode in scope?** Today it uses `settings.lock` and one config folder per group. The recommended default is no. Run one deployment per group, and replace `settings.lock` with an environment variable.
+1. **How are events stored?** In one database (D2). The owner accepted option (b) of [#9](https://github.com/PorkChopExpress86/derbynet/issues/9), an `Event` row with a site-level active-event pointer and an `event` foreign key on every event-scoped model. The cross-event leak test uses identical rosters with a non-first event active, because the spike showed that a leak hides while the first event is active. One container holds every racing group of an event, and other events such as another pack's race day, one active at a time (D12).
+2. **How do GPRM users bring their data in?** They do not. GPRM support is removed entirely, with no live sharing, no Access or ODBC, and no GPRM-specific import (D4). The generic CSV roster import stays. The importer still reads old DerbyNet SQLite event databases. ADR-06 records this.
+3. **Which anonymous endpoints get permission checks?** All of them except the kiosk pages, standings, and the data those pages fetch (D5). `standings.php` becomes public. The replay page, the browser timer, check-in, photo upload, settings, and every action need a role. Every hole in the list this question named closes. When balloting is built, voters log in with the ballot password, as today. That rule is a default. ADR-07 and [#15](https://github.com/PorkChopExpress86/derbynet/issues/15) record the list.
+4. **Must printables match pixel for pixel?** Printables are removed (D6). No printed documents ship. The FPDF documents, `render-document.php`, `print.php`, and barcode car tags go. On-screen reports and exports stay. [#55](https://github.com/PorkChopExpress86/derbynet/issues/55) is closed as not planned.
+5. **Must external replay apps keep working?** No (D9). Only the browser replay page is supported, and the XML `replay-message` protocol is dropped. The remote WebRTC camera stays. The replay page requires a login, and camera setup happens while logged in. The operator picks the camera device, resolution, and frame rate with a live preview, and the replay station remembers the choice. Today `website/replay.php` asks for the window's size. The replay settings are playback speed (`replay-rate`), number of showings (`replay-num-showings`), seconds recorded before the last car finishes (`replay-skipback`), a new post-roll of seconds after the last car finishes, and a new maximum clip length that defaults to 10 s. The post-roll and the maximum length are a default that follows the owner's stated interpretation, and the owner can still correct it. [#53](https://github.com/PorkChopExpress86/derbynet/issues/53) carries this out.
+6. **Must custom kiosk pages keep working?** No (D10). Kiosk pages are built in only, with no `local/kiosks/` loading. The Wrap-Up scene stops naming the missing `local/kiosks/feedback.kiosk`. The built-in pages are rebuilt in a modern front end chosen by [#71](https://github.com/PorkChopExpress86/derbynet/issues/71). ADR-10 records this.
+7. **Is hosted multi-group mode in scope?** No (D11, confirmed in D12). One deployment serves one organization. `settings.lock` and the per-group config folders go. A container environment variable locks settings if that is ever needed.
+
+The owner also decided these points in the same review.
+
+- **Database (D1).** SQLite in WAL mode by default, Postgres as a first-class option through a compose profile and `DATABASE_URL`, and CI on both engines. ADR-05 records this.
+- **Deployment (D3).** Docker is the only deployment, and the image runs Python 3.14 only. ADR-03 and ADR-14 record this. [#60](https://github.com/PorkChopExpress86/derbynet/issues/60) is closed as not planned. By default (D4), the Pi timer and photo-stand container images ([#59](https://github.com/PorkChopExpress86/derbynet/issues/59)) move to the backlog, and the browser timer is the supported timer client.
+- **Balloting (D7).** [#54](https://github.com/PorkChopExpress86/derbynet/issues/54) moves to the backlog. If it is built later, a parent scans a QR code shown at check-in and the phone receives a unique per-racer voting token, with one vote per token and no device fingerprinting. The ballot rows S14 to S16 in [#64](https://github.com/PorkChopExpress86/derbynet/issues/64) leave the cutover gate with it.
+- **Check-in and car weight (D6, D8).** A check-in station weighs the car, enters the racer and car names, generates the car number from the class, and takes the car photo in the browser. Each class sets its weigh-in to none, pass or fail, or recorded weight, in grams, ounces, or pounds. By default, weight is stored in grams, entered and shown in the class's unit, with an optional maximum that warns at check-in. [#70](https://github.com/PorkChopExpress86/derbynet/issues/70) builds it.
+- **Race-day flow (D11, D12).** The owner races one class at a time. Scouts round 1, then a scouts final with the top 4 or 8, then outlaws round 1, then an outlaws final. The playlist queues the whole day. Each step can wait for an operator before it starts, and by default the playlist waits between rounds while kiosks show the leaders. One tap starts the next round.
+- **PHP fixes (D12).** The PHP server gets no fixes. It is never exposed to the internet, and every row in [#64](https://github.com/PorkChopExpress86/derbynet/issues/64) is fixed only in the Django port.
 
 ## Check the cited paths
 
@@ -51,4 +60,4 @@ The owner answers each question, or accepts its recommended default, in a commen
 server/docs/adr/check-paths.sh
 ```
 
-The script exits with a nonzero status and names each path that does not exist. The `ALLOWED_MISSING` list in the script holds paths that are intended but do not exist in the repository. The `NOT_PATHS` list holds backticked text that looks like a path but is not a path from the repository root, such as URL routes and files that an install creates.
+The script exits with a nonzero status and names each path that does not exist. The `ALLOWED_MISSING` list in the script holds paths that are intended but do not exist in the repository. The `NOT_PATHS` list holds backticked text that looks like a path but is not a path from the repository root, such as URL routes, query names, and files that an install creates.

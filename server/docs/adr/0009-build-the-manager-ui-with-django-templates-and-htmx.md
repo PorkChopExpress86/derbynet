@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
+Accepted. The owner accepted it on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
 
 ## Context
 
@@ -14,7 +14,7 @@ Render manager pages on the server with Django templates. Use htmx for partial u
 
 ## Consequences
 
-Node is not needed at runtime or in the Debian package. Every drag-and-drop interaction gets a tap alternative. [#39](https://github.com/PorkChopExpress86/derbynet/issues/39) owns the design system.
+Node is not needed at runtime. Every drag-and-drop interaction gets a tap alternative. [#39](https://github.com/PorkChopExpress86/derbynet/issues/39) owns the design system.
 
 ## Evidence
 

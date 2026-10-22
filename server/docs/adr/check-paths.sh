@@ -25,6 +25,7 @@ NOT_PATHS=(
   "profiles.js"        # Ant build output
   "config-roles.inc"   # the installer writes it into local/
   "settings.lock"      # created by an install that locks its settings
+  "poll.kiosk"         # an action.php query name, not a file
 )
 
 # A bare name with a file extension is looked up in the repository root, then in website/.

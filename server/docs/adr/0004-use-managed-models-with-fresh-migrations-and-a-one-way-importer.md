@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
+Accepted. The owner accepted it on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
 
 ## Context
 
@@ -16,7 +16,7 @@ Design clean Django models with their own migrations. Do not map unmanaged model
 
 ## Consequences
 
-No `schema_version()` branches survive. The `RaceInfo` key names survive only as the importer's mapping table and as the vocabulary of `.pref` preference files, which users keep from year to year. [#12](https://github.com/PorkChopExpress86/derbynet/issues/12) and [#14](https://github.com/PorkChopExpress86/derbynet/issues/14) carry this out.
+No `schema_version()` branches survive. The `RaceInfo` key names survive only as the importer's mapping table and as the vocabulary of `.pref` preference files, which users keep from year to year. One legacy event folder becomes one `Event` row in the single database that ADR-05 describes (owner decision D2). [#12](https://github.com/PorkChopExpress86/derbynet/issues/12) and [#14](https://github.com/PorkChopExpress86/derbynet/issues/14) carry this out.
 
 ## Evidence
 

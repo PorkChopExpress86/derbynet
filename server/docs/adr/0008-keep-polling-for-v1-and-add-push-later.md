@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The owner accepts it in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
+Accepted. The owner accepted it on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
 
 ## Context
 
@@ -14,7 +14,7 @@ Keep every polling endpoint and interval. Server push through SSE or Channels is
 
 ## Consequences
 
-Plain WSGI with gunicorn is enough. There is no Redis dependency. Poll views must stay cheap. [#56](https://github.com/PorkChopExpress86/derbynet/issues/56) covers push.
+Plain WSGI with gunicorn is enough. There is no Redis dependency. Poll views must stay cheap. [#56](https://github.com/PorkChopExpress86/derbynet/issues/56) covers push. The kiosk framework spike ([#71](https://github.com/PorkChopExpress86/derbynet/issues/71), owner decision D10) may find that synced kiosk animations need push. If it does, push moves ahead of parity, and a new ADR supersedes this one.
 
 ## Evidence
 
