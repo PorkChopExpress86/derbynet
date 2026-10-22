@@ -42,28 +42,46 @@ export const RULES = [
       : text,
   },
   {
+    id: 'export-results-order',
+    doc: 'The Results sheet of export-json.php lists heats ORDER BY completed, heat, lane, and completed has one-second resolution, so rows that finished in different seconds from run to run swap places.  The rule first checks, on the unmasked timestamps, that PHP listed the rows in that order, then sorts them by class, round, heat, lane.  It runs before completed-timestamp, and fails the capture if a Results sheet is not laid out as it expects.',
+    apply: (ex, text) => {
+      if (!isJson(ex) || !/^GET export-json\.php(\?|$)/.test(ex.request ?? '')) return text;
+      if (!JSON.parse(text).some((sheet) => sheet[0] === 'Results')) return text;
+      let matched = false;
+      const sorted = text.replace(/("Results",\n {8}\[\n)([\s\S]*?)(\n {8}\]\n {4}\])/, (m, head, rows, tail) => {
+        matched = true;
+        const [header, ...data] = rows.split(/(?<=\n {12}\]),\n(?= {12}\[\n)/);
+        const columns = JSON.parse(header);
+        const col = (name) => {
+          const i = columns.indexOf(name);
+          if (i < 0) throw new Error(`${ex.name}: the export-json.php Results sheet has no ${name} column`);
+          return i;
+        };
+        const [cls, round, heat, lane, completed] = ['Class', 'Round', 'Heat', 'Lane', 'Completed'].map(col);
+        const compare = (x, y, cols) => {
+          for (const i of cols) if (x[i] !== y[i]) return (x[i] ?? '') < (y[i] ?? '') ? -1 : 1;
+          return 0;
+        };
+        const rowsJson = data.map((r) => JSON.parse(r));
+        // SQLite sorts NULL first, so a heat not yet raced comes before every raced one.
+        rowsJson.forEach((r, i) => {
+          if (i > 0 && compare(rowsJson[i - 1], r, [completed, heat, lane]) > 0) {
+            throw new Error(`${ex.name}: export-json.php Results row ${i + 1} breaks ORDER BY completed, heat, lane`);
+          }
+        });
+        const order = data.map((r, i) => i).sort((a, b) => compare(rowsJson[a], rowsJson[b], [cls, round, heat, lane]));
+        return head + [header, ...order.map((i) => data[i])].join(',\n') + tail;
+      });
+      if (!matched) throw new Error(`${ex.name}: export-json.php has a Results sheet that export-results-order does not recognize`);
+      return sorted;
+    },
+  },
+  {
     id: 'completed-timestamp',
     doc: 'A "YYYY-MM-DD HH:MM:SS" string in a JSON body, which is when a heat result was written (RaceChart.completed), becomes "<timestamp>".',
     apply: (ex, text) => isJson(ex)
       ? text.replace(/"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d"/g, '"<timestamp>"')
       : text,
-  },
-  {
-    id: 'export-results-order',
-    doc: 'The Results sheet of export-json.php lists heats ORDER BY completed, heat, lane, and completed has one-second resolution, so rows that finished in different seconds from run to run swap places.  The rows are sorted by class, round, heat, lane instead.',
-    apply: (ex, text) => {
-      if (!isJson(ex)) return text;
-      return text.replace(/("Results",\n {8}\[\n)([\s\S]*?)(\n {8}\]\n {4}\])/, (m, head, rows, tail) => {
-        const [header, ...data] = rows.split(/(?<=\n {12}\]),\n(?= {12}\[\n)/);
-        const key = (r) => JSON.parse(r);
-        data.sort((a, b) => {
-          const [x, y] = [key(a), key(b)];
-          for (const i of [0, 1, 2, 3]) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
-          return 0;
-        });
-        return head + [header, ...data].join(',\n') + tail;
-      });
-    },
   },
   {
     id: 'award-duration',

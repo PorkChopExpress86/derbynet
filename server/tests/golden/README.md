@@ -104,9 +104,11 @@ Files, by directory (`find http -type f` lists them all):
 | `award-duration` | The `"duration"` in `query=award.current` becomes `"<seconds>"`. |
 | `reschedule-timing` | The seconds in `schedule.reschedule`'s `"timing"` and trace become `"<seconds>"`, and the exchange gets a `note: deterministic` line. A reschedule whose request took half its search deadline or longer is left out and listed in a `.omitted.txt`, and so is every later exchange in that transcript when the omitted one changed the schedule. See [Reschedules](#reschedules). |
 | `completed-timestamp` | A `"YYYY-MM-DD HH:MM:SS"` string in a JSON body (when a heat result was written, `RaceChart.completed`) becomes `"<timestamp>"`. |
-| `export-results-order` | The Results sheet of `export-json.php` is listed `ORDER BY completed, heat, lane`, and `completed` has one-second resolution, so rows swap places from run to run. The rows are sorted by class, round, heat, lane instead. |
+| `export-results-order` | The Results sheet of `export-json.php` is listed `ORDER BY completed, heat, lane`, and `completed` has one-second resolution, so rows swap places from run to run. The rule first checks, on the unmasked `Completed` values, that PHP listed every row in that order (a heat not yet raced, with `Completed` null, comes first), and fails the capture if not. Then it sorts the rows by class, round, heat, lane. It also fails the capture if an `export-json.php` response has a Results sheet it does not recognize, so it can never pass rows through unsorted. |
 
 Values the capture does not need to mask because it never records them: session cookies (only `Set-Cookie`-independent fields, status, content type and `Location` are kept), other response headers, and photo bytes (issue #8).
+
+The committed order of the Results rows is therefore not PHP's: which rows share a second, and so the order across heats and rounds, changes from run to run, and the fixture cannot pin it. What PHP guarantees, and what a port must keep, is `ORDER BY completed, heat, lane` with null first. A port's harness that runs its export through `normalize.mjs` gets the same check.
 
 Fixed by construction: the server image sets `TZ=America/New_York`, so `RaceChart.completed` is a local-time string wherever it is captured. Race times come from a function of car number and lane, never from a clock.
 
