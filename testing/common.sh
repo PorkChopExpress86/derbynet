@@ -69,6 +69,46 @@ function curl_text() {
         | sed -e 's/&nbsp;/ /g' | tee -a $OUTPUT_CURL
 }
 
+# Fetch a page and check that it is there and clean: HTTP status 200 after any
+# redirects, and no PHP or Python error text in the body.  The body is not parsed,
+# so a server is free to render HTML the way it likes.  Prints the body.
+function curl_page() {
+	echo ' ' ' ' ' ' $1 >&2
+	echo    >> $OUTPUT_CURL
+	echo $1 >> $OUTPUT_CURL
+	echo    >> $OUTPUT_CURL
+	local STATUS
+	STATUS=$(curl --location -s -o $DEBUG_CURL -w '%{http_code}' \
+                  -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/$1)
+	cat $DEBUG_CURL >> $OUTPUT_CURL
+	if [ "$STATUS" != 200 ] ; then
+		test_fails $1 answered with HTTP status $STATUS
+	fi
+	if grep -q 'Notice\|Warning\|Fatal\|Traceback' $DEBUG_CURL ; then
+		test_fails $1 contains an error message: \
+				   "$(grep -m 1 'Notice\|Warning\|Fatal\|Traceback' $DEBUG_CURL)"
+	fi
+	cat $DEBUG_CURL
+}
+
+# The visible text of an HTML page on stdin: scripts, styles and tags are gone,
+# common entities are decoded, and runs of whitespace are one space.
+function page_text() {
+	perl -0777 -pe '
+		s{<(script|style)\b.*?</\1>}{ }gsi;
+		s{<[^>]*>}{ }gs;
+		s{&nbsp;}{ }g; s{&lt;}{<}g; s{&gt;}{>}g; s{&quot;}{"}g;
+		s{&#0*39;|&apos;}{\x27}g; s{&amp;}{&}g;
+		s{\s+}{ }g;'
+}
+
+# Prints the HTTP status and the redirect target of a page, without following
+# redirects, e.g. "302 http://localhost/login.php".
+function curl_status() {
+	curl -s -o /dev/null -w '%{http_code} %{redirect_url}' \
+		 -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/$1
+}
+
 function curl_getj() {
 	[ "$NOANNOUNCE" = "" ] && echo ' ' ' ' ' ' $1 >&2
 	echo    >> $OUTPUT_CURL
@@ -240,6 +280,16 @@ function expect_one {
 	fi
 }
 
+# Reads page text (see page_text) on stdin and fails unless the sentence $1
+# appears in it exactly once, as whole words.
+function expect_sentence {
+    local N
+    N=$(grep -o -E "(^| )$(printf '%s' "$1" | sed -e 's#[][\.*^$/+?(){}|]#\\&#g')( |\$)" | wc -l)
+    if [ "$N" -ne 1 ]; then
+        test_fails expecting one occurrence of the sentence "$1", but found $N
+    fi
+}
+
 function expect_eq {
     if [ "`cat`" != "$1" ]; then
         test_fails expecting string "$1"
@@ -358,19 +408,117 @@ function staged_heat6() {
         test_fails
 }
 
-Q='"'
+# Lookups.  They read one query and leave $DEBUG_CURL and $OUTPUT_CURL alone, so
+# a caller can use them in the middle of a command that reads the previous
+# response.  A lookup that finds nothing stops the whole test.  The suite never
+# assumes a database ID: it asks for the ID by its stable key (car number, class
+# name, award name) or takes it from the response that created the thing.
+function lookup_get() {
+    curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL "$BASE_URL/$1"
+}
 
+# $$ is the test script's pid even inside $(...), where a plain "exit" would
+# only leave the subshell.
+function lookup_fails() {
+    tput setaf 1  # red text
+    echo TEST FAILURE: $* >&2
+    stacktrace >&2
+    tput setaf 0  # black text
+    kill -TERM $$
+    exit 1
+}
+
+# racerid_of <carnumber>
+racerid_of() {
+    local ID
+    ID=$(lookup_get "action.php?query=racer.list" \
+             | jq --arg c "$1" '.racers | map(select(.carnumber | tostring == $c))[0].racerid // empty')
+    [ -n "$ID" ] || lookup_fails "No racer has car number $1"
+    echo $ID
+}
+
+# roundid_of <class name or prefix of one> <round number>
+roundid_of() {
+    local ID
+    ID=$(lookup_get "action.php?query=poll&values=rounds" \
+             | jq --arg c "$1" --argjson r "$2" \
+                  '.rounds | map(select(.round == $r)) |
+                   (map(select(.class == $c))[0] // map(select(.class | startswith($c)))[0]).roundid // empty')
+    [ -n "$ID" ] || lookup_fails "No round $2 of a class named $1"
+    echo $ID
+}
+
+# awardid_of <award name or prefix of one>
+awardid_of() {
+    local ID
+    ID=$(lookup_get "action.php?query=award.list" \
+             | jq --arg n "$1" \
+                  '.awards | (map(select(.awardname == $n))[0] // map(select(.awardname | startswith($n)))[0]).awardid // empty')
+    [ -n "$ID" ] || lookup_fails "No award is named $1"
+    echo $ID
+}
+
+# These three print "null", not a failure, when there is no match, because some
+# tests check that a group is gone.
+#
 # "$1" is a (unique) prefix for the rank name sought
 # E.g. WOLF_RANK=$(rankid_of "White")
 rankid_of() {
-    NOANNOUNCE=1 curl_getj "action.php?query=class.list" \
-        | jq ".classes | map(.subgroups) | add | map(select(.name | startswith($Q$1$Q)))[0].rankid"
+    lookup_get "action.php?query=class.list" \
+        | jq --arg n "$1" '.classes | map(.subgroups) | add | map(select(.name | startswith($n)))[0].rankid'
 }
 classid_of() {
-    NOANNOUNCE=1 curl_getj "action.php?query=class.list" \
-        | jq ".classes | map(select(.name | startswith($Q$1$Q)))[0].classid"
+    lookup_get "action.php?query=class.list" \
+        | jq --arg n "$1" '.classes | map(select(.name | startswith($n)))[0].classid'
 }
 partitionid_of() {
-    NOANNOUNCE=1 curl_getj "action.php?query=poll&values=partitions" \
-        | jq ".partitions | map(select(.name | startswith($Q$1$Q)))[0].partitionid"
+    lookup_get "action.php?query=poll&values=partitions" \
+        | jq --arg n "$1" '.partitions | map(select(.name | startswith($n)))[0].partitionid'
+}
+
+# standings_sheet <name>: the rows of the standings sheet "Standings for <name>"
+# in the workbook that export-json.php serves, as a JSON array of objects keyed
+# by column header.  The sheet's first row names it and its third row holds the
+# headers, so the sheet's own title is not needed, and neither is any ID.
+standings_sheet() {
+    curl_getj export-json.php | \
+        jq -c --arg t "Standings for $1" \
+           'map(select(.[1][0][0]? == $t))[0][1] as $rows
+            | $rows[2] as $h
+            | $rows[3:] | map([$h, .] | transpose | map({(.[0]): .[1]}) | add)'
+}
+
+# standings_row <name> <carnumber>: one row of standings_sheet <name>
+standings_row() {
+    standings_sheet "$1" | \
+        jq -c --arg c "$2" 'map(select(.["Car Number"] | tostring == $c))[0] // empty'
+}
+
+# expect_row <standings name> <carnumber> <the whole row, as a JSON array>
+# Types are not the fact under test, so values are compared as strings.
+expect_row() {
+    standings_row "$1" $2 | \
+        jq -e --argjson e "$3" '[.[]] | map(tostring) == ($e | map(tostring))' >/dev/null || \
+        test_fails Standings for "$1", car $2 should be "$3"
+}
+
+# expect_places <standings name> <column header> <carnumber> <place> ...
+expect_places() {
+    local SHEET="$1" COLUMN="$2"
+    shift 2
+    while [ $# -gt 0 ] ; do
+        standings_row "$SHEET" $1 | jq -e --arg c "$COLUMN" --arg p $2 '.[$c] | tostring == $p' >/dev/null || \
+            test_fails Standings for "$SHEET", car $1 should have $COLUMN = $2
+        shift 2
+    done
+}
+
+# Reads a roster.new response on stdin and prints the finalists' car numbers as
+# a sorted JSON array, e.g. [101,111,126].
+finalists_carnumbers() {
+    local IDS
+    IDS=$(jq -c '[.finalists[].racerid]')
+    lookup_get "action.php?query=racer.list" \
+        | jq -c --argjson ids "$IDS" \
+             '[.racers[] | select(.racerid as $r | $ids | index($r)) | .carnumber] | sort'
 }
