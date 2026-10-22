@@ -34,7 +34,7 @@ curl_post action.php "action=timer-message&message=IDENTIFIED&nlanes=4" | check_
 
 # TODO test replay connects after "now racing" started.
 
-run_heat 1 1 101:3.3294 121:3.4179 141:3.8182 111:2.2401
+run_heat 1 1 102:3.3294 121:3.4179 141:3.8182 111:2.2401
 
 curl_postj action.php "action=replay.message" | \
     jq -e '.replay == ["CANCEL", "START Lions & Tigers_Round1_Heat01",
