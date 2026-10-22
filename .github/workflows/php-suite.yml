@@ -1,0 +1,52 @@
+name: php-suite
+
+# Runs the shell test suite in testing/ against the PHP server image built from
+# this commit.  Every step is a step of testing/docker/run-suite.sh, so a
+# developer can run the same thing locally; see testing/README.md.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  php-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build test harness image
+        run: testing/docker/run-suite.sh harness
+
+      - name: Build PHP assets
+        run: testing/docker/run-suite.sh assets
+
+      - name: Build and start the server image
+        run: testing/docker/run-suite.sh server
+
+      - name: Raise PHP and nginx timeouts
+        run: testing/docker/run-suite.sh timeout
+
+      - name: Run the test suite
+        run: testing/docker/run-suite.sh suite
+
+      - name: Collect server log
+        if: failure()
+        run: docker logs derbynet-test-server > testing/server.log 2>&1 || true
+
+      - name: Upload test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-output
+          path: |
+            testing/output.curl
+            testing/debug.curl
+            testing/suite.log
+            testing/server.log
+          if-no-files-found: ignore
+
+      - name: Remove server container
+        if: always()
+        run: testing/docker/run-suite.sh clean
