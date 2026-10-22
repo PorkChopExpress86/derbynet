@@ -54,7 +54,7 @@ The sweep:
 
 Nothing is sampled in the manifests. The full records are committed for a representative subset: every lane count, car counts from the lane count to the lane count plus 10, and 17, 23, 50, 100 and 200. Any other full record is regenerated on demand by calling `ordered_record()` in `capture-engine.php`.
 
-The sweep takes about 20 minutes on 8 cores, because `make_ordered_schedule()` is cubic in the car count. The sweep workers run under the PHP JIT, which is 3.7 times faster; the tool recomputes sampled cases without the JIT and exits non-zero if a hash differs.
+The sweep takes about 20 minutes on 8 cores, because `make_ordered_schedule()` is cubic in the car count. The sweep workers run under the PHP JIT, which is 3.7 times faster; the tool recomputes a sample of cases without the JIT and exits non-zero if a hash differs. See [Known risks](#known-risks) for how small that sample is.
 
 Counts printed by the tool and recorded in `engine/summary.txt`: see that file. At the time of writing they were:
 
@@ -142,6 +142,22 @@ These are recorded as found and are not fixed here:
 - `timer-message` with `IDENTIFIED&nlanes=4` (what the suite sends) does not set the lane count, which the server reads from `lane_count`.
 - `schedule.reschedule` reports `"run-N-timed-out": true` both when a search reached its deadline and when it stopped early on a perfect score (`$score == 0`, which a `null` score also passes). Exchanges 004, 009 and 010 of `http/suite/reschedule.http` carry the flag for the second reason.
 - A `FINISHED` for the wrong heat answers `<failure code='wrong-heat'>` and then `<success/>`.
+
+## Known risks
+
+These are limits of the capture that are documented, not fixed.
+
+**The JIT cross-check is a sample.** The sweep workers run with `opcache.jit=tracing`. Afterwards `jit_cross_check()` in `capture-engine.php` recomputes 50 of the 12,624 ordered cases in the parent process, without the JIT, and compares their hashes with the manifest. The sample is every lane count (and 1 lane) with 40 and 61 cars, `n_times_per_lane` 1, 3 and 6, and both `max_runs_per_car` values. A JIT miscompile outside that sample, at 150 cars for example, is written into the fixtures, and CI cannot see it, because CI captures with the same JIT. The parent process runs without the JIT only because the image's CLI settings leave `opcache.enable_cli` at `0` and `opcache.jit` at `disable`. If the image ever turns opcache on for the CLI, both sides run the JIT and the check compares the JIT with itself.
+
+To widen the sample, add car counts or `n_times_per_lane` values to the loops in `jit_cross_check()`. To check every case, run the sweep without the JIT and compare it with git. It takes about 3.7 times as long as the normal engine capture:
+
+    server/tests/golden/capture.sh --engine-only --keep-server
+    docker exec -w /var/www/html derbynet-golden-server \
+        php -d serialize_precision=-1 /tmp/golden-capture/capture-engine.php /tmp/golden-out --no-jit
+    rm -rf server/tests/golden/engine
+    docker cp derbynet-golden-server:/tmp/golden-out/engine server/tests/golden/engine
+    git status --porcelain server/tests/golden/engine     # prints nothing if the JIT agrees
+    DERBYNET_TEST_PREFIX=derbynet-golden testing/docker/run-suite.sh clean
 
 ## Adding a case
 
