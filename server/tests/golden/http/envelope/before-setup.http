@@ -1,0 +1,46 @@
+### 001 not-a-page
+request: GET action.php
+status: 200
+content-type: text/html; charset=UTF-8
+length: 107
+body:
+<!DOCTYPE html><html><head><title>Not a Page</title></head><body><h1>This is not a page.</h1></body></html>
+### 002 poll-without-database
+request: GET action.php?query=poll.coordinator
+status: 302
+content-type: application/json; charset=utf-8
+location: setup.php
+length: 0
+body:
+
+### 003 login-without-database
+request: POST action.php
+request-body: action=role.login&name=RaceCoordinator&password=doyourbest
+status: 302
+content-type: application/json; charset=utf-8
+location: setup.php
+length: 0
+body:
+
+### 004 unrecognized-without-database
+request: GET action.php?query=no.such
+status: 302
+content-type: application/json; charset=utf-8
+location: setup.php
+length: 0
+body:
+
+### 005 nodata-query-without-database
+request: GET action.php?query=no.such.nodata
+status: 200
+content-type: application/json; charset=utf-8
+length: 149
+body:
+{
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized query: no.such.nodata"
+    }
+}
+

@@ -1,0 +1,59 @@
+### 001 identified-unconfirmed
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=IDENTIFIED&lane_count=4&timer=TestTimer&confirmed=0
+status: 200
+content-type: text/xml; charset=utf-8
+length: 294
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="IDENTIFIED" lane_count="4" timer="TestTimer" confirmed="0">
+  <success/>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="5" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 002 heartbeat-while-unconfirmed
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT&confirmed=0
+status: 200
+content-type: text/xml; charset=utf-8
+length: 260
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT" confirmed="0">
+  <success/>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="5" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 003 heartbeat-confirmed
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT&confirmed=1
+status: 200
+content-type: text/xml; charset=utf-8
+length: 260
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT" confirmed="1">
+  <success/>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="5" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 004 heartbeat-after-confirmed
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+

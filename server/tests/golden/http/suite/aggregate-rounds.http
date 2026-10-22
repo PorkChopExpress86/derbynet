@@ -1,0 +1,2231 @@
+### 001 roster.new
+request: POST action.php
+request-body: action=roster.new&top=4&bucketed=1&rankid_2=1&rankid_3=1&rankid_4=1&rankid_5=1&rankid_6=1&rankid_7=1&classname=Rank%20Final
+status: 200
+content-type: application/json; charset=utf-8
+length: 11235
+body:
+{
+    "action": {
+        "action": "roster.new",
+        "top": 4,
+        "bucketed": 1,
+        "rankid_2": 1,
+        "rankid_3": 1,
+        "rankid_4": 1,
+        "rankid_5": 1,
+        "rankid_6": 1,
+        "rankid_7": 1,
+        "classname": "Rank Final"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "finalists": [
+        {
+            "racerid": 62,
+            "score": 3.2215
+        },
+        {
+            "racerid": 47,
+            "score": 3.33625
+        },
+        {
+            "racerid": 17,
+            "score": 3.349
+        },
+        {
+            "racerid": 77,
+            "score": 3.362
+        },
+        {
+            "racerid": 58,
+            "score": 3.226
+        },
+        {
+            "racerid": 63,
+            "score": 3.251
+        },
+        {
+            "racerid": 18,
+            "score": 3.2895
+        },
+        {
+            "racerid": 78,
+            "score": 3.34275
+        },
+        {
+            "racerid": 69,
+            "score": 3.096
+        },
+        {
+            "racerid": 19,
+            "score": 3.19275
+        },
+        {
+            "racerid": 74,
+            "score": 3.2435
+        },
+        {
+            "racerid": 9,
+            "score": 3.36425
+        },
+        {
+            "racerid": 20,
+            "score": 3.12175
+        },
+        {
+            "racerid": 45,
+            "score": 3.26425
+        },
+        {
+            "racerid": 50,
+            "score": 3.3377499999999998
+        },
+        {
+            "racerid": 35,
+            "score": 3.3775
+        },
+        {
+            "racerid": 26,
+            "score": 3.2105
+        },
+        {
+            "racerid": 6,
+            "score": 3.29475
+        },
+        {
+            "racerid": 16,
+            "score": 3.29975
+        },
+        {
+            "racerid": 46,
+            "score": 3.42675
+        },
+        {
+            "racerid": 41,
+            "score": 3.5545
+        },
+        {
+            "racerid": 36,
+            "score": 3.6375
+        },
+        {
+            "racerid": 21,
+            "score": 3.7665
+        }
+    ],
+    "concerns": [
+        "There are only 3 eligible Cougars racer(s)."
+    ],
+    "new-round": {
+        "roundid": 6
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 5,
+        "roundid": 5,
+        "round": 1,
+        "tbodyid": 5,
+        "heat": 16,
+        "number-of-heats": 16,
+        "class": "Arrows <<--<<"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 80,
+            "name": "Weston Whigham",
+            "carname": "",
+            "carnumber": 480,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.646,
+            "finishplace": 3,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 2,
+            "racerid": 10,
+            "name": "Carey Craney",
+            "carname": "",
+            "carnumber": 410,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.184,
+            "finishplace": 1,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 3,
+            "racerid": 25,
+            "name": "Earnest Evangelista",
+            "carname": "",
+            "carnumber": 425,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.678,
+            "finishplace": 4,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 4,
+            "racerid": 60,
+            "name": "Numbers Nish",
+            "carname": "",
+            "carnumber": 460,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.263,
+            "finishplace": 2,
+            "subgroup": "Arrows <<--<<"
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                },
+                {
+                    "rankid": 6,
+                    "count": 8,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                },
+                {
+                    "rankid": 7,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Cougars"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 6,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Rank Final",
+            "aggregate-by-subgroup": true,
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "White's Wolves"
+                },
+                {
+                    "classid": 3,
+                    "name": "Bears and Fr\u00e8res"
+                },
+                {
+                    "classid": 4,
+                    "name": "Webelos (\"Webes\")"
+                },
+                {
+                    "classid": 5,
+                    "name": "Arrows <<--<<"
+                },
+                {
+                    "classid": 1,
+                    "name": "Lions & Tigers"
+                }
+            ],
+            "constituent-ranks": [
+                {
+                    "rankid": 2,
+                    "name": "White's Wolves",
+                    "classid": 2,
+                    "class": "White's Wolves"
+                },
+                {
+                    "rankid": 3,
+                    "name": "Bears and Fr\u00e8res",
+                    "classid": 3,
+                    "class": "Bears and Fr\u00e8res"
+                },
+                {
+                    "rankid": 4,
+                    "name": "Webelos (\"Webes\")",
+                    "classid": 4,
+                    "class": "Webelos (\"Webes\")"
+                },
+                {
+                    "rankid": 5,
+                    "name": "Arrows <<--<<",
+                    "classid": 5,
+                    "class": "Arrows <<--<<"
+                },
+                {
+                    "rankid": 6,
+                    "name": "Tigers",
+                    "classid": 1,
+                    "class": "Lions & Tigers"
+                },
+                {
+                    "rankid": 7,
+                    "name": "Cougars",
+                    "classid": 1,
+                    "class": "Lions & Tigers"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 6,
+            "classid": 6,
+            "class": "Rank Final",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 23,
+            "passed": 23,
+            "unscheduled": 23,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Rank Final, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 002 roster.delete
+request: POST action.php
+request-body: action=roster.delete&roundid=6
+status: 200
+content-type: application/json; charset=utf-8
+length: 6649
+body:
+{
+    "action": {
+        "action": "roster.delete",
+        "roundid": 6
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 5,
+        "roundid": 5,
+        "round": 1,
+        "tbodyid": 5,
+        "heat": 16,
+        "number-of-heats": 16,
+        "class": "Arrows <<--<<"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 80,
+            "name": "Weston Whigham",
+            "carname": "",
+            "carnumber": 480,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.646,
+            "finishplace": 3,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 2,
+            "racerid": 10,
+            "name": "Carey Craney",
+            "carname": "",
+            "carnumber": 410,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.184,
+            "finishplace": 1,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 3,
+            "racerid": 25,
+            "name": "Earnest Evangelista",
+            "carname": "",
+            "carnumber": 425,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.678,
+            "finishplace": 4,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 4,
+            "racerid": 60,
+            "name": "Numbers Nish",
+            "carname": "",
+            "carnumber": 460,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.263,
+            "finishplace": 2,
+            "subgroup": "Arrows <<--<<"
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                },
+                {
+                    "rankid": 6,
+                    "count": 8,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                },
+                {
+                    "rankid": 7,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Cougars"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Arrows <<--<<, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 003 roster.new
+request: POST action.php
+request-body: action=roster.new&top=4&bucketed=1&classid_1=1&classid_2=1&classname=Younger%20Finals
+status: 200
+content-type: application/json; charset=utf-8
+length: 8289
+body:
+{
+    "action": {
+        "action": "roster.new",
+        "top": 4,
+        "bucketed": 1,
+        "classid_1": 1,
+        "classid_2": 1,
+        "classname": "Younger Finals"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "finalists": [
+        {
+            "racerid": 26,
+            "score": 3.2105
+        },
+        {
+            "racerid": 1,
+            "score": 3.239
+        },
+        {
+            "racerid": 31,
+            "score": 3.25625
+        },
+        {
+            "racerid": 11,
+            "score": 3.2605
+        },
+        {
+            "racerid": 62,
+            "score": 3.2215
+        },
+        {
+            "racerid": 47,
+            "score": 3.33625
+        },
+        {
+            "racerid": 17,
+            "score": 3.349
+        },
+        {
+            "racerid": 77,
+            "score": 3.362
+        }
+    ],
+    "new-round": {
+        "roundid": 6
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 5,
+        "roundid": 5,
+        "round": 1,
+        "tbodyid": 5,
+        "heat": 16,
+        "number-of-heats": 16,
+        "class": "Arrows <<--<<"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 80,
+            "name": "Weston Whigham",
+            "carname": "",
+            "carnumber": 480,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.646,
+            "finishplace": 3,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 2,
+            "racerid": 10,
+            "name": "Carey Craney",
+            "carname": "",
+            "carnumber": 410,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.184,
+            "finishplace": 1,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 3,
+            "racerid": 25,
+            "name": "Earnest Evangelista",
+            "carname": "",
+            "carnumber": 425,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.678,
+            "finishplace": 4,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 4,
+            "racerid": 60,
+            "name": "Numbers Nish",
+            "carname": "",
+            "carnumber": 460,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.263,
+            "finishplace": 2,
+            "subgroup": "Arrows <<--<<"
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                },
+                {
+                    "rankid": 6,
+                    "count": 8,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                },
+                {
+                    "rankid": 7,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Cougars"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 6,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Younger Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "classid": 2,
+                    "name": "White's Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 6,
+            "classid": 6,
+            "class": "Younger Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 8,
+            "passed": 8,
+            "unscheduled": 8,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Younger Finals, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 004 roster.new
+request: POST action.php
+request-body: action=roster.new&top=4&bucketed=1&classid_3=1&classid_4=1&classid_5=1&classname=Older%20Finals
+status: 200
+content-type: application/json; charset=utf-8
+length: 9620
+body:
+{
+    "action": {
+        "action": "roster.new",
+        "top": 4,
+        "bucketed": 1,
+        "classid_3": 1,
+        "classid_4": 1,
+        "classid_5": 1,
+        "classname": "Older Finals"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "finalists": [
+        {
+            "racerid": 58,
+            "score": 3.226
+        },
+        {
+            "racerid": 63,
+            "score": 3.251
+        },
+        {
+            "racerid": 18,
+            "score": 3.2895
+        },
+        {
+            "racerid": 78,
+            "score": 3.34275
+        },
+        {
+            "racerid": 69,
+            "score": 3.096
+        },
+        {
+            "racerid": 19,
+            "score": 3.19275
+        },
+        {
+            "racerid": 74,
+            "score": 3.2435
+        },
+        {
+            "racerid": 9,
+            "score": 3.36425
+        },
+        {
+            "racerid": 20,
+            "score": 3.12175
+        },
+        {
+            "racerid": 45,
+            "score": 3.26425
+        },
+        {
+            "racerid": 50,
+            "score": 3.3377499999999998
+        },
+        {
+            "racerid": 35,
+            "score": 3.3775
+        }
+    ],
+    "new-round": {
+        "roundid": 7
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 6,
+        "roundid": 6,
+        "round": 1,
+        "tbodyid": 6,
+        "heat": 8,
+        "number-of-heats": 8,
+        "class": "Younger Finals"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 77,
+            "name": "Tracey Trapp",
+            "carname": "",
+            "carnumber": 277,
+            "note": "",
+            "photo": "",
+            "finishtime": 3,
+            "finishplace": 1,
+            "subgroup": "White's Wolves"
+        },
+        {
+            "lane": 2,
+            "racerid": 1,
+            "name": "Adolfo \"Dolf\" Asher",
+            "carname": "",
+            "carnumber": 101,
+            "note": "Anywhere",
+            "photo": "",
+            "finishtime": 3.477,
+            "finishplace": 2,
+            "subgroup": "Lions"
+        },
+        {
+            "lane": 3,
+            "racerid": 11,
+            "name": "Carroll Cybulski",
+            "carname": "",
+            "carnumber": 111,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.67,
+            "finishplace": 4,
+            "subgroup": "Lions"
+        },
+        {
+            "lane": 4,
+            "racerid": 17,
+            "name": "Darrell & Darrell Delaughter",
+            "carname": "",
+            "carnumber": 217,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.512,
+            "finishplace": 3,
+            "subgroup": "White's Wolves"
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                },
+                {
+                    "rankid": 6,
+                    "count": 8,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                },
+                {
+                    "rankid": 7,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Cougars"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 6,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Younger Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "classid": 2,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Older Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 3,
+                    "name": "Bears and Fr\u00e8res"
+                },
+                {
+                    "classid": 4,
+                    "name": "Webelos (\"Webes\")"
+                },
+                {
+                    "classid": 5,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 6,
+            "classid": 6,
+            "class": "Younger Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 8,
+            "passed": 8,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Younger Finals, Round 1"
+        },
+        {
+            "roundid": 7,
+            "classid": 7,
+            "class": "Older Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 12,
+            "passed": 12,
+            "unscheduled": 12,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Older Finals, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 005 roster.new
+request: POST action.php
+request-body: action=roster.new&top=8&roundid=7
+status: 200
+content-type: application/json; charset=utf-8
+length: 9583
+body:
+{
+    "action": {
+        "action": "roster.new",
+        "top": 8,
+        "roundid": 7
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "finalists": [
+        {
+            "racerid": 35,
+            "score": 3.19875
+        },
+        {
+            "racerid": 74,
+            "score": 3.20775
+        },
+        {
+            "racerid": 63,
+            "score": 3.23475
+        },
+        {
+            "racerid": 45,
+            "score": 3.31225
+        },
+        {
+            "racerid": 9,
+            "score": 3.333
+        },
+        {
+            "racerid": 78,
+            "score": 3.438
+        },
+        {
+            "racerid": 50,
+            "score": 3.46375
+        },
+        {
+            "racerid": 20,
+            "score": 3.48775
+        }
+    ],
+    "new-round": {
+        "roundid": 8
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 7,
+        "roundid": 7,
+        "round": 1,
+        "tbodyid": 7,
+        "heat": 12,
+        "number-of-heats": 12,
+        "class": "Older Finals"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 35,
+            "name": "Harley Howell",
+            "carname": "",
+            "carnumber": 435,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.11,
+            "finishplace": 2,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 2,
+            "racerid": 63,
+            "name": "Pete Pinkney",
+            "carname": "",
+            "carnumber": 363,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.026,
+            "finishplace": 1,
+            "subgroup": "Bears and Fr\u00e8res"
+        },
+        {
+            "lane": 3,
+            "racerid": 19,
+            "name": "Denny Deering",
+            "carname": "",
+            "carnumber": 504,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.401,
+            "finishplace": 4,
+            "subgroup": "Webelos (\"Webes\")"
+        },
+        {
+            "lane": 4,
+            "racerid": 50,
+            "name": "Lanny Lavigne",
+            "carname": "",
+            "carnumber": 450,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.152,
+            "finishplace": 3,
+            "subgroup": "Arrows <<--<<"
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                },
+                {
+                    "rankid": 6,
+                    "count": 8,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                },
+                {
+                    "rankid": 7,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Cougars"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 6,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Younger Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "classid": 2,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Older Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 3,
+                    "name": "Bears and Fr\u00e8res"
+                },
+                {
+                    "classid": 4,
+                    "name": "Webelos (\"Webes\")"
+                },
+                {
+                    "classid": 5,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 6,
+            "classid": 6,
+            "class": "Younger Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 8,
+            "passed": 8,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Younger Finals, Round 1"
+        },
+        {
+            "roundid": 7,
+            "classid": 7,
+            "class": "Older Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 12,
+            "passed": 12,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 12,
+            "heats_run": 12,
+            "name": "Older Finals, Round 1"
+        },
+        {
+            "roundid": 8,
+            "classid": 7,
+            "class": "Older Finals",
+            "round": 2,
+            "aggregate": true,
+            "roster_size": 8,
+            "passed": 8,
+            "unscheduled": 8,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Older Finals, Round 2"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 006 roster.new
+request: POST action.php
+request-body: action=roster.new&top=4&bucketed=1&classid_7=1&classid_6=1&classname=Final%20Finals
+status: 200
+content-type: application/json; charset=utf-8
+length: 10525
+body:
+{
+    "action": {
+        "action": "roster.new",
+        "top": 4,
+        "bucketed": 1,
+        "classid_7": 1,
+        "classid_6": 1,
+        "classname": "Final Finals"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "finalists": [
+        {
+            "racerid": 20,
+            "score": 3.09125
+        },
+        {
+            "racerid": 74,
+            "score": 3.29
+        },
+        {
+            "racerid": 50,
+            "score": 3.3185000000000002
+        },
+        {
+            "racerid": 45,
+            "score": 3.42325
+        },
+        {
+            "racerid": 26,
+            "score": 3.31725
+        },
+        {
+            "racerid": 11,
+            "score": 3.38375
+        },
+        {
+            "racerid": 17,
+            "score": 3.3925
+        },
+        {
+            "racerid": 77,
+            "score": 3.428
+        }
+    ],
+    "new-round": {
+        "roundid": 9
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 7,
+        "roundid": 8,
+        "round": 2,
+        "tbodyid": 8,
+        "heat": 8,
+        "number-of-heats": 8,
+        "class": "Older Finals"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 20,
+            "name": "Derek Dantonio",
+            "carname": "",
+            "carnumber": 420,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.028,
+            "finishplace": 1,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 2,
+            "racerid": 74,
+            "name": "Sean Strasburg",
+            "carname": "",
+            "carnumber": 515,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.104,
+            "finishplace": 3,
+            "subgroup": "Webelos (\"Webes\")"
+        },
+        {
+            "lane": 3,
+            "racerid": 45,
+            "name": "Julian Jarrard",
+            "carname": "",
+            "carnumber": 445,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.049,
+            "finishplace": 2,
+            "subgroup": "Arrows <<--<<"
+        },
+        {
+            "lane": 4,
+            "racerid": 50,
+            "name": "Lanny Lavigne",
+            "carname": "",
+            "carnumber": 450,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.301,
+            "finishplace": 4,
+            "subgroup": "Arrows <<--<<"
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                },
+                {
+                    "rankid": 6,
+                    "count": 8,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                },
+                {
+                    "rankid": 7,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Cougars"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 6,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Younger Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "classid": 2,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Older Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 3,
+                    "name": "Bears and Fr\u00e8res"
+                },
+                {
+                    "classid": 4,
+                    "name": "Webelos (\"Webes\")"
+                },
+                {
+                    "classid": 5,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 8,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Final Finals",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 7,
+                    "name": "Older Finals"
+                },
+                {
+                    "classid": 6,
+                    "name": "Younger Finals"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 6,
+            "classid": 6,
+            "class": "Younger Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 8,
+            "passed": 8,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Younger Finals, Round 1"
+        },
+        {
+            "roundid": 7,
+            "classid": 7,
+            "class": "Older Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 12,
+            "passed": 12,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 12,
+            "heats_run": 12,
+            "name": "Older Finals, Round 1"
+        },
+        {
+            "roundid": 8,
+            "classid": 7,
+            "class": "Older Finals",
+            "round": 2,
+            "aggregate": true,
+            "roster_size": 8,
+            "passed": 8,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Older Finals, Round 2"
+        },
+        {
+            "roundid": 9,
+            "classid": 8,
+            "class": "Final Finals",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 8,
+            "passed": 8,
+            "unscheduled": 8,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Final Finals, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

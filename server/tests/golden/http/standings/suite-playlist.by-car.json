@@ -1,0 +1,74 @@
+{
+  "st-r4": [
+    [
+      "302 First302 Last302"
+    ],
+    [
+      "203 First203 Last203"
+    ],
+    [
+      "201 First201 Last201"
+    ]
+  ],
+  "st-r2": [
+    [
+      "203 First203 Last203"
+    ],
+    [
+      "201 First201 Last201"
+    ],
+    [
+      "202 First202 Last202"
+    ]
+  ],
+  "st-q4": [
+    [
+      "203 First203 Last203",
+      "302 First302 Last302"
+    ],
+    [],
+    [
+      "201 First201 Last201"
+    ],
+    [
+      "301 First301 Last301"
+    ],
+    [
+      "202 First202 Last202"
+    ]
+  ],
+  "st-ff": [
+    [
+      "203 First203 Last203",
+      "302 First302 Last302"
+    ],
+    [],
+    [
+      "201 First201 Last201"
+    ],
+    [
+      "301 First301 Last301"
+    ],
+    [
+      "202 First202 Last202"
+    ],
+    [
+      "101 First101 Last101",
+      "102 First102 Last102"
+    ]
+  ],
+  "st-r3": [
+    [
+      "302 First302 Last302"
+    ],
+    [
+      "301 First301 Last301"
+    ]
+  ],
+  "st-r1": [
+    [
+      "101 First101 Last101",
+      "102 First102 Last102"
+    ]
+  ]
+}

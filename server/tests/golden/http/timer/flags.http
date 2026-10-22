@@ -1,0 +1,68 @@
+### 001 flags
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=FLAGS&flag-debug=bool:true&desc-debug=Debug%20output&flag-delay=int:5&desc-delay=Delay%20in%20ms&flag-name=string:lane%20one&ports=/dev/ttyUSB0,/dev/ttyUSB1&device-TestTimer=Test%20Timer&device-OtherTimer=Other%20Timer
+status: 200
+content-type: text/xml; charset=utf-8
+length: 372
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FLAGS" flag-debug="bool:true" desc-debug="Debug output" flag-delay="int:5" desc-delay="Delay in ms" flag-name="string:lane one" ports="/dev/ttyUSB0,/dev/ttyUSB1" device-TestTimer="Test Timer" device-OtherTimer="Other Timer">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 002 timer-settings-as-coordinator
+request: GET action.php?query=timer.settings
+status: 200
+content-type: application/json; charset=utf-8
+length: 718
+body:
+{
+    "ports": "\/dev\/ttyUSB0,\/dev\/ttyUSB1",
+    "devices": [
+        {
+            "name": "TestTimer",
+            "description": "Test Timer"
+        },
+        {
+            "name": "OtherTimer",
+            "description": "Other Timer"
+        }
+    ],
+    "flags": [
+        {
+            "name": "debug",
+            "type": "bool",
+            "value": "true",
+            "description": "Debug output"
+        },
+        {
+            "name": "delay",
+            "type": "int",
+            "value": 5,
+            "description": "Delay in ms"
+        },
+        {
+            "name": "name",
+            "type": "string",
+            "value": "lane one",
+            "description": null
+        }
+    ]
+}
+
+### 003 heartbeat-after-flags
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+

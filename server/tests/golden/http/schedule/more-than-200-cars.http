@@ -1,0 +1,141 @@
+### 001 generate-with-201-cars
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 500
+content-type: application/json; charset=utf-8
+length: 0
+body:
+
+### 002 rounds-after-201-cars
+request: GET action.php?query=poll&values=rounds
+status: 200
+content-type: application/json; charset=utf-8
+length: 406
+body:
+{
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "TheTwoHundred",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 201,
+            "passed": 201,
+            "unscheduled": 201,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ]
+}
+
+### 003 generate-with-200-cars
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 200
+content-type: application/json; charset=utf-8
+length: 1796
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": null,
+        "roundid": -1,
+        "round": null,
+        "tbodyid": -1,
+        "heat": null,
+        "number-of-heats": 0
+    },
+    "racers": [],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 200,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TheTwoHundred",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 200,
+                    "ntrophies": -1,
+                    "name": "TheTwoHundred"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "TheTwoHundred",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 200,
+            "passed": 200,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 200,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 004 rounds-after-200-cars
+request: GET action.php?query=poll&values=rounds
+status: 200
+content-type: application/json; charset=utf-8
+length: 406
+body:
+{
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "TheTwoHundred",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 200,
+            "passed": 200,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 200,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ]
+}
+

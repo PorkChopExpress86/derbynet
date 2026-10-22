@@ -1,0 +1,175 @@
+### 001 started-heat-5
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=STARTED
+status: 200
+content-type: text/xml; charset=utf-8
+length: 157
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="STARTED">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 002 finished-all-zeroes
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=FINISHED&lane1=0.000&lane2=0.000&lane3=0.000&lane4=0.000
+status: 200
+content-type: text/xml; charset=utf-8
+length: 301
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane1="0.000" lane2="0.000" lane3="0.000" lane4="0.000">
+  <success/>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="5" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 003 finished-while-not-racing
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=FINISHED&lane1=3.100&lane2=3.200&lane3=3.300&lane4=3.400
+status: 200
+content-type: text/xml; charset=utf-8
+length: 255
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane1="3.100" lane2="3.200" lane3="3.300" lane4="3.400">
+  <failure code='notracing'>Not racing now.</failure>
+<remote-log send='false'/>
+</action-response>
+
+### 004 heartbeat-after-racing-stopped
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 005 poll-after-all-zeroes
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+length: 2681
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 5,
+        "number-of-heats": 6
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 5,
+            "name": "First105 Last105",
+            "carname": "",
+            "carnumber": 105,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 3,
+            "name": "First103 Last103",
+            "carname": "",
+            "carnumber": 103,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 6,
+            "name": "First106 Last106",
+            "carname": "",
+            "carnumber": 106,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 1,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 6,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Wolves",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 6,
+            "passed": 6,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 4,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

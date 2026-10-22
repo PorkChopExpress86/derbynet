@@ -1,0 +1,4 @@
+004 schedule.reschedule (action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1): the search ran into its deadline, so its result is not deterministic
+009 schedule.reschedule (action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1): the search ran into its deadline, so its result is not deterministic
+010 schedule.reschedule (action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1): the search ran into its deadline, so its result is not deterministic
+045 schedule.reschedule (action=schedule.reschedule&roundid=2&racerid=89): the search ran into its deadline, so its result is not deterministic

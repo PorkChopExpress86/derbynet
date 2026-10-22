@@ -58,7 +58,15 @@ The sweep takes about 20 minutes on 8 cores, because `make_ordered_schedule()` i
 
 Counts printed by the tool and recorded in `engine/summary.txt`: see that file. At the time of writing they were:
 
-    COUNTS
+    ordered cases: 12624
+    ordered full outputs: 990
+    rotation cases: 4116
+    out-of-range cases: 69
+    scheduler-data entries: 1178
+    unused-lane masks: 304
+    ordinals cases: 363
+    lane-bias cases: 140
+    critical-f-value cases: 1242
 
 The `history.php` sentences are mirrored in `history_sentences()` in the capture, and the capture refuses to run if `history.php` stops containing them. The HTTP capture also records the real `history.php` lane-bias block in `http/standings/edge-cases-history-lane-bias.html`.
 
@@ -69,7 +77,20 @@ A transcript is a sequence of exchanges in the format `capture/transcript.mjs` d
 - `capture` calls, for the cases written for this tool.
 - `record_script`, which runs a script from `testing/` unmodified through `capture/recorder.mjs`, a recording proxy. It records the exchanges named for each script, and for the group scripts a snapshot of the state after each step.
 
-FILES
+Files, by directory (`find http -type f` lists them all):
+
+- `http/envelope/` Dispatcher envelope (#18): `before-setup.http`, `dispatcher.http`
+- `http/kiosks/` Kiosk polling (#34): `pages.http`, `poll-kiosk.http`
+- `http/login/` role.login, role.list and the XML stubs (#16): `role-login.http`
+- `http/master-schedule/` Master schedule with half weights (#23): `half-weights.http`
+- `http/poll/` Poll payloads at fixed points: `race-day-polls.http`
+- `http/race-day/` The owner race day: playlist, top-4 and top-8 finals: `outlaws.http`, `playlist-queue.http`, `scouts.http`
+- `http/replay/` Replay command sequence (#27, #34): `command-sequence.http`
+- `http/schedule/` schedule.generate per round, then the schedule poll: `cant-fulfill-4-lanes.http`, `max-runs-per-car-1-4-lanes.http`, `more-than-200-cars.http`, `normal-4-lanes.http`, `rotation-schedule-4-lanes.http`, `seven-lanes.http`, `two-lanes.http`, `two-runs-per-lane-4-lanes.http`, `unused-lane-mask-33-6-lanes.http`
+- `http/setup/` The setup action: `ez-new.http`
+- `http/standings/` Standings and awards under every setting, as left by each script and on the edge-case roster: `edge-cases-all-heats.by-car.json`, `edge-cases-all-heats.http`, `edge-cases-history-lane-bias.html`, `edge-cases-setup.http`, `edge-cases-six-heats-of-nine.by-car.json`, `edge-cases-six-heats-of-nine.http`, `suite-aggregate-classes.by-car.json`, `suite-aggregate-classes.http`, `suite-aggregate-nonracing.by-car.json`, `suite-aggregate-nonracing.http`, `suite-aggregate-rounds.by-car.json`, `suite-aggregate-rounds.http`, `suite-basic-racing-after-new-rounds.by-car.json`, `suite-basic-racing-after-new-rounds.http`, `suite-basic-racing-and-awards.by-car.json`, `suite-basic-racing-and-awards.http`, `suite-master-schedule.by-car.json`, `suite-master-schedule.http`, `suite-playlist.by-car.json`, `suite-playlist.http`, `suite-points-racing.by-car.json`, `suite-points-racing.http`, `suite-standing-by-rank.by-car.json`, `suite-standing-by-rank.http`, `suite-subgroup-ntrophies.by-car.json`, `suite-subgroup-ntrophies.http`
+- `http/suite/` Suite scripts run unmodified through the recording proxy: finalists and concerns (#26), per-step group state (#25), replay commands, reschedules: `aggregate-classes.http`, `aggregate-nonracing.http`, `aggregate-rounds.http`, `basic-racing.http`, `den-changes-basic.http`, `master-schedule.http`, `new-rounds-basic.http`, `new-rounds-master.http`, `partitions.http`, `playlist.http`, `points-racing.http`, `racing-groups.http`, `reschedule.http`, `reschedule.omitted.txt`, `single-group-operation.http`, `standing-by-rank.http`, `subgroup-ntrophies.http`
+- `http/timer/` Timer transcripts, every case in the ticket: `before-login.http`, `competing-timers.http`, `finished-all-zeroes-and-not-racing.http`, `flags.http`, `handshake-and-idle-heartbeat.http`, `malfunction.http`, `race-staging-and-results.http`, `remote-start.http`, `reverse-lanes.http`, `unconfirmed-timer.http`
 
 ## Normalization
 
@@ -82,7 +103,8 @@ FILES
 | `timer-contact-age` | `CONNECTED (N sec.)` becomes `CONNECTED (<n> sec.)`, and a kiosk `"age"` becomes `"<seconds>"`. |
 | `award-duration` | The `"duration"` in `query=award.current` becomes `"<seconds>"`. |
 | `reschedule-timing` | The seconds in `schedule.reschedule`'s `"timing"` and trace become `"<seconds>"`, and the exchange gets a `note: deterministic` line. If a search hit its deadline the capture stops instead of recording it, because that result is not deterministic. |
-EXTRA_RULES
+| `completed-timestamp` | A `"YYYY-MM-DD HH:MM:SS"` string in a JSON body (when a heat result was written, `RaceChart.completed`) becomes `"<timestamp>"`. |
+| `export-results-order` | The Results sheet of `export-json.php` is listed `ORDER BY completed, heat, lane`, and `completed` has one-second resolution, so rows swap places from run to run. The rows are sorted by class, round, heat, lane instead. |
 
 Values the capture does not need to mask because it never records them: session cookies (only `Set-Cookie`-independent fields, status, content type and `Location` are kept), other response headers, and photo bytes (issue #8).
 
@@ -97,6 +119,7 @@ These are recorded as found and are not fixed here:
 - `schedule.generate` reports success when the schedule cannot be made (`cant-fulfill`), because `json_success()` overwrites the failure.
 - `action.php?query[]=poll` answers 500 with an empty body.
 - `timer-message` with `IDENTIFIED&nlanes=4` (what the suite sends) does not set the lane count, which the server reads from `lane_count`.
+- Four of the `schedule.reschedule` calls in `testing/test-reschedule.sh` run into their 10-second search deadline, so their results depend on how far the search got. They are left out of `http/suite/reschedule.http` and listed in `http/suite/reschedule.omitted.txt`.
 - A `FINISHED` for the wrong heat answers `<failure code='wrong-heat'>` and then `<success/>`.
 
 ## Adding a case

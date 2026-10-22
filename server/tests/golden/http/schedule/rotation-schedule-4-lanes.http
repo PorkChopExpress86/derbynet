@@ -1,0 +1,2174 @@
+### 001 racers
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+length: 23823
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Lucius",
+            "lastname": "Lemon",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Hubert",
+            "lastname": "Heffley",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Tangela",
+            "lastname": "Tacey",
+            "carnumber": 103,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Audry",
+            "lastname": "Appleby",
+            "carnumber": 104,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Kip",
+            "lastname": "Kennelly",
+            "carnumber": 105,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Charlena",
+            "lastname": "Callas",
+            "carnumber": 106,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Sherley",
+            "lastname": "Summerford",
+            "carnumber": 107,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 8,
+            "firstname": "Roland",
+            "lastname": "Rivero",
+            "carnumber": 108,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 9,
+            "firstname": "Gerald",
+            "lastname": "Glennon",
+            "carnumber": 109,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 10,
+            "firstname": "Shalanda",
+            "lastname": "Sanluis",
+            "carnumber": 110,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 11,
+            "firstname": "Nohemi",
+            "lastname": "Natale",
+            "carnumber": 111,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 12,
+            "firstname": "Lien",
+            "lastname": "Licht",
+            "carnumber": 112,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 13,
+            "firstname": "Rhett",
+            "lastname": "Roeder",
+            "carnumber": 113,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 14,
+            "firstname": "Ivey",
+            "lastname": "Ivester",
+            "carnumber": 114,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 15,
+            "firstname": "Christy",
+            "lastname": "Capo",
+            "carnumber": 115,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 16,
+            "firstname": "Dara",
+            "lastname": "Dittmer",
+            "carnumber": 116,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 17,
+            "firstname": "Iraida",
+            "lastname": "Icenhour",
+            "carnumber": 117,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 18,
+            "firstname": "Shirley",
+            "lastname": "Savidge",
+            "carnumber": 118,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 19,
+            "firstname": "Daphine",
+            "lastname": "Dimas",
+            "carnumber": 119,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 20,
+            "firstname": "Bonny",
+            "lastname": "Barrow",
+            "carnumber": 120,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 21,
+            "firstname": "Natisha",
+            "lastname": "Neifert",
+            "carnumber": 121,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 22,
+            "firstname": "Jesse",
+            "lastname": "John",
+            "carnumber": 122,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 23,
+            "firstname": "Lillia",
+            "lastname": "Lawson",
+            "carnumber": 123,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 24,
+            "firstname": "Anh",
+            "lastname": "Antonio",
+            "carnumber": 124,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 25,
+            "firstname": "Annalee",
+            "lastname": "Aguila",
+            "carnumber": 125,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 26,
+            "firstname": "Neomi",
+            "lastname": "Newlin",
+            "carnumber": 126,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 27,
+            "firstname": "Lyle",
+            "lastname": "Lahey",
+            "carnumber": 127,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 28,
+            "firstname": "Denny",
+            "lastname": "Daggett",
+            "carnumber": 128,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 29,
+            "firstname": "Rosemarie",
+            "lastname": "Robidoux",
+            "carnumber": 129,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 30,
+            "firstname": "Margot",
+            "lastname": "Mckeithan",
+            "carnumber": 130,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 31,
+            "firstname": "Ruthe",
+            "lastname": "Rooks",
+            "carnumber": 131,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 32,
+            "firstname": "Sherell",
+            "lastname": "Strode",
+            "carnumber": 132,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 33,
+            "firstname": "Demetrice",
+            "lastname": "Denmark",
+            "carnumber": 133,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 34,
+            "firstname": "Lakita",
+            "lastname": "Lanman",
+            "carnumber": 134,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 35,
+            "firstname": "Iva",
+            "lastname": "Imes",
+            "carnumber": 135,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 36,
+            "firstname": "Kellie",
+            "lastname": "Kubacki",
+            "carnumber": 136,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 37,
+            "firstname": "Amparo",
+            "lastname": "Ashbrook",
+            "carnumber": 137,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 38,
+            "firstname": "Maryetta",
+            "lastname": "Menchaca",
+            "carnumber": 138,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 39,
+            "firstname": "Edwardo",
+            "lastname": "Estabrook",
+            "carnumber": 139,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 40,
+            "firstname": "Librada",
+            "lastname": "Labat",
+            "carnumber": 140,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 41,
+            "firstname": "Vita",
+            "lastname": "Villeda",
+            "carnumber": 141,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 42,
+            "firstname": "Karrie",
+            "lastname": "Koski",
+            "carnumber": 142,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 43,
+            "firstname": "Charleen",
+            "lastname": "Crist",
+            "carnumber": 143,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 44,
+            "firstname": "Rosenda",
+            "lastname": "Rossiter",
+            "carnumber": 144,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 45,
+            "firstname": "Isobel",
+            "lastname": "Ivester",
+            "carnumber": 145,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 46,
+            "firstname": "Nelia",
+            "lastname": "Nagao",
+            "carnumber": 146,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 47,
+            "firstname": "Tuan",
+            "lastname": "Troxell",
+            "carnumber": 147,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Default",
+            "rankid": 1,
+            "rank": "Default",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 48,
+            "firstname": "Lynelle",
+            "lastname": "Lipsey",
+            "carnumber": 148,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Div 2",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Div 2",
+            "rankid": 2,
+            "rank": "Div 2",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 49,
+            "firstname": "Melanie",
+            "lastname": "Meacham",
+            "carnumber": 149,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Div 3",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Div 3",
+            "rankid": 3,
+            "rank": "Div 3",
+            "passed": true,
+            "seq": 0
+        }
+    ]
+}
+
+### 002 generate-round-1
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 200
+content-type: application/json; charset=utf-8
+length: 4993
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "nheats": 20,
+    "ncars": 20,
+    "heats": [
+        [
+            0,
+            1,
+            2,
+            3
+        ],
+        [
+            1,
+            2,
+            3,
+            4
+        ],
+        [
+            2,
+            3,
+            4,
+            5
+        ],
+        [
+            3,
+            4,
+            5,
+            6
+        ],
+        [
+            4,
+            5,
+            6,
+            7
+        ],
+        [
+            5,
+            6,
+            7,
+            8
+        ],
+        [
+            6,
+            7,
+            8,
+            9
+        ],
+        [
+            7,
+            8,
+            9,
+            10
+        ],
+        [
+            8,
+            9,
+            10,
+            11
+        ],
+        [
+            9,
+            10,
+            11,
+            12
+        ],
+        [
+            10,
+            11,
+            12,
+            13
+        ],
+        [
+            11,
+            12,
+            13,
+            14
+        ],
+        [
+            12,
+            13,
+            14,
+            15
+        ],
+        [
+            13,
+            14,
+            15,
+            16
+        ],
+        [
+            14,
+            15,
+            16,
+            17
+        ],
+        [
+            15,
+            16,
+            17,
+            18
+        ],
+        [
+            16,
+            17,
+            18,
+            19
+        ],
+        [
+            17,
+            18,
+            19,
+            0
+        ],
+        [
+            18,
+            19,
+            0,
+            1
+        ],
+        [
+            19,
+            0,
+            1,
+            2
+        ]
+    ],
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": -1,
+        "roundid": -1,
+        "round": null,
+        "tbodyid": -1,
+        "heat": -1,
+        "number-of-heats": 0,
+        "class": ""
+    },
+    "racers": [],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 20,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Default",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 20,
+                    "ntrophies": -1,
+                    "name": "Default"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 19,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 19,
+                    "ntrophies": -1,
+                    "name": "Div 2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 10,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 10,
+                    "ntrophies": -1,
+                    "name": "Div 3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 20,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 19,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 10,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 003 schedule-round-1
+request: GET action.php?query=poll&values=schedule,rounds
+status: 200
+content-type: application/json; charset=utf-8
+length: 2848
+body:
+{
+    "schedule": [
+        [
+            1,
+            2,
+            6,
+            7
+        ],
+        [
+            2,
+            6,
+            7,
+            11
+        ],
+        [
+            6,
+            7,
+            11,
+            12
+        ],
+        [
+            7,
+            11,
+            12,
+            16
+        ],
+        [
+            11,
+            12,
+            16,
+            17
+        ],
+        [
+            12,
+            16,
+            17,
+            21
+        ],
+        [
+            16,
+            17,
+            21,
+            22
+        ],
+        [
+            17,
+            21,
+            22,
+            26
+        ],
+        [
+            21,
+            22,
+            26,
+            27
+        ],
+        [
+            22,
+            26,
+            27,
+            31
+        ],
+        [
+            26,
+            27,
+            31,
+            32
+        ],
+        [
+            27,
+            31,
+            32,
+            36
+        ],
+        [
+            31,
+            32,
+            36,
+            37
+        ],
+        [
+            32,
+            36,
+            37,
+            41
+        ],
+        [
+            36,
+            37,
+            41,
+            42
+        ],
+        [
+            37,
+            41,
+            42,
+            46
+        ],
+        [
+            41,
+            42,
+            46,
+            47
+        ],
+        [
+            42,
+            46,
+            47,
+            1
+        ],
+        [
+            46,
+            47,
+            1,
+            2
+        ],
+        [
+            47,
+            1,
+            2,
+            6
+        ]
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 20,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 19,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 10,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ]
+}
+
+### 004 generate-round-2
+request: POST action.php
+request-body: action=schedule.generate&roundid=2
+status: 200
+content-type: application/json; charset=utf-8
+length: 6013
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 2
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "nheats": 19,
+    "ncars": 19,
+    "heats": [
+        [
+            0,
+            1,
+            2,
+            3
+        ],
+        [
+            1,
+            2,
+            3,
+            4
+        ],
+        [
+            2,
+            3,
+            4,
+            5
+        ],
+        [
+            3,
+            4,
+            5,
+            6
+        ],
+        [
+            4,
+            5,
+            6,
+            7
+        ],
+        [
+            5,
+            6,
+            7,
+            8
+        ],
+        [
+            6,
+            7,
+            8,
+            9
+        ],
+        [
+            7,
+            8,
+            9,
+            10
+        ],
+        [
+            8,
+            9,
+            10,
+            11
+        ],
+        [
+            9,
+            10,
+            11,
+            12
+        ],
+        [
+            10,
+            11,
+            12,
+            13
+        ],
+        [
+            11,
+            12,
+            13,
+            14
+        ],
+        [
+            12,
+            13,
+            14,
+            15
+        ],
+        [
+            13,
+            14,
+            15,
+            16
+        ],
+        [
+            14,
+            15,
+            16,
+            17
+        ],
+        [
+            15,
+            16,
+            17,
+            18
+        ],
+        [
+            16,
+            17,
+            18,
+            0
+        ],
+        [
+            17,
+            18,
+            0,
+            1
+        ],
+        [
+            18,
+            0,
+            1,
+            2
+        ]
+    ],
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 20,
+        "class": "Default"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "Lucius Lemon",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "Hubert Heffley",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 6,
+            "name": "Charlena Callas",
+            "carname": "",
+            "carnumber": 106,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 7,
+            "name": "Sherley Summerford",
+            "carname": "",
+            "carnumber": 107,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 20,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Default",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 20,
+                    "ntrophies": -1,
+                    "name": "Default"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 19,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 19,
+                    "ntrophies": -1,
+                    "name": "Div 2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 10,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 10,
+                    "ntrophies": -1,
+                    "name": "Div 3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 20,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 19,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 10,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 005 schedule-round-2
+request: GET action.php?query=poll&values=schedule,rounds
+status: 200
+content-type: application/json; charset=utf-8
+length: 2764
+body:
+{
+    "schedule": [
+        [
+            3,
+            4,
+            8,
+            9
+        ],
+        [
+            4,
+            8,
+            9,
+            13
+        ],
+        [
+            8,
+            9,
+            13,
+            14
+        ],
+        [
+            9,
+            13,
+            14,
+            18
+        ],
+        [
+            13,
+            14,
+            18,
+            19
+        ],
+        [
+            14,
+            18,
+            19,
+            23
+        ],
+        [
+            18,
+            19,
+            23,
+            24
+        ],
+        [
+            19,
+            23,
+            24,
+            28
+        ],
+        [
+            23,
+            24,
+            28,
+            29
+        ],
+        [
+            24,
+            28,
+            29,
+            33
+        ],
+        [
+            28,
+            29,
+            33,
+            34
+        ],
+        [
+            29,
+            33,
+            34,
+            38
+        ],
+        [
+            33,
+            34,
+            38,
+            39
+        ],
+        [
+            34,
+            38,
+            39,
+            43
+        ],
+        [
+            38,
+            39,
+            43,
+            44
+        ],
+        [
+            39,
+            43,
+            44,
+            48
+        ],
+        [
+            43,
+            44,
+            48,
+            3
+        ],
+        [
+            44,
+            48,
+            3,
+            4
+        ],
+        [
+            48,
+            3,
+            4,
+            8
+        ]
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 20,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 19,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 10,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ]
+}
+
+### 006 generate-round-3
+request: POST action.php
+request-body: action=schedule.generate&roundid=3
+status: 200
+content-type: application/json; charset=utf-8
+length: 5249
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 3
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "nheats": 10,
+    "ncars": 10,
+    "heats": [
+        [
+            0,
+            1,
+            2,
+            3
+        ],
+        [
+            1,
+            2,
+            3,
+            4
+        ],
+        [
+            2,
+            3,
+            4,
+            5
+        ],
+        [
+            3,
+            4,
+            5,
+            6
+        ],
+        [
+            4,
+            5,
+            6,
+            7
+        ],
+        [
+            5,
+            6,
+            7,
+            8
+        ],
+        [
+            6,
+            7,
+            8,
+            9
+        ],
+        [
+            7,
+            8,
+            9,
+            0
+        ],
+        [
+            8,
+            9,
+            0,
+            1
+        ],
+        [
+            9,
+            0,
+            1,
+            2
+        ]
+    ],
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 1,
+        "number-of-heats": 19,
+        "class": "Div 2"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 3,
+            "name": "Tangela Tacey",
+            "carname": "",
+            "carnumber": 103,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 4,
+            "name": "Audry Appleby",
+            "carname": "",
+            "carnumber": 104,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 8,
+            "name": "Roland Rivero",
+            "carname": "",
+            "carnumber": 108,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 9,
+            "name": "Gerald Glennon",
+            "carname": "",
+            "carnumber": 109,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 20,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Default",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 20,
+                    "ntrophies": -1,
+                    "name": "Default"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 19,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 19,
+                    "ntrophies": -1,
+                    "name": "Div 2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 10,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 10,
+                    "ntrophies": -1,
+                    "name": "Div 3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 20,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 19,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 007 schedule-round-3
+request: GET action.php?query=poll&values=schedule,rounds
+status: 200
+content-type: application/json; charset=utf-8
+length: 2020
+body:
+{
+    "schedule": [
+        [
+            5,
+            10,
+            15,
+            20
+        ],
+        [
+            10,
+            15,
+            20,
+            25
+        ],
+        [
+            15,
+            20,
+            25,
+            30
+        ],
+        [
+            20,
+            25,
+            30,
+            35
+        ],
+        [
+            25,
+            30,
+            35,
+            40
+        ],
+        [
+            30,
+            35,
+            40,
+            45
+        ],
+        [
+            35,
+            40,
+            45,
+            49
+        ],
+        [
+            40,
+            45,
+            49,
+            5
+        ],
+        [
+            45,
+            49,
+            5,
+            10
+        ],
+        [
+            49,
+            5,
+            10,
+            15
+        ]
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 20,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 19,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ]
+}
+

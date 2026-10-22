@@ -1,0 +1,59 @@
+{
+"t1-m0": {"meta": {"failure":null,"nheats":2}, "heats": [
+[0],
+[1]
+]},
+"t2-m0": {"meta": {"failure":null,"nheats":4}, "heats": [
+[0],
+[1],
+[0],
+[1]
+]},
+"t3-m0": {"meta": {"failure":null,"nheats":6}, "heats": [
+[0],
+[1],
+[0],
+[1],
+[0],
+[1]
+]},
+"t4-m0": {"meta": {"failure":null,"nheats":8}, "heats": [
+[0],
+[1],
+[0],
+[1],
+[0],
+[1],
+[0],
+[1]
+]},
+"t5-m0": {"meta": {"failure":null,"nheats":10}, "heats": [
+[0],
+[1],
+[0],
+[1],
+[0],
+[1],
+[0],
+[1],
+[0],
+[1]
+]},
+"t6-m0": {"meta": {"failure":null,"nheats":12}, "heats": [
+[0],
+[1],
+[0],
+[1],
+[0],
+[1],
+[0],
+[1],
+[0],
+[1],
+[0],
+[1]
+]},
+"t7-m0": {"meta": {"failure":"cant-fulfill","nheats":0}, "heats": [
+
+]}
+}

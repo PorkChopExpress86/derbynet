@@ -1,0 +1,1485 @@
+### 001 start-outlaws-round-1
+request: POST action.php
+request-body: action=heat.select&now_racing=1
+status: 200
+content-type: application/json; charset=utf-8
+length: 4028
+body:
+{
+    "action": {
+        "action": "heat.select",
+        "now_racing": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 1,
+        "number-of-heats": 14,
+        "class": "Outlaw"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 11,
+            "name": "Doc Holliday",
+            "carname": "",
+            "carnumber": 9902,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 13,
+            "name": "Hoodoo Brown",
+            "carname": "",
+            "carnumber": 9907,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 17,
+            "name": "Sundance Kid",
+            "carname": "",
+            "carnumber": 9927,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 16,
+            "name": "Fred Waite",
+            "carname": "",
+            "carnumber": 9922,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 10,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Scouts",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 10,
+                    "ntrophies": -1,
+                    "name": "Scouts"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 14,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Outlaw",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 14,
+                    "ntrophies": -1,
+                    "name": "Outlaw"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 10,
+            "name": "Scouts, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 2,
+            "aggregate": false,
+            "roster_size": 4,
+            "passed": 4,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Scouts, Round 2"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 14,
+            "passed": 14,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 14,
+            "heats_run": 0,
+            "name": "Outlaw, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 002 rounds-after-outlaws-round-1
+request: GET action.php?query=poll&values=rounds,schedule,current-heat
+status: 200
+content-type: application/json; charset=utf-8
+length: 3358
+body:
+{
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 10,
+            "name": "Scouts, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 2,
+            "aggregate": false,
+            "roster_size": 4,
+            "passed": 4,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Scouts, Round 2"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 14,
+            "passed": 14,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 14,
+            "heats_run": 14,
+            "name": "Outlaw, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 2,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 18,
+            "heats_run": 0,
+            "name": "Outlaw, Round 2"
+        }
+    ],
+    "schedule": [
+        [
+            21,
+            22,
+            11,
+            13
+        ],
+        [
+            16,
+            17,
+            23,
+            21
+        ],
+        [
+            11,
+            12,
+            17,
+            18
+        ],
+        [
+            18,
+            13,
+            16,
+            23
+        ],
+        [
+            17,
+            23,
+            12,
+            22
+        ],
+        [
+            22,
+            11,
+            18,
+            16
+        ],
+        [
+            23,
+            12,
+            21,
+            11
+        ],
+        [
+            13,
+            16,
+            17,
+            12
+        ],
+        [
+            12,
+            21,
+            22,
+            18
+        ],
+        [
+            11,
+            18,
+            13,
+            17
+        ],
+        [
+            22,
+            23,
+            16,
+            11
+        ],
+        [
+            21,
+            17,
+            13,
+            22
+        ],
+        [
+            12,
+            16,
+            18,
+            21
+        ],
+        [
+            23,
+            13,
+            11,
+            12
+        ],
+        [
+            17,
+            18,
+            22,
+            23
+        ],
+        [
+            16,
+            11,
+            21,
+            17
+        ],
+        [
+            18,
+            21,
+            23,
+            13
+        ],
+        [
+            13,
+            22,
+            12,
+            16
+        ]
+    ],
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 4,
+        "round": 2,
+        "tbodyid": 4,
+        "heat": 1,
+        "number-of-heats": 18,
+        "class": "Outlaw"
+    }
+}
+
+### 003 start-the-outlaws-final
+request: POST action.php
+request-body: action=heat.select&now_racing=1
+status: 200
+content-type: application/json; charset=utf-8
+length: 4413
+body:
+{
+    "action": {
+        "action": "heat.select",
+        "now_racing": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 4,
+        "round": 2,
+        "tbodyid": 4,
+        "heat": 1,
+        "number-of-heats": 18,
+        "class": "Outlaw"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 21,
+            "name": "John Wesley Hardin",
+            "carname": "",
+            "carnumber": 9947,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 22,
+            "name": "Jesse James",
+            "carname": "",
+            "carnumber": 9952,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 11,
+            "name": "Doc Holliday",
+            "carname": "",
+            "carnumber": 9902,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 13,
+            "name": "Hoodoo Brown",
+            "carname": "",
+            "carnumber": 9907,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 10,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Scouts",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 10,
+                    "ntrophies": -1,
+                    "name": "Scouts"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 14,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Outlaw",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 14,
+                    "ntrophies": -1,
+                    "name": "Outlaw"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 10,
+            "name": "Scouts, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 2,
+            "aggregate": false,
+            "roster_size": 4,
+            "passed": 4,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Scouts, Round 2"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 14,
+            "passed": 14,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 14,
+            "heats_run": 14,
+            "name": "Outlaw, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 2,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 18,
+            "heats_run": 0,
+            "name": "Outlaw, Round 2"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 004 rounds-after-outlaws-final
+request: GET action.php?query=poll&values=rounds,schedule,current-heat
+status: 200
+content-type: application/json; charset=utf-8
+length: 3360
+body:
+{
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 10,
+            "name": "Scouts, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 2,
+            "aggregate": false,
+            "roster_size": 4,
+            "passed": 4,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 8,
+            "name": "Scouts, Round 2"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 14,
+            "passed": 14,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 14,
+            "heats_run": 14,
+            "name": "Outlaw, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 2,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 18,
+            "heats_run": 18,
+            "name": "Outlaw, Round 2"
+        }
+    ],
+    "schedule": [
+        [
+            21,
+            22,
+            11,
+            13
+        ],
+        [
+            16,
+            17,
+            23,
+            21
+        ],
+        [
+            11,
+            12,
+            17,
+            18
+        ],
+        [
+            18,
+            13,
+            16,
+            23
+        ],
+        [
+            17,
+            23,
+            12,
+            22
+        ],
+        [
+            22,
+            11,
+            18,
+            16
+        ],
+        [
+            23,
+            12,
+            21,
+            11
+        ],
+        [
+            13,
+            16,
+            17,
+            12
+        ],
+        [
+            12,
+            21,
+            22,
+            18
+        ],
+        [
+            11,
+            18,
+            13,
+            17
+        ],
+        [
+            22,
+            23,
+            16,
+            11
+        ],
+        [
+            21,
+            17,
+            13,
+            22
+        ],
+        [
+            12,
+            16,
+            18,
+            21
+        ],
+        [
+            23,
+            13,
+            11,
+            12
+        ],
+        [
+            17,
+            18,
+            22,
+            23
+        ],
+        [
+            16,
+            11,
+            21,
+            17
+        ],
+        [
+            18,
+            21,
+            23,
+            13
+        ],
+        [
+            13,
+            22,
+            12,
+            16
+        ]
+    ],
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 4,
+        "round": 2,
+        "tbodyid": 4,
+        "heat": 18,
+        "number-of-heats": 18,
+        "class": "Outlaw"
+    }
+}
+
+### 005 standings-after-outlaws
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+length: 2506
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                8
+            ],
+            [
+                9
+            ],
+            [
+                10
+            ],
+            [
+                1
+            ],
+            [
+                7
+            ],
+            [
+                3
+            ],
+            [
+                2
+            ],
+            [
+                5
+            ],
+            [
+                4
+            ],
+            [
+                6
+            ]
+        ],
+        "st-r3": [
+            [
+                8
+            ],
+            [
+                9
+            ],
+            [
+                10
+            ],
+            [
+                1
+            ]
+        ],
+        "st-ff": [
+            [
+                8
+            ],
+            [
+                9
+            ],
+            [
+                21
+            ],
+            [
+                10
+            ],
+            [
+                16
+            ],
+            [
+                22
+            ],
+            [
+                17
+            ],
+            [
+                11
+            ],
+            [
+                23
+            ],
+            [
+                18
+            ],
+            [
+                12,
+                13
+            ],
+            [],
+            [
+                1
+            ]
+        ],
+        "st-r2": [
+            [
+                21
+            ],
+            [
+                16
+            ],
+            [
+                22
+            ],
+            [
+                17
+            ],
+            [
+                11
+            ],
+            [
+                23
+            ],
+            [
+                18
+            ],
+            [
+                12,
+                13
+            ],
+            [],
+            [
+                24
+            ],
+            [
+                19
+            ],
+            [
+                14
+            ],
+            [
+                20
+            ],
+            [
+                15
+            ]
+        ],
+        "st-r4": [
+            [
+                21
+            ],
+            [
+                16
+            ],
+            [
+                22
+            ],
+            [
+                17
+            ],
+            [
+                11
+            ],
+            [
+                23
+            ],
+            [
+                18
+            ],
+            [
+                12,
+                13
+            ]
+        ]
+    }
+}
+
+### 006 racers-after-outlaws
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+length: 11661
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Scout1",
+            "lastname": "Racer",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Scout2",
+            "lastname": "Racer",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Scout3",
+            "lastname": "Racer",
+            "carnumber": 103,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Scout4",
+            "lastname": "Racer",
+            "carnumber": 104,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Scout5",
+            "lastname": "Racer",
+            "carnumber": 105,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Scout6",
+            "lastname": "Racer",
+            "carnumber": 106,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Scout7",
+            "lastname": "Racer",
+            "carnumber": 107,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 8,
+            "firstname": "Scout8",
+            "lastname": "Racer",
+            "carnumber": 108,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 9,
+            "firstname": "Scout9",
+            "lastname": "Racer",
+            "carnumber": 109,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 10,
+            "firstname": "Scout10",
+            "lastname": "Racer",
+            "carnumber": 110,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Scouts",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Scouts",
+            "rankid": 1,
+            "rank": "Scouts",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 11,
+            "firstname": "Doc",
+            "lastname": "Holliday",
+            "carnumber": 9902,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 12,
+            "firstname": "Cherokee",
+            "lastname": "Bill",
+            "carnumber": 9907,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 13,
+            "firstname": "Hoodoo",
+            "lastname": "Brown",
+            "carnumber": 9907,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 14,
+            "firstname": "Sam",
+            "lastname": "Bass",
+            "carnumber": 9912,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 15,
+            "firstname": "Zip",
+            "lastname": "Wyatt",
+            "carnumber": 9917,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 16,
+            "firstname": "Fred",
+            "lastname": "Waite",
+            "carnumber": 9922,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 17,
+            "firstname": "Sundance",
+            "lastname": "Kid",
+            "carnumber": 9927,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 18,
+            "firstname": "Pearl",
+            "lastname": "Hart",
+            "carnumber": 9932,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 19,
+            "firstname": "Butch",
+            "lastname": "Cassidy",
+            "carnumber": 9937,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 20,
+            "firstname": "Belle",
+            "lastname": "Starr",
+            "carnumber": 9942,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 21,
+            "firstname": "John Wesley",
+            "lastname": "Hardin",
+            "carnumber": 9947,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 22,
+            "firstname": "Jesse",
+            "lastname": "James",
+            "carnumber": 9952,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 23,
+            "firstname": "Apache",
+            "lastname": "Kid",
+            "carnumber": 9957,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 24,
+            "firstname": "Billy",
+            "lastname": "Kid",
+            "carnumber": 9962,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Outlaw",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Outlaw",
+            "rankid": 2,
+            "rank": "Outlaw",
+            "passed": true,
+            "seq": 0
+        }
+    ]
+}
+
+### 007 award-list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+length: 3084
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 9,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 9,
+            "key": "speed-2-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 10,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 16,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 22,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 10,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Scouts",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 10,
+                    "ntrophies": -1,
+                    "name": "Scouts"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 14,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Outlaw",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 14,
+                    "ntrophies": -1,
+                    "name": "Outlaw"
+                }
+            ]
+        }
+    ]
+}
+

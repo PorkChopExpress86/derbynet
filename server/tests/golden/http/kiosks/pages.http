@@ -1,0 +1,5409 @@
+### 001 assign-award-presentations
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/award-presentations.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7928
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/award-presentations.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/award-presentations.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 002 poll-award-presentations
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 158
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/award-presentations.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 003 assign-derbynet
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/derbynet.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7906
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/derbynet.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/derbynet.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 004 poll-derbynet
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 147
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/derbynet.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 005 assign-flag
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/flag.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7898
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/flag.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/flag.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 006 poll-flag
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 143
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/flag.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 007 assign-identify
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/identify.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7906
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/identify.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 008 poll-identify
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 147
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/identify.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 009 assign-now-racing-columnar-reversed
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/now-racing-columnar-reversed.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7946
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/now-racing-columnar-reversed.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/now-racing-columnar-reversed.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 010 poll-now-racing-columnar-reversed
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 167
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/now-racing-columnar-reversed.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 011 assign-now-racing-columnar
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/now-racing-columnar.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7928
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/now-racing-columnar.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/now-racing-columnar.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 012 poll-now-racing-columnar
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 158
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/now-racing-columnar.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 013 assign-now-racing
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/now-racing.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7910
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/now-racing.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/now-racing.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 014 poll-now-racing
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 149
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/now-racing.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 015 assign-ondeck
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/ondeck.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7902
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/ondeck.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/ondeck.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 016 poll-ondeck
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 145
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/ondeck.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 017 assign-please-check-in
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/please-check-in.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7920
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/please-check-in.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/please-check-in.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 018 poll-please-check-in
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 154
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/please-check-in.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 019 assign-qrcode
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/qrcode.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7902
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/qrcode.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/qrcode.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 020 poll-qrcode
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 145
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/qrcode.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 021 assign-results-by-racer
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/results-by-racer.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7922
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/results-by-racer.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/results-by-racer.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 022 poll-results-by-racer
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 155
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/results-by-racer.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 023 assign-scale-MPH
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/scale-MPH.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7908
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/scale-MPH.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/scale-MPH.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 024 poll-scale-MPH
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 148
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/scale-MPH.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 025 assign-slideshow
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/slideshow.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7908
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/slideshow.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/slideshow.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 026 poll-slideshow
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 148
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/slideshow.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 027 assign-standings
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/standings.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7908
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/standings.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/standings.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 028 poll-standings
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 148
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/standings.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 029 assign-welcome
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/welcome.kiosk
+status: 200
+content-type: application/json; charset=utf-8
+length: 7904
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/welcome.kiosk"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/welcome.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 030 poll-welcome
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 146
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/welcome.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 031 assign-with-parameters
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/standings.kiosk&params=title=Final%20Standings
+status: 200
+content-type: application/json; charset=utf-8
+length: 7951
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "page": "kiosks\/standings.kiosk",
+        "params": "title=Final Standings"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/standings.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 032 poll-with-parameters
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 167
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/standings.kiosk",
+        "name": "",
+        "reload": false,
+        "parameters": "title=Final Standings"
+    }
+}
+
+### 033 assign-name
+request: POST action.php
+request-body: action=kiosk.assign&address=192.168.1.10&name=Main
+status: 200
+content-type: application/json; charset=utf-8
+length: 7893
+body:
+{
+    "action": {
+        "action": "kiosk.assign",
+        "address": "192.168.1.10",
+        "name": "Main"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "Main",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/standings.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+
+### 034 poll-named
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 171
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/standings.kiosk",
+        "name": "Main",
+        "reload": false,
+        "parameters": "title=Final Standings"
+    }
+}
+
+### 035 reload
+request: POST action.php
+request-body: action=kiosk.reload&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 228
+body:
+{
+    "action": {
+        "action": "kiosk.reload",
+        "address": "192.168.1.10"
+    },
+    "outcome": {
+        "summary": "in-progress",
+        "code": "in-progress",
+        "description": "No outcome defined."
+    }
+}
+
+### 036 poll-after-reload
+request: GET action.php?query=poll.kiosk&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+length: 170
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/standings.kiosk",
+        "name": "Main",
+        "reload": true,
+        "parameters": "title=Final Standings"
+    }
+}
+
+### 037 poll-kiosk-all
+request: GET action.php?query=poll.kiosk.all
+status: 200
+content-type: application/json; charset=utf-8
+length: 7671
+body:
+{
+    "current-scene": "",
+    "kiosks": [
+        {
+            "name": "",
+            "address": "00:1A:2B:3C:4D:5E",
+            "madlib": "brave turkey",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.1",
+            "madlib": "loose ghost",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.2",
+            "madlib": "shallow coast",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "10.0.0.254",
+            "madlib": "wide-eyed geese",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "127.0.0.1",
+            "madlib": "immense vegetable",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "172.16.5.5",
+            "madlib": "substantial east",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.11",
+            "madlib": "elegant riddle",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.12",
+            "madlib": "bewildered poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.13",
+            "madlib": "bumpy patch",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.14",
+            "madlib": "weak smoke",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.15",
+            "madlib": "strong governor",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.16",
+            "madlib": "proud south",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.17",
+            "madlib": "wide-eyed badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.18",
+            "madlib": "cold beggar",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "192.168.1.19",
+            "madlib": "plain seashore",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "AA:BB:CC:DD:EE:FF",
+            "madlib": "green arithmetic",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "fe80::1",
+            "madlib": "rotten frame",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "kiosk-with-a-name",
+            "madlib": "lazy poison",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "",
+            "address": "localhost",
+            "madlib": "delicious west",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/identify.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        },
+        {
+            "name": "Main",
+            "address": "192.168.1.10",
+            "madlib": "mushy badge",
+            "last_contact": "<epoch>",
+            "page": "kiosks\/standings.kiosk",
+            "reload": false,
+            "age": "<seconds>",
+            "parameters": null
+        }
+    ],
+    "kiosk-pages": [
+        {
+            "brief": "award-presentations",
+            "full": "kiosks\/award-presentations.kiosk"
+        },
+        {
+            "brief": "derbynet",
+            "full": "kiosks\/derbynet.kiosk"
+        },
+        {
+            "brief": "flag",
+            "full": "kiosks\/flag.kiosk"
+        },
+        {
+            "brief": "identify",
+            "full": "kiosks\/identify.kiosk"
+        },
+        {
+            "brief": "now-racing",
+            "full": "kiosks\/now-racing.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar",
+            "full": "kiosks\/now-racing-columnar.kiosk"
+        },
+        {
+            "brief": "now-racing-columnar-reversed",
+            "full": "kiosks\/now-racing-columnar-reversed.kiosk"
+        },
+        {
+            "brief": "ondeck",
+            "full": "kiosks\/ondeck.kiosk"
+        },
+        {
+            "brief": "please-check-in",
+            "full": "kiosks\/please-check-in.kiosk"
+        },
+        {
+            "brief": "qrcode",
+            "full": "kiosks\/qrcode.kiosk"
+        },
+        {
+            "brief": "results-by-racer",
+            "full": "kiosks\/results-by-racer.kiosk"
+        },
+        {
+            "brief": "scale-MPH",
+            "full": "kiosks\/scale-MPH.kiosk"
+        },
+        {
+            "brief": "slideshow",
+            "full": "kiosks\/slideshow.kiosk"
+        },
+        {
+            "brief": "standings",
+            "full": "kiosks\/standings.kiosk"
+        },
+        {
+            "brief": "welcome",
+            "full": "kiosks\/welcome.kiosk"
+        }
+    ]
+}
+

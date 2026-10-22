@@ -1,0 +1,272 @@
+### 001 racers
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+length: 4285
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Ann",
+            "lastname": "Lee",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Bob",
+            "lastname": "lee",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Cy",
+            "lastname": "Moss",
+            "carnumber": 103,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Di",
+            "lastname": "Moss",
+            "carnumber": 104,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Ed",
+            "lastname": "Moss",
+            "carnumber": 105,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Flo",
+            "lastname": "Nye",
+            "carnumber": 106,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Gus",
+            "lastname": "Oak",
+            "carnumber": 107,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 8,
+            "firstname": "Hal",
+            "lastname": "Pine",
+            "carnumber": 108,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 9,
+            "firstname": "Ivy",
+            "lastname": "Quill",
+            "carnumber": 109,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Edge",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Edge",
+            "rankid": 1,
+            "rank": "Edge",
+            "passed": true,
+            "seq": 0
+        }
+    ]
+}
+
+### 002 schedule
+request: GET action.php?query=poll&values=schedule,rounds
+status: 200
+content-type: application/json; charset=utf-8
+length: 865
+body:
+{
+    "schedule": [
+        [
+            1,
+            5
+        ],
+        [
+            2,
+            6
+        ],
+        [
+            3,
+            7
+        ],
+        [
+            4,
+            8
+        ],
+        [
+            5,
+            9
+        ],
+        [
+            6,
+            1
+        ],
+        [
+            7,
+            2
+        ],
+        [
+            8,
+            3
+        ],
+        [
+            9,
+            4
+        ]
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Edge",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 9,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ]
+}
+
+### 003 rounds-after-six-heats
+request: GET action.php?query=poll&values=rounds,current-heat
+status: 200
+content-type: application/json; charset=utf-8
+length: 646
+body:
+{
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Edge",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 9,
+            "heats_run": 6,
+            "name": "Round 1"
+        }
+    ],
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 7,
+        "number-of-heats": 9
+    }
+}
+

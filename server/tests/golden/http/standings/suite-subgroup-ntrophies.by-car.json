@@ -1,0 +1,116 @@
+{
+  "st-r1": [
+    [
+      "201 A Three-A"
+    ],
+    [
+      "203 C Three-C"
+    ],
+    [
+      "102 B Two-B"
+    ],
+    [
+      "101 A Two-A"
+    ],
+    [
+      "301 A Four-A"
+    ],
+    [
+      "303 C Four-C"
+    ],
+    [
+      "202 B Three-B",
+      "204 D Three-D"
+    ],
+    [],
+    [
+      "104 D Two-D"
+    ],
+    [
+      "103 C Two-C"
+    ],
+    [
+      "304 D Four-D"
+    ],
+    [
+      "302 B Four-B"
+    ]
+  ],
+  "st-rr1-2": [
+    [
+      "201 A Three-A"
+    ],
+    [
+      "203 C Three-C"
+    ],
+    [
+      "202 B Three-B",
+      "204 D Three-D"
+    ]
+  ],
+  "st-ff": [
+    [
+      "201 A Three-A"
+    ],
+    [
+      "203 C Three-C"
+    ],
+    [
+      "102 B Two-B"
+    ],
+    [
+      "101 A Two-A"
+    ],
+    [
+      "301 A Four-A"
+    ],
+    [
+      "303 C Four-C"
+    ],
+    [
+      "202 B Three-B",
+      "204 D Three-D"
+    ],
+    [],
+    [
+      "104 D Two-D"
+    ],
+    [
+      "103 C Two-C"
+    ],
+    [
+      "304 D Four-D"
+    ],
+    [
+      "302 B Four-B"
+    ]
+  ],
+  "st-rr1-1": [
+    [
+      "102 B Two-B"
+    ],
+    [
+      "101 A Two-A"
+    ],
+    [
+      "104 D Two-D"
+    ],
+    [
+      "103 C Two-C"
+    ]
+  ],
+  "st-rr1-3": [
+    [
+      "301 A Four-A"
+    ],
+    [
+      "303 C Four-C"
+    ],
+    [
+      "304 D Four-D"
+    ],
+    [
+      "302 B Four-B"
+    ]
+  ]
+}

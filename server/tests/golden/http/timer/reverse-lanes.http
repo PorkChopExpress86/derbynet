@@ -1,0 +1,216 @@
+### 001 login-timer
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=role.login&name=Timer&password=
+status: 200
+content-type: application/json; charset=utf-8
+length: 248
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "Timer",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>"
+}
+
+### 002 hello
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HELLO
+status: 200
+content-type: text/xml; charset=utf-8
+length: 168
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HELLO">
+  <success/>
+    <query/>
+<remote-log send='false'/>
+</action-response>
+
+### 003 identified
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=IDENTIFIED&lane_count=4&timer=TestTimer
+status: 200
+content-type: text/xml; charset=utf-8
+length: 280
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="IDENTIFIED" lane_count="4" timer="TestTimer">
+  <success/>
+  <heat-ready lane-mask="14" class="Wolves" round="1" roundid="1" heat="1" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 004 heartbeat-lane-mask-as-scheduled
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 005 heartbeat-lane-mask-reversed
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 006 started
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=STARTED
+status: 200
+content-type: text/xml; charset=utf-8
+length: 157
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="STARTED">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 007 finished-lanes-reversed
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=FINISHED&lane2=3.200&lane3=3.300&lane4=3.400
+status: 200
+content-type: text/xml; charset=utf-8
+length: 286
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane2="3.200" lane3="3.300" lane4="3.400">
+  <success/>
+  <heat-ready lane-mask="7" class="Wolves" round="1" roundid="1" heat="2" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 008 poll-after-reversed-finish
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+length: 2391
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 3
+    },
+    "racers": [
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "First102 Last102",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 3,
+            "name": "First103 Last103",
+            "carname": "",
+            "carnumber": 103,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Wolves",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 1,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

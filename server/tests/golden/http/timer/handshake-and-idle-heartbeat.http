@@ -1,0 +1,135 @@
+### 001 login-timer
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=role.login&name=Timer&password=
+status: 200
+content-type: application/json; charset=utf-8
+length: 248
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "Timer",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>"
+}
+
+### 002 hello
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HELLO&interface=golden-jar&build=1.2.3
+status: 200
+content-type: text/xml; charset=utf-8
+length: 205
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HELLO" interface="golden-jar" build="1.2.3">
+  <success/>
+    <query/>
+<remote-log send='false'/>
+</action-response>
+
+### 003 identified-with-nlanes-as-the-suite-sends-it
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=IDENTIFIED&nlanes=4
+status: 200
+content-type: text/xml; charset=utf-8
+length: 171
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="IDENTIFIED" nlanes="4">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 004 identified
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=IDENTIFIED&lane_count=4&timer=TestTimer&human=Test%20Timer%20%26%20Co&ident=SN-0001&options=a:1,b:2&vid=0403&pid=6001
+status: 200
+content-type: text/xml; charset=utf-8
+length: 277
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="IDENTIFIED" lane_count="4" timer="TestTimer" human="Test Timer &amp; Co" ident="SN-0001" options="a:1,b:2" vid="0403" pid="6001">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 005 heartbeat-idle
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 006 heartbeat-unhealthy
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT&unhealthy=1
+status: 200
+content-type: text/xml; charset=utf-8
+length: 173
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT" unhealthy="1">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 007 heartbeat-healthy-again
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 008 message-not-understood
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=NO-SUCH-MESSAGE
+status: 200
+content-type: text/xml; charset=utf-8
+length: 234
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="NO-SUCH-MESSAGE">
+  <failure code='notunderstood'>Message NO-SUCH-MESSAGE not recognized.</failure>
+<remote-log send='false'/>
+</action-response>
+
+### 009 message-missing
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=&x=1
+status: 200
+content-type: text/xml; charset=utf-8
+length: 210
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="" x="1">
+  <failure code='notunderstood'>Message  not recognized.</failure>
+<remote-log send='false'/>
+</action-response>
+

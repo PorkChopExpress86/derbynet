@@ -1,0 +1,606 @@
+### 001 replay-first-poll-is-greeted
+request: POST action.php
+request-body: action=replay.message&status=-2&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 259
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": -2,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "HELLO"
+    ]
+}
+
+### 002 replay-after-heat-select-sees-cancel-and-start
+request: POST action.php
+request-body: action=replay.message&status=0&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 297
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 0,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "CANCEL",
+        "START Wolves_Round1_Heat01"
+    ]
+}
+
+### 003 replay-after-racing-off-and-on
+request: POST action.php
+request-body: action=replay.message&status=1&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 333
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 1,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "CANCEL",
+        "CANCEL",
+        "CANCEL",
+        "START Wolves_Round1_Heat01"
+    ]
+}
+
+### 004 timer-started
+request: POST action.php
+request-body: action=timer-message&message=STARTED
+status: 200
+content-type: text/xml; charset=utf-8
+length: 157
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="STARTED">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 005 replay-after-gate-opens
+request: POST action.php
+request-body: action=replay.message&status=1&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 274
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 1,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "RACE_STARTS 4000 2 50"
+    ]
+}
+
+### 006 timer-finished
+request: POST action.php
+request-body: action=timer-message&message=FINISHED&lane1=3.111&lane2=3.222&lane3=3.333&lane4=3.444
+status: 200
+content-type: text/xml; charset=utf-8
+length: 301
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane1="3.111" lane2="3.222" lane3="3.333" lane4="3.444">
+  <success/>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="2" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 007 replay-after-finish-playing
+request: POST action.php
+request-body: action=replay.message&status=2&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 325
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 2,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "REPLAY 4000 2 50",
+        "CANCEL",
+        "START Wolves_Round1_Heat02"
+    ]
+}
+
+### 008 replay-after-playback-finished
+request: POST action.php
+request-body: action=replay.message&status=0&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 237
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 0,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": []
+}
+
+### 009 rerun-last-heat
+request: POST action.php
+request-body: action=heat.rerun&heat=last
+status: 200
+content-type: application/json; charset=utf-8
+length: 2854
+body:
+{
+    "action": {
+        "action": "heat.rerun",
+        "heat": "last"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 5
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "Replay1 Racer",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 3,
+            "name": "Replay3 Racer",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 5,
+            "name": "Replay5 Racer",
+            "carname": "",
+            "carnumber": 205,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 2,
+            "name": "Replay2 Racer",
+            "carname": "",
+            "carnumber": 202,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "connected": true,
+        "message": "Ready (<n> sec.)"
+    },
+    "last-heat": "recoverable",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Wolves",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 010 replay-after-rerun
+request: POST action.php
+request-body: action=replay.message&status=0&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 353
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 0,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "CANCEL",
+        "CANCEL",
+        "START Wolves_Round1_Heat01",
+        "START Wolves_Round1_Heat01"
+    ]
+}
+
+### 011 replay-trigger
+request: POST action.php
+request-body: action=replay.trigger
+status: 200
+content-type: application/json; charset=utf-8
+length: 168
+body:
+{
+    "action": {
+        "action": "replay.trigger"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 012 replay-after-trigger
+request: POST action.php
+request-body: action=replay.message&status=0&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 269
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 0,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "REPLAY 4000 2 50"
+    ]
+}
+
+### 013 replay-test
+request: POST action.php
+request-body: action=replay.test
+status: 200
+content-type: application/json; charset=utf-8
+length: 165
+body:
+{
+    "action": {
+        "action": "replay.test"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 014 replay-after-test
+request: POST action.php
+request-body: action=replay.message&status=0&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 267
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 0,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "TEST 4000 2 50"
+    ]
+}
+
+### 015 coordinator-poll-with-replay-connected
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+length: 2669
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 5
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "Replay1 Racer",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 3,
+            "name": "Replay3 Racer",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 5,
+            "name": "Replay5 Racer",
+            "carname": "",
+            "carnumber": 205,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 2,
+            "name": "Replay2 Racer",
+            "carname": "",
+            "carnumber": 202,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "connected": true,
+        "message": "Ready (<n> sec.)"
+    },
+    "last-heat": "recoverable",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Wolves",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 016 replay-trigger-with-other-settings
+request: POST action.php
+request-body: action=replay.trigger
+status: 200
+content-type: application/json; charset=utf-8
+length: 168
+body:
+{
+    "action": {
+        "action": "replay.trigger"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 017 replay-after-trigger-with-other-settings
+request: POST action.php
+request-body: action=replay.message&status=0&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 269
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 0,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "REPLAY 2500 3 25"
+    ]
+}
+
+### 018 replay-poll-with-no-status
+request: POST action.php
+request-body: action=replay.message
+status: 200
+content-type: application/json; charset=utf-8
+length: 186
+body:
+{
+    "action": {
+        "action": "replay.message"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": []
+}
+
+### 019 replay-greeted-again-after-silence
+request: POST action.php
+request-body: action=replay.message&status=0&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+length: 258
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": 0,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "HELLO"
+    ]
+}
+

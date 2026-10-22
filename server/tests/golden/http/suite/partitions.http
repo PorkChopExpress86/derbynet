@@ -1,0 +1,908 @@
+### step-0 initial state
+request: SNAPSHOT
+status: 200
+content-type: application/json
+length: 74
+body:
+{"step":0,"state":{"classes":[],"partitions":[],"rounds":[],"roster":[]}}
+
+### step-1 after database.execute
+request: SNAPSHOT after POST action.php
+request-body: action=database.execute&script=schema
+status: 200
+content-type: application/json
+length: 24
+body:
+{"step":1,"changed":{}}
+
+### step-2 after database.execute
+request: SNAPSHOT after POST action.php
+request-body: action=database.execute&script=update-schema
+status: 200
+content-type: application/json
+length: 24
+body:
+{"step":2,"changed":{}}
+
+### step-3 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&photo-dir=/var/lib/derbynet/2026/testdb/racers
+status: 200
+content-type: application/json
+length: 24
+body:
+{"step":3,"changed":{}}
+
+### step-4 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&car-photo-dir=/var/lib/derbynet/2026/testdb/cars
+status: 200
+content-type: application/json
+length: 24
+body:
+{"step":4,"changed":{}}
+
+### step-5 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&video-dir=/var/lib/derbynet/2026/testdb/videos
+status: 200
+content-type: application/json
+length: 24
+body:
+{"step":5,"changed":{}}
+
+### step-6 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&log-dir=/var/lib/derbynet/2026/testdb/logs
+status: 200
+content-type: application/json
+length: 24
+body:
+{"step":6,"changed":{}}
+
+### step-7 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Kristie&lastname=Kyzer
+status: 200
+content-type: application/json
+length: 506
+body:
+{"step":7,"changed":{"classes":[{"name":"Default","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":1}],"rounds":[{"class":"Default","round":1,"name":"Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":101,"name":"Kristie Kyzer","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-8 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Shana&lastname=Sester
+status: 200
+content-type: application/json
+length: 505
+body:
+{"step":8,"changed":{"classes":[{"name":"Default","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":2}],"rounds":[{"class":"Default","round":1,"name":"Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":102,"name":"Shana Sester","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-9 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Glendora&lastname=Giusti
+status: 200
+content-type: application/json
+length: 508
+body:
+{"step":9,"changed":{"classes":[{"name":"Default","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":3,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":3}],"rounds":[{"class":"Default","round":1,"name":"Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":103,"name":"Glendora Giusti","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-10 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Ophelia&lastname=Oja
+status: 200
+content-type: application/json
+length: 505
+body:
+{"step":10,"changed":{"classes":[{"name":"Default","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":4,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":4}],"rounds":[{"class":"Default","round":1,"name":"Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":104,"name":"Ophelia Oja","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-11 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Mirna&lastname=Manier
+status: 200
+content-type: application/json
+length: 506
+body:
+{"step":11,"changed":{"classes":[{"name":"Default","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":5,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":5}],"rounds":[{"class":"Default","round":1,"name":"Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":105,"name":"Mirna Manier","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-12 after database.execute
+request: SNAPSHOT after POST action.php
+request-body: action=database.execute&script=schema
+status: 200
+content-type: application/json
+length: 727
+body:
+{"step":12,"changed":{"classes":[],"partitions":[],"rounds":[],"roster":{"added":[],"removed":[{"carnumber":101,"name":"Kristie Kyzer","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":102,"name":"Shana Sester","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":103,"name":"Glendora Giusti","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":104,"name":"Ophelia Oja","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":105,"name":"Mirna Manier","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}]}}}
+
+### step-13 after database.execute
+request: SNAPSHOT after POST action.php
+request-body: action=database.execute&script=update-schema
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":13,"changed":{}}
+
+### step-14 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&photo-dir=/var/lib/derbynet/2026/testdb/racers
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":14,"changed":{}}
+
+### step-15 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&car-photo-dir=/var/lib/derbynet/2026/testdb/cars
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":15,"changed":{}}
+
+### step-16 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&video-dir=/var/lib/derbynet/2026/testdb/videos
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":16,"changed":{}}
+
+### step-17 after settings.write
+request: SNAPSHOT after POST action.php
+request-body: action=settings.write&log-dir=/var/lib/derbynet/2026/testdb/logs
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":17,"changed":{}}
+
+### step-18 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Lucius&lastname=Lemon&carnumber=101&partition=Default
+status: 200
+content-type: application/json
+length: 506
+body:
+{"step":18,"changed":{"classes":[{"name":"Default","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":1}],"rounds":[{"class":"Default","round":1,"name":"Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-19 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Hubert&lastname=Heffley&carnumber=102&partition=Default
+status: 200
+content-type: application/json
+length: 508
+body:
+{"step":19,"changed":{"classes":[{"name":"Default","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":2}],"rounds":[{"class":"Default","round":1,"name":"Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-20 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Tangela&lastname=Tacey&carnumber=103&partition=Div%202
+status: 200
+content-type: application/json
+length: 794
+body:
+{"step":20,"changed":{"classes":[{"name":"Default","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":2,"ntrophies":-1}]},{"name":"Div 2","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":2},{"name":"Div 2","count":1}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-21 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Audry&lastname=Appleby&carnumber=104&partition=Div%202
+status: 200
+content-type: application/json
+length: 794
+body:
+{"step":21,"changed":{"classes":[{"name":"Default","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":2,"ntrophies":-1}]},{"name":"Div 2","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":2},{"name":"Div 2","count":2}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-22 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Kip&lastname=Kennelly&carnumber=105&partition=Div%203
+status: 200
+content-type: application/json
+length: 1077
+body:
+{"step":22,"changed":{"classes":[{"name":"Default","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":2,"ntrophies":-1}]},{"name":"Div 2","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":2,"ntrophies":-1}]},{"name":"Div 3","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":2},{"name":"Div 2","count":2},{"name":"Div 3","count":1}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-23 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Charlena&lastname=Callas&carnumber=106&partition=Default
+status: 200
+content-type: application/json
+length: 1086
+body:
+{"step":23,"changed":{"classes":[{"name":"Default","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":3,"ntrophies":-1}]},{"name":"Div 2","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":2,"ntrophies":-1}]},{"name":"Div 3","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":3},{"name":"Div 2","count":2},{"name":"Div 3","count":1}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-24 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Sherley&lastname=Summerford&carnumber=107&partition=Default
+status: 200
+content-type: application/json
+length: 1089
+body:
+{"step":24,"changed":{"classes":[{"name":"Default","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":4,"ntrophies":-1}]},{"name":"Div 2","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":2,"ntrophies":-1}]},{"name":"Div 3","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":4},{"name":"Div 2","count":2},{"name":"Div 3","count":1}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-25 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Roland&lastname=Rivero&carnumber=108&partition=Div%202
+status: 200
+content-type: application/json
+length: 1078
+body:
+{"step":25,"changed":{"classes":[{"name":"Default","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":4,"ntrophies":-1}]},{"name":"Div 2","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":3,"ntrophies":-1}]},{"name":"Div 3","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":4},{"name":"Div 2","count":3},{"name":"Div 3","count":1}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-26 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Gerald&lastname=Glennon&carnumber=109&partition=Div%202
+status: 200
+content-type: application/json
+length: 1079
+body:
+{"step":26,"changed":{"classes":[{"name":"Default","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":4,"ntrophies":-1}]},{"name":"Div 2","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":4,"ntrophies":-1}]},{"name":"Div 3","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":4},{"name":"Div 2","count":4},{"name":"Div 3","count":1}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-27 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Shalanda&lastname=Sanluis&carnumber=110&partition=Div%203
+status: 200
+content-type: application/json
+length: 1081
+body:
+{"step":27,"changed":{"classes":[{"name":"Default","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":4,"ntrophies":-1}]},{"name":"Div 2","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":4,"ntrophies":-1}]},{"name":"Div 3","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":4},{"name":"Div 2","count":4},{"name":"Div 3","count":2}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-28 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Nohemi&lastname=Natale&carnumber=111&partition=Default
+status: 200
+content-type: application/json
+length: 1084
+body:
+{"step":28,"changed":{"classes":[{"name":"Default","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":5,"ntrophies":-1}]},{"name":"Div 2","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":4,"ntrophies":-1}]},{"name":"Div 3","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":5},{"name":"Div 2","count":4},{"name":"Div 3","count":2}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-29 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Lien&lastname=Licht&carnumber=112&partition=Default
+status: 200
+content-type: application/json
+length: 1081
+body:
+{"step":29,"changed":{"classes":[{"name":"Default","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":6,"ntrophies":-1}]},{"name":"Div 2","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":4,"ntrophies":-1}]},{"name":"Div 3","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":6},{"name":"Div 2","count":4},{"name":"Div 3","count":2}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-30 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Rhett&lastname=Roeder&carnumber=113&partition=Div%202
+status: 200
+content-type: application/json
+length: 1077
+body:
+{"step":30,"changed":{"classes":[{"name":"Default","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":6,"ntrophies":-1}]},{"name":"Div 2","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":5,"ntrophies":-1}]},{"name":"Div 3","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":6},{"name":"Div 2","count":5},{"name":"Div 3","count":2}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-31 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Ivey&lastname=Ivester&carnumber=114&partition=Div%202
+status: 200
+content-type: application/json
+length: 1077
+body:
+{"step":31,"changed":{"classes":[{"name":"Default","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":6,"ntrophies":-1}]},{"name":"Div 2","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":6,"ntrophies":-1}]},{"name":"Div 3","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":6},{"name":"Div 2","count":6},{"name":"Div 3","count":2}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-32 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Christy&lastname=Capo&carnumber=115&partition=Div%203
+status: 200
+content-type: application/json
+length: 1077
+body:
+{"step":32,"changed":{"classes":[{"name":"Default","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":6,"ntrophies":-1}]},{"name":"Div 2","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":6,"ntrophies":-1}]},{"name":"Div 3","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":3,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":6},{"name":"Div 2","count":6},{"name":"Div 3","count":3}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-33 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Dara&lastname=Dittmer&carnumber=116&partition=Default
+status: 200
+content-type: application/json
+length: 1083
+body:
+{"step":33,"changed":{"classes":[{"name":"Default","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":7,"ntrophies":-1}]},{"name":"Div 2","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":6,"ntrophies":-1}]},{"name":"Div 3","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":3,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":7},{"name":"Div 2","count":6},{"name":"Div 3","count":3}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-34 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Iraida&lastname=Icenhour&carnumber=117&partition=Default
+status: 200
+content-type: application/json
+length: 1086
+body:
+{"step":34,"changed":{"classes":[{"name":"Default","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":8,"ntrophies":-1}]},{"name":"Div 2","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":6,"ntrophies":-1}]},{"name":"Div 3","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":3,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":8},{"name":"Div 2","count":6},{"name":"Div 3","count":3}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-35 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Shirley&lastname=Savidge&carnumber=118&partition=Div%202
+status: 200
+content-type: application/json
+length: 1080
+body:
+{"step":35,"changed":{"classes":[{"name":"Default","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":8,"ntrophies":-1}]},{"name":"Div 2","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":7,"ntrophies":-1}]},{"name":"Div 3","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":3,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":8},{"name":"Div 2","count":7},{"name":"Div 3","count":3}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-36 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Daphine&lastname=Dimas&carnumber=119&partition=Div%202
+status: 200
+content-type: application/json
+length: 1078
+body:
+{"step":36,"changed":{"classes":[{"name":"Default","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":8,"ntrophies":-1}]},{"name":"Div 2","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":8,"ntrophies":-1}]},{"name":"Div 3","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":3,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":8},{"name":"Div 2","count":8},{"name":"Div 3","count":3}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-37 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Bonny&lastname=Barrow&carnumber=120&partition=Div%203
+status: 200
+content-type: application/json
+length: 1077
+body:
+{"step":37,"changed":{"classes":[{"name":"Default","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":8,"ntrophies":-1}]},{"name":"Div 2","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":8,"ntrophies":-1}]},{"name":"Div 3","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":4,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":8},{"name":"Div 2","count":8},{"name":"Div 3","count":4}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-38 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Natisha&lastname=Neifert&carnumber=121&partition=Default
+status: 200
+content-type: application/json
+length: 1086
+body:
+{"step":38,"changed":{"classes":[{"name":"Default","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":9,"ntrophies":-1}]},{"name":"Div 2","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":8,"ntrophies":-1}]},{"name":"Div 3","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":4,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":9},{"name":"Div 2","count":8},{"name":"Div 3","count":4}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-39 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Jesse&lastname=John&carnumber=122&partition=Default
+status: 200
+content-type: application/json
+length: 1085
+body:
+{"step":39,"changed":{"classes":[{"name":"Default","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":10,"ntrophies":-1}]},{"name":"Div 2","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":8,"ntrophies":-1}]},{"name":"Div 3","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":4,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":10},{"name":"Div 2","count":8},{"name":"Div 3","count":4}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-40 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Lillia&lastname=Lawson&carnumber=123&partition=Div%202
+status: 200
+content-type: application/json
+length: 1082
+body:
+{"step":40,"changed":{"classes":[{"name":"Default","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":10,"ntrophies":-1}]},{"name":"Div 2","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":9,"ntrophies":-1}]},{"name":"Div 3","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":4,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":10},{"name":"Div 2","count":9},{"name":"Div 3","count":4}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-41 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Anh&lastname=Antonio&carnumber=124&partition=Div%202
+status: 200
+content-type: application/json
+length: 1084
+body:
+{"step":41,"changed":{"classes":[{"name":"Default","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":10,"ntrophies":-1}]},{"name":"Div 2","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":10,"ntrophies":-1}]},{"name":"Div 3","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":4,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":10},{"name":"Div 2","count":10},{"name":"Div 3","count":4}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-42 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Annalee&lastname=Aguila&carnumber=125&partition=Div%203
+status: 200
+content-type: application/json
+length: 1087
+body:
+{"step":42,"changed":{"classes":[{"name":"Default","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":10,"ntrophies":-1}]},{"name":"Div 2","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":10,"ntrophies":-1}]},{"name":"Div 3","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":5,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":10},{"name":"Div 2","count":10},{"name":"Div 3","count":5}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-43 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Neomi&lastname=Newlin&carnumber=126&partition=Default
+status: 200
+content-type: application/json
+length: 1091
+body:
+{"step":43,"changed":{"classes":[{"name":"Default","count":11,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":11,"ntrophies":-1}]},{"name":"Div 2","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":10,"ntrophies":-1}]},{"name":"Div 3","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":5,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":11},{"name":"Div 2","count":10},{"name":"Div 3","count":5}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":11,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-44 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Lyle&lastname=Lahey&carnumber=127&partition=Default
+status: 200
+content-type: application/json
+length: 1089
+body:
+{"step":44,"changed":{"classes":[{"name":"Default","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":12,"ntrophies":-1}]},{"name":"Div 2","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":10,"ntrophies":-1}]},{"name":"Div 3","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":5,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":12},{"name":"Div 2","count":10},{"name":"Div 3","count":5}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-45 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Denny&lastname=Daggett&carnumber=128&partition=Div%202
+status: 200
+content-type: application/json
+length: 1086
+body:
+{"step":45,"changed":{"classes":[{"name":"Default","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":12,"ntrophies":-1}]},{"name":"Div 2","count":11,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":11,"ntrophies":-1}]},{"name":"Div 3","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":5,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":12},{"name":"Div 2","count":11},{"name":"Div 3","count":5}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":11,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-46 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Rosemarie&lastname=Robidoux&carnumber=129&partition=Div%202
+status: 200
+content-type: application/json
+length: 1091
+body:
+{"step":46,"changed":{"classes":[{"name":"Default","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":12,"ntrophies":-1}]},{"name":"Div 2","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":12,"ntrophies":-1}]},{"name":"Div 3","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":5,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":12},{"name":"Div 2","count":12},{"name":"Div 3","count":5}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-47 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Margot&lastname=Mckeithan&carnumber=130&partition=Div%203
+status: 200
+content-type: application/json
+length: 1089
+body:
+{"step":47,"changed":{"classes":[{"name":"Default","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":12,"ntrophies":-1}]},{"name":"Div 2","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":12,"ntrophies":-1}]},{"name":"Div 3","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":6,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":12},{"name":"Div 2","count":12},{"name":"Div 3","count":6}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-48 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Ruthe&lastname=Rooks&carnumber=131&partition=Default
+status: 200
+content-type: application/json
+length: 1090
+body:
+{"step":48,"changed":{"classes":[{"name":"Default","count":13,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":13,"ntrophies":-1}]},{"name":"Div 2","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":12,"ntrophies":-1}]},{"name":"Div 3","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":6,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":13},{"name":"Div 2","count":12},{"name":"Div 3","count":6}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":13,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-49 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Sherell&lastname=Strode&carnumber=132&partition=Default
+status: 200
+content-type: application/json
+length: 1093
+body:
+{"step":49,"changed":{"classes":[{"name":"Default","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":14,"ntrophies":-1}]},{"name":"Div 2","count":12,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":12,"ntrophies":-1}]},{"name":"Div 3","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":6,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":14},{"name":"Div 2","count":12},{"name":"Div 3","count":6}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":12,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-50 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Demetrice&lastname=Denmark&carnumber=133&partition=Div%202
+status: 200
+content-type: application/json
+length: 1090
+body:
+{"step":50,"changed":{"classes":[{"name":"Default","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":14,"ntrophies":-1}]},{"name":"Div 2","count":13,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":13,"ntrophies":-1}]},{"name":"Div 3","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":6,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":14},{"name":"Div 2","count":13},{"name":"Div 3","count":6}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":13,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-51 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Lakita&lastname=Lanman&carnumber=134&partition=Div%202
+status: 200
+content-type: application/json
+length: 1086
+body:
+{"step":51,"changed":{"classes":[{"name":"Default","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":14,"ntrophies":-1}]},{"name":"Div 2","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":14,"ntrophies":-1}]},{"name":"Div 3","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":6,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":14},{"name":"Div 2","count":14},{"name":"Div 3","count":6}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-52 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Iva&lastname=Imes&carnumber=135&partition=Div%203
+status: 200
+content-type: application/json
+length: 1081
+body:
+{"step":52,"changed":{"classes":[{"name":"Default","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":14,"ntrophies":-1}]},{"name":"Div 2","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":14,"ntrophies":-1}]},{"name":"Div 3","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":7,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":14},{"name":"Div 2","count":14},{"name":"Div 3","count":7}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-53 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Kellie&lastname=Kubacki&carnumber=136&partition=Default
+status: 200
+content-type: application/json
+length: 1093
+body:
+{"step":53,"changed":{"classes":[{"name":"Default","count":15,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":15,"ntrophies":-1}]},{"name":"Div 2","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":14,"ntrophies":-1}]},{"name":"Div 3","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":7,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":15},{"name":"Div 2","count":14},{"name":"Div 3","count":7}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":15,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-54 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Amparo&lastname=Ashbrook&carnumber=137&partition=Default
+status: 200
+content-type: application/json
+length: 1094
+body:
+{"step":54,"changed":{"classes":[{"name":"Default","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":16,"ntrophies":-1}]},{"name":"Div 2","count":14,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":14,"ntrophies":-1}]},{"name":"Div 3","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":7,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":16},{"name":"Div 2","count":14},{"name":"Div 3","count":7}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":14,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-55 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Maryetta&lastname=Menchaca&carnumber=138&partition=Div%202
+status: 200
+content-type: application/json
+length: 1090
+body:
+{"step":55,"changed":{"classes":[{"name":"Default","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":16,"ntrophies":-1}]},{"name":"Div 2","count":15,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":15,"ntrophies":-1}]},{"name":"Div 3","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":7,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":16},{"name":"Div 2","count":15},{"name":"Div 3","count":7}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":15,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-56 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Edwardo&lastname=Estabrook&carnumber=139&partition=Div%202
+status: 200
+content-type: application/json
+length: 1090
+body:
+{"step":56,"changed":{"classes":[{"name":"Default","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":16,"ntrophies":-1}]},{"name":"Div 2","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":16,"ntrophies":-1}]},{"name":"Div 3","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":7,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":16},{"name":"Div 2","count":16},{"name":"Div 3","count":7}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-57 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Librada&lastname=Labat&carnumber=140&partition=Div%203
+status: 200
+content-type: application/json
+length: 1086
+body:
+{"step":57,"changed":{"classes":[{"name":"Default","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":16,"ntrophies":-1}]},{"name":"Div 2","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":16,"ntrophies":-1}]},{"name":"Div 3","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":8,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":16},{"name":"Div 2","count":16},{"name":"Div 3","count":8}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-58 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Vita&lastname=Villeda&carnumber=141&partition=Default
+status: 200
+content-type: application/json
+length: 1091
+body:
+{"step":58,"changed":{"classes":[{"name":"Default","count":17,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":17,"ntrophies":-1}]},{"name":"Div 2","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":16,"ntrophies":-1}]},{"name":"Div 3","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":8,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":17},{"name":"Div 2","count":16},{"name":"Div 3","count":8}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":17,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-59 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Karrie&lastname=Koski&carnumber=142&partition=Default
+status: 200
+content-type: application/json
+length: 1091
+body:
+{"step":59,"changed":{"classes":[{"name":"Default","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":18,"ntrophies":-1}]},{"name":"Div 2","count":16,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":16,"ntrophies":-1}]},{"name":"Div 3","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":8,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":18},{"name":"Div 2","count":16},{"name":"Div 3","count":8}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":16,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-60 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Charleen&lastname=Crist&carnumber=143&partition=Div%202
+status: 200
+content-type: application/json
+length: 1087
+body:
+{"step":60,"changed":{"classes":[{"name":"Default","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":18,"ntrophies":-1}]},{"name":"Div 2","count":17,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":17,"ntrophies":-1}]},{"name":"Div 3","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":8,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":18},{"name":"Div 2","count":17},{"name":"Div 3","count":8}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":17,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-61 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Rosenda&lastname=Rossiter&carnumber=144&partition=Div%202
+status: 200
+content-type: application/json
+length: 1089
+body:
+{"step":61,"changed":{"classes":[{"name":"Default","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":18,"ntrophies":-1}]},{"name":"Div 2","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":18,"ntrophies":-1}]},{"name":"Div 3","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":8,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":18},{"name":"Div 2","count":18},{"name":"Div 3","count":8}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-62 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Isobel&lastname=Ivester&carnumber=145&partition=Div%203
+status: 200
+content-type: application/json
+length: 1087
+body:
+{"step":62,"changed":{"classes":[{"name":"Default","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":18,"ntrophies":-1}]},{"name":"Div 2","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":18,"ntrophies":-1}]},{"name":"Div 3","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":9,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":18},{"name":"Div 2","count":18},{"name":"Div 3","count":9}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-63 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Nelia&lastname=Nagao&carnumber=146&partition=Default
+status: 200
+content-type: application/json
+length: 1090
+body:
+{"step":63,"changed":{"classes":[{"name":"Default","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":19,"ntrophies":-1}]},{"name":"Div 2","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":18,"ntrophies":-1}]},{"name":"Div 3","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":9,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":19},{"name":"Div 2","count":18},{"name":"Div 3","count":9}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-64 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Tuan&lastname=Troxell&carnumber=147&partition=Default
+status: 200
+content-type: application/json
+length: 1091
+body:
+{"step":64,"changed":{"classes":[{"name":"Default","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":20,"ntrophies":-1}]},{"name":"Div 2","count":18,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":18,"ntrophies":-1}]},{"name":"Div 3","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":9,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":20},{"name":"Div 2","count":18},{"name":"Div 3","count":9}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":18,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false}],"removed":[]}}}
+
+### step-65 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Lynelle&lastname=Lipsey&carnumber=148&partition=Div%202
+status: 200
+content-type: application/json
+length: 1087
+body:
+{"step":65,"changed":{"classes":[{"name":"Default","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":20,"ntrophies":-1}]},{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 3","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":9,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":20},{"name":"Div 2","count":19},{"name":"Div 3","count":9}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false}],"removed":[]}}}
+
+### step-66 after racer.import
+request: SNAPSHOT after POST action.php
+request-body: action=racer.import&firstname=Melanie&lastname=Meacham&carnumber=149&partition=Div%203
+status: 200
+content-type: application/json
+length: 1092
+body:
+{"step":66,"changed":{"classes":[{"name":"Default","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":20,"ntrophies":-1}]},{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 3","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":20},{"name":"Div 2","count":19},{"name":"Div 3","count":10}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[]}}}
+
+### step-67 after class.order
+request: SNAPSHOT after POST action.php
+request-body: action=class.order&classid_1=2&classid_2=1&classid_3=3
+status: 200
+content-type: application/json
+length: 936
+body:
+{"step":67,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Default","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":20,"ntrophies":-1}]},{"name":"Div 3","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Default","count":20},{"name":"Div 3","count":10}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}]}}
+
+### step-68 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=one-group
+status: 200
+content-type: application/json
+length: 12676
+body:
+{"step":68,"changed":{"classes":[{"name":"All Racers","count":49,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1},{"name":"Default","count":20,"ntrophies":-1},{"name":"Div 3","count":10,"ntrophies":-1}]}],"rounds":[{"class":"All Racers","round":1,"name":"Round 1","aggregate":false,"roster_size":49,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false}],"removed":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}]}}}
+
+### step-69 after rank.order
+request: SNAPSHOT after POST action.php
+request-body: action=rank.order&rankid_1=1&rankid_2=2&rankid_3=3
+status: 200
+content-type: application/json
+length: 342
+body:
+{"step":69,"changed":{"classes":[{"name":"All Racers","count":49,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":20,"ntrophies":-1},{"name":"Div 2","count":19,"ntrophies":-1},{"name":"Div 3","count":10,"ntrophies":-1}]}],"partitions":[{"name":"Default","count":20},{"name":"Div 2","count":19},{"name":"Div 3","count":10}]}}
+
+### step-70 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=by-partition
+status: 200
+content-type: application/json
+length: 13113
+body:
+{"step":70,"changed":{"classes":[{"name":"Default","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":20,"ntrophies":-1}]},{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 3","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]}],"rounds":[{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false}]}}}
+
+### step-71 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=custom
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":71,"changed":{}}
+
+### step-72 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=by-partition
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":72,"changed":{}}
+
+### step-73 after partition.order
+request: SNAPSHOT after POST action.php
+request-body: action=partition.order&partitionid_1=3&partitionid_2=2&partitionid_3=1
+status: 200
+content-type: application/json
+length: 936
+body:
+{"step":73,"changed":{"classes":[{"name":"Div 3","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]},{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Default","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Default","count":20,"ntrophies":-1}]}],"partitions":[{"name":"Div 3","count":10},{"name":"Div 2","count":19},{"name":"Default","count":20}],"rounds":[{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Default","round":1,"name":"Default, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}]}}
+
+### step-74 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=one-group
+status: 200
+content-type: application/json
+length: 12676
+body:
+{"step":74,"changed":{"classes":[{"name":"All Racers","count":49,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1},{"name":"Div 2","count":19,"ntrophies":-1},{"name":"Default","count":20,"ntrophies":-1}]}],"rounds":[{"class":"All Racers","round":1,"name":"Round 1","aggregate":false,"roster_size":49,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false}],"removed":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"Default","rank":"Default","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}]}}}
+
+### step-75 after partition.order
+request: SNAPSHOT after POST action.php
+request-body: action=partition.order&partitionid_1=2&partitionid_2=3&partitionid_3=1
+status: 200
+content-type: application/json
+length: 342
+body:
+{"step":75,"changed":{"classes":[{"name":"All Racers","count":49,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1},{"name":"Div 3","count":10,"ntrophies":-1},{"name":"Default","count":20,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":10},{"name":"Default","count":20}]}}
+
+### step-76 after partition.edit
+request: SNAPSHOT after POST action.php
+request-body: action=partition.edit&partitionid=1&name=Div%202
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":76,"changed":{}}
+
+### step-77 after partition.edit
+request: SNAPSHOT after POST action.php
+request-body: action=partition.edit&partitionid=1&name=Default
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":77,"changed":{}}
+
+### step-78 after partition.edit
+request: SNAPSHOT after POST action.php
+request-body: action=partition.edit&partitionid=1&name=Div%201
+status: 200
+content-type: application/json
+length: 5445
+body:
+{"step":78,"changed":{"classes":[{"name":"All Racers","count":49,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1},{"name":"Div 3","count":10,"ntrophies":-1},{"name":"Div 1","count":20,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":10},{"name":"Div 1","count":20}],"roster":{"added":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false}],"removed":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Default","class":"All Racers","rank":"Default","passed":false}]}}}
+
+### step-79 after partition.add
+request: SNAPSHOT after POST action.php
+request-body: action=partition.add&name=Div%201
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":79,"changed":{}}
+
+### step-80 after partition.add
+request: SNAPSHOT after POST action.php
+request-body: action=partition.add&name=New%20Div
+status: 200
+content-type: application/json
+length: 411
+body:
+{"step":80,"changed":{"classes":[{"name":"All Racers","count":49,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1},{"name":"Div 3","count":10,"ntrophies":-1},{"name":"Div 1","count":20,"ntrophies":-1},{"name":"New Div","count":0,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":10},{"name":"Div 1","count":20},{"name":"New Div","count":0}]}}
+
+### step-81 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=by-partition
+status: 200
+content-type: application/json
+length: 13170
+body:
+{"step":81,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 3","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":0,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":0,"ntrophies":-1}]}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":0,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Div 1","class":"Div 1","rank":"Div 1","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"Div 2","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}],"removed":[{"carnumber":101,"name":"Lucius Lemon","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":102,"name":"Hubert Heffley","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":103,"name":"Tangela Tacey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":104,"name":"Audry Appleby","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":106,"name":"Charlena Callas","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":107,"name":"Sherley Summerford","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":108,"name":"Roland Rivero","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":109,"name":"Gerald Glennon","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":111,"name":"Nohemi Natale","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":112,"name":"Lien Licht","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":113,"name":"Rhett Roeder","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":114,"name":"Ivey Ivester","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":116,"name":"Dara Dittmer","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":117,"name":"Iraida Icenhour","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":118,"name":"Shirley Savidge","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":119,"name":"Daphine Dimas","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":121,"name":"Natisha Neifert","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":122,"name":"Jesse John","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":123,"name":"Lillia Lawson","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":124,"name":"Anh Antonio","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":126,"name":"Neomi Newlin","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":127,"name":"Lyle Lahey","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":128,"name":"Denny Daggett","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":129,"name":"Rosemarie Robidoux","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":131,"name":"Ruthe Rooks","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":132,"name":"Sherell Strode","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":133,"name":"Demetrice Denmark","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":134,"name":"Lakita Lanman","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":136,"name":"Kellie Kubacki","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":137,"name":"Amparo Ashbrook","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":138,"name":"Maryetta Menchaca","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":139,"name":"Edwardo Estabrook","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":141,"name":"Vita Villeda","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":142,"name":"Karrie Koski","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":143,"name":"Charleen Crist","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":144,"name":"Rosenda Rossiter","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false},{"carnumber":146,"name":"Nelia Nagao","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":147,"name":"Tuan Troxell","carname":"","partition":"Div 1","class":"All Racers","rank":"Div 1","passed":false},{"carnumber":148,"name":"Lynelle Lipsey","carname":"","partition":"Div 2","class":"All Racers","rank":"Div 2","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"All Racers","rank":"Div 3","passed":false}]}}}
+
+### step-82 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=custom
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":82,"changed":{}}
+
+### step-83 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=by-partition
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":83,"changed":{}}
+
+### step-84 after partition.add
+request: SNAPSHOT after POST action.php
+request-body: action=partition.add&name=Empty
+status: 200
+content-type: application/json
+length: 1504
+body:
+{"step":84,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 3","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":0,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":0,"ntrophies":-1}]},{"name":"Empty","count":0,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Empty","count":0,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":10},{"name":"Div 1","count":20},{"name":"New Div","count":0},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":0,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Empty","round":1,"name":"Empty, Round 1","aggregate":false,"roster_size":0,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}]}}
+
+### step-85 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=by-partition
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":85,"changed":{}}
+
+### step-86 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=by-partition
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":86,"changed":{}}
+
+### step-87 after partition.apply-rule
+request: SNAPSHOT after POST action.php
+request-body: action=partition.apply-rule&rule=custom
+status: 200
+content-type: application/json
+length: 25
+body:
+{"step":87,"changed":{}}
+
+### step-88 after rank.move
+request: SNAPSHOT after POST action.php
+request-body: action=rank.move&rankid=4&classid=4
+status: 200
+content-type: application/json
+length: 1134
+body:
+{"step":88,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 3","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":0,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":0,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3","round":1,"name":"Div 3, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":0,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}]}}
+
+### step-89 after rank.move
+request: SNAPSHOT after POST action.php
+request-body: action=rank.move&rankid=3&classid=-1
+status: 200
+content-type: application/json
+length: 3597
+body:
+{"step":89,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":0,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":0,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":10,"ntrophies":-1}]}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":0,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}],"removed":[{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false},{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3","rank":"Div 3","passed":false}]}}}
+
+### step-90 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=5&partitionid=4
+status: 200
+content-type: application/json
+length: 1570
+body:
+{"step":90,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":1,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":9,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":9},{"name":"Div 1","count":20},{"name":"New Div","count":1},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":105,"name":"Kip Kennelly","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-91 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=10&partitionid=4
+status: 200
+content-type: application/json
+length: 1578
+body:
+{"step":91,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":2,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":8,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":8},{"name":"Div 1","count":20},{"name":"New Div","count":2},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":110,"name":"Shalanda Sanluis","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-92 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=15&partitionid=4
+status: 200
+content-type: application/json
+length: 1570
+body:
+{"step":92,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":3,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":7,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":7},{"name":"Div 1","count":20},{"name":"New Div","count":3},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":115,"name":"Christy Capo","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":115,"name":"Christy Capo","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-93 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=20&partitionid=4
+status: 200
+content-type: application/json
+length: 1570
+body:
+{"step":93,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":4,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":6,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":6},{"name":"Div 1","count":20},{"name":"New Div","count":4},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":120,"name":"Bonny Barrow","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-94 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=25&partitionid=4
+status: 200
+content-type: application/json
+length: 1574
+body:
+{"step":94,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":5,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":5,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":5,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":5},{"name":"Div 1","count":20},{"name":"New Div","count":5},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":5,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":125,"name":"Annalee Aguila","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-95 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=30&partitionid=4
+status: 200
+content-type: application/json
+length: 1578
+body:
+{"step":95,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":6,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":6,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":4,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":4,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":4},{"name":"Div 1","count":20},{"name":"New Div","count":6},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":6,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":4,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":130,"name":"Margot Mckeithan","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-96 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=35&partitionid=4
+status: 200
+content-type: application/json
+length: 1562
+body:
+{"step":96,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":7,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":7,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":3,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":3,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":3},{"name":"Div 1","count":20},{"name":"New Div","count":7},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":7,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":3,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":135,"name":"Iva Imes","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":135,"name":"Iva Imes","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-97 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=40&partitionid=4
+status: 200
+content-type: application/json
+length: 1572
+body:
+{"step":97,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":8,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":8,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":2,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":2,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":2},{"name":"Div 1","count":20},{"name":"New Div","count":8},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":8,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":2,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":140,"name":"Librada Labat","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":140,"name":"Librada Labat","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-98 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=45&partitionid=4
+status: 200
+content-type: application/json
+length: 1574
+body:
+{"step":98,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":9,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":9,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":1,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":1,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":1},{"name":"Div 1","count":20},{"name":"New Div","count":9},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":9,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":1,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":145,"name":"Isobel Ivester","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-99 after racer.edit
+request: SNAPSHOT after POST action.php
+request-body: action=racer.edit&racerid=49&partitionid=4
+status: 200
+content-type: application/json
+length: 1580
+body:
+{"step":99,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":10,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":0,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 3","count":0,"ntrophies":-1}]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 3","count":0},{"name":"Div 1","count":20},{"name":"New Div","count":10},{"name":"Empty","count":0}],"rounds":[{"class":"Div 2","round":1,"name":"Div 2, Round 1","aggregate":false,"roster_size":19,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 1","round":1,"name":"Div 1, Round 1","aggregate":false,"roster_size":20,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"New Div","round":1,"name":"New Div, Round 1","aggregate":false,"roster_size":10,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0},{"class":"Div 3-1","round":1,"name":"Div 3-1, Round 1","aggregate":false,"roster_size":0,"passed":0,"unscheduled":0,"heats_scheduled":0,"heats_run":0}],"roster":{"added":[{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"New Div","class":"New Div","rank":"New Div","passed":false}],"removed":[{"carnumber":149,"name":"Melanie Meacham","carname":"","partition":"Div 3","class":"Div 3-1","rank":"Div 3","passed":false}]}}}
+
+### step-100 after partition.delete
+request: SNAPSHOT after POST action.php
+request-body: action=partition.delete&partitionid=3
+status: 200
+content-type: application/json
+length: 618
+body:
+{"step":100,"changed":{"classes":[{"name":"Div 2","count":19,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 2","count":19,"ntrophies":-1}]},{"name":"Div 1","count":20,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"Div 1","count":20,"ntrophies":-1}]},{"name":"New Div","count":10,"nrounds":0,"ntrophies":-1,"subgroups":[{"name":"New Div","count":10,"ntrophies":-1},{"name":"Empty","count":0,"ntrophies":-1}]},{"name":"Div 3-1","count":0,"nrounds":0,"ntrophies":-1,"subgroups":[]}],"partitions":[{"name":"Div 2","count":19},{"name":"Div 1","count":20},{"name":"New Div","count":10},{"name":"Empty","count":0}]}}
+
