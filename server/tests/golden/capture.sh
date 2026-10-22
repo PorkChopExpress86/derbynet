@@ -50,8 +50,21 @@ done
 
 step_server() {
   "$RUN_SUITE" harness assets server timeout
-  echo "php: $(docker exec "$SERVER" php -r 'echo PHP_VERSION;')" \
-       "on $(docker exec "$SERVER" sed -n 's/^PRETTY_NAME=//p' /etc/os-release)" >&2
+  write_provenance
+  cat "$GOLDEN/provenance.txt" >&2
+}
+
+# provenance.txt: what the fixtures were captured against.  Only values that stay
+# the same from run to run on one image, so --check still compares cleanly.
+write_provenance() {
+  docker exec "$SERVER" sh -c '
+    modules() { "$@" -m | grep -v -e "^\[" -e "^$" | sort -u | tr "\n" " " | sed "s/ $//"; }
+    echo "php: $(php -r "echo PHP_VERSION;")"
+    echo "alpine: $(cat /etc/alpine-release)"
+    echo "tz: $TZ"
+    echo "php cli extensions: $(modules php)"
+    echo "php-fpm extensions: $(modules "$(ls /usr/sbin/php-fpm* | head -n 1)")"
+  ' > "$GOLDEN/provenance.txt"
 }
 
 # Fail before any capture if README.md does not document every normalization rule.

@@ -20,7 +20,14 @@ The script builds the harness and server images by calling the steps of `testing
 
 The `golden-fixtures` workflow runs `capture.sh --check` on every pull request and push to master that touches `website/`, `installer/docker/`, `testing/` or this directory.
 
-The committed fixtures were captured against the image built from `installer/docker/Dockerfile` (Alpine 3.23, PHP 8.4, `TZ=America/New_York`).
+The committed fixtures were captured against the image built from `installer/docker/Dockerfile`. `capture.sh` writes what that image held to `provenance.txt`: the PHP version to the patch level, the Alpine release, `TZ`, and the extensions the PHP CLI (engine capture) and php-fpm (HTTP capture) load. `--check` compares it like any fixture, so CI fails when the image it builds has a different PHP or Alpine release than the fixtures were captured against, and someone recaptures.
+
+The file leaves out the commit SHA and the image digest on purpose. Both change on every commit and every image build, even when PHP and every fixture stay the same, so `--check` would always fail. The commit that captured the fixtures is the one that last changed them (`git log -1 -- server/tests/golden/engine server/tests/golden/http`).
+
+The Dockerfile starts `FROM alpine:3.23` and runs `apk upgrade`, so the PHP it gets is whatever Alpine publishes that day, and CI always builds from scratch. A local Docker layer cache can hold an older build. If `provenance.txt` shows an older PHP than CI, refresh the base image and rebuild without the cache, then capture again:
+
+    docker pull alpine:3.23
+    docker build --no-cache -t derbynet-golden-server -f installer/docker/Dockerfile .
 
 ## What is here
 
@@ -35,6 +42,7 @@ The committed fixtures were captured against the image built from `installer/doc
 | `engine/ordinals.json` | `ordinal()` and `nth_fastest()` for 0 to 120 (and `T0` to `T120`) | same |
 | `engine/lane-bias.json`, `engine/critical-f-value.json` | `lane_bias_analysis()` over fixed time sets for 2 to 8 lanes, the `history.php` sentences, and `critical_f_value()` | same |
 | `engine/summary.txt` | The case counts the tool printed | same |
+| `provenance.txt` | PHP version, Alpine release, `TZ` and PHP extensions of the image the fixtures were captured against | `capture.sh` |
 | `http/**/*.http` | HTTP transcripts: request, status, content type, `Location`, `Set-Cookie`, `Cache-Control`, body | `capture/capture-http.sh` and its `scenarios/` |
 | `http/**/*.by-car.json` | Standings ladders with racer IDs replaced by car number and name | `standings_by_car` in `capture-http.sh` |
 
