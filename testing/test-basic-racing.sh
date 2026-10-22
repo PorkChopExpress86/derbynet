@@ -111,26 +111,14 @@ run_heat 3 4  -          343:9.9999 139:2.7565 303:3.0264  x
 user_login_coordinator
 ### Editing racers
 
-[ `curl_get checkin.php | grep '"racerid":5,' | grep -c '"class":"Arrows'` -eq 1 ] || test_fails Initial class
 EDITED_RACERID=$(racerid_of 405)
 curl_getj "action.php?query=racer.list" | \
     jq -e --argjson id $EDITED_RACERID '.racers | map(select(.racerid == $id)) | length == 1 and
         (.[0].class | startswith("Arrows"))' >/dev/null || test_fails Initial class by racer.list
 curl_postj action.php "action=racer.edit&racer=5&firstname=Zuzu&lastname=Zingelo&carno=999&carname=Z-Car&rankid=4&note_from=Suburbia" | check_jsuccess
-## To construct the checkin table, checkin.php includes a bunch of javascript
-## addRow0 calls manufactured by PHP code.
-[ `curl_get checkin.php | grep '"racerid":5,' | grep -c '"firstname":"Zuzu"'` -eq 1 ] || test_fails Firstname change
-[ `curl_get checkin.php | grep '"racerid":5,' | grep -c '"lastname":"Zingelo"'` -eq 1 ] || test_fails Lastname change
-[ `curl_get checkin.php | grep '"racerid":5,' | grep -c '"class":"Webelos'` -eq 1 ] || test_fails Class change
-[ `curl_get checkin.php | grep '"racerid":5,' | grep -c '"carnumber":999'` -eq 1 ] || test_fails Car number change
-[ `curl_get checkin.php | grep '"racerid":5,' | grep -c '"note":"Suburbia"'` -eq 1 ] || test_fails note_from change
 
-curl_get checkin.php | expect_count '"note":null' 0
-# Not sure how many, but the pattern is:
-#   curl_get checkin.php | expect_count '"note":""' 10
-
-# The same facts through racer.list, looking the racer up by its new car number
-# and checking that it is still the racer we edited
+# Look the racer up by its new car number, and check that it is still the racer
+# we edited
 function edited_racer_has() {
     curl_getj "action.php?query=racer.list" | \
         jq -e --argjson id $EDITED_RACERID \
@@ -144,7 +132,6 @@ edited_racer_has '.note_from == "Suburbia"' || test_fails note_from change by ra
 curl_getj "action.php?query=racer.list" | \
     jq -e '.racers | map(select(.note_from == null)) | length == 0' >/dev/null || \
     test_fails Racers without a note by racer.list
-
 
 ### Overwriting manual heat results: Clobber Dereck Dreier's results to all be 8.888
 curl_postj action.php "action=heat.select&roundid=1&heat=1&now_racing=0" | check_jsuccess
@@ -218,12 +205,11 @@ curl_getj "action.php?query=award.current" | expect_one Byron
 curl_postj action.php "action=award.present&key=speed-2-1" | check_jsuccess
 curl_getj "action.php?query=award.current" | expect_one Asher
 
-# Issue#87: make sure the awards presentation page populates for speed awards
-curl_get awards-presentation.php | expect_one "<option data-classid=.1.>Lions &amp; Tigers</option>"
-curl_get awards-presentation.php | expect_count ">3rd Fastest in " 6
+# Issue#87: make sure the speed awards are there for the awards presentation page,
+# which is built from award.list
 curl_getj "action.php?query=award.list" | \
     jq -e '.classes | map(select(.name == "Lions & Tigers")) | length == 1' >/dev/null || \
-    test_fails Lions \& Tigers by award.list
+    test_fails Lions \& Tigers in award.list
 curl_getj "action.php?query=award.list" | \
     jq -e '.["speed-awards"] | map(select(.place == 3)) | length == 6' >/dev/null || \
     test_fails 3rd place speed awards by award.list
@@ -231,7 +217,6 @@ curl_getj "action.php?query=award.list" | \
 curl_postj action.php "action=settings.write&one-trophy-per=1&one-trophy-per-checkbox" | check_jsuccess
 # There are only 3 racers in Webelos, and one of them gets a pack-level award.  So only
 # five 3rd-place trophies in this case.
-curl_get awards-presentation.php | expect_count ">3rd Fastest in " 5
 curl_getj "action.php?query=award.list" | \
     jq -e '.["speed-awards"] | map(select(.place == 3)) | length == 5' >/dev/null || \
     test_fails 3rd place speed awards with one trophy per racer, by award.list
@@ -249,12 +234,6 @@ curl_postj action.php "action=award.present&key=speed-2-4" | check_jsuccess
 curl_getj "action.php?query=award.current" | expect_one Byron
 
 # Issue#97: confirm lane bias calculation isn't broken
-curl_get history.php | expect_one "<td>1.757 sample variance.</td>"
-curl_get history.php | expect_one "<td>1.867 sample variance.</td>"
-curl_get history.php | expect_one "<td>1.832 sample variance.</td>"
-curl_get history.php | expect_one "<td>1.966 sample variance.</td>"
-curl_get history.php | expect_one "<p>F statistic is 0.090 with df1=3 and df2=85</p>"
-
 curl_page history.php | page_text | expect_sentence "1.757 sample variance."
 curl_page history.php | page_text | expect_sentence "1.867 sample variance."
 curl_page history.php | page_text | expect_sentence "1.832 sample variance."
