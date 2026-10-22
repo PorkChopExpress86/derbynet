@@ -1,6 +1,8 @@
 ## docker build -t derbynet_server -f installer/docker/Dockerfile .
 
-FROM alpine
+# Unpinned, "alpine" moved to Alpine 3.24, whose PHP is 8.5, and the php-fpm84
+# check below failed.  Alpine 3.23 is the release whose PHP is 8.4.
+FROM alpine:3.23
 LABEL org.opencontainers.image.authors=jeffpiazza
 LABEL description="DerbyNet is the new standard in race management software for Pinewood Derby events.  \
 Visit http://jeffpiazza.github.io/derbynet/ for more information about DerbyNet."
