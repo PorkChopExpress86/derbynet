@@ -4,7 +4,7 @@ request-body: action=replay.message&status=-1&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 238
+length: 259
 body:
 {
     "action": {
@@ -17,7 +17,9 @@ body:
         "code": "success",
         "description": ""
     },
-    "replay": []
+    "replay": [
+        "HELLO"
+    ]
 }
 
 ### 002 replay.message
