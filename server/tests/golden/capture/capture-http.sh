@@ -240,13 +240,29 @@ start_recorder() {
   return 1
 }
 
+# wait_for_replay_timeout: wait until the server stops counting a replay client
+# as connected, 10 s after its last replay.message (REPLAY_TIMEOUT_LIMIT in
+# website/inc/replay.inc).  A poll's "replay-state" then does not depend on how
+# long the steps before it took.
+wait_for_replay_timeout() {
+  local i
+  for i in $(seq 1 30); do
+    [ "$(curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/action.php?query=poll&values=replay-state" \
+           | jq '.["replay-state"].connected')" = false ] && return 0
+    sleep 1
+  done
+  echo "the replay client still counts as connected after 30 s" >&2
+  return 1
+}
+
 # record_script <tag> <record-list> <steps 0|1> <script> [args...]
-# Runs one script from testing/ through the recording proxy.  The script gets
-# BASE_URL=http://localhost:8081/<tag>.
+# Runs one script from testing/ through the recording proxy, starting with no
+# replay client connected.  The script gets BASE_URL=http://localhost:8081/<tag>.
 record_script() {
   local name="$1" record="$2" steps="$3" script="$4"
   shift 4
   local tag="${name//\//__}"   # the proxy's tag is one path segment; __ stands for /
+  wait_for_replay_timeout
   echo "  recording $name: $script $*" >&2
   curl -sf "http://127.0.0.1:$RECORDER_PORT/__control/begin?tag=$tag&record=$record&steps=$steps" >/dev/null
   local status=0
