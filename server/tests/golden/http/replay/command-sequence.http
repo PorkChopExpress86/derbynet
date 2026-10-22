@@ -3,6 +3,8 @@ request: POST action.php
 request-body: action=replay.message&status=-2&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
 length: 259
 body:
 {
@@ -26,6 +28,7 @@ request: POST action.php
 request-body: action=replay.message&status=0&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 297
 body:
 {
@@ -50,6 +53,7 @@ request: POST action.php
 request-body: action=replay.message&status=1&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 333
 body:
 {
@@ -76,6 +80,7 @@ request: POST action.php
 request-body: action=timer-message&message=STARTED
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 157
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -89,6 +94,7 @@ request: POST action.php
 request-body: action=replay.message&status=1&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 274
 body:
 {
@@ -112,6 +118,7 @@ request: POST action.php
 request-body: action=timer-message&message=FINISHED&lane1=3.111&lane2=3.222&lane3=3.333&lane4=3.444
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 301
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -126,6 +133,7 @@ request: POST action.php
 request-body: action=replay.message&status=2&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 325
 body:
 {
@@ -151,6 +159,7 @@ request: POST action.php
 request-body: action=replay.message&status=0&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 237
 body:
 {
@@ -172,6 +181,7 @@ request: POST action.php
 request-body: action=heat.rerun&heat=last
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 2854
 body:
 {
@@ -300,6 +310,7 @@ request: POST action.php
 request-body: action=replay.message&status=0&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 353
 body:
 {
@@ -326,6 +337,7 @@ request: POST action.php
 request-body: action=replay.trigger
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 168
 body:
 {
@@ -344,6 +356,7 @@ request: POST action.php
 request-body: action=replay.message&status=0&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 269
 body:
 {
@@ -367,6 +380,7 @@ request: POST action.php
 request-body: action=replay.test
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 165
 body:
 {
@@ -385,6 +399,7 @@ request: POST action.php
 request-body: action=replay.message&status=0&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 267
 body:
 {
@@ -407,6 +422,7 @@ body:
 request: GET action.php?query=poll.coordinator
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 2669
 body:
 {
@@ -526,6 +542,7 @@ request: POST action.php
 request-body: action=replay.trigger
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 168
 body:
 {
@@ -544,6 +561,7 @@ request: POST action.php
 request-body: action=replay.message&status=0&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 269
 body:
 {
@@ -567,6 +585,7 @@ request: POST action.php
 request-body: action=replay.message
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 186
 body:
 {
@@ -586,6 +605,7 @@ request: POST action.php
 request-body: action=replay.message&status=0&finished-replay=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 258
 body:
 {

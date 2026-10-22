@@ -4,6 +4,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=IDENTIFIED&lane_count=4&timer=TestTimer&confirmed=0
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 294
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -19,6 +20,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT&confirmed=0
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 260
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -34,6 +36,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT&confirmed=1
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 260
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -49,6 +52,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 159
 body:
 <?xml version="1.0" encoding="UTF-8"?>

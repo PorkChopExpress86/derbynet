@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=1&round=1&sceneid_at_finish=5
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 556
 body:
 {
@@ -37,6 +38,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=2&round=1&n_times_per_lane=1&continue_racing=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 585
 body:
 {
@@ -72,6 +74,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=3&round=1&n_times_per_lane=1&continue_racing=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 585
 body:
 {
@@ -107,6 +110,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=4&round=1&top=3&bucketed=0&n_times_per_lane=2
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 604
 body:
 {

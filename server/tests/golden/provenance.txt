@@ -1,0 +1,5 @@
+php: 8.4.27
+alpine: 3.23.7
+tz: America/New_York
+php cli extensions: Core PDO PDO_ODBC Reflection SPL Zend OPcache curl date filter gd hash iconv json libxml mysqlnd openssl pcre pdo_mysql pdo_sqlite random readline session standard zlib
+php-fpm extensions: Core PDO PDO_ODBC Reflection SPL Zend OPcache cgi-fcgi curl date filter gd hash iconv json libxml mysqlnd openssl pcre pdo_mysql pdo_sqlite random readline session standard zlib

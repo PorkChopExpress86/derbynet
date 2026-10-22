@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=roster.new&roundid=&top=3&bucketed=1&classid_1=1&classid_2=1&classid_3=1&classid_4=1&classname=Grand%20Finals
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 9237
 body:
 {
@@ -378,6 +379,7 @@ request: POST action.php
 request-body: action=roster.delete&roundid=8
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 5831
 body:
 {

@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/award-presentations.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7928
 body:
 {
@@ -287,6 +288,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 158
 body:
 {
@@ -303,6 +305,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/derbynet.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7906
 body:
 {
@@ -587,6 +590,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 147
 body:
 {
@@ -603,6 +607,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/flag.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7898
 body:
 {
@@ -887,6 +892,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 143
 body:
 {
@@ -903,6 +909,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/identify.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7906
 body:
 {
@@ -1187,6 +1194,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 147
 body:
 {
@@ -1203,6 +1211,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/now-racing-columnar-reversed.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7946
 body:
 {
@@ -1487,6 +1496,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 167
 body:
 {
@@ -1503,6 +1513,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/now-racing-columnar.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7928
 body:
 {
@@ -1787,6 +1798,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 158
 body:
 {
@@ -1803,6 +1815,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/now-racing.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7910
 body:
 {
@@ -2087,6 +2100,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 149
 body:
 {
@@ -2103,6 +2117,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/ondeck.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7902
 body:
 {
@@ -2387,6 +2402,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 145
 body:
 {
@@ -2403,6 +2419,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/please-check-in.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7920
 body:
 {
@@ -2687,6 +2704,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 154
 body:
 {
@@ -2703,6 +2721,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/qrcode.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7902
 body:
 {
@@ -2987,6 +3006,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 145
 body:
 {
@@ -3003,6 +3023,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/results-by-racer.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7922
 body:
 {
@@ -3287,6 +3308,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 155
 body:
 {
@@ -3303,6 +3325,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/scale-MPH.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7908
 body:
 {
@@ -3587,6 +3610,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 148
 body:
 {
@@ -3603,6 +3627,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/slideshow.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7908
 body:
 {
@@ -3887,6 +3912,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 148
 body:
 {
@@ -3903,6 +3929,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/standings.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7908
 body:
 {
@@ -4187,6 +4214,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 148
 body:
 {
@@ -4203,6 +4231,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/welcome.kiosk
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7904
 body:
 {
@@ -4487,6 +4516,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 146
 body:
 {
@@ -4503,6 +4533,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&page=kiosks/standings.kiosk&params=title=Final%20Standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7951
 body:
 {
@@ -4788,6 +4819,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 167
 body:
 {
@@ -4804,6 +4836,7 @@ request: POST action.php
 request-body: action=kiosk.assign&address=192.168.1.10&name=Main
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7893
 body:
 {
@@ -5088,6 +5121,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 171
 body:
 {
@@ -5104,6 +5138,7 @@ request: POST action.php
 request-body: action=kiosk.reload&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 228
 body:
 {
@@ -5122,6 +5157,7 @@ body:
 request: GET action.php?query=poll.kiosk&address=192.168.1.10
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 170
 body:
 {
@@ -5137,6 +5173,7 @@ body:
 request: GET action.php?query=poll.kiosk.all
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7671
 body:
 {

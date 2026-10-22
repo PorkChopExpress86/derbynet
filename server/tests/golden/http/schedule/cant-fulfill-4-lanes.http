@@ -2,6 +2,7 @@
 request: GET action.php?query=racer.list&order=car
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 23823
 body:
 {
@@ -896,6 +897,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=3&n_times_per_lane=7
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3328
 body:
 {
@@ -1039,6 +1041,7 @@ request: POST action.php
 request-body: action=heat.select&roundid=3&now_racing=0
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3353
 body:
 {
@@ -1181,6 +1184,7 @@ body:
 request: GET action.php?query=poll&values=schedule,rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1180
 body:
 {
@@ -1236,6 +1240,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=3&n_times_per_lane=6
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3328
 body:
 {
@@ -1379,6 +1384,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=99
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 272
 body:
 {

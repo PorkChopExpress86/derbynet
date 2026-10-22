@@ -2,6 +2,7 @@
 request: GET export-json.php
 status: 200
 content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
 length: 27301
 body:
 [
@@ -1295,6 +1296,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1831
 body:
 {
@@ -1420,6 +1422,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3622
 body:
 {
@@ -1577,6 +1580,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1196
 body:
 {
@@ -1662,6 +1666,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -1728,6 +1733,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1831
 body:
 {
@@ -1853,6 +1859,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3622
 body:
 {
@@ -2010,6 +2017,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1220
 body:
 {
@@ -2097,6 +2105,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -2163,6 +2172,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1883
 body:
 {
@@ -2292,6 +2302,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3394
 body:
 {
@@ -2440,6 +2451,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1220
 body:
 {
@@ -2527,6 +2539,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -2593,6 +2606,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1883
 body:
 {
@@ -2722,6 +2736,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3394
 body:
 {
@@ -2870,6 +2885,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1100
 body:
 {
@@ -2947,6 +2963,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -3013,6 +3030,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1711
 body:
 {
@@ -3128,6 +3146,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3852
 body:
 {
@@ -3294,6 +3313,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1076
 body:
 {
@@ -3369,6 +3389,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -3435,6 +3456,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1699
 body:
 {
@@ -3549,6 +3571,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3624
 body:
 {
@@ -3706,6 +3729,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1004
 body:
 {
@@ -3775,6 +3799,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -3841,6 +3866,7 @@ body:
 request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1531
 body:
 {
@@ -3942,6 +3968,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3856
 body:
 {
@@ -4108,6 +4135,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -4174,6 +4202,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -4240,6 +4269,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -4306,6 +4336,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {
@@ -4372,6 +4403,7 @@ body:
 request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1353
 body:
 {

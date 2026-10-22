@@ -4,6 +4,8 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=role.login&name=Timer&password=
 status: 200
 content-type: application/json; charset=utf-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
 length: 248
 body:
 {
@@ -26,6 +28,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HELLO&interface=golden-jar&build=1.2.3
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 205
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -41,6 +44,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=IDENTIFIED&nlanes=4
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 171
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -55,6 +59,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=IDENTIFIED&lane_count=4&timer=TestTimer&human=Test%20Timer%20%26%20Co&ident=SN-0001&options=a:1,b:2&vid=0403&pid=6001
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 277
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -69,6 +74,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 159
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -83,6 +89,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT&unhealthy=1
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 173
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -97,6 +104,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 159
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -111,6 +119,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=NO-SUCH-MESSAGE
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 234
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -125,6 +134,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=&x=1
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 210
 body:
 <?xml version="1.0" encoding="UTF-8"?>

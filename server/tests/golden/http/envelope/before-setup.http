@@ -2,6 +2,8 @@
 request: GET action.php
 status: 200
 content-type: text/html; charset=UTF-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
 length: 107
 body:
 <!DOCTYPE html><html><head><title>Not a Page</title></head><body><h1>This is not a page.</h1></body></html>
@@ -10,6 +12,7 @@ request: GET action.php?query=poll.coordinator
 status: 302
 content-type: application/json; charset=utf-8
 location: setup.php
+cache-control: no-store, no-cache, must-revalidate
 length: 0
 body:
 
@@ -19,6 +22,7 @@ request-body: action=role.login&name=RaceCoordinator&password=doyourbest
 status: 302
 content-type: application/json; charset=utf-8
 location: setup.php
+cache-control: no-store, no-cache, must-revalidate
 length: 0
 body:
 
@@ -27,6 +31,7 @@ request: GET action.php?query=no.such
 status: 302
 content-type: application/json; charset=utf-8
 location: setup.php
+cache-control: no-store, no-cache, must-revalidate
 length: 0
 body:
 
@@ -34,6 +39,7 @@ body:
 request: GET action.php?query=no.such.nodata
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 149
 body:
 {

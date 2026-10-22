@@ -3,7 +3,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=5&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6719
 body:
 {
@@ -270,7 +271,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=5&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6304
 body:
 {
@@ -523,7 +525,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=5&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6718
 body:
 {
@@ -785,12 +788,261 @@ body:
     "ready-aggregate": []
 }
 
+### 004 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
+length: 6233
+body:
+{
+    "action": {
+        "action": "schedule.reschedule",
+        "roundid": 1,
+        "racerid": 6,
+        "dry-run": 1,
+        "trace": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "adjuster": "<sha256 ed16111d45aa3e3b4dfee8cffde9d6daf182cea287891bec8f406155ec4e1439 of 4584 bytes>",
+    "chart": [
+        null,
+        "11 - 1 6",
+        "6 - 11 1",
+        "- - 6 -"
+    ],
+    "timing": {
+        "load": "<seconds>",
+        "inject": "<seconds>",
+        "update": "<seconds>",
+        "master-heat": "<seconds>",
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-timed-out": true,
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    },
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 3,
+        "class": "Lions & Tigers"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 11,
+            "name": "Carroll Cybulski",
+            "carname": "",
+            "carnumber": 111,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 1,
+            "name": "Adolfo \"Dolf\" Asher",
+            "carname": "",
+            "carnumber": 101,
+            "note": "Anywhere",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 1,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Arrows <<--<<, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
 ### 005 schedule.reschedule
 request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6473
 body:
 {
@@ -1047,7 +1299,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6495
 body:
 {
@@ -1305,7 +1558,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6488
 body:
 {
@@ -1563,7 +1817,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6486
 body:
 {
@@ -1817,12 +2072,530 @@ body:
     "ready-aggregate": []
 }
 
+### 009 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
+length: 6550
+body:
+{
+    "action": {
+        "action": "schedule.reschedule",
+        "roundid": 1,
+        "racerid": 6,
+        "dry-run": 1,
+        "trace": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "adjuster": "<sha256 b008c2537d2bfc0389bef0193e76231906bbc716c80821c7c8c525efb2ec6dca of 4430 bytes>",
+    "chart": [
+        null,
+        null,
+        null,
+        null,
+        "6 - - -",
+        "- - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "load": "<seconds>",
+        "inject": "<seconds>",
+        "update": "<seconds>",
+        "master-heat": "<seconds>",
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-timed-out": true,
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 4,
+        "number-of-heats": 4,
+        "class": "Lions & Tigers"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 21,
+            "name": "Derick Dreier",
+            "carname": "",
+            "carnumber": 121,
+            "note": "",
+            "photo": "",
+            "finishtime": 1.21,
+            "finishplace": 3
+        },
+        {
+            "lane": 3,
+            "racerid": 16,
+            "name": "Danial Depaolo",
+            "carname": "",
+            "carnumber": 116,
+            "note": "",
+            "photo": "",
+            "finishtime": 1.16,
+            "finishplace": 2
+        },
+        {
+            "lane": 4,
+            "racerid": 11,
+            "name": "Carroll Cybulski",
+            "carname": "",
+            "carnumber": 111,
+            "note": "",
+            "photo": "",
+            "finishtime": 1.11,
+            "finishplace": 1
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 4,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 4,
+            "heats_run": 4,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Arrows <<--<<, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 010 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 5 s search deadline
+length: 6476
+body:
+{
+    "action": {
+        "action": "schedule.reschedule",
+        "roundid": 1,
+        "racerid": 6,
+        "dry-run": 1,
+        "trace": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "adjuster": "<sha256 41507630938d955995ca35605c41e7b757b9b2c96491c3dd378bf84ee60d202a of 9854 bytes>",
+    "chart": [
+        null,
+        "11 - 1 6",
+        "6 - 11 1",
+        "1 - 11 6",
+        "11 - 6 1",
+        "6 - 1 11",
+        "- - 6 -"
+    ],
+    "timing": {
+        "load": "<seconds>",
+        "inject": "<seconds>",
+        "update": "<seconds>",
+        "master-heat": "<seconds>",
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>",
+            "run-1-extra-0-start": "<seconds>",
+            "run-1-extra-1-start": "<seconds>",
+            "run-1-timed-out": true,
+            "run-1-injected": "<seconds>",
+            "run-1-racechart": "<seconds>"
+        }
+    },
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 6,
+        "class": "Lions & Tigers"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 11,
+            "name": "Carroll Cybulski",
+            "carname": "",
+            "carnumber": 111,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 1,
+            "name": "Adolfo \"Dolf\" Asher",
+            "carname": "",
+            "carnumber": 101,
+            "note": "Anywhere",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 1,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Arrows <<--<<, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
 ### 011 schedule.reschedule
 request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 5 s search deadline
 length: 6691
 body:
 {
@@ -2086,7 +2859,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 5 s search deadline
 length: 6734
 body:
 {
@@ -2352,7 +3126,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 5 s search deadline
 length: 6728
 body:
 {
@@ -2618,7 +3393,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 5 s search deadline
 length: 6706
 body:
 {
@@ -2884,7 +3660,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 5 s search deadline
 length: 6713
 body:
 {
@@ -3150,7 +3927,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6788
 body:
 {
@@ -3422,7 +4200,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=2
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6723
 body:
 {
@@ -3691,7 +4470,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6943
 body:
 {
@@ -3967,7 +4747,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=2
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6567
 body:
 {
@@ -4232,7 +5013,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6809
 body:
 {
@@ -4505,7 +5287,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=2
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6726
 body:
 {
@@ -4774,7 +5557,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6960
 body:
 {
@@ -5055,7 +5839,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6941
 body:
 {
@@ -5336,7 +6121,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6943
 body:
 {
@@ -5617,7 +6403,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6915
 body:
 {
@@ -5898,7 +6685,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6911
 body:
 {
@@ -6179,7 +6967,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6898
 body:
 {
@@ -6460,7 +7249,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6887
 body:
 {
@@ -6741,7 +7531,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6889
 body:
 {
@@ -7022,7 +7813,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6893
 body:
 {
@@ -7303,7 +8095,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6870
 body:
 {
@@ -7584,7 +8377,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6863
 body:
 {
@@ -7865,7 +8659,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6858
 body:
 {
@@ -8146,7 +8941,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6835
 body:
 {
@@ -8427,7 +9223,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6833
 body:
 {
@@ -8708,7 +9505,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6833
 body:
 {
@@ -8989,7 +9787,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6849
 body:
 {
@@ -9271,7 +10070,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 6852
 body:
 {
@@ -9554,7 +10354,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=83
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 7914
 body:
 {
@@ -9871,7 +10672,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=84
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 7914
 body:
 {
@@ -10188,7 +10990,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=85
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 7914
 body:
 {
@@ -10505,7 +11308,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=86
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 7914
 body:
 {
@@ -10822,7 +11626,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=87
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 7914
 body:
 {
@@ -11139,7 +11944,8 @@ request: POST action.php
 request-body: action=schedule.reschedule&roundid=2&racerid=88
 status: 200
 content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
 length: 7914
 body:
 {
@@ -11440,1701 +12246,6 @@ body:
             "round": 1,
             "aggregate": false,
             "roster_size": 6,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "2, Round 1"
-        }
-    ],
-    "ready-aggregate": []
-}
-
-### 046 schedule.reschedule
-request: POST action.php
-request-body: action=schedule.reschedule&roundid=2&racerid=90
-status: 200
-content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
-length: 8546
-body:
-{
-    "action": {
-        "action": "schedule.reschedule",
-        "roundid": 2,
-        "racerid": 90
-    },
-    "outcome": {
-        "summary": "success",
-        "code": "success",
-        "description": ""
-    },
-    "chart": [
-        null,
-        "90 41 47 61 2 42",
-        "57 67 77 7 32 72",
-        "7 17 27 41 61 22",
-        "37 90 52 67 7 47",
-        "61 72 82 12 37 77",
-        "12 22 32 42 67 27",
-        "41 47 57 72 12 52",
-        "67 77 2 17 41 82",
-        "17 27 37 47 72 32",
-        "42 52 90 77 17 57",
-        "72 82 7 22 42 2",
-        "22 32 41 52 77 90",
-        "47 57 67 82 22 61",
-        "77 2 12 27 47 7",
-        "27 37 42 57 82 41",
-        "52 61 72 90 27 67",
-        "82 7 17 32 90 12",
-        "32 42 61 2 52 37"
-    ],
-    "timing": {
-        "load": "<seconds>",
-        "inject": "<seconds>",
-        "update": "<seconds>",
-        "master-heat": "<seconds>",
-        "internal": {
-            "constructed": "<seconds>",
-            "run-0-extra-0-start": "<seconds>",
-            "run-0-injected": "<seconds>",
-            "run-0-racechart": "<seconds>"
-        }
-    },
-    "current-heat": {
-        "now_racing": true,
-        "use_master_sched": false,
-        "use_points": false,
-        "classid": 2,
-        "roundid": 2,
-        "round": 1,
-        "tbodyid": 2,
-        "heat": 2,
-        "number-of-heats": 19,
-        "class": "White's Wolves"
-    },
-    "racers": [
-        {
-            "lane": 1,
-            "racerid": 90,
-            "name": "F6-late1 L6-late1",
-            "carname": "",
-            "carnumber": 901,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 2,
-            "racerid": 41,
-            "name": "Jesse Jara",
-            "carname": "",
-            "carnumber": 141,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 3,
-            "racerid": 47,
-            "name": "Kelvin Knapp",
-            "carname": "",
-            "carnumber": 247,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 4,
-            "racerid": 61,
-            "name": "Owen O'Leary",
-            "carname": "",
-            "carnumber": 161,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 5,
-            "racerid": 2,
-            "name": "Angelo Alas",
-            "carname": "",
-            "carnumber": 202,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 6,
-            "racerid": 42,
-            "name": "Josh Jose",
-            "carname": "",
-            "carnumber": 242,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        }
-    ],
-    "timer-state": {
-        "lanes": 6,
-        "last-contact": "<epoch>",
-        "state": 3,
-        "icon": "img\/status\/ok.png",
-        "remote-start": false,
-        "message": "Staging"
-    },
-    "replay-state": {
-        "last_contact": 0,
-        "state": 1,
-        "icon": "img\/status\/not_connected.png",
-        "connected": false,
-        "message": "NOT CONNECTED"
-    },
-    "last-heat": "available",
-    "refused-results": 0,
-    "heat-results": [],
-    "classes": [
-        {
-            "classid": 1,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Lions & Tigers",
-            "subgroups": [
-                {
-                    "rankid": 1,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Lions & Tigers"
-                }
-            ]
-        },
-        {
-            "classid": 2,
-            "count": 18,
-            "nrounds": 1,
-            "ntrophies": -1,
-            "name": "White's Wolves",
-            "subgroups": [
-                {
-                    "rankid": 2,
-                    "count": 18,
-                    "ntrophies": -1,
-                    "name": "White's Wolves"
-                }
-            ]
-        },
-        {
-            "classid": 3,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Bears and Fr\u00e8res",
-            "subgroups": [
-                {
-                    "rankid": 3,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Bears and Fr\u00e8res"
-                }
-            ]
-        },
-        {
-            "classid": 4,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Webelos (\"Webes\")",
-            "subgroups": [
-                {
-                    "rankid": 4,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Webelos (\"Webes\")"
-                }
-            ]
-        },
-        {
-            "classid": 5,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Arrows <<--<<",
-            "subgroups": [
-                {
-                    "rankid": 5,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Arrows <<--<<"
-                }
-            ]
-        },
-        {
-            "classid": 6,
-            "count": 8,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": 2,
-            "subgroups": [
-                {
-                    "rankid": 6,
-                    "count": 8,
-                    "ntrophies": -1,
-                    "name": 2
-                }
-            ]
-        }
-    ],
-    "rounds": [
-        {
-            "roundid": 1,
-            "classid": 1,
-            "class": "Lions & Tigers",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 16,
-            "unscheduled": 16,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Lions & Tigers, Round 1"
-        },
-        {
-            "roundid": 2,
-            "classid": 2,
-            "class": "White's Wolves",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 18,
-            "passed": 18,
-            "unscheduled": 0,
-            "adjustments": [
-                {
-                    "why": "departed",
-                    "racerid": 90,
-                    "lastname": "L6-late1",
-                    "firstname": "F6-late1",
-                    "carnumber": 901
-                }
-            ],
-            "heats_scheduled": 19,
-            "heats_run": 1,
-            "name": "White's Wolves, Round 1"
-        },
-        {
-            "roundid": 3,
-            "classid": 3,
-            "class": "Bears and Fr\u00e8res",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Bears and Fr\u00e8res, Round 1"
-        },
-        {
-            "roundid": 4,
-            "classid": 4,
-            "class": "Webelos (\"Webes\")",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Webelos (\"Webes\"), Round 1"
-        },
-        {
-            "roundid": 5,
-            "classid": 5,
-            "class": "Arrows <<--<<",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Arrows <<--<<, Round 1"
-        },
-        {
-            "roundid": 6,
-            "classid": 6,
-            "class": 2,
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 8,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "2, Round 1"
-        }
-    ],
-    "ready-aggregate": []
-}
-
-### 047 schedule.reschedule
-request: POST action.php
-request-body: action=schedule.reschedule&roundid=2&racerid=91
-status: 200
-content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
-length: 8546
-body:
-{
-    "action": {
-        "action": "schedule.reschedule",
-        "roundid": 2,
-        "racerid": 91
-    },
-    "outcome": {
-        "summary": "success",
-        "code": "success",
-        "description": ""
-    },
-    "chart": [
-        null,
-        "91 41 47 61 2 42",
-        "57 67 77 7 32 72",
-        "7 17 27 41 61 22",
-        "37 91 52 67 7 47",
-        "61 72 82 12 37 77",
-        "12 22 32 42 67 27",
-        "41 47 57 72 12 52",
-        "67 77 2 17 41 82",
-        "17 27 37 47 72 32",
-        "42 52 91 77 17 57",
-        "72 82 7 22 42 2",
-        "22 32 41 52 77 91",
-        "47 57 67 82 22 61",
-        "77 2 12 27 47 7",
-        "27 37 42 57 82 41",
-        "52 61 72 91 27 67",
-        "82 7 17 32 91 12",
-        "32 42 61 2 52 37"
-    ],
-    "timing": {
-        "load": "<seconds>",
-        "inject": "<seconds>",
-        "update": "<seconds>",
-        "master-heat": "<seconds>",
-        "internal": {
-            "constructed": "<seconds>",
-            "run-0-extra-0-start": "<seconds>",
-            "run-0-injected": "<seconds>",
-            "run-0-racechart": "<seconds>"
-        }
-    },
-    "current-heat": {
-        "now_racing": true,
-        "use_master_sched": false,
-        "use_points": false,
-        "classid": 2,
-        "roundid": 2,
-        "round": 1,
-        "tbodyid": 2,
-        "heat": 2,
-        "number-of-heats": 19,
-        "class": "White's Wolves"
-    },
-    "racers": [
-        {
-            "lane": 1,
-            "racerid": 91,
-            "name": "F6-late2 L6-late2",
-            "carname": "",
-            "carnumber": 902,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 2,
-            "racerid": 41,
-            "name": "Jesse Jara",
-            "carname": "",
-            "carnumber": 141,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 3,
-            "racerid": 47,
-            "name": "Kelvin Knapp",
-            "carname": "",
-            "carnumber": 247,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 4,
-            "racerid": 61,
-            "name": "Owen O'Leary",
-            "carname": "",
-            "carnumber": 161,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 5,
-            "racerid": 2,
-            "name": "Angelo Alas",
-            "carname": "",
-            "carnumber": 202,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 6,
-            "racerid": 42,
-            "name": "Josh Jose",
-            "carname": "",
-            "carnumber": 242,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        }
-    ],
-    "timer-state": {
-        "lanes": 6,
-        "last-contact": "<epoch>",
-        "state": 3,
-        "icon": "img\/status\/ok.png",
-        "remote-start": false,
-        "message": "Staging"
-    },
-    "replay-state": {
-        "last_contact": 0,
-        "state": 1,
-        "icon": "img\/status\/not_connected.png",
-        "connected": false,
-        "message": "NOT CONNECTED"
-    },
-    "last-heat": "available",
-    "refused-results": 0,
-    "heat-results": [],
-    "classes": [
-        {
-            "classid": 1,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Lions & Tigers",
-            "subgroups": [
-                {
-                    "rankid": 1,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Lions & Tigers"
-                }
-            ]
-        },
-        {
-            "classid": 2,
-            "count": 18,
-            "nrounds": 1,
-            "ntrophies": -1,
-            "name": "White's Wolves",
-            "subgroups": [
-                {
-                    "rankid": 2,
-                    "count": 18,
-                    "ntrophies": -1,
-                    "name": "White's Wolves"
-                }
-            ]
-        },
-        {
-            "classid": 3,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Bears and Fr\u00e8res",
-            "subgroups": [
-                {
-                    "rankid": 3,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Bears and Fr\u00e8res"
-                }
-            ]
-        },
-        {
-            "classid": 4,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Webelos (\"Webes\")",
-            "subgroups": [
-                {
-                    "rankid": 4,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Webelos (\"Webes\")"
-                }
-            ]
-        },
-        {
-            "classid": 5,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Arrows <<--<<",
-            "subgroups": [
-                {
-                    "rankid": 5,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Arrows <<--<<"
-                }
-            ]
-        },
-        {
-            "classid": 6,
-            "count": 9,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": 2,
-            "subgroups": [
-                {
-                    "rankid": 6,
-                    "count": 9,
-                    "ntrophies": -1,
-                    "name": 2
-                }
-            ]
-        }
-    ],
-    "rounds": [
-        {
-            "roundid": 1,
-            "classid": 1,
-            "class": "Lions & Tigers",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 16,
-            "unscheduled": 16,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Lions & Tigers, Round 1"
-        },
-        {
-            "roundid": 2,
-            "classid": 2,
-            "class": "White's Wolves",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 18,
-            "passed": 18,
-            "unscheduled": 0,
-            "adjustments": [
-                {
-                    "why": "departed",
-                    "racerid": 91,
-                    "lastname": "L6-late2",
-                    "firstname": "F6-late2",
-                    "carnumber": 902
-                }
-            ],
-            "heats_scheduled": 19,
-            "heats_run": 1,
-            "name": "White's Wolves, Round 1"
-        },
-        {
-            "roundid": 3,
-            "classid": 3,
-            "class": "Bears and Fr\u00e8res",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Bears and Fr\u00e8res, Round 1"
-        },
-        {
-            "roundid": 4,
-            "classid": 4,
-            "class": "Webelos (\"Webes\")",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Webelos (\"Webes\"), Round 1"
-        },
-        {
-            "roundid": 5,
-            "classid": 5,
-            "class": "Arrows <<--<<",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Arrows <<--<<, Round 1"
-        },
-        {
-            "roundid": 6,
-            "classid": 6,
-            "class": 2,
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 9,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "2, Round 1"
-        }
-    ],
-    "ready-aggregate": []
-}
-
-### 048 schedule.reschedule
-request: POST action.php
-request-body: action=schedule.reschedule&roundid=2&racerid=92
-status: 200
-content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
-length: 8549
-body:
-{
-    "action": {
-        "action": "schedule.reschedule",
-        "roundid": 2,
-        "racerid": 92
-    },
-    "outcome": {
-        "summary": "success",
-        "code": "success",
-        "description": ""
-    },
-    "chart": [
-        null,
-        "92 41 47 61 2 42",
-        "57 67 77 7 32 72",
-        "7 17 27 41 61 22",
-        "37 92 52 67 7 47",
-        "61 72 82 12 37 77",
-        "12 22 32 42 67 27",
-        "41 47 57 72 12 52",
-        "67 77 2 17 41 82",
-        "17 27 37 47 72 32",
-        "42 52 92 77 17 57",
-        "72 82 7 22 42 2",
-        "22 32 41 52 77 92",
-        "47 57 67 82 22 61",
-        "77 2 12 27 47 7",
-        "27 37 42 57 82 41",
-        "52 61 72 92 27 67",
-        "82 7 17 32 92 12",
-        "32 42 61 2 52 37"
-    ],
-    "timing": {
-        "load": "<seconds>",
-        "inject": "<seconds>",
-        "update": "<seconds>",
-        "master-heat": "<seconds>",
-        "internal": {
-            "constructed": "<seconds>",
-            "run-0-extra-0-start": "<seconds>",
-            "run-0-injected": "<seconds>",
-            "run-0-racechart": "<seconds>"
-        }
-    },
-    "current-heat": {
-        "now_racing": true,
-        "use_master_sched": false,
-        "use_points": false,
-        "classid": 2,
-        "roundid": 2,
-        "round": 1,
-        "tbodyid": 2,
-        "heat": 2,
-        "number-of-heats": 19,
-        "class": "White's Wolves"
-    },
-    "racers": [
-        {
-            "lane": 1,
-            "racerid": 92,
-            "name": "F6-late3 L6-late3",
-            "carname": "",
-            "carnumber": 903,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 2,
-            "racerid": 41,
-            "name": "Jesse Jara",
-            "carname": "",
-            "carnumber": 141,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 3,
-            "racerid": 47,
-            "name": "Kelvin Knapp",
-            "carname": "",
-            "carnumber": 247,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 4,
-            "racerid": 61,
-            "name": "Owen O'Leary",
-            "carname": "",
-            "carnumber": 161,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 5,
-            "racerid": 2,
-            "name": "Angelo Alas",
-            "carname": "",
-            "carnumber": 202,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 6,
-            "racerid": 42,
-            "name": "Josh Jose",
-            "carname": "",
-            "carnumber": 242,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        }
-    ],
-    "timer-state": {
-        "lanes": 6,
-        "last-contact": "<epoch>",
-        "state": 3,
-        "icon": "img\/status\/ok.png",
-        "remote-start": false,
-        "message": "Staging"
-    },
-    "replay-state": {
-        "last_contact": 0,
-        "state": 1,
-        "icon": "img\/status\/not_connected.png",
-        "connected": false,
-        "message": "NOT CONNECTED"
-    },
-    "last-heat": "available",
-    "refused-results": 0,
-    "heat-results": [],
-    "classes": [
-        {
-            "classid": 1,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Lions & Tigers",
-            "subgroups": [
-                {
-                    "rankid": 1,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Lions & Tigers"
-                }
-            ]
-        },
-        {
-            "classid": 2,
-            "count": 18,
-            "nrounds": 1,
-            "ntrophies": -1,
-            "name": "White's Wolves",
-            "subgroups": [
-                {
-                    "rankid": 2,
-                    "count": 18,
-                    "ntrophies": -1,
-                    "name": "White's Wolves"
-                }
-            ]
-        },
-        {
-            "classid": 3,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Bears and Fr\u00e8res",
-            "subgroups": [
-                {
-                    "rankid": 3,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Bears and Fr\u00e8res"
-                }
-            ]
-        },
-        {
-            "classid": 4,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Webelos (\"Webes\")",
-            "subgroups": [
-                {
-                    "rankid": 4,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Webelos (\"Webes\")"
-                }
-            ]
-        },
-        {
-            "classid": 5,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Arrows <<--<<",
-            "subgroups": [
-                {
-                    "rankid": 5,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Arrows <<--<<"
-                }
-            ]
-        },
-        {
-            "classid": 6,
-            "count": 10,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": 2,
-            "subgroups": [
-                {
-                    "rankid": 6,
-                    "count": 10,
-                    "ntrophies": -1,
-                    "name": 2
-                }
-            ]
-        }
-    ],
-    "rounds": [
-        {
-            "roundid": 1,
-            "classid": 1,
-            "class": "Lions & Tigers",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 16,
-            "unscheduled": 16,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Lions & Tigers, Round 1"
-        },
-        {
-            "roundid": 2,
-            "classid": 2,
-            "class": "White's Wolves",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 18,
-            "passed": 18,
-            "unscheduled": 0,
-            "adjustments": [
-                {
-                    "why": "departed",
-                    "racerid": 92,
-                    "lastname": "L6-late3",
-                    "firstname": "F6-late3",
-                    "carnumber": 903
-                }
-            ],
-            "heats_scheduled": 19,
-            "heats_run": 1,
-            "name": "White's Wolves, Round 1"
-        },
-        {
-            "roundid": 3,
-            "classid": 3,
-            "class": "Bears and Fr\u00e8res",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Bears and Fr\u00e8res, Round 1"
-        },
-        {
-            "roundid": 4,
-            "classid": 4,
-            "class": "Webelos (\"Webes\")",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Webelos (\"Webes\"), Round 1"
-        },
-        {
-            "roundid": 5,
-            "classid": 5,
-            "class": "Arrows <<--<<",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Arrows <<--<<, Round 1"
-        },
-        {
-            "roundid": 6,
-            "classid": 6,
-            "class": 2,
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 10,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "2, Round 1"
-        }
-    ],
-    "ready-aggregate": []
-}
-
-### 049 schedule.reschedule
-request: POST action.php
-request-body: action=schedule.reschedule&roundid=2&racerid=93
-status: 200
-content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
-length: 8549
-body:
-{
-    "action": {
-        "action": "schedule.reschedule",
-        "roundid": 2,
-        "racerid": 93
-    },
-    "outcome": {
-        "summary": "success",
-        "code": "success",
-        "description": ""
-    },
-    "chart": [
-        null,
-        "93 41 47 61 2 42",
-        "57 67 77 7 32 72",
-        "7 17 27 41 61 22",
-        "37 93 52 67 7 47",
-        "61 72 82 12 37 77",
-        "12 22 32 42 67 27",
-        "41 47 57 72 12 52",
-        "67 77 2 17 41 82",
-        "17 27 37 47 72 32",
-        "42 52 93 77 17 57",
-        "72 82 7 22 42 2",
-        "22 32 41 52 77 93",
-        "47 57 67 82 22 61",
-        "77 2 12 27 47 7",
-        "27 37 42 57 82 41",
-        "52 61 72 93 27 67",
-        "82 7 17 32 93 12",
-        "32 42 61 2 52 37"
-    ],
-    "timing": {
-        "load": "<seconds>",
-        "inject": "<seconds>",
-        "update": "<seconds>",
-        "master-heat": "<seconds>",
-        "internal": {
-            "constructed": "<seconds>",
-            "run-0-extra-0-start": "<seconds>",
-            "run-0-injected": "<seconds>",
-            "run-0-racechart": "<seconds>"
-        }
-    },
-    "current-heat": {
-        "now_racing": true,
-        "use_master_sched": false,
-        "use_points": false,
-        "classid": 2,
-        "roundid": 2,
-        "round": 1,
-        "tbodyid": 2,
-        "heat": 2,
-        "number-of-heats": 19,
-        "class": "White's Wolves"
-    },
-    "racers": [
-        {
-            "lane": 1,
-            "racerid": 93,
-            "name": "F6-late4 L6-late4",
-            "carname": "",
-            "carnumber": 904,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 2,
-            "racerid": 41,
-            "name": "Jesse Jara",
-            "carname": "",
-            "carnumber": 141,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 3,
-            "racerid": 47,
-            "name": "Kelvin Knapp",
-            "carname": "",
-            "carnumber": 247,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 4,
-            "racerid": 61,
-            "name": "Owen O'Leary",
-            "carname": "",
-            "carnumber": 161,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 5,
-            "racerid": 2,
-            "name": "Angelo Alas",
-            "carname": "",
-            "carnumber": 202,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 6,
-            "racerid": 42,
-            "name": "Josh Jose",
-            "carname": "",
-            "carnumber": 242,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        }
-    ],
-    "timer-state": {
-        "lanes": 6,
-        "last-contact": "<epoch>",
-        "state": 3,
-        "icon": "img\/status\/ok.png",
-        "remote-start": false,
-        "message": "Staging"
-    },
-    "replay-state": {
-        "last_contact": 0,
-        "state": 1,
-        "icon": "img\/status\/not_connected.png",
-        "connected": false,
-        "message": "NOT CONNECTED"
-    },
-    "last-heat": "available",
-    "refused-results": 0,
-    "heat-results": [],
-    "classes": [
-        {
-            "classid": 1,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Lions & Tigers",
-            "subgroups": [
-                {
-                    "rankid": 1,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Lions & Tigers"
-                }
-            ]
-        },
-        {
-            "classid": 2,
-            "count": 18,
-            "nrounds": 1,
-            "ntrophies": -1,
-            "name": "White's Wolves",
-            "subgroups": [
-                {
-                    "rankid": 2,
-                    "count": 18,
-                    "ntrophies": -1,
-                    "name": "White's Wolves"
-                }
-            ]
-        },
-        {
-            "classid": 3,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Bears and Fr\u00e8res",
-            "subgroups": [
-                {
-                    "rankid": 3,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Bears and Fr\u00e8res"
-                }
-            ]
-        },
-        {
-            "classid": 4,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Webelos (\"Webes\")",
-            "subgroups": [
-                {
-                    "rankid": 4,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Webelos (\"Webes\")"
-                }
-            ]
-        },
-        {
-            "classid": 5,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Arrows <<--<<",
-            "subgroups": [
-                {
-                    "rankid": 5,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Arrows <<--<<"
-                }
-            ]
-        },
-        {
-            "classid": 6,
-            "count": 11,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": 2,
-            "subgroups": [
-                {
-                    "rankid": 6,
-                    "count": 11,
-                    "ntrophies": -1,
-                    "name": 2
-                }
-            ]
-        }
-    ],
-    "rounds": [
-        {
-            "roundid": 1,
-            "classid": 1,
-            "class": "Lions & Tigers",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 16,
-            "unscheduled": 16,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Lions & Tigers, Round 1"
-        },
-        {
-            "roundid": 2,
-            "classid": 2,
-            "class": "White's Wolves",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 18,
-            "passed": 18,
-            "unscheduled": 0,
-            "adjustments": [
-                {
-                    "why": "departed",
-                    "racerid": 93,
-                    "lastname": "L6-late4",
-                    "firstname": "F6-late4",
-                    "carnumber": 904
-                }
-            ],
-            "heats_scheduled": 19,
-            "heats_run": 1,
-            "name": "White's Wolves, Round 1"
-        },
-        {
-            "roundid": 3,
-            "classid": 3,
-            "class": "Bears and Fr\u00e8res",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Bears and Fr\u00e8res, Round 1"
-        },
-        {
-            "roundid": 4,
-            "classid": 4,
-            "class": "Webelos (\"Webes\")",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Webelos (\"Webes\"), Round 1"
-        },
-        {
-            "roundid": 5,
-            "classid": 5,
-            "class": "Arrows <<--<<",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Arrows <<--<<, Round 1"
-        },
-        {
-            "roundid": 6,
-            "classid": 6,
-            "class": 2,
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 11,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "2, Round 1"
-        }
-    ],
-    "ready-aggregate": []
-}
-
-### 050 schedule.reschedule
-request: POST action.php
-request-body: action=schedule.reschedule&roundid=2&racerid=94
-status: 200
-content-type: application/json; charset=utf-8
-note: deterministic: the search ended before its deadline
-length: 8549
-body:
-{
-    "action": {
-        "action": "schedule.reschedule",
-        "roundid": 2,
-        "racerid": 94
-    },
-    "outcome": {
-        "summary": "success",
-        "code": "success",
-        "description": ""
-    },
-    "chart": [
-        null,
-        "94 41 47 61 2 42",
-        "57 67 77 7 32 72",
-        "7 17 27 41 61 22",
-        "37 94 52 67 7 47",
-        "61 72 82 12 37 77",
-        "12 22 32 42 67 27",
-        "41 47 57 72 12 52",
-        "67 77 2 17 41 82",
-        "17 27 37 47 72 32",
-        "42 52 94 77 17 57",
-        "72 82 7 22 42 2",
-        "22 32 41 52 77 94",
-        "47 57 67 82 22 61",
-        "77 2 12 27 47 7",
-        "27 37 42 57 82 41",
-        "52 61 72 94 27 67",
-        "82 7 17 32 94 12",
-        "32 42 61 2 52 37"
-    ],
-    "timing": {
-        "load": "<seconds>",
-        "inject": "<seconds>",
-        "update": "<seconds>",
-        "master-heat": "<seconds>",
-        "internal": {
-            "constructed": "<seconds>",
-            "run-0-extra-0-start": "<seconds>",
-            "run-0-injected": "<seconds>",
-            "run-0-racechart": "<seconds>"
-        }
-    },
-    "current-heat": {
-        "now_racing": true,
-        "use_master_sched": false,
-        "use_points": false,
-        "classid": 2,
-        "roundid": 2,
-        "round": 1,
-        "tbodyid": 2,
-        "heat": 2,
-        "number-of-heats": 19,
-        "class": "White's Wolves"
-    },
-    "racers": [
-        {
-            "lane": 1,
-            "racerid": 94,
-            "name": "F6-late5 L6-late5",
-            "carname": "",
-            "carnumber": 905,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 2,
-            "racerid": 41,
-            "name": "Jesse Jara",
-            "carname": "",
-            "carnumber": 141,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 3,
-            "racerid": 47,
-            "name": "Kelvin Knapp",
-            "carname": "",
-            "carnumber": 247,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 4,
-            "racerid": 61,
-            "name": "Owen O'Leary",
-            "carname": "",
-            "carnumber": 161,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 5,
-            "racerid": 2,
-            "name": "Angelo Alas",
-            "carname": "",
-            "carnumber": 202,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 6,
-            "racerid": 42,
-            "name": "Josh Jose",
-            "carname": "",
-            "carnumber": 242,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        }
-    ],
-    "timer-state": {
-        "lanes": 6,
-        "last-contact": "<epoch>",
-        "state": 3,
-        "icon": "img\/status\/ok.png",
-        "remote-start": false,
-        "message": "Staging"
-    },
-    "replay-state": {
-        "last_contact": 0,
-        "state": 1,
-        "icon": "img\/status\/not_connected.png",
-        "connected": false,
-        "message": "NOT CONNECTED"
-    },
-    "last-heat": "available",
-    "refused-results": 0,
-    "heat-results": [],
-    "classes": [
-        {
-            "classid": 1,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Lions & Tigers",
-            "subgroups": [
-                {
-                    "rankid": 1,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Lions & Tigers"
-                }
-            ]
-        },
-        {
-            "classid": 2,
-            "count": 18,
-            "nrounds": 1,
-            "ntrophies": -1,
-            "name": "White's Wolves",
-            "subgroups": [
-                {
-                    "rankid": 2,
-                    "count": 18,
-                    "ntrophies": -1,
-                    "name": "White's Wolves"
-                }
-            ]
-        },
-        {
-            "classid": 3,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Bears and Fr\u00e8res",
-            "subgroups": [
-                {
-                    "rankid": 3,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Bears and Fr\u00e8res"
-                }
-            ]
-        },
-        {
-            "classid": 4,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Webelos (\"Webes\")",
-            "subgroups": [
-                {
-                    "rankid": 4,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Webelos (\"Webes\")"
-                }
-            ]
-        },
-        {
-            "classid": 5,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Arrows <<--<<",
-            "subgroups": [
-                {
-                    "rankid": 5,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Arrows <<--<<"
-                }
-            ]
-        },
-        {
-            "classid": 6,
-            "count": 12,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": 2,
-            "subgroups": [
-                {
-                    "rankid": 6,
-                    "count": 12,
-                    "ntrophies": -1,
-                    "name": 2
-                }
-            ]
-        }
-    ],
-    "rounds": [
-        {
-            "roundid": 1,
-            "classid": 1,
-            "class": "Lions & Tigers",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 16,
-            "unscheduled": 16,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Lions & Tigers, Round 1"
-        },
-        {
-            "roundid": 2,
-            "classid": 2,
-            "class": "White's Wolves",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 18,
-            "passed": 18,
-            "unscheduled": 0,
-            "adjustments": [
-                {
-                    "why": "departed",
-                    "racerid": 94,
-                    "lastname": "L6-late5",
-                    "firstname": "F6-late5",
-                    "carnumber": 905
-                }
-            ],
-            "heats_scheduled": 19,
-            "heats_run": 1,
-            "name": "White's Wolves, Round 1"
-        },
-        {
-            "roundid": 3,
-            "classid": 3,
-            "class": "Bears and Fr\u00e8res",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Bears and Fr\u00e8res, Round 1"
-        },
-        {
-            "roundid": 4,
-            "classid": 4,
-            "class": "Webelos (\"Webes\")",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Webelos (\"Webes\"), Round 1"
-        },
-        {
-            "roundid": 5,
-            "classid": 5,
-            "class": "Arrows <<--<<",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 16,
-            "passed": 0,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 0,
-            "heats_run": 0,
-            "name": "Arrows <<--<<, Round 1"
-        },
-        {
-            "roundid": 6,
-            "classid": 6,
-            "class": 2,
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 12,
             "passed": 0,
             "unscheduled": 0,
             "adjustments": [],

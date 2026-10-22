@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=1&round=1&n_times_per_lane=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 559
 body:
 {
@@ -37,6 +38,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=1&round=2&top=4&bucketed=0&n_times_per_lane=2
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 600
 body:
 {
@@ -73,6 +75,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=2&round=1&n_times_per_lane=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 559
 body:
 {
@@ -107,6 +110,7 @@ request: POST action.php
 request-body: action=playlist.add&classid=2&round=2&top=8&bucketed=0&n_times_per_lane=2
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 600
 body:
 {
@@ -143,6 +147,7 @@ request: POST action.php
 request-body: action=playlist.start
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 168
 body:
 {
@@ -160,6 +165,7 @@ body:
 request: GET action.php?query=poll&values=rounds,schedule,current-heat
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1894
 body:
 {

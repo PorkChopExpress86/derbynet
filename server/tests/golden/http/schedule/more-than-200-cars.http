@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=1
 status: 500
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 0
 body:
 
@@ -10,6 +11,7 @@ body:
 request: GET action.php?query=poll&values=rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 406
 body:
 {
@@ -36,6 +38,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1796
 body:
 {
@@ -118,6 +121,7 @@ body:
 request: GET action.php?query=poll&values=rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 406
 body:
 {

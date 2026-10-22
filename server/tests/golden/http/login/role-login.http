@@ -2,6 +2,8 @@
 request: GET action.php?query=role.list
 status: 200
 content-type: application/json; charset=utf-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
 length: 443
 body:
 {
@@ -34,6 +36,7 @@ request: POST action.php
 request-body: action=role.login&name=RaceCoordinator&password=doyourbest
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 289
 body:
 {
@@ -55,6 +58,7 @@ body:
 request: GET action.php?query=role.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 443
 body:
 {
@@ -87,6 +91,7 @@ request: POST action.php
 request-body: action=role.login&name=RaceCoordinator&password=wrong
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 242
 body:
 {
@@ -107,6 +112,7 @@ request: POST action.php
 request-body: action=role.login&name=Timer&password=
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 248
 body:
 {
@@ -128,6 +134,7 @@ request: POST action.php
 request-body: action=role.login&name=Timer
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 221
 body:
 {
@@ -148,6 +155,7 @@ request: POST action.php
 request-body: action=role.login&name=Nobody&password=x
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 228
 body:
 {
@@ -168,6 +176,7 @@ request: POST action.php
 request-body: action=role.login&name=RaceCrew&password=murphy
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 275
 body:
 {
@@ -190,6 +199,7 @@ request: POST action.php
 request-body: action=role.login&name=Photo&password=flashbulb
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 269
 body:
 {
@@ -212,6 +222,7 @@ request: POST action.php
 request-body: action=role.login
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 196
 body:
 {
@@ -231,6 +242,7 @@ request: POST action.php
 request-body: action=role.login&password=doyourbest
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 223
 body:
 {
@@ -250,6 +262,7 @@ body:
 request: GET action.php?query=role.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 443
 body:
 {
@@ -282,6 +295,7 @@ request: POST action.php
 request-body: action=login&name=RaceCoordinator&password=doyourbest
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 227
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -294,6 +308,7 @@ body:
 request: GET action.php?query=roles
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 227
 body:
 <?xml version="1.0" encoding="UTF-8"?>

@@ -2,6 +2,7 @@
 request: GET action.php?query=racer.list&order=car
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 9102
 body:
 {
@@ -356,6 +357,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4065
 body:
 {
@@ -529,6 +531,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=2
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4595
 body:
 {
@@ -725,6 +728,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=3
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4595
 body:
 {
@@ -921,6 +925,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=4
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4596
 body:
 {
@@ -1116,6 +1121,7 @@ body:
 request: GET action.php?query=poll&values=rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 1513
 body:
 {
@@ -1183,6 +1189,7 @@ body:
 request: GET action.php?query=poll&values=ondeck,current-heat
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 13570
 body:
 {
@@ -1671,6 +1678,7 @@ request: POST action.php
 request-body: action=role.login&name=Timer&password=
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 248
 body:
 {
@@ -1692,6 +1700,7 @@ request: POST action.php
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 242
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1706,6 +1715,7 @@ request: POST action.php
 request-body: action=timer-message&message=FINISHED&lane1=3.100&lane2=3.200
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 271
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1719,6 +1729,7 @@ body:
 request: GET action.php?query=poll&values=ondeck,current-heat
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 13583
 body:
 {
@@ -2207,6 +2218,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=4
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4597
 body:
 {
@@ -2402,6 +2414,7 @@ body:
 request: GET action.php?query=poll&values=ondeck,current-heat
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 13581
 body:
 {

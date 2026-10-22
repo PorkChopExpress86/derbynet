@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=setup.nodata&ez-new=testdb
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 20601
 body:
 {
@@ -540,6 +541,7 @@ body:
 request: GET action.php?query=poll.coordinator
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 827
 body:
 {
@@ -582,6 +584,7 @@ body:
 request: GET action.php?query=settings.list
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 596
 body:
 {

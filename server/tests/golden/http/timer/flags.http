@@ -4,6 +4,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=FLAGS&flag-debug=bool:true&desc-debug=Debug%20output&flag-delay=int:5&desc-delay=Delay%20in%20ms&flag-name=string:lane%20one&ports=/dev/ttyUSB0,/dev/ttyUSB1&device-TestTimer=Test%20Timer&device-OtherTimer=Other%20Timer
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 372
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -16,6 +17,7 @@ body:
 request: GET action.php?query=timer.settings
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 718
 body:
 {
@@ -58,6 +60,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 159
 body:
 <?xml version="1.0" encoding="UTF-8"?>

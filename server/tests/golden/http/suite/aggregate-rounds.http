@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=roster.new&top=4&bucketed=1&rankid_2=1&rankid_3=1&rankid_4=1&rankid_5=1&rankid_6=1&rankid_7=1&classname=Rank%20Final
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 11235
 body:
 {
@@ -455,6 +456,7 @@ request: POST action.php
 request-body: action=roster.delete&roundid=6
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 6649
 body:
 {
@@ -716,6 +718,7 @@ request: POST action.php
 request-body: action=roster.new&top=4&bucketed=1&classid_1=1&classid_2=1&classname=Younger%20Finals
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 8289
 body:
 {
@@ -1050,6 +1053,7 @@ request: POST action.php
 request-body: action=roster.new&top=4&bucketed=1&classid_3=1&classid_4=1&classid_5=1&classname=Older%20Finals
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 9620
 body:
 {
@@ -1437,6 +1441,7 @@ request: POST action.php
 request-body: action=roster.new&top=8&roundid=7
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 9583
 body:
 {
@@ -1818,6 +1823,7 @@ request: POST action.php
 request-body: action=roster.new&top=4&bucketed=1&classid_7=1&classid_6=1&classname=Final%20Finals
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 10525
 body:
 {

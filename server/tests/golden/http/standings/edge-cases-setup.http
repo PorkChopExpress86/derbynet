@@ -2,6 +2,7 @@
 request: GET action.php?query=racer.list&order=car
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4285
 body:
 {
@@ -175,6 +176,7 @@ body:
 request: GET action.php?query=poll&values=schedule,rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 865
 body:
 {
@@ -238,6 +240,7 @@ body:
 request: GET action.php?query=poll&values=rounds,current-heat
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 646
 body:
 {

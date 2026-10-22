@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=roster.delete&roundid=8
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 211
 body:
 {
@@ -22,6 +23,7 @@ request: POST action.php
 request-body: action=roster.new&roundid=1&top=3
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7963
 body:
 {
@@ -338,6 +340,7 @@ request: POST action.php
 request-body: action=roster.delete&roundid=8
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7253
 body:
 {
@@ -622,6 +625,7 @@ request: POST action.php
 request-body: action=roster.delete&roundid=8
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 211
 body:
 {
@@ -641,6 +645,7 @@ request: POST action.php
 request-body: action=roster.new&roundid=2&top=3&bucketed=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7986
 body:
 {
@@ -958,6 +963,7 @@ request: POST action.php
 request-body: action=roster.new&roundid=&top=4&bucketed=1&classid_1=1&classid_2=1&classid_3=1&classid_4=1&classname=Grand%20Finals
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 10247
 body:
 {
@@ -1368,6 +1374,7 @@ request: POST action.php
 request-body: action=roster.delete&roundid=9
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7645
 body:
 {
@@ -1666,6 +1673,7 @@ request: POST action.php
 request-body: action=roster.new&roundid=&top=5&classid_1=1&classid_2=1&classid_3=1&classid_4=1&classname=Grand%20Finals-2
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 9566
 body:
 {
@@ -2040,6 +2048,7 @@ request: POST action.php
 request-body: action=roster.delete&roundid=9
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 7645
 body:
 {

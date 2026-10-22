@@ -2,6 +2,7 @@
 request: GET action.php?query=racer.list&order=car
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 23823
 body:
 {
@@ -896,6 +897,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3297
 body:
 {
@@ -1037,6 +1039,7 @@ body:
 request: GET action.php?query=poll&values=schedule,rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3568
 body:
 {
@@ -1253,6 +1256,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=2
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4398
 body:
 {
@@ -1439,6 +1443,7 @@ body:
 request: GET action.php?query=poll&values=schedule,rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 3448
 body:
 {
@@ -1647,6 +1652,7 @@ request: POST action.php
 request-body: action=schedule.generate&roundid=3
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 4391
 body:
 {
@@ -1833,6 +1839,7 @@ body:
 request: GET action.php?query=poll&values=schedule,rounds
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 2380
 body:
 {

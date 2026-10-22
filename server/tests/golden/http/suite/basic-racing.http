@@ -1,8 +1,31 @@
 ### 001 replay.message
 request: POST action.php
+request-body: action=replay.message&status=-1&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 238
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": -1,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": []
+}
+
+### 002 replay.message
+request: POST action.php
 request-body: action=replay.message
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 379
 body:
 {
@@ -24,11 +47,12 @@ body:
     ]
 }
 
-### 002 heat.rerun
+### 003 heat.rerun
 request: POST action.php
 request-body: action=heat.rerun&heat=last
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 6893
 body:
 {
@@ -298,11 +322,12 @@ body:
     "ready-aggregate": []
 }
 
-### 003 heat.reinstate
+### 004 heat.reinstate
 request: POST action.php
 request-body: action=heat.reinstate
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 6879
 body:
 {

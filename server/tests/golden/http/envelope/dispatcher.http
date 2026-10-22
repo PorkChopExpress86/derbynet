@@ -2,6 +2,8 @@
 request: GET action.php
 status: 200
 content-type: text/html; charset=UTF-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
 length: 107
 body:
 <!DOCTYPE html><html><head><title>Not a Page</title></head><body><h1>This is not a page.</h1></body></html>
@@ -9,6 +11,7 @@ body:
 request: GET action.php?query=no.such
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 142
 body:
 {
@@ -24,6 +27,7 @@ request: POST action.php
 request-body: action=no.such&password=x&n=007&f=1.50&e=1e3&w=%205&h=0x1A&s=a/b&u=%C3%A9&message[recipient]=AA&message[key]=v&list[]=1&list[]=2&a.b=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 517
 body:
 {
@@ -59,6 +63,7 @@ request: POST action.php
 request-body: action=snapshot.no-such&q=%27%22%3C%3E%26
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 207
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -68,6 +73,7 @@ body:
 request: GET action.php?query=snapshot.no-such
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 150
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -78,6 +84,7 @@ request: POST action.php?query=poll
 request-body: action=no.such
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 194
 body:
 {
@@ -95,6 +102,7 @@ body:
 request: GET action.php?action=no.such
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 135
 body:
 {
@@ -110,6 +118,7 @@ request: POST action.php
 request-body: 
 status: 200
 content-type: text/html; charset=UTF-8
+cache-control: no-store, no-cache, must-revalidate
 length: 107
 body:
 <!DOCTYPE html><html><head><title>Not a Page</title></head><body><h1>This is not a page.</h1></body></html>
@@ -117,6 +126,7 @@ body:
 request: GET action.php?query=
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 135
 body:
 {
@@ -132,6 +142,7 @@ request: POST action.php
 request-body: action=
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 180
 body:
 {
@@ -150,6 +161,7 @@ request: POST action.php
 request-body: action=no.such.nodata
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 208
 body:
 {
@@ -168,6 +180,7 @@ request: POST action.php
 request-body: action=login
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 227
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -180,6 +193,7 @@ body:
 request: GET action.php?query=roles
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 227
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -193,6 +207,7 @@ request: POST action.php
 request-body: action=timer-message&message=HELLO
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 199
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -202,6 +217,7 @@ body:
 request: GET action.php?query[]=poll
 status: 500
 content-type: text/html; charset=UTF-8
+cache-control: no-store, no-cache, must-revalidate
 length: 0
 body:
 
@@ -210,6 +226,7 @@ request: POST action.php?action=role.login
 request-body: action=no.such
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 194
 body:
 {

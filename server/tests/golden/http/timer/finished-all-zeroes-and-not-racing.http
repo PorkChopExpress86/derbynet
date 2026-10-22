@@ -4,6 +4,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=STARTED
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 157
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -18,6 +19,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=FINISHED&lane1=0.000&lane2=0.000&lane3=0.000&lane4=0.000
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 301
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -33,6 +35,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=FINISHED&lane1=3.100&lane2=3.200&lane3=3.300&lane4=3.400
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 255
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,6 +50,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 159
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -59,6 +63,7 @@ body:
 request: GET action.php?query=poll.coordinator
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 2681
 body:
 {

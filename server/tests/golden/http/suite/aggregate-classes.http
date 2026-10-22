@@ -3,6 +3,7 @@ request: POST action.php
 request-body: action=roster.new&classid=10&top=2&bucketed=1
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 11294
 body:
 {

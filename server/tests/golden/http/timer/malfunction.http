@@ -4,6 +4,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=MALFUNCTION&error=Lost%20the%20serial%20port
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 190
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -18,6 +19,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 246
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -33,6 +35,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=MALFUNCTION&detectable=1&error=Cable%20unplugged
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 200
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,6 +50,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=MALFUNCTION&detectable=0&error=Gate%20sensor%20silent
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 203
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -61,6 +65,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HEARTBEAT
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 246
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -76,6 +81,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=MALFUNCTION
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 161
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -88,6 +94,7 @@ body:
 request: GET action.php?query=poll.coordinator
 status: 200
 content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 2676
 body:
 {
@@ -208,6 +215,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=HELLO
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 168
 body:
 <?xml version="1.0" encoding="UTF-8"?>
@@ -223,6 +231,7 @@ user-agent: DerbyNet-Timer/golden-1.0 (jar)
 request-body: action=timer-message&message=IDENTIFIED&lane_count=4&timer=TestTimer
 status: 200
 content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
 length: 280
 body:
 <?xml version="1.0" encoding="UTF-8"?>
