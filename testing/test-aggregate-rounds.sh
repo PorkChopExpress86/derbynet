@@ -36,9 +36,7 @@ curl_postj action.php "action=racer.edit&rankid=$(rankid_of Cougars)&racer=$(rac
 # Add a Grand Final by ranks, leaving out the Lions subgroup
 RANK_FINAL=`mktemp`
 curl_postj action.php "action=roster.new&top=4&bucketed=1&rankid_$(rankid_of White)=1&rankid_$(rankid_of Bears)=1&rankid_$(rankid_of Webelos)=1&rankid_$(rankid_of Arrows)=1&rankid_$(rankid_of Tigers)=1&rankid_$(rankid_of Cougars)=1&classname=Rank%20Final" | tee $RANK_FINAL | check_jsuccess
-jq -e '.finalists | map(.racerid) | sort ==
-     [6,9,16,17,18,19,20,21,26,35,36,41,45,46,47,50,58,62,63,69,74,77,78]' \
-         $RANK_FINAL >/dev/null || test_fails
+finalists_carnumbers < $RANK_FINAL | expect_eq '[106,116,121,126,136,141,146,217,247,262,277,318,358,363,378,420,435,445,450,502,504,514,515]'
 
 RANK_FINAL_ROUNDID=$(jq '.["new-round"].roundid' $RANK_FINAL)
 curl_postj action.php "action=roster.delete&roundid=$RANK_FINAL_ROUNDID" | check_jsuccess

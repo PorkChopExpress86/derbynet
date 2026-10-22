@@ -10,7 +10,8 @@
 # What counts as a literal ID, in the scripts the suite runs:
 #   - a parameter that names an ID and gets a number: racer=5, roundid=1,
 #     classid_3=1, constituent_7=1
-#   - the number in an award key that names a group: speed-1-4, award-3
+#   - the number in an award key or standings key that names a group: speed-1-4,
+#     award-3, st-r1
 #   - run_heat's first argument, which is a roundid
 #   - jq comparing an ID field with a number: .roundid == 3, or a golden
 #     response with "classid": 1 in it
@@ -44,6 +45,8 @@ PATTERNS=(
     "\\bconstituent_${NUM}\\b"
     "\\b(classid|rankid|partitionid|awardid|racerid)_${NUM}=[0-9]"
     "\\bkey=(speed-[0-9]+[a-z]?-${NUM}|award-${NUM})"
+    "\\bst-(r|q|rr)${NUM}\\b"
+    "\\]\\[0\\] *== *${NUM}\\b"
     "\\brun_heat( -place)? ${NUM} "
     "\\.${IDNAME} *(==|!=|<=|>=|<|>) *${NUM}\\b"
     "\"${IDNAME}\": *${NUM}\\b"
@@ -53,7 +56,8 @@ PATTERNS=(
     "\\bclass_and_rank=${NUM},"
     "\\bclass_and_rank=[0-9]+,${NUM}"
     "\\b${IDNAME}[a-z_]* *== *\\[[0-9]"
-    "\\(\\.${IDNAME}\\) *\\| *sort *== *\\[[0-9]"
+    "\\(\\.${IDNAME}\\) *\\| *sort *==( *\\[[0-9]|\$)"
+    "^[[:space:]]*\\[[0-9]+(,[0-9]+)+\\]"
 )
 
 FOUND=$(mktemp)
