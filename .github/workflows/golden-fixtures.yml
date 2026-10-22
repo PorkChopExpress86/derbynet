@@ -23,6 +23,12 @@ on:
       - .github/workflows/golden-fixtures.yml
   workflow_dispatch:
 
+# A new push to a pull request cancels the run on its previous head.  Runs on
+# master each finish, so every merged commit is checked.
+concurrency:
+  group: golden-fixtures-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   golden-fixtures:
     runs-on: ubuntu-latest
