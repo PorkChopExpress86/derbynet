@@ -64,6 +64,11 @@ RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
     sed -i 's/^;* *error_log = .*/error_log = \/dev\/stderr/' /etc/php84/php-fpm.conf && \
     sed -i 's/^;* *catch_workers_output = .*/catch_workers_output = yes/' /etc/php84/php-fpm.d/www.conf
 
+# Lets set-timeout.sh reload php-fpm without killing requests in flight.  With
+# the default of 0, a reload kills the workers immediately.
+RUN sed -i 's/^;* *process_control_timeout *=.*/process_control_timeout = 600s/' /etc/php84/php-fpm.conf && \
+    grep -q '^process_control_timeout = 600s' /etc/php84/php-fpm.conf
+
 VOLUME /var/lib/derbynet
 
 EXPOSE 80 443
