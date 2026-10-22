@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check the tests for literal IDs
+        run: testing/check-no-literal-ids.sh
+
       - name: Build test harness image
         run: testing/docker/run-suite.sh harness
 
