@@ -25,6 +25,11 @@ curl_postj action.php "action=racer.delete&racer=21" | check_jfailure
 ## curl_postj action.php "action=replay.message" | jq -e ".replay == [\"HELLO\"]" \
 ##        >/dev/null || test_fails
 
+# The server treats a replay as connected for 10 seconds after its last message,
+# and test-each-role.sh sent the last one some time ago.  Connect again, so that
+# the replay messages below don't depend on how long the tests in between took.
+curl_postj action.php "action=replay.message&status=-1&finished-replay=0" | check_jsuccess
+
 ### Racing for roundid=1: 5 heats
 curl_postj action.php "action=heat.select&roundid=1&now_racing=1" | check_jsuccess
 
