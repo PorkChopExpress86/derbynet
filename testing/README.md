@@ -92,6 +92,11 @@ usual ID.
 
 `test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
 
+`test-photo-manipulations.sh` checks how the renders of a photo with EXIF
+orientation 6 come out.  The PHP server ignores the tag (#73) and won't be
+fixed, so by default the script expects PHP's sideways renders.  With
+`DERBYNET_BACKEND=django` it expects upright ones.
+
 ## Test photos
 
 `data/carphotos/pattern-o6.jpg` stands in for a phone photo taken in portrait:
