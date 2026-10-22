@@ -13,7 +13,7 @@ curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/action.php \
 
 curl_photo_any head/file/original/ISO_12233-reschart.jpg/$RANDOM
 
-curl_postj action.php "action=photo.assign&repo=head&photo=ISO_12233-reschart.jpg&racer=30" | check_jsuccess
+curl_postj action.php "action=photo.assign&repo=head&photo=ISO_12233-reschart.jpg&racer=$(racerid_of 430)" | check_jsuccess
 
 # As of PHP 5.5, this gives a different signature
 # curl_photo head/file/100x100/ISO_12233-reschart.jpg/$RANDOM 16329a387284cfbb7ece2f2a6a173040
@@ -42,4 +42,4 @@ curl_postj action.php "action=photo.rotate&repo=head&image_name=ISO_12233-rescha
 curl_photo_any head/file/original/ISO_12233-reschart.jpg/$RANDOM
 curl_photo_any head/file/cropped/ISO_12233-reschart.jpg/$RANDOM
 
-curl_photo_any head/racer/30/$RANDOM
+curl_photo_any head/racer/$(racerid_of 430)/$RANDOM

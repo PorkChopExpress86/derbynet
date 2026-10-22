@@ -406,8 +406,20 @@ function staged_heat6() {
 # response.  A lookup that finds nothing stops the whole test.  The suite never
 # assumes a database ID: it asks for the ID by its stable key (car number, class
 # name, award name) or takes it from the response that created the thing.
+#
+# A lookup logs in as the coordinator in a session of its own.  A test often
+# evaluates a lookup in the same pipeline as a request that uses the test's own
+# cookie jar, and two curls that write one jar at the same time can leave it
+# empty, which logs the test out.
 function lookup_get() {
-    curl --location -s -b $COOKIES_CURL -c $COOKIES_CURL "$BASE_URL/$1"
+    local JAR LOGIN_PASSWORD
+    JAR=$(mktemp)
+    LOGIN_PASSWORD=$(sed -n -e "s/^RaceCoordinator://p" \
+                         "${PASSWORDS_FILE:-$(dirname "${BASH_SOURCE[0]}")/default.passwords}")
+    curl -s -c $JAR -d "action=role.login&name=RaceCoordinator&password=$LOGIN_PASSWORD" \
+         $BASE_URL/action.php > /dev/null
+    curl --location -s -b $JAR "$BASE_URL/$1"
+    rm -f $JAR
 }
 
 # $$ is the test script's pid even inside $(...), where a plain "exit" would
@@ -430,15 +442,30 @@ racerid_of() {
     echo $ID
 }
 
+# racerid_named "<first name> <last name>", for racers that share a car number
+racerid_named() {
+    local ID
+    ID=$(lookup_get "action.php?query=racer.list" \
+             | jq --arg n "$1" '.racers | map(select(.firstname + " " + .lastname == $n))[0].racerid // empty')
+    [ -n "$ID" ] || lookup_fails "No racer is named $1"
+    echo $ID
+}
+
 # roundid_of <class name or prefix of one> <round number>
 roundid_of() {
     local ID
     ID=$(lookup_get "action.php?query=poll&values=rounds" \
              | jq --arg c "$1" --argjson r "$2" \
                   '.rounds | map(select(.round == $r)) |
-                   (map(select(.class == $c))[0] // map(select(.class | startswith($c)))[0]).roundid // empty')
+                   (map(select((.class | tostring) == $c))[0] // map(select(.class | tostring | startswith($c)))[0]).roundid // empty')
     [ -n "$ID" ] || lookup_fails "No round $2 of a class named $1"
     echo $ID
+}
+
+# A roundid that no round has, for checking that an action refuses a round that
+# isn't there
+unused_roundid() {
+    lookup_get "action.php?query=poll&values=rounds" | jq '([.rounds[].roundid] | max) + 1'
 }
 
 # awardid_of <award name or prefix of one>
@@ -446,7 +473,7 @@ awardid_of() {
     local ID
     ID=$(lookup_get "action.php?query=award.list" \
              | jq --arg n "$1" \
-                  '.awards | (map(select(.awardname == $n))[0] // map(select(.awardname | startswith($n)))[0]).awardid // empty')
+                  '.awards | (map(select((.awardname | tostring) == $n))[0] // map(select(.awardname | tostring | startswith($n)))[0]).awardid // empty')
     [ -n "$ID" ] || lookup_fails "No award is named $1"
     echo $ID
 }
@@ -458,15 +485,15 @@ awardid_of() {
 # E.g. WOLF_RANK=$(rankid_of "White")
 rankid_of() {
     lookup_get "action.php?query=class.list" \
-        | jq --arg n "$1" '.classes | map(.subgroups) | add | map(select(.name | startswith($n)))[0].rankid'
+        | jq --arg n "$1" '.classes | map(.subgroups) | add | map(select(.name | tostring | startswith($n)))[0].rankid'
 }
 classid_of() {
     lookup_get "action.php?query=class.list" \
-        | jq --arg n "$1" '.classes | map(select(.name | startswith($n)))[0].classid'
+        | jq --arg n "$1" '.classes | map(select(.name | tostring | startswith($n)))[0].classid'
 }
 partitionid_of() {
     lookup_get "action.php?query=poll&values=partitions" \
-        | jq --arg n "$1" '.partitions | map(select(.name | startswith($n)))[0].partitionid'
+        | jq --arg n "$1" '.partitions | map(select(.name | tostring | startswith($n)))[0].partitionid'
 }
 
 # standings_sheet <name>: the rows of the standings sheet "Standings for <name>"
@@ -504,6 +531,20 @@ expect_places() {
             test_fails Standings for "$SHEET", car $1 should have $COLUMN = $2
         shift 2
     done
+}
+
+# Prints the car number of each racer, as a JSON object by racerid:
+# {"1":101,"2":202,...}.  For translating a response that names racers by ID.
+racer_carnumbers() {
+    lookup_get "action.php?query=racer.list" | \
+        jq -c '.racers | map({(.racerid | tostring): .carnumber}) | add'
+}
+
+# Reads a JSON response on stdin and writes it with each ID replaced by a label
+# like "class#1" (see normalize-ids.jq), for comparing against a golden response
+# without depending on the IDs a server assigned.
+normalize_ids() {
+    jq -f "$(dirname "${BASH_SOURCE[0]}")/normalize-ids.jq"
 }
 
 # Reads a roster.new response on stdin and prints the finalists' car numbers as

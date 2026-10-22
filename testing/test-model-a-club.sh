@@ -23,9 +23,9 @@ curl_postj action.php "action=racer.bulk&what=checkin&who=all&value=1" | check_j
 curl_postj action.php "action=racer.bulk&what=number&who=all&start=101" | check_jsuccess
 
 curl_postj action.php "action=settings.write&n-lanes=3&max-runs-per-car=1" | check_jsuccess
-curl_postj action.php "action=schedule.generate&roundid=1" | check_jsuccess
+curl_postj action.php "action=schedule.generate&roundid=$(roundid_of "Unwashed-Class" 1)" | check_jsuccess
 
-curl_postj action.php "action=heat.select&roundid=1&now_racing=1" | check_jsuccess
+curl_postj action.php "action=heat.select&roundid=$(roundid_of "Unwashed-Class" 1)&now_racing=1" | check_jsuccess
 curl_getj "action.php?query=poll&values=current-heat" | \
     jq '.["current-heat"]["number-of-heats"]' | \
     sed -e 's/"//g' | expect_eq 34

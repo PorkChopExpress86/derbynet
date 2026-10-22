@@ -11,15 +11,15 @@ RESET_SOURCE=car-numbers-x `dirname $0`/reset-database.sh "$BASE_URL"
 curl_postj action.php "action=class.add&name=First%20Group" | check_jsuccess
 
 curl_getj "action.php?query=poll&values=car-numbers" | \
-    jq -e '.["car-numbers"] | length == 1 and .[0].partitionid == 1 and .[0].next_carnumber == 101' \
+    jq -e --argjson first_group $(partitionid_of "First Group") '.["car-numbers"] | length == 1 and .[0].partitionid == $first_group and .[0].next_carnumber == 101' \
     > /dev/null || test_fails
 
 curl_postj action.php "action=class.add&name=Second%20Group" | check_jsuccess
 
 curl_getj "action.php?query=poll&values=car-numbers" | \
-    jq -e '.["car-numbers"] | length == 2
-           and .[0].partitionid == 1 and .[0].next_carnumber == 101
-           and .[1].partitionid == 2 and .[1].next_carnumber == 201' \
+    jq -e --argjson first_group $(partitionid_of "First Group") --argjson second_group $(partitionid_of "Second Group") '.["car-numbers"] | length == 2
+           and .[0].partitionid == $first_group and .[0].next_carnumber == 101
+           and .[1].partitionid == $second_group and .[1].next_carnumber == 201' \
     > /dev/null || test_fails
 
 RESET_SOURCE=car-numbers-y `dirname $0`/reset-database.sh "$BASE_URL"
@@ -29,23 +29,23 @@ curl_postj action.php "action=settings.write&car-numbering=0%2B1" | check_jsucce
 curl_postj action.php "action=class.add&name=First%20Group" | check_jsuccess
 
 curl_getj "action.php?query=poll&values=car-numbers" | \
-    jq -e '.["car-numbers"] | length == 1 and .[0].partitionid == 1 and .[0].next_carnumber == 1' \
+    jq -e --argjson first_group $(partitionid_of "First Group") '.["car-numbers"] | length == 1 and .[0].partitionid == $first_group and .[0].next_carnumber == 1' \
     > /dev/null || test_fails
 
 curl_postj action.php "action=class.add&name=Second%20Group" | check_jsuccess
 
 curl_getj "action.php?query=poll&values=car-numbers" | \
-    jq -e '.["car-numbers"] | length == 2
-           and .[0].partitionid == 1 and .[0].next_carnumber == 1
-           and .[1].partitionid == 2 and .[1].next_carnumber == 1' \
+    jq -e --argjson first_group $(partitionid_of "First Group") --argjson second_group $(partitionid_of "Second Group") '.["car-numbers"] | length == 2
+           and .[0].partitionid == $first_group and .[0].next_carnumber == 1
+           and .[1].partitionid == $second_group and .[1].next_carnumber == 1' \
     > /dev/null || test_fails
 
-curl_postj action.php "action=racer.add&firstname=First&lastname=Racer&carno=1&partitionid=2" | check_jsuccess
+curl_postj action.php "action=racer.add&firstname=First&lastname=Racer&carno=1&partitionid=$(partitionid_of "Second Group")" | check_jsuccess
 
 curl_getj "action.php?query=poll&values=car-numbers" | \
-    jq -e '.["car-numbers"] | length == 2
-           and .[0].partitionid == 1 and .[0].next_carnumber == 2
-           and .[1].partitionid == 2 and .[1].next_carnumber == 2' \
+    jq -e --argjson first_group $(partitionid_of "First Group") --argjson second_group $(partitionid_of "Second Group") '.["car-numbers"] | length == 2
+           and .[0].partitionid == $first_group and .[0].next_carnumber == 2
+           and .[1].partitionid == $second_group and .[1].next_carnumber == 2' \
     > /dev/null || test_fails
 
 exit
@@ -131,7 +131,7 @@ curl_getj "action.php?query=racer.list" | \
 # Partitionid 2: Tigers
 # Partitionid 3: Lions
 # Re-order to Lions, Tigers, Wolves
-curl_postj action.php "action=partition.order&partitionid_1=3&partitionid_2=2&partitionid_3=1" | check_jsuccess
+curl_postj action.php "action=partition.order&partitionid_1=$(partitionid_of Lions)&partitionid_2=$(partitionid_of Tigers)&partitionid_3=$(partitionid_of Wolves)" | check_jsuccess
 
 curl_postj action.php "action=racer.bulk&what=number&who=all&renumber=1&auto=1" | check_jsuccess
 

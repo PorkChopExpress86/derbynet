@@ -34,111 +34,111 @@ curl_postj action.php "action=rank.order&rankid_1=$RANKID2&rankid_2=$RANKID" | c
 curl_postj action.php "action=rank.edit&rankid=$RANKID2&name=New%20Rank%20Name" | check_jsuccess
 
 GOLDEN=$(mktemp /tmp/derby-golden-class.list.XXXXX)
-cat >$GOLDEN <<EOF
+cat >$GOLDEN <<'EOF'
 {
-    "classes": [
+  "classes": [
+    {
+      "classid": "class#1",
+      "count": 17,
+      "nrounds": 0,
+      "ntrophies": -1,
+      "name": "Lions & Tigers",
+      "subgroups": [
         {
-            "classid": 1,
-            "count": 17,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Lions & Tigers",
-            "subgroups": [
-                {
-                    "rankid": 1,
-                    "count": 17,
-                    "ntrophies": -1,
-                    "name": "Lions & Tigers"
-                }
-            ]
-        },
-        {
-            "classid": 2,
-            "count": 17,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "White's Wolves",
-            "subgroups": [
-                {
-                    "rankid": 2,
-                    "count": 17,
-                    "ntrophies": -1,
-                    "name": "White's Wolves"
-                }
-            ]
-        },
-        {
-            "classid": 3,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Bears and Fr\u00e8res",
-            "subgroups": [
-                {
-                    "rankid": 8,
-                    "count": 0,
-                    "ntrophies": -1,
-                    "name": "New Rank Name"
-                },
-                {
-                    "rankid": 3,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Bears and Fr\u00e8res"
-                }
-            ]
-        },
-        {
-            "classid": 4,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Webelos (\"Webes\")",
-            "subgroups": [
-                {
-                    "rankid": 4,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Webelos (\"Webes\")"
-                }
-            ]
-        },
-        {
-            "classid": 5,
-            "count": 16,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Arrows <<--<<",
-            "subgroups": [
-                {
-                    "rankid": 5,
-                    "count": 16,
-                    "ntrophies": -1,
-                    "name": "Arrows <<--<<"
-                }
-            ]
-        },
-        {
-            "classid": 7,
-            "count": 0,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "TheLastClass",
-            "subgroups": [
-                {
-                    "rankid": 7,
-                    "count": 0,
-                    "ntrophies": -1,
-                    "name": "TheLastClass"
-                }
-            ]
+          "rankid": "rank#1",
+          "count": 17,
+          "ntrophies": -1,
+          "name": "Lions & Tigers"
         }
-    ]
+      ]
+    },
+    {
+      "classid": "class#2",
+      "count": 17,
+      "nrounds": 0,
+      "ntrophies": -1,
+      "name": "White's Wolves",
+      "subgroups": [
+        {
+          "rankid": "rank#2",
+          "count": 17,
+          "ntrophies": -1,
+          "name": "White's Wolves"
+        }
+      ]
+    },
+    {
+      "classid": "class#3",
+      "count": 16,
+      "nrounds": 0,
+      "ntrophies": -1,
+      "name": "Bears and Frères",
+      "subgroups": [
+        {
+          "rankid": "rank#3",
+          "count": 0,
+          "ntrophies": -1,
+          "name": "New Rank Name"
+        },
+        {
+          "rankid": "rank#4",
+          "count": 16,
+          "ntrophies": -1,
+          "name": "Bears and Frères"
+        }
+      ]
+    },
+    {
+      "classid": "class#4",
+      "count": 16,
+      "nrounds": 0,
+      "ntrophies": -1,
+      "name": "Webelos (\"Webes\")",
+      "subgroups": [
+        {
+          "rankid": "rank#5",
+          "count": 16,
+          "ntrophies": -1,
+          "name": "Webelos (\"Webes\")"
+        }
+      ]
+    },
+    {
+      "classid": "class#5",
+      "count": 16,
+      "nrounds": 0,
+      "ntrophies": -1,
+      "name": "Arrows <<--<<",
+      "subgroups": [
+        {
+          "rankid": "rank#6",
+          "count": 16,
+          "ntrophies": -1,
+          "name": "Arrows <<--<<"
+        }
+      ]
+    },
+    {
+      "classid": "class#6",
+      "count": 0,
+      "nrounds": 0,
+      "ntrophies": -1,
+      "name": "TheLastClass",
+      "subgroups": [
+        {
+          "rankid": "rank#7",
+          "count": 0,
+          "ntrophies": -1,
+          "name": "TheLastClass"
+        }
+      ]
+    }
+  ]
 }
 EOF
 
 curl_getj "action.php?query=class.list" > $CLASS_LIST
-diff $GOLDEN $CLASS_LIST || test_fails "class.list fails to match expected response"
+normalize_ids < $CLASS_LIST | diff $GOLDEN - || test_fails "class.list fails to match expected response"
 
 curl_postj action.php "action=rank.delete&rankid=$RANKID2" | check_jsuccess
 
