@@ -1,0 +1,7 @@
+# Lines that may contain a literal database ID, for check-no-literal-ids.sh.
+#
+# One entry per line, three fields separated by tabs:
+#   the script's file name, a piece of the line that must appear in it, the reason
+#
+# There are none.  The check fails for an entry that matches no line, so a
+# stale entry can't linger.

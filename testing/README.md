@@ -47,8 +47,8 @@ script always makes one.
 
 ## Run individual scripts from the host
 
-The scripts need `bash`, `curl`, `jq`, `xmllint` (Debian and Ubuntu package
-`libxml2-utils`), and `md5sum`.  The Puppeteer tests and `js-syntax-check.sh`
+The scripts need `bash`, `curl`, `jq`, `perl`, `xmllint` (Debian and Ubuntu
+package `libxml2-utils`, used only for the XML responses), and `md5sum`.  The Puppeteer tests and `js-syntax-check.sh`
 also need `node`: run `npm ci` in `testing/puppeteer` and
 `export NODE_PATH=$PWD/testing/puppeteer/node_modules`.
 
@@ -61,6 +61,28 @@ Then give the script the server's URL, for example
     bash testing/exercise-one-database.sh http://localhost:8080 ez
 
 Stop the server with `testing/docker/run-suite.sh clean`.
+
+## Write a test that works against any server
+
+The suite is meant to gate more than one server, so a test checks behavior
+through JSON and stable keys, and not through what the PHP server happens to
+render or number:
+
+- To look at a page, use `curl_page`.  It checks the status and the error text
+  and doesn't parse the HTML.  `page_text` gives a page's visible text.
+- To check standings, read the workbook that `export-json.php` serves with
+  `standings_sheet`, `standings_row` and `expect_row`.
+- Which pages each role can open is `fixtures/role-pages.json`, and
+  `test-permissions.sh` holds every server to it.
+- Never write a database ID.  Look it up by a stable key with `racerid_of`
+  (car number), `racerid_named`, `roundid_of` (class and round), `classid_of`,
+  `rankid_of`, `partitionid_of` and `awardid_of`, or take it from the response
+  that created the thing.  `normalize_ids` replaces every ID in a response with
+  a label, to compare it with a golden response.
+- `check-no-literal-ids.sh` fails when a script contains a literal ID.  An
+  exception goes in `check-no-literal-ids.allowlist`, with its reason.
+
+`test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
 
 ## macOS
 
