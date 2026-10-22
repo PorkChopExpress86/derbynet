@@ -48,7 +48,9 @@ script always makes one.
 ## Run individual scripts from the host
 
 The scripts need `bash`, `curl`, `jq`, `perl`, `xmllint` (Debian and Ubuntu
-package `libxml2-utils`, used only for the XML responses), and `md5sum`.  The Puppeteer tests and `js-syntax-check.sh`
+package `libxml2-utils`, used only for the XML responses), `md5sum`, and
+ImageMagick's `identify` and `convert` (`test-photo-manipulations.sh` measures
+photos with them).  The Puppeteer tests and `js-syntax-check.sh`
 also need `node`: run `npm ci` in `testing/puppeteer` and
 `export NODE_PATH=$PWD/testing/puppeteer/node_modules`.
 
