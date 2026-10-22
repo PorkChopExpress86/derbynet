@@ -129,15 +129,17 @@ The response cannot show whether that happened. `"run-N-timed-out"` is also set 
 
 An omitted reschedule that was not a dry run wrote the schedule that every later call in `test-reschedule.sh` starts from, so the rest of that transcript is left out too.
 
-On the capture machine (8 cores), the 50 calls in `test-reschedule.sh` took:
+The 50 calls in `test-reschedule.sh` took these wall times on the capture machine (8 cores, WSL2). The first column is the run whose fixtures are committed; the second is the range over that run, an earlier full capture, and three runs of `test-reschedule.sh` alone:
 
-| Exchanges | Wall time | Deadline | Kept |
-|---|---|---|---|
-| 001 to 044 | 59 ms to 2.1 s (the slowest are 016 to 021, which reschedule a whole round with `trace=1`, and 039) | 10 s, or 5 s for 010 to 015 | yes |
-| 045, the first 6-lane latecomer, not a dry run | 11.5 s, cut off by its deadline | 10 s | no |
-| 046 to 050 | under 1.1 s, but they start from the schedule 045 wrote | 10 s | no |
+| Exchanges | Committed run | Range over 5 runs | Deadline | Kept |
+|---|---|---|---|---|
+| 001 to 038 | 58 ms to 2.1 s (the slowest are 016 to 021, which reschedule a whole round with `trace=1`) | the same, over the two full captures | 10 s, or 5 s for 010 to 015 | yes |
+| 039, the first 4-lane latecomer, not a dry run | 4.0 s | 2.1 s to 4.0 s | 10 s | yes |
+| 040 to 044 | 2.0 s to 2.4 s | 0.65 s to 2.4 s | 10 s | yes |
+| 045, the first 6-lane latecomer, not a dry run | 12.2 s, cut off by its deadline | 11.5 s to 12.2 s | 10 s | no |
+| 046 to 050 | under 1.1 s, but they start from the schedule 045 wrote | | 10 s | no |
 
-The slowest kept exchange took 2.1 s of a 10 s deadline. A runner would have to be 2.4 times slower for it to cross the 5 s line and be omitted, which `--check` reports as a changed fixture, and 4.7 times slower for its search to reach the deadline. `http/suite/reschedule.omitted.txt` lists the omitted exchanges and why.
+Exchange 039 sets the margin. It usually takes about 2.2 s; the 4.0 s run was a full capture while the host was busy with other containers. At 2.2 s a runner has to be 2.3 times slower for 039 to cross the 5 s line and be omitted, which `--check` reports as a changed `reschedule.http` and `reschedule.omitted.txt`, and 4.5 times slower for its search to reach the deadline. At 4.0 s those margins are 1.25 and 2.5 times. The CI log prints the same `reschedule` lines, so a failure there shows the time that crossed the line. `http/suite/reschedule.omitted.txt` lists the omitted exchanges and why.
 
 ## Things the fixtures show about PHP
 
@@ -173,7 +175,7 @@ To widen the sample, add car counts or `n_times_per_lane` values to the loops in
 
 - `http/timer/competing-timers.http`. `action.timer-message.inc` treats a second timer as competing only while `$last_contact + 1 >= time()`. The scenario in `capture/scenarios/03-timer.sh` sends five timer messages from two `User-Agent` values, and each must arrive within about a second of the one before, or a `<competing>` reply turns into a plain one.
 - `http/replay/command-sequence.http` and the replay exchanges in `http/suite/basic-racing.http`. The server forgets a replay client that has not polled for more than `REPLAY_TIMEOUT_LIMIT` (10 s, `website/inc/replay.inc`), and greets it again with `HELLO`. A gap over 10 s between polls changes the command list. `09-replay.sh` sleeps 11 s on purpose to record the greeting, and `08-suite-scripts.sh` polls just before `test-basic-racing.sh`, so the gap stays short.
-- `http/suite/reschedule.http`, which [Reschedules](#reschedules) covers: a 2.4 times slower runner moves exchange 039 into the omitted list.
+- `http/suite/reschedule.http`, which [Reschedules](#reschedules) covers: exchange 039 moves into the omitted list if it takes 5 s or more, which a loaded runner can reach.
 
 If one of these fails in CI, rerun the job before you treat the diff as real. A real change reproduces.
 
