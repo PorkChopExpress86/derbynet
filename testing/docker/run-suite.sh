@@ -12,6 +12,7 @@
 #   server   Build the server image from installer/docker/Dockerfile and start it
 #   timeout  Raise the PHP and nginx timeouts, for test-extended-scheduling.sh
 #   suite    Run test-face-detection.sh, js-syntax-check.sh, exercise-one-database.sh
+#   logs     Print the server container's log
 #   clean    Remove the server container and its data volume
 #
 # With no arguments, runs "all", which cleans up even when a step fails.
@@ -101,6 +102,10 @@ step_suite() {
   '
 }
 
+step_logs() {
+  docker logs "$SERVER" 2>&1
+}
+
 step_clean() {
   docker rm -f "$SERVER" >/dev/null 2>&1 || true
   docker volume rm -f "$VOLUME" >/dev/null 2>&1 || true
@@ -120,7 +125,7 @@ if [ $# -eq 0 ]; then
 fi
 for step in "$@"; do
   case "$step" in
-    harness|assets|server|timeout|suite|clean|all) "step_$step" ;;
+    harness|assets|server|timeout|suite|logs|clean|all) "step_$step" ;;
     *) echo "Unknown step: $step" >&2; exit 2 ;;
   esac
 done

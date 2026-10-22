@@ -33,7 +33,7 @@ jobs:
 
       - name: Collect server log
         if: failure()
-        run: docker logs derbynet-test-server > testing/server.log 2>&1 || true
+        run: testing/docker/run-suite.sh logs > testing/server.log || true
 
       - name: Upload test output
         if: failure()
