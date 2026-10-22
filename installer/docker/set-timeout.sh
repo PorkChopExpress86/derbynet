@@ -1,7 +1,7 @@
 #! /bin/bash
 #
 # Adjusts max_execution_time for PHP-fpm and fastcgi_read_timeout for nginx.
-# Assumes php-fpm is running under supervisord.
+# Both servers are signalled to pick up the change.
 #
 # Takes an optional argument for the new timeout in seconds, otherwise assumes 600.
 #
@@ -29,3 +29,8 @@ sed -i \
     -e "/fastcgi_read_timeout/ s/.*/fastcgi_read_timeout $TIMEOUT;/" \
     /etc/nginx/http.d/default.conf
 nginx -s reload
+
+# php-fpm reads php.ini only when it starts, so the new max_execution_time needs
+# more than a reload of nginx.  SIGUSR2 makes the php-fpm master restart itself
+# gracefully.
+pkill -USR2 -f 'php-fpm.*master process'
