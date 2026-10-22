@@ -47,7 +47,9 @@ curl_postj action.php "action=vote.cast&awardid=$BEST_WOLF&votes=[$(racerid_of 2
 rm $COOKIES_CURL
 
 curl_getj "action.php?query=ballot.get&password=" | jq -e 'has("ballot")' >/dev/null || test_fails
-curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 519),$(racerid_of 237)]" | check_jsuccess
+# Car 504 is Denny Deering, imported as 519: import-roster.sh renumbers the
+# Webelos from 501 in the order they were imported.
+curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[$(racerid_of 504),$(racerid_of 237)]" | check_jsuccess
 
 # Only the coordinator can see the results
 user_login_coordinator
