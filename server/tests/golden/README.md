@@ -94,7 +94,7 @@ Files, by directory (`find http -type f` lists them all):
 
 ## Normalization
 
-`capture/normalize.mjs` is the only place that masks a volatile value, and it masks nothing else. It changes only the volatile token, so the rest of each body is byte for byte what the server sent. `normalize.mjs --check-readme` fails the capture if a rule below is missing here.
+`capture/normalize.mjs` is the only place that masks a volatile value, and it masks nothing else. It changes only the volatile token, so the rest of each body is byte for byte what the server sent. `capture.sh` runs `normalize.mjs --check-readme` before it captures anything, and stops if a rule below is missing here.
 
 | Rule | What it masks |
 |---|---|

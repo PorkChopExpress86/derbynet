@@ -54,6 +54,12 @@ step_server() {
        "on $(docker exec "$SERVER" sed -n 's/^PRETTY_NAME=//p' /etc/os-release)" >&2
 }
 
+# Fail before any capture if README.md does not document every normalization rule.
+step_check_readme() {
+  docker run --rm -v "$ROOT:/derbynet" "$HARNESS_IMAGE" \
+         node /derbynet/server/tests/golden/capture/normalize.mjs --check-readme /derbynet/server/tests/golden/README.md
+}
+
 step_engine() {
   echo "== engine" >&2
   docker exec "$SERVER" rm -rf /tmp/golden-capture /tmp/golden-out
@@ -96,6 +102,7 @@ check_fixtures() {
 
 trap step_clean EXIT
 step_server
+step_check_readme
 if [ -n "$do_engine" ]; then
   step_engine
   [ -z "$check" ] || check_fixtures
