@@ -3,7 +3,7 @@
 The tests are shell scripts that drive a running DerbyNet server over HTTP, plus
 a few Puppeteer scripts in `puppeteer/`.  `exercise-one-database.sh` runs all of
 them.  The `php-suite` GitHub Actions workflow runs the suite against the PHP
-server image on every push and pull request.
+server image on every pull request and every push to master.
 
 ## Run the suite on Linux
 
@@ -33,9 +33,10 @@ as the last line of the suite's output.  Any failure stops the run with
 `testing/debug.curl`, and `testing/suite.log` hold the details.
 
 Name the steps to run some of them, e.g. `run-suite.sh harness assets server`
-to leave a server running, and then `run-suite.sh suite`; `run-suite.sh clean`
-removes the server.  Set `DERBYNET_TEST_PREFIX` to change the prefix
-(`derbynet-test`) on the names of the images, container, and volume.
+to leave a server running, and then `run-suite.sh suite`; `run-suite.sh logs`
+prints the server's log, and `run-suite.sh clean` removes the server.  Set
+`DERBYNET_TEST_PREFIX` to change the prefix (`derbynet-test`) on the names of
+the images, container, and volume.
 
 Run from a regular checkout, not a `git worktree`: the containers can't see the
 repository's git directory, and the build needs it.
