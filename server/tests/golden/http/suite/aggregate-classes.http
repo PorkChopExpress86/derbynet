@@ -1,0 +1,449 @@
+### 001 roster.new
+request: POST action.php
+request-body: action=roster.new&classid=10&top=2&bucketed=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 11294
+body:
+{
+    "action": {
+        "action": "roster.new",
+        "classid": 10,
+        "top": 2,
+        "bucketed": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "finalists": [
+        {
+            "racerid": 26,
+            "score": 3.2105
+        },
+        {
+            "racerid": 1,
+            "score": 3.239
+        },
+        {
+            "racerid": 89,
+            "score": 2.83475
+        },
+        {
+            "racerid": 95,
+            "score": 3.02025
+        },
+        {
+            "racerid": 92,
+            "score": 2.48575
+        },
+        {
+            "racerid": 90,
+            "score": 2.7615
+        }
+    ],
+    "new-round": {
+        "roundid": 7
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 6,
+        "roundid": 6,
+        "round": 1,
+        "tbodyid": 6,
+        "heat": 14,
+        "number-of-heats": 14,
+        "class": "Outlaw"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 96,
+            "name": "Billy Kid",
+            "carname": "",
+            "carnumber": 9962,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.819,
+            "finishplace": 4,
+            "subgroup": "Siblings"
+        },
+        {
+            "lane": 2,
+            "racerid": 84,
+            "name": "Cherokee Bill",
+            "carname": "",
+            "carnumber": 9907,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.065,
+            "finishplace": 1,
+            "subgroup": "Parents"
+        },
+        {
+            "lane": 3,
+            "racerid": 88,
+            "name": "Fred Waite",
+            "carname": "",
+            "carnumber": 9922,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.761,
+            "finishplace": 3,
+            "subgroup": "Parents"
+        },
+        {
+            "lane": 4,
+            "racerid": 87,
+            "name": "Zip Wyatt",
+            "carname": "",
+            "carnumber": 9917,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.551,
+            "finishplace": 2,
+            "subgroup": "Desperados"
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 6,
+            "count": 14,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Outlaw",
+            "subgroups": [
+                {
+                    "rankid": 6,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Siblings"
+                },
+                {
+                    "rankid": 7,
+                    "count": 7,
+                    "ntrophies": -1,
+                    "name": "Parents"
+                },
+                {
+                    "rankid": 8,
+                    "count": 4,
+                    "ntrophies": -1,
+                    "name": "Desperados"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Younger",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "classid": 2,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 8,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Older",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 3,
+                    "name": "Bears and Fr\u00e8res"
+                },
+                {
+                    "classid": 4,
+                    "name": "Webelos (\"Webes\")"
+                },
+                {
+                    "classid": 5,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 9,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Scouts",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 7,
+                    "name": "Younger"
+                },
+                {
+                    "classid": 8,
+                    "name": "Older"
+                }
+            ]
+        },
+        {
+            "classid": 10,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Firsts and Families",
+            "aggregate-by-subgroup": true,
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "classid": 6,
+                    "name": "Outlaw"
+                }
+            ],
+            "constituent-ranks": [
+                {
+                    "rankid": 1,
+                    "name": "Lions & Tigers",
+                    "classid": 1,
+                    "class": "Lions & Tigers"
+                },
+                {
+                    "rankid": 6,
+                    "name": "Siblings",
+                    "classid": 6,
+                    "class": "Outlaw"
+                },
+                {
+                    "rankid": 7,
+                    "name": "Parents",
+                    "classid": 6,
+                    "class": "Outlaw"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 17,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 17,
+            "heats_run": 17,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 16,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 16,
+            "heats_run": 16,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 6,
+            "classid": 6,
+            "class": "Outlaw",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 14,
+            "passed": 14,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 14,
+            "heats_run": 14,
+            "name": "Outlaw, Round 1"
+        },
+        {
+            "roundid": 7,
+            "classid": 10,
+            "class": "Firsts and Families",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 6,
+            "passed": 6,
+            "unscheduled": 6,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Firsts and Families, Round 1"
+        }
+    ],
+    "ready-aggregate": [
+        {
+            "classid": 7,
+            "by-subgroup": false,
+            "class": "Younger"
+        },
+        {
+            "classid": 8,
+            "by-subgroup": false,
+            "class": "Older"
+        },
+        {
+            "classid": 9,
+            "by-subgroup": false,
+            "class": "Scouts"
+        }
+    ]
+}
+

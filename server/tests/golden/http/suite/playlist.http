@@ -1,0 +1,144 @@
+### 001 playlist.add
+request: POST action.php
+request-body: action=playlist.add&classid=1&round=1&sceneid_at_finish=5
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 556
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 1,
+        "round": 1,
+        "sceneid_at_finish": 5
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 1,
+        "seq": 1,
+        "classid": 1,
+        "round": 1,
+        "bucket_limit": 0,
+        "bucketed": 0,
+        "n_times_per_lane": -1,
+        "sceneid_at_finish": 5,
+        "continue_racing": 0,
+        "class": "Den1",
+        "roundname": "Den1, Round 1"
+    }
+}
+
+### 002 playlist.add
+request: POST action.php
+request-body: action=playlist.add&classid=2&round=1&n_times_per_lane=1&continue_racing=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 585
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 2,
+        "round": 1,
+        "n_times_per_lane": 1,
+        "continue_racing": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 2,
+        "seq": 2,
+        "classid": 2,
+        "round": 1,
+        "bucket_limit": 0,
+        "bucketed": 0,
+        "n_times_per_lane": 1,
+        "sceneid_at_finish": -1,
+        "continue_racing": 1,
+        "class": "Den2",
+        "roundname": "Den2, Round 1"
+    }
+}
+
+### 003 playlist.add
+request: POST action.php
+request-body: action=playlist.add&classid=3&round=1&n_times_per_lane=1&continue_racing=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 585
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 3,
+        "round": 1,
+        "n_times_per_lane": 1,
+        "continue_racing": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 3,
+        "seq": 3,
+        "classid": 3,
+        "round": 1,
+        "bucket_limit": 0,
+        "bucketed": 0,
+        "n_times_per_lane": 1,
+        "sceneid_at_finish": -1,
+        "continue_racing": 1,
+        "class": "Den3",
+        "roundname": "Den3, Round 1"
+    }
+}
+
+### 004 playlist.add
+request: POST action.php
+request-body: action=playlist.add&classid=4&round=1&top=3&bucketed=0&n_times_per_lane=2
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 604
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 4,
+        "round": 1,
+        "top": 3,
+        "bucketed": 0,
+        "n_times_per_lane": 2
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 4,
+        "seq": 4,
+        "classid": 4,
+        "round": 1,
+        "bucket_limit": 3,
+        "bucketed": 0,
+        "n_times_per_lane": 2,
+        "sceneid_at_finish": -1,
+        "continue_racing": 0,
+        "class": "TwoThree",
+        "roundname": "TwoThree, Round 1"
+    }
+}
+

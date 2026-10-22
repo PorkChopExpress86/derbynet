@@ -1,0 +1,116 @@
+### 001 remote-start-before-the-timer-offers-it
+request: POST action.php
+request-body: action=timer.remote-start
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 207
+body:
+{
+    "action": {
+        "action": "timer.remote-start"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "no-remote-start",
+        "description": "Remote start not available."
+    }
+}
+
+### 002 hello-offering-remote-start
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HELLO&remote-start=YES
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 187
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HELLO" remote-start="YES">
+  <success/>
+    <query/>
+<remote-log send='false'/>
+</action-response>
+
+### 003 heartbeat-offering-remote-start
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT&remote-start=YES
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT" remote-start="YES">
+  <success/>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="5" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 004 remote-start-requested
+request: POST action.php
+request-body: action=timer.remote-start
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 172
+body:
+{
+    "action": {
+        "action": "timer.remote-start"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 005 heartbeat-after-remote-start-request
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT&remote-start=YES
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 196
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT" remote-start="YES">
+  <success/>
+  <remote-start/>
+<remote-log send='false'/>
+</action-response>
+
+### 006 heartbeat-after-remote-start-delivered
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT&remote-start=YES
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 178
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT" remote-start="YES">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 007 heartbeat-withdrawing-remote-start
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+

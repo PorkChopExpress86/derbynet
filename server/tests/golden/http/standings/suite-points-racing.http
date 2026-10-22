@@ -1,0 +1,2991 @@
+### 001 as-the-script-left-it export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 22384
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Excluded?"
+            ],
+            [
+                "Antoine",
+                "Akiyama",
+                "",
+                303,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Adolfo \"Dolf\"",
+                "Asher",
+                "Anywhere",
+                101,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Barney",
+                "Bainter",
+                "",
+                405,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Byron",
+                "Billy",
+                "",
+                502,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Blake",
+                "Burling",
+                "",
+                207,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Ca\u00f1umil",
+                "Calero",
+                "",
+                415,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Clark",
+                "Chesnutt",
+                "",
+                313,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Carroll",
+                "Cybulski",
+                "",
+                111,
+                "Vroom",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Darrell & Darrell",
+                "Delaughter",
+                "",
+                217,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Domingo",
+                "Doles",
+                "",
+                323,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Derick",
+                "Dreier",
+                "",
+                121,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Elliot",
+                "Eastman",
+                "",
+                227,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Earnest",
+                "Evangelista",
+                "",
+                425,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Freeman",
+                "Fizer",
+                "",
+                333,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Felton",
+                "Fouche",
+                "",
+                131,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Harley",
+                "Howell",
+                "",
+                435,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Ian",
+                "Ives",
+                "",
+                237,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Juan",
+                "Jacobsen",
+                "",
+                343,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Jeffress",
+                "Jamison",
+                "",
+                139,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Jesse",
+                "Jara",
+                "",
+                141,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Julian",
+                "Jarrard",
+                "",
+                445,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Kris",
+                "Kaba",
+                "",
+                510,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Kelvin",
+                "Knapp",
+                "",
+                247,
+                "",
+                "White's Wolves",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                1,
+                1,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                1,
+                2,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                1,
+                3,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                1,
+                4,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                2,
+                1,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                2,
+                2,
+                "Felton",
+                "Fouche",
+                131,
+                "",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                2,
+                3,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                2,
+                4,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                3,
+                1,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                3.3,
+                206.6,
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                3,
+                2,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                3,
+                3,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                3,
+                4,
+                "Felton",
+                "Fouche",
+                131,
+                "",
+                3.4,
+                200.5,
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                4,
+                1,
+                "Felton",
+                "Fouche",
+                131,
+                "",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                4,
+                2,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                4,
+                3,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                4,
+                4,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                5,
+                1,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                5,
+                2,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                5,
+                3,
+                "Felton",
+                "Fouche",
+                131,
+                "",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                1,
+                5,
+                4,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                1,
+                1,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                1,
+                2,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                1,
+                3,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                1,
+                4,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                2,
+                1,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                2,
+                2,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                2,
+                3,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                2,
+                4,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                3,
+                1,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                3,
+                2,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                3,
+                3,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                3,
+                4,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                4,
+                1,
+                "Jesse",
+                "Jara",
+                141,
+                "",
+                0,
+                "--",
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                4,
+                2,
+                "Derick",
+                "Dreier",
+                121,
+                "",
+                0,
+                "--",
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                4,
+                3,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                3,
+                "<timestamp>"
+            ],
+            [
+                "Lions & Tigers",
+                2,
+                4,
+                4,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom",
+                0,
+                "--",
+                4,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Scoring by points"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Car Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Total Points (1st = 4)",
+                "Best",
+                "Worst"
+            ],
+            [
+                "T1",
+                101,
+                "Adolfo \"Dolf\" Asher",
+                "",
+                "Lions & Tigers",
+                "T1",
+                4,
+                12,
+                "1st",
+                "3rd"
+            ],
+            [
+                "T1",
+                141,
+                "Jesse Jara",
+                "",
+                "Lions & Tigers",
+                "T1",
+                4,
+                12,
+                "1st",
+                "3rd"
+            ],
+            [
+                "T3",
+                111,
+                "Carroll Cybulski",
+                "Vroom",
+                "Lions & Tigers",
+                "T3",
+                4,
+                8,
+                "2nd",
+                "4th"
+            ],
+            [
+                "T3",
+                121,
+                "Derick Dreier",
+                "",
+                "Lions & Tigers",
+                "T3",
+                4,
+                8,
+                "2nd",
+                "4th"
+            ]
+        ]
+    ],
+    [
+        "Standings Lions & Tigers",
+        [
+            [
+                "Standings for Lions & Tigers"
+            ],
+            [
+                "Scoring by points"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Car Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Total Points (1st = 4)",
+                "Best",
+                "Worst"
+            ],
+            [
+                "T1",
+                101,
+                "Adolfo \"Dolf\" Asher",
+                "",
+                "Lions & Tigers",
+                "T1",
+                4,
+                12,
+                "1st",
+                "3rd"
+            ],
+            [
+                "T1",
+                141,
+                "Jesse Jara",
+                "",
+                "Lions & Tigers",
+                "T1",
+                4,
+                12,
+                "1st",
+                "3rd"
+            ],
+            [
+                "T3",
+                111,
+                "Carroll Cybulski",
+                "Vroom",
+                "Lions & Tigers",
+                "T3",
+                4,
+                8,
+                "2nd",
+                "4th"
+            ],
+            [
+                "T3",
+                121,
+                "Derick Dreier",
+                "",
+                "Lions & Tigers",
+                "T3",
+                4,
+                8,
+                "2nd",
+                "4th"
+            ]
+        ]
+    ],
+    [
+        "Standings st-r1",
+        [
+            [
+                "Standings for Lions & Tigers, Round 1"
+            ],
+            [
+                "Scoring by points"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Car Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Total Points (1st = 4)",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                111,
+                "Carroll Cybulski",
+                "Vroom",
+                "Lions & Tigers",
+                "",
+                4,
+                16,
+                "1st",
+                "1st"
+            ],
+            [
+                2,
+                101,
+                "Adolfo \"Dolf\" Asher",
+                "",
+                "Lions & Tigers",
+                "",
+                4,
+                12,
+                "1st",
+                "3rd"
+            ],
+            [
+                "T3",
+                121,
+                "Derick Dreier",
+                "",
+                "Lions & Tigers",
+                "",
+                4,
+                9,
+                "2nd",
+                "3rd"
+            ],
+            [
+                "T3",
+                141,
+                "Jesse Jara",
+                "",
+                "Lions & Tigers",
+                "",
+                4,
+                9,
+                "2nd",
+                "4th"
+            ],
+            [
+                5,
+                131,
+                "Felton Fouche",
+                "",
+                "Lions & Tigers",
+                "",
+                4,
+                4,
+                "4th",
+                "4th"
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack (Tie)",
+                "Speed Trophy",
+                null,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                ""
+            ],
+            [
+                "Fastest in Pack (Tie)",
+                "Speed Trophy",
+                null,
+                "Jesse",
+                "Jara",
+                141,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack (Tie)",
+                "Speed Trophy",
+                null,
+                "Carroll",
+                "Cybulski",
+                111,
+                "Vroom"
+            ],
+            [
+                "2nd Fastest in Pack (Tie)",
+                "Speed Trophy",
+                null,
+                "Derick",
+                "Dreier",
+                121,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 002 as-the-script-left-it standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 644
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                1
+            ],
+            [
+                21,
+                41
+            ],
+            [],
+            [
+                31
+            ]
+        ],
+        "st-r6": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ]
+    }
+}
+
+### 003 as-the-script-left-it award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3307
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 004 points=0 scoring=0 subgroups=0 standings
+request: GET action.php?query=standings
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 005 points=0 scoring=0 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 006 points=0 scoring=0 subgroups=1 standings
+request: GET action.php?query=standings
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 007 points=0 scoring=0 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 008 points=0 scoring=1 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 804
+body:
+{
+    "standings": {
+        "st-r1": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                31
+            ],
+            "3": [
+                41
+            ]
+        },
+        "st-r6": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                41
+            ]
+        },
+        "st-ff": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                41
+            ]
+        }
+    }
+}
+
+### 009 points=0 scoring=1 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3130
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 010 points=0 scoring=1 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1345
+body:
+{
+    "standings": {
+        "st-r1": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                31
+            ],
+            "3": [
+                41
+            ]
+        },
+        "st-rr1-1": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                31
+            ],
+            "3": [
+                41
+            ]
+        },
+        "st-r6": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                41
+            ]
+        },
+        "st-rr6-1": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                41
+            ]
+        },
+        "st-ff": {
+            "-1": [
+                1
+            ],
+            "0": [
+                11
+            ],
+            "1": [
+                21
+            ],
+            "2": [
+                41
+            ]
+        }
+    }
+}
+
+### 011 points=0 scoring=1 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3130
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 012 points=0 scoring=2 subgroups=0 standings
+request: GET action.php?query=standings
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 013 points=0 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 014 points=0 scoring=2 subgroups=1 standings
+request: GET action.php?query=standings
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 015 points=0 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 016 points=1 scoring=0 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 644
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                1
+            ],
+            [
+                21,
+                41
+            ],
+            [],
+            [
+                31
+            ]
+        ],
+        "st-r6": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ]
+    }
+}
+
+### 017 points=1 scoring=0 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3307
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 018 points=1 scoring=0 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1086
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                1
+            ],
+            [
+                21,
+                41
+            ],
+            [],
+            [
+                31
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                11
+            ],
+            [
+                1
+            ],
+            [
+                21,
+                41
+            ],
+            [],
+            [
+                31
+            ]
+        ],
+        "st-r6": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-rr6-1": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ]
+    }
+}
+
+### 019 points=1 scoring=0 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3307
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 020 points=1 scoring=1 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 656
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                1
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ],
+        "st-r6": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ]
+    }
+}
+
+### 021 points=1 scoring=1 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3307
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 022 points=1 scoring=1 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1110
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                1
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                11
+            ],
+            [
+                1
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ],
+        "st-r6": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-rr6-1": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ]
+    }
+}
+
+### 023 points=1 scoring=1 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3307
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 024 points=1 scoring=2 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 632
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                11
+            ],
+            [],
+            [
+                21,
+                41
+            ],
+            [],
+            [
+                31
+            ]
+        ],
+        "st-r6": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ]
+    }
+}
+
+### 025 points=1 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3307
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 026 points=1 scoring=2 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1062
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                11
+            ],
+            [],
+            [
+                21,
+                41
+            ],
+            [],
+            [
+                31
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                1,
+                11
+            ],
+            [],
+            [
+                21,
+                41
+            ],
+            [],
+            [
+                31
+            ]
+        ],
+        "st-r6": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-rr6-1": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                41
+            ],
+            [],
+            [
+                11,
+                21
+            ]
+        ]
+    }
+}
+
+### 027 points=1 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3307
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 11,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 028 one-trophy-per=0 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 029 one-trophy-per=1 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 030 n-rank-trophies=0 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 031 n-rank-trophies=1 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 032 n-rank-trophies=3 award.list
+request: GET action.php?query=award.list
+status: 500
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+

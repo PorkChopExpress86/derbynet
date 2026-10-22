@@ -1,0 +1,242 @@
+### 001 not-a-page
+request: GET action.php
+status: 200
+content-type: text/html; charset=UTF-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
+length: 107
+body:
+<!DOCTYPE html><html><head><title>Not a Page</title></head><body><h1>This is not a page.</h1></body></html>
+### 002 unknown-query
+request: GET action.php?query=no.such
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 142
+body:
+{
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized query: no.such"
+    }
+}
+
+### 003 unknown-action-encoding-quirks
+request: POST action.php
+request-body: action=no.such&password=x&n=007&f=1.50&e=1e3&w=%205&h=0x1A&s=a/b&u=%C3%A9&message[recipient]=AA&message[key]=v&list[]=1&list[]=2&a.b=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 517
+body:
+{
+    "action": {
+        "action": "no.such",
+        "password": "...",
+        "n": 7,
+        "f": 1.5,
+        "e": 1000,
+        "w": 5,
+        "h": "0x1A",
+        "s": "a\/b",
+        "u": "\u00e9",
+        "message": {
+            "recipient": "AA",
+            "key": "v"
+        },
+        "list": [
+            1,
+            2
+        ],
+        "a_b": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized action: no.such"
+    }
+}
+
+### 004 unknown-xml-action-escaping
+request: POST action.php
+request-body: action=snapshot.no-such&q=%27%22%3C%3E%26
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 207
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="snapshot.no-such" q="&#039;&quot;&lt;&gt;&amp;"><failure code="unrecognized">Unrecognized action: snapshot.no-such</failure></action-response>
+
+### 005 unknown-xml-query
+request: GET action.php?query=snapshot.no-such
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 150
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response><failure code="unrecognized">Unrecognized query: snapshot.no-such</failure></action-response>
+
+### 006 post-with-query-string
+request: POST action.php?query=poll
+request-body: action=no.such
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 194
+body:
+{
+    "action": {
+        "action": "no.such"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized action: no.such"
+    }
+}
+
+### 007 get-with-action-parameter
+request: GET action.php?action=no.such
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 135
+body:
+{
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized query: "
+    }
+}
+
+### 008 post-with-empty-body
+request: POST action.php
+request-body: 
+status: 200
+content-type: text/html; charset=UTF-8
+cache-control: no-store, no-cache, must-revalidate
+length: 107
+body:
+<!DOCTYPE html><html><head><title>Not a Page</title></head><body><h1>This is not a page.</h1></body></html>
+### 009 query-name-empty
+request: GET action.php?query=
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 135
+body:
+{
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized query: "
+    }
+}
+
+### 010 action-name-empty
+request: POST action.php
+request-body: action=
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 180
+body:
+{
+    "action": {
+        "action": ""
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized action: "
+    }
+}
+
+### 011 unknown-action-nodata
+request: POST action.php
+request-body: action=no.such.nodata
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 208
+body:
+{
+    "action": {
+        "action": "no.such.nodata"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized action: no.such.nodata"
+    }
+}
+
+### 012 unknown-xml-action-login-stub
+request: POST action.php
+request-body: action=login
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 227
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="login">
+  <failure code="version">Please upgrade your derby-timer.jar
+                          (should be using role.login to login)</failure>
+</action-response>
+
+### 013 unknown-xml-query-roles-stub
+request: GET action.php?query=roles
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 227
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="login">
+  <failure code="version">Please upgrade your derby-timer.jar</failure>
+  <role timer_message="1">Please upgrade derby-timer.jar</role>
+</action-response>
+
+### 014 xml-action-timer-message-without-login
+request: POST action.php
+request-body: action=timer-message&message=HELLO
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 199
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HELLO"><failure code="notauthorized">Not authorized -- please see race coordinator</failure></action-response>
+
+### 015 query-with-array-parameter
+request: GET action.php?query[]=poll
+status: 500
+content-type: text/html; charset=UTF-8
+cache-control: no-store, no-cache, must-revalidate
+length: 0
+body:
+
+### 016 post-with-both-same-key
+request: POST action.php?action=role.login
+request-body: action=no.such
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 194
+body:
+{
+    "action": {
+        "action": "no.such"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "unrecognized",
+        "description": "Unrecognized action: no.such"
+    }
+}
+

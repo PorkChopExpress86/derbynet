@@ -1,0 +1,6 @@
+045 schedule.reschedule (action=schedule.reschedule&roundid=2&racerid=89): the request took 5 s or longer, 1/2 of its 10 s search deadline, so a slower machine could cut the search off
+046 schedule.reschedule (action=schedule.reschedule&roundid=2&racerid=90): starts from the schedule that 045 schedule.reschedule wrote
+047 schedule.reschedule (action=schedule.reschedule&roundid=2&racerid=91): starts from the schedule that 045 schedule.reschedule wrote
+048 schedule.reschedule (action=schedule.reschedule&roundid=2&racerid=92): starts from the schedule that 045 schedule.reschedule wrote
+049 schedule.reschedule (action=schedule.reschedule&roundid=2&racerid=93): starts from the schedule that 045 schedule.reschedule wrote
+050 schedule.reschedule (action=schedule.reschedule&roundid=2&racerid=94): starts from the schedule that 045 schedule.reschedule wrote

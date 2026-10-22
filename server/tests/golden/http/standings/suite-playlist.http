@@ -1,0 +1,5877 @@
+### 001 as-the-script-left-it export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 18094
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Excluded?"
+            ],
+            [
+                "First101",
+                "Last101",
+                "",
+                101,
+                "",
+                "Den1",
+                0
+            ],
+            [
+                "First102",
+                "Last102",
+                "",
+                102,
+                "",
+                "Den1",
+                0
+            ],
+            [
+                "First201",
+                "Last201",
+                "",
+                201,
+                "",
+                "Den2",
+                0
+            ],
+            [
+                "First202",
+                "Last202",
+                "",
+                202,
+                "",
+                "Den2",
+                0
+            ],
+            [
+                "First203",
+                "Last203",
+                "",
+                203,
+                "",
+                "Den2",
+                0
+            ],
+            [
+                "First301",
+                "Last301",
+                "",
+                301,
+                "",
+                "Den3",
+                0
+            ],
+            [
+                "First302",
+                "Last302",
+                "",
+                302,
+                "",
+                "Den3",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Den1",
+                1,
+                1,
+                1,
+                "First101",
+                "Last101",
+                101,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Den1",
+                1,
+                1,
+                2,
+                "First102",
+                "Last102",
+                102,
+                "",
+                2,
+                340.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Den1",
+                1,
+                2,
+                1,
+                "First102",
+                "Last102",
+                102,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Den1",
+                1,
+                2,
+                2,
+                "First101",
+                "Last101",
+                101,
+                "",
+                2,
+                340.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Den2",
+                1,
+                1,
+                1,
+                "First201",
+                "Last201",
+                201,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Den2",
+                1,
+                1,
+                2,
+                "First203",
+                "Last203",
+                203,
+                "",
+                1.2,
+                568.2,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Den2",
+                1,
+                2,
+                1,
+                "First202",
+                "Last202",
+                202,
+                "",
+                1.01,
+                675.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Den2",
+                1,
+                2,
+                2,
+                "First201",
+                "Last201",
+                201,
+                "",
+                1.3,
+                524.5,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Den2",
+                1,
+                3,
+                1,
+                "First203",
+                "Last203",
+                203,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Den2",
+                1,
+                3,
+                2,
+                "First202",
+                "Last202",
+                202,
+                "",
+                1.4,
+                487,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Den3",
+                1,
+                1,
+                1,
+                "First301",
+                "Last301",
+                301,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Den3",
+                1,
+                1,
+                2,
+                "First302",
+                "Last302",
+                302,
+                "",
+                1.2,
+                568.2,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Den3",
+                1,
+                2,
+                1,
+                "First302",
+                "Last302",
+                302,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Den3",
+                1,
+                2,
+                2,
+                "First301",
+                "Last301",
+                301,
+                "",
+                1.4,
+                487,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "TwoThree",
+                1,
+                1,
+                1,
+                "First203",
+                "Last203",
+                203,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "TwoThree",
+                1,
+                1,
+                2,
+                "First201",
+                "Last201",
+                201,
+                "",
+                1.2,
+                568.2,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "TwoThree",
+                1,
+                2,
+                1,
+                "First302",
+                "Last302",
+                302,
+                "",
+                1,
+                681.8,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "TwoThree",
+                1,
+                2,
+                2,
+                "First203",
+                "Last203",
+                203,
+                "",
+                1.2,
+                568.2,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "TwoThree",
+                1,
+                3,
+                1,
+                "First201",
+                "Last201",
+                201,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "TwoThree",
+                1,
+                3,
+                2,
+                "First302",
+                "Last302",
+                302,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "TwoThree",
+                1,
+                4,
+                1,
+                "First203",
+                "Last203",
+                203,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "TwoThree",
+                1,
+                4,
+                2,
+                "First302",
+                "Last302",
+                302,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "TwoThree",
+                1,
+                5,
+                1,
+                "First302",
+                "Last302",
+                302,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "TwoThree",
+                1,
+                5,
+                2,
+                "First201",
+                "Last201",
+                201,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "TwoThree",
+                1,
+                6,
+                1,
+                "First201",
+                "Last201",
+                201,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "TwoThree",
+                1,
+                6,
+                2,
+                "First203",
+                "Last203",
+                203,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                "T1",
+                203,
+                "First203 Last203",
+                "Den2",
+                1,
+                2,
+                1.1,
+                1,
+                1.2
+            ],
+            [
+                "T1",
+                302,
+                "First302 Last302",
+                "Den3",
+                1,
+                2,
+                1.1,
+                1,
+                1.2
+            ],
+            [
+                3,
+                201,
+                "First201 Last201",
+                "Den2",
+                2,
+                2,
+                1.15,
+                1,
+                1.3
+            ],
+            [
+                4,
+                301,
+                "First301 Last301",
+                "Den3",
+                2,
+                2,
+                1.2,
+                1,
+                1.4
+            ],
+            [
+                5,
+                202,
+                "First202 Last202",
+                "Den2",
+                3,
+                2,
+                1.205,
+                1.01,
+                1.4
+            ],
+            [
+                "T6",
+                101,
+                "First101 Last101",
+                "Den1",
+                "T1",
+                2,
+                1.5,
+                1,
+                2
+            ],
+            [
+                "T6",
+                102,
+                "First102 Last102",
+                "Den1",
+                "T1",
+                2,
+                1.5,
+                1,
+                2
+            ]
+        ]
+    ],
+    [
+        "Standings Den1",
+        [
+            [
+                "Standings for Den1"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                "T1",
+                101,
+                "First101 Last101",
+                "Den1",
+                "T1",
+                2,
+                1.5,
+                1,
+                2
+            ],
+            [
+                "T1",
+                102,
+                "First102 Last102",
+                "Den1",
+                "T1",
+                2,
+                1.5,
+                1,
+                2
+            ]
+        ]
+    ],
+    [
+        "Standings Den2",
+        [
+            [
+                "Standings for Den2"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                203,
+                "First203 Last203",
+                "Den2",
+                1,
+                2,
+                1.1,
+                1,
+                1.2
+            ],
+            [
+                2,
+                201,
+                "First201 Last201",
+                "Den2",
+                2,
+                2,
+                1.15,
+                1,
+                1.3
+            ],
+            [
+                3,
+                202,
+                "First202 Last202",
+                "Den2",
+                3,
+                2,
+                1.205,
+                1.01,
+                1.4
+            ]
+        ]
+    ],
+    [
+        "Standings Den3",
+        [
+            [
+                "Standings for Den3"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                302,
+                "First302 Last302",
+                "Den3",
+                1,
+                2,
+                1.1,
+                1,
+                1.2
+            ],
+            [
+                2,
+                301,
+                "First301 Last301",
+                "Den3",
+                2,
+                2,
+                1.2,
+                1,
+                1.4
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack (Tie)",
+                "Speed Trophy",
+                null,
+                "First203",
+                "Last203",
+                203,
+                ""
+            ],
+            [
+                "Fastest in Pack (Tie)",
+                "Speed Trophy",
+                null,
+                "First302",
+                "Last302",
+                302,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                "First201",
+                "Last201",
+                201,
+                ""
+            ],
+            [
+                "3rd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                "First301",
+                "Last301",
+                301,
+                ""
+            ],
+            [
+                "Fastest in TwoThree",
+                "Speed Trophy",
+                "TwoThree",
+                "First302",
+                "Last302",
+                302,
+                ""
+            ],
+            [
+                "2nd Fastest in TwoThree",
+                "Speed Trophy",
+                "TwoThree",
+                "First203",
+                "Last203",
+                203,
+                ""
+            ],
+            [
+                "3rd Fastest in TwoThree",
+                "Speed Trophy",
+                "TwoThree",
+                "First201",
+                "Last201",
+                201,
+                ""
+            ],
+            [
+                "Fastest in Den1 (Tie)",
+                "Speed Trophy",
+                "Den1",
+                "First101",
+                "Last101",
+                101,
+                ""
+            ],
+            [
+                "Fastest in Den1 (Tie)",
+                "Speed Trophy",
+                "Den1",
+                "First102",
+                "Last102",
+                102,
+                ""
+            ],
+            [
+                "Fastest in Den2",
+                "Speed Trophy",
+                "Den2",
+                "First203",
+                "Last203",
+                203,
+                ""
+            ],
+            [
+                "2nd Fastest in Den2",
+                "Speed Trophy",
+                "Den2",
+                "First201",
+                "Last201",
+                201,
+                ""
+            ],
+            [
+                "3rd Fastest in Den2",
+                "Speed Trophy",
+                "Den2",
+                "First202",
+                "Last202",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Den3",
+                "Speed Trophy",
+                "Den3",
+                "First302",
+                "Last302",
+                302,
+                ""
+            ],
+            [
+                "2nd Fastest in Den3",
+                "Speed Trophy",
+                "Den3",
+                "First301",
+                "Last301",
+                301,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 002 as-the-script-left-it standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1156
+body:
+{
+    "standings": {
+        "st-r4": [
+            [
+                7
+            ],
+            [
+                5
+            ],
+            [
+                3
+            ]
+        ],
+        "st-r2": [
+            [
+                5
+            ],
+            [
+                3
+            ],
+            [
+                4
+            ]
+        ],
+        "st-q4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                4
+            ]
+        ],
+        "st-ff": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                4
+            ],
+            [
+                1,
+                2
+            ]
+        ],
+        "st-r3": [
+            [
+                7
+            ],
+            [
+                6
+            ]
+        ],
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ]
+    }
+}
+
+### 003 as-the-script-left-it award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4838
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 004 points=0 scoring=0 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1156
+body:
+{
+    "standings": {
+        "st-r4": [
+            [
+                7
+            ],
+            [
+                5
+            ],
+            [
+                3
+            ]
+        ],
+        "st-r2": [
+            [
+                5
+            ],
+            [
+                3
+            ],
+            [
+                4
+            ]
+        ],
+        "st-q4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                4
+            ]
+        ],
+        "st-ff": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                4
+            ],
+            [
+                1,
+                2
+            ]
+        ],
+        "st-r3": [
+            [
+                7
+            ],
+            [
+                6
+            ]
+        ],
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ]
+    }
+}
+
+### 005 points=0 scoring=0 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4838
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 006 points=0 scoring=0 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1553
+body:
+{
+    "standings": {
+        "st-r4": [
+            [
+                7
+            ],
+            [
+                5
+            ],
+            [
+                3
+            ]
+        ],
+        "st-r2": [
+            [
+                5
+            ],
+            [
+                3
+            ],
+            [
+                4
+            ]
+        ],
+        "st-rr2-2": [
+            [
+                5
+            ],
+            [
+                3
+            ],
+            [
+                4
+            ]
+        ],
+        "st-q4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                4
+            ]
+        ],
+        "st-ff": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                4
+            ],
+            [
+                1,
+                2
+            ]
+        ],
+        "st-r3": [
+            [
+                7
+            ],
+            [
+                6
+            ]
+        ],
+        "st-rr3-3": [
+            [
+                7
+            ],
+            [
+                6
+            ]
+        ],
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                1,
+                2
+            ]
+        ]
+    }
+}
+
+### 007 points=0 scoring=0 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4838
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 008 points=0 scoring=1 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1160
+body:
+{
+    "standings": {
+        "st-r2": [
+            [
+                3
+            ],
+            [
+                5
+            ],
+            [
+                4
+            ]
+        ],
+        "st-q4": [
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-ff": [
+            [
+                3
+            ],
+            [
+                1,
+                2,
+                6
+            ],
+            [],
+            [],
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-r3": [
+            [
+                6
+            ],
+            [
+                7
+            ]
+        ],
+        "st-r4": [
+            [
+                7
+            ],
+            [
+                5
+            ],
+            [
+                3
+            ]
+        ]
+    }
+}
+
+### 009 points=0 scoring=1 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5187
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2c",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-3a",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-3b",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 010 points=0 scoring=1 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1557
+body:
+{
+    "standings": {
+        "st-r2": [
+            [
+                3
+            ],
+            [
+                5
+            ],
+            [
+                4
+            ]
+        ],
+        "st-rr2-2": [
+            [
+                3
+            ],
+            [
+                5
+            ],
+            [
+                4
+            ]
+        ],
+        "st-q4": [
+            [
+                3
+            ],
+            [
+                6
+            ],
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-ff": [
+            [
+                3
+            ],
+            [
+                1,
+                2,
+                6
+            ],
+            [],
+            [],
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-r3": [
+            [
+                6
+            ],
+            [
+                7
+            ]
+        ],
+        "st-rr3-3": [
+            [
+                6
+            ],
+            [
+                7
+            ]
+        ],
+        "st-r4": [
+            [
+                7
+            ],
+            [
+                5
+            ],
+            [
+                3
+            ]
+        ]
+    }
+}
+
+### 011 points=0 scoring=1 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5187
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2c",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-3a",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-3b",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 012 points=0 scoring=2 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1060
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                5,
+                6,
+                7
+            ],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                5
+            ],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                5,
+                6,
+                7
+            ],
+            [],
+            [],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-r4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 013 points=0 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5367
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 014 points=0 scoring=2 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1417
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                5,
+                6,
+                7
+            ],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                5
+            ],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-rr2-2": [
+            [
+                3,
+                5
+            ],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                5,
+                6,
+                7
+            ],
+            [],
+            [],
+            [],
+            [
+                4
+            ]
+        ],
+        "st-r4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ],
+        "st-rr3-3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 015 points=0 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5367
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 016 points=1 scoring=0 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 844
+body:
+{
+    "standings": {
+        "st-r4": [
+            [
+                7
+            ],
+            [
+                5
+            ],
+            [
+                3
+            ]
+        ],
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 017 points=1 scoring=0 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5367
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 018 points=1 scoring=0 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1157
+body:
+{
+    "standings": {
+        "st-r4": [
+            [
+                7
+            ],
+            [
+                5
+            ],
+            [
+                3
+            ]
+        ],
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-rr2-2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ],
+        "st-rr3-3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 019 points=1 scoring=0 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5367
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 020 points=1 scoring=1 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 832
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 021 points=1 scoring=1 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5369
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 022 points=1 scoring=1 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1145
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-rr2-2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ],
+        "st-rr3-3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 023 points=1 scoring=1 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5369
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 024 points=1 scoring=2 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 832
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 025 points=1 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5369
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 026 points=1 scoring=2 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1145
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                1,
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-rr2-2": [
+            [
+                3,
+                4,
+                5
+            ]
+        ],
+        "st-q4": [
+            [
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "st-r4": [
+            [
+                5,
+                7
+            ],
+            [],
+            [
+                3
+            ]
+        ],
+        "st-r3": [
+            [
+                6,
+                7
+            ]
+        ],
+        "st-rr3-3": [
+            [
+                6,
+                7
+            ]
+        ]
+    }
+}
+
+### 027 points=1 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5369
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 028 one-trophy-per=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4838
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 029 one-trophy-per=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3466
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 030 n-rank-trophies=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4838
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 031 n-rank-trophies=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4838
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+
+### 032 n-rank-trophies=3 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4838
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-4",
+            "place": 2,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-4",
+            "place": 3,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ]
+}
+

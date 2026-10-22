@@ -1,0 +1,81 @@
+### 001 first-timer-hello
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HELLO
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 168
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HELLO">
+  <success/>
+    <query/>
+<remote-log send='false'/>
+</action-response>
+
+### 002 second-timer-hello-within-a-second
+request: POST action.php
+user-agent: DerbyNet-Browser-Timer/golden-2.0
+request-body: action=timer-message&message=HELLO
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 223
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HELLO"><competing>DerbyNet-Timer/golden-1.0 (jar)</competing>
+
+  <success/>
+    <query/>
+<remote-log send='false'/>
+</action-response>
+
+### 003 second-timer-heartbeat
+request: POST action.php
+user-agent: DerbyNet-Browser-Timer/golden-2.0
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 301
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<competing>DerbyNet-Timer/golden-1.0 (jar)</competing>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="5" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 004 first-timer-heartbeat-is-told-it-competes
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 159
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 005 second-timer-heartbeat-again
+request: POST action.php
+user-agent: DerbyNet-Browser-Timer/golden-2.0
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 214
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT">
+  <success/>
+<competing>DerbyNet-Timer/golden-1.0 (jar)</competing>
+<remote-log send='false'/>
+</action-response>
+

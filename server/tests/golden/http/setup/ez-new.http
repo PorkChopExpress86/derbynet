@@ -1,0 +1,605 @@
+### 001 ez-new
+request: POST action.php
+request-body: action=setup.nodata&ez-new=testdb
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 20601
+body:
+{
+    "action": {
+        "action": "setup.nodata",
+        "ez-new": "testdb"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "executed": [
+        {
+            "sql": "DROP TABLE IF EXISTS `Awards`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `Awards` (  `awardid` INTEGER PRIMARY KEY,   `awardname` VARCHAR(100) NOT NULL,   `awardtypeid` INTEGER NOT NULL DEFAULT 1,   `classid` INTEGER,   `rankid` INTEGER,   `racerid` INTEGER DEFAULT 0,   `sort` INTEGER DEFAULT 0)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Awards_awardtypeid ON Awards(awardtypeid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Awards_awardname ON Awards(awardname)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Awards_classid ON Awards(classid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Awards_rankid ON Awards(rankid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Awards_sort ON Awards(sort)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `AwardTypes`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `AwardTypes` (  `awardtypeid` INTEGER PRIMARY KEY,   `awardtype` VARCHAR(15) NOT NULL)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS CheckinAudit",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE CheckinAudit\t(\tseq    INTEGER PRIMARY KEY,\tstmt   VARCHAR (250),\ttstamp DATETIME\t)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS Events",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE Events (  seq     INTEGER PRIMARY KEY,\ttstamp  DATETIME,\taction  INTEGER,  racerid INTEGER,  classid INTEGER,  rankid  INTEGER,  roundid INTEGER,  heat    INTEGER,  finishid  INTEGER,  other   VARCHAR(250)\t)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `Classes`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `Classes` (  `classid` INTEGER PRIMARY KEY,   `class` VARCHAR(75) NOT NULL UNIQUE COLLATE NOCASE,  `constituents` VARCHAR(100) DEFAULT '',  `rankids` VARCHAR(100) DEFAULT '', `durable` INTEGER, `ntrophies` INTEGER DEFAULT -1,  `sortorder` INTEGER)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS ConstituentClasses",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE ConstituentClasses (  antecedent INTEGER,  dependent  INTEGER,  UNIQUE (antecedent, dependent))",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `RaceChart`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `RaceChart` (  `resultid` INTEGER PRIMARY KEY,   `classid` INTEGER,   `roundid` INTEGER NOT NULL,   `heat` INTEGER NOT NULL,   `lane` INTEGER NOT NULL,   `racerid` INTEGER,   `chartnumber` INTEGER,   `finishtime` DOUBLE NULL,   `finishplace` INTEGER,   `points` INTEGER,   `completed` TIMESTAMP,   `ignoretime` TINYINT(1) DEFAULT 0,   `masterheat` INTEGER DEFAULT 0)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_chartnumber ON RaceChart(chartnumber)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_classid ON RaceChart(classid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_finishtime ON RaceChart(finishtime)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_heat ON RaceChart(heat)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_lane ON RaceChart(lane)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_masterheat ON RaceChart(masterheat)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_points ON RaceChart(points)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_racerid ON RaceChart(racerid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceChart_roundid ON RaceChart(roundid)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `RaceInfo`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `RaceInfo` (  `raceinfoid` INTEGER PRIMARY KEY,   `itemkey` VARCHAR(20) NOT NULL,   `itemvalue` VARCHAR(200))",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RaceInfo_itemkey ON RaceInfo(itemkey)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `Ranks`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `Ranks` (  `rankid` INTEGER PRIMARY KEY,   `rank` VARCHAR(75) NOT NULL COLLATE NOCASE,   `classid` INTEGER NOT NULL, `ntrophies` INTEGER DEFAULT -1,  `sortorder` INTEGER )",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Ranks_classid ON Ranks(classid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Ranks_rank ON Ranks(rank)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `RegistrationInfo`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `RegistrationInfo` (  `racerid` INTEGER PRIMARY KEY,   `carnumber` INTEGER NOT NULL,   `carname` VARCHAR(30),   `lastname` VARCHAR(30) NOT NULL COLLATE NOCASE,   `firstname` VARCHAR(30) NOT NULL COLLATE NOCASE,   `classid` INTEGER NOT NULL,   `rankid` INTEGER NOT NULL,   `partitionid` INTEGER NOT NULL,  `passedinspection` TINYINT(1) DEFAULT 0,   `imagefile` VARCHAR(255),   `carphoto` VARCHAR(255),   `checkin_time` INTEGER,   `note` VARCHAR(255),   `exclude` TINYINT(1) DEFAULT 0)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RegistrationInfo_carnumber ON RegistrationInfo(carnumber)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RegistrationInfo_classid ON RegistrationInfo(classid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RegistrationInfo_exclude ON RegistrationInfo(exclude)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RegistrationInfo_lastname ON RegistrationInfo(lastname)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RegistrationInfo_passedinspection ON RegistrationInfo(passedinspection)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS RegistrationInfo_rankid ON RegistrationInfo(rankid)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `Roster`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `Roster` (  `rosterid` INTEGER PRIMARY KEY,   `roundid` INTEGER NOT NULL,   `classid` INTEGER NOT NULL DEFAULT 0,   `racerid` INTEGER NOT NULL,   `finalist` TINYINT(1) DEFAULT 0,   `grandfinalist` TINYINT(1) DEFAULT 0)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Roster_classid ON Roster(classid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Roster_racerid ON Roster(racerid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Roster_roundid ON Roster(roundid)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `Rounds`",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE `Rounds` (  `roundid` INTEGER PRIMARY KEY,   `round` INTEGER NOT NULL,   `classid` INTEGER NOT NULL,   `charttype` INTEGER,   `phase` INTEGER)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Rounds_classid ON Rounds(classid)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Rounds_round ON Rounds(round)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS Kiosks",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE Kiosks ( address VARCHAR(50), name VARCHAR(200), page VARCHAR(200), last_contact INTEGER NOT NULL)",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS MessageQueue",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE MessageQueue (  msgid      INTEGER PRIMARY KEY,   recipient  VARCHAR(50),  expiration INTEGER,  message    TEXT  )",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS SceneKiosk",
+            "result": 0
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS Scenes",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE Scenes ( sceneid INTEGER PRIMARY KEY, name VARCHAR(200), sortorder INTEGER)",
+            "result": 0
+        },
+        {
+            "sql": "CREATE TABLE SceneKiosk ( scenekioskid INTEGER PRIMARY KEY, sceneid INTEGER, kiosk_name VARCHAR(200), page VARCHAR(200))",
+            "result": 0
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS SceneKiosk_primary ON SceneKiosk(sceneid, kiosk_name)",
+            "result": 0
+        },
+        {
+            "sql": "INSERT INTO Scenes(sceneid, name, sortorder) VALUES(1, 'Welcome', 1)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(1, 'Main', 'kiosks\/welcome.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO Scenes(sceneid, name, sortorder) VALUES(2, 'Opening', 2)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(2, 'Main', 'kiosks\/flag.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(2, 'Aux1', 'kiosks\/flag.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(2, 'Aux2', 'kiosks\/flag.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO Scenes(sceneid, name, sortorder) VALUES(3, 'Check-In', 3)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(3, 'Main', 'kiosks\/slideshow.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(3, 'Aux1', 'kiosks\/please-check-in.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(3, 'Aux2', 'kiosks\/welcome.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO Scenes(sceneid, name, sortorder) VALUES(4, 'Racing', 4)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(4, 'Main', 'kiosks\/now-racing.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(4, 'Aux1', 'kiosks\/ondeck.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(4, 'Aux2', 'kiosks\/results-by-racer.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO Scenes(sceneid, name, sortorder) VALUES(5, 'Awards', 5)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(5, 'Main', 'kiosks\/award-presentations.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO Scenes(sceneid, name, sortorder) VALUES(6, 'Wrap-Up', 6)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(6, 'Main', 'kiosks\/standings.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(6, 'Aux1', 'kiosks\/derbynet.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO SceneKiosk(sceneid, kiosk_name, page) VALUES(6, 'Aux2', 'local\/kiosks\/feedback.kiosk')",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS Playlist",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE Playlist (  queueid              INTEGER PRIMARY KEY,  seq                  INTEGER,  classid              INTEGER,  round                INTEGER,  bucket_limit         INTEGER,  bucketed             INTEGER,  n_times_per_lane     INTEGER,  sceneid_at_finish    INTEGER,  continue_racing      INTEGER  )",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO AwardTypes (AwardTypeID, AwardType) VALUES (1, 'Design General')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO AwardTypes (AwardTypeID, AwardType) VALUES (2, 'Speed General')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO AwardTypes (AwardTypeID, AwardType) VALUES (3, 'Other')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO AwardTypes (AwardTypeID, AwardType) VALUES (4, 'Design Trophy')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO AwardTypes (AwardTypeID, AwardType) VALUES (5, 'Speed Trophy')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO AwardTypes (AwardTypeID, AwardType) VALUES (6, 'Ad Hoc')",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `BallotAwards`",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE `BallotAwards` ( ballotid INTEGER NOT NULL, awardid INTEGER NOT NULL,  depth INTEGER NOT NULL)",
+            "result": 1
+        },
+        {
+            "sql": "CREATE UNIQUE INDEX IF NOT EXISTS BallotAwards_Primary ON BallotAwards(ballotid, awardid)",
+            "result": 1
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS BallotAwards_ballotid ON BallotAwards(ballotid)",
+            "result": 1
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS BallotAwards_awardid ON BallotAwards(awardid)",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `Voters`",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE `Voters` ( voterid INTEGER PRIMARY KEY,  ballotid INTEGER NOT NULL,  identifier VARCHAR(200),  when_cast TIMESTAMP,  ip_addr VARCHAR(200))",
+            "result": 1
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Voters_identifier ON Voters(identifier)",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS `Votes`",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE `Votes` ( voteid INTEGER PRIMARY KEY, awardid INTEGER NOT NULL,  racerid INTEGER NOT NULL,  voterid INTEGER NOT NULL)",
+            "result": 1
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Votes_awardid ON Votes(awardid)",
+            "result": 1
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Votes_racerid ON Votes(racerid)",
+            "result": 1
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS Votes_voterid ON Votes(voterid)",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS TimerSettings",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE TimerSettings (  settingid            INTEGER PRIMARY KEY,  kind                 VARCHAR(20),  key                  VARCHAR(100),  type                 VARCHAR(10),  value                VARCHAR(100),  description          VARCHAR(500),  pending              VARCHAR(100)  )",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS Partitions",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE Partitions (  partitionid        INTEGER PRIMARY KEY,  name              VARCHAR(200) UNIQUE,  rankid            INTEGER,  sortorder         INTEGER)",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS EventLaneDetails",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE EventLaneDetails (  tresultid           INTEGER PRIMARY KEY,   finishid            INTEGER,   `lane`              INTEGER NOT NULL,   `finishtime`        DOUBLE NULL,   `finishplace`       INTEGER,   `completed`         TIMESTAMP DEFAULT CURRENT_TIMESTAMP )",
+            "result": 1
+        },
+        {
+            "sql": "CREATE INDEX IF NOT EXISTS EventLaneDetails_finishid ON EventLaneDetails(finishid)",
+            "result": 1
+        },
+        {
+            "sql": "DROP TABLE IF EXISTS ActionHistory",
+            "result": 1
+        },
+        {
+            "sql": "CREATE TABLE ActionHistory ( historyid    INTEGER PRIMARY KEY, received     TIMESTAMP, request      TEXT)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('schema', 10)",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('photos-on-now-racing', 'head')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('show-cars-on-deck', '1')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('show-racer-photos-rr', '1')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('show-car-photos-rr', '1')",
+            "result": 1
+        },
+        {
+            "sql": "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('upload-videos', '1')",
+            "result": 1
+        }
+    ],
+    "details": {
+        "locked": false,
+        "database": {
+            "status": "ok",
+            "writable": true,
+            "details": "<p>SQLITE: \/var\/lib\/derbynet\/2026\/testdb\/derbynet.sqlite3<\/p>\n"
+        },
+        "schema": {
+            "status": "ok",
+            "button": "re-initialize",
+            "details": "<p>Schema version is S1010, as expected.<br\/> You can <a href='import-snapshot.php'>Import a database<\/a> if you previously captured one.<\/p>\n"
+        },
+        "purge": {
+            "nracers": 0,
+            "nawards": 0,
+            "nheats": 0,
+            "nresults": 0
+        },
+        "roster": {
+            "status": "unknown",
+            "count": 0,
+            "fake": 0,
+            "details": "<p>There are no racers registered.  (Visit the <a href=\"checkin.php\">Check-In page<\/a> to enter individual racers.)<\/p>\n"
+        },
+        "groups": {
+            "status": "unknown",
+            "label": "Den",
+            "plural": "Dens",
+            "details": "<p>Racing by den: There are no dens defined.<\/p>\n"
+        },
+        "awards": {
+            "status": "unknown",
+            "details": "<p>There are no awards defined.  (Visit the <a href=\"awards-editor.php\">Awards Editor page<\/a> to enter individual awards.)<\/p>\n"
+        },
+        "settings": {
+            "status": "unknown",
+            "details": "<p>Racer photos: \/var\/lib\/derbynet\/2026\/testdb\/racers<br\/>\nCar photos: \/var\/lib\/derbynet\/2026\/testdb\/cars<br\/><span class='trouble'>The number of lanes on the track hasn't been set.<\/span><\/p>\n"
+        },
+        "form_fields": {
+            "drivers": [
+                "odbc",
+                "sqlite",
+                "mysql"
+            ],
+            "radio": "sqlite",
+            "sqlite_path": "\/var\/lib\/derbynet\/2026\/testdb\/derbynet.sqlite3",
+            "connection_string": "sqlite:\/var\/lib\/derbynet\/2026\/testdb\/derbynet.sqlite3"
+        }
+    }
+}
+
+### 002 poll-after-setup
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 827
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": null,
+        "roundid": -1,
+        "round": null,
+        "tbodyid": -1,
+        "heat": null,
+        "number-of-heats": 0
+    },
+    "racers": [],
+    "timer-state": {
+        "lanes": 0,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [],
+    "rounds": [],
+    "ready-aggregate": []
+}
+
+### 003 settings-list-after-setup
+request: GET action.php?query=settings.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 596
+body:
+{
+    "settings": {
+        "db-connection": "sqlite:\/var\/lib\/derbynet\/2026\/testdb\/derbynet.sqlite3",
+        "schema": 10,
+        "photos-on-now-racing": "head",
+        "show-cars-on-deck": 1,
+        "show-racer-photos-rr": 1,
+        "show-car-photos-rr": 1,
+        "upload-videos": 1,
+        "photo-directory": "\/var\/lib\/derbynet\/2026\/testdb\/racers",
+        "car-photo-directory": "\/var\/lib\/derbynet\/2026\/testdb\/cars",
+        "video-directory": "\/var\/lib\/derbynet\/2026\/testdb\/videos",
+        "logs-directory": "\/var\/lib\/derbynet\/2026\/testdb\/logs"
+    }
+}
+

@@ -1,0 +1,319 @@
+### 001 role-list-anonymous
+request: GET action.php?query=role.list
+status: 200
+content-type: application/json; charset=utf-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
+length: 443
+body:
+{
+    "roles": [
+        {
+            "name": "",
+            "timer-message": 0
+        },
+        {
+            "name": "Timer",
+            "timer-message": 4096
+        },
+        {
+            "name": "Photo",
+            "timer-message": 0
+        },
+        {
+            "name": "RaceCrew",
+            "timer-message": 0
+        },
+        {
+            "name": "RaceCoordinator",
+            "timer-message": 4096
+        }
+    ]
+}
+
+### 002 login-coordinator
+request: POST action.php
+request-body: action=role.login&name=RaceCoordinator&password=doyourbest
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "RaceCoordinator",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>",
+    "role": "RaceCoordinator"
+}
+
+### 003 role-list-as-coordinator
+request: GET action.php?query=role.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 443
+body:
+{
+    "roles": [
+        {
+            "name": "",
+            "timer-message": 0
+        },
+        {
+            "name": "Timer",
+            "timer-message": 4096
+        },
+        {
+            "name": "Photo",
+            "timer-message": 0
+        },
+        {
+            "name": "RaceCrew",
+            "timer-message": 0
+        },
+        {
+            "name": "RaceCoordinator",
+            "timer-message": 4096
+        }
+    ]
+}
+
+### 004 login-wrong-password
+request: POST action.php
+request-body: action=role.login&name=RaceCoordinator&password=wrong
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 242
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "RaceCoordinator",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "login",
+        "description": "Incorrect password"
+    }
+}
+
+### 005 login-timer-empty-password
+request: POST action.php
+request-body: action=role.login&name=Timer&password=
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 248
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "Timer",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>"
+}
+
+### 006 login-timer-no-password-field
+request: POST action.php
+request-body: action=role.login&name=Timer
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 221
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "Timer"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>"
+}
+
+### 007 login-unknown-role
+request: POST action.php
+request-body: action=role.login&name=Nobody&password=x
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 228
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "Nobody",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "role",
+        "description": "No such role: "
+    }
+}
+
+### 008 login-crew
+request: POST action.php
+request-body: action=role.login&name=RaceCrew&password=murphy
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 275
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "RaceCrew",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>",
+    "role": "RaceCrew"
+}
+
+### 009 login-photo
+request: POST action.php
+request-body: action=role.login&name=Photo&password=flashbulb
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 269
+body:
+{
+    "action": {
+        "action": "role.login",
+        "name": "Photo",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>",
+    "role": "Photo"
+}
+
+### 010 logout
+request: POST action.php
+request-body: action=role.login
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 196
+body:
+{
+    "action": {
+        "action": "role.login"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>"
+}
+
+### 011 login-no-name-field
+request: POST action.php
+request-body: action=role.login&password=doyourbest
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 223
+body:
+{
+    "action": {
+        "action": "role.login",
+        "password": "..."
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "timecheck": "<timecheck>"
+}
+
+### 012 role-list-after-logout
+request: GET action.php?query=role.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 443
+body:
+{
+    "roles": [
+        {
+            "name": "",
+            "timer-message": 0
+        },
+        {
+            "name": "Timer",
+            "timer-message": 4096
+        },
+        {
+            "name": "Photo",
+            "timer-message": 0
+        },
+        {
+            "name": "RaceCrew",
+            "timer-message": 0
+        },
+        {
+            "name": "RaceCoordinator",
+            "timer-message": 4096
+        }
+    ]
+}
+
+### 013 login-stub-xml
+request: POST action.php
+request-body: action=login&name=RaceCoordinator&password=doyourbest
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 227
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="login">
+  <failure code="version">Please upgrade your derby-timer.jar
+                          (should be using role.login to login)</failure>
+</action-response>
+
+### 014 roles-stub-xml
+request: GET action.php?query=roles
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 227
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="login">
+  <failure code="version">Please upgrade your derby-timer.jar</failure>
+  <role timer_message="1">Please upgrade derby-timer.jar</role>
+</action-response>
+

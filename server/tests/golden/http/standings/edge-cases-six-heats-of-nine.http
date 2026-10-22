@@ -1,0 +1,2834 @@
+### 001 as-the-script-left-it export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 9007
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Excluded?"
+            ],
+            [
+                "Ann",
+                "Lee",
+                "",
+                101,
+                "",
+                0
+            ],
+            [
+                "Bob",
+                "lee",
+                "",
+                102,
+                "",
+                0
+            ],
+            [
+                "Cy",
+                "Moss",
+                "",
+                103,
+                "",
+                0
+            ],
+            [
+                "Di",
+                "Moss",
+                "",
+                104,
+                "",
+                0
+            ],
+            [
+                "Ed",
+                "Moss",
+                "",
+                105,
+                "",
+                0
+            ],
+            [
+                "Flo",
+                "Nye",
+                "",
+                106,
+                "",
+                0
+            ],
+            [
+                "Gus",
+                "Oak",
+                "",
+                107,
+                "",
+                0
+            ],
+            [
+                "Hal",
+                "Pine",
+                "",
+                108,
+                "",
+                0
+            ],
+            [
+                "Ivy",
+                "Quill",
+                "",
+                109,
+                "",
+                1
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Edge",
+                1,
+                1,
+                1,
+                "Ann",
+                "Lee",
+                101,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                1,
+                2,
+                "Ed",
+                "Moss",
+                105,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                2,
+                1,
+                "Bob",
+                "lee",
+                102,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                2,
+                2,
+                "Flo",
+                "Nye",
+                106,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                3,
+                1,
+                "Cy",
+                "Moss",
+                103,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                3,
+                2,
+                "Gus",
+                "Oak",
+                107,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                4,
+                1,
+                "Di",
+                "Moss",
+                104,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                4,
+                2,
+                "Hal",
+                "Pine",
+                108,
+                "",
+                3.4,
+                200.5,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                5,
+                1,
+                "Ed",
+                "Moss",
+                105,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                5,
+                2,
+                "Ivy",
+                "Quill",
+                109,
+                "",
+                2.5,
+                272.7,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                6,
+                1,
+                "Flo",
+                "Nye",
+                106,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                6,
+                2,
+                "Ann",
+                "Lee",
+                101,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Edge",
+                1,
+                7,
+                1,
+                "Gus",
+                "Oak",
+                107,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Edge",
+                1,
+                7,
+                2,
+                "Bob",
+                "lee",
+                102,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Edge",
+                1,
+                8,
+                1,
+                "Hal",
+                "Pine",
+                108,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Edge",
+                1,
+                8,
+                2,
+                "Cy",
+                "Moss",
+                103,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Edge",
+                1,
+                9,
+                1,
+                "Ivy",
+                "Quill",
+                109,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Edge",
+                1,
+                9,
+                2,
+                "Di",
+                "Moss",
+                104,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Edge (Tie)",
+                "Speed Trophy",
+                "Ann",
+                "Lee",
+                101,
+                ""
+            ],
+            [
+                "Fastest in Edge (Tie)",
+                "Speed Trophy",
+                "Bob",
+                "lee",
+                102,
+                ""
+            ],
+            [
+                "2nd Fastest in Edge (Tie)",
+                "Speed Trophy",
+                "Cy",
+                "Moss",
+                103,
+                ""
+            ],
+            [
+                "2nd Fastest in Edge (Tie)",
+                "Speed Trophy",
+                "Di",
+                "Moss",
+                104,
+                ""
+            ],
+            [
+                "2nd Fastest in Edge (Tie)",
+                "Speed Trophy",
+                "Ed",
+                "Moss",
+                105,
+                ""
+            ],
+            [
+                "3rd Fastest in Edge",
+                "Speed Trophy",
+                "Flo",
+                "Nye",
+                106,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 002 as-the-script-left-it standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 397
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ],
+            [],
+            [
+                3,
+                4,
+                5
+            ],
+            [],
+            [],
+            [
+                6
+            ],
+            [
+                7
+            ],
+            [
+                8
+            ]
+        ]
+    }
+}
+
+### 003 as-the-script-left-it award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 004 points=0 scoring=0 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 397
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ],
+            [],
+            [
+                3,
+                4,
+                5
+            ],
+            [],
+            [],
+            [
+                6
+            ],
+            [
+                7
+            ],
+            [
+                8
+            ]
+        ]
+    }
+}
+
+### 005 points=0 scoring=0 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 006 points=0 scoring=0 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 397
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ],
+            [],
+            [
+                3,
+                4,
+                5
+            ],
+            [],
+            [],
+            [
+                6
+            ],
+            [
+                7
+            ],
+            [
+                8
+            ]
+        ]
+    }
+}
+
+### 007 points=0 scoring=0 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 008 points=0 scoring=1 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 397
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ],
+            [],
+            [
+                3,
+                4,
+                5
+            ],
+            [],
+            [],
+            [
+                6
+            ],
+            [
+                7
+            ],
+            [
+                8
+            ]
+        ]
+    }
+}
+
+### 009 points=0 scoring=1 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 010 points=0 scoring=1 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 397
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ],
+            [],
+            [
+                3,
+                4,
+                5
+            ],
+            [],
+            [],
+            [
+                6
+            ],
+            [
+                7
+            ],
+            [
+                8
+            ]
+        ]
+    }
+}
+
+### 011 points=0 scoring=1 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 012 points=0 scoring=2 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 397
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ],
+            [],
+            [
+                3,
+                4,
+                5
+            ],
+            [],
+            [],
+            [
+                6
+            ],
+            [
+                7
+            ],
+            [
+                8
+            ]
+        ]
+    }
+}
+
+### 013 points=0 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 014 points=0 scoring=2 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 397
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2
+            ],
+            [],
+            [
+                3,
+                4,
+                5
+            ],
+            [],
+            [],
+            [
+                6
+            ],
+            [
+                7
+            ],
+            [
+                8
+            ]
+        ]
+    }
+}
+
+### 015 points=0 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 016 points=1 scoring=0 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 313
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2,
+                3,
+                4
+            ],
+            [],
+            [],
+            [],
+            [
+                5,
+                6,
+                7,
+                8
+            ]
+        ]
+    }
+}
+
+### 017 points=1 scoring=0 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2580
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-2d-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 018 points=1 scoring=0 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 313
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2,
+                3,
+                4
+            ],
+            [],
+            [],
+            [],
+            [
+                5,
+                6,
+                7,
+                8
+            ]
+        ]
+    }
+}
+
+### 019 points=1 scoring=0 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2580
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-2d-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 020 points=1 scoring=1 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 313
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2,
+                3,
+                4
+            ],
+            [],
+            [],
+            [],
+            [
+                5,
+                6,
+                7,
+                8
+            ]
+        ]
+    }
+}
+
+### 021 points=1 scoring=1 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2580
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-2d-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 022 points=1 scoring=1 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 313
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2,
+                3,
+                4
+            ],
+            [],
+            [],
+            [],
+            [
+                5,
+                6,
+                7,
+                8
+            ]
+        ]
+    }
+}
+
+### 023 points=1 scoring=1 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2580
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-2d-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 024 points=1 scoring=2 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 313
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2,
+                3,
+                4
+            ],
+            [],
+            [],
+            [],
+            [
+                5,
+                6,
+                7,
+                8
+            ]
+        ]
+    }
+}
+
+### 025 points=1 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2580
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-2d-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 026 points=1 scoring=2 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 313
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1,
+                2,
+                3,
+                4
+            ],
+            [],
+            [],
+            [],
+            [
+                5,
+                6,
+                7,
+                8
+            ]
+        ]
+    }
+}
+
+### 027 points=1 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2580
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-2d-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 028 one-trophy-per=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 029 one-trophy-per=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 030 n-rank-trophies=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 031 n-rank-trophies=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+
+### 032 n-rank-trophies=3 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2185
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Edge",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Edge"
+                }
+            ]
+        }
+    ]
+}
+

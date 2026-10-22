@@ -1,0 +1,277 @@
+### 001 add-scouts-round-1
+request: POST action.php
+request-body: action=playlist.add&classid=1&round=1&n_times_per_lane=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 559
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 1,
+        "round": 1,
+        "n_times_per_lane": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 1,
+        "seq": 1,
+        "classid": 1,
+        "round": 1,
+        "bucket_limit": 0,
+        "bucketed": 0,
+        "n_times_per_lane": 1,
+        "sceneid_at_finish": -1,
+        "continue_racing": 0,
+        "class": "Scouts",
+        "roundname": "Scouts, Round 1"
+    }
+}
+
+### 002 add-scouts-final-top-4
+request: POST action.php
+request-body: action=playlist.add&classid=1&round=2&top=4&bucketed=0&n_times_per_lane=2
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 600
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 1,
+        "round": 2,
+        "top": 4,
+        "bucketed": 0,
+        "n_times_per_lane": 2
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 2,
+        "seq": 2,
+        "classid": 1,
+        "round": 2,
+        "bucket_limit": 4,
+        "bucketed": 0,
+        "n_times_per_lane": 2,
+        "sceneid_at_finish": -1,
+        "continue_racing": 0,
+        "class": "Scouts",
+        "roundname": "Scouts, Round 2"
+    }
+}
+
+### 003 add-outlaws-round-1
+request: POST action.php
+request-body: action=playlist.add&classid=2&round=1&n_times_per_lane=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 559
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 2,
+        "round": 1,
+        "n_times_per_lane": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 3,
+        "seq": 3,
+        "classid": 2,
+        "round": 1,
+        "bucket_limit": 0,
+        "bucketed": 0,
+        "n_times_per_lane": 1,
+        "sceneid_at_finish": -1,
+        "continue_racing": 0,
+        "class": "Outlaw",
+        "roundname": "Outlaw, Round 1"
+    }
+}
+
+### 004 add-outlaws-final-top-8
+request: POST action.php
+request-body: action=playlist.add&classid=2&round=2&top=8&bucketed=0&n_times_per_lane=2
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 600
+body:
+{
+    "action": {
+        "action": "playlist.add",
+        "classid": 2,
+        "round": 2,
+        "top": 8,
+        "bucketed": 0,
+        "n_times_per_lane": 2
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "queue-entry": {
+        "queueid": 4,
+        "seq": 4,
+        "classid": 2,
+        "round": 2,
+        "bucket_limit": 8,
+        "bucketed": 0,
+        "n_times_per_lane": 2,
+        "sceneid_at_finish": -1,
+        "continue_racing": 0,
+        "class": "Outlaw",
+        "roundname": "Outlaw, Round 2"
+    }
+}
+
+### 005 start-playlist
+request: POST action.php
+request-body: action=playlist.start
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 168
+body:
+{
+    "action": {
+        "action": "playlist.start"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 006 rounds-after-start
+request: GET action.php?query=poll&values=rounds,schedule,current-heat
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1894
+body:
+{
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Scouts",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 0,
+            "name": "Scouts, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Outlaw",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 14,
+            "passed": 14,
+            "unscheduled": 14,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Outlaw, Round 1"
+        }
+    ],
+    "schedule": [
+        [
+            1,
+            3,
+            5,
+            10
+        ],
+        [
+            2,
+            4,
+            6,
+            1
+        ],
+        [
+            5,
+            7,
+            9,
+            4
+        ],
+        [
+            8,
+            10,
+            2,
+            7
+        ],
+        [
+            4,
+            6,
+            8,
+            3
+        ],
+        [
+            7,
+            9,
+            1,
+            6
+        ],
+        [
+            3,
+            5,
+            7,
+            2
+        ],
+        [
+            6,
+            8,
+            10,
+            5
+        ],
+        [
+            9,
+            1,
+            3,
+            8
+        ],
+        [
+            10,
+            2,
+            4,
+            9
+        ]
+    ],
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 10,
+        "class": "Scouts"
+    }
+}
+

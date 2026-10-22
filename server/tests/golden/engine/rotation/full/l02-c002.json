@@ -1,0 +1,20 @@
+{
+"t1": {"meta": {"failure":null,"nheats":2,"ncars":2}, "heats": [
+[0,1],
+[1,0]
+]},
+"t2": {"meta": {"failure":null,"nheats":2,"ncars":2}, "heats": [
+[0,1],
+[1,0],
+[0,1],
+[1,0]
+]},
+"t3": {"meta": {"failure":null,"nheats":2,"ncars":2}, "heats": [
+[0,1],
+[1,0],
+[0,1],
+[1,0],
+[0,1],
+[1,0]
+]}
+}

@@ -1,0 +1,5 @@
+# The transcripts are length-prefixed and the manifests hash bytes, so git must
+# never convert line endings in them (core.autocrlf, eol).
+engine/** -text linguist-generated=true
+http/** -text linguist-generated=true
+provenance.txt -text

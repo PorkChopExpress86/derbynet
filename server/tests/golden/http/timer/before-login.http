@@ -1,0 +1,37 @@
+### 001 hello-before-login
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HELLO
+status: 200
+content-type: text/xml; charset=utf-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
+length: 199
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HELLO"><failure code="notauthorized">Not authorized -- please see race coordinator</failure></action-response>
+
+### 002 heartbeat-before-login
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=HEARTBEAT
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 203
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="HEARTBEAT"><failure code="notauthorized">Not authorized -- please see race coordinator</failure></action-response>
+
+### 003 finished-before-login
+request: POST action.php
+user-agent: DerbyNet-Timer/golden-1.0 (jar)
+request-body: action=timer-message&message=FINISHED&lane1=3.000&lane2=3.100
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 230
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane1="3.000" lane2="3.100"><failure code="notauthorized">Not authorized -- please see race coordinator</failure></action-response>
+

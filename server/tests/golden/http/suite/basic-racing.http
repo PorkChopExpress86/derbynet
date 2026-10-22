@@ -1,0 +1,600 @@
+### 001 replay.message
+request: POST action.php
+request-body: action=replay.message&status=-1&finished-replay=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+{
+    "action": {
+        "action": "replay.message",
+        "status": -1,
+        "finished-replay": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "HELLO"
+    ]
+}
+
+### 002 replay.message
+request: POST action.php
+request-body: action=replay.message
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 379
+body:
+{
+    "action": {
+        "action": "replay.message"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "replay": [
+        "CANCEL",
+        "START Lions & Tigers_Round1_Heat01",
+        "RACE_STARTS 4000 2 50",
+        "REPLAY 4000 2 50",
+        "CANCEL",
+        "START Lions & Tigers_Round1_Heat02"
+    ]
+}
+
+### 003 heat.rerun
+request: POST action.php
+request-body: action=heat.rerun&heat=last
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 6893
+body:
+{
+    "action": {
+        "action": "heat.rerun",
+        "heat": "last"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 2,
+        "number-of-heats": 5,
+        "class": "White's Wolves"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 17,
+            "name": "Darrell & Darrell Delaughter",
+            "carname": "",
+            "carnumber": 217,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 37,
+            "name": "Ian Ives",
+            "carname": "",
+            "carnumber": 237,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 7,
+            "name": "Blake Burling",
+            "carname": "",
+            "carnumber": 207,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 27,
+            "name": "Elliot Eastman",
+            "carname": "",
+            "carnumber": 227,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "connected": true,
+        "message": "Ready (<n> sec.)"
+    },
+    "last-heat": "recoverable",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 1,
+            "ntrophies": 4,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TheLastClass",
+            "subgroups": [
+                {
+                    "rankid": 7,
+                    "count": 0,
+                    "ntrophies": -1,
+                    "name": "TheLastClass"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 5,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 18,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 1,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 6,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 0,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 15,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 5,
+            "unscheduled": 5,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 7,
+            "classid": 7,
+            "class": "TheLastClass",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 0,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "TheLastClass, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 004 heat.reinstate
+request: POST action.php
+request-body: action=heat.reinstate
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 6879
+body:
+{
+    "action": {
+        "action": "heat.reinstate"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 2,
+        "number-of-heats": 5,
+        "class": "White's Wolves"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 17,
+            "name": "Darrell & Darrell Delaughter",
+            "carname": "",
+            "carnumber": 217,
+            "note": "",
+            "photo": "",
+            "finishtime": 2.994,
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 37,
+            "name": "Ian Ives",
+            "carname": "",
+            "carnumber": 237,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.457,
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 7,
+            "name": "Blake Burling",
+            "carname": "",
+            "carnumber": 207,
+            "note": "",
+            "photo": "",
+            "finishtime": 2.187,
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 27,
+            "name": "Elliot Eastman",
+            "carname": "",
+            "carnumber": 227,
+            "note": "",
+            "photo": "",
+            "finishtime": 2.345,
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "connected": true,
+        "message": "Ready (<n> sec.)"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 1,
+            "ntrophies": 4,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TheLastClass",
+            "subgroups": [
+                {
+                    "rankid": 7,
+                    "count": 0,
+                    "ntrophies": -1,
+                    "name": "TheLastClass"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 5,
+            "name": "Lions & Tigers, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "White's Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 18,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 2,
+            "name": "White's Wolves, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Bears and Fr\u00e8res",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 17,
+            "passed": 6,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 0,
+            "name": "Bears and Fr\u00e8res, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 15,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Webelos (\"Webes\"), Round 1"
+        },
+        {
+            "roundid": 5,
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 16,
+            "passed": 5,
+            "unscheduled": 5,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Arrows <<--<<, Round 1"
+        },
+        {
+            "roundid": 7,
+            "classid": 7,
+            "class": "TheLastClass",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 0,
+            "passed": 0,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "TheLastClass, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

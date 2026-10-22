@@ -1,0 +1,9 @@
+ordered cases: 12624
+ordered full outputs: 990
+rotation cases: 4116
+out-of-range cases: 69
+scheduler-data entries: 1178
+unused-lane masks: 304
+ordinals cases: 363
+lane-bias cases: 140
+critical-f-value cases: 1242

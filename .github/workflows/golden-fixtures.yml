@@ -1,0 +1,57 @@
+name: golden-fixtures
+
+# Regenerates the golden fixtures under server/tests/golden from the PHP server
+# image built from this commit, and fails if they differ from the committed
+# ones.  The capture runs the full schedule sweep, so it takes a while.  See
+# server/tests/golden/README.md.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - website/**
+      - installer/docker/**
+      - testing/**
+      - server/tests/golden/**
+      - .github/workflows/golden-fixtures.yml
+  pull_request:
+    paths:
+      - website/**
+      - installer/docker/**
+      - testing/**
+      - server/tests/golden/**
+      - .github/workflows/golden-fixtures.yml
+  workflow_dispatch:
+
+# A new push to a pull request cancels the run on its previous head.  Runs on
+# master each finish, so every merged commit is checked.
+concurrency:
+  group: golden-fixtures-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  golden-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Capture the fixtures and compare them with the committed ones
+        run: server/tests/golden/capture.sh --check
+
+      - name: Save what the capture produced
+        if: failure()
+        run: |
+          git add -N server/tests/golden
+          git diff -- server/tests/golden > golden.diff || true
+          git diff --stat -- server/tests/golden > golden.stat || true
+
+      - name: Upload the difference
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-diff
+          path: |
+            golden.diff
+            golden.stat
+          if-no-files-found: ignore
