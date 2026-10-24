@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -66,6 +67,18 @@ class PerEvent(models.Model):
     @classmethod
     def for_event(cls, event):
         return cls.objects.get(event=event)
+
+
+def is_event_scoped(model):
+    """True when `model` has an `event` foreign key to `Event`."""
+    field = next((f for f in model._meta.fields if f.name == "event"), None)
+    return field is not None and field.related_model is Event
+
+
+def event_scoped_models():
+    """Every event-scoped model, in a stable order."""
+    found = [model for model in apps.get_models() if is_event_scoped(model)]
+    return sorted(found, key=lambda m: m._meta.label_lower)
 
 
 class FullFieldRule(models.TextChoices):

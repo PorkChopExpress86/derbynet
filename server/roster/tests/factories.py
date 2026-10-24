@@ -1,7 +1,14 @@
 import factory
 
 from core.tests.factories import EventFactory
-from roster.models import Group, GroupConstituent, Partition, Racer, Subgroup
+from roster.models import (
+    Group,
+    GroupConstituent,
+    GroupConstituentSubgroup,
+    Partition,
+    Racer,
+    Subgroup,
+)
 
 
 class GroupFactory(factory.django.DjangoModelFactory):
@@ -65,3 +72,14 @@ class RacerFactory(factory.django.DjangoModelFactory):
     car_number = factory.Sequence(lambda n: 100 + n)
     first_name = factory.Sequence(lambda n: f"First{n}")
     last_name = factory.Sequence(lambda n: f"Last{n}")
+
+
+class GroupConstituentSubgroupFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GroupConstituentSubgroup
+
+    aggregate = factory.SubFactory(GroupFactory)
+    subgroup = factory.SubFactory(
+        SubgroupFactory, group__event=factory.SelfAttribute("...aggregate.event")
+    )
+    event = factory.SelfAttribute("aggregate.event")
