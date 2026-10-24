@@ -19,6 +19,7 @@ from roster.tests.factories import (
     GroupConstituentFactory,
     GroupConstituentSubgroupFactory,
 )
+from transfer.models import LegacyId
 
 
 def populated_event():
@@ -50,6 +51,9 @@ def populated_event():
     SignalMessageFactory(event=event)
     ReplayCommandFactory(event=event)
     ActionLogFactory(event=event)
+    LegacyId.objects.create(
+        event=event, model="roster.racer", legacy_id=1, new_id=racer.id
+    )
     RaceSettings.objects.filter(event=event).update(
         full_field_rule="group", full_field_group=link.aggregate, racing_scene=scene
     )

@@ -35,6 +35,30 @@ uv run python manage.py dump_event <slug>
 
 The command only reads.
 
+## Import a past DerbyNet event
+
+`import_derbynet` loads one event from the PHP server as a new event. The source is an event folder's `derbynet.sqlite3`, at any schema version from 1 to 10, or a file saved from `action.php?query=snapshot.get&photos`. The importer copies a SQLite source, with its `-wal` and `-journal` files, to a private temporary folder and reads the copy read-only, so the source folder is never written and can be read-only. A source with an unfinished write in its `-journal` is refused. Stop the PHP server before importing its database.
+
+```sh
+uv run python manage.py import_derbynet /path/to/2024/pack42/derbynet.sqlite3 --report report.json
+```
+
+| Option | Effect |
+|---|---|
+| `--event NAME` | The new event's name. Default: the source's folder name, `pack42` above. |
+| `--photos-dir DIR`, `--car-photos-dir DIR` | Where to look for photos first. Then the source's `racers/` and `cars/` folders. |
+| `--replace` | Replace the event of the same name. Its rows go, and after the commit its `racers/`, `cars/`, `videos/` and `logs/` folders go too. The new event starts with empty `videos/` and `logs/`. Without `--replace`, an existing name is refused. |
+| `--time-zone ZONE` | The IANA time zone the PHP server kept local times in, such as `America/Chicago`. Default: this server's `TIME_ZONE`. The report records it. |
+| `--accept-violations` | Keep the import when `check_invariants()` finds violations. Without it, they roll the import back. |
+| `--report PATH` | Write the full report as JSON. A summary always goes to stdout. The path cannot be the source or its `-wal`, `-shm` or `-journal` file. |
+| `--force-report` | Overwrite an existing `--report` file. Without it, an existing file is refused before the import starts. |
+
+The report counts the rows read and imported per legacy table, and lists every row dropped and every value changed, with the reason.
+
+The import copies photos into a new folder, `events/<name>.import-<token>` under `DERBYNET_DATA_DIR`, and points the event's photo, video and log directories at it in the same transaction as the rows. A killed import leaves either the old event with its folders or the new event with the new folder. The next import removes what a killed one left behind and lists it in the report under `recovered`. With `--replace`, the old event's folders are removed after the commit.
+
+The tests read fixtures that `transfer/tests/fixtures/legacy/build.sh` made with the PHP server.
+
 ## Run both servers
 
 From the repository root, first build the files the PHP pages need, as step 2 of the top-level `README.md` says (`ant generated`). Then run:
