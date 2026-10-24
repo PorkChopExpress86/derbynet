@@ -1,0 +1,11 @@
+# Sourced by the verify helpers.  One verification instance per RUN.
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+RUN="${VERIFY_RUN:-v1}"
+PORT="${VERIFY_PORT:-8090}"
+export DERBYNET_TEST_PREFIX="verify-$RUN"
+export DERBYNET_TEST_PORT="$PORT"
+BASE="http://127.0.0.1:$PORT"
+SERVER="$DERBYNET_TEST_PREFIX-server"
+EVIDENCE="$REPO/.claude/verify-evidence/$RUN"
+JAR="$EVIDENCE/cookies.txt"
+mkdir -p "$EVIDENCE"

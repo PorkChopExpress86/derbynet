@@ -1,0 +1,9 @@
+#!/bin/bash
+# Removes this run's container, volume, and images.  Keeps the evidence in
+# .claude/verify-evidence/$VERIFY_RUN.
+set -uo pipefail
+source "$(dirname "$0")/env.sh"
+"$REPO/testing/docker/run-suite.sh" clean >/dev/null 2>&1
+docker rmi "$DERBYNET_TEST_PREFIX-server" "$DERBYNET_TEST_PREFIX-harness" >/dev/null 2>&1
+rm -f "$JAR"
+echo "cleaned $DERBYNET_TEST_PREFIX; evidence kept in $EVIDENCE"

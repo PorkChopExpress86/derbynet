@@ -1,0 +1,26 @@
+#!/bin/bash
+# Puts the instance in the baseline state the feature map assumes: an event
+# named "Verify", 4 lanes, and 8 checked-in racers in two dens
+# (Lions 101-104, Tigers 201-204).  Uses the legacy API, so it seeds
+# preconditions only; drive the feature under test through the browser.
+set -euo pipefail
+source "$(dirname "$0")/env.sh"
+post() {
+  local out
+  out=$(curl -s -b "$JAR" -c "$JAR" "$BASE/action.php" --data "$1")
+  grep -q '"summary": "success"' <<<"$out" || { echo "seed failed: $1" >&2; echo "$out" | head -12 >&2; exit 1; }
+}
+rm -f "$JAR"
+# A fresh install grants setup rights to a session that has opened setup.php,
+# as a browser does.  action.php answers 302 until a database exists.
+curl -s -o /dev/null -b "$JAR" -c "$JAR" "$BASE/setup.php"
+post "action=setup.nodata&ez-new=Verify"
+post "action=role.login&name=RaceCoordinator&password=doyourbest"
+post "action=settings.write&n-lanes=4"
+names=(Ava Ben Cal Dee Eli Fay Gus Hal)
+for i in 0 1 2 3 4 5 6 7; do
+  den=Lions; car=$((101 + i)); [ $i -ge 4 ] && { den=Tigers; car=$((197 + i)); }
+  post "action=racer.import&firstname=${names[$i]}&lastname=Verify&partition=$den&carnumber=$car"
+done
+post "action=racer.bulk&what=checkin&who=all"
+echo "seeded: event Verify, 4 lanes, Lions 101-104, Tigers 201-204, all checked in"
