@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from django.test import override_settings
 
 SERVER_DIR = Path(__file__).resolve().parent.parent
 
@@ -56,25 +57,40 @@ def test_health_page_under_the_url_prefix_has_prefixed_urls_and_static_paths(
 
 
 @pytest.mark.django_db
-def test_plain_http_gets_no_https_redirect_secure_cookie_or_hsts(client):
-    response = client.get("/health/")
+def test_health_page_writes_no_session(client):
+    from django.contrib.sessions.models import Session
 
-    assert response.status_code == 200
-    assert not response.cookies["csrftoken"]["secure"]
-    assert response.cookies["sessionid"].value
-    assert not response.cookies["sessionid"]["secure"]
-    assert "Strict-Transport-Security" not in response.headers
+    client.get("/health/")
+
+    assert "sessionid" not in client.cookies
+    assert Session.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_plain_http_gets_no_https_redirect_secure_cookie_or_hsts(client):
+    health = client.get("/health/")
+    with override_settings(ROOT_URLCONF="tests.session_urls"):
+        session = client.get("/session/")
+
+    assert health.status_code == 200
+    assert not health.cookies["csrftoken"]["secure"]
+    assert "Strict-Transport-Security" not in health.headers
+    assert session.status_code == 200
+    assert not session.cookies["sessionid"]["secure"]
 
 
 @pytest.mark.django_db
 def test_cookies_stay_insecure_and_hsts_stays_off_behind_https(client):
-    response = client.get("/health/", HTTP_X_FORWARDED_PROTO="https")
+    health = client.get("/health/", HTTP_X_FORWARDED_PROTO="https")
+    with override_settings(ROOT_URLCONF="tests.session_urls"):
+        session = client.get("/session/", HTTP_X_FORWARDED_PROTO="https")
 
-    assert response.status_code == 200
-    assert response.cookies["sessionid"].value
-    assert not response.cookies["sessionid"]["secure"]
-    assert not response.cookies["csrftoken"]["secure"]
-    assert "Strict-Transport-Security" not in response.headers
+    assert health.status_code == 200
+    assert not health.cookies["csrftoken"]["secure"]
+    assert "Strict-Transport-Security" not in health.headers
+    assert session.status_code == 200
+    assert not session.cookies["sessionid"]["secure"]
+    assert "Strict-Transport-Security" not in session.headers
 
 
 def test_forwarded_proto_https_makes_the_request_secure(rf):
