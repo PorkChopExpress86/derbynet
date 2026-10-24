@@ -1,0 +1,27 @@
+# Owner decisions
+
+Every product decision the owner made for the Django migration, newest last. The issue named after each decision holds the full text, and #4 holds D1 to D13. ADRs in `server/docs/adr/` record the architectural ones. Add a decision here in the same change that edits the issues it touches.
+
+| ID | Date | Decision | Recorded in |
+| --- | --- | --- | --- |
+| D1 | 2026-10-21 | SQLite in WAL mode is the default. Postgres is first class, through a compose profile and `DATABASE_URL`. CI runs both. | #4, ADR-05 |
+| D2 | 2026-10-21 | One database. `Event` rows, a site-level active-event pointer, and an `event` foreign key on every event-scoped model (option b of #9). | #4, #9 |
+| D3 | 2026-10-21 | Docker is the only deployment, on Python 3.14. Laptops connect timers through the browser timer (Web Serial). | #4, ADR-03, ADR-14 |
+| D4 | 2026-10-21 | GPRM, MS Access, and ODBC are removed. CSV roster import and the importer for old DerbyNet SQLite files stay. Pi timer and photo-stand images (#59) go to the backlog. | #4, ADR-06 |
+| D5 | 2026-10-21 | Only kiosk pages, standings, and the data they fetch are anonymous. Everything else needs a login, including replay and the browser timer. | #4, #15 |
+| D6 | 2026-10-21 | Printables are removed (#55 closed). Check-in flow: weigh the car, enter racer and car name, car number from the class, car photo in the browser. | #4, #42 |
+| D7 | 2026-10-21 | Voting (#54) goes to the backlog. If built, a QR code at check-in gives each racer a voting token. | #4, #54 |
+| D8 | 2026-10-21 | Car weigh-in per class: none, pass or fail, or recorded, in g, oz, or lb, stored in grams with an optional maximum. | #4, #70 |
+| D9 | 2026-10-21 | Replay is a must, behind a login, with an explicit camera setup remembered per station. The XML replay-message protocol is dropped. | #4, #53 |
+| D10 | 2026-10-21 | Only the built-in kiosk pages, rebuilt in a modern front end with animations. The #71 spike picks the framework. | #4, ADR-10 |
+| D11 | 2026-10-21 | No hosted multi-group mode. Race day: scouts round 1, scouts final (top 4 or 8), outlaws round 1, outlaws final. | #4, #25, #44 |
+| D12 | 2026-10-21 | One container holds every racing group and other events, one active at a time. Playlist steps can wait for the operator, by default between rounds. The PHP server gets no fixes. | #4, #44, #64 |
+| D13 | 2026-10-22 | Check-in drops barcode scanning (USB and camera). Racers are found by name or car number. Legacy `barcode` parameters stay for the photo stand. | #4, #42 |
+| D14 | 2026-10-23 | A new event can copy settings, classes and ranks, award definitions, kiosk names, and scenes, never racers, results, or photos. Archived or replaced events are read-only until reopened. | #9, #48 |
+| D15 | 2026-10-24 | Importer drops pre-2023 Retrospective history, and imports awards of a deleted group as pack-wide, listed in the report. | #12 |
+| D16 | 2026-10-24 | Replay, its camera setup, and replay upload need `CONTROL_RACE`. The Race Dashboard needs `CONTROL_RACE`. Default passwords are seeded with a warning banner. `query=stats` needs a login. | #15 |
+| D17 | 2026-10-24 | The `cease` signal is never sent. Every documented timer message is part of the contract. | #17 |
+| D18 | 2026-10-24 | Replay clip runs from `replay-skipback` (default 4 s) before the last finish to a post-roll (default 2 s) after it, capped at 10 s. | #53 |
+| D19 | 2026-10-24 | Match PHP's reschedule charts in v1 and fix the quirk after the parity gate. Unsupported lane or car counts return `cant-fulfill`. The full timer audit is revived. Manual results carry the shown heat and get `wrong-heat` if it moved. | #20, #32 |
+| D20 | 2026-10-24 | Phone bottom nav is fixed per role. Every old operator URL gets a 301. Dark mode follows the device. | #39 |
+| D21 | 2026-10-24 | Kiosks get sub-second push updates, required in M5, with polling as the fallback. `ws-server.js` is dropped. A Pi is not supported as the server. | #56, ADR-15 |
