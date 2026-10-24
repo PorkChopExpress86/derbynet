@@ -128,13 +128,19 @@ def racechart_straight_lanes(event):
 
 
 def roster_round_classid(event):
-    """A racer in an organic group's round-1 roster belongs to that group."""
+    """A racer in any round of an organic group belongs to that group.
+
+    PHP compares `Roster.classid` with the racer's group in every round, and
+    joins through the racer's group's round 1, so a racer whose group has no
+    round 1 is left to `classes-round1`. PHP also flags aggregate rosters,
+    because it writes the aggregate's id into `Roster.classid`
+    (`roster.inc:131`). Those rosters are valid, so they are not checked here.
+    """
+    own_round1 = Round.objects.filter(group=OuterRef("racer__group"), number=1)
     return _rows(
-        RosterEntry.objects.filter(
-            event=event,
-            round__number=1,
-            round__group__in=_organic(event),
-        ).exclude(racer__group=F("round__group")),
+        RosterEntry.objects.filter(event=event, round__group__in=_organic(event))
+        .exclude(racer__group=F("round__group"))
+        .filter(Exists(own_round1)),
         "id",
         "round_id",
         "racer_id",

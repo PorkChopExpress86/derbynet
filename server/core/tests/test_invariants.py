@@ -368,6 +368,38 @@ def test_a_completed_heat_may_share_its_master_heat():
     assert "racechart-masterheat2" not in check_invariants(event)
 
 
+def test_a_racer_rostered_in_another_groups_later_round_is_reported():
+    event = EventFactory()
+    group_a, group_b = _organic_group(event), _organic_group(event)
+    racer = RosterEntryFactory(round=group_b.rounds.get(number=1)).racer
+    entry = RosterEntryFactory(round=RoundFactory(group=group_a, number=2), racer=racer)
+
+    violations = check_invariants(event)
+
+    assert _ids(violations["roster-round-classid"]) == {entry.id}
+
+
+def test_a_racer_whose_group_has_no_round_1_is_left_to_classes_round1():
+    event = EventFactory()
+    stranger = RacerFactory(group=GroupFactory(event=event))
+    RosterEntryFactory(round=_organic_group(event).rounds.get(), racer=stranger)
+
+    violations = check_invariants(event)
+
+    assert "roster-round-classid" not in violations
+    assert _ids(violations["classes-round1"]) == {stranger.group_id}
+
+
+def test_a_constituents_racer_in_an_aggregate_round_is_not_reported():
+    event = EventFactory()
+    aggregate = _aggregate_group(event)
+    constituent = aggregate.constituent_links.get().constituent
+    racer = RosterEntryFactory(round=constituent.rounds.get(number=1)).racer
+    RosterEntryFactory(round=RoundFactory(group=aggregate, number=1), racer=racer)
+
+    assert "roster-round-classid" not in check_invariants(event)
+
+
 def test_classes_ranks_is_skipped_when_the_event_has_no_partitions():
     event = EventFactory()
     RoundFactory(group__event=event, number=1)
