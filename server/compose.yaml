@@ -27,9 +27,15 @@ services:
       - -c
       - |
         [ -e /var/lib/derbynet/config-database.inc ] && exit 0
-        until wget -q -O /dev/null --post-data 'action=setup.nodata&ez-new=dev' http://php/action.php
-        do sleep 1
+        for try in $$(seq 60); do
+          reply=$$(wget -q -O - --post-data 'action=setup.nodata&ez-new=dev' http://php/action.php) &&
+            break
+          sleep 1
         done
+        case "$$reply" in
+          *success*) echo "php-setup: created the dev event" ;;
+          *) echo "php-setup: setup did not succeed: $$reply" >&2; exit 1 ;;
+        esac
 
   django:
     image: ghcr.io/astral-sh/uv:0.13.5-python3.14-trixie-slim
