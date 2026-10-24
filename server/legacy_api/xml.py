@@ -4,7 +4,14 @@
 whitespace, so this writes strings, not an ElementTree (#17).
 """
 
+import re
+
 PROLOG = '<?xml version="1.0" encoding="UTF-8"?>\n'
+
+# XML has no escape for a name, so a field whose name falls outside this set is
+# left out of the attributes. No colon and no `xml` prefix, so a field cannot
+# declare a namespace. Every name a client sends fits.
+_ATTRIBUTE_NAME = re.compile(r"(?![Xx][Mm][Ll])[A-Za-z_][A-Za-z0-9_.-]*")
 
 _ESCAPES = str.maketrans(
     {"&": "&amp;", '"': "&quot;", "'": "&#039;", "<": "&lt;", ">": "&gt;"}
@@ -33,10 +40,11 @@ class XmlWriter:
 
     def start_response(self) -> None:
         # PHP fails on an array field here. A nested form field is left out.
+        # PHP writes every name raw, which lets a caller inject markup.
         attributes = "".join(
             f' {name}="{php_escape(value)}"'
             for name, value in self._fields.items()
-            if isinstance(value, str)
+            if isinstance(value, str) and _ATTRIBUTE_NAME.fullmatch(name)
         )
         self.write(f"<action-response{attributes}>")
 
