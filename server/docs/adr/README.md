@@ -13,13 +13,14 @@ These architecture decision records (ADRs) record how the DerbyNet server moves 
 | [ADR-05](0005-default-to-sqlite-in-wal-mode-and-support-postgres.md) | Default to SQLite in WAL mode, and support Postgres | Accepted |
 | [ADR-06](0006-drop-ms-access-odbc-and-all-gprm-support.md) | Drop MS Access, ODBC, and all GPRM support | Accepted |
 | [ADR-07](0007-keep-shared-password-roles-stored-hashed-in-the-database.md) | Keep shared-password roles, stored hashed in the database | Accepted |
-| [ADR-08](0008-keep-polling-for-v1-and-add-push-later.md) | Keep polling for v1, and add push later | Accepted |
+| [ADR-08](0008-keep-polling-for-v1-and-add-push-later.md) | Keep polling for v1, and add push later | Superseded for kiosks by ADR-15 |
 | [ADR-09](0009-build-the-manager-ui-with-django-templates-and-htmx.md) | Build the manager UI with Django templates, htmx, Alpine.js, Tailwind, and SortableJS | Accepted |
 | [ADR-10](0010-rebuild-the-built-in-kiosk-pages-in-a-modern-front-end.md) | Rebuild the built-in kiosk pages in a modern front end | Accepted |
 | [ADR-11](0011-leave-derby-timer-jar-and-the-browser-timer-unchanged.md) | Leave derby-timer.jar and the browser timer unchanged | Accepted |
 | [ADR-12](0012-make-tests-id-agnostic-instead-of-copying-sqlite-rowid-reuse.md) | Make tests ID-agnostic instead of copying SQLite rowid reuse | Accepted |
 | [ADR-13](0013-put-new-code-in-server-and-delete-website-at-cutover.md) | Put new code in `server/`, and delete `website/` at cutover | Accepted |
 | [ADR-14](0014-ship-docker-images-as-the-only-deployment.md) | Ship Docker images as the only deployment | Accepted |
+| [ADR-15](0015-push-kiosk-updates-for-sub-second-scene-switches.md) | Push kiosk updates for sub-second scene switches | Accepted |
 
 ## Status lifecycle
 
