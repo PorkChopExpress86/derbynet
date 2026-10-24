@@ -1,8 +1,12 @@
+import json
+
 import pytest
+from django.db import connection
 
 from accounts.permissions import Perm
 from core.models import ActionLog
 from legacy_api.tests.conftest import post
+from roster.models import Racer
 
 pytestmark = pytest.mark.django_db
 
@@ -68,3 +72,24 @@ def test_a_query_is_not_logged(client, event):
     client.get("/action.php?query=no.such")
 
     assert logged() == []
+
+
+def test_a_log_write_the_database_refuses_still_answers_the_envelope(
+    client, event, endpoint, caplog
+):
+    # Postgres refuses a NUL in JSON text. PHP's record_action() swallows the
+    # PDOException and goes on.
+    def count_racers(ctx):
+        ctx.put("racers", Racer.objects.filter(event=ctx.event).count())
+        ctx.success()
+
+    endpoint("action", "probe.count", count_racers)
+
+    response = post(client, "action=probe.count&a=%00x")
+
+    assert response.status_code == 200
+    assert json.loads(response.content)["outcome"]["code"] == "success"
+    assert json.loads(response.content)["racers"] == 0
+    if connection.vendor == "postgresql":
+        assert logged() == []
+        assert "action log" in caplog.text
