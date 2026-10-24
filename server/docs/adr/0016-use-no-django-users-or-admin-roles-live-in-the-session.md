@@ -10,7 +10,7 @@ DerbyNet has no per-person accounts. A visitor logs in as one of a few roles, ea
 
 ## Decision
 
-The server installs no `django.contrib.auth`, `django.contrib.admin`, or `django.contrib.messages`. It installs no `AuthenticationMiddleware`, `MessageMiddleware`, or auth context processor, sets no `AUTH_PASSWORD_VALIDATORS`, and leaves `AUTH_USER_MODEL` unset. There is no admin URL. A login stores the role and its permission bits in the session (`django.contrib.sessions`), and the permission checks of [#17](https://github.com/PorkChopExpress86/derbynet/issues/17) read them from there. Role passwords are hashed and checked with `django.contrib.auth.hashers`, which is a plain module and needs no installed app. The `core` app serves a `health/` page that renders a URL, a static path, and a CSRF token and sets a session value, so tests and probes have a real page to request.
+The server installs no `django.contrib.auth`, `django.contrib.admin`, or `django.contrib.messages`. It installs no `AuthenticationMiddleware`, `MessageMiddleware`, or auth context processor, sets no `AUTH_PASSWORD_VALIDATORS`, and leaves `AUTH_USER_MODEL` unset. There is no admin URL. A login stores the role and its permission bits in the session (`django.contrib.sessions`), and the permission checks of [#17](https://github.com/PorkChopExpress86/derbynet/issues/17) read them from there. Role passwords are hashed and checked with `django.contrib.auth.hashers`, which is a plain module and needs no installed app. The `core` app serves a `health/` page that renders a URL, a static path, and a CSRF token and writes nothing, so tests and health probes have a real page to request.
 
 ## Consequences
 
