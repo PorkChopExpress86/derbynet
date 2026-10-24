@@ -7,8 +7,6 @@ repo_root="$(cd "$adr_dir/../../.." && pwd)"
 
 # Cited paths that are intended but absent from the repository.
 ALLOWED_MISSING=(
-  # ADR-13 names the future home of the golden fixtures.
-  "server/tests/golden/"
   # The installer creates local/ per install. It is not tracked in git.
   "local/config-roles.inc"
   "local/kiosks/"
