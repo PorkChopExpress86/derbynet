@@ -6,15 +6,29 @@ legacy key to the model fields that replace it, with a codec between the
 legacy text and the typed value, so the importer, preferences files, and the
 `settings.*` endpoints keep the legacy vocabulary.
 
-`decode(key, raw)` turns legacy text into a typed value and `encode(key,
-value)` turns it back. A `Ref` value is an id, which the importer maps
-through `transfer.LegacyId`. Times become aware UTC datetimes.
+`decode(key, raw)` turns legacy text into a typed value, or raises
+`LegacyValueError`, and `encode(key, value)` turns it back. A `Ref` value is
+an id, which the importer maps through `transfer.LegacyId`. Times become
+aware UTC datetimes.
 """
 
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+
+
+class LegacyValueError(ValueError):
+    """Legacy text that the key's codec cannot read.
+
+    `RaceInfo` values are free text, so the importer catches this per key and
+    reports the key and the raw value.
+    """
+
+    def __init__(self, key, raw):
+        super().__init__(f"{key}: cannot read {raw!r}")
+        self.key = key
+        self.raw = raw
 
 
 class Codec:
@@ -475,7 +489,10 @@ def _codec(key):
 
 
 def decode(key, raw):
-    return _codec(key).decode(raw)
+    try:
+        return _codec(key).decode(raw)
+    except (ValueError, OverflowError) as error:
+        raise LegacyValueError(key, raw) from error
 
 
 def encode(key, value):
