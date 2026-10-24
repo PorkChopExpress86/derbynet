@@ -6,6 +6,7 @@ nothing left to violate.
 """
 
 import pytest
+from django.utils import timezone
 
 from awards.models import Award, AwardType
 from awards.tests.factories import AwardFactory
@@ -339,6 +340,32 @@ def test_service_tag_ignores_another_events_violation(tag):
     SERVICE_VIOLATIONS[tag](EventFactory())
 
     assert check_invariants(clean) == {}
+
+
+def test_a_heat_with_exactly_lane_count_lanes_is_not_reported():
+    event = EventFactory()
+    RaceSettings.objects.filter(event=event).update(lane_count=3)
+    round1 = _organic_group(event).rounds.get()
+    for lane in (1, 2, 3):
+        HeatLaneFactory(round=round1, heat=1, lane=lane)
+
+    assert "racechart-straight-lanes" not in check_invariants(event)
+
+
+def test_a_completed_heat_may_share_its_master_heat():
+    event = EventFactory()
+    group = _organic_group(event)
+    round2 = RoundFactory(group=group, number=2)
+    HeatLaneFactory(
+        round=group.rounds.get(number=1),
+        heat=1,
+        lane=1,
+        master_heat=5,
+        completed=timezone.now(),
+    )
+    HeatLaneFactory(round=round2, heat=1, lane=1, master_heat=5)
+
+    assert "racechart-masterheat2" not in check_invariants(event)
 
 
 def test_classes_ranks_is_skipped_when_the_event_has_no_partitions():
