@@ -1,0 +1,93 @@
+"""Django's `/action.php` against the PHP captures, byte for byte.
+
+Each exchange is replayed and compared on status, `Content-Type`, `Location`,
+`Cache-Control` and body. `Set-Cookie` is not compared: PHP starts a session
+on every request, and the session cookie contract belongs to #16.
+
+No handler is ported yet, so the exchanges that reach one register a stub
+under the PHP name with the permission #17 gives it. A refused request never
+runs the stub, so the response is the dispatcher's alone.
+"""
+
+import pytest
+
+from accounts.permissions import Access, Perm
+from core.tests.factories import EventFactory
+from legacy_api.tests.golden import replay, transcript
+
+pytestmark = pytest.mark.django_db
+
+
+def _never_runs(ctx):
+    raise AssertionError("an anonymous request reached a refusing stub")
+
+
+STUBS = {
+    "timer-message": dict(kind="action", permission=Perm.TIMER_MESSAGE),
+    "kiosk.reload": dict(kind="action", permission=Perm.CONTROL_RACE),
+    "class.edit": dict(
+        kind="action", permission=Perm.SET_UP, failure_code="permission"
+    ),
+}
+
+# Exchanges this ticket does not reproduce, and why.
+NOT_COMPARED = {
+    # The `login` and `roles` XML stubs are handlers, ported with role.login in #16.
+    "unknown-xml-action-login-stub": "#16",
+    "unknown-xml-query-roles-stub": "#16",
+    # PHP answers 500 with an empty body. Django answers `Unrecognized query: `.
+    "query-with-array-parameter": "PHP defect, see test_dispatcher",
+}
+
+
+def _cases(name):
+    return [
+        pytest.param(name, ex, id=f"{ex.number}-{ex.name}")
+        for ex in transcript(name)
+        if ex.name not in NOT_COMPARED
+    ]
+
+
+def assert_same(response, ex):
+    assert response.status_code == ex.status
+    assert response.get("Content-Type") == ex.content_type
+    assert response.get("Location") == ex.location
+    assert response.get("Cache-Control") == ex.cache_control
+    assert response.content == ex.body
+
+
+@pytest.fixture
+def stubs(endpoint):
+    for name, fields in STUBS.items():
+        fields = dict(fields)
+        endpoint(fields.pop("kind"), name, _never_runs, **fields)
+
+
+@pytest.mark.parametrize(("name", "ex"), _cases("envelope/before-setup"))
+def test_before_any_event_exists(client, name, ex):
+    assert_same(replay(client, ex), ex)
+
+
+@pytest.mark.parametrize(("name", "ex"), _cases("envelope/dispatcher"))
+def test_the_dispatcher_envelope(client, stubs, name, ex):
+    EventFactory()
+
+    assert_same(replay(client, ex), ex)
+
+
+def test_the_dispatcher_transcript_holds_the_json_refusals():
+    names = {ex.name for ex in transcript("envelope/dispatcher")}
+
+    assert {"json-notauthorized", "json-permission-failure"} <= names
+
+
+def test_a_query_that_writes_nothing_is_an_empty_object(client, endpoint):
+    [ex] = [
+        ex
+        for ex in transcript("poll/race-day-polls")
+        if ex.name == "08-before-awards award.current"
+    ]
+    endpoint("query", "award.current", permission=Access.ANONYMOUS)
+    EventFactory()
+
+    assert_same(replay(client, ex), ex)
