@@ -23,6 +23,18 @@ uv run python manage.py makemigrations --check --dry-run
 
 The `server` GitHub Actions workflow runs these four commands on Python 3.14, once on SQLite and once on Postgres. To run the tests on Postgres locally, set `DATABASE_URL`, for example `DATABASE_URL=postgres://postgres:postgres@localhost:5432/derbynet uv run pytest`.
 
+Model tests build their data with the factory_boy factories in `<app>/tests/factories.py`. `EventFactory` creates an event through `core.services.new_event()`, so each event comes with its settings, state rows, and the six legacy scenes.
+
+## Inspect an event
+
+The server has no Django admin (ADR-16). To see what one event holds, print its rows for every event-scoped model as JSON:
+
+```sh
+uv run python manage.py dump_event <slug>
+```
+
+The command only reads.
+
 ## Run both servers
 
 From the repository root, first build the files the PHP pages need, as step 2 of the top-level `README.md` says (`ant generated`). Then run:
