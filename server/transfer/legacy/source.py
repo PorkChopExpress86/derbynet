@@ -5,7 +5,9 @@ column names in lower case, as PHP reads them through `PDO::CASE_LOWER`.
 """
 
 import json
+import shutil
 import sqlite3
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -78,9 +80,28 @@ def read_source(path):
 
 
 def _read_sqlite(path):
-    uri = f"{path.resolve().as_uri()}?mode=ro"
+    """Read a private copy of the database and its -wal and -journal files.
+
+    Opening the source itself would write a -shm next to a WAL database, and
+    fails in a read-only folder.
+    """
+    with tempfile.TemporaryDirectory(prefix="derbynet-import-") as private:
+        copy = Path(private) / "source.sqlite3"
+        try:
+            shutil.copyfile(path, copy)
+            for suffix in ("-wal", "-journal"):
+                side = path.with_name(path.name + suffix)
+                if side.exists():
+                    shutil.copyfile(side, copy.with_name(copy.name + suffix))
+        except OSError as error:
+            raise SourceError(f"cannot copy {path}: {error}") from None
+        return _read_tables(path, copy)
+
+
+def _read_tables(path, copy):
     try:
-        connection = sqlite3.connect(uri, uri=True)
+        # Read-only, so a hot journal is refused rather than rolled back.
+        connection = sqlite3.connect(f"{copy.as_uri()}?mode=ro", uri=True)
     except sqlite3.Error as error:
         raise SourceError(f"cannot open {path}: {error}") from None
     # Legacy text is not always UTF-8, for example names typed on Windows.
@@ -105,6 +126,13 @@ def _read_sqlite(path):
             ]
         return tables
     except sqlite3.Error as error:
+        if error.sqlite_errorname == "SQLITE_READONLY_ROLLBACK":
+            raise SourceError(
+                f"{path} has an unfinished write in {path.name}-journal: the PHP"
+                " server crashed or is still running. Stop it, open a copy of the"
+                " folder once with sqlite3 to roll the write back, and import the"
+                " copy."
+            ) from None
         raise SourceError(f"cannot read {path}: {error}") from None
     finally:
         connection.close()

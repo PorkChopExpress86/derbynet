@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import shutil
+import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -613,3 +614,84 @@ def test_an_existing_report_is_overwritten_only_with_force_report(tmp_path):
         stdout=io.StringIO(),
     )
     assert json.loads(report.read_text())["outcome"] == "committed"
+
+
+def _folder_state(folder):
+    return {p.name: _md5(p) for p in folder.iterdir() if p.is_file()}
+
+
+def _wal_source(tmp_path):
+    """A v10 folder whose last write, car 101's name, lives only in its -wal."""
+    database = legacy_folder(tmp_path, "v10", photos=False)
+    writer = sqlite3.connect(database)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("PRAGMA wal_autocheckpoint=0")
+    writer.execute(
+        "UPDATE RegistrationInfo SET carname = 'From WAL' WHERE carnumber = 101"
+    )
+    writer.commit()
+    # As a crashed PHP server leaves it: the -wal with no checkpoint, no -shm.
+    frozen = tmp_path / "frozen"
+    frozen.mkdir()
+    shutil.copyfile(database, frozen / database.name)
+    shutil.copyfile(f"{database}-wal", frozen / f"{database.name}-wal")
+    writer.close()
+    return frozen / database.name
+
+
+@pytest.fixture
+def read_only(tmp_path):
+    folders = []
+
+    def make(folder):
+        folder.chmod(0o555)
+        folders.append(folder)
+        return folder
+
+    yield make
+    for folder in folders:
+        folder.chmod(0o755)
+
+
+def test_a_wal_source_imports_its_wal_and_adds_no_side_files(tmp_path):
+    database = _wal_source(tmp_path)
+    before = _folder_state(database.parent)
+
+    report, _ = _import(tmp_path, database)
+
+    assert _racer(report, 101).car_name == "From WAL"
+    assert _folder_state(database.parent) == before
+
+
+@pytest.mark.parametrize("wal", [False, True])
+def test_a_source_in_a_read_only_folder_imports(tmp_path, read_only, wal):
+    database = _wal_source(tmp_path) if wal else legacy_folder(tmp_path, "v10")
+    before = _folder_state(database.parent)
+    read_only(database.parent)
+
+    report, _ = _import(tmp_path, database)
+
+    assert report["counts"]["registrationinfo"]["imported"] == 82
+    assert _folder_state(database.parent) == before
+
+
+def test_a_hot_journal_is_refused_with_a_clear_message(tmp_path):
+    database = legacy_folder(tmp_path, "v10", photos=False)
+    writer = sqlite3.connect(database, isolation_level=None)
+    writer.execute("PRAGMA cache_size=1")
+    writer.execute("BEGIN")
+    # Big enough to spill the one-page cache, so the journal is hot.
+    writer.execute("UPDATE RegistrationInfo SET carname = hex(randomblob(500))")
+    crashed = tmp_path / "crashed"
+    crashed.mkdir()
+    for name in (database.name, f"{database.name}-journal"):
+        shutil.copyfile(database.parent / name, crashed / name)
+    writer.execute("ROLLBACK")
+    writer.close()
+    before = _folder_state(crashed)
+
+    with pytest.raises(CommandError, match="unfinished write.*-journal"):
+        _import(tmp_path, crashed / database.name)
+
+    assert _folder_state(crashed) == before
+    assert not Event.objects.exists()
