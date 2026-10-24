@@ -1,0 +1,18 @@
+#!/bin/bash
+# Builds the PHP server image from this checkout and starts a fresh, empty
+# instance at http://127.0.0.1:$VERIFY_PORT (default 8090).  Ready when it prints
+# "ready".  Run from a regular clone, not a git worktree.
+set -euo pipefail
+source "$(dirname "$0")/env.sh"
+if docker ps -a --format '{{.Names}}' | grep -qx "$SERVER"; then
+  echo "$SERVER already exists; run bin/cleanup first, or pick another VERIFY_RUN" >&2
+  exit 1
+fi
+if ss -ltn | grep -q ":$PORT\b"; then
+  echo "port $PORT is taken; set VERIFY_PORT" >&2
+  exit 1
+fi
+"$REPO/testing/docker/run-suite.sh" harness assets server > "$EVIDENCE/launch.log" 2>&1 \
+  || { tail -20 "$EVIDENCE/launch.log" >&2; exit 1; }
+"$(dirname "$0")/doctor"
+echo ready "$BASE"

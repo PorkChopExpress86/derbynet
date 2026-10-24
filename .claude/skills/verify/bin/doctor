@@ -1,0 +1,16 @@
+#!/bin/bash
+# Read-only: is this run's instance up, ours, and answering?
+set -uo pipefail
+source "$(dirname "$0")/env.sh"
+ok=1
+state=$(docker inspect -f '{{.State.Status}} {{.Config.Image}}' "$SERVER" 2>/dev/null) || { echo "FAIL no container $SERVER"; exit 1; }
+echo "container $SERVER: $state"
+[[ $state == running* ]] || ok=0
+published=$(docker port "$SERVER" 80/tcp 2>/dev/null)
+echo "published: $published"
+[[ $published == "127.0.0.1:$PORT" ]] || { echo "FAIL port $PORT is not this container's"; ok=0; }
+code=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/index.php")
+echo "index.php: $code"
+[[ $code == 200* || $code == 302* ]] || ok=0
+echo "commit: $(git -C "$REPO" rev-parse --short HEAD)"
+[ $ok = 1 ] && echo "doctor: ok" || { echo "doctor: FAIL"; exit 1; }

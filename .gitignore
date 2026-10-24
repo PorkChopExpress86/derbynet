@@ -42,3 +42,8 @@ adapter-webrtc/
 .idea
 *.iml
 .DS_Store
+
+# Claude Code: agent worktrees, verification evidence, Playwright MCP snapshots
+.claude/worktrees/
+.claude/verify-evidence/
+.playwright-mcp/
