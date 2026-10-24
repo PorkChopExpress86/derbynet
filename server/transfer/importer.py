@@ -143,21 +143,31 @@ def _recordings_to_discard(name, replace, discard_videos, report):
         return None
     old_settings = RaceSettings.for_event(old)
     files = size = 0
-    unreadable = []
+    problems = []
     for directory in (old_settings.video_directory, old_settings.logs_directory):
         if not os.path.isdir(directory):
             continue
-        for root, _, names in os.walk(directory, onerror=unreadable.append):
+        for root, _, names in os.walk(
+            directory, onerror=lambda e: problems.append((e.filename, e.strerror))
+        ):
+            # rmtree needs write and search access on every folder it empties.
+            if not os.access(root, os.W_OK | os.X_OK):
+                problems.append((root, "not writable"))
             for file_name in names:
                 path = Path(root, file_name)
-                if not path.is_symlink():
-                    files += 1
+                try:
+                    if path.is_symlink():
+                        continue
                     size += path.stat().st_size
-    if unreadable:
-        error = unreadable[0]
+                except OSError as e:
+                    problems.append((str(path), e.strerror))
+                    continue
+                files += 1
+    if problems:
+        where, why = problems[0]
         raise ImportFailed(
-            f"cannot count the videos and logs of {name!r}: {error.filename}"
-            f" cannot be read ({error.strerror}). Make it readable and run"
+            f"cannot count or delete the videos and logs of {name!r}: {where}"
+            f" cannot be read or deleted ({why}). Fix its permissions and run"
             " again. --discard-videos does not skip this check, because the"
             " size cannot be reported and the delete would fail after the"
             " commit",

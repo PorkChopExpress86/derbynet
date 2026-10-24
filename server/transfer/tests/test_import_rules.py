@@ -1059,14 +1059,17 @@ def test_replace_of_empty_videos_and_logs_needs_no_flag(tmp_path, data_dir):
     assert report["photos"]["discarded_recordings"] == {"files": 0, "bytes": 0}
 
 
-@pytest.fixture
-def unreadable_videos(pack_with_recordings):
-    """The `Pack` event's videos/ holds a `chmod 000` folder with a file in it."""
+@pytest.fixture(
+    params=[0o000, 0o500, 0o400], ids=["unreadable", "read-only", "unsearchable"]
+)
+def unreadable_videos(request, pack_with_recordings):
+    """The `Pack` event's videos/ holds a folder with a file in it that the
+    import cannot list, cannot empty, or cannot stat inside."""
     old = RaceSettings.for_event(_event(pack_with_recordings))
     hidden = Path(old.video_directory) / "hidden"
     hidden.mkdir()
     (hidden / "heat3.mkv").write_bytes(b"hidden")
-    hidden.chmod(0)
+    hidden.chmod(request.param)
     yield hidden
     hidden.chmod(0o700)
 
@@ -1084,7 +1087,7 @@ def test_replace_is_refused_when_an_unreadable_folder_hides_videos(
     with pytest.raises(CommandError, match="hidden") as refused:
         _import(tmp_path, source, "--event", "Pack", "--replace", *extra)
 
-    assert "cannot be read" in str(refused.value)
+    assert "cannot be read or deleted" in str(refused.value)
     if extra:
         assert "--discard-videos does not skip this check" in str(refused.value)
     assert sorted(str(p) for p in data_dir.rglob("*")) == names_before
