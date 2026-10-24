@@ -90,16 +90,30 @@ def test_an_array_name_is_no_such_role(client, event):
 
 
 def test_the_timer_logs_in_as_a_role_without_naming_it(client, event, endpoint):
-    """The response leaves `role` out for an empty password, as PHP does, but
-    the session holds the role, so the timer counts as logged in."""
+    """The response leaves `role` out for an empty password, as PHP does. The
+    session holds the role and Timer's bits, but a login anyone can make does
+    not count as logged in."""
     endpoint("query", "probe.logged-in", permission=Access.LOGGED_IN)
+    endpoint("query", "probe.timer", permission=Perm.TIMER_MESSAGE)
+    endpoint("query", "probe.results", permission=Perm.VIEW_RACE_RESULTS)
 
     body = login(client, "name=Timer&password=")
 
     assert "role" not in body
     assert client.session["role"] == "Timer"
-    probe = json.loads(client.get("/action.php?query=probe.logged-in").content)
-    assert probe == {}
+    assert client.session["permissions"] == Perm.TIMER_MESSAGE
+    assert json.loads(client.get("/action.php?query=probe.timer").content) == {}
+    for refused in ("probe.logged-in", "probe.results"):
+        body = json.loads(client.get(f"/action.php?query={refused}").content)
+        assert body["outcome"]["code"] == "notauthorized"
+
+
+def test_a_role_with_a_password_counts_as_logged_in(client, event, endpoint):
+    endpoint("query", "probe.logged-in", permission=Access.LOGGED_IN)
+
+    login(client, "name=RaceCrew&password=murphy")
+
+    assert json.loads(client.get("/action.php?query=probe.logged-in").content) == {}
 
 
 def test_a_login_grants_the_roles_bits_to_handlers(client, event, endpoint):

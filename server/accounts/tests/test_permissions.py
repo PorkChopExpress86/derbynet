@@ -102,8 +102,23 @@ def test_a_requirement_is_met_by_any_of_its_bits(event, bits, requirement, expec
 
 def test_logged_in_needs_a_role_name_not_bits(event):
     assert not allows(request_with({"permissions": -1}), Access.LOGGED_IN)
+    crew = request_with({"role": "RaceCrew", "permissions": 8687})
+    assert allows(crew, Access.LOGGED_IN)
+
+
+def test_a_role_without_a_password_is_not_logged_in(event):
+    """Anyone can log in as `Timer`: its password is empty and `role.list`
+    publishes its name. The session holds Timer's bits and nothing more."""
     timer = request_with({"role": "Timer", "permissions": 4096})
-    assert allows(timer, Access.LOGGED_IN)
+
+    assert not allows(timer, Access.LOGGED_IN)
+    assert granted(timer) == Perm.TIMER_MESSAGE
+
+
+def test_a_role_that_no_longer_exists_is_not_logged_in(event):
+    ghost = request_with({"role": "Ghost", "permissions": 0})
+
+    assert not allows(ghost, Access.LOGGED_IN)
 
 
 @pytest.fixture
