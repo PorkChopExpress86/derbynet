@@ -2,9 +2,10 @@
 
 The file assigns `$roles`, an array literal of role name to `password`,
 `permissions` and `interactive`, and `$post_setup_role`. `parse()` reads the
-literal subset these files use: strings, integers, `true` and `false`, the
-`*_PERMISSION` constants, `|`, and `array(...)` or `[...]`. Anything else
-raises `ConfigRolesError`, and `read()` then asks `php` when it is installed.
+literal subset these files use: strings with simple escapes, decimal
+integers, `true` and `false`, the `*_PERMISSION` constants, `|`, and keyed
+`array(...)` or `[...]`. Anything else, an octal mask included, raises
+`ConfigRolesError`, and `read()` then asks `php` when it is installed.
 """
 
 import json
@@ -36,8 +37,8 @@ _TOKEN = re.compile(
     r"""
     (?P<skip>\s+|<\?php|\?>|//[^\n]*|\#[^\n]*|/\*.*?\*/)
     | (?P<single>'(?:[^'\\]|\\.)*')
-    | (?P<double>"(?:[^"\\$]|\\.)*")
-    | (?P<int>-?\d+)
+    | (?P<double>"(?:[^"\\$]|\\[ntr\\"$])*")
+    | (?P<int>-?(?:0|[1-9]\d*)(?![\w.]))
     | (?P<var>\$[A-Za-z_]\w*)
     | (?P<name>[A-Za-z_]\w*)
     | (?P<punct>=>|[=()\[\],;|])
@@ -62,9 +63,7 @@ def _tokens(text: str):
             value = re.sub(r"\\([\\'])", r"\1", value[1:-1])
             kind = "str"
         elif kind == "double":
-            value = re.sub(
-                r"\\(.)", lambda m: _DOUBLE_ESCAPES.get(m[1], m[0]), value[1:-1]
-            )
+            value = re.sub(r"\\(.)", lambda m: _DOUBLE_ESCAPES[m[1]], value[1:-1])
             kind = "str"
         elif kind == "int":
             value = int(value)
@@ -134,7 +133,7 @@ class _Parser:
                 self._next()
                 items[key] = self._expression()
             else:
-                items[len(items)] = key
+                raise ConfigRolesError("an array item has no key")
             if self.value != ",":
                 break
             self._next()
