@@ -11,6 +11,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "factory-boy>=3.3",
     "pytest>=8.4",
     "pytest-django>=4.11",
     "ruff>=0.14",
@@ -27,5 +28,5 @@ select = ["E", "F", "W", "I", "UP", "B", "DJ"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "derbynet.settings"
-testpaths = ["tests"]
+testpaths = ["tests", "core", "roster", "racing", "awards", "kiosks"]
 addopts = "--strict-markers"
