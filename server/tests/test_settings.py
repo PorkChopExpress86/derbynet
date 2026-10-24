@@ -1,8 +1,12 @@
+import runpy
 import stat
+from pathlib import Path
 
 import dj_database_url
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+
+import derbynet.settings
 
 
 def test_secret_key_is_generated_once_with_mode_0600(load_settings, tmp_path):
@@ -97,3 +101,27 @@ def test_host_tz_that_is_not_an_iana_name_falls_back_to_utc(
 def test_invalid_derbynet_time_zone_names_the_variable_and_value(load_settings):
     with pytest.raises(ImproperlyConfigured, match="DERBYNET_TIME_ZONE.*'Mars/Base'"):
         load_settings(DERBYNET_TIME_ZONE="Mars/Base")
+
+
+def test_use_tz_is_on(load_settings):
+    assert load_settings()["USE_TZ"] is True
+
+
+def test_csrf_trusted_origins_come_from_the_environment(load_settings):
+    assert load_settings()["CSRF_TRUSTED_ORIGINS"] == []
+    loaded = load_settings(
+        DERBYNET_CSRF_TRUSTED_ORIGINS="https://a.example, https://b.example"
+    )
+    assert loaded["CSRF_TRUSTED_ORIGINS"] == ["https://a.example", "https://b.example"]
+
+
+def test_default_data_and_config_dirs_live_under_server_var(monkeypatch):
+    monkeypatch.delenv("DERBYNET_DATA_DIR", raising=False)
+    monkeypatch.delenv("DERBYNET_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("DJANGO_SECRET_KEY", raising=False)
+    server_dir = Path(derbynet.settings.__file__).resolve().parent.parent
+
+    loaded = runpy.run_path(derbynet.settings.__file__)
+
+    assert loaded["DATA_DIR"] == server_dir / "var" / "data"
+    assert loaded["CONFIG_DIR"] == server_dir / "var" / "config"
