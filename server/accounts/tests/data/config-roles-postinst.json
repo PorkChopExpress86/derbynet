@@ -1,0 +1,1 @@
+{"roles":{"":{"password":"","permissions":1},"Timer":{"password":"","permissions":4096,"interactive":false},"Photo":{"password":"flashbulb","permissions":8192,"interactive":false},"RaceCrew":{"password":"murphy","permissions":8687},"RaceCoordinator":{"password":"doyourbest","permissions":-1}},"post_setup_role":"RaceCoordinator"}

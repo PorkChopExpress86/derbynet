@@ -1,0 +1,1 @@
+{"roles":{"":{"password":"","permissions":0},"Timer":{"password":"","permissions":4096,"interactive":false},"Judge":{"password":"it's a \\secret","permissions":258},"RaceCrew":{"password":"10","permissions":8687,"interactive":true},"RaceCoordinator":{"password":"n3w-pass","permissions":-1}},"post_setup_role":"RaceCrew"}
