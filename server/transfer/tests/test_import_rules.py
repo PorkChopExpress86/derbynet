@@ -1,0 +1,473 @@
+"""The importer's rules for legacy data that PHP accepted but Django refuses."""
+
+import hashlib
+import json
+import shutil
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import pytest
+from django.conf import settings
+from django.core.management import CommandError
+
+from awards.models import Award
+from core.models import ActionLog, Event, RaceSettings, RaceState, SiteState
+from core.services import event_dir
+from kiosks.models import Kiosk
+from roster.models import Group, GroupConstituent, Partition, Racer
+from transfer.models import LegacyId
+from transfer.tests.legacy import (
+    FIXTURES,
+    SNAPSHOT,
+    legacy_folder,
+    legacy_ids,
+    run_import,
+    source_rows,
+)
+
+pytestmark = pytest.mark.django_db
+
+
+def _import(tmp_path, source, *args):
+    return run_import(source, *args, report_dir=tmp_path)
+
+
+def _event(report):
+    return Event.objects.get(pk=report["event"]["id"])
+
+
+def _findings(report, kind):
+    return [f for f in report["findings"] if f["kind"] == kind]
+
+
+def _racer(report, car_number):
+    return Racer.objects.get(event=_event(report), car_number=car_number)
+
+
+def _md5(path):
+    return hashlib.md5(path.read_bytes()).hexdigest()
+
+
+def test_the_source_file_is_never_written(tmp_path):
+    database = legacy_folder(tmp_path, "v10")
+    before = (_md5(database), database.stat().st_mtime_ns)
+    database.chmod(0o444)
+
+    _import(tmp_path, database)
+
+    assert (_md5(database), database.stat().st_mtime_ns) == before
+    assert sorted(p.name for p in database.parent.iterdir()) == [
+        "cars",
+        "derbynet.sqlite3",
+        "racers",
+    ]
+
+
+def test_the_event_name_defaults_to_the_source_folder(tmp_path):
+    report, _ = _import(tmp_path, legacy_folder(tmp_path, "v10", folder="Pack 42 2024"))
+    assert _event(report).name == "Pack 42 2024"
+
+
+def test_a_snapshot_reads_with_or_without_its_xml_bookends(tmp_path):
+    text = SNAPSHOT.read_text()
+    bare = text[text.index("<![CDATA[") + len("<![CDATA[") : text.rindex("]]>")]
+    source = tmp_path / "bare" / "snapshot.json"
+    source.parent.mkdir()
+    source.write_text(bare)
+
+    report, _ = _import(tmp_path, source)
+
+    assert report["source"]["kind"] == "snapshot"
+    assert report["counts"]["registrationinfo"]["imported"] == 82
+
+
+def test_a_file_that_is_neither_sqlite_nor_a_snapshot_is_refused(tmp_path):
+    source = tmp_path / "x" / "notes.txt"
+    source.parent.mkdir()
+    source.write_text("not a database")
+    with pytest.raises(CommandError, match="neither a SQLite database nor a snapshot"):
+        _import(tmp_path, source)
+    assert not Event.objects.exists()
+
+
+# Handed off from the #13 review: one bad value never stops the import.
+def test_a_bad_raceinfo_value_is_reported_and_the_rest_imports(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[
+            "UPDATE RaceInfo SET itemvalue = 'four' WHERE itemkey = 'lane_count'",
+            "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('track-length', '-5')",
+            "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('timer_state', '2+x++')",
+            "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('n-pack-trophies', '7')",
+            "INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('no-such-key', 'hi')",
+        ],
+    )
+
+    report, _ = _import(tmp_path, database)
+
+    bad = {f["legacy_id"]: f["detail"] for f in _findings(report, "bad-value")}
+    assert set(bad) == {"lane_count", "track-length", "timer_state"}
+    assert "'four'" in bad["lane_count"]
+    assert [f["legacy_id"] for f in _findings(report, "unknown-key")] == ["no-such-key"]
+    settings_row = RaceSettings.for_event(_event(report))
+    assert settings_row.lane_count == 0
+    assert settings_row.track_length == 40
+    assert settings_row.n_pack_trophies == 7
+    assert report["counts"]["registrationinfo"]["imported"] == 82
+
+
+# #64 C30: a key written twice. The later row wins.
+def test_a_repeated_raceinfo_key_keeps_the_highest_raceinfoid(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[
+            "INSERT INTO RaceInfo(raceinfoid, itemkey, itemvalue)"
+            " VALUES(900, 'supergroup-label', 'Troop')",
+            "INSERT INTO RaceInfo(raceinfoid, itemkey, itemvalue)"
+            " VALUES(800, 'supergroup-label', 'Pack')",
+        ],
+    )
+
+    report, _ = _import(tmp_path, database)
+
+    assert RaceSettings.for_event(_event(report)).supergroup_label == "Troop"
+    duplicates = _findings(report, "duplicate-key")
+    assert len(duplicates) == 1 and "'Troop'" in duplicates[0]["detail"]
+
+
+# #64 C11: PHP writes scoring=1 on every standings include when drop-slowest
+# is set. The importer converts it once.
+@pytest.mark.parametrize(
+    ("rows", "scoring"),
+    [
+        (["('drop-slowest', '1')"], 1),
+        (["('drop-slowest', '1')", "('scoring', '2')"], 2),
+        (["('drop-slowest', '0')"], 0),
+    ],
+)
+def test_drop_slowest_becomes_scoring_1_unless_scoring_is_set(tmp_path, rows, scoring):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[f"INSERT INTO RaceInfo(itemkey, itemvalue) VALUES{row}" for row in rows],
+    )
+    report, _ = _import(tmp_path, database)
+    assert RaceSettings.for_event(_event(report)).scoring == scoring
+
+
+@pytest.mark.parametrize(
+    ("show", "expected"), [("'1'", "head"), ("'0'", "0"), (None, "0")]
+)
+def test_show_racer_photos_sets_an_unset_photos_on_now_racing(tmp_path, show, expected):
+    sql = ["DELETE FROM RaceInfo WHERE itemkey = 'photos-on-now-racing'"]
+    if show is not None:
+        sql.append(
+            "INSERT INTO RaceInfo(itemkey, itemvalue)"
+            f" VALUES('show-racer-photos', {show})"
+        )
+    report, _ = _import(tmp_path, legacy_folder(tmp_path, "v10", sql=sql))
+    assert RaceSettings.for_event(_event(report)).photos_on_now_racing == expected
+
+
+# Handed off from the #13 review: legacy absolute paths become relative ones.
+def test_windows_and_dotted_photo_paths_are_rebased_or_reported(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[
+            "UPDATE RaceInfo SET itemvalue = 'C:\\DerbyNet\\2024\\pack\\racers'"
+            " WHERE itemkey = 'photo-directory'",
+            "UPDATE RegistrationInfo SET imagefile ="
+            " 'c:\\derbynet\\2024\\PACK\\racers\\0-cropped\\head-101.jpg'"
+            " WHERE carnumber = 101",
+            "UPDATE RegistrationInfo SET imagefile = '/old/racers/../../etc/passwd'"
+            " WHERE carnumber = 111",
+            "UPDATE RegistrationInfo SET imagefile = 'D:\\photos\\..'"
+            " WHERE carnumber = 121",
+            "UPDATE RegistrationInfo SET carphoto = '/elsewhere/cars/car-101.jpg'"
+            " WHERE carnumber = 101",
+        ],
+    )
+
+    report, _ = _import(tmp_path, database)
+
+    folder = event_dir(report["event"]["slug"])
+    rebased = _racer(report, 101)
+    assert rebased.headshot == "0-cropped/head-101.jpg"
+    assert _md5(folder / "racers" / "0-cropped" / "head-101.jpg") == _md5(
+        FIXTURES / "v10-photos" / "racers" / "0-cropped" / "head-101.jpg"
+    )
+    assert _md5(folder / "racers" / "head-101.jpg") == _md5(
+        FIXTURES / "v10-photos" / "racers" / "head-101.jpg"
+    )
+    assert rebased.car_photo == "car-101.jpg"
+    assert (folder / "cars" / "car-101.jpg").is_file()
+    assert _racer(report, 111).headshot == "passwd"
+    assert _racer(report, 121).headshot == ""
+    missing = _findings(report, "missing-photo")
+    assert [f["legacy_id"] for f in missing] == [_legacy_racer(report, 111)]
+    unusable = [
+        f for f in _findings(report, "photo-path") if "D:\\\\photos" in f["detail"]
+    ]
+    assert len(unusable) == 1
+    assert not (folder / "racers" / "passwd").exists()
+
+
+def _legacy_racer(report, car_number):
+    ids = legacy_ids(_event(report))
+    return ids[("roster.racer", _racer(report, car_number).id)]
+
+
+def test_photos_are_found_under_the_photos_dir_options(tmp_path):
+    database = legacy_folder(tmp_path, "v10", photos=False)
+    shutil.copytree(FIXTURES / "v10-photos" / "racers", tmp_path / "heads")
+    shutil.copytree(FIXTURES / "v10-photos" / "cars", tmp_path / "carpix")
+
+    report, _ = _import(
+        tmp_path,
+        database,
+        "--photos-dir",
+        str(tmp_path / "heads"),
+        "--car-photos-dir",
+        str(tmp_path / "carpix"),
+    )
+
+    assert _findings(report, "missing-photo") == []
+    folder = event_dir(report["event"]["slug"])
+    assert (folder / "racers" / "0-cropped" / "head-101.jpg").is_file()
+    assert (folder / "cars" / "car-101.jpg").is_file()
+
+
+def test_a_photo_with_no_file_is_reported(tmp_path):
+    report, _ = _import(tmp_path, legacy_folder(tmp_path, "v10", photos=False))
+    missing = _findings(report, "missing-photo")
+    assert len(missing) == 3
+    assert _racer(report, 111).headshot == "head-111.jpg"
+
+
+def _violating_source(tmp_path, folder="bad"):
+    # An organic group without round 1 (classes-round1).
+    return legacy_folder(
+        tmp_path,
+        "v10",
+        folder=folder,
+        sql=["INSERT INTO Classes(classid, class, sortorder) VALUES(50, 'Ghosts', 50)"],
+    )
+
+
+# Handed off from the #13 review: the whole import is one transaction.
+def test_a_violation_rolls_back_everything_the_import_wrote(tmp_path, data_dir):
+    with pytest.raises(CommandError, match="classes-round1"):
+        _import(tmp_path, _violating_source(tmp_path))
+
+    assert not Event.objects.exists()
+    assert not Racer.objects.exists()
+    assert not LegacyId.objects.exists()
+    assert not SiteState.objects.exists()
+    assert [p for p in data_dir.rglob("*") if p.is_file()] == []
+    report = (tmp_path / "report.json").read_text()
+    assert '"outcome": "rolled back"' in report
+    assert '"classes-round1"' in report
+
+
+def test_accept_violations_keeps_the_import_and_reports_them(tmp_path):
+    report, out = _import(tmp_path, _violating_source(tmp_path), "--accept-violations")
+    assert report["outcome"] == "committed"
+    assert [row["name"] for row in report["invariants"]["classes-round1"]] == ["Ghosts"]
+    assert "classes-round1: 1" in out
+
+
+def test_a_failed_replace_keeps_the_old_event(tmp_path):
+    first, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
+    old = _event(first)
+    files = sorted(p for p in event_dir(old.slug).rglob("*") if p.is_file())
+    assert files
+
+    with pytest.raises(CommandError):
+        _import(tmp_path, _violating_source(tmp_path), "--event", "Pack", "--replace")
+
+    assert list(Event.objects.values_list("id", "slug")) == [(old.id, old.slug)]
+    assert SiteState.get().active_event == old
+    assert Racer.objects.filter(event=old).count() == 82
+    assert LegacyId.objects.filter(event=old).exists()
+    assert sorted(p for p in event_dir(old.slug).rglob("*") if p.is_file()) == files
+
+
+def test_replace_moves_the_active_event_to_the_new_import(tmp_path):
+    first, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
+    assert SiteState.get().active_event_id == first["event"]["id"]
+    second, _ = _import(
+        tmp_path, legacy_folder(tmp_path, "v9"), "--event", "Pack", "--replace"
+    )
+    assert SiteState.get().active_event_id == second["event"]["id"]
+
+
+def test_a_racechart_row_with_no_racer_is_dropped_and_reported(tmp_path):
+    report, _ = _import(tmp_path, legacy_folder(tmp_path, "v1"))
+    dropped = [f for f in _findings(report, "dropped-row") if f["table"] == "racechart"]
+    assert len(dropped) == 1 and "racerid is empty" in dropped[0]["detail"]
+    counts = report["counts"]["racechart"]
+    assert counts["imported"] == counts["source"] - 1
+
+
+def test_v1_mixed_case_columns_read_as_lower_case(tmp_path):
+    v1, _ = _import(tmp_path / "a", legacy_folder(tmp_path / "a", "v1"), "--event", "a")
+    v10, _ = _import(
+        tmp_path / "b", legacy_folder(tmp_path / "b", "v10"), "--event", "b"
+    )
+
+    def names(report):
+        return sorted(
+            Racer.objects.filter(event=_event(report)).values_list(
+                "car_number", "first_name", "last_name"
+            )
+        )
+
+    assert names(v1) == names(v10)
+    assert RaceSettings.for_event(_event(v1)).supergroup_label == "x" * 50
+
+
+def test_check_in_times_before_schema_10_come_from_events(tmp_path):
+    database = legacy_folder(tmp_path, "v9")
+    events = source_rows(
+        database, "SELECT racerid, tstamp FROM Events WHERE action = 1 ORDER BY seq"
+    )
+    assert events
+    report, _ = _import(tmp_path, database)
+    ids = legacy_ids(_event(report))
+    zone = ZoneInfo(settings.TIME_ZONE)
+    seen = {}
+    for racer in Racer.objects.filter(event=_event(report)):
+        racerid = ids[("roster.racer", racer.id)]
+        latest = [row["tstamp"] for row in events if row["racerid"] == racerid]
+        if not latest:
+            assert racer.checked_in_at is None
+            continue
+        wall = datetime.fromisoformat(latest[-1]).replace(tzinfo=zone)
+        # Racers checked in within one second keep their order by microseconds.
+        assert racer.checked_in_at.replace(microsecond=0) == wall
+        seen.setdefault(wall, []).append(racer.checked_in_at)
+    assert any(len(times) > 1 for times in seen.values())
+    assert all(len(set(times)) == len(times) for times in seen.values())
+
+
+def test_a_ranks_partition_named_not_specified_becomes_default(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v7",
+        sql=["UPDATE Ranks SET rank = '* Not specified' WHERE rankid = 1"],
+    )
+    report, _ = _import(tmp_path, database)
+    names = set(
+        Partition.objects.filter(event=_event(report)).values_list("name", flat=True)
+    )
+    assert "Default" in names
+    assert "* Not specified" not in names
+
+
+def test_constituent_csv_and_rows_are_merged_and_differences_reported(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=["DELETE FROM ConstituentClasses WHERE dependent = 8 AND antecedent = 2"],
+    )
+    report, _ = _import(tmp_path, database)
+
+    younger = Group.objects.get(event=_event(report), name="Younger")
+    assert sorted(younger.constituents.values_list("name", flat=True)) == [
+        "Lions & Tigers",
+        "White's Wolves",
+    ]
+    mismatches = _findings(report, "constituent-mismatch")
+    assert [f["legacy_id"] for f in mismatches] == [8]
+    assert GroupConstituent.objects.filter(event=_event(report)).count() == 4
+
+
+def test_kiosk_pages_split_into_page_params_and_reload(tmp_path):
+    report, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"))
+    kiosks = {k.address: k for k in Kiosk.objects.filter(event=_event(report))}
+    assert kiosks["fixture-kiosk-1"].page == "kiosks/please-check-in.kiosk"
+    assert kiosks["fixture-kiosk-1"].params == {"classids": [1, 2]}
+    assert kiosks["fixture-kiosk-1"].name == "Main"
+    assert kiosks["fixture-kiosk-3"].page == "kiosks/standings.kiosk"
+    assert kiosks["fixture-kiosk-3"].reload_requested
+    assert not kiosks["fixture-kiosk-1"].reload_requested
+    local = _findings(report, "local-kiosk-page")
+    assert {(f["table"], f["legacy_id"]) for f in local} == {
+        ("kiosks", "fixture-kiosk-2"),
+        ("scenekiosk", 14),
+    }
+
+
+def test_action_history_is_copied_verbatim_and_bad_json_is_kept(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[
+            "INSERT INTO ActionHistory(historyid, received, request)"
+            " VALUES(9000, '2024-02-10 13:05:09', '{not json')"
+        ],
+    )
+    source = source_rows(database, "SELECT historyid, request FROM ActionHistory")
+    report, _ = _import(tmp_path, database)
+
+    ids = legacy_ids(_event(report))
+    logs = {
+        ids[("core.actionlog", log.id)]: log
+        for log in ActionLog.objects.filter(event=_event(report))
+    }
+    assert len(logs) == len(source)
+    for row in source:
+        if row["historyid"] == 9000:
+            assert logs[9000].request == {"unparsed": "{not json"}
+        else:
+            assert logs[row["historyid"]].request == json.loads(row["request"])
+    assert [f["legacy_id"] for f in _findings(report, "unparsed-action")] == [9000]
+    assert logs[9000].received == datetime(
+        2024, 2, 10, 13, 5, 9, tzinfo=ZoneInfo(settings.TIME_ZONE)
+    )
+
+
+def test_an_award_of_a_deleted_group_becomes_pack_wide(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[
+            "UPDATE Awards SET classid = 99, rankid = 98 WHERE awardname = 'Best Bear'",
+            "UPDATE Awards SET racerid = 777 WHERE awardname = 'Best in Show'",
+        ],
+    )
+    report, _ = _import(tmp_path, database)
+
+    bear = Award.objects.get(event=_event(report), name="Best Bear")
+    assert bear.group is None and bear.subgroup is None
+    assert len(_findings(report, "unscoped-award")) == 1
+    assert Award.objects.get(event=_event(report), name="Best in Show").racer is None
+    lionic = Award.objects.get(event=_event(report), name="Most Lionic")
+    assert lionic.group.name == "Lions & Tigers"
+
+
+def test_references_in_raceinfo_point_at_the_imported_rows(tmp_path):
+    report, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"))
+    state = RaceState.for_event(_event(report))
+    ids = legacy_ids(_event(report))
+    assert ids[("racing.round", state.current_round_id)] == 5
+    assert ids[("roster.group", state.current_group_id)] == 5
+    assert state.last_heat == {
+        "round_id": state.current_round_id,
+        "heat": 16,
+        "results": None,
+    }
+
+
+def test_the_report_lists_counts_findings_and_invariants(tmp_path):
+    report, out = _import(tmp_path, legacy_folder(tmp_path, "v10"))
+    assert report["source"]["version"] == 10
+    assert report["counts"]["racechart"] == {"source": 328, "imported": 328}
+    assert report["invariants"] == {}
+    assert "events" in report["not_imported"]
+    # Three racer photos, one of them cropped, so four files.
+    assert report["photos"] == {"paths": 3, "files_copied": 4}
+    assert "racechart: 328 of 328" in out

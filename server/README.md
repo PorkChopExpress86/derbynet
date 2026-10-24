@@ -35,6 +35,24 @@ uv run python manage.py dump_event <slug>
 
 The command only reads.
 
+## Import a past DerbyNet event
+
+`import_derbynet` loads one event from the PHP server as a new event. The source is an event folder's `derbynet.sqlite3`, at any schema version from 1 to 10, or a file saved from `action.php?query=snapshot.get&photos`. The source is opened read-only.
+
+```sh
+uv run python manage.py import_derbynet /path/to/2024/pack42/derbynet.sqlite3 --report report.json
+```
+
+| Option | Effect |
+|---|---|
+| `--event NAME` | The new event's name. Default: the source's folder name, `pack42` above. |
+| `--photos-dir DIR`, `--car-photos-dir DIR` | Where to look for photos first. Then the source's `racers/` and `cars/` folders. |
+| `--replace` | Replace the event of the same name. Without it, an existing name is refused. |
+| `--accept-violations` | Keep the import when `check_invariants()` finds violations. Without it, they roll the import back. |
+| `--report PATH` | Write the full report as JSON. A summary always goes to stdout. |
+
+The report counts the rows read and imported per legacy table, and lists every row dropped and every value changed, with the reason. The tests read fixtures that `transfer/tests/fixtures/legacy/build.sh` made with the PHP server.
+
 ## Run both servers
 
 From the repository root, first build the files the PHP pages need, as step 2 of the top-level `README.md` says (`ant generated`). Then run:
