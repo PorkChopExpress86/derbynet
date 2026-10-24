@@ -4,12 +4,10 @@
 schema 10, and writes them in one transaction: the event, every table, the
 `RaceInfo` settings and state, and a `LegacyId` row per imported row. It then
 runs `check_invariants()`. A violation rolls everything back unless the
-caller accepts violations. Photo files are staged outside the event's folder
-and moved in only after the commit.
+caller accepts violations. The event's files go into a new folder, which the
+commit switches the event to (`legacy.folders`).
 """
 
-import shutil
-import tempfile
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -17,10 +15,11 @@ from django.conf import settings
 from django.db import transaction
 
 from core.invariants import check_invariants
-from core.models import Event, SiteState, event_scoped_models
+from core.models import Event, RaceSettings, SiteState, event_scoped_models
 from core.services import new_event
 
-from .legacy.photos import CAR_PHOTOS, HEADSHOTS, Photos, publish
+from .legacy.folders import FOLDERS, ImportFolder, recover
+from .legacy.photos import CAR_PHOTOS, HEADSHOTS, Photos
 from .legacy.raceinfo import apply_raceinfo, legacy_folders
 from .legacy.report import Report
 from .legacy.source import read_source
@@ -80,57 +79,58 @@ def import_derbynet(
     tables = upgrade(source.tables, version)
 
     events_root = Path(settings.DATA_DIR) / "events"
-    events_root.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".import-", dir=events_root))
+    report.recovered = [str(path) for path in recover(events_root)]
+    folder = ImportFolder(events_root, name)
     try:
         photos = Photos(
             report,
-            staging,
+            folder.path,
             source_path=path,
             legacy_dirs=legacy_folders(tables["raceinfo"]),
             search_dirs={HEADSHOTS: photos_dir, CAR_PHOTOS: car_photos_dir},
         )
         photos.add_snapshot_photos(source.photos)
-        restore = None
-        try:
-            with transaction.atomic():
-                event = _create_event(name, replace, report)
-                ctx = Context(event, tables, report, zone, photos)
-                legacy_ids = load_tables(ctx)
-                apply_raceinfo(ctx)
-                LegacyId.objects.bulk_create(
-                    LegacyId(event=event, model=m, legacy_id=legacy, new_id=new)
-                    for m, legacy, new in legacy_ids
+        # durable: the commit at the end of this block is the switch from the
+        # old event's folders to the new one.
+        with transaction.atomic(durable=True):
+            event, replaced = _create_event(name, replace, report)
+            ctx = Context(event, tables, report, zone, photos)
+            legacy_ids = load_tables(ctx)
+            apply_raceinfo(ctx)
+            folder.point(event)
+            LegacyId.objects.bulk_create(
+                LegacyId(event=event, model=m, legacy_id=legacy, new_id=new)
+                for m, legacy, new in legacy_ids
+            )
+            report.photos = {
+                "folder": str(folder.path),
+                "paths": photos.referenced,
+                "files_copied": photos.copied,
+            }
+            report.invariants = check_invariants(event)
+            if report.invariants and not accept_violations:
+                raise ImportFailed(
+                    "the imported rows violate invariants: "
+                    + ", ".join(sorted(report.invariants)),
+                    report,
                 )
-                report.photos = {
-                    "paths": photos.referenced,
-                    "files_copied": photos.copied,
-                }
-                report.invariants = check_invariants(event)
-                if report.invariants and not accept_violations:
-                    raise ImportFailed(
-                        "the imported rows violate invariants: "
-                        + ", ".join(sorted(report.invariants)),
-                        report,
-                    )
-                # Last, so a failure here rolls the rows back too.
-                restore = publish(staging, event.slug)
-        except OSError as error:
-            if restore is not None:
-                restore()
-            raise ImportFailed(f"cannot write the photos: {error}", report) from None
-        except BaseException:
-            if restore is not None:
-                restore()
-            raise
-        report.outcome = "committed"
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
+            folder.note_replaced(replaced)
+    except OSError as error:
+        folder.discard()
+        raise ImportFailed(f"cannot write the photos: {error}", report) from None
+    except BaseException:
+        folder.discard()
+        raise
+    folder.finish()
+    report.outcome = "committed"
     return report
 
 
 def _create_event(name, replace, report):
-    """A new event named `name`, replacing the existing one if asked to."""
+    """A new event named `name`, replacing the existing one if asked to.
+
+    Also returns the replaced event's directories.
+    """
     existing = list(Event.objects.select_for_update().filter(name=name))
     if existing and not replace:
         raise ImportFailed(
@@ -139,7 +139,10 @@ def _create_event(name, replace, report):
     if len(existing) > 1:
         raise ImportFailed(f"{len(existing)} events are named {name!r}", report)
     old = existing[0] if existing else None
+    replaced = []
     if old is not None:
+        old_settings = RaceSettings.for_event(old)
+        replaced = [getattr(old_settings, field) for field in FOLDERS]
         # Frees the slug, so the new event gets the old one's folder name.
         Event.objects.filter(pk=old.pk).update(slug=f"{old.slug}-replaced-{old.pk}")
         delete_event_rows(old)
@@ -148,7 +151,7 @@ def _create_event(name, replace, report):
         SiteState.objects.filter(active_event=old).update(active_event=event)
         old.delete()
     report.event = {"id": event.id, "name": event.name, "slug": event.slug}
-    return event
+    return event, replaced
 
 
 def delete_event_rows(event):

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from django.core.management import call_command
 
-from core.models import event_scoped_models
+from core.models import RaceSettings, event_scoped_models
 from core.services import event_dir
 from transfer.models import LegacyId
 
@@ -63,6 +63,11 @@ def run_import(source, *args, report_dir):
     return json.loads(report.read_text()), out.getvalue()
 
 
+def event_folder(event):
+    """The folder that holds the event's photo folders."""
+    return Path(RaceSettings.for_event(event).photo_directory).parent
+
+
 def legacy_ids(event):
     """`{(model label, new id): legacy id}` for the event's imported rows."""
     return {
@@ -79,7 +84,7 @@ def legacy_dump(event, *, omit=()):
     into the event's folder name it `<event>`.
     """
     mapping = legacy_ids(event)
-    folder = str(event_dir(event.slug))
+    folders = (str(event_folder(event)), str(event_dir(event.slug)))
     dump = {}
     for model in event_scoped_models():
         model_label = model._meta.label_lower
@@ -104,7 +109,8 @@ def legacy_dump(event, *, omit=()):
                         **value,
                         "round_id": mapping[("racing.round", value["round_id"])],
                     }
-                elif isinstance(value, str) and value.startswith(folder):
+                elif isinstance(value, str) and value.startswith(folders):
+                    folder = next(f for f in folders if value.startswith(f))
                     value = "<event>" + value[len(folder) :]
                 row[field.name] = value
             rows.append(row)

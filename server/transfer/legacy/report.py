@@ -52,6 +52,8 @@ class Report:
     findings: list[Finding] = field(default_factory=list)
     photos: dict = field(default_factory=dict)
     invariants: dict = field(default_factory=dict)
+    # What dead imports left behind and this one removed (`legacy.folders`).
+    recovered: list = field(default_factory=list)
     outcome: str = "rolled back"
 
     def add(self, kind, table, legacy_id, detail):
@@ -74,6 +76,7 @@ class Report:
             "photos": self.photos,
             "findings": [asdict(finding) for finding in self.findings],
             "invariants": self.invariants,
+            "recovered": self.recovered,
         }
 
     def summary(self):
@@ -87,6 +90,8 @@ class Report:
         lines.append("rows imported of rows read:")
         for table, count in sorted(self.counts.items()):
             lines.append(f"  {table}: {count['imported']} of {count['source']}")
+        for path in self.recovered:
+            lines.append(f"removed {path}, left by an import that did not finish")
         if self.photos:
             lines.append(
                 f"photos: {self.photos['paths']} paths, {self.photos['files_copied']}"

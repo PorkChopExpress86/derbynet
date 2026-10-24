@@ -13,7 +13,6 @@ from awards.models import Award
 from core.invariants import check_invariants
 from core.legacy_keys import Dropped, Mapped, Ref, encode, entry_for
 from core.models import Event
-from core.services import event_dir
 from racing.models import HeatLane, RosterEntry, Round
 from roster.models import Group, Partition, Racer, Subgroup
 from transfer.legacy.source import read_source
@@ -21,6 +20,7 @@ from transfer.models import LegacyId
 from transfer.tests.legacy import (
     FIXTURES,
     SNAPSHOT,
+    event_folder,
     legacy_dump,
     legacy_folder,
     legacy_ids,
@@ -362,8 +362,8 @@ def test_the_v10_snapshot_imports_as_the_v10_database_does(tmp_path):
     photos = read_source(SNAPSHOT).photos
     assert {photo.column for photo in photos} == {"imagefile", "carphoto"}
     assert any(photo.original for photo in photos)
-    folder = event_dir(_event(snapshot).slug)
-    sqlite_folder = event_dir(_event(sqlite).slug)
+    folder = event_folder(_event(snapshot))
+    sqlite_folder = event_folder(_event(sqlite))
     ids = legacy_ids(_event(snapshot))
     for photo in photos:
         racer = Racer.objects.get(pk=_new_id(ids, "roster.racer", photo.racerid))
@@ -399,7 +399,7 @@ def test_a_snapshot_basename_cannot_leave_the_photo_repository(tmp_path, data_di
     report, _ = _import(tmp_path, source)
 
     repo = "racers" if photo.column == "imagefile" else "cars"
-    folder = event_dir(report["event"]["slug"]) / repo
+    folder = event_folder(_event(report)) / repo
     assert (folder / "x.jpg").read_bytes() == photo.displayed
     written = [p for p in data_dir.rglob("*") if p.is_file()]
     assert written

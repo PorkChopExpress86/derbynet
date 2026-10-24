@@ -14,7 +14,6 @@ from django.core.management import CommandError, call_command
 
 from awards.models import Award
 from core.models import ActionLog, Event, RaceSettings, RaceState, SiteState
-from core.services import event_dir
 from kiosks.models import Kiosk
 from roster.models import Group, GroupConstituent, Partition, Racer
 from transfer.legacy import photos
@@ -23,6 +22,7 @@ from transfer.models import LegacyId
 from transfer.tests.legacy import (
     FIXTURES,
     SNAPSHOT,
+    event_folder,
     legacy_folder,
     legacy_ids,
     run_import,
@@ -197,7 +197,7 @@ def test_windows_and_dotted_photo_paths_are_rebased_or_reported(tmp_path):
 
     report, _ = _import(tmp_path, database)
 
-    folder = event_dir(report["event"]["slug"])
+    folder = event_folder(_event(report))
     rebased = _racer(report, 101)
     assert rebased.headshot == "0-cropped/head-101.jpg"
     assert _md5(folder / "racers" / "0-cropped" / "head-101.jpg") == _md5(
@@ -239,7 +239,7 @@ def test_photos_are_found_under_the_photos_dir_options(tmp_path):
     )
 
     assert _findings(report, "missing-photo") == []
-    folder = event_dir(report["event"]["slug"])
+    folder = event_folder(_event(report))
     assert (folder / "racers" / "0-cropped" / "head-101.jpg").is_file()
     assert (folder / "cars" / "car-101.jpg").is_file()
 
@@ -286,7 +286,7 @@ def test_accept_violations_keeps_the_import_and_reports_them(tmp_path):
 def test_a_failed_replace_keeps_the_old_event(tmp_path):
     first, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
     old = _event(first)
-    files = sorted(p for p in event_dir(old.slug).rglob("*") if p.is_file())
+    files = sorted(p for p in event_folder(old).rglob("*") if p.is_file())
     assert files
 
     with pytest.raises(CommandError):
@@ -296,7 +296,7 @@ def test_a_failed_replace_keeps_the_old_event(tmp_path):
     assert SiteState.get().active_event == old
     assert Racer.objects.filter(event=old).count() == 82
     assert LegacyId.objects.filter(event=old).exists()
-    assert sorted(p for p in event_dir(old.slug).rglob("*") if p.is_file()) == files
+    assert sorted(p for p in event_folder(old).rglob("*") if p.is_file()) == files
 
 
 def test_replace_moves_the_active_event_to_the_new_import(tmp_path):
@@ -479,7 +479,11 @@ def test_the_report_lists_counts_findings_and_invariants(tmp_path):
     assert report["invariants"] == {}
     assert "events" in report["not_imported"]
     # Three racer photos, one of them cropped, so four files.
-    assert report["photos"] == {"paths": 3, "files_copied": 4}
+    assert report["photos"] == {
+        "folder": str(event_folder(_event(report))),
+        "paths": 3,
+        "files_copied": 4,
+    }
     assert "racechart: 328 of 328" in out
 
 
@@ -529,7 +533,7 @@ def test_a_dropped_racer_publishes_no_photo(tmp_path):
         sql=["UPDATE RegistrationInfo SET carnumber = 1e20 WHERE carnumber = 101"],
     )
     report, _ = _import(tmp_path, database)
-    folder = event_dir(report["event"]["slug"])
+    folder = event_folder(_event(report))
     assert not (folder / "racers" / "head-101.jpg").exists()
     assert not (folder / "cars" / "car-101.jpg").exists()
     assert (folder / "racers" / "head-111.jpg").is_file()
@@ -541,22 +545,25 @@ def test_a_photo_write_failure_rolls_back_and_keeps_the_old_photos(
 ):
     first, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
     old = _event(first)
-    folder = event_dir(old.slug)
+    folder = event_folder(old)
     before = {p: _md5(p) for p in folder.rglob("*") if p.is_file()}
     assert before
-    real_move = photos.shutil.move
+    real_copy = photos.shutil.copyfileobj
+    copies = []
 
-    def failing_move(source, target):
-        if str(target).endswith("cars"):
+    def failing_copy(source, target):
+        copies.append(source)
+        if len(copies) == 2:
             raise OSError(28, "No space left on device")
-        return real_move(source, target)
+        return real_copy(source, target)
 
-    monkeypatch.setattr(photos.shutil, "move", failing_move)
+    monkeypatch.setattr(photos.shutil, "copyfileobj", failing_copy)
     with pytest.raises(CommandError, match="No space left"):
         _import(tmp_path, legacy_folder(tmp_path, "v9"), "--event", "Pack", "--replace")
     monkeypatch.undo()
 
     assert list(Event.objects.values_list("id", flat=True)) == [old.id]
+    assert [p.name for p in folder.parent.iterdir()] == [folder.name]
     assert {p: _md5(p) for p in folder.rglob("*") if p.is_file()} == before
 
 
@@ -755,7 +762,7 @@ def test_snapshot_photos_sharing_a_name_each_keep_their_own_file(tmp_path):
 
     report, _ = _import(tmp_path, source)
 
-    racers = event_dir(report["event"]["slug"]) / "racers"
+    racers = event_folder(_event(report)) / "racers"
     shots = {racerid: _headshot(report, racerid) for racerid in (1, 11, 21, 31)}
     assert shots == {
         1: "0-cropped/same.jpg",
@@ -778,7 +785,7 @@ def test_snapshot_names_that_sanitize_alike_each_keep_their_own_file(tmp_path):
 
     report, _ = _import(tmp_path, source)
 
-    racers = event_dir(report["event"]["slug"]) / "racers"
+    racers = event_folder(_event(report)) / "racers"
     assert (_headshot(report, 1), _headshot(report, 11)) == ("_.jpg", "_-2.jpg")
     assert (racers / "_.jpg").read_bytes() == b"e acute"
     assert (racers / "_-2.jpg").read_bytes() == b"e grave"
@@ -796,7 +803,7 @@ def test_a_snapshot_name_too_long_for_the_disk_is_shortened(tmp_path):
 
     report, _ = _import(tmp_path, source)
 
-    racers = event_dir(report["event"]["slug"]) / "racers"
+    racers = event_folder(_event(report)) / "racers"
     first, second = _headshot(report, 1), _headshot(report, 11)
     assert first.startswith("0-cropped/aaa") and first.endswith(".jpg")
     assert len(first) <= 255
@@ -841,8 +848,8 @@ def test_symbolic_links_in_the_photo_folders_are_skipped_and_reported(
     assert any(str(car_dir / "car-101.jpg") in d for d in links)
     assert _racer(report, 101).headshot == "head-101.jpg"
     assert _racer(report, 101).car_photo == "car-101.jpg"
-    event_folder = event_dir(report["event"]["slug"])
-    assert _md5(event_folder / "cars" / "car-101.jpg") == _md5(
+    folder = event_folder(_event(report))
+    assert _md5(folder / "cars" / "car-101.jpg") == _md5(
         FIXTURES / "v10-photos" / "cars" / "car-101.jpg"
     )
     assert [f["legacy_id"] for f in _findings(report, "missing-photo")] == [

@@ -3,9 +3,8 @@
 `RegistrationInfo.imagefile` and `carphoto` hold absolute paths on the machine
 that recorded them, on Windows too. A `Racer` keeps a path relative to the
 event's repository: `""`, `"<basename>"`, or `"0-cropped/<basename>"`
-(`roster.models.PHOTO_PATH_REGEX`). The importer copies the files into a
-staging folder, and `publish()` moves them into the event's folder after the
-database transaction commits.
+(`roster.models.PHOTO_PATH_REGEX`). The importer copies the files into the
+new event's folder (`legacy.folders`).
 """
 
 import ntpath
@@ -15,8 +14,6 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-
-from core.services import event_dir
 
 from .report import Kind
 
@@ -82,9 +79,9 @@ def relative_parts(path, directory):
 class Photos:
     """Stages photo files for one import and rebases each racer's paths."""
 
-    def __init__(self, report, staging, *, source_path, legacy_dirs, search_dirs):
+    def __init__(self, report, folder, *, source_path, legacy_dirs, search_dirs):
         self.report = report
-        self.staging = Path(staging)
+        self.folder = Path(folder)
         self.source_dir = Path(source_path).resolve().parent
         self.legacy_dirs = legacy_dirs  # Repository -> legacy directory or None
         self.search_dirs = search_dirs  # Repository -> --photos-dir style override
@@ -173,10 +170,10 @@ class Photos:
         return candidate
 
     def stage(self, racerids):
-        """Write the files of the imported racers into the staging folder."""
+        """Write the files of the imported racers into the event's folder."""
         for racerid in racerids:
             for content, repository, relative in self.pending.pop(racerid, []):
-                target = self.staging / repository.folder / relative
+                target = self.folder / repository.folder / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if isinstance(content, Path):
                     # O_NOFOLLOW: a file swapped for a link since is refused.
@@ -293,40 +290,3 @@ def _fit(stem, suffix, extension):
 
 def _relative(cropped, name):
     return f"{CROPPED}/{name}" if cropped else name
-
-
-def publish(staging, slug):
-    """Move the staged photo folders into the event's folder.
-
-    Folders already there move into `staging`, and the returned function moves
-    them back, for when the transaction that published them rolls back.
-    """
-    staging = Path(staging)
-    target = event_dir(slug)
-    target.mkdir(parents=True, exist_ok=True)
-    moved = []
-
-    def restore():
-        for folder, kept in reversed(moved):
-            if folder.exists():
-                shutil.rmtree(folder)
-            if kept is not None:
-                shutil.move(kept, folder)
-
-    try:
-        for repository in REPOSITORIES:
-            folder = target / repository.folder
-            kept = None
-            if folder.exists():
-                kept = staging / f"replaced-{repository.folder}"
-                shutil.move(folder, kept)
-            moved.append((folder, kept))
-            staged = staging / repository.folder
-            if staged.exists():
-                shutil.move(staged, folder)
-            else:
-                folder.mkdir()
-    except BaseException:
-        restore()
-        raise
-    return restore
