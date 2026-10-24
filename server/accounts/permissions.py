@@ -106,9 +106,9 @@ def log_in(session: SessionBase, logged_in: Role) -> None:
 
 
 def log_out(session: SessionBase) -> None:
-    session.cycle_key()
-    session.pop(SESSION_ROLE, None)
-    session.pop(SESSION_PERMISSIONS, None)
+    """Forget the whole session, as a shared check-in phone needs: the next
+    user must not inherit the barcode mode or any other key."""
+    session.flush()
 
 
 def add_bits(session: SessionBase, bits: Perm) -> None:
