@@ -58,6 +58,20 @@ def test_an_array_name_is_unrecognized_where_php_answers_500(client, event):
     assert outcome(response)["description"] == "Unrecognized query: "
 
 
+def test_a_hostile_field_name_cannot_add_markup_to_an_xml_response(client, event):
+    response = post(
+        client,
+        "action=timer-message&message=HELLO"
+        "&%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E%3Cx%20y=1",
+    )
+
+    assert b"script" not in response.content
+    assert ET.fromstring(response.content).attrib == {
+        "action": "timer-message",
+        "message": "HELLO",
+    }
+
+
 def test_every_response_forbids_caching(client, event):
     for response in (client.get("/action.php"), client.get("/action.php?query=x")):
         assert response["Cache-Control"] == "no-store, no-cache, must-revalidate"

@@ -1,3 +1,5 @@
+import xml.etree.ElementTree as ET
+
 from legacy_api.xml import XmlWriter, php_escape
 
 
@@ -49,3 +51,37 @@ def test_a_nested_field_is_left_out_of_the_attributes():
 
 def test_a_handler_with_nothing_to_say_sends_only_the_prolog():
     assert XmlWriter({}).document() == b'<?xml version="1.0" encoding="UTF-8"?>\n'
+
+
+def test_a_field_name_that_would_inject_markup_is_left_out():
+    writer = XmlWriter(
+        {
+            "action": "timer-message",
+            '><script xmlns="http://www.w3.org/1999/xhtml">alert(1)</script><x y': "1",
+            "xmlns": "http://www.w3.org/1999/xhtml",
+            "xlink:href": "javascript:alert(1)",
+            "message": "HELLO",
+        }
+    )
+    writer.not_authorized()
+
+    document = writer.document()
+    assert document == (
+        b'<?xml version="1.0" encoding="UTF-8"?>\n'
+        b'<action-response action="timer-message" message="HELLO">'
+        b'<failure code="notauthorized">'
+        b"Not authorized -- please see race coordinator</failure>"
+        b"</action-response>\n"
+    )
+    assert ET.fromstring(document).tag == "action-response"
+
+
+def test_the_field_names_clients_send_stay_attributes():
+    names = ["action", "lane_count", "remote-start", "device-TestTimer", "_x", "a.b"]
+    writer = XmlWriter(dict.fromkeys(names, "1"))
+    writer.start_response()
+
+    assert writer.document().endswith(
+        b'<action-response action="1" lane_count="1" remote-start="1"'
+        b' device-TestTimer="1" _x="1" a.b="1">'
+    )
