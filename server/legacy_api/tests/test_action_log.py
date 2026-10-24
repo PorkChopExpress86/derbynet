@@ -93,3 +93,4 @@ def test_a_log_write_the_database_refuses_still_answers_the_envelope(
     if connection.vendor == "postgresql":
         assert logged() == []
         assert "action log" in caplog.text
+        assert {r.levelname for r in caplog.records} == {"ERROR"}
