@@ -1,0 +1,60 @@
+# The PHP server and the Django server side by side, each with its own data.
+# See server/README.md.
+
+services:
+  php:
+    image: jeffpiazza/derbynet_server
+    ports:
+      - "${DERBYNET_PHP_PORT:-8080}:80"
+    volumes:
+      # Run "ant generated" first; the PHP pages need the files it writes.
+      - type: bind
+        source: ${DERBYNET_WEBSITE_DIR:-../website}
+        target: /var/www/html
+        read_only: true
+      - php-data:/var/lib/derbynet
+
+  # PHP answers every action with a redirect to setup.php until it has a
+  # database, so create one event database on the first start.
+  php-setup:
+    image: jeffpiazza/derbynet_server
+    depends_on:
+      - php
+    volumes:
+      - php-data:/var/lib/derbynet
+    command:
+      - sh
+      - -c
+      - |
+        [ -e /var/lib/derbynet/config-database.inc ] && exit 0
+        until wget -q -O /dev/null --post-data 'action=setup.nodata&ez-new=dev' http://php/action.php
+        do sleep 1
+        done
+
+  django:
+    image: ghcr.io/astral-sh/uv:0.13.5-python3.14-trixie-slim
+    working_dir: /server
+    command: >
+      sh -c "uv run --locked python manage.py migrate &&
+             uv run --locked python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "${DERBYNET_DJANGO_PORT:-8000}:8000"
+    environment:
+      DERBYNET_DEBUG: "1"
+      DERBYNET_DATA_DIR: /var/lib/derbynet/data
+      DERBYNET_CONFIG_DIR: /var/lib/derbynet/config
+      # Keep the container's virtualenv and bytecode out of the bind mount.
+      UV_PROJECT_ENVIRONMENT: /venv
+      UV_CACHE_DIR: /uv-cache
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - .:/server
+      - django-data:/var/lib/derbynet
+      - django-venv:/venv
+      - uv-cache:/uv-cache
+
+volumes:
+  php-data:
+  django-data:
+  django-venv:
+  uv-cache:
