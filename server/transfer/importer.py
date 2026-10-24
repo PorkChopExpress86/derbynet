@@ -8,6 +8,7 @@ caller accepts violations. The event's files go into a new folder, which the
 commit switches the event to (`legacy.folders`).
 """
 
+import os
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -142,11 +143,36 @@ def _recordings_to_discard(name, replace, discard_videos, report):
         return None
     old_settings = RaceSettings.for_event(old)
     files = size = 0
+    problems = []
     for directory in (old_settings.video_directory, old_settings.logs_directory):
-        for path in Path(directory).rglob("*"):
-            if path.is_file() and not path.is_symlink():
+        if not os.path.isdir(directory):
+            continue
+        for root, _, names in os.walk(
+            directory, onerror=lambda e: problems.append((e.filename, e.strerror))
+        ):
+            # rmtree needs write and search access on every folder it empties.
+            if not os.access(root, os.W_OK | os.X_OK):
+                problems.append((root, "not writable"))
+            for file_name in names:
+                path = Path(root, file_name)
+                try:
+                    if path.is_symlink():
+                        continue
+                    size += path.stat().st_size
+                except OSError as e:
+                    problems.append((str(path), e.strerror))
+                    continue
                 files += 1
-                size += path.stat().st_size
+    if problems:
+        where, why = problems[0]
+        raise ImportFailed(
+            f"cannot count or delete the videos and logs of {name!r}: {where}"
+            f" cannot be read or deleted ({why}). Fix its permissions and run"
+            " again. --discard-videos does not skip this check, because the"
+            " size cannot be reported and the delete would fail after the"
+            " commit",
+            report,
+        )
     if files and not discard_videos:
         raise ImportFailed(
             f"replacing {name!r} would delete {files} video and log files"

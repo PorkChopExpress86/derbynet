@@ -3,6 +3,7 @@
 import hashlib
 import io
 import json
+import os
 import shutil
 import sqlite3
 from datetime import UTC, datetime
@@ -1056,3 +1057,63 @@ def test_replace_of_empty_videos_and_logs_needs_no_flag(tmp_path, data_dir):
     )
 
     assert report["photos"]["discarded_recordings"] == {"files": 0, "bytes": 0}
+
+
+@pytest.fixture(
+    params=[0o000, 0o500, 0o400], ids=["unreadable", "read-only", "unsearchable"]
+)
+def unreadable_videos(request, pack_with_recordings):
+    """The `Pack` event's videos/ holds a folder with a file in it that the
+    import cannot list, cannot empty, or cannot stat inside."""
+    old = RaceSettings.for_event(_event(pack_with_recordings))
+    hidden = Path(old.video_directory) / "hidden"
+    hidden.mkdir()
+    (hidden / "heat3.mkv").write_bytes(b"hidden")
+    hidden.chmod(request.param)
+    yield hidden
+    hidden.chmod(0o700)
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any folder")
+@pytest.mark.parametrize("extra", [[], ["--discard-videos"]])
+def test_replace_is_refused_when_an_unreadable_folder_hides_videos(
+    tmp_path, data_dir, pack_with_recordings, unreadable_videos, extra
+):
+    source = legacy_folder(tmp_path, "v9")
+    event_before = pack_with_recordings["event"]["id"]
+    names_before = sorted(str(p) for p in data_dir.rglob("*"))
+    source_before = _tree(source.parent)
+
+    with pytest.raises(CommandError, match="hidden") as refused:
+        _import(tmp_path, source, "--event", "Pack", "--replace", *extra)
+
+    assert "cannot be read or deleted" in str(refused.value)
+    if extra:
+        assert "--discard-videos does not skip this check" in str(refused.value)
+    assert sorted(str(p) for p in data_dir.rglob("*")) == names_before
+    unreadable_videos.chmod(0o700)
+    assert (unreadable_videos / "heat3.mkv").read_bytes() == b"hidden"
+    assert _tree(source.parent) == source_before
+    assert [e.pk for e in Event.objects.filter(name="Pack")] == [event_before]
+
+
+def test_replace_neither_counts_nor_follows_a_symlinked_video(
+    tmp_path, data_dir, pack_with_recordings
+):
+    old = RaceSettings.for_event(_event(pack_with_recordings))
+    target = tmp_path / "precious.mkv"
+    target.write_bytes(b"keep me")
+    (Path(old.video_directory) / "link.mkv").symlink_to(target)
+
+    report, _ = _import(
+        tmp_path,
+        legacy_folder(tmp_path, "v9"),
+        "--event",
+        "Pack",
+        "--replace",
+        "--discard-videos",
+    )
+
+    assert report["photos"]["discarded_recordings"] == {"files": 3, "bytes": 10}
+    assert target.read_bytes() == b"keep me"
+    assert not Path(old.video_directory).exists()
