@@ -25,3 +25,6 @@ Every product decision the owner made for the Django migration, newest last. The
 | D19 | 2026-10-24 | Match PHP's reschedule charts in v1 and fix the quirk after the parity gate. Unsupported lane or car counts return `cant-fulfill`. The full timer audit is revived. Manual results carry the shown heat and get `wrong-heat` if it moved. | #20, #32 |
 | D20 | 2026-10-24 | Phone bottom nav is fixed per role. Every old operator URL gets a 301. Dark mode follows the device. | #39 |
 | D21 | 2026-10-24 | Kiosks get sub-second push updates, required in M5, with polling as the fallback. `ws-server.js` is dropped. A Pi is not supported as the server. | #56, ADR-15 |
+| D22 | 2026-10-24 | No Django users or admin. `django.contrib.auth` and `admin` are not installed, `AUTH_USER_MODEL` stays unset, and roles live in the session. | #15, ADR-16 |
+| D23 | 2026-10-24 | `role.list`, `query=roles`, `role.login` and `action=login` stay anonymous, because `derby-timer.jar` reads the role list before it logs in. Refines D5. | #15 |
+| D24 | 2026-10-24 | `query=standings` is public, like the standings page. | #17 |
