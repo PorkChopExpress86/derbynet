@@ -96,6 +96,7 @@ class Photos:
         # (folder, relative path) -> what was queued there: a source file's
         # path or a snapshot photo's bytes.
         self.claimed = {}
+        self.links = set()
         self._racerid = None
 
     def add_snapshot_photos(self, photos):
@@ -110,6 +111,27 @@ class Photos:
             # directory is set (`car_photo_directory()`).
             roots += self._roots(HEADSHOTS)
         return [Path(root) for root in roots if root]
+
+    def _is_file(self, root, *parts):
+        """Whether `root/parts` is a file, reached through no symbolic link.
+
+        A link could point anywhere on this machine, and photos are served to
+        anyone (D5). Each link is reported once.
+        """
+        path = root
+        for part in parts:
+            path = path / part
+            if path.is_symlink():
+                if path not in self.links:
+                    self.links.add(path)
+                    self.report.add(
+                        Kind.SYMLINK,
+                        "registrationinfo",
+                        self._racerid,
+                        f"{path} is a symbolic link; skipped",
+                    )
+                return False
+        return path.is_file()
 
     def _place(self, repository, name, files):
         """Queue `files` under `name`, or under `name-2`, `name-3` and so on
@@ -157,7 +179,10 @@ class Photos:
                 target = self.staging / repository.folder / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if isinstance(content, Path):
-                    shutil.copyfile(content, target)
+                    # O_NOFOLLOW: a file swapped for a link since is refused.
+                    fd = os.open(content, os.O_RDONLY | os.O_NOFOLLOW)
+                    with open(fd, "rb") as f, target.open("wb") as out:
+                        shutil.copyfileobj(f, out)
                 else:
                     target.write_bytes(content)
                 self.copied += 1
@@ -224,12 +249,13 @@ class Photos:
 
         for root in self._roots(repository):
             original, crop = root / name, root / CROPPED / name
-            if cropped and crop.is_file():
+            has_original = self._is_file(root, name)
+            if cropped and self._is_file(root, CROPPED, name):
                 files = [(True, crop)]
-                if original.is_file():
+                if has_original:
                     files.append((False, original))
                 return _relative(True, self._place(repository, name, files))
-            if original.is_file():
+            if has_original:
                 name = self._place(repository, name, [(False, original)])
                 if cropped:
                     self.report.add(

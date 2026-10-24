@@ -20,6 +20,7 @@ class Kind(StrEnum):
     UNPARSED_ACTION = "unparsed-action"
     PHOTO_PATH = "photo-path"
     MISSING_PHOTO = "missing-photo"
+    SYMLINK = "symlink"
     AMBIGUOUS_TIME = "ambiguous-time"
 
 

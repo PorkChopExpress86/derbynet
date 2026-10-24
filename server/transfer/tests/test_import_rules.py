@@ -809,3 +809,42 @@ def test_a_snapshot_name_too_long_for_the_disk_is_shortened(tmp_path):
         f for f in _findings(report, "photo-path") if "too long" in f["detail"]
     ]
     assert sorted(f["legacy_id"] for f in shortened) == [1, 11]
+
+
+def test_symbolic_links_in_the_photo_folders_are_skipped_and_reported(
+    tmp_path, data_dir
+):
+    database = legacy_folder(tmp_path, "v10")
+    folder = database.parent
+    secret = tmp_path / "secret.jpg"
+    secret.write_bytes(b"secret")
+    (folder / "racers" / "head-111.jpg").unlink()
+    (folder / "racers" / "head-111.jpg").symlink_to(secret)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "head-101.jpg").symlink_to(secret)
+    shutil.rmtree(folder / "racers" / "0-cropped")
+    (folder / "racers" / "0-cropped").symlink_to(elsewhere)
+    car_dir = tmp_path / "carpix"
+    car_dir.mkdir()
+    (car_dir / "car-101.jpg").symlink_to(secret)
+
+    report, _ = _import(tmp_path, database, "--car-photos-dir", str(car_dir))
+
+    assert not any(
+        p.read_bytes() == b"secret" for p in data_dir.rglob("*") if p.is_file()
+    )
+    links = sorted(f["detail"] for f in _findings(report, "symlink"))
+    assert len(links) == 3
+    assert any(str(folder / "racers" / "head-111.jpg") in d for d in links)
+    assert any(str(folder / "racers" / "0-cropped") in d for d in links)
+    assert any(str(car_dir / "car-101.jpg") in d for d in links)
+    assert _racer(report, 101).headshot == "head-101.jpg"
+    assert _racer(report, 101).car_photo == "car-101.jpg"
+    event_folder = event_dir(report["event"]["slug"])
+    assert _md5(event_folder / "cars" / "car-101.jpg") == _md5(
+        FIXTURES / "v10-photos" / "cars" / "car-101.jpg"
+    )
+    assert [f["legacy_id"] for f in _findings(report, "missing-photo")] == [
+        _legacy_racer(report, 111)
+    ]
