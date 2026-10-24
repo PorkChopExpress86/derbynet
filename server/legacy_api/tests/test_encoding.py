@@ -75,6 +75,14 @@ def test_an_empty_list_and_an_empty_dict_stay_distinct():
     assert encode_php_json({}) == b"{}\n"
 
 
+def test_an_empty_list_encodes_as_phps_empty_array_inside_a_response():
+    assert encode_php_json({"racers": []}) == b'{\n    "racers": []\n}\n'
+
+
+def test_an_empty_dict_encodes_as_an_empty_object_inside_a_response():
+    assert encode_php_json({"racers": {}}) == b'{\n    "racers": {}\n}\n'
+
+
 def test_an_infinite_float_from_a_handler_is_refused():
     with pytest.raises(ValueError):
         encode_php_json(float("inf"))

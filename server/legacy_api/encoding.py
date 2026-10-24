@@ -4,6 +4,8 @@
 depend on its quirks (#17): a numeric-looking string becomes a number, a slash
 is written `\\/`, and anything past ASCII is a `\\uXXXX` escape. The expected
 outputs in `tests/data/php_encoding.json` come from PHP itself.
+
+A handler passes a list for PHP's empty array, because an empty dict encodes as `{}`.
 """
 
 import math
