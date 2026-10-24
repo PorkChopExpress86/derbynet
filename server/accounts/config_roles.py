@@ -150,29 +150,48 @@ def parse(text: str) -> tuple[dict, str | None]:
 
 
 def _php(path: Path) -> tuple[dict, str | None]:
+    """Run the file with `php` and read back `json_encode()` of its roles.
+
+    This executes the file as PHP code."""
     defines = "".join(
         f"define('{name}', {value});" for name, value in CONSTANTS.items()
     )
     script = (
         defines + "include $argv[1];"
-        'echo json_encode(["roles" => $roles,'
-        ' "post_setup_role" => $post_setup_role ?? null]);'
+        '$found = json_encode(["roles" => $roles,'
+        ' "post_setup_role" => $post_setup_role ?? null], JSON_FORCE_OBJECT);'
+        "if ($found === false) {"
+        " fwrite(STDERR, 'json_encode: ' . json_last_error_msg()); exit(1); }"
+        "echo $found;"
     )
+    # An absolute path skips PHP's include_path, and `--` keeps a name that
+    # starts with `-` from reading as an option.
     result = subprocess.run(
-        ["php", "-r", script, str(path)],
+        ["php", "-r", script, "--", str(path.resolve())],
         capture_output=True,
         text=True,
-        check=True,
     )
-    found = json.loads(result.stdout)
-    return found["roles"], found["post_setup_role"]
+    if result.returncode != 0:
+        raise ConfigRolesError(
+            f"php exited with {result.returncode}: {result.stderr.strip()}"
+        )
+    try:
+        found = json.loads(result.stdout)
+    except ValueError:
+        found = None
+    if not (isinstance(found, dict) and isinstance(found.get("roles"), dict)):
+        raise ConfigRolesError(
+            "php printed something other than the roles, such as text outside"
+            f" <?php or a warning: {result.stdout[:200]!r}"
+        )
+    return found["roles"], found.get("post_setup_role")
 
 
 def read(path: Path) -> tuple[list[RoleConfig], str | None]:
     """The roles in file order, and the post-setup role's name."""
     try:
         roles, post_setup_role = parse(path.read_text())
-    except ConfigRolesError:
+    except ConfigRolesError, UnicodeDecodeError:
         if shutil.which("php") is None:
             raise
         roles, post_setup_role = _php(path)

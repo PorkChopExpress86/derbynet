@@ -155,3 +155,83 @@ def test_a_post_setup_role_that_names_no_role_fails(tmp_path):
     with pytest.raises(CommandError, match="Nobody"):
         import_roles(path)
     assert Role.objects.count() == 5
+
+
+def install_php(tmp_path, monkeypatch, script):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "php").write_text(f"#!/bin/sh\n{script}\n")
+    (bin_dir / "php").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+
+ROLES_JSON = '{"roles":{"":{"password":"","permissions":1}},"post_setup_role":""}'
+
+
+@pytest.mark.django_db
+def test_php_gets_an_absolute_path_after_the_options(tmp_path, monkeypatch):
+    """A relative path would be looked up in PHP's include_path first, and a
+    name starting with `-` would read as an option."""
+    (tmp_path / "config-roles.inc").write_text(UNREADABLE)
+    argv = tmp_path / "argv"
+    install_php(
+        tmp_path, monkeypatch, f"printf '%s\\n' \"$@\" > {argv}\necho '{ROLES_JSON}'"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    import_roles(Path("config-roles.inc"))
+
+    assert argv.read_text().splitlines()[-2:] == [
+        "--",
+        str(tmp_path / "config-roles.inc"),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "script",
+    [
+        # What `echo json_encode(...)` prints when the encoding fails.
+        "printf ''",
+        f"echo 'Notice: Undefined variable $x'; echo '{ROLES_JSON}'",
+        "echo '{\"roles\": '",
+        "echo '[]'",
+        'echo \'{"roles": [], "post_setup_role": null}\'',
+    ],
+    ids=["nothing", "stray-output", "truncated", "not-an-object", "roles-not-a-map"],
+)
+def test_output_php_cannot_have_meant_is_a_command_error(tmp_path, monkeypatch, script):
+    path = tmp_path / "config-roles.inc"
+    path.write_text(UNREADABLE)
+    install_php(tmp_path, monkeypatch, script)
+
+    with pytest.raises(CommandError, match="php printed"):
+        import_roles(path)
+    assert Role.objects.count() == 5
+
+
+@pytest.mark.django_db
+def test_a_php_error_message_reaches_the_operator(tmp_path, monkeypatch):
+    path = tmp_path / "config-roles.inc"
+    path.write_text(UNREADABLE)
+    install_php(tmp_path, monkeypatch, "echo 'Malformed UTF-8 characters' >&2; exit 1")
+
+    with pytest.raises(CommandError, match="Malformed UTF-8 characters"):
+        import_roles(path)
+
+
+def test_the_help_says_php_runs_the_file(capsys):
+    with pytest.raises(SystemExit):
+        call_command("import_roles", "--help")
+
+    assert "executes the file as PHP" in " ".join(capsys.readouterr().out.split())
+
+
+@pytest.mark.django_db
+def test_a_file_that_is_not_utf8_is_a_command_error(tmp_path, monkeypatch):
+    path = tmp_path / "config-roles.inc"
+    path.write_bytes(b"<?php $roles = array('X' => array('password' => '\xff'));")
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+
+    with pytest.raises(CommandError, match="cannot read"):
+        import_roles(path)
