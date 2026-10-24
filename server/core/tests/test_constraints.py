@@ -2,6 +2,7 @@
 
 import pytest
 from django.db import connection
+from django.utils import timezone
 
 from awards.tests.factories import BallotAwardFactory, VoteFactory
 from core.models import Event, RaceSettings, RaceState, SiteState
@@ -110,6 +111,15 @@ def test_an_award_has_one_ballot_entry():
     ballot = BallotAwardFactory()
     with refused():
         BallotAwardFactory(award=ballot.award)
+
+
+def test_a_malfunction_either_expires_or_waits_for_a_reset():
+    status = TimerStatus.for_event(EventFactory())
+    status.malfunction_requires_reset = True
+    status.malfunction_expires_at = timezone.now()
+
+    with refused():
+        status.save()
 
 
 def test_full_field_group_is_set_exactly_when_the_rule_is_group():

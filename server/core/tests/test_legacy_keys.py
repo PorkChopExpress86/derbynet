@@ -29,6 +29,7 @@ from core.legacy_keys import (
     entry_for,
 )
 from core.services import new_event
+from racing.models import TimerStatus
 
 # Frozen output of the grep command in #12, run against website/ before the
 # cutover deletes it, plus the one key that PHP names through a constant.
@@ -136,6 +137,7 @@ ROUND_TRIPS = [
             "last_contact": T1,
             "assume_connected_for_test": False,
             "malfunction_expires_at": T2,
+            "malfunction_requires_reset": False,
             "malfunction_message": "Lane 2 sensor + jammed",
         },
     ),
@@ -146,7 +148,19 @@ ROUND_TRIPS = [
             "last_contact": None,
             "assume_connected_for_test": True,
             "malfunction_expires_at": None,
+            "malfunction_requires_reset": False,
             "malfunction_message": "",
+        },
+    ),
+    (
+        TimerState(),
+        {
+            "state": 5,
+            "last_contact": T1,
+            "assume_connected_for_test": False,
+            "malfunction_expires_at": None,
+            "malfunction_requires_reset": True,
+            "malfunction_message": "Reset the timer",
         },
     ),
     (LastHeat(), None),
@@ -199,6 +213,7 @@ def test_bool_reads_other_text_as_true_like_php(raw):
     [
         ("timer_state", "3+1793028605+1793028660+Lane 2 jammed"),
         ("timer_state", "2+-1++"),
+        ("timer_state", "5+1793028605+0+bad"),
         ("last_heat", "4#2"),
         ("last_heat", "4#2#3.125##2.5"),
         ("timer_current", "7#3"),
@@ -224,6 +239,7 @@ def test_timer_state_decodes_the_packed_fields():
         "last_contact": datetime.fromtimestamp(1793028605, tz=UTC),
         "assume_connected_for_test": False,
         "malfunction_expires_at": None,
+        "malfunction_requires_reset": False,
         "malfunction_message": "no heartbeat",
     }
 
@@ -234,5 +250,31 @@ def test_timer_state_pads_short_legacy_values_as_php_does():
         "last_contact": None,
         "assume_connected_for_test": False,
         "malfunction_expires_at": None,
+        "malfunction_requires_reset": False,
         "malfunction_message": "",
     }
+
+
+def test_timer_state_reads_expiration_0_as_a_malfunction_that_waits_for_reset():
+    decoded = decode("timer_state", "5+0+0+bad")
+
+    assert decoded["malfunction_requires_reset"] is True
+    assert decoded["malfunction_expires_at"] is None
+
+
+@pytest.mark.django_db
+def test_a_sticky_malfunction_saves_on_the_timer_status():
+    status = TimerStatus.for_event(new_event("Derby"))
+    for name, value in decode("timer_state", "5+0+0+bad").items():
+        setattr(status, name, value)
+    status.save()
+
+    status.refresh_from_db()
+    assert status.malfunction_requires_reset is True
+    assert status.malfunction_expires_at is None
+
+
+@pytest.mark.parametrize("raw", ["-1", "-1793028605"])
+def test_unix_time_refuses_a_negative_time(raw):
+    with pytest.raises(ValueError):
+        UnixTime().decode(raw)

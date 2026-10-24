@@ -81,7 +81,10 @@ class Ref(Codec):
 
 
 def _from_unix(seconds):
-    return datetime.fromtimestamp(int(seconds), tz=UTC)
+    seconds = int(seconds)
+    if seconds < 0:
+        raise ValueError(f"a unix time cannot be negative: {seconds}")
+    return datetime.fromtimestamp(seconds, tz=UTC)
 
 
 def _to_unix(moment):
@@ -90,7 +93,11 @@ def _to_unix(moment):
 
 @dataclass(frozen=True)
 class UnixTime(Codec):
-    """Unix seconds as an aware datetime. `""` and `"0"` mean none."""
+    """Unix seconds as an aware datetime. `""` and `"0"` mean none.
+
+    PHP never writes a negative time to these keys, so one is refused rather
+    than read as a moment before 1970.
+    """
 
     none: str = ""
 
@@ -109,7 +116,8 @@ class TimerState(Packed):
     """`state+last_contact+malfunction_expiration+message` (`timer-state.inc`).
 
     A negative `last_contact` marks a test that skips the contact timeout. An
-    empty expiration means no malfunction.
+    empty expiration means no malfunction, and `0` means a malfunction that
+    lasts until something resets it.
     """
 
     def decode(self, raw):
@@ -118,13 +126,13 @@ class TimerState(Packed):
             parts + ["0", "", ""][len(parts) - 1 :]
         )
         last_contact = int(last_contact or 0)
+        expires = None if expiration == "" else int(expiration)
         return {
             "state": int(state),
             "last_contact": _from_unix(last_contact) if last_contact > 0 else None,
             "assume_connected_for_test": last_contact < 0,
-            "malfunction_expires_at": None
-            if expiration == ""
-            else _from_unix(expiration),
+            "malfunction_expires_at": _from_unix(expires) if expires else None,
+            "malfunction_requires_reset": expires == 0,
             "malfunction_message": message,
         }
 
@@ -135,12 +143,17 @@ class TimerState(Packed):
             last_contact = "0"
         else:
             last_contact = _to_unix(value["last_contact"])
-        expires = value["malfunction_expires_at"]
+        if value["malfunction_requires_reset"]:
+            expiration = "0"
+        elif value["malfunction_expires_at"] is None:
+            expiration = ""
+        else:
+            expiration = _to_unix(value["malfunction_expires_at"])
         return "+".join(
             [
                 str(value["state"]),
                 last_contact,
-                "" if expires is None else _to_unix(expires),
+                expiration,
                 value["malfunction_message"],
             ]
         )
@@ -380,6 +393,7 @@ REGISTRY: dict[str, Mapped | Dropped | Prefix] = {
             "last_contact",
             "assume_connected_for_test",
             "malfunction_expires_at",
+            "malfunction_requires_reset",
             "malfunction_message",
         ),
         TimerState(),
@@ -388,6 +402,7 @@ REGISTRY: dict[str, Mapped | Dropped | Prefix] = {
             "last_contact": None,
             "assume_connected_for_test": False,
             "malfunction_expires_at": None,
+            "malfunction_requires_reset": False,
             "malfunction_message": "",
         },
     ),

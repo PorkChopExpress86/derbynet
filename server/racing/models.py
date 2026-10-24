@@ -132,7 +132,10 @@ class TimerStatus(PerEvent):
     last_contact = models.DateTimeField(null=True, blank=True)
     # Legacy last_contact < 0: a test that skips the contact timeout.
     assume_connected_for_test = models.BooleanField(default=False)
+    # A malfunction either expires or waits for an explicit reset. Legacy
+    # malfunction_expiration=0 is the reset case (`timer-state.inc`).
     malfunction_expires_at = models.DateTimeField(null=True, blank=True)
+    malfunction_requires_reset = models.BooleanField(default=False)
     malfunction_message = models.CharField(max_length=500, blank=True, default="")
 
     staged_round = models.ForeignKey(
@@ -165,6 +168,13 @@ class TimerStatus(PerEvent):
 
     class Meta:
         verbose_name_plural = "timer statuses"
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(malfunction_requires_reset=False)
+                | Q(malfunction_expires_at__isnull=True),
+                name="timerstatus_malfunction_expires_or_waits_for_reset",
+            ),
+        ]
 
 
 class AuditEvent(EventScoped):
