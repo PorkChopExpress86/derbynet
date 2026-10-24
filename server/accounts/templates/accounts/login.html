@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Please Log In</title>
+</head>
+<body>
+<h1>Please Log In</h1>
+{% if current %}
+<p>Logged in as {{ current }}.</p>
+<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
+{% endif %}
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="{% url 'login' %}">
+{% csrf_token %}
+<input type="hidden" name="next" value="{{ next }}">
+<p><label>Role
+<select name="name">
+{% for r in roles %}<option>{{ r.name }}</option>
+{% endfor %}</select></label></p>
+<p><label>Password <input type="password" name="password" autocomplete="current-password"></label></p>
+<p><button type="submit">Log in</button></p>
+</form>
+</body>
+</html>

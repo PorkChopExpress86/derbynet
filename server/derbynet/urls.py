@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.urls import path
 
+from accounts import views as accounts
 from core import views
 from legacy_api.views import dispatch
 
@@ -11,6 +12,9 @@ _legacy_prefix = (settings.FORCE_SCRIPT_NAME or "/derbynet").strip("/")
 
 urlpatterns = [
     path("health/", views.health, name="health"),
+    path("login/", accounts.login, name="login"),
+    path("logout/", accounts.logout, name="logout"),
+    path("mcheckin.php", accounts.mcheckin, name="mcheckin"),
     path("action.php", dispatch, name="action-php"),
     path(f"{_legacy_prefix}/action.php", dispatch),
 ]
