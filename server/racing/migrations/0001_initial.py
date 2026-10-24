@@ -371,6 +371,7 @@ class Migration(migrations.Migration):
                 ("last_contact", models.DateTimeField(blank=True, null=True)),
                 ("assume_connected_for_test", models.BooleanField(default=False)),
                 ("malfunction_expires_at", models.DateTimeField(blank=True, null=True)),
+                ("malfunction_requires_reset", models.BooleanField(default=False)),
                 (
                     "malfunction_message",
                     models.CharField(blank=True, default="", max_length=500),
@@ -512,6 +513,17 @@ class Migration(migrations.Migration):
             constraint=models.UniqueConstraint(
                 fields=("event", "round", "heat", "lane"),
                 name="heatlane_one_car_per_lane",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="timerstatus",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    ("malfunction_requires_reset", False),
+                    ("malfunction_expires_at__isnull", True),
+                    _connector="OR",
+                ),
+                name="timerstatus_malfunction_expires_or_waits_for_reset",
             ),
         ),
         migrations.AddIndex(
