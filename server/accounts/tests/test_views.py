@@ -3,6 +3,7 @@ from unittest import mock
 
 import pytest
 from django.conf import settings
+from django.core import signing
 from django.http import HttpResponse
 from django.test import Client, RequestFactory
 
@@ -218,9 +219,15 @@ def test_a_tampered_check_in_link_grants_nothing(client, event, tamper):
     assert "permissions" not in client.session
 
 
-def test_another_salt_does_not_make_a_check_in_link(client, event):
-    from django.core.signing import TimestampSigner
-
-    token = TimestampSigner(salt="derbynet.other").sign("mcheckin")
+@pytest.mark.parametrize(
+    "signer",
+    [signing.TimestampSigner(), signing.TimestampSigner(salt="derbynet.other")],
+    ids=["default-salt", "other-salt"],
+)
+def test_another_salt_does_not_make_a_check_in_link(client, event, signer):
+    """Django signs other values with the default salt, so a signature made
+    for another purpose must not open check-in."""
+    token = signer.sign("mcheckin")
 
     assert client.get(f"/mcheckin.php?tok={token}").status_code == 302
+    assert "permissions" not in client.session
