@@ -11,7 +11,7 @@ from django.db import connection
 
 from core.models import Event, RaceSettings
 from roster.models import Racer
-from transfer.legacy.folders import ImportFolder, recover
+from transfer.legacy.folders import FOLDERS, ImportFolder, recover
 from transfer.tests.legacy import event_folder, legacy_folder, run_import
 
 SERVER = Path(__file__).resolve().parents[2]
@@ -37,8 +37,8 @@ def _files(event):
     """`{"<folder>/<path>": md5}` for every file in the event's folders."""
     settings_row = RaceSettings.for_event(event)
     files = {}
-    for directory in (settings_row.photo_directory, settings_row.car_photo_directory):
-        root = Path(directory)
+    for field in FOLDERS:
+        root = Path(getattr(settings_row, field))
         for path in root.rglob("*"):
             if path.is_file():
                 files[f"{root.name}/{path.relative_to(root)}"] = _md5(path.read_bytes())
@@ -67,11 +67,18 @@ def test_a_replace_killed_at_any_step_leaves_one_whole_event(
         report_dir=tmp_path,
     )
     old = Event.objects.get(pk=first["event"]["id"])
+    old_settings = RaceSettings.for_event(old)
+    for directory in (old_settings.video_directory, old_settings.logs_directory):
+        Path(directory).mkdir(exist_ok=True)
+        (Path(directory) / "old.txt").write_bytes(b"old event")
     old_files = _files(old)
-    assert len(old_files) == 4
+    assert len(old_files) == 6
     source = legacy_folder(tmp_path / "new", "v10")
     (source.parent / "racers" / "head-111.jpg").write_bytes(b"new 111")
-    new_files = {**old_files, "racers/head-111.jpg": _md5(b"new 111")}
+    new_files = {
+        **{k: v for k, v in old_files.items() if not k.endswith("old.txt")},
+        "racers/head-111.jpg": _md5(b"new 111"),
+    }
 
     killed = subprocess.run(
         [
@@ -103,7 +110,12 @@ def test_a_replace_killed_at_any_step_leaves_one_whole_event(
     assert _files(event) == (old_files if survivor == "old" else new_files)
     folder = event_folder(event)
     assert [p.name for p in folder.parent.iterdir()] == [folder.name]
-    assert sorted(p.name for p in folder.iterdir()) == ["cars", "racers"]
+    assert sorted(p.name for p in folder.iterdir()) == [
+        "cars",
+        "logs",
+        "racers",
+        "videos",
+    ]
 
 
 @pytest.mark.django_db

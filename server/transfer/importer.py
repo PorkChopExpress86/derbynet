@@ -121,7 +121,7 @@ def import_derbynet(
     except BaseException:
         folder.discard()
         raise
-    folder.finish()
+    report.photos["replaced_folders_removed"] = [str(p) for p in folder.finish()]
     report.outcome = "committed"
     return report
 

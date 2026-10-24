@@ -32,7 +32,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--replace",
             action="store_true",
-            help="Replace an existing event of the same name.",
+            help="Replace an existing event of the same name. Its rows, and its"
+            " photo, video and log folders, are removed.",
         )
         parser.add_argument(
             "--accept-violations",

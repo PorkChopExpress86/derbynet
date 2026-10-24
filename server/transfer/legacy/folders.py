@@ -11,9 +11,10 @@ next import:
 
 - An import folder still marked `.pending` that no event points at. The
   import died before its commit, and the folder holds only copies.
-- The old event's folders that a committed `--replace` import listed in its
-  `.replaced` note before the commit. Each goes only when no event points at
-  it any more.
+- The old event's folders, photos, videos and logs alike, that a committed
+  `--replace` import listed in its `.replaced` note before the commit. Each
+  goes only when no event points at it any more. The new event starts with
+  empty `videos/` and `logs/`, as its rows start from the source.
 
 Each import holds an exclusive `flock` on its folder until it finishes, so
 `recover()` skips an import that is still running. Folders are matched to
@@ -39,6 +40,8 @@ REPLACED = ".replaced"
 FOLDERS = {
     "photo_directory": "racers",
     "car_photo_directory": "cars",
+    "video_directory": "videos",
+    "logs_directory": "logs",
 }
 
 
@@ -78,10 +81,12 @@ class ImportFolder:
         (self.path / REPLACED).write_text(json.dumps(replaced))
 
     def finish(self):
-        """After the commit: drop the pending mark and the replaced folders."""
+        """After the commit: drop the pending mark and the replaced folders.
+        Returns the folders removed."""
         (self.path / PENDING).unlink()
-        _remove_replaced(self.path)
+        removed = _remove_replaced(self.path)
         os.close(self._lock)
+        return removed
 
     def discard(self):
         """Before or instead of the commit: remove everything this wrote."""

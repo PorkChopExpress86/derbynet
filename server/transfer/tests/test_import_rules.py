@@ -6,6 +6,7 @@ import json
 import shutil
 import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -17,6 +18,7 @@ from core.models import ActionLog, Event, RaceSettings, RaceState, SiteState
 from kiosks.models import Kiosk
 from roster.models import Group, GroupConstituent, Partition, Racer
 from transfer.legacy import photos
+from transfer.legacy.folders import FOLDERS
 from transfer.legacy.source import read_source
 from transfer.models import LegacyId
 from transfer.tests.legacy import (
@@ -483,6 +485,7 @@ def test_the_report_lists_counts_findings_and_invariants(tmp_path):
         "folder": str(event_folder(_event(report))),
         "paths": 3,
         "files_copied": 4,
+        "replaced_folders_removed": [],
     }
     assert "racechart: 328 of 328" in out
 
@@ -946,3 +949,30 @@ def test_a_check_in_in_the_autumn_fold_reads_as_the_first_and_is_reported(tmp_pa
     assert times[11] == datetime(2030, 11, 3, 5, 30, tzinfo=UTC)
     ambiguous = _findings(report, "ambiguous-time")
     assert [(f["table"], f["legacy_id"]) for f in ambiguous] == [("events", 901)]
+
+
+def test_replace_clears_the_old_event_videos_and_logs(tmp_path, data_dir):
+    first, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
+    old = RaceSettings.for_event(_event(first))
+    for directory, name in (
+        (old.video_directory, "heat.mkv"),
+        (old.logs_directory, "timer.log"),
+    ):
+        Path(directory).mkdir(parents=True, exist_ok=True)
+        (Path(directory) / name).write_text("old event")
+
+    second, _ = _import(
+        tmp_path, legacy_folder(tmp_path, "v9"), "--event", "Pack", "--replace"
+    )
+
+    new = RaceSettings.for_event(_event(second))
+    folder = event_folder(_event(second))
+    for directory in (new.video_directory, new.logs_directory):
+        assert Path(directory).parent == folder
+        assert list(Path(directory).iterdir()) == []
+    assert not Path(old.video_directory).exists()
+    assert not Path(old.logs_directory).exists()
+    assert sorted(second["photos"]["replaced_folders_removed"]) == sorted(
+        getattr(old, field) for field in FOLDERS
+    )
+    assert [p.name for p in (data_dir / "events").iterdir()] == [folder.name]

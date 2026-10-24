@@ -38,7 +38,6 @@ class Repository:
 
 HEADSHOTS = Repository("imagefile", "racers", "photo-directory", ("racers", "Racers"))
 CAR_PHOTOS = Repository("carphoto", "cars", "car-photo-directory", ("cars", "Cars"))
-REPOSITORIES = (HEADSHOTS, CAR_PHOTOS)
 
 
 def basename(path):
