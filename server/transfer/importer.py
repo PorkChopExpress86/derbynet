@@ -11,7 +11,7 @@ and moved in only after the commit.
 import shutil
 import tempfile
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
 from django.db import transaction
@@ -47,13 +47,20 @@ def import_derbynet(
     car_photos_dir=None,
     replace=False,
     accept_violations=False,
+    time_zone=None,
 ):
     """Import the legacy database at `path` and return the `Report`.
 
-    Raises `SourceError` for an unreadable file, and `ImportFailed` when the
-    event name is taken or the imported rows violate an invariant.
+    Legacy local times read in `time_zone`, by default `TIME_ZONE`. Raises
+    `SourceError` for an unreadable file, and `ImportFailed` when the event
+    name is taken or the imported rows violate an invariant.
     """
     path = Path(path)
+    time_zone = time_zone or settings.TIME_ZONE
+    try:
+        zone = ZoneInfo(time_zone)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise ImportFailed(f"unknown time zone {time_zone!r}: {error}") from None
     source = read_source(path)
     version = source.version
     report = Report(
@@ -62,6 +69,7 @@ def import_derbynet(
             "kind": source.kind,
             "version": version,
             "tables": sorted(source.tables),
+            "time_zone": time_zone,
         }
     )
     if not 1 <= version <= LATEST_SCHEMA:
@@ -87,7 +95,6 @@ def import_derbynet(
         try:
             with transaction.atomic():
                 event = _create_event(name, replace, report)
-                zone = ZoneInfo(settings.TIME_ZONE)
                 ctx = Context(event, tables, report, zone, photos)
                 legacy_ids = load_tables(ctx)
                 apply_raceinfo(ctx)

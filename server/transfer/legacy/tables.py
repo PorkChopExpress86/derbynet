@@ -56,7 +56,7 @@ class Context:
         self.zone = zone
         self.photos = photos
         self.ids = defaultdict(dict)  # model label -> {legacy id: new id}
-        self.checkins = _checkins_from_events(tables["events"], zone, report)
+        self.checkins = _checkins_from_events(self)
 
     def ref(self, model, value, column):
         """The new id for a required legacy reference, or `Skip`."""
@@ -92,37 +92,46 @@ class Context:
         return moment
 
 
-def _checkins_from_events(events, zone, report):
+def _checkins_from_events(ctx):
     """Racer id -> check-in time from the latest EVENT_CHECKIN row.
 
-    Before schema 10, PHP orders check-ins by the latest `Events` row
-    (`query.racer.list.inc`). `tstamp` has whole seconds, so racers who
-    share a second get one microsecond each in `seq` order.
+    PHP lists check-ins by each racer's `MAX(seq)` (`query.racer.list.inc`).
+    The times come from `tstamp`, moved just after the previous racer's when
+    the clock went back, so they keep that order. Each move is reported.
     """
-    latest = {}
-    for event in events:
+    latest = {}  # racer id -> (seq, tstamp)
+    for event in ctx.tables["events"]:
         try:
             if values.integer(event["action"]) != EVENT_CHECKIN:
                 continue
-            racerid, seq = (
-                values.integer(event["racerid"]),
-                values.integer(event["seq"]),
-            )
-            moment, _ = values.local_time(event["tstamp"], zone)
+            racerid = values.integer(event["racerid"])
+            seq = values.integer(event["seq"])
         except BadValue as error:
-            report.add(Kind.DROPPED_ROW, "events", event.get("seq"), str(error))
+            ctx.report.add(Kind.DROPPED_ROW, "events", event.get("seq"), str(error))
             continue
-        if racerid is None or moment is None:
+        if racerid is not None and (racerid not in latest or seq > latest[racerid][0]):
+            latest[racerid] = (seq, event["tstamp"])
+    checkins, previous = {}, None
+    for racerid, (seq, tstamp) in sorted(latest.items(), key=lambda item: item[1][0]):
+        try:
+            moment = ctx.time(tstamp, "events", seq, "tstamp")
+        except BadValue as error:
+            ctx.report.add(Kind.DROPPED_ROW, "events", seq, str(error))
             continue
-        if racerid not in latest or seq > latest[racerid][1]:
-            latest[racerid] = (moment, seq)
-    checkins, previous, tie = {}, None, 0
-    for racerid, (moment, _) in sorted(
-        latest.items(), key=lambda item: (item[1][0], item[1][1])
-    ):
-        tie = tie + 1 if moment == previous else 0
-        previous = moment
-        checkins[racerid] = moment + timedelta(microseconds=tie)
+        if moment is None:
+            continue
+        if previous is not None and moment <= previous:
+            moved = previous + timedelta(microseconds=1)
+            if moment.replace(microsecond=0) != previous.replace(microsecond=0):
+                ctx.report.add(
+                    Kind.CHANGED_VALUE,
+                    "events",
+                    seq,
+                    f"tstamp {tstamp!r} is before the previous check-in; racer"
+                    f" {racerid} keeps its place in PHP's order at {moved}",
+                )
+            moment = moved
+        checkins[racerid] = previous = moment
     return checkins
 
 

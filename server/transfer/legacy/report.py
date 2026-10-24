@@ -79,7 +79,8 @@ class Report:
     def summary(self):
         lines = [
             f"{self.source['path']} ({self.source['kind']}, schema"
-            f" {self.source['version']}): {self.outcome}"
+            f" {self.source['version']}): {self.outcome}",
+            f"legacy local times read in {self.source['time_zone']}",
         ]
         if self.event:
             lines.append(f"event {self.event['name']!r} (slug {self.event['slug']})")

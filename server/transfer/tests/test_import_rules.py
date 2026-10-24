@@ -5,7 +5,7 @@ import io
 import json
 import shutil
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -848,3 +848,94 @@ def test_symbolic_links_in_the_photo_folders_are_skipped_and_reported(
     assert [f["legacy_id"] for f in _findings(report, "missing-photo")] == [
         _legacy_racer(report, 111)
     ]
+
+
+def _checkins(tmp_path, events, *args):
+    """Import v9 with `events` as racers 1 and 11's only EVENT_CHECKIN rows:
+    `(seq, tstamp, racerid)`. Returns the report and both check-in times."""
+    database = legacy_folder(
+        tmp_path,
+        "v9",
+        sql=[
+            "DELETE FROM Events WHERE racerid IN (1, 11)",
+            *(
+                f"INSERT INTO Events(seq, tstamp, action, racerid)"
+                f" VALUES({seq}, '{tstamp}', 1, {racerid})"
+                for seq, tstamp, racerid in events
+            ),
+        ],
+    )
+    report, _ = _import(tmp_path, database, *args)
+    event = _event(report)
+    times = {
+        racerid: Racer.objects.get(
+            pk=_new_id(event, "roster.racer", racerid)
+        ).checked_in_at
+        for racerid in (1, 11)
+    }
+    return report, times
+
+
+def test_the_latest_check_in_of_a_racer_wins(tmp_path):
+    zone = ZoneInfo(settings.TIME_ZONE)
+    _, times = _checkins(
+        tmp_path,
+        [
+            (900, "2030-01-01 09:00:00", 1),
+            (902, "2030-01-01 10:00:00", 1),
+            (901, "2030-01-01 09:30:00", 11),
+        ],
+    )
+    assert times[1] == datetime(2030, 1, 1, 10, tzinfo=zone)
+    assert times[11] == datetime(2030, 1, 1, 9, 30, tzinfo=zone)
+
+
+def test_check_ins_keep_php_seq_order_when_the_clock_went_back(tmp_path):
+    # PHP lists check-ins by MAX(seq): racer 1 checked in after racer 11,
+    # though the clock had gone back.
+    zone = ZoneInfo(settings.TIME_ZONE)
+    report, times = _checkins(
+        tmp_path,
+        [(901, "2030-01-01 10:00:00", 11), (902, "2030-01-01 09:00:00", 1)],
+    )
+    assert times[11] == datetime(2030, 1, 1, 10, tzinfo=zone)
+    assert times[1] == datetime(2030, 1, 1, 10, 0, 0, 1, tzinfo=zone)
+    moved = [f for f in _findings(report, "changed-value") if f["table"] == "events"]
+    assert [f["legacy_id"] for f in moved] == [902]
+
+
+def test_legacy_times_read_in_the_time_zone_option(tmp_path):
+    report, times = _checkins(
+        tmp_path,
+        [(901, "2030-01-01 10:00:00", 11), (902, "2030-01-01 11:00:00", 1)],
+        "--time-zone",
+        "America/New_York",
+    )
+    assert report["source"]["time_zone"] == "America/New_York"
+    assert times[11] == datetime(2030, 1, 1, 15, tzinfo=UTC)
+
+
+def test_the_time_zone_defaults_to_the_server_one(tmp_path, settings):
+    settings.TIME_ZONE = "Europe/Paris"
+    report, times = _checkins(tmp_path, [(901, "2030-01-01 10:00:00", 11)])
+    assert report["source"]["time_zone"] == "Europe/Paris"
+    assert times[11] == datetime(2030, 1, 1, 9, tzinfo=UTC)
+
+
+def test_an_unknown_time_zone_is_refused(tmp_path):
+    with pytest.raises(CommandError, match="Mars/Olympus"):
+        _import(tmp_path, legacy_folder(tmp_path, "v9"), "--time-zone", "Mars/Olympus")
+    assert not Event.objects.exists()
+
+
+def test_a_check_in_in_the_autumn_fold_reads_as_the_first_and_is_reported(tmp_path):
+    report, times = _checkins(
+        tmp_path,
+        [(901, "2030-11-03 01:30:00", 11)],
+        "--time-zone",
+        "America/New_York",
+    )
+    # 01:30 EDT, the first of the two.
+    assert times[11] == datetime(2030, 11, 3, 5, 30, tzinfo=UTC)
+    ambiguous = _findings(report, "ambiguous-time")
+    assert [(f["table"], f["legacy_id"]) for f in ambiguous] == [("events", 901)]

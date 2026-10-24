@@ -40,6 +40,11 @@ class Command(BaseCommand):
             help="Keep the import even when check_invariants() reports violations.",
         )
         parser.add_argument(
+            "--time-zone",
+            help="The IANA time zone the legacy server kept local times in."
+            " Default: this server's TIME_ZONE.",
+        )
+        parser.add_argument(
             "--report", type=Path, help="Write the full report as JSON."
         )
         parser.add_argument(
@@ -59,6 +64,7 @@ class Command(BaseCommand):
                 car_photos_dir=options["car_photos_dir"],
                 replace=options["replace"],
                 accept_violations=options["accept_violations"],
+                time_zone=options["time_zone"],
             )
         except SourceError as error:
             raise CommandError(str(error)) from None
