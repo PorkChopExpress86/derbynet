@@ -44,6 +44,8 @@ def test_every_registered_endpoint_has_a_php_name():
         ("roles", Format.XML),
         ("snapshot.get", Format.XML),
         ("snapshot.put", Format.XML),
+        # PHP tests strpos($name, "snapshot"), not a prefix.
+        ("no.snapshot", Format.XML),
         ("role.login", Format.JSON),
         ("timer.test", Format.JSON),
         ("", Format.JSON),
