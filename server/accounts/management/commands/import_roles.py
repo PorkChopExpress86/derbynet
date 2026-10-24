@@ -1,17 +1,19 @@
-import subprocess
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from accounts.config_roles import ConfigRolesError, read
+from accounts.config_roles import read
 from accounts.models import Role
 
 
 class Command(BaseCommand):
     help = (
         "Replace every role with the roles of a PHP config-roles.inc, "
-        "hashing each password."
+        "hashing each password. A file that is not the plain array literal "
+        "DerbyNet writes is read by running it with php, when php is "
+        "installed. That executes the file as PHP, --dry-run included, so "
+        "import only a file you trust."
     )
 
     def add_arguments(self, parser):
@@ -25,7 +27,8 @@ class Command(BaseCommand):
     def handle(self, path, dry_run, **options):
         try:
             configs, post_setup_role = read(path)
-        except (OSError, ConfigRolesError, subprocess.CalledProcessError) as error:
+        # ConfigRolesError and a file that is not UTF-8 are ValueErrors.
+        except (OSError, ValueError) as error:
             raise CommandError(f"cannot read {path}: {error}") from error
         names = [config.name for config in configs]
         if post_setup_role is not None and post_setup_role not in names:
