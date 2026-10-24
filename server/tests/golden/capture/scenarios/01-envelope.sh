@@ -22,3 +22,8 @@ capture unknown-xml-query-roles-stub "GET action.php?query=roles"
 capture xml-action-timer-message-without-login "POST action.php action=timer-message&message=HELLO"
 capture query-with-array-parameter "GET action.php?query[]=poll"
 capture post-with-both-same-key "POST action.php?action=role.login action=no.such"
+
+# JSON refusals, anonymous: the common notauthorized code, and the permission
+# code that class.add, class.edit, class.order, rank.add and rank.move use.
+capture json-notauthorized "POST action.php action=kiosk.reload&address=x"
+capture json-permission-failure "POST action.php action=class.edit&classid=1&name=x"

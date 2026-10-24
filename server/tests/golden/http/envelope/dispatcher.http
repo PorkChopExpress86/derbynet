@@ -240,3 +240,44 @@ body:
     }
 }
 
+### 017 json-notauthorized
+request: POST action.php
+request-body: action=kiosk.reload&address=x
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 242
+body:
+{
+    "action": {
+        "action": "kiosk.reload",
+        "address": "x"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "notauthorized",
+        "description": "Not authorized -- please see race coordinator."
+    }
+}
+
+### 018 json-permission-failure
+request: POST action.php
+request-body: action=class.edit&classid=1&name=x
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 224
+body:
+{
+    "action": {
+        "action": "class.edit",
+        "classid": 1,
+        "name": "x"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "permission",
+        "description": "Not authorized"
+    }
+}
+

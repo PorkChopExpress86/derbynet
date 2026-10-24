@@ -28,5 +28,5 @@ select = ["E", "F", "W", "I", "UP", "B", "DJ"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "derbynet.settings"
-testpaths = ["tests", "core", "roster", "racing", "awards", "kiosks", "transfer"]
+testpaths = ["tests", "core", "roster", "racing", "awards", "kiosks", "accounts", "legacy_api", "transfer"]
 addopts = "--strict-markers"

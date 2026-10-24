@@ -1,0 +1,443 @@
+{
+    "php": "8.4",
+    "serialize_precision": "-1",
+    "cases": [
+        {
+            "kind": "string",
+            "input": "007",
+            "is_numeric": true,
+            "json": "7"
+        },
+        {
+            "kind": "string",
+            "input": " 5",
+            "is_numeric": true,
+            "json": "5"
+        },
+        {
+            "kind": "string",
+            "input": "5 ",
+            "is_numeric": true,
+            "json": "5"
+        },
+        {
+            "kind": "string",
+            "input": "+5",
+            "is_numeric": true,
+            "json": "5"
+        },
+        {
+            "kind": "string",
+            "input": "-0",
+            "is_numeric": true,
+            "json": "0"
+        },
+        {
+            "kind": "string",
+            "input": ".5",
+            "is_numeric": true,
+            "json": "0.5"
+        },
+        {
+            "kind": "string",
+            "input": "5.",
+            "is_numeric": true,
+            "json": "5"
+        },
+        {
+            "kind": "string",
+            "input": "1.50",
+            "is_numeric": true,
+            "json": "1.5"
+        },
+        {
+            "kind": "string",
+            "input": "1e3",
+            "is_numeric": true,
+            "json": "1000"
+        },
+        {
+            "kind": "string",
+            "input": "1E3",
+            "is_numeric": true,
+            "json": "1000"
+        },
+        {
+            "kind": "string",
+            "input": "0x1A",
+            "is_numeric": false,
+            "json": "\"0x1A\""
+        },
+        {
+            "kind": "string",
+            "input": "NaN",
+            "is_numeric": false,
+            "json": "\"NaN\""
+        },
+        {
+            "kind": "string",
+            "input": "INF",
+            "is_numeric": false,
+            "json": "\"INF\""
+        },
+        {
+            "kind": "string",
+            "input": "9223372036854775807",
+            "is_numeric": true,
+            "json": "9223372036854775807"
+        },
+        {
+            "kind": "string",
+            "input": "9223372036854775808",
+            "is_numeric": true,
+            "json": "9.223372036854776e+18"
+        },
+        {
+            "kind": "string",
+            "input": "-9223372036854775808",
+            "is_numeric": true,
+            "json": "-9223372036854775808"
+        },
+        {
+            "kind": "string",
+            "input": "-9223372036854775809",
+            "is_numeric": true,
+            "json": "-9.223372036854776e+18"
+        },
+        {
+            "kind": "string",
+            "input": "12345678901234567890",
+            "is_numeric": true,
+            "json": "1.2345678901234567e+19"
+        },
+        {
+            "kind": "string",
+            "input": "",
+            "is_numeric": false,
+            "json": "\"\""
+        },
+        {
+            "kind": "string",
+            "input": " ",
+            "is_numeric": false,
+            "json": "\" \""
+        },
+        {
+            "kind": "string",
+            "input": "1e",
+            "is_numeric": false,
+            "json": "\"1e\""
+        },
+        {
+            "kind": "string",
+            "input": "1e+",
+            "is_numeric": false,
+            "json": "\"1e+\""
+        },
+        {
+            "kind": "string",
+            "input": "1.5e3",
+            "is_numeric": true,
+            "json": "1500"
+        },
+        {
+            "kind": "string",
+            "input": ".5e1",
+            "is_numeric": true,
+            "json": "5"
+        },
+        {
+            "kind": "string",
+            "input": "5.e1",
+            "is_numeric": true,
+            "json": "50"
+        },
+        {
+            "kind": "string",
+            "input": "+.5",
+            "is_numeric": true,
+            "json": "0.5"
+        },
+        {
+            "kind": "string",
+            "input": "-.5e-3",
+            "is_numeric": true,
+            "json": "-0.0005"
+        },
+        {
+            "kind": "string",
+            "input": "\t5\n",
+            "is_numeric": true,
+            "json": "5"
+        },
+        {
+            "kind": "string",
+            "input": "\u000b5\f",
+            "is_numeric": true,
+            "json": "5"
+        },
+        {
+            "kind": "string",
+            "input": "1e25",
+            "is_numeric": true,
+            "json": "1.0e+25"
+        },
+        {
+            "kind": "string",
+            "input": "1e400",
+            "is_numeric": true,
+            "json": "\"1e400\""
+        },
+        {
+            "kind": "string",
+            "input": "0.00001",
+            "is_numeric": true,
+            "json": "1.0e-5"
+        },
+        {
+            "kind": "string",
+            "input": "0.0001",
+            "is_numeric": true,
+            "json": "0.0001"
+        },
+        {
+            "kind": "string",
+            "input": "1e16",
+            "is_numeric": true,
+            "json": "10000000000000000"
+        },
+        {
+            "kind": "string",
+            "input": "1e17",
+            "is_numeric": true,
+            "json": "1.0e+17"
+        },
+        {
+            "kind": "string",
+            "input": "3.0",
+            "is_numeric": true,
+            "json": "3"
+        },
+        {
+            "kind": "string",
+            "input": "2.50E+2",
+            "is_numeric": true,
+            "json": "250"
+        },
+        {
+            "kind": "string",
+            "input": "00",
+            "is_numeric": true,
+            "json": "0"
+        },
+        {
+            "kind": "string",
+            "input": "0000.0",
+            "is_numeric": true,
+            "json": "0"
+        },
+        {
+            "kind": "string",
+            "input": "-0.0",
+            "is_numeric": true,
+            "json": "-0"
+        },
+        {
+            "kind": "string",
+            "input": "123.456e-7",
+            "is_numeric": true,
+            "json": "1.23456e-5"
+        },
+        {
+            "kind": "string",
+            "input": "abc",
+            "is_numeric": false,
+            "json": "\"abc\""
+        },
+        {
+            "kind": "string",
+            "input": "5 5",
+            "is_numeric": false,
+            "json": "\"5 5\""
+        },
+        {
+            "kind": "string",
+            "input": "- 5",
+            "is_numeric": false,
+            "json": "\"- 5\""
+        },
+        {
+            "kind": "string",
+            "input": "0b1",
+            "is_numeric": false,
+            "json": "\"0b1\""
+        },
+        {
+            "kind": "string",
+            "input": "1_000",
+            "is_numeric": false,
+            "json": "\"1_000\""
+        },
+        {
+            "kind": "string",
+            "input": "٣",
+            "is_numeric": false,
+            "json": "\"\\u0663\""
+        },
+        {
+            "kind": "string",
+            "input": ".",
+            "is_numeric": false,
+            "json": "\".\""
+        },
+        {
+            "kind": "string",
+            "input": "+",
+            "is_numeric": false,
+            "json": "\"+\""
+        },
+        {
+            "kind": "string",
+            "input": ".e1",
+            "is_numeric": false,
+            "json": "\".e1\""
+        },
+        {
+            "kind": "string",
+            "input": "0.1",
+            "is_numeric": true,
+            "json": "0.1"
+        },
+        {
+            "kind": "string",
+            "input": "1e-4",
+            "is_numeric": true,
+            "json": "0.0001"
+        },
+        {
+            "kind": "float",
+            "input": "1e25",
+            "json": "1.0e+25"
+        },
+        {
+            "kind": "float",
+            "input": "0.1",
+            "json": "0.1"
+        },
+        {
+            "kind": "float",
+            "input": "0.3",
+            "json": "0.3"
+        },
+        {
+            "kind": "float",
+            "input": "1e-5",
+            "json": "1.0e-5"
+        },
+        {
+            "kind": "float",
+            "input": "1e-4",
+            "json": "0.0001"
+        },
+        {
+            "kind": "float",
+            "input": "0.0001",
+            "json": "0.0001"
+        },
+        {
+            "kind": "float",
+            "input": "2.5e-4",
+            "json": "0.00025"
+        },
+        {
+            "kind": "float",
+            "input": "1e16",
+            "json": "10000000000000000"
+        },
+        {
+            "kind": "float",
+            "input": "1e17",
+            "json": "1.0e+17"
+        },
+        {
+            "kind": "float",
+            "input": "-0.0",
+            "json": "-0"
+        },
+        {
+            "kind": "float",
+            "input": "100.0",
+            "json": "100"
+        },
+        {
+            "kind": "float",
+            "input": "1.5",
+            "json": "1.5"
+        },
+        {
+            "kind": "float",
+            "input": "123456789.125",
+            "json": "123456789.125"
+        },
+        {
+            "kind": "float",
+            "input": "5e-324",
+            "json": "5.0e-324"
+        },
+        {
+            "kind": "float",
+            "input": "1.7976931348623157e308",
+            "json": "1.7976931348623157e+308"
+        },
+        {
+            "kind": "float",
+            "input": "-1234.5",
+            "json": "-1234.5"
+        },
+        {
+            "kind": "float",
+            "input": "0.5",
+            "json": "0.5"
+        },
+        {
+            "kind": "value",
+            "input": "{\"007\":\"x\"}",
+            "json": "{\n    \"007\": \"x\"\n}"
+        },
+        {
+            "kind": "value",
+            "input": "{\"5\":\"x\"}",
+            "json": "{\n    \"5\": \"x\"\n}"
+        },
+        {
+            "kind": "value",
+            "input": "[]",
+            "json": "[]"
+        },
+        {
+            "kind": "value",
+            "input": "{}",
+            "json": "{}"
+        },
+        {
+            "kind": "value",
+            "input": "{\"a\":[],\"b\":{}}",
+            "json": "{\n    \"a\": [],\n    \"b\": {}\n}"
+        },
+        {
+            "kind": "value",
+            "input": "{\"s\":\"a/b\",\"u\":\"é😀\",\"c\":\"\\u0001\\b\\f\\n\\r\\t\\\"\\\\\\u007f\"}",
+            "json": "{\n    \"s\": \"a\\/b\",\n    \"u\": \"\\u00e9\\ud83d\\ude00\",\n    \"c\": \"\\u0001\\b\\f\\n\\r\\t\\\"\\\\\"\n}"
+        },
+        {
+            "kind": "value",
+            "input": "[1,\"2\",[3,{\"k\":\"4\"}],true,false,null]",
+            "json": "[\n    1,\n    2,\n    [\n        3,\n        {\n            \"k\": 4\n        }\n    ],\n    true,\n    false,\n    null\n]"
+        },
+        {
+            "kind": "value",
+            "input": "{\"n\":-0.0,\"x\":1.0}",
+            "json": "{\n    \"n\": -0,\n    \"x\": 1\n}"
+        }
+    ]
+}
