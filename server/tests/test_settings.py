@@ -125,3 +125,12 @@ def test_default_data_and_config_dirs_live_under_server_var(monkeypatch):
 
     assert loaded["DATA_DIR"] == server_dir / "var" / "data"
     assert loaded["CONFIG_DIR"] == server_dir / "var" / "config"
+
+
+def test_empty_stored_secret_key_is_rejected(load_settings, tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "secret_key").write_text("")
+
+    with pytest.raises(ImproperlyConfigured, match="secret_key.*empty"):
+        load_settings()
