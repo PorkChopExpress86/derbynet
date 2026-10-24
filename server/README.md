@@ -107,7 +107,9 @@ A handler lives in `legacy_api/handlers/` and registers under its exact PHP name
 
 ## Roles and logins
 
-Roles are rows of `accounts.Role`, with hashed passwords and PHP's permission bits (ADR-07, ADR-16). A new database starts with PHP's five default roles and passwords, which `testing/default.passwords` lists. A login stores the role name and its bits in the session. A session with no login holds the bits of the anonymous role, the one named `''`. Before the first event exists, every session also holds `SET_UP`.
+Roles are rows of `accounts.Role`, with hashed passwords and PHP's permission bits (ADR-07, ADR-16). A new database starts with PHP's five default roles and passwords, which `testing/default.passwords` lists. A login stores the role name and its bits in the session. A session with no login holds the bits of the anonymous role, the one named `''`. Before the first event exists, every session also holds `SET_UP`. `Access.LOGGED_IN` admits only a role that has a password. Anyone can log in as `Timer`, because its password is empty, so a timer handler requires `TIMER_MESSAGE` instead. A logout clears the whole session.
+
+A session keeps the bits it got at login. A role edit or an `import_roles` run does not change a session that is already logged in, until that session expires after 24 hours. PHP behaves the same way.
 
 To keep the roles and passwords of a PHP install, import its `config-roles.inc`. The import replaces every role:
 
@@ -116,11 +118,13 @@ uv run python manage.py import_roles /path/to/local/config-roles.inc --dry-run
 uv run python manage.py import_roles /path/to/local/config-roles.inc
 ```
 
-`--dry-run` prints each role and its bit mask and writes nothing. When the file holds PHP that the command cannot read, it runs `php` instead, if `php` is installed.
+`--dry-run` prints each role and its bit mask and writes nothing. When the file holds PHP that the command cannot read, it runs `php` instead, if `php` is installed. That executes the file as PHP, with `--dry-run` too, so import only a file you trust.
 
 Pages log in at `login/` and log out with a POST to `logout/`. A page view declares its permission with `@page_requires(Perm.X)` from `accounts/views.py`, which sends a visitor without it to `login/?next=<page>`. A mobile check-in link is `mcheckin.php?tok=<make_mcheckin_token()>`. It grants check-in, revert and photo upload to the phone's session, and expires after 60 minutes.
 
 A POST to `/action.php` that carries an `Origin` header for another site answers `notauthorized`. The server's own origin and the origins in `DERBYNET_CSRF_TRUSTED_ORIGINS` pass. Hardware clients send no `Origin`.
+
+Behind a proxy that ends TLS, the server takes its own scheme from the `X-Forwarded-Proto` header. If the proxy does not send that header, the server thinks it serves `http`, and every browser POST to `/action.php` answers `notauthorized`, logins included. Set the proxy to send `X-Forwarded-Proto: https`, or set `DERBYNET_CSRF_TRUSTED_ORIGINS` to the public origin, such as `https://derby.example`.
 
 ## Settings
 
