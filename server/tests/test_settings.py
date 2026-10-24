@@ -83,3 +83,17 @@ def test_time_zone_falls_back_to_tz_then_utc(load_settings, monkeypatch):
         ]
         == "Europe/London"
     )
+
+
+@pytest.mark.parametrize("tz", [":/etc/localtime", "Bogus/Zone"])
+def test_host_tz_that_is_not_an_iana_name_falls_back_to_utc(
+    load_settings, monkeypatch, tz
+):
+    monkeypatch.delenv("DERBYNET_TIME_ZONE", raising=False)
+
+    assert load_settings(TZ=tz)["TIME_ZONE"] == "UTC"
+
+
+def test_invalid_derbynet_time_zone_names_the_variable_and_value(load_settings):
+    with pytest.raises(ImproperlyConfigured, match="DERBYNET_TIME_ZONE.*'Mars/Base'"):
+        load_settings(DERBYNET_TIME_ZONE="Mars/Base")

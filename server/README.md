@@ -75,7 +75,7 @@ The Django server answers no legacy actions yet, so the scripts pass only agains
 | `DERBYNET_CONFIG_DIR` | `server/var/config` | Holds `secret_key` and other install-level files |
 | `DATABASE_URL` | `sqlite:///<DERBYNET_DATA_DIR>/derbynet.sqlite3` | Parsed with `dj-database-url` |
 | `DERBYNET_URL_PREFIX` | empty | Sets `FORCE_SCRIPT_NAME`, for example `/derbynet` |
-| `DERBYNET_TIME_ZONE` | `TZ`, else `UTC` | Sets `TIME_ZONE`, with `USE_TZ = True` |
+| `DERBYNET_TIME_ZONE` | `TZ` when it is an IANA name, else `UTC` | Sets `TIME_ZONE`, with `USE_TZ = True`. An invalid value raises `ImproperlyConfigured` |
 | `DERBYNET_DEBUG` | `0` | Sets `DEBUG`. Only `0` and `1` are accepted |
 | `DERBYNET_ALLOWED_HOSTS` | `*` | Comma-separated. LAN installs are reached by bare IP address |
 | `DERBYNET_CSRF_TRUSTED_ORIGINS` | empty | Comma-separated extra origins for the new UI behind a proxy |

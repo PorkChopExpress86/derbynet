@@ -7,6 +7,7 @@ server/README.md.
 import os
 import tempfile
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
@@ -39,6 +40,27 @@ def _env_flag(name):
 def _url_prefix(value):
     value = value.strip().strip("/")
     return f"/{value}" if value else None
+
+
+def _is_time_zone(name):
+    try:
+        ZoneInfo(name)
+    except ZoneInfoNotFoundError, ValueError, OSError:
+        return False
+    return True
+
+
+def _time_zone():
+    configured = os.environ.get("DERBYNET_TIME_ZONE")
+    if configured:
+        if not _is_time_zone(configured):
+            raise ImproperlyConfigured(
+                f"DERBYNET_TIME_ZONE must be an IANA time zone name, not {configured!r}"
+            )
+        return configured
+    # Hosts often set TZ to something else, such as ":/etc/localtime".
+    host = os.environ.get("TZ", "")
+    return host if host and _is_time_zone(host) else "UTC"
 
 
 def _stored_secret_key(config_dir):
@@ -150,7 +172,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = os.environ.get("DERBYNET_TIME_ZONE") or os.environ.get("TZ") or "UTC"
+TIME_ZONE = _time_zone()
 USE_I18N = True
 USE_TZ = True
 
