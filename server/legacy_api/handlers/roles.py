@@ -35,7 +35,7 @@ def role_login(ctx: LegacyContext) -> None:
     # With no name, PHP ignores the password and logs out.
     name = ctx.args.get("name", "")
     password = ctx.args.get("password", "") if name else ""
-    found = Role.objects.filter(name=name).first() if isinstance(name, str) else None
+    found = Role.objects.named(name)
     if found is None:
         # PHP interpolates the failed lookup, which is empty.
         ctx.failure("role", "No such role: ")

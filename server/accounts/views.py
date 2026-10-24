@@ -75,7 +75,7 @@ def _safe_next(request) -> str:
 def login(request):
     error = ""
     if request.method == "POST":
-        found = Role.objects.filter(name=request.POST.get("name", "")).first()
+        found = Role.objects.named(request.POST.get("name", ""))
         if found is None or not found.name:
             error = "No such role."
         elif not found.check_password(request.POST.get("password", "")):

@@ -7,6 +7,15 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 
 
+class RoleQuerySet(models.QuerySet):
+    def named(self, name) -> Role | None:
+        """The role called `name`, or None for a name no role can have: not a
+        string, or holding a NUL, which Postgres refuses in a query."""
+        if not isinstance(name, str) or "\x00" in name:
+            return None
+        return self.filter(name=name).first()
+
+
 class Role(models.Model):
     # '' is the anonymous role: its bits are what a visitor with no login holds.
     name = models.CharField(max_length=100, unique=True, blank=True)
@@ -19,6 +28,8 @@ class Role(models.Model):
     position = models.PositiveSmallIntegerField()
     # The role the first-run setup logs the session in as.
     post_setup = models.BooleanField(default=False)
+
+    objects = RoleQuerySet.as_manager()
 
     class Meta:
         ordering = ["position"]
