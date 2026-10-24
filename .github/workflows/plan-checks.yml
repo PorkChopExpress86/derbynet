@@ -1,0 +1,38 @@
+name: plan-checks
+
+# Checks the Django migration's planning records: the paths the ADRs cite, and
+# every django-migration issue body (plan/lint-issues.py).  Issue edits trigger
+# it too, because an issue body can go stale with no code change.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  issues:
+    types: [opened, edited, labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: plan-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan-checks:
+    if: github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'django-migration')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the paths the ADRs cite
+        run: bash server/docs/adr/check-paths.sh
+
+      - name: Lint the plan's issue bodies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I plan/lint-issues.py --repo "${{ github.repository }}"
