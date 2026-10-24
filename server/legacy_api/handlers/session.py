@@ -16,7 +16,7 @@ WRITABLE = {
 def session_write(ctx: LegacyContext) -> None:
     for key, allowed in WRITABLE.items():
         value = ctx.args.get(f"session_{key}")
-        if value in allowed:
+        if isinstance(value, str) and value in allowed:
             ctx.session[key] = value
     # PHP echoes the whole session, which would show the role and its bits.
     ctx.put(

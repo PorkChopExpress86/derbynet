@@ -49,3 +49,10 @@ def test_a_session_without_check_in_is_refused(client, event):
 
     assert body["outcome"]["code"] == "notauthorized"
     assert "barcode-action" not in client.session
+
+
+def test_an_array_value_is_ignored(crew):
+    body = write(crew, "session_barcode-action[]=checkin")
+
+    assert body["outcome"]["code"] == "success"
+    assert body["session"] == {}
