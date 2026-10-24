@@ -159,6 +159,9 @@ CONSTRAINT_VIOLATIONS = {
     ),
 }
 
+# PHP never runs this check: it sits in `if (false)`, "frequently violated".
+DISABLED_IN_PHP = {"classes-ranks"}
+
 # Each PHP check compared a redundant column that the models do not have.
 GONE_WITH_COLUMN = {
     "racechart-classid": HeatLane,
@@ -168,10 +171,15 @@ GONE_WITH_COLUMN = {
 
 
 def test_every_php_tag_is_classified_once():
-    classes = [set(CONSTRAINT_VIOLATIONS), set(CHECKS), set(GONE_WITH_COLUMN)]
+    classes = [
+        set(CONSTRAINT_VIOLATIONS),
+        set(CHECKS),
+        set(GONE_WITH_COLUMN),
+        DISABLED_IN_PHP,
+    ]
     assert set().union(*classes) == PHP_TAGS
     assert sum(len(c) for c in classes) == len(PHP_TAGS) == 40
-    assert [len(c) for c in classes] == [26, 11, 3]
+    assert [len(c) for c in classes] == [26, 10, 3, 1]
 
 
 @pytest.mark.parametrize("tag", sorted(CONSTRAINT_VIOLATIONS))
@@ -230,13 +238,6 @@ def _build_valid_event():
 
 def test_a_valid_event_reports_no_violations():
     assert check_invariants(_build_valid_event()) == {}
-
-
-def _classes_ranks(event):
-    PartitionFactory(subgroup__group=_organic_group(event))
-    bare = GroupFactory(event=event)
-    RoundFactory(group=bare, number=1)
-    return bare.id, "id"
 
 
 def _classes_round1(event):
@@ -305,7 +306,6 @@ def _rounds_sequential(event):
 # Each builder makes a violation in the event and returns the value that
 # identifies it in the reported rows, with the row key that holds it.
 SERVICE_VIOLATIONS = {
-    "classes-ranks": _classes_ranks,
     "classes-round1": _classes_round1,
     "aggregate-members": _aggregate_members,
     "aggregate-ranks": _aggregate_ranks,
@@ -400,8 +400,9 @@ def test_a_constituents_racer_in_an_aggregate_round_is_not_reported():
     assert "roster-round-classid" not in check_invariants(event)
 
 
-def test_classes_ranks_is_skipped_when_the_event_has_no_partitions():
+def test_an_organic_group_without_subgroups_is_not_reported_as_php_does():
     event = EventFactory()
+    PartitionFactory(subgroup__group=_organic_group(event))
     RoundFactory(group__event=event, number=1)
 
     assert check_invariants(event) == {}
