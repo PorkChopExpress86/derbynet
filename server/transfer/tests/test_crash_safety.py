@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from django.core.management import CommandError
 from django.db import connection
 
 from core.models import Event, RaceSettings
@@ -208,3 +209,32 @@ def test_recover_removes_a_removing_folder_unless_an_event_points_at_it(
 
     assert removed == [dead]
     assert sorted(p.name for p in events.iterdir()) == sorted([live.name, used.name])
+
+
+@pytest.mark.django_db
+def test_a_refused_replace_runs_before_recover_and_leaves_dead_folders(
+    tmp_path, data_dir
+):
+    events = data_dir / "events"
+    first, _ = run_import(
+        legacy_folder(tmp_path, "v10"), "--event", "Pack", report_dir=tmp_path
+    )
+    old = RaceSettings.for_event(Event.objects.get(pk=first["event"]["id"]))
+    (Path(old.video_directory) / "heat.mkv").write_bytes(b"video")
+    pending = events / "dead.import-pending"
+    (pending / "racers").mkdir(parents=True)
+    (pending / ".pending").touch()
+    removing = events / ".removing-dead"
+    (removing / "racers").mkdir(parents=True)
+
+    with pytest.raises(CommandError, match="--discard-videos"):
+        run_import(
+            legacy_folder(tmp_path, "v9"),
+            "--event",
+            "Pack",
+            "--replace",
+            report_dir=tmp_path,
+        )
+
+    assert pending.is_dir()
+    assert removing.is_dir()
