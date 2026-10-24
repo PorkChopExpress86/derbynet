@@ -27,7 +27,12 @@ from roster.tests.factories import GroupFactory, RacerFactory, SubgroupFactory
 pytestmark = pytest.mark.django_db
 
 # (kind, name) to the form fields of a call that reads or writes event rows.
-LEAK_REQUESTS: dict[tuple[str, str], dict] = {}
+LEAK_REQUESTS: dict[tuple[str, str], dict] = {
+    ("action", "role.login"): {"name": "RaceCoordinator", "password": "doyourbest"},
+    ("query", "role.list"): {},
+    ("action", "login"): {"name": "RaceCoordinator", "password": "doyourbest"},
+    ("query", "roles"): {},
+}
 
 # Response keys that carry a row id, and the model the id belongs to.
 ID_KEYS = {"racerid": Racer, "roundid": Round, "classid": Group, "rankid": Subgroup}
@@ -66,7 +71,9 @@ def _ids_in(response, fmt):
     if fmt is Format.XML:
         # The root's attributes echo the request.
         for element in list(ET.fromstring(response.content).iter())[1:]:
-            yield from element.attrib.items()
+            yield from (
+                (key, value) for key, value in element.attrib.items() if key in ID_KEYS
+            )
         return
     body = json.loads(response.content)
     body.pop("action", None)

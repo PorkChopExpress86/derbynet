@@ -2,12 +2,14 @@
 
 Each exchange is replayed and compared on status, `Content-Type`, `Location`,
 `Cache-Control` and body. `Set-Cookie` is not compared: PHP starts a session
-on every request, and the session cookie contract belongs to #16.
+on every request, and Django sends a cookie only when the session changes.
 
-No handler is ported yet, so the exchanges that reach one register a stub
-under the PHP name with the permission #17 gives it. A refused request never
-runs the stub, so the response is the dispatcher's alone.
+The exchanges that reach a handler not ported yet register a stub under the
+PHP name with the permission #17 gives it. A refused request never runs the
+stub, so the response is the dispatcher's alone.
 """
+
+import re
 
 import pytest
 
@@ -32,9 +34,6 @@ STUBS = {
 
 # Exchanges this ticket does not reproduce, and why.
 NOT_COMPARED = {
-    # The `login` and `roles` XML stubs are handlers, ported with role.login in #16.
-    "unknown-xml-action-login-stub": "#16",
-    "unknown-xml-query-roles-stub": "#16",
     # PHP answers 500 with an empty body. Django answers `Unrecognized query: `.
     "query-with-array-parameter": "PHP defect, see test_dispatcher",
 }
@@ -91,3 +90,22 @@ def test_a_query_that_writes_nothing_is_an_empty_object(client, endpoint):
     EventFactory()
 
     assert_same(replay(client, ex), ex)
+
+
+TIMECHECK = re.compile(rb'"timecheck": "([^"]*)"')
+PHP_ISO8601 = re.compile(rb"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d{4}")
+
+
+def test_logging_in_by_role(client):
+    """One client replays the transcript in order, so each exchange runs with
+    the session the ones before it left. Only the `timecheck` value differs."""
+    EventFactory()
+
+    for ex in transcript("login/role-login"):
+        response = replay(client, ex)
+        for stamp in TIMECHECK.findall(response.content):
+            assert PHP_ISO8601.fullmatch(stamp), ex.name
+        response.content = TIMECHECK.sub(
+            b'"timecheck": "<timecheck>"', response.content
+        )
+        assert_same(response, ex)
