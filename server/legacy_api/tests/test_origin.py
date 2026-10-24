@@ -74,6 +74,12 @@ def test_a_null_origin_is_refused(coordinator):
     assert outcome(response) == "notauthorized"
 
 
+def test_another_scheme_is_another_origin(coordinator):
+    response = post(coordinator, "action=probe.write", Origin="https://testserver")
+
+    assert outcome(response) == "notauthorized"
+
+
 def test_another_port_is_another_origin(coordinator):
     response = post(coordinator, "action=probe.write", Origin="http://testserver:81")
 
