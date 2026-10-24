@@ -1,0 +1,151 @@
+{
+  "classes-ambiguous-sort": [
+    {
+      "count(*)": 6,
+      "sortorder": null
+    }
+  ],
+  "classes-sortorder": [
+    {
+      "class": "Lions & Tigers",
+      "classid": 1,
+      "constituents": "",
+      "durable": null,
+      "ntrophies": -1,
+      "rankids": "",
+      "sortorder": null
+    },
+    {
+      "class": "White's Wolves",
+      "classid": 2,
+      "constituents": "",
+      "durable": null,
+      "ntrophies": -1,
+      "rankids": "",
+      "sortorder": null
+    },
+    {
+      "class": "Bears and Frères",
+      "classid": 3,
+      "constituents": "",
+      "durable": null,
+      "ntrophies": -1,
+      "rankids": "",
+      "sortorder": null
+    },
+    {
+      "class": "Webelos (\"Webes\")",
+      "classid": 4,
+      "constituents": "",
+      "durable": null,
+      "ntrophies": -1,
+      "rankids": "",
+      "sortorder": null
+    },
+    {
+      "class": "Arrows <<--<<",
+      "classid": 5,
+      "constituents": "",
+      "durable": null,
+      "ntrophies": -1,
+      "rankids": "",
+      "sortorder": null
+    },
+    {
+      "class": "TheLastClass",
+      "classid": 7,
+      "constituents": "",
+      "durable": null,
+      "ntrophies": -1,
+      "rankids": "",
+      "sortorder": null
+    }
+  ],
+  "outcome": {
+    "code": "corrupt",
+    "description": "Discrepancies detected",
+    "summary": "failure"
+  },
+  "partition-sortorder": [
+    {
+      "name": "Lions & Tigers",
+      "partitionid": 1,
+      "rankid": 1,
+      "sortorder": null
+    },
+    {
+      "name": "White's Wolves",
+      "partitionid": 2,
+      "rankid": 2,
+      "sortorder": null
+    },
+    {
+      "name": "Bears and Frères",
+      "partitionid": 3,
+      "rankid": 3,
+      "sortorder": null
+    },
+    {
+      "name": "Webelos (\"Webes\")",
+      "partitionid": 4,
+      "rankid": 4,
+      "sortorder": null
+    },
+    {
+      "name": "Arrows <<--<<",
+      "partitionid": 5,
+      "rankid": 5,
+      "sortorder": null
+    },
+    {
+      "name": "TheLastClass",
+      "partitionid": 7,
+      "rankid": 7,
+      "sortorder": null
+    }
+  ],
+  "ranks-sortorder": [
+    {
+      "classid": 1,
+      "ntrophies": -1,
+      "rank": "Lions & Tigers",
+      "rankid": 1,
+      "sortorder": null
+    },
+    {
+      "classid": 2,
+      "ntrophies": -1,
+      "rank": "White's Wolves",
+      "rankid": 2,
+      "sortorder": null
+    },
+    {
+      "classid": 3,
+      "ntrophies": -1,
+      "rank": "Bears and Frères",
+      "rankid": 3,
+      "sortorder": null
+    },
+    {
+      "classid": 4,
+      "ntrophies": -1,
+      "rank": "Webelos (\"Webes\")",
+      "rankid": 4,
+      "sortorder": null
+    },
+    {
+      "classid": 5,
+      "ntrophies": -1,
+      "rank": "Arrows <<--<<",
+      "rankid": 5,
+      "sortorder": null
+    },
+    {
+      "classid": 7,
+      "ntrophies": -1,
+      "rank": "TheLastClass",
+      "rankid": 7,
+      "sortorder": null
+    }
+  ]
+}
