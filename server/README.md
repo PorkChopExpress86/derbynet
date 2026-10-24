@@ -99,11 +99,28 @@ testing/login-coordinator.sh http://localhost:8080
 testing/login-coordinator.sh http://localhost:8000
 ```
 
-The Django server serves `/action.php` with PHP's dispatch rules and envelope, but no handler is ported yet, so every name answers `unrecognized`. The scripts pass only against PHP until the handlers land (#16 and M3).
+The Django server serves `/action.php` with PHP's dispatch rules and envelope. Only the login handlers are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh` pass against both servers. Every other name answers `unrecognized` until M3 ports it.
 
 ## Legacy handlers
 
 A handler lives in `legacy_api/handlers/` and registers under its exact PHP name with `@action(...)` or `@query(...)` from `legacy_api/registry.py`. Each declares its `permission`, a `Perm` from `accounts/permissions.py` or an `Access` value. The dispatcher checks it against the session's `role` and `permissions` keys before the handler runs. A handler resolves every id from a request with `ctx.resolve(Model, raw_id)`, which finds rows of the active event only, and writes through services, never the ORM. Each new endpoint adds a request to `LEAK_REQUESTS` in `legacy_api/tests/test_event_leak.py`.
+
+## Roles and logins
+
+Roles are rows of `accounts.Role`, with hashed passwords and PHP's permission bits (ADR-07, ADR-16). A new database starts with PHP's five default roles and passwords, which `testing/default.passwords` lists. A login stores the role name and its bits in the session. A session with no login holds the bits of the anonymous role, the one named `''`. Before the first event exists, every session also holds `SET_UP`.
+
+To keep the roles and passwords of a PHP install, import its `config-roles.inc`. The import replaces every role:
+
+```sh
+uv run python manage.py import_roles /path/to/local/config-roles.inc --dry-run
+uv run python manage.py import_roles /path/to/local/config-roles.inc
+```
+
+`--dry-run` prints each role and its bit mask and writes nothing. When the file holds PHP that the command cannot read, it runs `php` instead, if `php` is installed.
+
+Pages log in at `login/` and log out with a POST to `logout/`. A page view declares its permission with `@page_requires(Perm.X)` from `accounts/views.py`, which sends a visitor without it to `login/?next=<page>`. A mobile check-in link is `mcheckin.php?tok=<make_mcheckin_token()>`. It grants check-in, revert and photo upload to the phone's session, and expires after 60 minutes.
+
+A POST to `/action.php` that carries an `Origin` header for another site answers `notauthorized`. The server's own origin and the origins in `DERBYNET_CSRF_TRUSTED_ORIGINS` pass. Hardware clients send no `Origin`.
 
 ## Settings
 
