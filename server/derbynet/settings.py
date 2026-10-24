@@ -77,7 +77,13 @@ def _stored_secret_key(config_dir):
             pass
         finally:
             os.unlink(temp)
-    return path.read_text().strip()
+    key = path.read_text().strip()
+    if not key:
+        raise ImproperlyConfigured(
+            f"{path} is empty. Delete it to generate a new key, "
+            "or set DJANGO_SECRET_KEY."
+        )
+    return key
 
 
 DATA_DIR = _env_dir("DERBYNET_DATA_DIR", BASE_DIR / "var" / "data")
