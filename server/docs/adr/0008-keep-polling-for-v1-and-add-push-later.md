@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
+Accepted on 2026-10-22, when the owner approved merging the ADR pull request. Superseded for the kiosk pages by [ADR-15](0015-push-kiosk-updates-for-sub-second-scene-switches.md) on 2026-10-24. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4).
 
 ## Context
 
