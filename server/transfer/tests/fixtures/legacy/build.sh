@@ -122,4 +122,4 @@ with open(sys.argv[2], "w") as out:
 ' "$WORK/$name.sqlite3" "$HERE/$name.sql"
 done
 
-echo "fixtures: $(cd "$HERE" && ls *.sql *.snapshot checks/*.json | tr '\n' ' ')" >&2
+echo "fixtures:" "$HERE"/*.sql "$HERE"/*.snapshot "$HERE"/checks/*.json >&2

@@ -98,7 +98,7 @@
       "sortorder": null
     },
     {
-      "name": "TheLastClass",
+      "name": "Default",
       "partitionid": 7,
       "rankid": 7,
       "sortorder": null
@@ -143,7 +143,7 @@
     {
       "classid": 7,
       "ntrophies": -1,
-      "rank": "TheLastClass",
+      "rank": "* Not specified",
       "rankid": 7,
       "sortorder": null
     }

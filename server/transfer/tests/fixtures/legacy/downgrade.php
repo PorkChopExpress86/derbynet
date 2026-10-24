@@ -95,6 +95,13 @@ if ($aggregates) {
   }
 }
 
+// Before partitions, a subgroup named "* Not specified" was the default one,
+// which after_update_schema() renames.
+if ($version < 8) {
+  $db->exec("UPDATE Ranks SET rank = '* Not specified'"
+            .' WHERE rankid = (SELECT MAX(rankid) FROM Ranks)');
+}
+
 $db->exec("DELETE FROM RaceInfo WHERE itemkey = 'schema'");
 if ($version > 1) {
   $db->exec("INSERT INTO RaceInfo(itemkey, itemvalue) VALUES('schema', '$version')");

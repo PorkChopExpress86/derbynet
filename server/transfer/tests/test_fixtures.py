@@ -327,7 +327,7 @@ def test_old_v7_and_the_php_upgraded_v7_give_identical_dumps(tmp_path):
     # The partition structure is logged when the database is upgraded.
     omit = {"core.actionlog.received"}
     old_dump = legacy_dump(_event(report), omit=omit)
-    assert old_dump["roster.partition"]
+    assert "Default" in [row["name"] for row in old_dump["roster.partition"]]
     assert old_dump["core.actionlog"]
     assert old_dump == legacy_dump(_event(upgraded), omit=omit)
 
