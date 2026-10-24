@@ -48,13 +48,21 @@ def basename(path):
 
 def is_valid_name(name):
     """A basename that stays inside its folder: not empty and not all dots."""
-    return bool(name) and "/" not in name and "\\" not in name and name.strip(".") != ""
+    return (
+        bool(name)
+        and "/" not in name
+        and "\\" not in name
+        and name.strip(".") != ""
+        # The name of the cropped photos' folder.
+        and name != CROPPED
+    )
 
 
 def relative_parts(path, directory):
     """The path below `directory`, as components, under Windows or POSIX rules.
 
-    A path outside `directory`, or with no `directory`, gives its basename.
+    A path outside `directory`, or with no `directory`, gives its basename,
+    under `0-cropped` when that is the folder it is in.
     """
     if directory:
         for rules in (posixpath, ntpath):
@@ -64,7 +72,8 @@ def relative_parts(path, directory):
             if rules.normcase(full).startswith(rules.normcase(root + rules.sep)):
                 rest = full[len(root) + 1 :]
                 return [part for part in re.split(r"[\\/]", rest) if part]
-    return [basename(path)]
+    folder = basename(ntpath.dirname(path.replace("/", "\\")))
+    return [CROPPED, basename(path)] if folder == CROPPED else [basename(path)]
 
 
 class Photos:
@@ -79,6 +88,9 @@ class Photos:
         self.snapshot = {}  # (racerid, column) -> SnapshotPhoto
         self.copied = 0
         self.referenced = 0
+        # Racer id -> the files to write once the racer is imported.
+        self.pending = {}
+        self._racerid = None
 
     def add_snapshot_photos(self, photos):
         for photo in photos:
@@ -94,22 +106,30 @@ class Photos:
         return [Path(root) for root in roots if root]
 
     def _copy(self, source, repository, relative):
-        target = self.staging / repository.folder / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, target)
-        self.copied += 1
+        self.pending.setdefault(self._racerid, []).append(
+            (lambda target: shutil.copyfile(source, target), repository, relative)
+        )
 
     def _write(self, data, repository, relative):
-        target = self.staging / repository.folder / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
-        self.copied += 1
+        self.pending.setdefault(self._racerid, []).append(
+            (lambda target: target.write_bytes(data), repository, relative)
+        )
+
+    def stage(self, racerids):
+        """Write the files of the imported racers into the staging folder."""
+        for racerid in racerids:
+            for write, repository, relative in self.pending.pop(racerid, []):
+                target = self.staging / repository.folder / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                write(target)
+                self.copied += 1
 
     def rebase(self, racerid, repository, legacy_path):
         """The racer's new relative path. Copies the files it names."""
         if not legacy_path:
             return ""
         self.referenced += 1
+        self._racerid = racerid
         photo = self.snapshot.get((racerid, repository.column))
         if photo is not None:
             return self._from_snapshot(racerid, repository, photo)
@@ -194,16 +214,37 @@ class Photos:
 
 
 def publish(staging, slug):
-    """Move the staged photo folders into the event's folder, replacing any."""
+    """Move the staged photo folders into the event's folder.
+
+    Folders already there move into `staging`, and the returned function moves
+    them back, for when the transaction that published them rolls back.
+    """
     staging = Path(staging)
     target = event_dir(slug)
     target.mkdir(parents=True, exist_ok=True)
-    for repository in REPOSITORIES:
-        old = target / repository.folder
-        if old.exists():
-            shutil.rmtree(old)
-        staged = staging / repository.folder
-        if staged.exists():
-            shutil.move(staged, old)
-        else:
-            old.mkdir()
+    moved = []
+
+    def restore():
+        for folder, kept in reversed(moved):
+            if folder.exists():
+                shutil.rmtree(folder)
+            if kept is not None:
+                shutil.move(kept, folder)
+
+    try:
+        for repository in REPOSITORIES:
+            folder = target / repository.folder
+            kept = None
+            if folder.exists():
+                kept = staging / f"replaced-{repository.folder}"
+                shutil.move(folder, kept)
+            moved.append((folder, kept))
+            staged = staging / repository.folder
+            if staged.exists():
+                shutil.move(staged, folder)
+            else:
+                folder.mkdir()
+    except BaseException:
+        restore()
+        raise
+    return restore

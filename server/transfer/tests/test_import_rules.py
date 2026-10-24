@@ -15,6 +15,8 @@ from core.models import ActionLog, Event, RaceSettings, RaceState, SiteState
 from core.services import event_dir
 from kiosks.models import Kiosk
 from roster.models import Group, GroupConstituent, Partition, Racer
+from transfer.legacy import photos
+from transfer.legacy.source import read_source
 from transfer.models import LegacyId
 from transfer.tests.legacy import (
     FIXTURES,
@@ -353,18 +355,24 @@ def test_check_in_times_before_schema_10_come_from_events(tmp_path):
     assert all(len(set(times)) == len(times) for times in seen.values())
 
 
-def test_a_ranks_partition_named_not_specified_becomes_default(tmp_path):
+def test_subgroups_sharing_a_name_become_renamed_partitions(tmp_path):
+    # PHP's INSERT ... SELECT FROM Ranks fails on Partitions.name UNIQUE and
+    # leaves no partitions at all. The importer renames and reports instead.
     database = legacy_folder(
         tmp_path,
         "v7",
-        sql=["UPDATE Ranks SET rank = '* Not specified' WHERE rankid = 1"],
+        sql=["UPDATE Ranks SET rank = 'Wolves' WHERE rankid IN (1, 2)"],
     )
     report, _ = _import(tmp_path, database)
-    names = set(
+    names = sorted(
         Partition.objects.filter(event=_event(report)).values_list("name", flat=True)
     )
-    assert "Default" in names
-    assert "* Not specified" not in names
+    assert names[-2:] == ["Wolves", "Wolves (2)"]
+    renamed = [
+        f for f in _findings(report, "changed-value") if f["table"] == "partitions"
+    ]
+    assert [f["legacy_id"] for f in renamed] == [2]
+    assert report["invariants"] == {}
 
 
 def test_constituent_csv_and_rows_are_merged_and_differences_reported(tmp_path):
@@ -471,3 +479,97 @@ def test_the_report_lists_counts_findings_and_invariants(tmp_path):
     # Three racer photos, one of them cropped, so four files.
     assert report["photos"] == {"paths": 3, "files_copied": 4}
     assert "racechart: 328 of 328" in out
+
+
+def _new_id(event, model, legacy_id):
+    return LegacyId.objects.get(event=event, model=model, legacy_id=legacy_id).new_id
+
+
+def test_long_names_that_collide_once_cut_are_renamed(tmp_path):
+    long = "A" * 75
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[
+            f"UPDATE Classes SET class = '{long}x' WHERE classid = 1",
+            f"UPDATE Classes SET class = '{long}y' WHERE classid = 2",
+        ],
+    )
+    report, _ = _import(tmp_path, database)
+    names = {
+        group.name
+        for group in Group.objects.filter(event=_event(report))
+        if group.name.startswith("AAA")
+    }
+    assert names == {long, "A" * 71 + " (2)"}
+    assert len(_findings(report, "changed-value")) == 2
+
+
+def test_a_snapshot_basename_naming_the_cropped_folder_is_dropped(tmp_path):
+    text = SNAPSHOT.read_text()
+    photo = next(p for p in read_source(SNAPSHOT).photos if p.original is None)
+    source = tmp_path / "crafted" / "snapshot.xml"
+    source.parent.mkdir()
+    source.write_text(
+        text.replace(f'"basename": "{photo.basename}"', '"basename": "0-cropped"', 1)
+    )
+    report, _ = _import(tmp_path, source)
+    racer = Racer.objects.get(pk=_new_id(_event(report), "roster.racer", photo.racerid))
+    column = "headshot" if photo.column == "imagefile" else "car_photo"
+    assert getattr(racer, column) == ""
+    assert any("'0-cropped'" in f["detail"] for f in _findings(report, "photo-path"))
+
+
+def test_a_dropped_racer_publishes_no_photo(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=["UPDATE RegistrationInfo SET carnumber = 1e20 WHERE carnumber = 101"],
+    )
+    report, _ = _import(tmp_path, database)
+    folder = event_dir(report["event"]["slug"])
+    assert not (folder / "racers" / "head-101.jpg").exists()
+    assert not (folder / "cars" / "car-101.jpg").exists()
+    assert (folder / "racers" / "head-111.jpg").is_file()
+    assert report["photos"]["files_copied"] == 1
+
+
+def test_a_photo_write_failure_rolls_back_and_keeps_the_old_photos(
+    tmp_path, monkeypatch
+):
+    first, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
+    old = _event(first)
+    folder = event_dir(old.slug)
+    before = {p: _md5(p) for p in folder.rglob("*") if p.is_file()}
+    assert before
+    real_move = photos.shutil.move
+
+    def failing_move(source, target):
+        if str(target).endswith("cars"):
+            raise OSError(28, "No space left on device")
+        return real_move(source, target)
+
+    monkeypatch.setattr(photos.shutil, "move", failing_move)
+    with pytest.raises(CommandError, match="No space left"):
+        _import(tmp_path, legacy_folder(tmp_path, "v9"), "--event", "Pack", "--replace")
+    monkeypatch.undo()
+
+    assert list(Event.objects.values_list("id", flat=True)) == [old.id]
+    assert {p: _md5(p) for p in folder.rglob("*") if p.is_file()} == before
+
+
+def test_nul_characters_are_dropped_for_postgres(tmp_path):
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=[
+            "UPDATE RegistrationInfo SET carname = 'Zoom' || char(0) || 'er'"
+            " WHERE carnumber = 101",
+            "INSERT INTO ActionHistory(historyid, received, request)"
+            " VALUES(9001, '2024-02-10 13:05:09', '{\"action\":\"x\\u0000y\"}')",
+        ],
+    )
+    report, _ = _import(tmp_path, database)
+    assert _racer(report, 101).car_name == "Zoomer"
+    log = ActionLog.objects.get(pk=_new_id(_event(report), "core.actionlog", 9001))
+    assert log.request == {"action": "xy"}

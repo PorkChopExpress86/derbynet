@@ -104,7 +104,8 @@ def test_an_autumn_wall_time_reads_as_its_first_occurrence():
         ),
         ("/var/racers/a.jpg", "/var/racers/", ["a.jpg"]),
         ("/var/racers/../cars/a.jpg", "/var/racers", ["a.jpg"]),
-        ("/elsewhere/0-cropped/a.jpg", "/var/racers", ["a.jpg"]),
+        ("/elsewhere/0-cropped/a.jpg", "/var/racers", ["0-cropped", "a.jpg"]),
+        ("D:\\moved\\0-cropped\\a.jpg", "/var/racers", ["0-cropped", "a.jpg"]),
         ("C:\\x\\a.jpg", None, ["a.jpg"]),
     ],
 )

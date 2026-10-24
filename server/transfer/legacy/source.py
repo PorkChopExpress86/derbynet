@@ -84,7 +84,10 @@ def _read_sqlite(path):
     except sqlite3.Error as error:
         raise SourceError(f"cannot open {path}: {error}") from None
     # Legacy text is not always UTF-8, for example names typed on Windows.
-    connection.text_factory = lambda raw: raw.decode("utf-8", "replace")
+    # Postgres refuses NUL characters, which SQLite text can hold.
+    connection.text_factory = lambda raw: raw.decode("utf-8", "replace").replace(
+        "\x00", ""
+    )
     try:
         names = [
             name
@@ -120,7 +123,7 @@ def _read_snapshot(path):
     text = _strip_bookends(text, "<snapshot>", "</snapshot>")
     text = _strip_bookends(text, "<![CDATA[", "]]>")
     try:
-        entries = json.loads(text)
+        entries = json.loads(text.replace("\\u0000", ""))
     except json.JSONDecodeError as error:
         raise SourceError(
             f"{path} is neither a SQLite database nor a snapshot: {error}"

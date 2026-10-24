@@ -138,6 +138,8 @@ class Table:
     unique: tuple[str, ...] = ()
     # The report's name for a row of a table without an id column.
     key: Callable[[dict], object] | None = None
+    # Runs with the legacy ids of the rows that were written.
+    after: Callable[[Context, list], None] | None = None
 
     def legacy_key(self, row):
         if self.id_column:
@@ -174,21 +176,26 @@ def _fill_sort_order(ctx, table, id_column, scope=None):
     return rows
 
 
-def _rename_duplicates(ctx, rows, table, id_column, column, fold):
-    """Rename later rows whose name collides, as a unique constraint needs."""
+def _rename_duplicates(ctx, rows, table, id_column, column, fold, max_length):
+    """Rename later rows whose name collides, as a unique constraint needs.
+
+    Names are cut to the column's length first, so the cut cannot make two
+    of them collide again.
+    """
     seen = set()
     for row in sorted(rows, key=lambda r: values.id_order(r[id_column])):
         name, n = values.text(row[column]), 1
-        candidate = name
+        candidate = name[:max_length]
         while fold(candidate) in seen:
             n += 1
-            candidate = f"{name} ({n})"
+            suffix = f" ({n})"
+            candidate = name[: max_length - len(suffix)] + suffix
         if candidate != name:
             ctx.report.add(
                 Kind.CHANGED_VALUE,
                 table,
                 row[id_column],
-                f"{column} {name!r} is taken; renamed {candidate!r}",
+                f"{column} {name!r} is taken or too long; renamed {candidate!r}",
             )
             row[column] = candidate
         seen.add(fold(candidate))
@@ -198,7 +205,15 @@ def _rename_duplicates(ctx, rows, table, id_column, column, fold):
 def _classes(ctx):
     rows = _fill_sort_order(ctx, "classes", "classid")
     # Postgres folds non-ASCII case for the unique index, PHP's NOCASE does not.
-    return _rename_duplicates(ctx, rows, "classes", "classid", "class", str.lower)
+    return _rename_duplicates(
+        ctx,
+        rows,
+        "classes",
+        "classid",
+        "class",
+        str.lower,
+        Group._meta.get_field("name").max_length,
+    )
 
 
 def _group(row, ctx):
@@ -225,7 +240,15 @@ def _subgroup(row, ctx):
 
 def _partitions(ctx):
     rows = _fill_sort_order(ctx, "partitions", "partitionid")
-    return _rename_duplicates(ctx, rows, "partitions", "partitionid", "name", str)
+    return _rename_duplicates(
+        ctx,
+        rows,
+        "partitions",
+        "partitionid",
+        "name",
+        str,
+        Partition._meta.get_field("name").max_length,
+    )
 
 
 def _partition(row, ctx):
@@ -340,7 +363,8 @@ def _racer(row, ctx):
         "note": values.text(row["note"]),
         "exclude": values.truthy(row["exclude"]),
     }
-    # Last, so a dropped racer copies no photo.
+    # Last, so a racer dropped here queues no photo. Photos are written only
+    # for the racers that are imported.
     fields["headshot"] = ctx.photos.rebase(racerid, HEADSHOTS, row["imagefile"])
     fields["car_photo"] = ctx.photos.rebase(racerid, CAR_PHOTOS, row["carphoto"])
     return fields
@@ -521,7 +545,8 @@ def _kiosk(row, ctx):
 def _action_log(row, ctx):
     request = values.text(row["request"])
     try:
-        parsed = json.loads(request)
+        # Postgres's jsonb refuses an escaped NUL character.
+        parsed = json.loads(request.replace("\\u0000", ""))
     except json.JSONDecodeError:
         parsed = None
     if not isinstance(parsed, dict):
@@ -559,7 +584,13 @@ TABLES = [
         unique=("aggregate_id", "subgroup_id"),
         key=lambda row: f"{row['classid']}:{row['rankid']}",
     ),
-    Table("registrationinfo", Racer, "racerid", _racer),
+    Table(
+        "registrationinfo",
+        Racer,
+        "racerid",
+        _racer,
+        after=lambda ctx, ids: ctx.photos.stage(ids),
+    ),
     Table("rounds", Round, "roundid", _round, unique=("group_id", "number")),
     Table(
         "roster",
@@ -680,5 +711,7 @@ def load_tables(ctx):
             if table.id_column:
                 ctx.ids[label(table.model)][legacy_id] = obj.pk
                 legacy_ids.append((label(table.model), legacy_id, obj.pk))
+        if table.after:
+            table.after(ctx, [legacy_id for legacy_id, _ in built])
         ctx.report.count(table.name, len(rows), len(built))
     return legacy_ids

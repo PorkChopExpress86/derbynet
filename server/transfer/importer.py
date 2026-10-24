@@ -83,25 +83,40 @@ def import_derbynet(
             search_dirs={HEADSHOTS: photos_dir, CAR_PHOTOS: car_photos_dir},
         )
         photos.add_snapshot_photos(source.photos)
-        with transaction.atomic():
-            event = _create_event(name, replace, report)
-            ctx = Context(event, tables, report, ZoneInfo(settings.TIME_ZONE), photos)
-            legacy_ids = load_tables(ctx)
-            apply_raceinfo(ctx)
-            LegacyId.objects.bulk_create(
-                LegacyId(event=event, model=model, legacy_id=legacy_id, new_id=new_id)
-                for model, legacy_id, new_id in legacy_ids
-            )
-            report.photos = {"paths": photos.referenced, "files_copied": photos.copied}
-            report.invariants = check_invariants(event)
-            if report.invariants and not accept_violations:
-                raise ImportFailed(
-                    "the imported rows violate invariants: "
-                    + ", ".join(sorted(report.invariants)),
-                    report,
+        restore = None
+        try:
+            with transaction.atomic():
+                event = _create_event(name, replace, report)
+                zone = ZoneInfo(settings.TIME_ZONE)
+                ctx = Context(event, tables, report, zone, photos)
+                legacy_ids = load_tables(ctx)
+                apply_raceinfo(ctx)
+                LegacyId.objects.bulk_create(
+                    LegacyId(event=event, model=m, legacy_id=legacy, new_id=new)
+                    for m, legacy, new in legacy_ids
                 )
+                report.photos = {
+                    "paths": photos.referenced,
+                    "files_copied": photos.copied,
+                }
+                report.invariants = check_invariants(event)
+                if report.invariants and not accept_violations:
+                    raise ImportFailed(
+                        "the imported rows violate invariants: "
+                        + ", ".join(sorted(report.invariants)),
+                        report,
+                    )
+                # Last, so a failure here rolls the rows back too.
+                restore = publish(staging, event.slug)
+        except OSError as error:
+            if restore is not None:
+                restore()
+            raise ImportFailed(f"cannot write the photos: {error}", report) from None
+        except BaseException:
+            if restore is not None:
+                restore()
+            raise
         report.outcome = "committed"
-        publish(staging, event.slug)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
     return report
