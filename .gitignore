@@ -47,3 +47,6 @@ adapter-webrtc/
 .claude/worktrees/
 .claude/verify-evidence/
 .playwright-mcp/
+
+# Django dev data: the SQLite database, secret_key, and event folders
+server/var/
