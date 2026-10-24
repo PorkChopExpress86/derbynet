@@ -9,6 +9,7 @@ database transaction commits.
 """
 
 import ntpath
+import os
 import posixpath
 import re
 import shutil
@@ -90,6 +91,9 @@ class Photos:
         self.referenced = 0
         # Racer id -> the files to write once the racer is imported.
         self.pending = {}
+        # (folder, relative path) -> what was queued there: a source file's
+        # path or a snapshot photo's bytes.
+        self.claimed = {}
         self._racerid = None
 
     def add_snapshot_photos(self, photos):
@@ -105,23 +109,50 @@ class Photos:
             roots += self._roots(HEADSHOTS)
         return [Path(root) for root in roots if root]
 
-    def _copy(self, source, repository, relative):
-        self.pending.setdefault(self._racerid, []).append(
-            (lambda target: shutil.copyfile(source, target), repository, relative)
-        )
+    def _place(self, repository, name, files):
+        """Queue `files` under `name`, or under `name-2`, `name-3` and so on
+        when another photo already took that name. Returns the name used.
 
-    def _write(self, data, repository, relative):
-        self.pending.setdefault(self._racerid, []).append(
-            (lambda target: target.write_bytes(data), repository, relative)
-        )
+        `files` holds `(cropped, content)` pairs, where `content` is the
+        source file's `Path` or the bytes to write.
+        """
+        stem, extension = os.path.splitext(name)
+        candidate, n = name, 1
+        while any(
+            self.claimed.get(
+                (repository.folder, _relative(cropped, candidate)), content
+            )
+            != content
+            for cropped, content in files
+        ):
+            n += 1
+            candidate = f"{stem}-{n}{extension}"
+        for cropped, content in files:
+            relative = _relative(cropped, candidate)
+            self.claimed[(repository.folder, relative)] = content
+            self.pending.setdefault(self._racerid, []).append(
+                (content, repository, relative)
+            )
+        if candidate != name:
+            self.report.add(
+                Kind.PHOTO_PATH,
+                "registrationinfo",
+                self._racerid,
+                f"{repository.column}: another photo is named {name!r}; saved as"
+                f" {candidate!r}",
+            )
+        return candidate
 
     def stage(self, racerids):
         """Write the files of the imported racers into the staging folder."""
         for racerid in racerids:
-            for write, repository, relative in self.pending.pop(racerid, []):
+            for content, repository, relative in self.pending.pop(racerid, []):
                 target = self.staging / repository.folder / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
-                write(target)
+                if isinstance(content, Path):
+                    shutil.copyfile(content, target)
+                else:
+                    target.write_bytes(content)
                 self.copied += 1
 
     def rebase(self, racerid, repository, legacy_path):
@@ -155,11 +186,12 @@ class Photos:
                 f" saved as {name!r}",
             )
         if photo.original is not None:
-            self._write(photo.original, repository, name)
-            self._write(photo.displayed, repository, f"{CROPPED}/{name}")
-            return f"{CROPPED}/{name}"
-        self._write(photo.displayed, repository, name)
-        return name
+            files = [(False, photo.original), (True, photo.displayed)]
+        else:
+            files = [(False, photo.displayed)]
+        return _relative(
+            photo.original is not None, self._place(repository, name, files)
+        )
 
     def _from_files(self, racerid, repository, legacy_path):
         parts = relative_parts(legacy_path, self.legacy_dirs.get(repository))
@@ -186,12 +218,12 @@ class Photos:
         for root in self._roots(repository):
             original, crop = root / name, root / CROPPED / name
             if cropped and crop.is_file():
+                files = [(True, crop)]
                 if original.is_file():
-                    self._copy(original, repository, name)
-                self._copy(crop, repository, f"{CROPPED}/{name}")
-                return f"{CROPPED}/{name}"
+                    files.append((False, original))
+                return _relative(True, self._place(repository, name, files))
             if original.is_file():
-                self._copy(original, repository, name)
+                name = self._place(repository, name, [(False, original)])
                 if cropped:
                     self.report.add(
                         Kind.PHOTO_PATH,
@@ -211,6 +243,10 @@ class Photos:
             f" {', '.join(str(root) for root in self._roots(repository))}",
         )
         return wanted
+
+
+def _relative(cropped, name):
+    return f"{CROPPED}/{name}" if cropped else name
 
 
 def publish(staging, slug):

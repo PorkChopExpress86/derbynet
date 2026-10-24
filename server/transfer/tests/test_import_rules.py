@@ -713,3 +713,72 @@ def test_a_snapshot_strips_nul_characters_but_keeps_an_escaped_backslash(tmp_pat
     racer = _racer(report, 101)
     assert racer.car_name == "C:\\u0000\\x"
     assert racer.last_name == "Asher"
+
+
+def _snapshot_with_headshots(tmp_path, headshots):
+    """The v10 snapshot with only `headshots`: racerid -> (basename, original,
+    displayed). Each of those racers gets an imagefile path."""
+    text = SNAPSHOT.read_text()
+    entries = json.loads(text[text.index("<![CDATA[") + 9 : text.rindex("]]>")])
+    entries = [entry for entry in entries if "racerid" not in entry]
+    rows = next(e for e in entries if e["table"] == "RegistrationInfo")["rows"]
+    for row in rows:
+        row["imagefile"] = row["carphoto"] = None
+        if row["racerid"] in headshots:
+            row["imagefile"] = f"/old/racers/{headshots[row['racerid']][0]}"
+    for racerid, (name, original, displayed) in headshots.items():
+        photo = {"basename": name, "displayed": displayed.hex()}
+        if original is not None:
+            photo["original"] = original.hex()
+        entries.append({"racerid": racerid, "imagefile": photo})
+    source = tmp_path / "crafted" / "snapshot.json"
+    source.parent.mkdir(exist_ok=True)
+    source.write_text(json.dumps(entries))
+    return source
+
+
+def _headshot(report, racerid):
+    racer = Racer.objects.get(pk=_new_id(_event(report), "roster.racer", racerid))
+    return racer.headshot
+
+
+def test_snapshot_photos_sharing_a_name_each_keep_their_own_file(tmp_path):
+    source = _snapshot_with_headshots(
+        tmp_path,
+        {
+            1: ("same.jpg", b"original 1", b"cropped 1"),
+            11: ("same.jpg", None, b"photo 11"),
+            21: ("same.jpg", None, b"photo 21"),
+            31: ("same.jpg", None, b"photo 11"),
+        },
+    )
+
+    report, _ = _import(tmp_path, source)
+
+    racers = event_dir(report["event"]["slug"]) / "racers"
+    shots = {racerid: _headshot(report, racerid) for racerid in (1, 11, 21, 31)}
+    assert shots == {
+        1: "0-cropped/same.jpg",
+        11: "same-2.jpg",
+        21: "same-3.jpg",
+        31: "same-2.jpg",
+    }
+    assert (racers / "same.jpg").read_bytes() == b"original 1"
+    assert (racers / "0-cropped" / "same.jpg").read_bytes() == b"cropped 1"
+    assert (racers / "same-2.jpg").read_bytes() == b"photo 11"
+    assert (racers / "same-3.jpg").read_bytes() == b"photo 21"
+    renamed = [f for f in _findings(report, "photo-path") if "same-" in f["detail"]]
+    assert sorted(f["legacy_id"] for f in renamed) == [11, 21, 31]
+
+
+def test_snapshot_names_that_sanitize_alike_each_keep_their_own_file(tmp_path):
+    source = _snapshot_with_headshots(
+        tmp_path, {1: ("é.jpg", None, b"e acute"), 11: ("è.jpg", None, b"e grave")}
+    )
+
+    report, _ = _import(tmp_path, source)
+
+    racers = event_dir(report["event"]["slug"]) / "racers"
+    assert (_headshot(report, 1), _headshot(report, 11)) == ("_.jpg", "_-2.jpg")
+    assert (racers / "_.jpg").read_bytes() == b"e acute"
+    assert (racers / "_-2.jpg").read_bytes() == b"e grave"
