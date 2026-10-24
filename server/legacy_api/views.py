@@ -7,6 +7,7 @@ except the setup redirect PHP sends when no event is open.
 
 import logging
 
+from django.conf import settings
 from django.db import DatabaseError, transaction
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -63,6 +64,34 @@ def _masked(fields: dict) -> dict:
     }
 
 
+def _foreign_origin(request) -> bool:
+    """A POST whose `Origin` is neither this host nor a trusted origin (S34).
+
+    Hardware clients and scripts send no `Origin`. Browsers send one with
+    every cross-site POST, so a page on another site cannot post with the
+    visitor's login.
+    """
+    origin = request.headers.get("Origin")
+    if origin is None or request.method != "POST":
+        return False
+    own = f"{request.scheme}://{request.get_host()}"
+    return origin != own and origin not in settings.CSRF_TRUSTED_ORIGINS
+
+
+def _refusal(kind: str, fmt: Format, args: dict, post: dict, code) -> bytes:
+    if fmt is Format.XML:
+        xml = XmlWriter(_masked(post))
+        xml.not_authorized()
+        return xml.document()
+    out = {"action": _masked(args)} if kind == "action" else {}
+    out["outcome"] = {
+        "summary": "failure",
+        "code": code,
+        "description": REFUSALS[code],
+    }
+    return encode_php_json(out)
+
+
 def _record_action(event, echo: dict) -> None:
     """PHP's record_action() swallows a PDOException, so a log row the
     database refuses never fails the request. The savepoint keeps the failed
@@ -102,6 +131,9 @@ def dispatch(request):
     # PHP answers a 500 for an array name, such as query[]=poll.
     name = name if isinstance(name, str) else ""
     fmt = format_of(name)
+    if _foreign_origin(request):
+        body = _refusal(kind, fmt, args, post, "notauthorized")
+        return _response(body, CONTENT_TYPES[fmt])
 
     event = _active_event()
     if event is None and needs_event(name):
@@ -128,10 +160,8 @@ def dispatch(request):
         else:
             ctx.failure("unrecognized", f"Unrecognized {kind}: {name}")
     elif not allows(request, endpoint.permission):
-        if fmt is Format.XML:
-            ctx.xml.not_authorized()
-        else:
-            ctx.failure(endpoint.failure_code, REFUSALS[endpoint.failure_code])
+        body = _refusal(kind, fmt, args, post, endpoint.failure_code)
+        return _response(body, CONTENT_TYPES[fmt])
     else:
         return _response(_run(ctx, endpoint, fmt), CONTENT_TYPES[fmt])
 
