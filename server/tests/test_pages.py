@@ -35,6 +35,7 @@ def test_health_page_under_the_url_prefix_has_prefixed_urls_and_static_paths(
     env = os.environ | {
         "DJANGO_SETTINGS_MODULE": "derbynet.settings",
         "DERBYNET_URL_PREFIX": "/derbynet",
+        "DATABASE_URL": f"sqlite:///{tmp_path / 'db.sqlite3'}",
         "DERBYNET_DATA_DIR": str(tmp_path / "data"),
         "DERBYNET_CONFIG_DIR": str(tmp_path / "config"),
     }
