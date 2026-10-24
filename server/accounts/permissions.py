@@ -39,6 +39,9 @@ class Access(Enum):
     """A requirement that is not a permission bit."""
 
     ANONYMOUS = "anonymous"
+    # Logged in as a role that has a password. Anyone can log in as `Timer`,
+    # whose password is empty and whose name `role.list` publishes, so that
+    # login proves nothing. The timer's handlers require `TIMER_MESSAGE`.
     LOGGED_IN = "logged-in"
 
 
@@ -79,7 +82,11 @@ def allows(request: HttpRequest, requirement: Requirement) -> bool:
         case Access.ANONYMOUS:
             return True
         case Access.LOGGED_IN:
-            return role(request) is not None
+            name = role(request)
+            return (
+                name is not None
+                and Role.objects.filter(name=name).exclude(password_hash="").exists()
+            )
         case Perm():
             return granted(request) & requirement != 0
 
