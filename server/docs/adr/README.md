@@ -21,6 +21,7 @@ These architecture decision records (ADRs) record how the DerbyNet server moves 
 | [ADR-13](0013-put-new-code-in-server-and-delete-website-at-cutover.md) | Put new code in `server/`, and delete `website/` at cutover | Accepted |
 | [ADR-14](0014-ship-docker-images-as-the-only-deployment.md) | Ship Docker images as the only deployment | Accepted |
 | [ADR-15](0015-push-kiosk-updates-for-sub-second-scene-switches.md) | Push kiosk updates for sub-second scene switches | Accepted |
+| [ADR-16](0016-use-no-django-users-or-admin-roles-live-in-the-session.md) | Use no Django users or admin; roles live in the session | Accepted |
 
 ## Status lifecycle
 
