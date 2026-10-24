@@ -41,7 +41,7 @@ Check that both answer:
 
 ```sh
 curl -s 'http://localhost:8080/action.php?query=role.list'
-curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/admin/login/
+curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health/
 ```
 
 These variables change the defaults:

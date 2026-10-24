@@ -1,0 +1,12 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DerbyNet health</title>
+<link rel="stylesheet" href="{% static 'core/health.css' %}">
+</head>
+<body>
+<p>DerbyNet is running.</p>
+<form method="post" action="{% url 'health' %}">{% csrf_token %}</form>
+</body>
+</html>
