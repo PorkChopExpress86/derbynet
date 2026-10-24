@@ -127,12 +127,18 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "accounts.middleware.RoleSessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "derbynet.urls"
+
+# A fixed 24-hour window covers a race day. Django slides the expiry only by
+# saving the session on every request, and polls must never write it (#15).
+SESSION_COOKIE_AGE = 86400
+SESSION_SAVE_EVERY_REQUEST = False
 
 TEMPLATES = [
     {
