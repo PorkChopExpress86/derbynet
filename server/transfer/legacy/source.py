@@ -146,12 +146,25 @@ def _strip_bookends(text, start, stop):
     return text[begin + len(start) : end]
 
 
+def _strip_nul(value):
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, list):
+        return [_strip_nul(item) for item in value]
+    return value
+
+
+def _without_nul(pairs):
+    """A JSON object with NUL characters removed, which Postgres refuses."""
+    return {_strip_nul(key): _strip_nul(value) for key, value in pairs}
+
+
 def _read_snapshot(path):
     text = path.read_text(encoding="utf-8", errors="replace")
     text = _strip_bookends(text, "<snapshot>", "</snapshot>")
     text = _strip_bookends(text, "<![CDATA[", "]]>")
     try:
-        entries = json.loads(text.replace("\\u0000", ""))
+        entries = json.loads(text, object_pairs_hook=_without_nul)
     except json.JSONDecodeError as error:
         raise SourceError(
             f"{path} is neither a SQLite database nor a snapshot: {error}"

@@ -695,3 +695,21 @@ def test_a_hot_journal_is_refused_with_a_clear_message(tmp_path):
 
     assert _folder_state(crashed) == before
     assert not Event.objects.exists()
+
+
+def test_a_snapshot_strips_nul_characters_but_keeps_an_escaped_backslash(tmp_path):
+    text = SNAPSHOT.read_text()
+    row = '"carnumber": 101,\n     "carname": "",\n     "lastname": "Asher",'
+    assert row in text
+    crafted = row.replace('"carname": ""', r'"carname": "C:\\u0000\\x"').replace(
+        '"Asher"', r'"Ash\u0000er"'
+    )
+    source = tmp_path / "crafted" / "snapshot.xml"
+    source.parent.mkdir()
+    source.write_text(text.replace(row, crafted))
+
+    report, _ = _import(tmp_path, source)
+
+    racer = _racer(report, 101)
+    assert racer.car_name == "C:\\u0000\\x"
+    assert racer.last_name == "Asher"
