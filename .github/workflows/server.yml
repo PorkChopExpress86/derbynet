@@ -1,0 +1,71 @@
+name: server
+
+# Lints and tests the Django server in server/ on Python 3.14, once on SQLite
+# and once on Postgres (owner decision D1).  See server/README.md.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - server/**
+      - .github/workflows/server.yml
+  pull_request:
+    paths:
+      - server/**
+      - .github/workflows/server.yml
+  workflow_dispatch:
+
+concurrency:
+  group: server-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  server:
+    name: server (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: sqlite
+            url: ''
+          - database: postgres
+            url: postgres://postgres:postgres@localhost:5432/derbynet
+    services:
+      postgres:
+        # An empty image skips the service on the SQLite run.
+        image: ${{ matrix.database == 'postgres' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: ${{ matrix.url }}
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Check formatting
+        run: uv run ruff format --check
+
+      - name: Check for missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Test
+        run: uv run pytest -v -rs
