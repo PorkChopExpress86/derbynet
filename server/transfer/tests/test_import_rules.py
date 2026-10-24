@@ -782,3 +782,30 @@ def test_snapshot_names_that_sanitize_alike_each_keep_their_own_file(tmp_path):
     assert (_headshot(report, 1), _headshot(report, 11)) == ("_.jpg", "_-2.jpg")
     assert (racers / "_.jpg").read_bytes() == b"e acute"
     assert (racers / "_-2.jpg").read_bytes() == b"e grave"
+
+
+def test_a_snapshot_name_too_long_for_the_disk_is_shortened(tmp_path):
+    long = "a" * 300 + ".jpg"
+    source = _snapshot_with_headshots(
+        tmp_path,
+        {
+            1: (long, b"original 1", b"cropped 1"),
+            11: (long, None, b"photo 11"),
+        },
+    )
+
+    report, _ = _import(tmp_path, source)
+
+    racers = event_dir(report["event"]["slug"]) / "racers"
+    first, second = _headshot(report, 1), _headshot(report, 11)
+    assert first.startswith("0-cropped/aaa") and first.endswith(".jpg")
+    assert len(first) <= 255
+    name = first.removeprefix("0-cropped/")
+    assert (racers / name).read_bytes() == b"original 1"
+    assert (racers / first).read_bytes() == b"cropped 1"
+    assert second.endswith("-2.jpg") and len(second) <= 255
+    assert (racers / second).read_bytes() == b"photo 11"
+    shortened = [
+        f for f in _findings(report, "photo-path") if "too long" in f["detail"]
+    ]
+    assert sorted(f["legacy_id"] for f in shortened) == [1, 11]

@@ -21,6 +21,8 @@ from core.services import event_dir
 from .report import Kind
 
 CROPPED = "0-cropped"
+# `Racer.headshot` holds 255 characters, `0-cropped/` included.
+MAX_NAME_LENGTH = 255 - len(CROPPED) - 1
 
 # `photo.upload` keeps these characters of a file name and replaces each run of
 # others with `_` (`action.photo.upload.inc`).
@@ -117,7 +119,7 @@ class Photos:
         source file's `Path` or the bytes to write.
         """
         stem, extension = os.path.splitext(name)
-        candidate, n = name, 1
+        candidate, n = _fit(stem, "", extension), 1
         while any(
             self.claimed.get(
                 (repository.folder, _relative(cropped, candidate)), content
@@ -126,19 +128,24 @@ class Photos:
             for cropped, content in files
         ):
             n += 1
-            candidate = f"{stem}-{n}{extension}"
+            candidate = _fit(stem, f"-{n}", extension)
         for cropped, content in files:
             relative = _relative(cropped, candidate)
             self.claimed[(repository.folder, relative)] = content
             self.pending.setdefault(self._racerid, []).append(
                 (content, repository, relative)
             )
-        if candidate != name:
+        reasons = []
+        if _fit(stem, "", extension) != name:
+            reasons.append("is too long for a file name")
+        if n > 1:
+            reasons.append("is taken by another photo")
+        if reasons:
             self.report.add(
                 Kind.PHOTO_PATH,
                 "registrationinfo",
                 self._racerid,
-                f"{repository.column}: another photo is named {name!r}; saved as"
+                f"{repository.column}: {name!r} {' and '.join(reasons)}; saved as"
                 f" {candidate!r}",
             )
         return candidate
@@ -243,6 +250,19 @@ class Photos:
             f" {', '.join(str(root) for root in self._roots(repository))}",
         )
         return wanted
+
+
+def _fit(stem, suffix, extension):
+    """`stem + suffix + extension`, with the stem cut so the name fits a file
+    system (255 bytes) and a `Racer` path under `0-cropped/` (255 characters).
+    """
+    if len(extension) > 16:
+        stem, extension = stem + extension, ""
+    name = stem + suffix + extension
+    while len(name) > MAX_NAME_LENGTH or len(name.encode()) > 255:
+        stem = stem[:-1]
+        name = stem + suffix + extension
+    return name
 
 
 def _relative(cropped, name):
