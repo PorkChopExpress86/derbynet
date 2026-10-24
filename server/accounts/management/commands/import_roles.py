@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
@@ -24,7 +25,7 @@ class Command(BaseCommand):
     def handle(self, path, dry_run, **options):
         try:
             configs, post_setup_role = read(path)
-        except (OSError, ConfigRolesError) as error:
+        except (OSError, ConfigRolesError, subprocess.CalledProcessError) as error:
             raise CommandError(f"cannot read {path}: {error}") from error
         names = [config.name for config in configs]
         if post_setup_role is not None and post_setup_role not in names:

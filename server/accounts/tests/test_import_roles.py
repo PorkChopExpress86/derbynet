@@ -83,9 +83,35 @@ $post_setup_role = '';
 """
 
 
-def test_the_parser_refuses_what_it_cannot_read():
+@pytest.mark.parametrize(
+    "text",
+    [
+        UNREADABLE,
+        # PHP reads 0100 as octal 64.
+        "<?php $roles = array('X' => array('password' => '', 'permissions' => 0100));",
+        """<?php $roles = array('X' => array('password' => "p\\x41"));""",
+        "<?php $roles = array('X' => array('', 1));",
+    ],
+    ids=["variable", "octal", "hex-escape", "keyless"],
+)
+def test_the_parser_refuses_what_it_cannot_read(text):
     with pytest.raises(ConfigRolesError):
-        parse(UNREADABLE)
+        parse(text)
+
+
+@pytest.mark.django_db
+def test_a_php_failure_is_a_command_error(tmp_path, monkeypatch):
+    path = tmp_path / "config-roles.inc"
+    path.write_text(UNREADABLE)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "php").write_text("#!/bin/sh\nexit 255\n")
+    (bin_dir / "php").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+    with pytest.raises(CommandError, match="cannot read"):
+        import_roles(path)
+    assert Role.objects.count() == 5
 
 
 @pytest.mark.django_db
