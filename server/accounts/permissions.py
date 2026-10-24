@@ -2,12 +2,14 @@
 
 The bit values are those of `website/inc/permissions.inc`. A login stores the
 role name and its bits in the session. #16 writes those keys, and gives the
-anonymous role and the first-run setup their bits in `granted()`. Everything
-that checks a permission reads the session through `granted()` and `role()`.
+anonymous role's stored bits and the first-run `SET_UP` in `granted()`, which
+takes the request so it can read them. Everything that checks a permission
+goes through `granted()` and `role()`.
 """
 
-from collections.abc import Mapping
 from enum import Enum, IntFlag
+
+from django.http import HttpRequest
 
 
 class Perm(IntFlag):
@@ -43,21 +45,21 @@ SESSION_ROLE = "role"
 SESSION_PERMISSIONS = "permissions"
 
 
-def granted(session: Mapping) -> int:
-    """The session's permission bits. -1 holds every bit."""
-    return int(session.get(SESSION_PERMISSIONS, 0))
+def granted(request: HttpRequest) -> int:
+    """The request's permission bits. -1 holds every bit."""
+    return int(request.session.get(SESSION_PERMISSIONS, 0))
 
 
-def role(session: Mapping) -> str | None:
+def role(request: HttpRequest) -> str | None:
     """The name of the role the session logged in as, or None."""
-    return session.get(SESSION_ROLE) or None
+    return request.session.get(SESSION_ROLE) or None
 
 
-def allows(session: Mapping, requirement: Requirement) -> bool:
+def allows(request: HttpRequest, requirement: Requirement) -> bool:
     match requirement:
         case Access.ANONYMOUS:
             return True
         case Access.LOGGED_IN:
-            return role(session) is not None
+            return role(request) is not None
         case Perm():
-            return granted(session) & requirement != 0
+            return granted(request) & requirement != 0

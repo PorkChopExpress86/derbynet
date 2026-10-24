@@ -1,4 +1,5 @@
 import pytest
+from django.test import RequestFactory
 
 from accounts.permissions import Access, Perm, allows, granted, role
 
@@ -23,10 +24,16 @@ def test_the_bits_are_phps():
     }
 
 
+def request_with(session: dict):
+    request = RequestFactory().get("/")
+    request.session = session
+    return request
+
+
 def test_an_empty_session_holds_nothing():
-    assert granted({}) == 0
-    assert role({}) is None
-    assert role({"role": ""}) is None
+    assert granted(request_with({})) == 0
+    assert role(request_with({})) is None
+    assert role(request_with({"role": ""})) is None
 
 
 @pytest.mark.parametrize(
@@ -41,9 +48,10 @@ def test_an_empty_session_holds_nothing():
     ],
 )
 def test_a_requirement_is_met_by_any_of_its_bits(bits, requirement, expected):
-    assert allows({"permissions": bits}, requirement) is expected
+    assert allows(request_with({"permissions": bits}), requirement) is expected
 
 
 def test_logged_in_needs_a_role_name_not_bits():
-    assert not allows({"permissions": -1}, Access.LOGGED_IN)
-    assert allows({"role": "Timer", "permissions": 4096}, Access.LOGGED_IN)
+    assert not allows(request_with({"permissions": -1}), Access.LOGGED_IN)
+    timer = request_with({"role": "Timer", "permissions": 4096})
+    assert allows(timer, Access.LOGGED_IN)
