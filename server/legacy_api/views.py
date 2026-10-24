@@ -95,12 +95,14 @@ def _refusal(kind: str, fmt: Format, args: dict, post: dict, code) -> bytes:
 def _record_action(event, echo: dict) -> None:
     """PHP's record_action() swallows a PDOException, so a log row the
     database refuses never fails the request. The savepoint keeps the failed
-    insert from aborting a transaction the request runs in."""
+    insert from aborting a transaction the request runs in. The error is
+    logged at ERROR, not PHP's warning, since a locked or down database
+    fails here first."""
     try:
         with transaction.atomic():
             ActionLog.objects.create(event=event, request=echo)
     except DatabaseError:
-        logger.warning("the action log refused %s", echo.get("action"), exc_info=True)
+        logger.exception("the action log refused %s", echo.get("action"))
 
 
 def _run(ctx: LegacyContext, endpoint, fmt: Format) -> bytes:
