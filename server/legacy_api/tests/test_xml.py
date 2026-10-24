@@ -85,3 +85,13 @@ def test_the_field_names_clients_send_stay_attributes():
         b'<action-response action="1" lane_count="1" remote-start="1"'
         b' device-TestTimer="1" _x="1" a.b="1">'
     )
+
+
+def test_a_failure_escapes_its_description():
+    writer = XmlWriter({})
+    writer.failure("unrecognized", "Unrecognized action: <x a='1'>&")
+
+    assert writer.document().endswith(
+        b'<failure code="unrecognized">'
+        b"Unrecognized action: &lt;x a=&#039;1&#039;&gt;&amp;</failure>"
+    )

@@ -89,6 +89,27 @@ def test_with_no_event_open_a_name_redirects_to_setup(client, db):
         assert response.content == b""
 
 
+def test_with_no_event_open_an_xml_name_redirects_with_the_prolog(client, db):
+    # PHP echoes the prolog before data.inc sends the redirect.
+    response = client.get("/action.php?query=snapshot.get")
+
+    assert response.status_code == 302
+    assert response["Location"] == "setup.php"
+    assert response["Content-Type"] == "text/xml; charset=utf-8"
+    assert response.content == b'<?xml version="1.0" encoding="UTF-8"?>\n'
+
+
+def test_an_xml_action_masks_the_password_attribute(client, event):
+    response = post(client, "action=timer-message&message=HELLO&password=secret")
+
+    assert b"secret" not in response.content
+    assert ET.fromstring(response.content).attrib == {
+        "action": "timer-message",
+        "message": "HELLO",
+        "password": "...",
+    }
+
+
 def test_with_no_event_open_a_nodata_name_runs(client, db, endpoint):
     endpoint("query", "probe.nodata", lambda ctx: ctx.put("event", ctx.event))
 
@@ -300,6 +321,12 @@ def test_the_read_only_session_raises_directly(client, event, endpoint):
             ctx.session["sneaky"] = 1
         with pytest.raises(SessionWriteError):
             ctx.session.pop("role", None)
+        with pytest.raises(SessionWriteError):
+            del ctx.session["role"]
+        with pytest.raises(SessionWriteError):
+            ctx.session.flush()
+        with pytest.raises(SessionWriteError):
+            ctx.session.cycle_key()
         raised.append(dict(ctx.session))
         ctx.success()
 
@@ -325,6 +352,44 @@ def test_in_production_a_session_write_is_dropped_with_a_warning(
 
     assert outcome(response)["code"] == "success"
     assert "probe.writes writes the session" in caplog.text
+    assert "sneaky" not in client.session
+
+
+@pytest.mark.parametrize(
+    "write",
+    [
+        lambda session: session.__delitem__("role"),
+        lambda session: session.flush(),
+        lambda session: session.cycle_key(),
+    ],
+    ids=["del", "flush", "cycle_key"],
+)
+def test_a_dropped_session_write_leaves_the_login_and_its_key(
+    client, event, endpoint, write
+):
+    def handler(ctx):
+        write(ctx.session)
+        ctx.success()
+
+    endpoint("action", "probe.writes", handler)
+    log_in(client, Perm.SET_UP)
+    key = client.session.session_key
+
+    with override_settings(LEGACY_SESSION_WRITES_RAISE=False):
+        assert outcome(post(client, "action=probe.writes"))["code"] == "success"
+
+    assert client.session.session_key == key
+    assert client.session["role"] == "Tester"
+
+
+@override_settings(LEGACY_SESSION_WRITES_RAISE=False, DEBUG=True)
+def test_under_debug_a_session_write_raises(client, event, endpoint):
+    def handler(ctx):
+        ctx.session["sneaky"] = 1
+
+    endpoint("action", "probe.writes", handler)
+
+    assert outcome(post(client, "action=probe.writes"))["code"] == "server-error"
     assert "sneaky" not in client.session
 
 
