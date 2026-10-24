@@ -75,7 +75,11 @@ testing/login-coordinator.sh http://localhost:8080
 testing/login-coordinator.sh http://localhost:8000
 ```
 
-The Django server answers no legacy actions yet, so the scripts pass only against PHP until `/action.php` lands (#18).
+The Django server serves `/action.php` with PHP's dispatch rules and envelope, but no handler is ported yet, so every name answers `unrecognized`. The scripts pass only against PHP until the handlers land (#16 and M3).
+
+## Legacy handlers
+
+A handler lives in `legacy_api/handlers/` and registers under its exact PHP name with `@action(...)` or `@query(...)` from `legacy_api/registry.py`. Each declares its `permission`, a `Perm` from `accounts/permissions.py` or an `Access` value. The dispatcher checks it against the session's `role` and `permissions` keys before the handler runs. A handler resolves every id from a request with `ctx.resolve(Model, raw_id)`, which finds rows of the active event only, and writes through services, never the ORM. Each new endpoint adds a request to `LEAK_REQUESTS` in `legacy_api/tests/test_event_leak.py`.
 
 ## Settings
 

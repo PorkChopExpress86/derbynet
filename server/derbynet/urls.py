@@ -1,7 +1,16 @@
+from django.conf import settings
 from django.urls import path
 
 from core import views
+from legacy_api.views import dispatch
+
+# A proxy that strips the URL prefix sends `action.php`. A server reached
+# directly, such as runserver, sees the prefix in the path. A root install also
+# answers clients set up for the Debian layout under `derbynet/` (#17).
+_legacy_prefix = (settings.FORCE_SCRIPT_NAME or "/derbynet").strip("/")
 
 urlpatterns = [
     path("health/", views.health, name="health"),
+    path("action.php", dispatch, name="action-php"),
+    path(f"{_legacy_prefix}/action.php", dispatch),
 ]
