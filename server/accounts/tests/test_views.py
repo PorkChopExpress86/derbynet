@@ -90,6 +90,13 @@ def test_a_page_login_issues_a_new_session_id(client, event):
     assert session_cookie(client) != planted
 
 
+def test_a_nul_in_the_name_is_no_such_role(client, event):
+    response = log_in(client, "RaceCrew\x00", "murphy")
+
+    assert response.status_code == 401
+    assert "No such role." in response.content.decode()
+
+
 def test_logging_out_returns_to_the_login_page(client, event):
     log_in(client, "RaceCrew", "murphy")
 

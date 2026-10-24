@@ -89,6 +89,15 @@ def test_an_array_name_is_no_such_role(client, event):
     }
 
 
+@pytest.mark.parametrize("name", ["RaceCrew%00", "Race%00Crew", "%00"])
+def test_a_nul_in_the_name_is_no_such_role(client, event, name):
+    """Postgres refuses a NUL in a query string, which would be a 500."""
+    body = login(client, f"name={name}&password=murphy")
+
+    assert body["outcome"]["code"] == "role"
+    assert "role" not in client.session
+
+
 def test_the_timer_logs_in_as_a_role_without_naming_it(client, event, endpoint):
     """The response leaves `role` out for an empty password, as PHP does. The
     session holds the role and Timer's bits, but a login anyone can make does
