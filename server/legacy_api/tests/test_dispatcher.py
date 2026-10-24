@@ -3,6 +3,7 @@ import logging
 import xml.etree.ElementTree as ET
 
 import pytest
+from django.conf import settings
 from django.test import override_settings
 
 from accounts.permissions import Access, Perm
@@ -335,6 +336,38 @@ def test_the_read_only_session_raises_directly(client, event, endpoint):
 
     assert outcome(post(client, "action=probe.writes"))["code"] == "success"
     assert raised == [{"role": "Tester", "permissions": int(Perm.SET_UP)}]
+
+
+def test_the_read_only_session_reads_like_a_django_session(client, event, endpoint):
+    seen = {}
+
+    def handler(ctx):
+        session = ctx.session
+        seen["key"] = session.session_key
+        seen["empty"] = session.is_empty()
+        seen["age"] = session.get_expiry_age()
+        seen["browser"] = session.get_expire_at_browser_close()
+        seen["cookie"] = session.test_cookie_worked()
+        with pytest.raises(AttributeError):
+            session.session_key = "forged"
+        for write in (session.save, session.delete, session.create):
+            with pytest.raises(SessionWriteError):
+                write()
+        with pytest.raises(SessionWriteError):
+            session.set_expiry(0)
+        ctx.success()
+
+    endpoint("action", "probe.reads", handler)
+    log_in(client, Perm.SET_UP)
+    key = client.session.session_key
+
+    assert outcome(post(client, "action=probe.reads"))["code"] == "success"
+    assert seen["key"] == key
+    assert seen["empty"] is False
+    assert isinstance(seen["age"], int)
+    assert seen["browser"] is settings.SESSION_EXPIRE_AT_BROWSER_CLOSE
+    assert seen["cookie"] is False
+    assert client.session.session_key == key
 
 
 @override_settings(LEGACY_SESSION_WRITES_RAISE=False)

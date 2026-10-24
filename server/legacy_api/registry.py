@@ -186,6 +186,27 @@ class ReadOnlySession(Mapping):
 
     __setitem__ = __delitem__ = _refuse
     pop = setdefault = update = clear = flush = cycle_key = _refuse
+    set_expiry = set_test_cookie = delete_test_cookie = _refuse
+    save = create = delete = _refuse
+
+    @property
+    def session_key(self) -> str | None:
+        return self._session.session_key
+
+    def is_empty(self) -> bool:
+        return self._session.is_empty()
+
+    def test_cookie_worked(self) -> bool:
+        return self._session.test_cookie_worked()
+
+    def get_expiry_age(self, **kwargs) -> int:
+        return self._session.get_expiry_age(**kwargs)
+
+    def get_expiry_date(self, **kwargs):
+        return self._session.get_expiry_date(**kwargs)
+
+    def get_expire_at_browser_close(self) -> bool:
+        return self._session.get_expire_at_browser_close()
 
 
 @dataclass

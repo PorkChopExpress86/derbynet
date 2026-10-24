@@ -127,7 +127,7 @@ def dispatch(request):
             ctx.xml.failure_response("unrecognized", f"Unrecognized {kind}: {name}")
         else:
             ctx.failure("unrecognized", f"Unrecognized {kind}: {name}")
-    elif not allows(request.session, endpoint.permission):
+    elif not allows(request, endpoint.permission):
         if fmt is Format.XML:
             ctx.xml.not_authorized()
         else:
