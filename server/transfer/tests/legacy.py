@@ -52,7 +52,13 @@ def run_import(source, *args, report_dir):
     report = Path(report_dir) / "report.json"
     out = io.StringIO()
     call_command(
-        "import_derbynet", str(source), *args, "--report", str(report), stdout=out
+        "import_derbynet",
+        str(source),
+        *args,
+        "--report",
+        str(report),
+        "--force-report",
+        stdout=out,
     )
     return json.loads(report.read_text()), out.getvalue()
 

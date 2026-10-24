@@ -1,6 +1,7 @@
 """The importer's rules for legacy data that PHP accepted but Django refuses."""
 
 import hashlib
+import io
 import json
 import shutil
 from datetime import datetime
@@ -8,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings
-from django.core.management import CommandError
+from django.core.management import CommandError, call_command
 
 from awards.models import Award
 from core.models import ActionLog, Event, RaceSettings, RaceState, SiteState
@@ -573,3 +574,42 @@ def test_nul_characters_are_dropped_for_postgres(tmp_path):
     assert _racer(report, 101).car_name == "Zoomer"
     log = ActionLog.objects.get(pk=_new_id(_event(report), "core.actionlog", 9001))
     assert log.request == {"action": "xy"}
+
+
+@pytest.mark.parametrize("suffix", ["", "-wal", "-shm", "-journal"])
+def test_a_report_at_the_source_or_its_side_files_is_refused(tmp_path, suffix):
+    database = legacy_folder(tmp_path, "v10")
+    before = _md5(database)
+    report = database.parent / ".." / database.parent.name / (database.name + suffix)
+
+    with pytest.raises(CommandError, match="--report"):
+        call_command("import_derbynet", str(database), "--report", str(report))
+
+    assert _md5(database) == before
+    assert sorted(p.name for p in database.parent.iterdir()) == [
+        "cars",
+        "derbynet.sqlite3",
+        "racers",
+    ]
+    assert not Event.objects.exists()
+
+
+def test_an_existing_report_is_overwritten_only_with_force_report(tmp_path):
+    database = legacy_folder(tmp_path, "v10")
+    report = tmp_path / "report.json"
+    report.write_text("keep me")
+
+    with pytest.raises(CommandError, match="--force-report"):
+        call_command("import_derbynet", str(database), "--report", str(report))
+    assert report.read_text() == "keep me"
+    assert not Event.objects.exists()
+
+    call_command(
+        "import_derbynet",
+        str(database),
+        "--report",
+        str(report),
+        "--force-report",
+        stdout=io.StringIO(),
+    )
+    assert json.loads(report.read_text())["outcome"] == "committed"

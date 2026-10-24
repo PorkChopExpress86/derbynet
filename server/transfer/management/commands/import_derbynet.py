@@ -42,8 +42,15 @@ class Command(BaseCommand):
         parser.add_argument(
             "--report", type=Path, help="Write the full report as JSON."
         )
+        parser.add_argument(
+            "--force-report",
+            action="store_true",
+            help="Overwrite the --report file when it exists.",
+        )
 
-    def handle(self, *args, source, report, **options):
+    def handle(self, *args, source, report, force_report, **options):
+        if report is not None:
+            _check_report_path(report, source, force_report)
         try:
             result = import_derbynet(
                 source,
@@ -67,3 +74,25 @@ class Command(BaseCommand):
                 json.dumps(result.as_json(), cls=DjangoJSONEncoder, indent=2) + "\n"
             )
         self.stdout.write(result.summary())
+
+
+def _check_report_path(report, source, force):
+    """Refuse a report path that is the source or one of its SQLite side files,
+    or that exists without --force-report."""
+    resolved = report.resolve()
+    origin = source.resolve()
+    side_files = {
+        origin.with_name(origin.name + suffix)
+        for suffix in ("-wal", "-shm", "-journal")
+    }
+    same = resolved == origin or resolved in side_files
+    if not same and report.exists() and source.exists():
+        same = report.samefile(source)
+    if same:
+        raise CommandError(
+            f"--report {report} is the source database or one of its side files"
+        )
+    if report.exists() and not force:
+        raise CommandError(
+            f"--report {report} exists; pass --force-report to overwrite it"
+        )

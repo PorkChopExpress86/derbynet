@@ -49,7 +49,8 @@ uv run python manage.py import_derbynet /path/to/2024/pack42/derbynet.sqlite3 --
 | `--photos-dir DIR`, `--car-photos-dir DIR` | Where to look for photos first. Then the source's `racers/` and `cars/` folders. |
 | `--replace` | Replace the event of the same name. Without it, an existing name is refused. |
 | `--accept-violations` | Keep the import when `check_invariants()` finds violations. Without it, they roll the import back. |
-| `--report PATH` | Write the full report as JSON. A summary always goes to stdout. |
+| `--report PATH` | Write the full report as JSON. A summary always goes to stdout. The path cannot be the source or its `-wal`, `-shm` or `-journal` file. |
+| `--force-report` | Overwrite an existing `--report` file. Without it, an existing file is refused before the import starts. |
 
 The report counts the rows read and imported per legacy table, and lists every row dropped and every value changed, with the reason. The tests read fixtures that `transfer/tests/fixtures/legacy/build.sh` made with the PHP server.
 
