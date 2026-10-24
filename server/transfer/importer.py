@@ -8,6 +8,7 @@ caller accepts violations. The event's files go into a new folder, which the
 commit switches the event to (`legacy.folders`).
 """
 
+import os
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -142,11 +143,26 @@ def _recordings_to_discard(name, replace, discard_videos, report):
         return None
     old_settings = RaceSettings.for_event(old)
     files = size = 0
+    unreadable = []
     for directory in (old_settings.video_directory, old_settings.logs_directory):
-        for path in Path(directory).rglob("*"):
-            if path.is_file() and not path.is_symlink():
-                files += 1
-                size += path.stat().st_size
+        if not os.path.isdir(directory):
+            continue
+        for root, _, names in os.walk(directory, onerror=unreadable.append):
+            for file_name in names:
+                path = Path(root, file_name)
+                if not path.is_symlink():
+                    files += 1
+                    size += path.stat().st_size
+    if unreadable:
+        error = unreadable[0]
+        raise ImportFailed(
+            f"cannot count the videos and logs of {name!r}: {error.filename}"
+            f" cannot be read ({error.strerror}). Make it readable and run"
+            " again. --discard-videos does not skip this check, because the"
+            " size cannot be reported and the delete would fail after the"
+            " commit",
+            report,
+        )
     if files and not discard_videos:
         raise ImportFailed(
             f"replacing {name!r} would delete {files} video and log files"
