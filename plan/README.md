@@ -1,0 +1,28 @@
+# Django migration plan tooling
+
+The plan lives in GitHub issues on PorkChopExpress86/derbynet, labeled `django-migration`. The live issue bodies are the source of truth. This folder holds what the issues can't: the owner-decision log and the tools that check and ship the plan.
+
+| File | Purpose |
+| --- | --- |
+| `owner-decisions.md` | Every owner decision, with the issues and ADRs that record it |
+| `lint-issues.py` | Checks every plan issue body: style, section order, cited paths, `#N` references, and forward-only dependencies with no cycles |
+| `bin/pr-wait` | Waits for every check on a PR's current head and prints one line per check |
+| `bin/pr-merge` | Merges a PR only if every check on its current head passed, pinned to that head SHA |
+
+## Edit an issue body
+
+```bash
+gh issue view N --repo PorkChopExpress86/derbynet --json body --jq .body > /tmp/bodyN.md
+# edit /tmp/bodyN.md
+python3 -I plan/lint-issues.py --file N=/tmp/bodyN.md
+gh issue edit N --repo PorkChopExpress86/derbynet --body-file /tmp/bodyN.md
+```
+
+The lint reads every other issue live, so a reference or dependency is checked against the whole plan. It needs `gh` on `PATH`, or `GH=/path/to/gh`. CI runs it in `.github/workflows/plan-checks.yml`.
+
+## Ship a PR
+
+```bash
+plan/bin/pr-wait 82     # exits 1 if any check failed
+plan/bin/pr-merge 82 --squash
+```
