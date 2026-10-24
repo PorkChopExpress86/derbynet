@@ -1,8 +1,9 @@
 """The `query.database.check` invariants that no database constraint enforces.
 
 #12 classifies the 40 tags of `website/ajax/query.database.check.inc`. 26 are
-constraints on the models, 3 went away with their column, and the 11 below
-are checks over one event's rows.
+constraints on the models, 3 went away with their column, and the 10 below
+are checks over one event's rows. PHP runs `classes-ranks` inside
+`if (false)`, as "frequently violated", so it is not checked here either.
 
 `cross-event` is not a PHP tag. PHP kept one event per database, and D2 keeps
 every event in one, so each reference between event-scoped rows must stay
@@ -13,7 +14,7 @@ from django.db.models import Count, Exists, F, OuterRef, Q
 
 from core.models import RaceSettings, event_scoped_models, is_event_scoped
 from racing.models import HeatLane, RosterEntry, Round
-from roster.models import Group, Partition, Subgroup
+from roster.models import Group, Subgroup
 
 
 def _aggregate(event):
@@ -30,13 +31,6 @@ def _organic(event):
 
 def _rows(queryset, *fields):
     return [dict(row) for row in queryset.values(*fields).distinct()]
-
-
-def classes_ranks(event):
-    """An organic group has a subgroup, unless the event has no partitions."""
-    if not Partition.objects.filter(event=event).exists():
-        return []
-    return _rows(_organic(event).filter(subgroups__isnull=True), "id", "name")
 
 
 def classes_round1(event):
@@ -161,7 +155,6 @@ def rounds_sequential(event):
 
 
 CHECKS = {
-    "classes-ranks": classes_ranks,
     "classes-round1": classes_round1,
     "aggregate-members": aggregate_members,
     "aggregate-ranks": aggregate_ranks,
