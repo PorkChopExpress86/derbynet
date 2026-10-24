@@ -97,6 +97,12 @@ class Report:
                 f"photos: {self.photos['paths']} paths, {self.photos['files_copied']}"
                 " files copied"
             )
+        discarded = self.photos.get("discarded_recordings")
+        if discarded and discarded["files"]:
+            lines.append(
+                f"{discarded['files']} video and log files"
+                f" ({discarded['bytes']} bytes) removed with the replaced event"
+            )
         by_kind = Counter(finding.kind for finding in self.findings)
         if by_kind:
             lines.append("items dropped or changed:")

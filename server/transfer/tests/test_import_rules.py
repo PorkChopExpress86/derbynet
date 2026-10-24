@@ -25,6 +25,7 @@ from transfer.tests.legacy import (
     FIXTURES,
     SNAPSHOT,
     event_folder,
+    legacy_dump,
     legacy_folder,
     legacy_ids,
     run_import,
@@ -962,7 +963,12 @@ def test_replace_clears_the_old_event_videos_and_logs(tmp_path, data_dir):
         (Path(directory) / name).write_text("old event")
 
     second, _ = _import(
-        tmp_path, legacy_folder(tmp_path, "v9"), "--event", "Pack", "--replace"
+        tmp_path,
+        legacy_folder(tmp_path, "v9"),
+        "--event",
+        "Pack",
+        "--replace",
+        "--discard-videos",
     )
 
     new = RaceSettings.for_event(_event(second))
@@ -976,3 +982,77 @@ def test_replace_clears_the_old_event_videos_and_logs(tmp_path, data_dir):
         getattr(old, field) for field in FOLDERS
     )
     assert [p.name for p in (data_dir / "events").iterdir()] == [folder.name]
+
+
+def _tree(root):
+    return {
+        str(p.relative_to(root)): p.read_bytes() if p.is_file() else None
+        for p in sorted(Path(root).rglob("*"))
+    }
+
+
+@pytest.fixture
+def pack_with_recordings(tmp_path, data_dir):
+    """An imported `Pack` event whose videos/ holds 2 files (7 bytes) and
+    whose logs/ holds 1 file (3 bytes)."""
+    first, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
+    old = RaceSettings.for_event(_event(first))
+    for directory, name, content in (
+        (old.video_directory, "heat1.mkv", b"abcd"),
+        (old.video_directory, "heat2.mkv", b"efg"),
+        (old.logs_directory, "timer.log", b"xyz"),
+    ):
+        (Path(directory) / name).write_bytes(content)
+    return first
+
+
+def test_replace_refuses_to_delete_videos_and_logs_without_the_flag(
+    tmp_path, data_dir, pack_with_recordings
+):
+    source = legacy_folder(tmp_path, "v9")
+    events = data_dir / "events"
+    event_before = pack_with_recordings["event"]["id"]
+    data_before = _tree(data_dir)
+    source_before = _tree(source.parent)
+    rows_before = legacy_dump(Event.objects.get(pk=event_before))
+
+    with pytest.raises(
+        CommandError, match=r"3 video and log files \(10 bytes\)"
+    ) as refused:
+        _import(tmp_path, source, "--event", "Pack", "--replace")
+
+    assert "--discard-videos" in str(refused.value)
+    assert _tree(data_dir) == data_before
+    assert _tree(source.parent) == source_before
+    assert [e.pk for e in Event.objects.filter(name="Pack")] == [event_before]
+    assert legacy_dump(Event.objects.get(pk=event_before)) == rows_before
+    assert len(list(events.iterdir())) == 1
+
+
+def test_replace_with_discard_videos_removes_them_and_reports_the_size(
+    tmp_path, data_dir, pack_with_recordings
+):
+    report, out = _import(
+        tmp_path,
+        legacy_folder(tmp_path, "v9"),
+        "--event",
+        "Pack",
+        "--replace",
+        "--discard-videos",
+    )
+
+    assert report["photos"]["discarded_recordings"] == {"files": 3, "bytes": 10}
+    assert "3 video and log files (10 bytes) removed" in out
+    assert [p.name for p in (data_dir / "events").iterdir()] == [
+        event_folder(_event(report)).name
+    ]
+
+
+def test_replace_of_empty_videos_and_logs_needs_no_flag(tmp_path, data_dir):
+    _import(tmp_path, legacy_folder(tmp_path, "v10"), "--event", "Pack")
+
+    report, _ = _import(
+        tmp_path, legacy_folder(tmp_path, "v9"), "--event", "Pack", "--replace"
+    )
+
+    assert report["photos"]["discarded_recordings"] == {"files": 0, "bytes": 0}

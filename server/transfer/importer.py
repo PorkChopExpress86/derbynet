@@ -47,12 +47,15 @@ def import_derbynet(
     replace=False,
     accept_violations=False,
     time_zone=None,
+    discard_videos=False,
 ):
     """Import the legacy database at `path` and return the `Report`.
 
     Legacy local times read in `time_zone`, by default `TIME_ZONE`. Raises
     `SourceError` for an unreadable file, and `ImportFailed` when the event
-    name is taken or the imported rows violate an invariant.
+    name is taken or the imported rows violate an invariant. A replaced
+    event's videos and logs cannot be recovered from the source, so
+    `replace` refuses to remove any unless `discard_videos` is set.
     """
     path = Path(path)
     time_zone = time_zone or settings.TIME_ZONE
@@ -77,6 +80,7 @@ def import_derbynet(
         )
     name = event_name or path.resolve().parent.name
     tables = upgrade(source.tables, version)
+    recordings = _recordings_to_discard(name, replace, discard_videos, report)
 
     events_root = Path(settings.DATA_DIR) / "events"
     report.recovered = [str(path) for path in recover(events_root)]
@@ -107,6 +111,8 @@ def import_derbynet(
                 "paths": photos.referenced,
                 "files_copied": photos.copied,
             }
+            if recordings is not None:
+                report.photos["discarded_recordings"] = recordings
             report.invariants = check_invariants(event)
             if report.invariants and not accept_violations:
                 raise ImportFailed(
@@ -124,6 +130,31 @@ def import_derbynet(
     report.photos["replaced_folders_removed"] = [str(p) for p in folder.finish()]
     report.outcome = "committed"
     return report
+
+
+def _recordings_to_discard(name, replace, discard_videos, report):
+    """The file count and size of the videos and logs that replacing `name`
+    removes, or None when no event is replaced. Refuses when there are files
+    and `discard_videos` is false, before anything is written.
+    """
+    old = Event.objects.filter(name=name).first() if replace else None
+    if old is None:
+        return None
+    old_settings = RaceSettings.for_event(old)
+    files = size = 0
+    for directory in (old_settings.video_directory, old_settings.logs_directory):
+        for path in Path(directory).rglob("*"):
+            if path.is_file() and not path.is_symlink():
+                files += 1
+                size += path.stat().st_size
+    if files and not discard_videos:
+        raise ImportFailed(
+            f"replacing {name!r} would delete {files} video and log files"
+            f" ({size} bytes) that the legacy source cannot restore; pass"
+            " --discard-videos to delete them",
+            report,
+        )
+    return {"files": files, "bytes": size}
 
 
 def _create_event(name, replace, report):

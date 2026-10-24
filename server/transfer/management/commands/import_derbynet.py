@@ -33,7 +33,14 @@ class Command(BaseCommand):
             "--replace",
             action="store_true",
             help="Replace an existing event of the same name. Its rows, and its"
-            " photo, video and log folders, are removed.",
+            " photo, video and log folders, are removed. Refused when its videos"
+            " or logs hold files, unless --discard-videos is given.",
+        )
+        parser.add_argument(
+            "--discard-videos",
+            action="store_true",
+            help="With --replace, delete the old event's replay videos and logs."
+            " They cannot be recovered from the legacy source.",
         )
         parser.add_argument(
             "--accept-violations",
@@ -66,6 +73,7 @@ class Command(BaseCommand):
                 replace=options["replace"],
                 accept_violations=options["accept_violations"],
                 time_zone=options["time_zone"],
+                discard_videos=options["discard_videos"],
             )
         except SourceError as error:
             raise CommandError(str(error)) from None

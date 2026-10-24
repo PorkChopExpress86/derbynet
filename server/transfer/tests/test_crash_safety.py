@@ -91,6 +91,7 @@ def test_a_replace_killed_at_any_step_leaves_one_whole_event(
             "--event",
             "Pack",
             "--replace",
+            "--discard-videos",
         ],
         cwd=SERVER,
         env={**os.environ, "DERBYNET_DATA_DIR": str(data_dir)},
