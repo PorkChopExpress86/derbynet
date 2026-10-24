@@ -7,6 +7,7 @@ except the setup redirect PHP sends when no event is open.
 
 import logging
 
+from django.db import DatabaseError, transaction
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -62,6 +63,17 @@ def _masked(fields: dict) -> dict:
     }
 
 
+def _record_action(event, echo: dict) -> None:
+    """PHP's record_action() swallows a PDOException, so a log row the
+    database refuses never fails the request. The savepoint keeps the failed
+    insert from aborting a transaction the request runs in."""
+    try:
+        with transaction.atomic():
+            ActionLog.objects.create(event=event, request=echo)
+    except DatabaseError:
+        logger.warning("the action log refused %s", echo.get("action"), exc_info=True)
+
+
 def _run(ctx: LegacyContext, endpoint, fmt: Format) -> bytes:
     """Run the handler and encode what it wrote, or a server-error failure."""
     try:
@@ -108,7 +120,7 @@ def dispatch(request):
         ctx.put("action", echo)
         ctx.put("outcome", dict(IN_PROGRESS))
         if event is not None and is_logged(name, args):
-            ActionLog.objects.create(event=event, request=echo)
+            _record_action(event, echo)
 
     if endpoint is None:
         if fmt is Format.XML:
