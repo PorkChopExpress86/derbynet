@@ -93,6 +93,11 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or _stored_secret_key(CONFIG_DI
 
 DEBUG = _env_flag("DERBYNET_DEBUG")
 
+# A legacy handler that writes a session it did not declare raises when this
+# is on, and the write is dropped with a warning when it is off. Tests turn it
+# on in conftest.py.
+LEGACY_SESSION_WRITES_RAISE = DEBUG
+
 ALLOWED_HOSTS = _env_list("DERBYNET_ALLOWED_HOSTS", "*")
 CSRF_TRUSTED_ORIGINS = _env_list("DERBYNET_CSRF_TRUSTED_ORIGINS")
 
