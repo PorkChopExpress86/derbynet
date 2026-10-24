@@ -27,6 +27,17 @@ def test_reversing_a_three_step_playlist_renumbers_it_in_the_new_order():
     assert _playlist(group.event) == [(third.id, 1), (second.id, 2), (first.id, 3)]
 
 
+def test_reorder_renumbers_a_playlist_that_holds_negative_seqs():
+    group = GroupFactory()
+    first, second, third = (
+        PlaylistEntryFactory(group=group, seq=seq) for seq in (-1, -2, 5)
+    )
+
+    reorder_playlist(group.event, [third.id, first.id, second.id])
+
+    assert _playlist(group.event) == [(third.id, 1), (first.id, 2), (second.id, 3)]
+
+
 def test_reorder_leaves_another_events_playlist_alone():
     group, other = GroupFactory(), GroupFactory()
     mine = [PlaylistEntryFactory(group=group, seq=seq) for seq in (1, 2)]
