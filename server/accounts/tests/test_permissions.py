@@ -149,6 +149,18 @@ def test_logging_out_returns_to_the_anonymous_role_with_a_new_id(event, session)
     assert granted(request_with(session)) == Perm.VIEW_RACE_RESULTS
 
 
+def test_logging_out_clears_every_key_and_kills_the_old_id(event, session):
+    log_in(session, Role.objects.get(name="RaceCrew"))
+    session["barcode-action"] = "checkin"
+    session.save()
+    before = session.session_key
+
+    log_out(session)
+
+    assert dict(session.items()) == {}
+    assert not SessionStore().exists(before)
+
+
 def test_logging_in_as_the_anonymous_role_logs_out(event, session):
     log_in(session, Role.objects.get(name="RaceCoordinator"))
 

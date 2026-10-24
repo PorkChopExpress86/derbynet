@@ -99,6 +99,23 @@ def test_logging_out_returns_to_the_login_page(client, event):
     assert client.get("/logout/").status_code == 405
 
 
+def test_logging_out_forgets_the_barcode_mode_and_the_old_session(client, event):
+    log_in(client, "RaceCrew", "murphy")
+    client.post(
+        "/action.php",
+        "action=session.write&session_barcode-action=checkin",
+        content_type="application/x-www-form-urlencoded",
+    )
+    assert client.session["barcode-action"] == "checkin"
+    old = Client()
+    old.cookies[settings.SESSION_COOKIE_NAME] = session_cookie(client)
+
+    client.post("/logout/")
+
+    assert dict(client.session.items()) == {}
+    assert dict(old.session.items()) == {}
+
+
 def view(request):
     return HttpResponse("ok")
 
