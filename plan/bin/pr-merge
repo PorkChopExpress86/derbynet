@@ -1,0 +1,21 @@
+#!/bin/bash
+# Merges PR <number> only if every check on its current head passed, pinning the
+# merge to that head SHA so a push after the check can't slip in.
+#
+# Usage: plan/bin/pr-merge <pr> --squash|--rebase|--merge [--delete-branch]
+set -euo pipefail
+PR=${1:?usage: pr-merge <pr> --squash|--rebase|--merge [--delete-branch]}
+shift
+GH=${GH:-gh}
+REPO=${REPO:-PorkChopExpress86/derbynet}
+
+head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+not_passed=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name \
+               --jq '.[] | select(.bucket != "pass" and .bucket != "skipping") | "\(.bucket) \(.name)"')
+if [ -n "$not_passed" ]; then
+  echo "not merging #$PR; checks on $head not passed:" >&2
+  echo "$not_passed" >&2
+  exit 1
+fi
+"$GH" pr merge "$PR" --repo "$REPO" --match-head-commit "$head" "$@"
+"$GH" pr view "$PR" --repo "$REPO" --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"'

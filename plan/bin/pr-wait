@@ -1,0 +1,37 @@
+#!/bin/bash
+# Waits until every check on PR <number>'s current head has finished, then prints
+# one "<bucket> <name> <link>" line per check.  Exits 0 only if all passed or
+# were skipped.  Waits for checks to appear first, because GitHub creates the
+# runs a few seconds after a push.
+#
+# Usage: plan/bin/pr-wait <pr> [--timeout-min N]   (default 90)
+set -euo pipefail
+PR=${1:?usage: pr-wait <pr> [--timeout-min N]}
+TIMEOUT_MIN=${3:-90}
+GH=${GH:-gh}
+REPO=${REPO:-PorkChopExpress86/derbynet}
+
+head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+echo "PR #$PR head $head" >&2
+deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
+while :; do
+  now_head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+  if [ "$now_head" != "$head" ]; then
+    echo "head moved to $now_head while waiting; rerun pr-wait" >&2
+    exit 2
+  fi
+  # bucket is pass, fail, pending, skipping, or cancel
+  checks=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,link \
+             --jq '.[] | "\(.bucket) \(.name) \(.link)"' 2>/dev/null || true)
+  if [ -n "$checks" ] && ! grep -q '^pending ' <<<"$checks"; then
+    echo "$checks"
+    ! grep -qvE '^(pass|skipping) ' <<<"$checks"
+    exit
+  fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "timed out after $TIMEOUT_MIN min; still pending:" >&2
+    echo "${checks:-no checks yet}" >&2
+    exit 3
+  fi
+  sleep 30
+done
