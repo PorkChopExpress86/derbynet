@@ -102,12 +102,10 @@ FORCE_SCRIPT_NAME = _url_prefix(os.environ.get("DERBYNET_URL_PREFIX", ""))
 # HTTP-friendly. The bundled proxy says when the client used HTTPS.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# No django.contrib.auth or admin: roles live in the session (ADR-16).
 INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
-    "django.contrib.messages",
     "django.contrib.staticfiles",
     "core",
     "accounts",
@@ -126,8 +124,6 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -141,8 +137,6 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
@@ -166,16 +160,6 @@ if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
     }
     # An in-memory test database cannot use WAL, so tests use a file.
     DATABASES["default"]["TEST"] = {"NAME": str(DATA_DIR / "test-derbynet.sqlite3")}
-
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": f"django.contrib.auth.password_validation.{name}"}
-    for name in (
-        "UserAttributeSimilarityValidator",
-        "MinimumLengthValidator",
-        "CommonPasswordValidator",
-        "NumericPasswordValidator",
-    )
-]
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = _time_zone()
