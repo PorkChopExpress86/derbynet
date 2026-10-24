@@ -16,6 +16,7 @@ from core.legacy_keys import (
     FullFieldCalc,
     Int,
     LastHeat,
+    LegacyValueError,
     Mapped,
     Prefix,
     Ref,
@@ -278,3 +279,24 @@ def test_a_sticky_malfunction_saves_on_the_timer_status():
 def test_unix_time_refuses_a_negative_time(raw):
     with pytest.raises(ValueError):
         UnixTime().decode(raw)
+
+
+@pytest.mark.parametrize(
+    ("key", "raw"),
+    [
+        ("lane_count", "3.0"),
+        ("lane_count", "abc"),
+        ("tt-lane2", "abc"),
+        ("racing_scene", "abc"),
+        ("reschedule_underway", "-1"),
+        ("reschedule_underway", "99999999999999999999"),
+        ("timer_state", "abc+0++"),
+        ("timer_current", "7"),
+        ("last_heat", "4#x"),
+    ],
+)
+def test_unreadable_legacy_text_raises_legacy_value_error_naming_the_key(key, raw):
+    with pytest.raises(LegacyValueError) as raised:
+        decode(key, raw)
+
+    assert (raised.value.key, raised.value.raw) == (key, raw)
