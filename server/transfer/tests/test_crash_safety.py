@@ -144,3 +144,67 @@ def test_recover_removes_only_unfinished_imports_that_no_process_holds(
         [live.name, finished.name, running.path.name]
     )
     running.discard()
+
+
+def _rmtree_that_dies_after_the_pending_mark():
+    """Delete the `.pending` mark first, then stop, as a crash can."""
+
+    def partial(path, *args, **kwargs):
+        (Path(path) / ".pending").unlink(missing_ok=True)
+        raise KeyboardInterrupt
+
+    return partial
+
+
+@pytest.mark.django_db
+def test_a_removal_killed_after_the_pending_mark_is_cleaned_by_the_next_import(
+    tmp_path, data_dir, monkeypatch
+):
+    events = data_dir / "events"
+    folder = ImportFolder(events, "dead")
+    (folder.path / "racers" / "head.jpg").write_bytes(b"copy")
+    with monkeypatch.context() as patched:
+        patched.setattr(
+            "transfer.legacy.folders.shutil.rmtree",
+            _rmtree_that_dies_after_the_pending_mark(),
+        )
+        with pytest.raises(KeyboardInterrupt):
+            folder.discard()
+    leaked = [p for p in events.iterdir() if p != folder.path]
+    assert len(leaked) == 1
+    assert leaked[0].name.startswith(".removing-")
+    assert not (leaked[0] / ".pending").exists()
+
+    report, _ = run_import(
+        legacy_folder(tmp_path, "v10"), "--event", "Pack", report_dir=tmp_path
+    )
+
+    assert str(leaked[0]) in report["recovered"]
+    live = event_folder(Event.objects.get(pk=report["event"]["id"]))
+    assert [p.name for p in events.iterdir()] == [live.name]
+
+
+@pytest.mark.django_db
+def test_recover_removes_a_removing_folder_unless_an_event_points_at_it(
+    tmp_path, data_dir
+):
+    events = data_dir / "events"
+    report, _ = run_import(
+        legacy_folder(tmp_path, "v10"), "--event", "Pack", report_dir=tmp_path
+    )
+    event = Event.objects.get(pk=report["event"]["id"])
+    live = event_folder(event)
+    dead = events / ".removing-dead"
+    (dead / "racers").mkdir(parents=True)
+    (dead / "racers" / "x.jpg").write_bytes(b"x")
+    used = events / ".removing-used"
+    for folder in FOLDERS.values():
+        (used / folder).mkdir(parents=True)
+    RaceSettings.objects.filter(event=event).update(
+        **{field: str(used / folder) for field, folder in FOLDERS.items()}
+    )
+
+    removed = recover(events)
+
+    assert removed == [dead]
+    assert sorted(p.name for p in events.iterdir()) == sorted([live.name, used.name])

@@ -16,6 +16,10 @@ next import:
   goes only when no event points at it any more. The new event starts with
   empty `videos/` and `logs/`, as its rows start from the source.
 
+- A `.removing-<token>` folder that no event points at. A removal renames the
+  folder to that name first, because `rmtree` may delete the `.pending` mark
+  before the rest, and a folder without the mark would never be cleaned up.
+
 Each import holds an exclusive `flock` on its folder until it finishes, so
 `recover()` skips an import that is still running. Folders are matched to
 `RaceSettings` by name, not by absolute path, so a moved `DATA_DIR` makes
@@ -27,6 +31,7 @@ import json
 import os
 import shutil
 import tempfile
+import uuid
 from pathlib import Path
 
 from django.utils.text import slugify
@@ -34,6 +39,7 @@ from django.utils.text import slugify
 from core.models import RaceSettings
 
 MARK = ".import-"
+REMOVING = ".removing-"
 PENDING = ".pending"
 REPLACED = ".replaced"
 # RaceSettings field -> the subfolder it names.
@@ -90,7 +96,7 @@ class ImportFolder:
 
     def discard(self):
         """Before or instead of the commit: remove everything this wrote."""
-        shutil.rmtree(self.path, ignore_errors=True)
+        _remove_folder(self.path, ignore_errors=True)
         os.close(self._lock)
 
 
@@ -116,11 +122,33 @@ def recover(events_root):
                     (folder / PENDING).unlink()
                 removed += _remove_replaced(folder)
             elif (folder / PENDING).exists():
-                shutil.rmtree(folder)
+                _remove_folder(folder)
                 removed.append(folder)
         finally:
             os.close(lock)
+    used = _used_folders()
+    for folder in sorted(events_root.glob(f"{REMOVING}*")):
+        if (
+            not folder.is_symlink()
+            and folder.is_dir()
+            and not any(parent == folder.name for parent, _ in used)
+        ):
+            shutil.rmtree(folder, ignore_errors=True)
+            removed.append(folder)
     return removed
+
+
+def _remove_folder(folder, *, ignore_errors=False):
+    """Rename `folder` to `.removing-<token>`, then delete it. A crash partway
+    through the delete leaves a name `recover()` cleans up."""
+    doomed = folder.with_name(f"{REMOVING}{uuid.uuid4().hex}")
+    try:
+        folder.rename(doomed)
+    except OSError:
+        if not ignore_errors:
+            raise
+        doomed = folder
+    shutil.rmtree(doomed, ignore_errors=ignore_errors)
 
 
 def _used_folders():
