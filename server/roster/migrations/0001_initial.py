@@ -235,11 +235,60 @@ class Migration(migrations.Migration):
                 to="roster.subgroup",
             ),
         ),
+        migrations.CreateModel(
+            name="GroupConstituentSubgroup",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "aggregate",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="constituent_subgroup_links",
+                        to="roster.group",
+                    ),
+                ),
+                (
+                    "event",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to="core.event",
+                    ),
+                ),
+                (
+                    "subgroup",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="aggregate_links",
+                        to="roster.subgroup",
+                    ),
+                ),
+            ],
+        ),
         migrations.AddField(
             model_name="group",
             name="constituent_subgroups",
             field=models.ManyToManyField(
-                blank=True, related_name="aggregates", to="roster.subgroup"
+                blank=True,
+                related_name="aggregates",
+                through="roster.GroupConstituentSubgroup",
+                through_fields=("aggregate", "subgroup"),
+                to="roster.subgroup",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="groupconstituentsubgroup",
+            constraint=models.UniqueConstraint(
+                fields=("event", "aggregate", "subgroup"),
+                name="groupconstituentsubgroup_unique_pair",
             ),
         ),
         migrations.AddConstraint(

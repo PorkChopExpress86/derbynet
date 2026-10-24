@@ -43,7 +43,11 @@ class Group(EventScoped):
         blank=True,
     )
     constituent_subgroups = models.ManyToManyField(
-        "Subgroup", related_name="aggregates", blank=True
+        "Subgroup",
+        through="GroupConstituentSubgroup",
+        through_fields=("aggregate", "subgroup"),
+        related_name="aggregates",
+        blank=True,
     )
     weigh_in = models.CharField(
         max_length=10, choices=WeighIn.choices, default=WeighIn.NONE
@@ -79,6 +83,25 @@ class GroupConstituent(EventScoped):
             models.UniqueConstraint(
                 fields=["event", "aggregate", "constituent"],
                 name="groupconstituent_unique_pair",
+            ),
+        ]
+
+
+class GroupConstituentSubgroup(EventScoped):
+    """Legacy `Classes.rankids`: `subgroup` is one member of `aggregate`."""
+
+    aggregate = models.ForeignKey(
+        Group, on_delete=models.CASCADE, related_name="constituent_subgroup_links"
+    )
+    subgroup = models.ForeignKey(
+        "Subgroup", on_delete=models.CASCADE, related_name="aggregate_links"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "aggregate", "subgroup"],
+                name="groupconstituentsubgroup_unique_pair",
             ),
         ]
 

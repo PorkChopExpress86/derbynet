@@ -6,41 +6,11 @@ from django.core.management import CommandError, call_command
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from awards.tests.factories import BallotAwardFactory, VoteFactory
-from core.management.commands.dump_event import event_scoped_models
-from core.tests.factories import ActionLogFactory, EventFactory
-from kiosks.tests.factories import (
-    KioskFactory,
-    ReplayCommandFactory,
-    SignalMessageFactory,
-)
-from racing.tests.factories import (
-    AuditLaneResultFactory,
-    HeatLaneFactory,
-    PlaylistEntryFactory,
-    RosterEntryFactory,
-    TimerSettingFactory,
-)
-from roster.tests.factories import GroupConstituentFactory
+from core.models import event_scoped_models
+from core.tests.factories import EventFactory
+from core.tests.populated import populated_event
 
 pytestmark = pytest.mark.django_db
-
-
-def _populated_event():
-    event = EventFactory()
-    entry = RosterEntryFactory(round__group__event=event)
-    HeatLaneFactory(round=entry.round, racer=entry.racer, lane=1)
-    GroupConstituentFactory(aggregate__event=event)
-    PlaylistEntryFactory(group=entry.round.group)
-    TimerSettingFactory(event=event)
-    AuditLaneResultFactory(audit_event__event=event)
-    VoteFactory(voter__event=event)
-    BallotAwardFactory(award__event=event)
-    KioskFactory(event=event)
-    SignalMessageFactory(event=event)
-    ReplayCommandFactory(event=event)
-    ActionLogFactory(event=event)
-    return event
 
 
 def _dump(slug):
@@ -50,7 +20,7 @@ def _dump(slug):
 
 
 def test_dump_event_prints_every_event_scoped_models_rows_as_json():
-    event = _populated_event()
+    event = populated_event()
     EventFactory()  # rows of another event stay out
 
     with CaptureQueriesContext(connection) as queries:
@@ -59,7 +29,7 @@ def test_dump_event_prints_every_event_scoped_models_rows_as_json():
     assert dumped["event"]["slug"] == event.slug
     labels = {model._meta.label_lower for model in event_scoped_models()}
     assert set(dumped["models"]) == labels
-    assert len(labels) == 26
+    assert len(labels) == 27
     for label, rows in dumped["models"].items():
         assert rows, f"{label} has no rows"
         assert all(row["event"] == event.id for row in rows), label

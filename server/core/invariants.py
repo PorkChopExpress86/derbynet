@@ -3,11 +3,15 @@
 #12 classifies the 40 tags of `website/ajax/query.database.check.inc`. 26 are
 constraints on the models, 3 went away with their column, and the 11 below
 are checks over one event's rows.
+
+`cross-event` is not a PHP tag. PHP kept one event per database, and D2 keeps
+every event in one, so each reference between event-scoped rows must stay
+inside one event.
 """
 
 from django.db.models import Count, Exists, F, OuterRef, Q
 
-from core.models import RaceSettings
+from core.models import RaceSettings, event_scoped_models, is_event_scoped
 from racing.models import HeatLane, RosterEntry, Round
 from roster.models import Group, Partition, Subgroup
 
@@ -165,7 +169,46 @@ CHECKS = {
 }
 
 
+def cross_event_references():
+    """Every foreign key from an event-scoped model to an event-scoped model."""
+    return [
+        (model, field)
+        for model in event_scoped_models()
+        for field in model._meta.concrete_fields
+        if field.is_relation
+        and field.name != "event"
+        and is_event_scoped(field.related_model)
+    ]
+
+
+def cross_event(event):
+    """The event's rows that point at another event's row.
+
+    The check walks the models, so a foreign key added later is covered. It
+    reports rows however they were written: `save()`, `bulk_create()`,
+    `update()`, raw SQL, or an import.
+    """
+    rows = []
+    for model, field in cross_event_references():
+        found = (
+            model.objects.filter(event=event, **{f"{field.name}__isnull": False})
+            .exclude(**{f"{field.name}__event": F("event")})
+            .values_list("id", field.attname)
+        )
+        rows += [
+            {
+                "model": model._meta.label_lower,
+                "field": field.name,
+                "id": row_id,
+                "target_id": target_id,
+            }
+            for row_id, target_id in found
+        ]
+    return rows
+
+
 def check_invariants(event):
     """Return `{tag: [violating rows]}` for each check that finds a violation."""
-    violations = {tag: check(event) for tag, check in CHECKS.items()}
+    checks = {**CHECKS, "cross-event": cross_event}
+    violations = {tag: check(event) for tag, check in checks.items()}
     return {tag: rows for tag, rows in violations.items() if rows}

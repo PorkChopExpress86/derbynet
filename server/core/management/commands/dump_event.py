@@ -1,21 +1,10 @@
 import json
 
-from django.apps import apps
 from django.core import serializers
 from django.core.management.base import BaseCommand, CommandError
 from django.core.serializers.json import DjangoJSONEncoder
 
-from core.models import Event
-
-
-def event_scoped_models():
-    """Every model with an `event` foreign key, in a stable order."""
-    found = []
-    for model in apps.get_models():
-        field = next((f for f in model._meta.fields if f.name == "event"), None)
-        if field is not None and field.related_model is Event:
-            found.append(model)
-    return sorted(found, key=lambda m: m._meta.label_lower)
+from core.models import Event, event_scoped_models
 
 
 def _rows(queryset):
