@@ -36,6 +36,25 @@ uv run python tools/convert_generators.py --check   # exits 1 if the module is o
 
 `racing.engine.scheduling.generators.scheduler_data(nlanes, ncars)` returns `{"generators": [...], "permutation_sets": [...]}` or `None` when no table covers the counts. The module loads on the first call. `racing/engine/tests/test_generator_tables.py` compares the tables with the PHP dump in `tests/golden/engine/scheduler-data/`.
 
+## Schedule generation
+
+`racing.services.schedule.generate_schedule(round, n_times_per_lane)` replaces a round's chart and returns its number of heats. `unschedule(round)` deletes it. On failure `generate_schedule` raises `ScheduleFailure` with a `code` of `nlanes`, `results-exist`, `too-few-racers`, `cant-fulfill` or `busy`, and the old chart stays. `cant-fulfill` covers every request the generator tables cannot meet: too many runs per lane, 7 lanes, more than 8 lanes, and more than 200 racers. PHP reports success there and writes an empty round, or answers 500. `racing.engine.scheduling.rough.max_runs_per_lane(nlanes, nracers)` tells a form how many runs per lane the tables give.
+
+The engine modules in `racing/engine/scheduling/` are ported from `website/inc/schedule_*.inc`. `ordered.py` keeps the literal port of PHP's greedy reorder as `reference_ordered_schedule`, and `make_ordered_schedule` makes the same choices in integer arithmetic. The parity tests compare both with the PHP fixtures:
+
+```sh
+uv run pytest racing/engine/tests/test_schedule_parity.py -m pr     # every pull request, about a minute
+uv run pytest racing/engine/tests/test_schedule_parity.py -m full   # the whole sweep, in the schedule-parity workflow
+```
+
+A plain `uv run pytest` runs the `pr` grid and skips `full`.
+
+To time the largest case, 200 racers on 6 lanes with 6 runs per lane (1200 heats):
+
+```sh
+uv run python -m timeit -n 3 -r 3 -s 'from racing.engine.scheduling.ordered import make_ordered_schedule' 'make_ordered_schedule(6, 200, 6, 0)'
+```
+
 ## Inspect an event
 
 The server has no Django admin (ADR-16). To see what one event holds, print its rows for every event-scoped model as JSON:
