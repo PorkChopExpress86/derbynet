@@ -32,3 +32,4 @@ Every product decision the owner made for the Django migration, newest last. The
 | D26 | 2026-10-24 | The timer audit never delays the timer reply. The audit row is written after the race-state transaction, with at most a 1 s lock wait on SQLite. On timeout or error it is skipped with a warning. | #20, #27, #32 |
 | D27 | 2026-10-24 | A result changed during an intermission rebuilds the waiting final's roster and chart if none of its heats has run. Otherwise the dashboard warns. | #20, #25 |
 | D28 | 2026-10-24 | A final with fewer than 2 racers keeps the intermission open with "final needs at least 2 racers", and the coordinator skips the final or changes the cut. | #20, #25 |
+| D29 | 2026-10-25 | No Raspberry Pi timing is required. Speed targets are measured on a laptop, because a Pi is not supported as the server (D21). | #22 |
