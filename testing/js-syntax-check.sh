@@ -18,6 +18,7 @@ else
     find . \
          -path ./timer/electron -prune -or \
          -name node_modules -prune -or \
+         -name '.?*' -prune -or \
          -path ./templates -prune -or \
          -name \*.js -print0 | \
        xargs --null -t -n 1 -I % \
