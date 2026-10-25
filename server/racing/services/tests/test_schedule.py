@@ -299,6 +299,21 @@ def test_fewer_than_one_run_per_lane_is_cant_fulfill_and_keeps_the_chart(n_times
     assert chart_of(round) == before
 
 
+def test_zero_runs_reports_the_failures_php_checks_first():
+    no_lanes, _ = new_round(lane_count=0)
+    assert failure_of(lambda: generate_schedule(no_lanes, 0)).code == Failure.NLANES
+
+    raced, _ = new_round()
+    generate_schedule(raced, 1)
+    HeatLane.objects.filter(round=raced, heat=1, lane=1).update(finish_place=1)
+    failure = failure_of(lambda: generate_schedule(raced, 0))
+    assert failure.code == Failure.RESULTS_EXIST
+
+    alone, _ = new_round([101])
+    failure = failure_of(lambda: generate_schedule(alone, 0))
+    assert failure.code == Failure.TOO_FEW_RACERS
+
+
 @pytest.mark.parametrize("lanes", [4, 6, 8])
 def test_the_owner_race_day_schedules_every_round(lanes):
     """D11 and D12: Scouts round 1 and a top-4 final, then Outlaws round 1 and

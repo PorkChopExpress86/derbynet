@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from .lanes import spread_across_unused_lanes
 from .ordered import make_ordered_schedule
 from .rotation import make_rotation_schedule
+from .rough import CantFulfill
 
 
 class TooFewRacers(Exception):
@@ -26,10 +27,14 @@ def make_chart[T](
     `roster` is in PHP's order: roster entry order, or car number under
     `rotation-schedule`. `nlanes` counts the lanes in use. Byes pad the roster
     up to `nlanes`, then until `len * max_runs_per_car` divides by `nlanes`.
-    Raises TooFewRacers, or CantFulfill from the engine.
+    Raises TooFewRacers, or CantFulfill for fewer than one run per lane or
+    from the engine. PHP schedules no heats for zero runs, the empty round
+    that Q1 in #20 forbids.
     """
     if len(roster) < 2:
         raise TooFewRacers
+    if n_times_per_lane < 1:
+        raise CantFulfill(nlanes, len(roster), n_times_per_lane)
     padded: list[T | None] = list(roster)
     padded += [None] * (nlanes - len(padded))
     while len(padded) * max_runs_per_car % nlanes != 0:
