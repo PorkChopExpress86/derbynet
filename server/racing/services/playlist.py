@@ -23,8 +23,8 @@ from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
-from racing.engine.scheduling.lanes import count_one_bits
-from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
+from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, Round
+from racing.services import schedule
 from racing.services.rounds import (
     make_new_round,
     prepare_new_round,
@@ -42,14 +42,13 @@ PLAYLIST_SCENE_DELAY = timedelta(seconds=10)
 
 class Failure(StrEnum):
     NO_INTERMISSION = "no-intermission"
-    NO_RACERS = "no_racers"
-    NO_LANES = "no-lanes"
-    NO_RUNS = "no-runs"
-    NO_HEATS = "no-heats"
 
 
 class PlaylistFailure(Exception):
-    def __init__(self, code: Failure, description: str):
+    """`no-intermission`, or the `ScheduleFailure` code of a waiting round
+    that cannot be scheduled."""
+
+    def __init__(self, code: Failure | schedule.Failure, description: str):
         super().__init__(f"{code}: {description}")
         self.code = code
         self.description = description
@@ -100,19 +99,21 @@ def _activate(state: RaceState, entry: PlaylistEntry, finalists_for: FinalistsFo
     round = _round_of(entry) or make_new_round(entry.group, entry.round_number)
     if not round.roster.exists():
         write_roster(round, finalists_for(entry, round))
-    settings = RaceSettings.objects.get(event_id=entry.event_id)
-    if (
-        entry.n_times_per_lane > 0
-        and settings.lane_count > 0
-        and not HeatLane.objects.filter(round=round).exists()
-    ):
-        try:
-            generate_schedule(round, entry.n_times_per_lane)
-        except ScheduleFailure:
-            pass  # PHP's schedule_one_round writes no chart and reports nothing.
+    if not HeatLane.objects.filter(round=round).exists():
+        # PHP's schedule_one_round writes no chart and reports nothing.
+        # `start_waiting_step` reports the failure.
+        _schedule(round, entry)
         state.refresh_from_db()
     _select(state, round)
     return round
+
+
+def _schedule(round: Round, entry: PlaylistEntry) -> ScheduleFailure | None:
+    try:
+        generate_schedule(round, entry.n_times_per_lane)
+    except ScheduleFailure as failure:
+        return failure
+    return None
 
 
 def _next_entry(entry: PlaylistEntry) -> PlaylistEntry | None:
@@ -195,19 +196,24 @@ def _after_round(
 def start_waiting_step(event) -> Round:
     """End the intermission and race the waiting step's round.
 
-    Fails when the round has no heats, naming why, and the intermission
-    stays open. A final with fewer than 2 racers is `no_racers` (D28).
-    Applying the racing scene belongs to #27 and #34.
+    A round with no chart is scheduled now. If that fails, the intermission
+    stays open and the failure is raised with `generate_schedule`'s code. A
+    final with fewer than 2 racers says so (D28). Applying the racing scene
+    belongs to #27 and #34.
     """
     with transaction.atomic():
         state = lock_race_state(event.id)
-        if state.waiting_entry_id is None:
+        entry = state.waiting_entry
+        if entry is None:
             raise PlaylistFailure(
                 Failure.NO_INTERMISSION, "No playlist step is waiting."
             )
-        round = _round_of(state.waiting_entry)
-        if round is None or not HeatLane.objects.filter(round=round).exists():
-            raise _why_no_heats(state.waiting_entry, round)
+        round = _round_of(entry) or make_new_round(entry.group, entry.round_number)
+        if not HeatLane.objects.filter(round=round).exists():
+            failure = _schedule(round, entry)
+            if failure is not None:
+                raise _waiting_failure(state, entry, failure) from failure
+            state.refresh_from_db()
         state.waiting_entry = None
         state.ended_round = None
         _select(state, round)
@@ -216,31 +222,17 @@ def start_waiting_step(event) -> Round:
         return round
 
 
-def _why_no_heats(entry: PlaylistEntry, round: Round | None) -> PlaylistFailure:
-    """The reason `_activate` made no chart for the step's round."""
-    settings = RaceSettings.objects.get(event_id=entry.event_id)
-    if settings.lane_count - count_one_bits(settings.unused_lane_mask) <= 0:
-        return PlaylistFailure(
-            Failure.NO_LANES, "Number of lanes hasn't been determined."
-        )
-    if entry.n_times_per_lane < 1:
-        return PlaylistFailure(
-            Failure.NO_RUNS,
-            "The step races each lane 0 times. Choose at least one run per lane.",
-        )
+def _waiting_failure(
+    state: RaceState, entry: PlaylistEntry, failure: ScheduleFailure
+) -> PlaylistFailure:
+    description = failure.description
     if (
-        round is None
-        or RosterEntry.objects.filter(
-            round=round, racer__passed_inspection=True
-        ).count()
-        < 2
+        failure.code == schedule.Failure.TOO_FEW_RACERS
+        and state.ended_round is not None
+        and _feeds(state.ended_round, entry)
     ):
-        return PlaylistFailure(Failure.NO_RACERS, "The final needs at least 2 racers.")
-    return PlaylistFailure(
-        Failure.NO_HEATS,
-        "The round could not be scheduled with these settings. Schedule it"
-        " from the coordinator page, or skip it.",
-    )
+        description = "The final needs at least 2 racers."
+    return PlaylistFailure(failure.code, description)
 
 
 def skip_waiting_step(event, finalists_for: FinalistsFor) -> Round | None:

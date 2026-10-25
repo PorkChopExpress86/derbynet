@@ -15,6 +15,7 @@ from django.utils import timezone
 from core.models import RaceSettings, RaceState
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
 from racing.models import HeatLane, PlaylistEntry, Round
+from racing.services import schedule
 from racing.services.playlist import (
     Failure,
     PlaylistFailure,
@@ -275,7 +276,8 @@ def test_a_final_with_fewer_than_2_racers_keeps_the_intermission_open():
     round_ended(round, finalists_for)
     with pytest.raises(PlaylistFailure) as caught:
         start_waiting_step(replay.event)
-    assert caught.value.code == Failure.NO_RACERS
+    assert caught.value.code == schedule.Failure.TOO_FEW_RACERS
+    assert caught.value.description == "The final needs at least 2 racers."
     assert state(replay).waiting_entry is not None and not state(replay).racing
 
 
@@ -429,27 +431,40 @@ def test_skip_waiting_step_without_an_intermission_fails():
 
 
 @pytest.mark.parametrize(
-    "change, code",
+    "change, code, description",
     [
-        ("runs", Failure.NO_RUNS),
-        ("lanes", Failure.NO_LANES),
-        ("masked", Failure.NO_LANES),
+        ("no runs", schedule.Failure.CANT_FULFILL, "Choose at least one run per lane."),
+        (
+            "too many runs",
+            schedule.Failure.CANT_FULFILL,
+            "Cannot schedule 50 runs per lane for 4 racers on 4 lanes; the most is",
+        ),
+        (
+            "no lanes",
+            schedule.Failure.NLANES,
+            "Number of lanes hasn't been determined.",
+        ),
+        ("masked", schedule.Failure.NLANES, "Number of lanes hasn't been determined."),
     ],
 )
-def test_a_waiting_step_with_no_chart_says_why(change, code):
+def test_a_waiting_step_with_no_chart_says_why(change, code, description):
+    """`start_waiting_step` raises the failure `generate_schedule` raises."""
     replay, finalists_for = two_step_playlist(waits=True, continue_racing=False)
     scouts = start_playlist(replay.event, finalists_for)
-    if change == "runs":
-        PlaylistEntry.objects.filter(event=replay.event, seq=2).update(
-            n_times_per_lane=0
-        )
-    elif change == "lanes":
-        RaceSettings.objects.filter(event=replay.event).update(lane_count=0)
+    final = PlaylistEntry.objects.filter(event=replay.event, seq=2)
+    settings = RaceSettings.objects.filter(event=replay.event)
+    if change == "no runs":
+        final.update(n_times_per_lane=0)
+    elif change == "too many runs":
+        final.update(n_times_per_lane=50)
+    elif change == "no lanes":
+        settings.update(lane_count=0)
     else:
-        RaceSettings.objects.filter(event=replay.event).update(unused_lane_mask=0b1111)
+        settings.update(unused_lane_mask=0b1111)
     race(scouts)
     round_ended(scouts, finalists_for)
     with pytest.raises(PlaylistFailure) as caught:
         start_waiting_step(replay.event)
     assert caught.value.code == code
-    assert state(replay).waiting_entry is not None
+    assert caught.value.description.startswith(description)
+    assert state(replay).waiting_entry is not None and not state(replay).racing

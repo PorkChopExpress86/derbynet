@@ -22,7 +22,7 @@ from typing import Final
 
 from django.db import connection, transaction
 from django.db.models import Count, Max, Min, Q, Value
-from django.db.models.functions import Lower
+from django.db.models.functions import Left, Lower
 
 from awards.models import Award, BallotAward
 from core.models import FullFieldRule, RaceSettings, RaceState
@@ -153,15 +153,6 @@ def _fold(name: str) -> str:
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 
 
-def _group_key(name: str) -> str:
-    """The key two names share when they may not both name groups. The
-    constraint on group names uses the database's `lower()`, which folds
-    every letter on Postgres and only ASCII letters on SQLite. Python's
-    `lower()` folds every letter, so both databases make the same groups
-    and neither breaks the constraint."""
-    return name.lower()
-
-
 def _temporary_name() -> str:
     return f"(regrouping {uuid.uuid4().hex})"
 
@@ -225,7 +216,7 @@ def fill_in_missing_roster_entries(event_id) -> int:
 # ----- Row primitives ----------------------------------------------------
 
 
-def cancel_running_round(state: RaceState) -> None:
+def _cancel_running_round(state: RaceState) -> None:
     """`cancel_running_round()`: racing off and no current heat. The replay
     `CANCEL` that PHP sends when racing was on belongs to #27."""
     state.racing = False
@@ -253,7 +244,7 @@ def delete_rounds(event_id, rounds) -> None:
         if not round_ids:
             return
         if state.current_round_id in round_ids:
-            cancel_running_round(state)
+            _cancel_running_round(state)
         timers = TimerStatus.objects.filter(event_id=event_id)
         timers.filter(staged_round_id__in=round_ids).update(
             staged_round=None, staged_heat=None
@@ -549,8 +540,14 @@ def _retire(old_groups, old_subgroups, renames: dict[Group, str]) -> None:
 
 def _partitions(event_id) -> list[Partition]:
     """In id order, the order PHP's unordered `SELECT ... FROM Partitions`
-    returns them."""
-    return list(Partition.objects.filter(event_id=event_id).order_by("id"))
+    returns them. `group_key` is the group name each would give, folded by
+    the database's `lower()`, which is what the unique constraint on group
+    names compares: every letter on Postgres, ASCII letters on SQLite."""
+    return list(
+        Partition.objects.filter(event_id=event_id)
+        .annotate(group_key=Lower(Left("name", NAME_WIDTH)))
+        .order_by("id")
+    )
 
 
 def _form_one_group(event_id) -> None:
@@ -585,12 +582,11 @@ def _form_by_partition(event_id) -> None:
     partitions = _partitions(event_id)
     groups: dict[str, tuple[Group, str]] = {}
     for p in partitions:
-        name = p.name[:NAME_WIDTH]
-        if _group_key(name) not in groups:
+        if p.group_key not in groups:
             group = Group.objects.create(
                 event_id=event_id, name=_temporary_name(), sort_order=p.sort_order
             )
-            groups[_group_key(name)] = (group, name)
+            groups[p.group_key] = (group, p.name[:NAME_WIDTH])
     # PHP makes the subgroups and rounds with `INSERT ... SELECT ... FROM
     # Classes`, which SQLite reads through the class name index, so in name
     # order. Making them in that order gives them the ids PHP gives them.
@@ -602,10 +598,9 @@ def _form_by_partition(event_id) -> None:
         for key, (group, name) in by_name
     }
     for p in partitions:
-        key = _group_key(p.name[:NAME_WIDTH])
-        Partition.objects.filter(pk=p.pk).update(subgroup=subgroups[key])
+        Partition.objects.filter(pk=p.pk).update(subgroup=subgroups[p.group_key])
         Racer.objects.filter(partition=p).update(
-            group=groups[key][0], subgroup=subgroups[key]
+            group=groups[p.group_key][0], subgroup=subgroups[p.group_key]
         )
     _retire(old_groups, old_subgroups, dict(groups.values()))
     for _key, (group, _name) in by_name:

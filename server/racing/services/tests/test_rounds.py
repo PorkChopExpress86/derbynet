@@ -192,6 +192,7 @@ def _writers(replay):
     return {
         "write_roster": lambda: write_roster(final, racers(replay, "Lions")),
         "prepare_new_round": lambda: prepare_new_round(lions, 3),
+        "make_new_round": lambda: rounds.make_new_round(lions, 5),
         "delete_round_roster": lambda: delete_round_roster(extra),
         "fill_in_missing_roster_entries": lambda: groups.fill_in_missing_roster_entries(
             replay.event.id
@@ -241,6 +242,9 @@ def _writers(replay):
         "find_or_create_subgroup": lambda: groups.find_or_create_subgroup(
             lions, "Cubs"
         ),
+        "find_or_create_partition": lambda: groups.find_or_create_partition(
+            replay.event.id, "Cubs"
+        ),
         "clean_up_empty_groups_and_subgroups": lambda: (
             groups.clean_up_empty_groups_and_subgroups(replay.event.id)
         ),
@@ -257,6 +261,7 @@ def _writers(replay):
 WRITERS = [
     "write_roster",
     "prepare_new_round",
+    "make_new_round",
     "delete_round_roster",
     "fill_in_missing_roster_entries",
     "form_groups_by_rule",
@@ -282,6 +287,7 @@ WRITERS = [
     "reset_full_field",
     "find_or_create_group",
     "find_or_create_subgroup",
+    "find_or_create_partition",
     "clean_up_empty_groups_and_subgroups",
     "start_waiting_step",
     "skip_waiting_step",

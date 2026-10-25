@@ -395,18 +395,24 @@ def test_rank_edit_gives_a_subgroup_with_no_partition_a_partitions_name(replay):
     assert partition(replay, "Lions").subgroup.group == group(replay, "Lions")
 
 
-def test_by_partition_folds_case_the_same_way_on_every_database(replay):
-    """Postgres's `lower()` folds `É`; SQLite's does not. Both make one
-    group."""
-    replay.import_racer("A", "Racer", "École")
-    replay.import_racer("B", "Racer", "école")
+@pytest.mark.parametrize("names", [("École", "école"), ("ΟΔΟΣ", "οδοσ")])
+def test_by_partition_folds_case_as_the_group_name_constraint_does(replay, names):
+    """Postgres's `lower()` folds every letter, so each pair makes one group.
+    SQLite's folds ASCII letters only, so each pair makes two. Python's
+    `lower()` agrees with neither: it folds a final `Σ` to `ς`."""
+    for i, name in enumerate(names):
+        replay.import_racer(str(i), "Racer", name)
     groups.form_groups_by_rule(replay.event, "by-partition")
-    (only,) = Group.objects.filter(event=replay.event)
-    assert only.name == "École"
-    assert set(
-        Partition.objects.filter(subgroup__group=only).values_list("name", flat=True)
-    ) == {"École", "école"}
-    assert set(Racer.objects.values_list("group", flat=True)) == {only.pk}
+    made = {
+        g.pk: g.name for g in Group.objects.filter(event=replay.event).order_by("id")
+    }
+    folds = connection.vendor == "postgresql"
+    assert sorted(made.values()) == sorted(names[:1] if folds else names)
+    for p in Partition.objects.filter(event=replay.event):
+        assert made[p.subgroup.group_id] == (names[0] if folds else p.name)
+        assert set(
+            Racer.objects.filter(partition=p).values_list("group", flat=True)
+        ) == {p.subgroup.group_id}
 
 
 def test_order_partitions_gives_a_group_its_lowest_partition_sort_order(replay):
