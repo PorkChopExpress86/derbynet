@@ -1,0 +1,108 @@
+{
+  "deviations": [
+    {
+      "quirk": "Q1",
+      "fixture": "engine/out-of-range.json",
+      "cases": [
+        "ordered/2/1/1",
+        "ordered/2/201/1",
+        "ordered/2/202/1",
+        "ordered/2/250/1",
+        "ordered/2/400/1",
+        "ordered/3/1/1",
+        "ordered/3/2/1",
+        "ordered/3/201/1",
+        "ordered/3/202/1",
+        "ordered/3/250/1",
+        "ordered/3/400/1",
+        "ordered/4/1/1",
+        "ordered/4/2/1",
+        "ordered/4/3/1",
+        "ordered/4/201/1",
+        "ordered/4/202/1",
+        "ordered/4/250/1",
+        "ordered/4/400/1",
+        "ordered/5/1/1",
+        "ordered/5/2/1",
+        "ordered/5/3/1",
+        "ordered/5/4/1",
+        "ordered/5/201/1",
+        "ordered/5/202/1",
+        "ordered/5/250/1",
+        "ordered/5/400/1",
+        "ordered/6/1/1",
+        "ordered/6/2/1",
+        "ordered/6/3/1",
+        "ordered/6/4/1",
+        "ordered/6/5/1",
+        "ordered/6/201/1",
+        "ordered/6/202/1",
+        "ordered/6/250/1",
+        "ordered/6/400/1",
+        "ordered/7/1/1",
+        "ordered/7/2/1",
+        "ordered/7/3/1",
+        "ordered/7/4/1",
+        "ordered/7/5/1",
+        "ordered/7/6/1",
+        "ordered/7/7/1",
+        "ordered/7/8/1",
+        "ordered/7/9/1",
+        "ordered/7/10/1",
+        "ordered/7/11/1",
+        "ordered/7/12/1",
+        "ordered/7/17/1",
+        "ordered/7/23/1",
+        "ordered/7/50/1",
+        "ordered/7/100/1",
+        "ordered/7/200/1",
+        "ordered/7/201/1",
+        "ordered/7/202/1",
+        "ordered/7/250/1",
+        "ordered/7/400/1",
+        "ordered/8/1/1",
+        "ordered/8/2/1",
+        "ordered/8/3/1",
+        "ordered/8/4/1",
+        "ordered/8/5/1",
+        "ordered/8/6/1",
+        "ordered/8/7/1",
+        "ordered/8/201/1",
+        "ordered/8/202/1",
+        "ordered/8/250/1",
+        "ordered/8/400/1"
+      ],
+      "reason": "No generator table covers these counts; PHP throws a TypeError and Django raises CantFulfill.",
+      "expected": "deviations/Q1/out-of-range.json"
+    },
+    {
+      "quirk": "Q1",
+      "fixture": "http/schedule/cant-fulfill-4-lanes.http",
+      "exchanges": [
+        "002 generate-round-3-too-many-runs"
+      ],
+      "reason": "PHP replies success to a request beyond the tables; Django replies cant-fulfill.",
+      "expected": "deviations/Q1/cant-fulfill-4-lanes.http"
+    },
+    {
+      "quirk": "Q1",
+      "fixture": "http/schedule/seven-lanes.http",
+      "exchanges": [
+        "002 generate-round-1",
+        "004 generate-round-2",
+        "006 generate-round-3"
+      ],
+      "reason": "PHP answers 500 with no body for 7 lanes; Django replies cant-fulfill.",
+      "expected": "deviations/Q1/seven-lanes.http"
+    },
+    {
+      "quirk": "Q1",
+      "fixture": "http/schedule/more-than-200-cars.http",
+      "exchanges": [
+        "001 generate-with-201-cars"
+      ],
+      "reason": "PHP answers 500 with no body for 201 cars; Django replies cant-fulfill.",
+      "expected": "deviations/Q1/more-than-200-cars.http"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+### 001 generate-with-201-cars
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 308
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "cant-fulfill",
+        "description": "The schedule tables have no schedule for 201 racers on 4 lanes. Turn on rotation scheduling to race this round."
+    }
+}

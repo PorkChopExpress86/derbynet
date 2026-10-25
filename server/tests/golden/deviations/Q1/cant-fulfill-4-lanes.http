@@ -1,0 +1,20 @@
+### 002 generate-round-3-too-many-runs
+request: POST action.php
+request-body: action=schedule.generate&roundid=3&n_times_per_lane=7
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 360
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 3,
+        "n_times_per_lane": 7
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "cant-fulfill",
+        "description": "Cannot schedule 7 runs per lane for 10 racers on 4 lanes; the most is 6. Choose fewer runs per lane, or turn on rotation scheduling."
+    }
+}
