@@ -1,0 +1,57 @@
+### 002 generate-round-1
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 307
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "cant-fulfill",
+        "description": "The schedule tables have no schedule for 20 racers on 7 lanes. Turn on rotation scheduling to race this round."
+    }
+}
+### 004 generate-round-2
+request: POST action.php
+request-body: action=schedule.generate&roundid=2
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 307
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 2
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "cant-fulfill",
+        "description": "The schedule tables have no schedule for 19 racers on 7 lanes. Turn on rotation scheduling to race this round."
+    }
+}
+### 006 generate-round-3
+request: POST action.php
+request-body: action=schedule.generate&roundid=3
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 307
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 3
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "cant-fulfill",
+        "description": "The schedule tables have no schedule for 10 racers on 7 lanes. Turn on rotation scheduling to race this round."
+    }
+}

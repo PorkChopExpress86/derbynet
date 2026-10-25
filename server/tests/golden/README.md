@@ -183,3 +183,17 @@ If one of these fails in CI, rerun the job before you treat the diff as real. A 
 ## Adding a case
 
 A ticket that needs a case this tool lacks adds it here: a `capture` line in a scenario, or a new file in `capture/scenarios/`, or a case in `capture-engine.php`. Then rerun `capture.sh` and commit the new fixtures with the change.
+
+## Deviations
+
+`deviations.json` lists each place where Django differs from these fixtures on purpose (owner decision D25, #20 "How fixtures record decisions"). `capture.sh` never touches it or `deviations/`. Each entry has these keys:
+
+| Key | Value |
+|---|---|
+| `quirk` | A quirk id from #20 whose decision is Fix, such as `Q1` |
+| `fixture` | The fixture path, relative to this directory |
+| `cases` or `exchanges` | Engine case ids, or transcript exchange names as their `###` line gives them |
+| `reason` | One line |
+| `expected` | Django's output for those items, under `deviations/<quirk>/`: canonical engine records keyed by case id, or a transcript that holds only the named exchanges |
+
+A parity test compares a listed item with its expected output and fails if Django's output equals PHP's. It compares every other item with PHP. `racing/engine/tests/test_schedule_parity.py` does this for the engine fixtures. The legacy API transcripts get their runner with their handlers (#31). `tests/test_deviations.py` checks the list itself: a Fix quirk, items that exist, none listed twice, and expected files that hold exactly the listed items.
