@@ -1,0 +1,40 @@
+name: schedule-parity
+
+# Runs the whole ordered schedule sweep against the PHP fixtures, every car
+# count to 200 and every supported run count.  Every pull request runs the
+# smaller `-m pr` grid in the server workflow; one that changes the scheduler
+# also runs this.  See server/README.md.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - server/racing/engine/scheduling/**
+      - server/racing/engine/tests/test_schedule_parity.py
+      - .github/workflows/schedule-parity.yml
+
+concurrency:
+  group: schedule-parity-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Full schedule parity
+        run: uv run pytest racing/engine/tests/test_schedule_parity.py -m full -v --durations=10
