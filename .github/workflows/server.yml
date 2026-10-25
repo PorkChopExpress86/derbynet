@@ -8,10 +8,12 @@ on:
     branches: [master]
     paths:
       - server/**
+      - website/inc/generators/**
       - .github/workflows/server.yml
   pull_request:
     paths:
       - server/**
+      - website/inc/generators/**
       - .github/workflows/server.yml
   workflow_dispatch:
 
@@ -63,6 +65,9 @@ jobs:
 
       - name: Check formatting
         run: uv run ruff format --check
+
+      - name: Check the generator tables match website/inc/generators
+        run: uv run python tools/convert_generators.py --check
 
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run

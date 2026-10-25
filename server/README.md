@@ -25,6 +25,17 @@ The `server` GitHub Actions workflow runs these four commands on Python 3.14, on
 
 Model tests build their data with the factory_boy factories in `<app>/tests/factories.py`. `EventFactory` creates an event through `core.services.new_event()`, so each event comes with its settings, state rows, and the six legacy scenes.
 
+## Schedule generator tables
+
+`racing/engine/scheduling/generator_tables.py` holds the PHP schedule generator tables (`website/inc/generators/*.inc`) as data. Do not edit it. Regenerate it, and commit the result, with:
+
+```sh
+uv run python tools/convert_generators.py
+uv run python tools/convert_generators.py --check   # exits 1 if the module is out of date; CI runs this
+```
+
+`racing.engine.scheduling.generators.scheduler_data(nlanes, ncars)` returns `{"generators": [...], "permutation_sets": [...]}` or `None` when no table covers the counts. The module loads on the first call. `racing/engine/tests/test_generator_tables.py` compares the tables with the PHP dump in `tests/golden/engine/scheduler-data/`.
+
 ## Inspect an event
 
 The server has no Django admin (ADR-16). To see what one event holds, print its rows for every event-scoped model as JSON:
