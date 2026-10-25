@@ -2,6 +2,8 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from awards.models import Award, BallotAward
+from awards.tests.factories import AwardFactory, BallotAwardFactory
 from core.models import RaceSettings
 from racing.models import HeatLane, RosterEntry, Round
 from racing.tests.factories import HeatLaneFactory
@@ -324,3 +326,56 @@ def test_fill_in_missing_roster_entries_is_idempotent(replay):
     assert groups.fill_in_missing_roster_entries(replay.event.id) == 4
     assert groups.fill_in_missing_roster_entries(replay.event.id) == 0
     assert RosterEntry.objects.filter(event=replay.event).count() == 4
+
+
+# ----- Awards, renames and shared subgroups -------------------------------
+
+
+def _ballot_award(replay, **where):
+    award = AwardFactory(event=replay.event, **where)
+    BallotAwardFactory(award=award)
+    return award
+
+
+def test_deleting_a_group_deletes_its_awards_on_the_ballot(replay):
+    groups.add_group(replay.event, "Empty")
+    award = _ballot_award(replay, group=group(replay, "Empty"))
+    groups.delete_group(group(replay, "Empty"))
+    assert not Award.objects.filter(pk=award.pk).exists()
+    assert not BallotAward.objects.filter(award_id=award.pk).exists()
+
+
+def test_a_rule_change_deletes_group_awards_on_the_ballot(replay):
+    with_dens(replay)
+    _ballot_award(replay, group=group(replay, "Lions"))
+    _ballot_award(replay, subgroup=Subgroup.objects.get(name="Tigers"))
+    pack = _ballot_award(replay)
+    groups.form_groups_by_rule(replay.event, "one-group")
+    assert list(Award.objects.filter(event=replay.event)) == [pack]
+
+
+def test_rename_group_refuses_a_name_its_two_partitions_would_share(replay):
+    """By partition, the partitions take the group's name, and partition
+    names are unique."""
+    with_dens(replay)
+    lions = group(replay, "Lions")
+    groups.move_partition(partition(replay, "Tigers"), GroupRef("classid", lions.pk))
+    assert Partition.objects.filter(subgroup__group=lions).count() > 1
+    assert failure_of(groups.rename_group, lions, "Cubs") == Failure.NAME_TAKEN
+
+
+def test_deleting_a_partition_keeps_another_partition_of_its_subgroup(replay):
+    """The Tigers partition moves into the Lions subgroup without its
+    racers, so once the Lions racers go, only the partitions hold it."""
+    with_dens(replay)
+    groups.form_groups_by_rule(replay.event, "custom")
+    lions = Subgroup.objects.get(event=replay.event, name="Lions")
+    groups.move_partition(
+        partition(replay, "Tigers"),
+        GroupRef("rankid", lions.pk),
+        from_filter=GroupRef("classid", lions.group_id),
+    )
+    RosterEntry.objects.filter(racer__partition__name="Lions").delete()
+    Racer.objects.filter(partition__name="Lions").delete()
+    groups.delete_partition(partition(replay, "Lions"))
+    assert partition(replay, "Tigers").subgroup == lions

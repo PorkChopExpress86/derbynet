@@ -23,6 +23,7 @@ from racing.services.playlist import (
     start_playlist,
     start_waiting_step,
 )
+from racing.services.schedule import generate_schedule
 from racing.tests.test_round_scenarios import Rounds
 
 pytestmark = pytest.mark.django_db
@@ -314,3 +315,34 @@ def test_the_playlist_does_nothing_under_the_master_schedule():
     round_ended(round, finalists_for)
     assert state(replay).waiting_entry is None
     assert not Round.objects.filter(group=round.group, number=2).exists()
+
+
+def test_starting_the_playlist_closes_an_open_intermission():
+    replay, finalists_for = two_step_playlist(waits=True, continue_racing=False)
+    round = start_playlist(replay.event, finalists_for)
+    race(round)
+    round_ended(round, finalists_for)
+    assert state(replay).waiting_entry is not None
+    start_playlist(replay.event, finalists_for)
+    now = state(replay)
+    assert now.racing and now.waiting_entry is None and now.ended_round is None
+
+
+def test_the_intermission_names_the_round_that_ended_when_a_raced_step_is_skipped():
+    """The next step's round is already raced, so the step after it waits.
+    `ended_round` is still the round that just ended."""
+    replay = race_day(4, 8)
+    finalists_for = finalists_from_ladders(replay)
+    replay.ids.sync()
+    scouts = start_playlist(replay.event, finalists_for)
+    outlaws = Round.objects.get(group__name="Outlaw", number=1)
+    generate_schedule(outlaws, 1)
+    race(outlaws)
+    PlaylistEntry.objects.filter(event=replay.event, seq=2).update(seq=5)
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    now = state(replay)
+    assert (
+        now.waiting_entry.round_number == 2 and now.waiting_entry.group.name == "Outlaw"
+    )
+    assert now.ended_round == scouts

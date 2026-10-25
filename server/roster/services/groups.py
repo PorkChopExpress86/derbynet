@@ -24,7 +24,7 @@ from django.db import connection, transaction
 from django.db.models import Count, Max, Q, Value
 from django.db.models.functions import Lower
 
-from awards.models import Award
+from awards.models import Award, BallotAward
 from core.models import FullFieldRule, RaceSettings, RaceState
 from core.services import lock_race_state
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round, TimerStatus
@@ -255,10 +255,17 @@ def reset_full_field(event_id, groups) -> None:
     )
 
 
+def _delete_awards(awards) -> None:
+    """Delete awards with their ballot entries and votes. PHP deletes the
+    `Awards` rows and leaves their `BallotAwards` rows behind."""
+    BallotAward.objects.filter(award__in=awards).delete()
+    awards.delete()
+
+
 def _delete_subgroup(subgroup: Subgroup) -> None:
     """`delete_rank()`: the subgroup, its awards and its partitions. The
     caller has checked that no racer is in it."""
-    Award.objects.filter(subgroup=subgroup).delete()
+    _delete_awards(Award.objects.filter(subgroup=subgroup))
     Partition.objects.filter(subgroup=subgroup).delete()
     subgroup.delete()
 
@@ -270,7 +277,7 @@ def delete_group_rows(group: Group) -> None:
     for subgroup in Subgroup.objects.filter(group=group).order_by("id"):
         _delete_subgroup(subgroup)
     delete_rounds(group.event_id, Round.objects.filter(group=group))
-    Award.objects.filter(group=group).delete()
+    _delete_awards(Award.objects.filter(group=group))
     PlaylistEntry.objects.filter(group=group).delete()
     RaceState.objects.filter(event_id=group.event_id, current_group=group).update(
         current_group=None
@@ -364,17 +371,19 @@ def find_or_create_partition(event_id, name: str) -> Partition:
     first group, otherwise in the group of its name.
     """
     name = name.strip()
-    found = Partition.objects.filter(event_id=event_id, name=name).first()
-    if found:
-        return found
-    if _rule(event_id) == Rule.ONE_GROUP:
-        group = Group.objects.filter(event_id=event_id).order_by("id").first()
-        if group is None:
-            group = find_or_create_group(event_id, ONE_GROUP_NAME)
-    else:
-        group = find_or_create_group(event_id, name)
-    subgroup = find_or_create_subgroup(group, name, with_partition=False)
-    return _create_partition(event_id, name, subgroup)
+    with transaction.atomic():
+        lock_race_state(event_id)
+        found = Partition.objects.filter(event_id=event_id, name=name).first()
+        if found:
+            return found
+        if _rule(event_id) == Rule.ONE_GROUP:
+            group = Group.objects.filter(event_id=event_id).order_by("id").first()
+            if group is None:
+                group = find_or_create_group(event_id, ONE_GROUP_NAME)
+        else:
+            group = find_or_create_group(event_id, name)
+        subgroup = find_or_create_subgroup(group, name, with_partition=False)
+        return _create_partition(event_id, name, subgroup)
 
 
 def clean_up_empty_groups_and_subgroups(event_id) -> None:
@@ -488,9 +497,11 @@ def _clear_group_structure(event_id) -> tuple[list[Group], list[Subgroup]]:
     delete_rounds(event_id, Round.objects.filter(event_id=event_id))
     GroupConstituent.objects.filter(event_id=event_id).delete()
     GroupConstituentSubgroup.objects.filter(event_id=event_id).delete()
-    Award.objects.filter(event_id=event_id).filter(
-        Q(group__isnull=False) | Q(subgroup__isnull=False)
-    ).delete()
+    _delete_awards(
+        Award.objects.filter(event_id=event_id).filter(
+            Q(group__isnull=False) | Q(subgroup__isnull=False)
+        )
+    )
     PlaylistEntry.objects.filter(event_id=event_id).delete()
     RaceState.objects.filter(event_id=event_id).update(current_group=None)
     RaceSettings.objects.filter(event_id=event_id).update(
@@ -641,7 +652,10 @@ def delete_partition(partition: Partition) -> None:
         subgroup = Subgroup.objects.get(pk=partition.subgroup_id)
         group = Group.objects.get(pk=subgroup.group_id)
         partition.delete()
-        if not Racer.objects.filter(subgroup=subgroup).exists():
+        if not (
+            Racer.objects.filter(subgroup=subgroup).exists()
+            or Partition.objects.filter(subgroup=subgroup).exists()
+        ):
             _delete_subgroup(subgroup)
         if (
             _rule(event_id) == Rule.BY_PARTITION
@@ -733,22 +747,24 @@ def create_aggregate_group(
 ) -> Group:
     """`create_aggregate_class()`: a group with no round that draws from
     `constituents`, or from `subgroups` and their groups."""
-    group = create_group(event_id, name, with_first_round=False)
-    Group.objects.filter(pk=group.pk).update(durable=durable)
-    group.durable = durable
-    members: list[int] = []
-    for group_id in [g.pk for g in constituents] + [s.group_id for s in subgroups]:
-        if group_id not in members:
-            members.append(group_id)
-    GroupConstituent.objects.bulk_create(
-        GroupConstituent(event_id=event_id, aggregate=group, constituent_id=member)
-        for member in members
-    )
-    GroupConstituentSubgroup.objects.bulk_create(
-        GroupConstituentSubgroup(event_id=event_id, aggregate=group, subgroup=s)
-        for s in subgroups
-    )
-    return group
+    with transaction.atomic():
+        lock_race_state(event_id)
+        group = create_group(event_id, name, with_first_round=False)
+        Group.objects.filter(pk=group.pk).update(durable=durable)
+        group.durable = durable
+        members: list[int] = []
+        for group_id in [g.pk for g in constituents] + [s.group_id for s in subgroups]:
+            if group_id not in members:
+                members.append(group_id)
+        GroupConstituent.objects.bulk_create(
+            GroupConstituent(event_id=event_id, aggregate=group, constituent_id=m)
+            for m in members
+        )
+        GroupConstituentSubgroup.objects.bulk_create(
+            GroupConstituentSubgroup(event_id=event_id, aggregate=group, subgroup=s)
+            for s in subgroups
+        )
+        return group
 
 
 def add_group(
@@ -790,17 +806,21 @@ def rename_group(group: Group, name: str, n_trophies=KEEP) -> None:
     with transaction.atomic():
         lock_race_state(event_id)
         by_partition = _rule(event_id) == Rule.BY_PARTITION
+        partitions = Partition.objects.filter(subgroup__group=group)
         if _group_name_taken(event_id, name, exclude=group) or (
             by_partition
-            and Partition.objects.filter(event_id=event_id, name=name)
-            .exclude(subgroup__group=group)
-            .exists()
+            and (
+                partitions.count() > 1
+                or Partition.objects.filter(event_id=event_id, name=name)
+                .exclude(subgroup__group=group)
+                .exists()
+            )
         ):
             raise _name_taken(name)
         Group.objects.filter(pk=group.pk).update(name=name)
         if by_partition:
             Subgroup.objects.filter(group=group).update(name=name)
-            Partition.objects.filter(subgroup__group=group).update(name=name)
+            partitions.update(name=name)
         if n_trophies is not KEEP:
             Group.objects.filter(pk=group.pk).update(n_trophies=n_trophies)
 

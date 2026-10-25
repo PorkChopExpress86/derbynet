@@ -121,7 +121,7 @@ def _next_entry(entry: PlaylistEntry) -> PlaylistEntry | None:
 
 def start_playlist(event, finalists_for: FinalistsFor) -> Round | None:
     """`playlist.start`: activate the first step whose round is not done,
-    then turn racing on."""
+    then turn racing on. An open intermission closes."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         for entry in PlaylistEntry.objects.filter(event=event).order_by("seq"):
@@ -132,6 +132,8 @@ def start_playlist(event, finalists_for: FinalistsFor) -> Round | None:
                 or not round_is_complete(round)
             ):
                 round = _activate(state, entry, finalists_for)
+                state.waiting_entry = None
+                state.ended_round = None
                 _racing_on(state)
                 state.save()
                 return round
@@ -152,11 +154,13 @@ def round_ended(round: Round, finalists_for: FinalistsFor) -> None:
         state = lock_race_state(round.event_id)
         if RaceSettings.objects.get(event_id=round.event_id).use_master_sched:
             return
-        _after_round(state, round, finalists_for)
+        _after_round(state, round, round, finalists_for)
         state.save()
 
 
-def _after_round(state: RaceState, round: Round, finalists_for: FinalistsFor):
+def _after_round(
+    state: RaceState, round: Round, ended: Round, finalists_for: FinalistsFor
+):
     entry = PlaylistEntry.objects.filter(
         event_id=round.event_id, group_id=round.group_id, round_number=round.number
     ).first()
@@ -171,13 +175,13 @@ def _after_round(state: RaceState, round: Round, finalists_for: FinalistsFor):
             and HeatLane.objects.filter(round=next_round).exists()
             and round_is_complete(next_round)
         ):
-            _after_round(state, next_round, finalists_for)
+            _after_round(state, next_round, ended, finalists_for)
             return
         _activate(state, after, finalists_for)
         waits = after.waits_for_operator
         if waits:
             state.waiting_entry = after
-            state.ended_round = round
+            state.ended_round = ended
     if entry.scene_at_finish_id:
         state.playlist_scene_id = entry.scene_at_finish_id
         state.playlist_scene_at = timezone.now() + PLAYLIST_SCENE_DELAY

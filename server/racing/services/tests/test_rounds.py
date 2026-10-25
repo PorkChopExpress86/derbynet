@@ -159,6 +159,9 @@ def _writers(replay):
     lions_partition = lions.subgroups.get().partitions.get()
     PlaylistEntry.objects.create(event=replay.event, seq=1, group=lions, round_number=1)
     final, extra = prepare_new_round(lions, 2), prepare_new_round(lions, 4)
+    wolves = groups.add_partition(replay.event, "Wolves")
+    spare = groups.add_subgroup(replay.event, lions.pk, "Spare")
+    empty = groups.add_group(replay.event, "Empty")
     return {
         "write_roster": lambda: write_roster(final, racers(replay, "Lions")),
         "prepare_new_round": lambda: prepare_new_round(lions, 3),
@@ -172,30 +175,64 @@ def _writers(replay):
         "move_partition": lambda: groups.move_partition(
             lions_partition, groups.GroupRef("classid", tigers.pk)
         ),
-        "move_subgroup": lambda: groups.move_subgroup(lions.subgroups.get(), tigers),
+        "move_subgroup": lambda: groups.move_subgroup(
+            lions.subgroups.get(name="Lions"), tigers
+        ),
         "rename_partition": lambda: groups.rename_partition(lions_partition, "Cubs"),
         "add_group": lambda: groups.add_group(replay.event, "Bears"),
         "start_playlist": lambda: playlist.start_playlist(
             replay.event, lambda e, r: []
         ),
+        "round_ended": lambda: playlist.round_ended(
+            Round.objects.get(group=lions, number=1), lambda e, r: []
+        ),
+        "add_partition": lambda: groups.add_partition(replay.event, "Cubs"),
+        "delete_partition": lambda: groups.delete_partition(wolves),
+        "add_subgroup": lambda: groups.add_subgroup(replay.event, lions.pk, "Cubs"),
+        "rename_subgroup": lambda: groups.rename_subgroup(
+            lions.subgroups.get(name="Lions"), "Cubs"
+        ),
+        "delete_subgroup": lambda: groups.delete_subgroup(spare),
+        "rename_group": lambda: groups.rename_group(lions, "Cubs"),
+        "delete_group": lambda: groups.delete_group(empty),
+        "order_groups": lambda: groups.order_groups(replay.event, [tigers, lions]),
+        "order_subgroups": lambda: groups.order_subgroups(replay.event, [spare]),
+        "order_partitions": lambda: groups.order_partitions(
+            replay.event, [wolves, lions_partition]
+        ),
+        "create_aggregate_group": lambda: groups.create_aggregate_group(
+            replay.event.id, "Finals", [lions]
+        ),
     }
 
 
-@pytest.mark.parametrize(
-    "writer",
-    [
-        "write_roster",
-        "prepare_new_round",
-        "delete_round_roster",
-        "fill_in_missing_roster_entries",
-        "form_groups_by_rule",
-        "move_partition",
-        "move_subgroup",
-        "rename_partition",
-        "add_group",
-        "start_playlist",
-    ],
-)
+WRITERS = [
+    "write_roster",
+    "prepare_new_round",
+    "delete_round_roster",
+    "fill_in_missing_roster_entries",
+    "form_groups_by_rule",
+    "move_partition",
+    "move_subgroup",
+    "rename_partition",
+    "add_group",
+    "start_playlist",
+    "round_ended",
+    "add_partition",
+    "delete_partition",
+    "add_subgroup",
+    "rename_subgroup",
+    "delete_subgroup",
+    "rename_group",
+    "delete_group",
+    "order_groups",
+    "order_subgroups",
+    "order_partitions",
+    "create_aggregate_group",
+]
+
+
+@pytest.mark.parametrize("writer", WRITERS)
 def test_every_roster_writer_takes_the_race_state_lock_before_it_writes(
     replay, monkeypatch, writer
 ):
