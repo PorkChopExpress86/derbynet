@@ -206,6 +206,22 @@ class RaceState(PerEvent):
     )
     current_heat = models.IntegerField(null=True, blank=True)
     racing = models.BooleanField(default=False)
+    # The playlist intermission: the step waiting for the operator, and the
+    # round that ended before it. No step means no intermission.
+    waiting_entry = models.ForeignKey(
+        "racing.PlaylistEntry",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    ended_round = models.ForeignKey(
+        "racing.Round",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     timer_test = models.BooleanField(default=False)
     last_heat = models.JSONField(null=True, blank=True)
     refused_results = models.PositiveIntegerField(default=0)

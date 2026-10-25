@@ -59,6 +59,14 @@ uv run python -m timeit -n 3 -r 3 -s 'from racing.engine.scheduling.ordered impo
 
 `generate_schedule` and `unschedule` renumber the event's master heats in the same transaction as the chart, through `racing.services.master.reassign_master_heats(event)`. As in PHP, this runs whether `use-master-sched` is on or off. Raced heats keep their numbers. The unraced heats are numbered from 1 above the highest raced number, interleaved across the rounds of each round level by weight. The engine is `racing/engine/scheduling/master.py`. `assign_master_heats` does the numbering, and `master_target` gives the heat that `next-up`, `next` and `prev` land on. `racing/engine/tests/test_master_parity.py` checks the numbering against `tests/golden/http/master-schedule/half-weights.http`.
 
+## Groups, rounds and the playlist
+
+`roster/services/groups.py` holds the partition, group (legacy class) and subgroup (legacy rank) services behind `action.partition.*`, `action.class.*` and `action.rank.*`, and `form_groups_by_rule(event, rule)` for the three group formation rules. `racing/services/rounds.py` holds `prepare_new_round`, `write_roster(round, finalists)`, `delete_round_roster`, `round_counts` and `ready_aggregate_groups`. `racing/services/playlist.py` runs the playlist: `start_playlist`, `round_ended`, and the operator gate. When a round ends and the next step has `waits_for_operator`, the next round is scheduled and selected, racing stays off, and `RaceState.waiting_entry` and `ended_round` hold the intermission until `start_waiting_step(event)` starts it. A domain failure raises `GroupFailure`, `RoundFailure` or `PlaylistFailure` with PHP's code. Every service that changes a roster takes the `RaceState` lock first, as `generate_schedule` needs.
+
+The finalists of a follow-on or aggregate round come from the standings (#26), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
+
+`roster/tests/test_group_scenarios.py` and `racing/tests/test_round_scenarios.py` replay the group and round scripts of the shell suite through these services, using `roster/tests/php_replay.py`, and compare the state with what PHP recorded.
+
 ## Inspect an event
 
 The server has no Django admin (ADR-16). To see what one event holds, print its rows for every event-scoped model as JSON:
