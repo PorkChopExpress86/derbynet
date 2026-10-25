@@ -15,6 +15,7 @@ from racing.engine.scheduling.lanes import count_one_bits
 from racing.engine.scheduling.rough import CantFulfill, max_runs_per_lane
 from racing.engine.scheduling.round import TooFewRacers, make_chart
 from racing.models import HeatLane, RosterEntry, Round
+from racing.services.master import reassign_master_heats
 
 
 class Failure(StrEnum):
@@ -174,5 +175,6 @@ def after_chart_change(round: Round) -> None:
 
     PHP follows each one with `assign_master_heats()`, then under the master
     schedule `advance_heat(current, 'next-up')`, and `schedule.unschedule`
-    also cancels the round if it is current. #23 and #27 add those here.
+    also cancels the round if it is current. #27 adds the last two here.
     """
+    reassign_master_heats(round.event)
