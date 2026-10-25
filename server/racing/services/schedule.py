@@ -67,7 +67,7 @@ def _read_inputs(round: Round) -> _Inputs:
     )
 
 
-def cant_fulfill_description(inputs: _Inputs, n_times_per_lane: int) -> str:
+def _cant_fulfill_description(inputs: _Inputs, n_times_per_lane: int) -> str:
     nracers = len(inputs.roster)
     supported = (
         1 if inputs.max_runs_per_car else max_runs_per_lane(inputs.nlanes, nracers)
@@ -108,7 +108,7 @@ def _make_chart(inputs: _Inputs, n_times_per_lane: int) -> list[list[int | None]
         ) from None
     except CantFulfill:
         raise ScheduleFailure(
-            Failure.CANT_FULFILL, cant_fulfill_description(inputs, n_times_per_lane)
+            Failure.CANT_FULFILL, _cant_fulfill_description(inputs, n_times_per_lane)
         ) from None
 
 
@@ -120,9 +120,17 @@ def generate_schedule(round: Round, n_times_per_lane: int) -> int:
     large roster does not hold the race-state lock (#20, "Transactions and
     locks"). If the inputs changed by the time the lock is held, it tries
     once more, then fails with `busy`.
+
+    The recheck holds only if every writer of the roster, of inspection
+    status, and of the lane settings takes the same `RaceState` lock. On
+    Postgres a writer that skips it can commit between the recheck and the
+    write, and the chart is then made from stale inputs.
+
+    Fewer than one run per lane is `cant-fulfill`. PHP deletes the chart and
+    reports success with no heats, the empty round that Q1 in #20 forbids.
     """
     if n_times_per_lane < 1:
-        raise ValueError("n_times_per_lane must be at least 1")
+        raise ScheduleFailure(Failure.CANT_FULFILL, "Choose at least one run per lane.")
     for _ in range(2):
         inputs = _read_inputs(round)
         chart = _make_chart(inputs, n_times_per_lane)

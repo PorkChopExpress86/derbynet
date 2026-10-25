@@ -12,7 +12,10 @@ on:
   pull_request:
     paths:
       - server/racing/engine/scheduling/**
-      - server/racing/engine/tests/test_schedule_parity.py
+      - server/racing/engine/tests/**
+      - server/tests/golden/engine/**
+      - server/pyproject.toml
+      - server/uv.lock
       - .github/workflows/schedule-parity.yml
 
 concurrency:
