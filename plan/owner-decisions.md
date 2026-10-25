@@ -28,3 +28,7 @@ Every product decision the owner made for the Django migration, newest last. The
 | D22 | 2026-10-24 | No Django users or admin. `django.contrib.auth` and `admin` are not installed, `AUTH_USER_MODEL` stays unset, and roles live in the session. | #15, ADR-16 |
 | D23 | 2026-10-24 | `role.list`, `query=roles`, `role.login` and `action=login` stay anonymous, because `derby-timer.jar` reads the role list before it logs in. Refines D5. | #15 |
 | D24 | 2026-10-24 | `query=standings` is public, like the standings page. | #17 |
+| D25 | 2026-10-24 | Deliberate differences from PHP are listed in `server/tests/golden/deviations.json`, with the quirk, the PHP exchange, and the corrected output. Parity tests fail on any difference not listed, and on any listed entry that no longer differs. | #20 |
+| D26 | 2026-10-24 | The timer audit never delays the timer reply. The audit row is written after the race-state transaction, with at most a 1 s lock wait on SQLite. On timeout or error it is skipped with a warning. | #20, #27, #32 |
+| D27 | 2026-10-24 | A result changed during an intermission rebuilds the waiting final's roster and chart if none of its heats has run. Otherwise the dashboard warns. | #20, #25 |
+| D28 | 2026-10-24 | A final with fewer than 2 racers keeps the intermission open with "final needs at least 2 racers", and the coordinator skips the final or changes the cut. | #20, #25 |
