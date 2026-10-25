@@ -13,7 +13,7 @@ from racing.services.rounds import (
     round_counts,
     write_roster,
 )
-from roster.models import Group, Racer
+from roster.models import Group, GroupConstituent, Racer
 from roster.services import groups
 from roster.tests.php_replay import Replay
 
@@ -105,6 +105,19 @@ def test_a_durable_aggregate_stays_without_its_round(replay):
     assert not Round.objects.filter(group=finals).exists()
 
 
+def test_roster_delete_refuses_the_last_round_of_a_constituent_aggregate(replay):
+    """The aggregate would go, and with it a durable aggregate's link to it,
+    so this is refused as `class.delete` refuses a constituent."""
+    finals = groups.create_aggregate_group(
+        replay.event.id, "Finals", [group(replay, "Lions")]
+    )
+    grand = groups.add_group(replay.event, "Grand", constituents=[finals])
+    round = prepare_new_round(finals, 1)
+    assert failure_of(delete_round_roster, round) == Failure.CONSTITUENT
+    assert Round.objects.filter(pk=round.pk).exists()
+    assert GroupConstituent.objects.filter(aggregate=grand, constituent=finals).exists()
+
+
 def test_deleting_the_current_round_stops_racing(replay):
     final = prepare_new_round(group(replay, "Lions"), 2)
     RaceState.objects.filter(event=replay.event).update(
@@ -159,6 +172,20 @@ def _writers(replay):
     lions_partition = lions.subgroups.get().partitions.get()
     PlaylistEntry.objects.create(event=replay.event, seq=1, group=lions, round_number=1)
     final, extra = prepare_new_round(lions, 2), prepare_new_round(lions, 4)
+    final_step = PlaylistEntry.objects.create(
+        event=replay.event, seq=2, group=lions, round_number=2
+    )
+    HeatLane.objects.create(
+        event=replay.event,
+        round=final,
+        heat=1,
+        lane=1,
+        racer=racers(replay, "Lions")[0],
+    )
+    RaceState.objects.filter(event=replay.event).update(
+        waiting_entry=final_step,
+        ended_round=Round.objects.get(group=lions, number=1),
+    )
     wolves = groups.add_partition(replay.event, "Wolves")
     spare = groups.add_subgroup(replay.event, lions.pk, "Spare")
     empty = groups.add_group(replay.event, "Empty")
@@ -203,6 +230,27 @@ def _writers(replay):
         "create_aggregate_group": lambda: groups.create_aggregate_group(
             replay.event.id, "Finals", [lions]
         ),
+        "delete_rounds": lambda: groups.delete_rounds(
+            replay.event.id, Round.objects.filter(pk=extra.pk)
+        ),
+        "delete_group_rows": lambda: groups.delete_group_rows(empty),
+        "reset_full_field": lambda: groups.reset_full_field(replay.event.id, [lions]),
+        "find_or_create_group": lambda: groups.find_or_create_group(
+            replay.event.id, "Bears"
+        ),
+        "find_or_create_subgroup": lambda: groups.find_or_create_subgroup(
+            lions, "Cubs"
+        ),
+        "clean_up_empty_groups_and_subgroups": lambda: (
+            groups.clean_up_empty_groups_and_subgroups(replay.event.id)
+        ),
+        "start_waiting_step": lambda: playlist.start_waiting_step(replay.event),
+        "skip_waiting_step": lambda: playlist.skip_waiting_step(
+            replay.event, lambda e, r: []
+        ),
+        "rebuild_waiting_round": lambda: playlist.rebuild_waiting_round(
+            replay.event, lambda e, r: racers(replay, "Lions")
+        ),
     }
 
 
@@ -229,6 +277,15 @@ WRITERS = [
     "order_subgroups",
     "order_partitions",
     "create_aggregate_group",
+    "delete_rounds",
+    "delete_group_rows",
+    "reset_full_field",
+    "find_or_create_group",
+    "find_or_create_subgroup",
+    "clean_up_empty_groups_and_subgroups",
+    "start_waiting_step",
+    "skip_waiting_step",
+    "rebuild_waiting_round",
 ]
 
 

@@ -20,6 +20,7 @@ from racing.services.playlist import (
     PlaylistFailure,
     rebuild_waiting_round,
     round_ended,
+    skip_waiting_step,
     start_playlist,
     start_waiting_step,
 )
@@ -346,3 +347,109 @@ def test_the_intermission_names_the_round_that_ended_when_a_raced_step_is_skippe
         now.waiting_entry.round_number == 2 and now.waiting_entry.group.name == "Outlaw"
     )
     assert now.ended_round == scouts
+
+
+def test_a_changed_result_leaves_a_waiting_round_of_another_group_alone():
+    """D27 rebuilds a final from the round that fed it. Outlaw round 1 waits
+    after the Scouts final, and no Scouts result picks its racers."""
+    replay = race_day(4, 8)
+    finalists_for = finalists_from_ladders(replay)
+    replay.ids.sync()
+    scouts = start_playlist(replay.event, finalists_for)
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    final = start_waiting_step(replay.event)
+    race(final)
+    round_ended(final, finalists_for)
+    outlaws = Round.objects.get(group__name="Outlaw", number=1)
+    assert state(replay).waiting_entry.group == outlaws.group
+    racers, heats = outlaws.roster.count(), chart(replay, outlaws)
+    assert not rebuild_waiting_round(replay.event, finalists_for)
+    assert (outlaws.roster.count(), chart(replay, outlaws)) == (racers, heats)
+    assert racers == 14 and heats
+
+
+def one_finalist(replay):
+    one = [replay.racer(car=108)]
+    return lambda entry, round: one
+
+
+def test_skipping_a_final_with_fewer_than_2_racers_tees_up_the_next_step():
+    """D28: the coordinator skips the final and the next step waits."""
+    replay, _ = two_step_playlist(waits=True, continue_racing=False)
+    finalists_for = one_finalist(replay)
+    scouts = start_playlist(replay.event, finalists_for)
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    outlaws = skip_waiting_step(replay.event, finalists_for)
+    now = state(replay)
+    assert outlaws.group.name == "Outlaw" and outlaws.number == 1
+    assert (now.waiting_entry.group, now.waiting_entry.round_number) == (
+        outlaws.group,
+        1,
+    )
+    assert now.ended_round == scouts and not now.racing
+    assert now.current_round == outlaws and now.current_heat == 1
+    assert start_waiting_step(replay.event) == outlaws and state(replay).racing
+
+
+def test_skipping_the_last_step_finishes_the_playlist():
+    replay, _ = two_step_playlist(waits=True, continue_racing=False)
+    PlaylistEntry.objects.filter(event=replay.event, seq__gt=2).delete()
+    finalists_for = one_finalist(replay)
+    scouts = start_playlist(replay.event, finalists_for)
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    assert skip_waiting_step(replay.event, finalists_for) is None
+    now = state(replay)
+    assert now.waiting_entry is None and now.ended_round is None
+    assert not now.racing
+
+
+def test_skipping_into_a_step_that_does_not_wait_starts_it():
+    replay, _ = two_step_playlist(waits=True, continue_racing=False)
+    PlaylistEntry.objects.filter(event=replay.event, seq=3).update(
+        waits_for_operator=False
+    )
+    finalists_for = one_finalist(replay)
+    scouts = start_playlist(replay.event, finalists_for)
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    outlaws = skip_waiting_step(replay.event, finalists_for)
+    now = state(replay)
+    assert now.waiting_entry is None and now.racing
+    assert now.current_round == outlaws
+
+
+def test_skip_waiting_step_without_an_intermission_fails():
+    replay = race_day(4, 8)
+    with pytest.raises(PlaylistFailure) as caught:
+        skip_waiting_step(replay.event, finalists_from_ladders(replay))
+    assert caught.value.code == Failure.NO_INTERMISSION
+
+
+@pytest.mark.parametrize(
+    "change, code",
+    [
+        ("runs", Failure.NO_RUNS),
+        ("lanes", Failure.NO_LANES),
+        ("masked", Failure.NO_LANES),
+    ],
+)
+def test_a_waiting_step_with_no_chart_says_why(change, code):
+    replay, finalists_for = two_step_playlist(waits=True, continue_racing=False)
+    scouts = start_playlist(replay.event, finalists_for)
+    if change == "runs":
+        PlaylistEntry.objects.filter(event=replay.event, seq=2).update(
+            n_times_per_lane=0
+        )
+    elif change == "lanes":
+        RaceSettings.objects.filter(event=replay.event).update(lane_count=0)
+    else:
+        RaceSettings.objects.filter(event=replay.event).update(unused_lane_mask=0b1111)
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    with pytest.raises(PlaylistFailure) as caught:
+        start_waiting_step(replay.event)
+    assert caught.value.code == code
+    assert state(replay).waiting_entry is not None

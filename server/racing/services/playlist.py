@@ -4,9 +4,10 @@ Ported from `website/inc/playlist.inc` and `website/ajax/action.playlist.start.i
 with the gate PHP lacks. When a round ends and the next playlist step waits
 for the operator, the next round is prepared and scheduled and its first
 heat selected, racing stays off, and the race state holds an intermission
-naming the waiting step and the round that ended. `start_waiting_step()` is
-the one call that ends the intermission and turns racing on. A step that
-does not wait behaves as PHP does.
+naming the waiting step and the round that ended. `start_waiting_step()`
+ends the intermission and turns racing on; `skip_waiting_step()` ends it
+by passing over the waiting step. A step that does not wait behaves as
+PHP does.
 
 #27 calls `round_ended` when its heat advance finds the round complete, and
 #34 calls `start_playlist` for `playlist.start`. Choosing finalists reads
@@ -22,7 +23,8 @@ from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
-from racing.models import HeatLane, PlaylistEntry, Round
+from racing.engine.scheduling.lanes import count_one_bits
+from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
 from racing.services.rounds import (
     make_new_round,
     prepare_new_round,
@@ -30,8 +32,7 @@ from racing.services.rounds import (
     write_roster,
 )
 from racing.services.schedule import ScheduleFailure, generate_schedule, unschedule
-from roster.models import Racer
-from roster.services.groups import HAS_RESULT
+from roster.models import GroupConstituent, Racer
 
 FinalistsFor = Callable[[PlaylistEntry, Round], Sequence[Racer]]
 """The racers of a step's round, in roster order, when it has no roster yet."""
@@ -42,6 +43,9 @@ PLAYLIST_SCENE_DELAY = timedelta(seconds=10)
 class Failure(StrEnum):
     NO_INTERMISSION = "no-intermission"
     NO_RACERS = "no_racers"
+    NO_LANES = "no-lanes"
+    NO_RUNS = "no-runs"
+    NO_HEATS = "no-heats"
 
 
 class PlaylistFailure(Exception):
@@ -119,18 +123,22 @@ def _next_entry(entry: PlaylistEntry) -> PlaylistEntry | None:
     )
 
 
+def _is_raced(entry: PlaylistEntry) -> bool:
+    round = _round_of(entry)
+    return (
+        round is not None
+        and HeatLane.objects.filter(round=round).exists()
+        and round_is_complete(round)
+    )
+
+
 def start_playlist(event, finalists_for: FinalistsFor) -> Round | None:
     """`playlist.start`: activate the first step whose round is not done,
     then turn racing on. An open intermission closes."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         for entry in PlaylistEntry.objects.filter(event=event).order_by("seq"):
-            round = _round_of(entry)
-            if (
-                round is None
-                or not HeatLane.objects.filter(round=round).exists()
-                or not round_is_complete(round)
-            ):
+            if not _is_raced(entry):
                 round = _activate(state, entry, finalists_for)
                 state.waiting_entry = None
                 state.ended_round = None
@@ -169,13 +177,8 @@ def _after_round(
     after = _next_entry(entry)
     waits = False
     if after is not None:
-        next_round = _round_of(after)
-        if (
-            next_round is not None
-            and HeatLane.objects.filter(round=next_round).exists()
-            and round_is_complete(next_round)
-        ):
-            _after_round(state, next_round, ended, finalists_for)
+        if _is_raced(after):
+            _after_round(state, _round_of(after), ended, finalists_for)
             return
         _activate(state, after, finalists_for)
         waits = after.waits_for_operator
@@ -192,8 +195,8 @@ def _after_round(
 def start_waiting_step(event) -> Round:
     """End the intermission and race the waiting step's round.
 
-    Fails with `no_racers` when the round has no heats, which is how a final
-    with fewer than 2 racers stays (D28); the intermission then stays open.
+    Fails when the round has no heats, naming why, and the intermission
+    stays open. A final with fewer than 2 racers is `no_racers` (D28).
     Applying the racing scene belongs to #27 and #34.
     """
     with transaction.atomic():
@@ -204,9 +207,7 @@ def start_waiting_step(event) -> Round:
             )
         round = _round_of(state.waiting_entry)
         if round is None or not HeatLane.objects.filter(round=round).exists():
-            raise PlaylistFailure(
-                Failure.NO_RACERS, "The final needs at least 2 racers."
-            )
+            raise _why_no_heats(state.waiting_entry, round)
         state.waiting_entry = None
         state.ended_round = None
         _select(state, round)
@@ -215,15 +216,88 @@ def start_waiting_step(event) -> Round:
         return round
 
 
-def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
-    """Owner decision D27: after a result in the ended round changes, make the
-    waiting round's roster and chart again, unless one of its heats has a
-    result. Returns whether it rebuilt them."""
+def _why_no_heats(entry: PlaylistEntry, round: Round | None) -> PlaylistFailure:
+    """The reason `_activate` made no chart for the step's round."""
+    settings = RaceSettings.objects.get(event_id=entry.event_id)
+    if settings.lane_count - count_one_bits(settings.unused_lane_mask) <= 0:
+        return PlaylistFailure(
+            Failure.NO_LANES, "Number of lanes hasn't been determined."
+        )
+    if entry.n_times_per_lane < 1:
+        return PlaylistFailure(
+            Failure.NO_RUNS,
+            "The step races each lane 0 times. Choose at least one run per lane.",
+        )
+    if (
+        round is None
+        or RosterEntry.objects.filter(
+            round=round, racer__passed_inspection=True
+        ).count()
+        < 2
+    ):
+        return PlaylistFailure(Failure.NO_RACERS, "The final needs at least 2 racers.")
+    return PlaylistFailure(
+        Failure.NO_HEATS,
+        "The round could not be scheduled with these settings. Schedule it"
+        " from the coordinator page, or skip it.",
+    )
+
+
+def skip_waiting_step(event, finalists_for: FinalistsFor) -> Round | None:
+    """End the intermission by passing over the waiting step (D28), and
+    prepare the next step whose round is not raced, as `round_ended` does.
+
+    If that step waits, the intermission moves to it and still names the
+    round that ended. If it does not wait, it starts with racing on. With no
+    step left the playlist is done and racing stays off. Returns the next
+    step's round, or None. The skipped round keeps its roster.
+    """
     with transaction.atomic():
         state = lock_race_state(event.id)
         if state.waiting_entry_id is None:
+            raise PlaylistFailure(
+                Failure.NO_INTERMISSION, "No playlist step is waiting."
+            )
+        after = _next_entry(state.waiting_entry)
+        while after is not None and _is_raced(after):
+            after = _next_entry(after)
+        round = None
+        if after is not None:
+            round = _activate(state, after, finalists_for)
+        if after is not None and after.waits_for_operator:
+            state.waiting_entry = after
+        else:
+            state.waiting_entry = None
+            state.ended_round = None
+            state.racing = False
+            if after is not None:
+                _racing_on(state)
+        state.save()
+        return round
+
+
+def _feeds(ended: Round, entry: PlaylistEntry) -> bool:
+    """Whether the step's round takes its racers from `ended`: a later round
+    of the same group, or an aggregate that draws from that group."""
+    if entry.group_id == ended.group_id:
+        return entry.round_number > ended.number
+    return GroupConstituent.objects.filter(
+        aggregate_id=entry.group_id, constituent_id=ended.group_id
+    ).exists()
+
+
+def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
+    """Owner decision D27: after a result in the ended round changes, make the
+    waiting round's roster and chart again, when the waiting round draws its
+    racers from the ended round and none of its heats has a result. Returns
+    whether it rebuilt them."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        if state.waiting_entry_id is None or state.ended_round_id is None:
             return False
         entry = state.waiting_entry
+        if not _feeds(state.ended_round, entry):
+            return False
         round = _round_of(entry)
         if round is not None:
             if HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists():

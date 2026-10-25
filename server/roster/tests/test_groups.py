@@ -379,3 +379,68 @@ def test_deleting_a_partition_keeps_another_partition_of_its_subgroup(replay):
     Racer.objects.filter(partition__name="Lions").delete()
     groups.delete_partition(partition(replay, "Lions"))
     assert partition(replay, "Tigers").subgroup == lions
+
+
+# ----- Review fixes (#101) --------------------------------------------------
+
+
+def test_rank_edit_gives_a_subgroup_with_no_partition_a_partitions_name(replay):
+    """PHP accepts this: no partition is renamed, so none can collide."""
+    with_dens(replay)
+    bears = groups.add_group(replay.event, "Bears")
+    cubs = groups.add_subgroup(replay.event, bears.pk, "Cubs")
+    groups.rename_subgroup(cubs, "Lions")
+    cubs.refresh_from_db()
+    assert cubs.name == "Lions"
+    assert partition(replay, "Lions").subgroup.group == group(replay, "Lions")
+
+
+def test_by_partition_folds_case_the_same_way_on_every_database(replay):
+    """Postgres's `lower()` folds `É`; SQLite's does not. Both make one
+    group."""
+    replay.import_racer("A", "Racer", "École")
+    replay.import_racer("B", "Racer", "école")
+    groups.form_groups_by_rule(replay.event, "by-partition")
+    (only,) = Group.objects.filter(event=replay.event)
+    assert only.name == "École"
+    assert set(
+        Partition.objects.filter(subgroup__group=only).values_list("name", flat=True)
+    ) == {"École", "école"}
+    assert set(Racer.objects.values_list("group", flat=True)) == {only.pk}
+
+
+def test_order_partitions_gives_a_group_its_lowest_partition_sort_order(replay):
+    """By partition, a group holding two partitions sorts by the first of
+    them, whatever their ids."""
+    with_dens(replay, dens=("Lions", "Tigers", "Bears"))
+    lions = group(replay, "Lions")
+    groups.move_partition(partition(replay, "Tigers"), GroupRef("classid", lions.pk))
+    groups.order_partitions(
+        replay.event,
+        [partition(replay, n) for n in ("Tigers", "Bears", "Lions")],
+    )
+    names = Group.objects.filter(event=replay.event).order_by("sort_order")
+    assert [g.name for g in names] == ["Lions", "Bears"]
+
+
+def test_deleting_a_partition_keeps_its_groups_other_partitions(replay):
+    """By partition, PHP deletes the group once no racer is in it, and its
+    other partitions with it."""
+    groups.add_partition(replay.event, "Wolves")
+    groups.add_partition(replay.event, "Cubs")
+    wolves = group(replay, "Wolves")
+    groups.move_partition(partition(replay, "Cubs"), GroupRef("classid", wolves.pk))
+    left = {"Wolves", "Wolves-Cubs"}  # the subgroup Cubs gets in Wolves
+    groups.delete_partition(partition(replay, "Cubs"))
+    assert (
+        set(
+            Partition.objects.filter(subgroup__group=wolves).values_list(
+                "name", flat=True
+            )
+        )
+        == left
+    )
+    for name in sorted(left):
+        assert Group.objects.filter(pk=wolves.pk).exists()
+        groups.delete_partition(partition(replay, name))
+    assert not Group.objects.filter(pk=wolves.pk).exists()

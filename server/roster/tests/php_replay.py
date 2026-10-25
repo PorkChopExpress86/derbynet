@@ -16,7 +16,7 @@ from urllib.parse import parse_qsl
 
 from core.models import RaceSettings
 from core.services import new_event
-from racing.models import HeatLane, RosterEntry, Round
+from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from racing.services.rounds import round_counts
 from racing.services.schedule import generate_schedule
 from roster.models import Group, Partition, Racer, Subgroup
@@ -420,7 +420,7 @@ def _count_rounds_with_results(event):
     counts = {}
     for group_id, _round_id in (
         HeatLane.objects.filter(event=event)
-        .filter(groups.HAS_RESULT)
+        .filter(HAS_RESULT)
         .values_list("round__group_id", "round_id")
         .distinct()
     ):

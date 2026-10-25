@@ -4,6 +4,10 @@ from django.utils import timezone
 
 from core.models import EventScoped, PerEvent
 
+HAS_RESULT = Q(finish_time__isnull=False) | Q(finish_place__isnull=False)
+"""A `HeatLane` that has a result (#20, Q11): a time or a place, whatever
+`completed` says."""
+
 
 class Round(EventScoped):
     """Legacy `Rounds`."""

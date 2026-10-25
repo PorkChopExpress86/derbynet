@@ -20,10 +20,9 @@ from django.db.models.functions import Lower
 
 from core.services import lock_race_state
 from racing.engine.groups.aggregates import Aggregate, ready_aggregates
-from racing.models import HeatLane, RosterEntry, Round
+from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from roster.models import Group, GroupConstituent, GroupConstituentSubgroup, Racer
 from roster.services.groups import (
-    HAS_RESULT,
     delete_group_rows,
     delete_rounds,
     is_aggregate,
@@ -34,6 +33,7 @@ from roster.services.groups import (
 class Failure(StrEnum):
     SCHEDULED = "scheduled"
     FIRST_ROUND = "first_round"
+    CONSTITUENT = "constituent"
 
 
 class RoundFailure(Exception):
@@ -76,10 +76,11 @@ def delete_round_roster(round: Round) -> None:
     """`roster.delete`: delete a round that has no heats, and its roster.
 
     Round 1 of an organic group stays. An aggregate group that is not
-    durable goes with its last round, along with its playlist steps. A
-    full-field rule that names a group goes when the group's last round
-    does. If the round is the current one, racing stops and no heat is
-    current.
+    durable goes with its last round, along with its playlist steps, unless
+    another aggregate draws from it; then the round stays and this fails
+    with `constituent`, as `class.delete` does. A full-field rule that names
+    a group goes when the group's last round does. If the round is the
+    current one, racing stops and no heat is current.
     """
     with transaction.atomic():
         lock_race_state(round.event_id)
@@ -93,11 +94,17 @@ def delete_round_roster(round: Round) -> None:
             raise RoundFailure(
                 Failure.FIRST_ROUND, "Can't remove a first round of an organic class."
             )
-        delete_rounds(round.event_id, Round.objects.filter(pk=round.pk))
         group = Group.objects.get(pk=round.group_id)
-        if not group.rounds.exists():
+        last = not group.rounds.exclude(pk=round.pk).exists()
+        goes = last and aggregate and not group.durable
+        if goes and GroupConstituent.objects.filter(constituent=group).exists():
+            raise RoundFailure(
+                Failure.CONSTITUENT, "Unable to delete a constituent class"
+            )
+        delete_rounds(round.event_id, Round.objects.filter(pk=round.pk))
+        if last:
             reset_full_field(round.event_id, [group])
-            if aggregate and not group.durable:
+            if goes:
                 delete_group_rows(group)
 
 

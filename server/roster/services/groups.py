@@ -21,13 +21,20 @@ from enum import StrEnum
 from typing import Final
 
 from django.db import connection, transaction
-from django.db.models import Count, Max, Q, Value
+from django.db.models import Count, Max, Min, Q, Value
 from django.db.models.functions import Lower
 
 from awards.models import Award, BallotAward
 from core.models import FullFieldRule, RaceSettings, RaceState
 from core.services import lock_race_state
-from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round, TimerStatus
+from racing.models import (
+    HAS_RESULT,
+    HeatLane,
+    PlaylistEntry,
+    RosterEntry,
+    Round,
+    TimerStatus,
+)
 from roster.models import (
     Group,
     GroupConstituent,
@@ -42,8 +49,6 @@ from roster.models import (
 NAME_WIDTH: Final = 75
 DEFAULT_PARTITION_NAME: Final = "Default"
 ONE_GROUP_NAME: Final = "All Racers"
-
-HAS_RESULT: Final = Q(finish_time__isnull=False) | Q(finish_place__isnull=False)
 
 
 class Rule(StrEnum):
@@ -148,6 +153,15 @@ def _fold(name: str) -> str:
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 
 
+def _group_key(name: str) -> str:
+    """The key two names share when they may not both name groups. The
+    constraint on group names uses the database's `lower()`, which folds
+    every letter on Postgres and only ASCII letters on SQLite. Python's
+    `lower()` folds every letter, so both databases make the same groups
+    and neither breaks the constraint."""
+    return name.lower()
+
+
 def _temporary_name() -> str:
     return f"(regrouping {uuid.uuid4().hex})"
 
@@ -233,26 +247,29 @@ def cancel_running_round(state: RaceState) -> None:
 def delete_rounds(event_id, rounds) -> None:
     """Delete rounds with their charts and rosters, and every reference the
     race state and the timer hold to them."""
-    round_ids = list(rounds.values_list("id", flat=True))
-    if not round_ids:
-        return
-    state = RaceState.objects.get(event_id=event_id)
-    if state.current_round_id in round_ids:
-        cancel_running_round(state)
-    timers = TimerStatus.objects.filter(event_id=event_id)
-    timers.filter(staged_round_id__in=round_ids).update(
-        staged_round=None, staged_heat=None
-    )
-    timers.filter(test_saved_round_id__in=round_ids).update(test_saved_round=None)
-    HeatLane.objects.filter(round_id__in=round_ids).delete()
-    RosterEntry.objects.filter(round_id__in=round_ids).delete()
-    Round.objects.filter(id__in=round_ids).delete()
+    with transaction.atomic():
+        state = lock_race_state(event_id)
+        round_ids = list(rounds.values_list("id", flat=True))
+        if not round_ids:
+            return
+        if state.current_round_id in round_ids:
+            cancel_running_round(state)
+        timers = TimerStatus.objects.filter(event_id=event_id)
+        timers.filter(staged_round_id__in=round_ids).update(
+            staged_round=None, staged_heat=None
+        )
+        timers.filter(test_saved_round_id__in=round_ids).update(test_saved_round=None)
+        HeatLane.objects.filter(round_id__in=round_ids).delete()
+        RosterEntry.objects.filter(round_id__in=round_ids).delete()
+        Round.objects.filter(id__in=round_ids).delete()
 
 
 def reset_full_field(event_id, groups) -> None:
-    RaceSettings.objects.filter(event_id=event_id, full_field_group__in=groups).update(
-        full_field_rule=FullFieldRule.STANDARD, full_field_group=None
-    )
+    with transaction.atomic():
+        lock_race_state(event_id)
+        RaceSettings.objects.filter(
+            event_id=event_id, full_field_group__in=groups
+        ).update(full_field_rule=FullFieldRule.STANDARD, full_field_group=None)
 
 
 def _delete_awards(awards) -> None:
@@ -274,16 +291,18 @@ def delete_group_rows(group: Group) -> None:
     """`delete_class()`: the group, its subgroups, rounds, awards, playlist
     steps and aggregate links. The caller has checked that no racer is in
     it."""
-    for subgroup in Subgroup.objects.filter(group=group).order_by("id"):
-        _delete_subgroup(subgroup)
-    delete_rounds(group.event_id, Round.objects.filter(group=group))
-    _delete_awards(Award.objects.filter(group=group))
-    PlaylistEntry.objects.filter(group=group).delete()
-    RaceState.objects.filter(event_id=group.event_id, current_group=group).update(
-        current_group=None
-    )
-    reset_full_field(group.event_id, [group])
-    group.delete()
+    with transaction.atomic():
+        lock_race_state(group.event_id)
+        for subgroup in Subgroup.objects.filter(group=group).order_by("id"):
+            _delete_subgroup(subgroup)
+        delete_rounds(group.event_id, Round.objects.filter(group=group))
+        _delete_awards(Award.objects.filter(group=group))
+        PlaylistEntry.objects.filter(group=group).delete()
+        RaceState.objects.filter(event_id=group.event_id, current_group=group).update(
+            current_group=None
+        )
+        reset_full_field(group.event_id, [group])
+        group.delete()
 
 
 def _create_partition(event_id, name: str, subgroup: Subgroup) -> Partition:
@@ -297,7 +316,7 @@ def _create_partition(event_id, name: str, subgroup: Subgroup) -> Partition:
     )
 
 
-def create_group(event_id, name: str, with_first_round: bool = True) -> Group:
+def _create_group(event_id, name: str, with_first_round: bool = True) -> Group:
     """`create_class()`. The caller trims and cuts the name."""
     if _group_name_taken(event_id, name):
         raise GroupFailure(Failure.ALREADY_EXISTS, f"A group named {name} exists.")
@@ -316,8 +335,10 @@ def create_group(event_id, name: str, with_first_round: bool = True) -> Group:
 def find_or_create_group(event_id, name: str, with_first_round: bool = True) -> Group:
     """`find_or_create_class()`: by name, ignoring case."""
     name = _cut(name)
-    found = _named(Group.objects.filter(event_id=event_id), name).first()
-    return found or create_group(event_id, name, with_first_round)
+    with transaction.atomic():
+        lock_race_state(event_id)
+        found = _named(Group.objects.filter(event_id=event_id), name).first()
+        return found or _create_group(event_id, name, with_first_round)
 
 
 def choose_unused_group_name(event_id, seed: str) -> str:
@@ -339,29 +360,32 @@ def find_or_create_subgroup(
     another subgroup, the new subgroup gets `<group>-<subgroup>` instead,
     plus `-1`, `-2`, ... until the name is free.
     """
-    name = _cut(name)
-    found = _named(Subgroup.objects.filter(group=group), name).first()
-    if found:
-        return found
-    top = Subgroup.objects.filter(group=group).aggregate(top=Max("sort_order"))["top"]
-    subgroup = Subgroup.objects.create(
-        event_id=group.event_id,
-        group=group,
-        name=name,
-        sort_order=1 if top is None else 1 + top,
-    )
-    if with_partition:
-        partition = find_or_create_partition(group.event_id, name)
-        if partition.subgroup_id != subgroup.id:
-            base = f"{group.name}-{name}"
-            candidate, n = base, 0
-            while Partition.objects.filter(
-                event_id=group.event_id, name=candidate
-            ).exists():
-                n += 1
-                candidate = f"{base}-{n}"
-            _create_partition(group.event_id, candidate, subgroup)
-    return subgroup
+    with transaction.atomic():
+        lock_race_state(group.event_id)
+        name = _cut(name)
+        found = _named(Subgroup.objects.filter(group=group), name).first()
+        if found:
+            return found
+        siblings = Subgroup.objects.filter(group=group)
+        top = siblings.aggregate(top=Max("sort_order"))["top"]
+        subgroup = Subgroup.objects.create(
+            event_id=group.event_id,
+            group=group,
+            name=name,
+            sort_order=1 if top is None else 1 + top,
+        )
+        if with_partition:
+            partition = find_or_create_partition(group.event_id, name)
+            if partition.subgroup_id != subgroup.id:
+                base = f"{group.name}-{name}"
+                candidate, n = base, 0
+                while Partition.objects.filter(
+                    event_id=group.event_id, name=candidate
+                ).exists():
+                    n += 1
+                    candidate = f"{base}-{n}"
+                _create_partition(group.event_id, candidate, subgroup)
+        return subgroup
 
 
 def find_or_create_partition(event_id, name: str) -> Partition:
@@ -395,39 +419,41 @@ def clean_up_empty_groups_and_subgroups(event_id) -> None:
     no aggregate draws from goes too. A subgroup or group that racers still
     name stays; PHP deletes it and leaves the racers pointing at nothing.
     """
-    unused = (
-        Subgroup.objects.filter(event_id=event_id, partitions__isnull=True)
-        .exclude(racers__isnull=False)
-        .order_by("id")
-    )
-    for subgroup in list(unused):
-        drawn_from = GroupConstituent.objects.filter(
-            constituent_id=subgroup.group_id
-        ).exists()
-        first = (
-            Subgroup.objects.filter(group_id=subgroup.group_id)
-            .order_by("id")
-            .values_list("id", flat=True)
-            .first()
-        )
-        if drawn_from and first == subgroup.id:
-            continue
-        _delete_subgroup(subgroup)
-
-    if _rule(event_id) != Rule.ONE_GROUP:
-        empty = (
-            Group.objects.filter(event_id=event_id, subgroups__isnull=True)
-            .exclude(aggregate_links__isnull=False)
-            .exclude(constituent_links__isnull=False)
-            .exclude(constituent_subgroup_links__isnull=False)
+    with transaction.atomic():
+        lock_race_state(event_id)
+        unused = (
+            Subgroup.objects.filter(event_id=event_id, partitions__isnull=True)
             .exclude(racers__isnull=False)
             .order_by("id")
         )
-        for group in list(empty):
-            delete_group_rows(group)
+        for subgroup in list(unused):
+            drawn_from = GroupConstituent.objects.filter(
+                constituent_id=subgroup.group_id
+            ).exists()
+            first = (
+                Subgroup.objects.filter(group_id=subgroup.group_id)
+                .order_by("id")
+                .values_list("id", flat=True)
+                .first()
+            )
+            if drawn_from and first == subgroup.id:
+                continue
+            _delete_subgroup(subgroup)
+
+        if _rule(event_id) != Rule.ONE_GROUP:
+            empty = (
+                Group.objects.filter(event_id=event_id, subgroups__isnull=True)
+                .exclude(aggregate_links__isnull=False)
+                .exclude(constituent_links__isnull=False)
+                .exclude(constituent_subgroup_links__isnull=False)
+                .exclude(racers__isnull=False)
+                .order_by("id")
+            )
+            for group in list(empty):
+                delete_group_rows(group)
 
 
-def reorder_partitions(event_id) -> None:
+def _reorder_partitions(event_id) -> None:
     """`reorder_partitions()`: number the partitions 1, 2, ... in the order
     of their groups, then of their subgroups."""
     ids = Partition.objects.filter(event_id=event_id).order_by(
@@ -438,8 +464,10 @@ def reorder_partitions(event_id) -> None:
 
 
 def _make_sort_orders_unique(rows, posted) -> None:
-    """When a post leaves rows sharing a sort order, number them all 1, 2,
-    ... by sort order, the posted rows first within one.
+    """When a post leaves rows sharing a sort order, renumber every row 1,
+    2, ... by sort order. Among rows that share one, the posted rows come
+    first: posting B, C over A=1, B=2, C=3 leaves B=1, A=1, C=2, which
+    becomes B, A, C.
 
     A post that names only some rows can do this. PHP's cleanup in
     `class.order` and `partition.order` fails (`class.order` binds a whole
@@ -558,15 +586,15 @@ def _form_by_partition(event_id) -> None:
     groups: dict[str, tuple[Group, str]] = {}
     for p in partitions:
         name = p.name[:NAME_WIDTH]
-        if _fold(name) not in groups:
+        if _group_key(name) not in groups:
             group = Group.objects.create(
                 event_id=event_id, name=_temporary_name(), sort_order=p.sort_order
             )
-            groups[_fold(name)] = (group, name)
+            groups[_group_key(name)] = (group, name)
     # PHP makes the subgroups and rounds with `INSERT ... SELECT ... FROM
     # Classes`, which SQLite reads through the class name index, so in name
     # order. Making them in that order gives them the ids PHP gives them.
-    by_name = sorted(groups.items())
+    by_name = sorted(groups.items(), key=lambda item: _fold(item[1][1]))
     subgroups = {
         key: Subgroup.objects.create(
             event_id=event_id, group=group, name=name, sort_order=1
@@ -574,7 +602,7 @@ def _form_by_partition(event_id) -> None:
         for key, (group, name) in by_name
     }
     for p in partitions:
-        key = _fold(p.name[:NAME_WIDTH])
+        key = _group_key(p.name[:NAME_WIDTH])
         Partition.objects.filter(pk=p.pk).update(subgroup=subgroups[key])
         Racer.objects.filter(partition=p).update(
             group=groups[key][0], subgroup=subgroups[key]
@@ -636,9 +664,11 @@ def rename_partition(partition: Partition, name: str) -> None:
 def delete_partition(partition: Partition) -> None:
     """`partition.delete`.
 
-    Its subgroup goes when no racer is left in it, and under `by-partition`
-    its group goes, with its rounds and its place in any aggregate, when no
-    racer is left in the group.
+    Its subgroup goes when no racer or partition is left in it, and under
+    `by-partition` its group goes, with its rounds and its place in any
+    aggregate, when no racer or partition is left in the group. PHP deletes
+    the group whenever no racer is left, and the group's other partitions
+    with it.
     """
     event_id = partition.event_id
     with transaction.atomic():
@@ -660,6 +690,7 @@ def delete_partition(partition: Partition) -> None:
         if (
             _rule(event_id) == Rule.BY_PARTITION
             and not Racer.objects.filter(group=group).exists()
+            and not Partition.objects.filter(subgroup__group=group).exists()
         ):
             GroupConstituent.objects.filter(constituent=group).delete()
             delete_group_rows(group)
@@ -706,7 +737,7 @@ def move_partition(
         racers.update(group=group, subgroup=subgroup)
         fill_in_missing_roster_entries(event_id)
         clean_up_empty_groups_and_subgroups(event_id)
-        reorder_partitions(event_id)
+        _reorder_partitions(event_id)
 
 
 def order_partitions(event, partitions: Sequence[Partition]) -> None:
@@ -721,18 +752,28 @@ def order_partitions(event, partitions: Sequence[Partition]) -> None:
         rule = _rule(event.id)
         if rule == Rule.ONE_GROUP:
             for subgroup in Subgroup.objects.filter(event=event):
-                _take_sort_order(subgroup, Partition.objects.filter(subgroup=subgroup))
+                first = (
+                    Partition.objects.filter(subgroup=subgroup)
+                    .order_by("id")
+                    .values_list("sort_order", flat=True)
+                    .first()
+                )
+                _take_sort_order(subgroup, first)
         elif rule == Rule.BY_PARTITION:
             for group in Group.objects.filter(event=event):
-                _take_sort_order(group, Partition.objects.filter(subgroup__group=group))
+                lowest = Partition.objects.filter(subgroup__group=group).aggregate(
+                    lowest=Min("sort_order")
+                )["lowest"]
+                _take_sort_order(group, lowest)
 
 
-def _take_sort_order(row, partitions) -> None:
-    """Give `row` the sort order of its first partition. A row with no
+def _take_sort_order(row, sort_order: int | None) -> None:
+    """A subgroup takes the sort order of its first partition by id, as PHP
+    does. A group takes the lowest of its partitions'; PHP takes whichever
+    its subquery reads first, which follows subgroup ids. A row with no
     partition keeps its own; PHP sets it to null."""
-    first = partitions.order_by("id").values_list("sort_order", flat=True).first()
-    if first is not None:
-        type(row).objects.filter(pk=row.pk).update(sort_order=first)
+    if sort_order is not None:
+        type(row).objects.filter(pk=row.pk).update(sort_order=sort_order)
 
 
 # ----- Groups -------------------------------------------------------------
@@ -749,7 +790,7 @@ def create_aggregate_group(
     `constituents`, or from `subgroups` and their groups."""
     with transaction.atomic():
         lock_race_state(event_id)
-        group = create_group(event_id, name, with_first_round=False)
+        group = _create_group(event_id, name, with_first_round=False)
         Group.objects.filter(pk=group.pk).update(durable=durable)
         group.durable = durable
         members: list[int] = []
@@ -789,7 +830,7 @@ def add_group(
                 event.id, name, constituents, subgroups, durable=True
             )
         else:
-            group = create_group(event.id, name)
+            group = _create_group(event.id, name)
             find_or_create_subgroup(group, name)
         if n_trophies is not KEEP:
             Group.objects.filter(pk=group.pk).update(n_trophies=n_trophies)
@@ -849,7 +890,7 @@ def order_groups(event, groups: Sequence[Group]) -> None:
         for position, group in enumerate(groups, 1):
             Group.objects.filter(pk=group.pk).update(sort_order=position)
         _make_sort_orders_unique(Group.objects.filter(event=event), groups)
-        reorder_partitions(event.id)
+        _reorder_partitions(event.id)
 
 
 # ----- Subgroups ----------------------------------------------------------
@@ -876,17 +917,19 @@ def add_subgroup(event, group_id: int, name: str) -> Subgroup:
 def rename_subgroup(subgroup: Subgroup, name: str, n_trophies=KEEP) -> None:
     """`rank.edit`: rename the subgroup and its partitions.
 
-    A name another partition holds is `name-taken`, and so is any name for a
-    subgroup with more than one partition, since they cannot share it. PHP
-    fails both with a database error after renaming the subgroup.
+    For a subgroup with partitions, a name another partition holds is
+    `name-taken`, and so is any name when it has more than one, since they
+    cannot share it. PHP fails both with a database error after renaming the
+    subgroup. A subgroup with no partition takes any name.
     """
     name = _cut(name)
     with transaction.atomic():
         lock_race_state(subgroup.event_id)
         partitions = Partition.objects.filter(subgroup=subgroup)
-        if (
-            partitions.count() > 1
-            or Partition.objects.filter(event_id=subgroup.event_id, name=name)
+        n = partitions.count()
+        if n > 1 or (
+            n == 1
+            and Partition.objects.filter(event_id=subgroup.event_id, name=name)
             .exclude(subgroup=subgroup)
             .exists()
         ):
@@ -927,7 +970,7 @@ def move_subgroup(subgroup: Subgroup, group: Group | None) -> None:
         subgroup = Subgroup.objects.get(pk=subgroup.pk)
         old_group_id = subgroup.group_id
         if group is None:
-            group = create_group(
+            group = _create_group(
                 event_id, choose_unused_group_name(event_id, subgroup.name)
             )
         n = Subgroup.objects.filter(group=group).count()
@@ -959,4 +1002,4 @@ def order_subgroups(event, subgroups: Sequence[Subgroup]) -> None:
             _make_sort_orders_unique(
                 Subgroup.objects.filter(group_id=group_id), subgroups
             )
-        reorder_partitions(event.id)
+        _reorder_partitions(event.id)
