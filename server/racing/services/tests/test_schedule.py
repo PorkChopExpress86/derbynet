@@ -286,12 +286,26 @@ def test_both_services_run_the_chart_change_hook(monkeypatch):
     assert seen == [round, round]
 
 
+@pytest.mark.parametrize("n_times", [0, -1])
+def test_fewer_than_one_run_per_lane_is_cant_fulfill_and_keeps_the_chart(n_times):
+    round, _ = new_round()
+    generate_schedule(round, 1)
+    before = chart_of(round)
+
+    failure = failure_of(lambda: generate_schedule(round, n_times))
+
+    assert failure.code == Failure.CANT_FULFILL
+    assert failure.description == "Choose at least one run per lane."
+    assert chart_of(round) == before
+
+
 @pytest.mark.parametrize("lanes", [4, 6, 8])
 def test_the_owner_race_day_schedules_every_round(lanes):
     """D11 and D12: Scouts round 1 and a top-4 final, then Outlaws round 1 and
     a top-8 final that a tie grows to 9, each scheduled through
     generate_schedule with its playlist step's runs per lane, as in
-    `capture/scenarios/06-race-day.sh`."""
+    `capture/scenarios/06-race-day.sh`. An exact top-8 final without the tie
+    fills 8 lanes with no byes."""
     scouts_1 = RoundFactory()
     event = scouts_1.event
     set_race(event, lane_count=lanes)
@@ -302,12 +316,15 @@ def test_the_owner_race_day_schedules_every_round(lanes):
     enter_racers(scouts_final, [scouts[i] for i in (7, 8, 9, 0)])
     outlaws_final = RoundFactory(event=event, group=outlaws_1.group, number=2)
     enter_racers(outlaws_final, [outlaws[i] for i in (10, 5, 11, 6, 0, 12, 7, 1, 2)])
+    untied_final = RoundFactory(event=event, group=outlaws_1.group, number=3)
+    enter_racers(untied_final, [outlaws[i] for i in (10, 5, 11, 6, 0, 12, 7, 1)])
 
     steps = [
         (scouts_1, 1, 10),
         (scouts_final, 2, 4),
         (outlaws_1, 1, 14),
         (outlaws_final, 2, 9),
+        (untied_final, 2, 8),
     ]
     for seq, (round, n_times, _) in enumerate(steps, start=1):
         PlaylistEntry.objects.create(

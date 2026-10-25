@@ -66,6 +66,7 @@ def ordered_cases(nlanes, keep):
     return [c for c in ORDERED if parse(c)[0] == nlanes and keep(c)]
 
 
+@pytest.mark.pr
 def test_the_grids_cover_what_the_ticket_names():
     for nlanes in LANE_COUNTS:
         car_counts = {parse(c)[1] for c in ordered_cases(nlanes, in_pr_grid)}

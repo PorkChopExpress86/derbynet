@@ -56,8 +56,9 @@ def rate_next_heat(prev_heat, n_prev_heats, next_heat, appearances):
 class ChoseAUsedHeat(RuntimeError):
     """No heat scored under 10000 and the last rough heat was already used.
 
-    PHP then appends a null heat and fails on the next step. No schedule the
-    tables give reaches it.
+    PHP then appends a null heat. On the last step it returns the schedule
+    with that trailing null. On an earlier step the next rating fails on the
+    null previous heat. No schedule the tables give reaches it.
     """
 
 
