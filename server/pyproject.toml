@@ -30,4 +30,8 @@ select = ["E", "F", "W", "I", "UP", "B", "DJ"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "derbynet.settings"
 testpaths = ["tests", "core", "roster", "racing", "awards", "kiosks", "accounts", "legacy_api", "transfer"]
-addopts = "--strict-markers"
+addopts = "--strict-markers -m 'not full'"
+markers = [
+    "pr: schedule parity cases run on every pull request",
+    "full: the whole schedule parity sweep; run with -m full",
+]
