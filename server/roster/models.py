@@ -132,6 +132,9 @@ class Partition(EventScoped):
         Subgroup, on_delete=models.PROTECT, related_name="partitions"
     )
     sort_order = models.IntegerField()
+    # Award scope (D34): off leaves the partition's racers out of the pack's
+    # speed awards, such as fastest in the pack, but not their own group's.
+    counts_for_all_partition_awards = models.BooleanField(default=True)
 
     class Meta:
         constraints = [
@@ -171,7 +174,10 @@ class Racer(EventScoped):
     headshot = models.CharField(max_length=255, blank=True, default="")
     car_photo = models.CharField(max_length=255, blank=True, default="")
     note = models.CharField(max_length=255, blank=True, default="")
+    # The two award settings (D33). `exclude` is the legacy name of "not
+    # eligible for any award", speed and judged awards alike.
     exclude = models.BooleanField(default=False)
+    not_eligible_for_speed_awards = models.BooleanField(default=False)
 
     class Meta:
         constraints = [

@@ -13,3 +13,12 @@ def php_round(x: float) -> int:
     if abs(x) - whole >= 0.5:
         whole += 1
     return int(math.copysign(whole, x))
+
+
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def ascii_fold(name: str) -> str:
+    """A sort key that compares as SQLite's `COLLATE NOCASE`, which folds
+    ASCII letters only. `str.lower()` would also fold `É`."""
+    return name.translate(_ASCII_LOWER)

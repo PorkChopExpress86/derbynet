@@ -2,27 +2,37 @@
 counts the coordinator page shows.
 
 Ported from `make_new_round` and `write_roster_entries` in
-`website/inc/roster.inc`, `prepare_new_round` in
+`website/inc/roster.inc`, `prepare_new_round` and the rest of
 `website/ajax/action.roster.new.inc`, `website/ajax/action.roster.delete.inc`,
 `maybe_clean_up_aggregate_class_for_round` in `website/inc/aggregate_round.inc`
-and `all_rounds_with_counts` in `website/inc/rounds.inc`. Choosing finalists
-reads the standings, so it belongs to #26; `write_roster` takes them as
-input. Writers take the `RaceState` lock first, as `generate_schedule`
+and `all_rounds_with_counts` in `website/inc/rounds.inc`. `new_round_roster`
+and `playlist_finalists` choose a new round's racers from the standings
+(#26). Writers take the `RaceState` lock first, as `generate_schedule`
 needs.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 from django.db import transaction
 from django.db.models.functions import Lower
 
+from core.models import FullFieldRule, RaceSettings
 from core.services import lock_race_state
 from racing.engine.groups.aggregates import Aggregate, ready_aggregates
-from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
-from roster.models import Group, GroupConstituent, GroupConstituentSubgroup, Racer
+from racing.engine.standings import finalists
+from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
+from racing.services.standings import standings_snapshot
+from roster.models import (
+    Group,
+    GroupConstituent,
+    GroupConstituentSubgroup,
+    Racer,
+    Subgroup,
+)
 from roster.services.groups import (
+    create_aggregate_group,
     delete_group_rows,
     delete_rounds,
     is_aggregate,
@@ -34,6 +44,7 @@ class Failure(StrEnum):
     SCHEDULED = "scheduled"
     FIRST_ROUND = "first_round"
     CONSTITUENT = "constituent"
+    NO_RACERS = "no_racers"
 
 
 class RoundFailure(Exception):
@@ -70,6 +81,148 @@ def write_roster(round: Round, finalists: Iterable[Racer]) -> None:
             RosterEntry(event_id=round.event_id, round=round, racer=racer)
             for racer in finalists
         )
+
+
+@dataclass(frozen=True)
+class FollowOn:
+    """The next round of the group that raced `round`."""
+
+    round: Round
+
+
+@dataclass(frozen=True)
+class FromAggregate:
+    """Round 1 of an existing aggregate group."""
+
+    group: Group
+
+
+@dataclass(frozen=True)
+class NewAggregate:
+    """Round 1 of a new aggregate group, which also decides the pack's
+    awards from then on, as PHP assumes it is the grand final. It draws
+    from `subgroups` when any are given, else from `groups`."""
+
+    name: str
+    groups: Sequence[Group] = ()
+    subgroups: Sequence[Subgroup] = ()
+
+
+RosterSource = FollowOn | FromAggregate | NewAggregate
+
+
+@dataclass(frozen=True)
+class NewRoster:
+    round: Round
+    qualifiers: tuple[finalists.Finalist, ...]
+    extras: tuple[Racer, ...]
+    concerns: tuple[str, ...]
+
+
+def new_round_roster(
+    source: RosterSource,
+    top: int,
+    bucketed: bool = False,
+    extras: Sequence[Racer] = (),
+) -> NewRoster:
+    """`roster.new`: make the round, or clear the roster of the one that
+    exists, and enter the racers the standings qualify, then `extras`.
+
+    `top` is how many racers to take, or with `bucketed` how many from each
+    group or subgroup the round draws from; a tie at the cut takes more.
+    Extras are racers the race coordinator allowed in (D32). They follow the
+    qualifiers and never take a qualifier's place, so a rebuild that passes
+    the same extras keeps them. Fails with `no_racers`, and changes nothing,
+    when the roster would be empty.
+    """
+    event_id = (
+        source.round.event_id if isinstance(source, FollowOn) else _event_of(source)
+    )
+    with transaction.atomic():
+        lock_race_state(event_id)
+        if isinstance(source, FollowOn):
+            group = source.round.group
+            round = prepare_new_round(group, source.round.number + 1)
+            choose = finalists.follow_on
+        else:
+            if isinstance(source, NewAggregate):
+                group = _new_aggregate(event_id, source)
+            else:
+                group = source.group
+            round = prepare_new_round(group, 1)
+            choose = finalists.for_aggregate
+        standings = standings_snapshot(round.event).standings
+        cut = choose(standings, group.id, bucketed=bucketed, limit=top)
+        qualifiers = _unique(cut.finalists)
+        by_id = Racer.objects.in_bulk([f.racer_id for f in qualifiers])
+        chosen = {f.racer_id for f in qualifiers}
+        added = tuple(_unique_racers(r for r in extras if r.pk not in chosen))
+        roster = [by_id[f.racer_id] for f in qualifiers] + list(added)
+        if not roster:
+            raise RoundFailure(Failure.NO_RACERS, "No eligible racers found.")
+        write_roster(round, roster)
+        return NewRoster(round, qualifiers, added, cut.concerns)
+
+
+def _event_of(source: FromAggregate | NewAggregate) -> int:
+    if isinstance(source, FromAggregate):
+        return source.group.event_id
+    members = [*source.groups, *source.subgroups]
+    return members[0].event_id
+
+
+def _new_aggregate(event_id, source: NewAggregate) -> Group:
+    """`create_aggregate_class()`, then `full-field-calc` set to it."""
+    group = create_aggregate_group(
+        event_id, source.name, source.groups, source.subgroups
+    )
+    RaceSettings.objects.filter(event_id=event_id).update(
+        full_field_rule=FullFieldRule.GROUP, full_field_group=group
+    )
+    return group
+
+
+def _unique(cut: Iterable[finalists.Finalist]) -> tuple[finalists.Finalist, ...]:
+    """The first place of each racer. A racer can qualify from two of the
+    groups an aggregate draws from; PHP would enter the racer twice."""
+    seen: dict[int, finalists.Finalist] = {}
+    for finalist in cut:
+        seen.setdefault(finalist.racer_id, finalist)
+    return tuple(seen.values())
+
+
+def _unique_racers(racers: Iterable[Racer]) -> list[Racer]:
+    return list({r.pk: r for r in racers}.values())
+
+
+def playlist_finalists(extras: Sequence[Racer] = ()):
+    """The playlist's `FinalistsFor`: the racers of a step's round, as
+    `activate_playlist_entry()` chooses them, then `extras` (D32).
+
+    Round 1 of a group is an aggregate's first round; any later round
+    follows on from the group's own standings. The step's `bucket_limit`
+    and `bucketed` set the cut.
+    """
+
+    def finalists_for(entry: PlaylistEntry, round: Round) -> list[Racer]:
+        standings = standings_snapshot(round.event).standings
+        choose = (
+            finalists.for_aggregate if entry.round_number == 1 else finalists.follow_on
+        )
+        cut = choose(
+            standings,
+            entry.group_id,
+            bucketed=entry.bucketed,
+            limit=entry.bucket_limit,
+        )
+        qualifiers = _unique(cut.finalists)
+        by_id = Racer.objects.in_bulk([f.racer_id for f in qualifiers])
+        chosen = {f.racer_id for f in qualifiers}
+        return [by_id[f.racer_id] for f in qualifiers] + _unique_racers(
+            r for r in extras if r.pk not in chosen
+        )
+
+    return finalists_for
 
 
 def delete_round_roster(round: Round) -> None:
