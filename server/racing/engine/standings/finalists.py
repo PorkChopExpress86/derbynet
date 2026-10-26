@@ -58,7 +58,10 @@ def from_keys(
                 continue
             bucket = buckets[keys.index(key) if bucketed else 0]
             score = row.summary.score
-            if len(bucket) < limit or (bucket and bucket[-1].score >= score):
+            # PHP reads an empty bucket's last score as null, and null >= 0.0
+            # holds, so even a top 0 takes a racer who scores 0.0.
+            tied = bucket[-1].score >= score if bucket else score == 0
+            if len(bucket) < limit or tied:
                 bucket.append(Finalist(row.racer.id, score))
             break
 
