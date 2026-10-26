@@ -63,9 +63,15 @@ uv run python -m timeit -n 3 -r 3 -s 'from racing.engine.scheduling.ordered impo
 
 `roster/services/groups.py` holds the partition, group (legacy class) and subgroup (legacy rank) services behind `action.partition.*`, `action.class.*` and `action.rank.*`, and `form_groups_by_rule(event, rule)` for the three group formation rules. `racing/services/rounds.py` holds `prepare_new_round`, `write_roster(round, finalists)`, `delete_round_roster`, `round_counts` and `ready_aggregate_groups`. `racing/services/playlist.py` runs the playlist: `start_playlist`, `round_ended`, and the operator gate. When a round ends and the next step has `waits_for_operator`, the next round is scheduled and selected, racing stays off, and `RaceState.waiting_entry` and `ended_round` hold the intermission until `start_waiting_step(event)` starts it or `skip_waiting_step(event, finalists_for)` passes over it to the next step (D28). `rebuild_waiting_round` makes a waiting round's roster and chart again after a result in the round that feeds it changes (D27). A domain failure raises `GroupFailure`, `RoundFailure` or `PlaylistFailure` with PHP's code. Every service that changes a roster takes the `RaceState` lock first, as `generate_schedule` needs.
 
+Owner decision D31 sets two rules where PHP behaves otherwise.
+
+- A real rule change deletes every round, chart, aggregate link, group award and playlist step, and is refused with `results-exist` once any heat has a result. Applying the rule already in force writes nothing and succeeds, even once results exist.
+- Partition names are unique per event with case ignored. Adding or renaming a partition to a name that matches another partition in any case is refused with `name-taken` (an exact match on `partition.add` keeps PHP's `already-exists`). `find_or_create_partition` returns the partition that matches, so a racer imported with `LIONS` joins `Lions`. The services compare `Partition.name_key`, Python's `casefold()`, because SQLite's `lower()` folds only ASCII letters. The importer renames a legacy partition that matches an earlier one in any case.
+If the waiting round has no racers in its roster, because its roster was deleted during the intermission, `start_waiting_step` says so instead of D28's "The final needs at least 2 racers."
+
 The finalists of a follow-on or aggregate round come from the standings (#26), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
 
-`roster/tests/test_group_scenarios.py` and `racing/tests/test_round_scenarios.py` replay the group and round scripts of the shell suite through these services, using `roster/tests/php_replay.py`, and compare the state with what PHP recorded.
+`roster/tests/test_group_scenarios.py` and `racing/tests/test_round_scenarios.py` replay the group and round scripts of the shell suite through these services, using `roster/tests/php_replay.py`, and compare the state with what PHP recorded. PHP rebuilds the groups, with new ids, when a script applies the rule in force, so the replay checks that Django changes nothing and then rebuilds them itself, so later requests find the rows they name.
 
 ## Inspect an event
 
