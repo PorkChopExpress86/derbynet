@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<snapshot><![CDATA[
+[
+  {
+    "table": "Classes",
+    "high-water": 1,
+    "rows": [
+      {
+        "classid": 1,
+        "class": "Snapshot",
+        "sortorder": 1,
+        "constituents": "",
+        "durable": null,
+        "rankids": ""
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "Ranks",
+    "high-water": 1,
+    "rows": [
+      {
+        "rankid": 1,
+        "rank": "Snapshot",
+        "classid": 1,
+        "sortorder": 1
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "RegistrationInfo",
+    "high-water": 2,
+    "rows": [
+      {
+        "racerid": 1,
+        "carnumber": 401,
+        "carname": "",
+        "lastname": "Gray",
+        "firstname": "Ida",
+        "classid": 1,
+        "rankid": 1,
+        "passedinspection": 1,
+        "imagefile": null,
+        "exclude": 0,
+        "carphoto": null,
+        "partitionid": 1
+      },
+      {
+        "racerid": 2,
+        "carnumber": 402,
+        "carname": "",
+        "lastname": "Hart",
+        "firstname": "Jo",
+        "classid": 1,
+        "rankid": 1,
+        "passedinspection": 1,
+        "imagefile": null,
+        "exclude": 0,
+        "carphoto": null,
+        "partitionid": 1
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "Rounds",
+    "high-water": 1,
+    "rows": [
+      {
+        "roundid": 1,
+        "round": 1,
+        "classid": 1,
+        "charttype": null,
+        "phase": null
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "AwardTypes",
+    "high-water": 6,
+    "rows": [
+      {
+        "awardtypeid": 1,
+        "awardtype": "Design General"
+      },
+      {
+        "awardtypeid": 2,
+        "awardtype": "Speed General"
+      },
+      {
+        "awardtypeid": 3,
+        "awardtype": "Other"
+      },
+      {
+        "awardtypeid": 4,
+        "awardtype": "Design Trophy"
+      },
+      {
+        "awardtypeid": 5,
+        "awardtype": "Speed Trophy"
+      },
+      {
+        "awardtypeid": 6,
+        "awardtype": "Ad Hoc"
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "Awards",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  },
+  {
+    "table": "Roster",
+    "high-water": 2,
+    "rows": [
+      {
+        "rosterid": 1,
+        "roundid": 1,
+        "classid": 1,
+        "racerid": 1,
+        "finalist": 0,
+        "grandfinalist": 0
+      },
+      {
+        "rosterid": 2,
+        "roundid": 1,
+        "classid": 1,
+        "racerid": 2,
+        "finalist": 0,
+        "grandfinalist": 0
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "RaceChart",
+    "high-water": 4,
+    "rows": [
+      {
+        "resultid": 1,
+        "classid": 1,
+        "roundid": 1,
+        "heat": 1,
+        "lane": 1,
+        "racerid": 1,
+        "chartnumber": null,
+        "finishtime": 3,
+        "finishplace": 1,
+        "points": null,
+        "completed": "2026-01-01 12:00:00",
+        "ignoretime": 0,
+        "masterheat": 1
+      },
+      {
+        "resultid": 2,
+        "classid": 1,
+        "roundid": 1,
+        "heat": 1,
+        "lane": 2,
+        "racerid": 2,
+        "chartnumber": null,
+        "finishtime": 3.3,
+        "finishplace": 2,
+        "points": null,
+        "completed": "2026-01-01 12:00:00",
+        "ignoretime": 0,
+        "masterheat": 1
+      },
+      {
+        "resultid": 3,
+        "classid": 1,
+        "roundid": 1,
+        "heat": 2,
+        "lane": 1,
+        "racerid": 2,
+        "chartnumber": null,
+        "finishtime": 3.2,
+        "finishplace": 1,
+        "points": null,
+        "completed": "2026-01-01 12:00:00",
+        "ignoretime": 0,
+        "masterheat": 2
+      },
+      {
+        "resultid": 4,
+        "classid": 1,
+        "roundid": 1,
+        "heat": 2,
+        "lane": 2,
+        "racerid": 1,
+        "chartnumber": null,
+        "finishtime": 3.8,
+        "finishplace": 2,
+        "points": null,
+        "completed": "2026-01-01 12:00:00",
+        "ignoretime": 0,
+        "masterheat": 2
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "RaceInfo",
+    "high-water": 22,
+    "rows": [
+      {
+        "raceinfoid": 1,
+        "itemkey": "schema",
+        "itemvalue": "10"
+      },
+      {
+        "raceinfoid": 2,
+        "itemkey": "photos-on-now-racing",
+        "itemvalue": "head"
+      },
+      {
+        "raceinfoid": 3,
+        "itemkey": "show-cars-on-deck",
+        "itemvalue": "1"
+      },
+      {
+        "raceinfoid": 4,
+        "itemkey": "show-racer-photos-rr",
+        "itemvalue": "1"
+      },
+      {
+        "raceinfoid": 5,
+        "itemkey": "show-car-photos-rr",
+        "itemvalue": "1"
+      },
+      {
+        "raceinfoid": 6,
+        "itemkey": "upload-videos",
+        "itemvalue": "1"
+      },
+      {
+        "raceinfoid": 7,
+        "itemkey": "photo-directory",
+        "itemvalue": "/var/lib/derbynet/2026/testdb/racers"
+      },
+      {
+        "raceinfoid": 8,
+        "itemkey": "car-photo-directory",
+        "itemvalue": "/var/lib/derbynet/2026/testdb/cars"
+      },
+      {
+        "raceinfoid": 9,
+        "itemkey": "video-directory",
+        "itemvalue": "/var/lib/derbynet/2026/testdb/videos"
+      },
+      {
+        "raceinfoid": 10,
+        "itemkey": "logs-directory",
+        "itemvalue": "/var/lib/derbynet/2026/testdb/logs"
+      },
+      {
+        "raceinfoid": 11,
+        "itemkey": "lane_count",
+        "itemvalue": "2"
+      },
+      {
+        "raceinfoid": 12,
+        "itemkey": "unused-lane-mask",
+        "itemvalue": "0"
+      },
+      {
+        "raceinfoid": 13,
+        "itemkey": "NowRacingState",
+        "itemvalue": "0"
+      },
+      {
+        "raceinfoid": 14,
+        "itemkey": "refused-results",
+        "itemvalue": "0"
+      },
+      {
+        "raceinfoid": 15,
+        "itemkey": "RoundID",
+        "itemvalue": "1"
+      },
+      {
+        "raceinfoid": 16,
+        "itemkey": "Heat",
+        "itemvalue": "2"
+      },
+      {
+        "raceinfoid": 17,
+        "itemkey": "ClassID",
+        "itemvalue": "1"
+      },
+      {
+        "raceinfoid": 18,
+        "itemkey": "remote-start-go",
+        "itemvalue": "0"
+      },
+      {
+        "raceinfoid": 20,
+        "itemkey": "last_heat",
+        "itemvalue": "1#2"
+      },
+      {
+        "raceinfoid": 21,
+        "itemkey": "timer_current",
+        "itemvalue": ""
+      },
+      {
+        "raceinfoid": 22,
+        "itemkey": "drop-slowest",
+        "itemvalue": "1"
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "SceneKiosk",
+    "high-water": 14,
+    "rows": [
+      {
+        "scenekioskid": 1,
+        "sceneid": 1,
+        "kiosk_name": "Main",
+        "page": "kiosks/welcome.kiosk"
+      },
+      {
+        "scenekioskid": 2,
+        "sceneid": 2,
+        "kiosk_name": "Main",
+        "page": "kiosks/flag.kiosk"
+      },
+      {
+        "scenekioskid": 3,
+        "sceneid": 2,
+        "kiosk_name": "Aux1",
+        "page": "kiosks/flag.kiosk"
+      },
+      {
+        "scenekioskid": 4,
+        "sceneid": 2,
+        "kiosk_name": "Aux2",
+        "page": "kiosks/flag.kiosk"
+      },
+      {
+        "scenekioskid": 5,
+        "sceneid": 3,
+        "kiosk_name": "Main",
+        "page": "kiosks/slideshow.kiosk"
+      },
+      {
+        "scenekioskid": 6,
+        "sceneid": 3,
+        "kiosk_name": "Aux1",
+        "page": "kiosks/please-check-in.kiosk"
+      },
+      {
+        "scenekioskid": 7,
+        "sceneid": 3,
+        "kiosk_name": "Aux2",
+        "page": "kiosks/welcome.kiosk"
+      },
+      {
+        "scenekioskid": 8,
+        "sceneid": 4,
+        "kiosk_name": "Main",
+        "page": "kiosks/now-racing.kiosk"
+      },
+      {
+        "scenekioskid": 9,
+        "sceneid": 4,
+        "kiosk_name": "Aux1",
+        "page": "kiosks/ondeck.kiosk"
+      },
+      {
+        "scenekioskid": 10,
+        "sceneid": 4,
+        "kiosk_name": "Aux2",
+        "page": "kiosks/results-by-racer.kiosk"
+      },
+      {
+        "scenekioskid": 11,
+        "sceneid": 5,
+        "kiosk_name": "Main",
+        "page": "kiosks/award-presentations.kiosk"
+      },
+      {
+        "scenekioskid": 12,
+        "sceneid": 6,
+        "kiosk_name": "Main",
+        "page": "kiosks/standings.kiosk"
+      },
+      {
+        "scenekioskid": 13,
+        "sceneid": 6,
+        "kiosk_name": "Aux1",
+        "page": "kiosks/derbynet.kiosk"
+      },
+      {
+        "scenekioskid": 14,
+        "sceneid": 6,
+        "kiosk_name": "Aux2",
+        "page": "local/kiosks/feedback.kiosk"
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "Scenes",
+    "high-water": 6,
+    "rows": [
+      {
+        "sceneid": 1,
+        "name": "Welcome",
+        "sortorder": 1
+      },
+      {
+        "sceneid": 2,
+        "name": "Opening",
+        "sortorder": 2
+      },
+      {
+        "sceneid": 3,
+        "name": "Check-In",
+        "sortorder": 3
+      },
+      {
+        "sceneid": 4,
+        "name": "Racing",
+        "sortorder": 4
+      },
+      {
+        "sceneid": 5,
+        "name": "Awards",
+        "sortorder": 5
+      },
+      {
+        "sceneid": 6,
+        "name": "Wrap-Up",
+        "sortorder": 6
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "Playlist",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  },
+  {
+    "table": "BallotAwards",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  },
+  {
+    "table": "Voters",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  },
+  {
+    "table": "Votes",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  },
+  {
+    "table": "Partitions",
+    "high-water": 1,
+    "rows": [
+      {
+        "partitionid": 1,
+        "name": "Snapshot",
+        "rankid": 1,
+        "sortorder": 1
+      }
+    ],
+    "missing": []
+  },
+  {
+    "table": "ConstituentClasses",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  },
+  {
+    "table": "Events",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  },
+  {
+    "table": "EventLaneDetails",
+    "high-water": 0,
+    "rows": [],
+    "missing": []
+  }
+]
+]]></snapshot>
