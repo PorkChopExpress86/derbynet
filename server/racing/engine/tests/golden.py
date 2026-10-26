@@ -63,9 +63,13 @@ def rotation_manifest() -> dict[str, str]:
 
 
 def read_cases(path: Path) -> dict[str, dict]:
-    """Records from a file `write_cases()` made, with `heats` back in place."""
+    """Records from a file `write_cases()` made, with `heats` back in place,
+    or from one `write_json_lines()` made, as they are."""
     cases = {}
     for case_id, item in json.loads(path.read_text()).items():
+        if "meta" not in item:
+            cases[case_id] = item
+            continue
         record = dict(item["meta"])
         if "heats" in item:
             record["heats"] = item["heats"]
