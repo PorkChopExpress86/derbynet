@@ -41,7 +41,14 @@ def _count_one_more(result, standings, *_args):
 
 
 def _drop_last_finalist(cut, *args):
-    return replace(cut, finalists=cut.finalists[:-1]) if cut.finalists else cut
+    for i in reversed(range(len(cut.buckets))):
+        bucket = cut.buckets[i]
+        if bucket.finalists:
+            shorter = replace(bucket, finalists=bucket.finalists[:-1])
+            return replace(
+                cut, buckets=(*cut.buckets[:i], shorter, *cut.buckets[i + 1 :])
+            )
+    return cut
 
 
 def _drop_tie_awards(current, key, *args):

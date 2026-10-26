@@ -21,6 +21,8 @@ from django.utils import timezone  # noqa: E402
 
 from core.models import RaceSettings  # noqa: E402
 from core.services import new_event  # noqa: E402
+from racing.engine.standings.oracle import Standings  # noqa: E402
+from racing.engine.standings.speed_awards import speed_awards  # noqa: E402
 from racing.models import HeatLane, Round  # noqa: E402
 from racing.services import standings  # noqa: E402
 from roster.models import Racer, Subgroup  # noqa: E402
@@ -87,22 +89,23 @@ def timed(call, runs=20):
     return statistics.median(seconds) * 1000, min(seconds) * 1000
 
 
-def cold(event):
-    standings._cache.clear()
-    snapshot = standings.standings_snapshot(event)
-    return snapshot.speed_awards
-
-
-def warm(event):
-    return standings.standings_snapshot(event).speed_awards
-
-
 def main():
     event = build_event()
-    awards = cold(event)
-    print(f"{len(awards.awards)} speed awards")
-    for name, call in (("computed", cold), ("cached", warm)):
-        median, best = timed(lambda call=call: call(event))
+    inputs = standings._read(event)
+    snapshot = standings.standings_snapshot(event)
+    print(f"{len(snapshot.speed_awards.awards)} speed awards")
+    for name, call in (
+        (
+            "snapshot and speed awards",
+            lambda: standings.standings_snapshot(event).speed_awards,
+        ),
+        ("reading the rows", lambda: standings._read(event)),
+        (
+            "computing from rows read once",
+            lambda: speed_awards(Standings(inputs.event), inputs.trophies),
+        ),
+    ):
+        median, best = timed(call)
         print(f"{name}: median {median:.1f} ms, best {best:.1f} ms")
 
 

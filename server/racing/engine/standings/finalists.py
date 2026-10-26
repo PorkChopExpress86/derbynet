@@ -29,12 +29,45 @@ class Finalist:
 
 
 @dataclass(frozen=True)
+class Bucket:
+    name: str
+    finalists: tuple[Finalist, ...]
+
+
+@dataclass(frozen=True)
 class Cut:
     """The finalists, bucket by bucket and best first within a bucket, and a
     concern for each bucket that holds fewer than `limit` racers."""
 
-    finalists: tuple[Finalist, ...]
-    concerns: tuple[str, ...]
+    buckets: tuple[Bucket, ...]
+    limit: int
+
+    @property
+    def finalists(self) -> tuple[Finalist, ...]:
+        return tuple(f for bucket in self.buckets for f in bucket.finalists)
+
+    @property
+    def concerns(self) -> tuple[str, ...]:
+        concerns = []
+        for bucket in self.buckets:
+            n = len(bucket.finalists)
+            if n == 0:
+                concerns.append(f"There are no eligible {bucket.name} racer(s).")
+            elif n < self.limit:
+                concerns.append(f"There are only {n} eligible {bucket.name} racer(s).")
+        return tuple(concerns)
+
+    def unique(self) -> Cut:
+        """Each racer in the first bucket that took them only. A racer can
+        qualify from two of the groups an aggregate draws from, and PHP
+        would enter the racer twice and count the racer in both buckets."""
+        seen: set[int] = set()
+        buckets = []
+        for bucket in self.buckets:
+            kept = tuple(f for f in bucket.finalists if f.racer_id not in seen)
+            seen |= {f.racer_id for f in kept}
+            buckets.append(Bucket(bucket.name, kept))
+        return Cut(tuple(buckets), self.limit)
 
 
 def from_keys(
@@ -65,18 +98,12 @@ def from_keys(
                 bucket.append(Finalist(row.racer.id, score))
             break
 
-    concerns = []
-    for bucket, name in zip(buckets, names, strict=True):
-        if len(bucket) < limit:
-            if not bucket:
-                concerns.append(f"There are no eligible {name} racer(s).")
-            else:
-                concerns.append(
-                    f"There are only {len(bucket)} eligible {name} racer(s)."
-                )
     return Cut(
-        finalists=tuple(f for bucket in buckets for f in bucket),
-        concerns=tuple(concerns),
+        tuple(
+            Bucket(name, tuple(bucket))
+            for bucket, name in zip(buckets, names, strict=True)
+        ),
+        limit,
     )
 
 

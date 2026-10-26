@@ -97,7 +97,7 @@ def test_a_rebuilt_final_keeps_its_extra_racer(replay):
         round_number=2,
         bucket_limit=4,
     )
-    finalists_for = playlist_finalists(extras=[late])
+    finalists_for = playlist_finalists(extras={(round_1.group_id, 2): [late]})
     new_round_roster(FollowOn(round_1), top=4, extras=[late])
     RaceState.objects.filter(event=replay.event).update(
         waiting_entry=entry, ended_round=round_1
@@ -142,7 +142,7 @@ def test_both_award_settings_show_in_the_snapshot_with_no_place(replay):
         lions[1].pk: {NotEligible.SPEED_AWARDS},
     }
     ladder = standings.ladders[round_key(first_round(replay, "Lions").pk)]
-    assert ladder[0] == [lions[2].pk]
+    assert ladder[0] == (lions[2].pk,)
 
 
 def test_a_final_of_the_pack_aggregate_skips_a_partition_that_does_not_count(
@@ -195,14 +195,26 @@ def test_an_aggregate_takes_the_top_of_each_group(replay):
     assert again.concerns == ()
 
 
-def test_the_snapshot_is_reused_until_a_result_changes(replay):
+def test_the_snapshot_follows_a_result_change(replay):
     first = standings_snapshot(replay.event)
-    assert standings_snapshot(replay.event) is first
     lane = HeatLane.objects.filter(event=replay.event).order_by("pk").last()
     HeatLane.objects.filter(pk=lane.pk).update(finish_time=2.5)
     second = standings_snapshot(replay.event)
-    assert second is not first
     assert second.standings.ladders != first.standings.ladders
+
+
+def test_no_caller_can_change_the_standings_another_reads(replay):
+    standings = standings_snapshot(replay.event).standings
+    ladder = standings.award_ladder_full_field()
+    with pytest.raises((AttributeError, TypeError)):
+        ladder.pop()
+    with pytest.raises((AttributeError, TypeError)):
+        ladder[0].append(0)
+    with pytest.raises(TypeError):
+        standings.catalog_counts[FULL_FIELD] = 0
+    with pytest.raises(TypeError):
+        standings.ladders[FULL_FIELD] = ()
+    assert standings.award_ladder_full_field() == ladder
 
 
 def test_the_current_award_names_its_racer(replay):
@@ -210,3 +222,20 @@ def test_the_current_award_names_its_racer(replay):
     RaceState.objects.filter(event=replay.event).update(current_award_key="speed-1")
     assert current_award(replay.event).racer_id == lions[0].pk
     assert current_award(replay.event).name == "Fastest in Pack"
+
+
+def test_a_playlist_cut_reports_its_concerns(replay):
+    round_1 = first_round(replay, "Tigers")
+    entry = PlaylistEntry.objects.create(
+        event=replay.event, seq=2, group=round_1.group, round_number=2, bucket_limit=4
+    )
+    final = Round.objects.create(event=replay.event, group=round_1.group, number=2)
+    entrants = playlist_finalists()(entry, final)
+    assert list(entrants.racers) == racers_of(replay, "Tigers")
+    assert entrants.concerns == ("There are only 3 eligible Tigers racer(s).",)
+
+
+def test_a_new_aggregate_of_nothing_fails_with_no_racers(replay):
+    with pytest.raises(RoundFailure) as caught:
+        new_round_roster(NewAggregate("Nobody"), top=4)
+    assert caught.value.code == Failure.NO_RACERS

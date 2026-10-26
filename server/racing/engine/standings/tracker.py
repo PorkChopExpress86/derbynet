@@ -1,17 +1,17 @@
 """`StandingsTracker` from `website/inc/standings.inc`: one ladder, built
 from scores fed in best first.
 
-A ladder is a list of rungs, rung i holding the racers in place i + 1. A
+A ladder is a tuple of rungs, rung i holding the racers in place i + 1. A
 tie of k racers shares one rung and leaves k - 1 empty rungs after it, so
-`[[11], [1], [21, 41], [], [31]]` is a tie for third and a fifth place.
+`((11,), (1,), (21, 41), (), (31,))` is a tie for third and a fifth place.
 """
 
-Ladder = list[list[int]]
+Ladder = tuple[tuple[int, ...], ...]
 
 
 class StandingsTracker:
     def __init__(self):
-        self.rungs: Ladder = []
+        self.rungs: list[list[int]] = []
         self.count = 0
         self._last_score = -1.0
 
@@ -30,3 +30,7 @@ class StandingsTracker:
             place = self.count - 1
         self._last_score = score
         return place
+
+    @property
+    def ladder(self) -> Ladder:
+        return tuple(tuple(rung) for rung in self.rungs)

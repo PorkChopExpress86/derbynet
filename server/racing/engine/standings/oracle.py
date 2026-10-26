@@ -161,12 +161,15 @@ class Standings:
         self.groups = {g.id: g for g in event.groups}
         self.subgroups = {s.id: s for s in event.subgroups}
         self.racers = {r.id: r for r in event.racers}
-        self.rounds_of: dict[int, list[Round]] = {g.id: [] for g in event.groups}
+        rounds_of: dict[int, list[Round]] = {g.id: [] for g in event.groups}
         for round in sorted(event.rounds, key=lambda r: -r.number):
-            self.rounds_of.setdefault(round.group_id, []).append(round)
+            rounds_of.setdefault(round.group_id, []).append(round)
+        self.rounds_of: Mapping[int, tuple[Round, ...]] = MappingProxyType(
+            {g: tuple(rounds) for g, rounds in rounds_of.items()}
+        )
         self.rolls_up_to = _rolls_up_to(event.groups)
-        self.ladders: dict[str, Ladder] = {}
-        self.catalog_counts: dict[str, int] = {}
+        self.ladders: Mapping[str, Ladder] = MappingProxyType({})
+        self.catalog_counts: Mapping[str, int] = MappingProxyType({})
         self.rows: tuple[Row, ...] = self._place_rows(_rows(event))
 
     def _keys(self, row: Row) -> tuple[list[str], bool]:
@@ -219,9 +222,10 @@ class Standings:
                     tracker = trackers.setdefault(key, StandingsTracker())
                     placed[key] = tracker.add(row.summary.score, row.racer.id)
             marks.append((nonfinal, placed, not_eligible))
-        for key, tracker in trackers.items():
-            self.ladders[key] = tracker.rungs
-            self.catalog_counts[key] = tracker.count
+        self.ladders = MappingProxyType({k: t.ladder for k, t in trackers.items()})
+        self.catalog_counts = MappingProxyType(
+            {k: t.count for k, t in trackers.items()}
+        )
 
         def place(key: str, rung: int) -> Place:
             return f"T{rung + 1}" if len(self.ladders[key][rung]) > 1 else rung + 1
@@ -260,36 +264,36 @@ class Standings:
         return round_subgroup_key(round.id, subgroup_id)
 
     def award_ladder_full_field(self) -> Ladder:
-        return self.ladders.get(FULL_FIELD, [])
+        return self.ladders.get(FULL_FIELD, ())
 
     def award_ladder_class(self, group_id: int) -> Ladder:
         """A group's highest round, finished or not, else its qualifier
         standings."""
-        rounds = self.rounds_of.get(group_id, [])
+        rounds = self.rounds_of.get(group_id, ())
         key = round_key(rounds[0].id) if rounds else qualifier_key(group_id)
-        return self.ladders.get(key, [])
+        return self.ladders.get(key, ())
 
     def award_ladder_subgroup(self, subgroup_id: int) -> Ladder:
-        rounds = self.rounds_of.get(self.subgroups[subgroup_id].group_id, [])
+        rounds = self.rounds_of.get(self.subgroups[subgroup_id].group_id, ())
         if not rounds:
-            return []
-        return self.ladders.get(round_subgroup_key(rounds[0].id, subgroup_id), [])
+            return ()
+        return self.ladders.get(round_subgroup_key(rounds[0].id, subgroup_id), ())
 
     @cached_property
-    def group_order(self) -> list[Group]:
+    def group_order(self) -> tuple[Group, ...]:
         """`classseq`: groups in the order `classes_and_ranks` lists them."""
         seen: dict[int, Group] = {}
         for group, _subgroup in self._group_subgroup_rows:
             seen.setdefault(group.id, group)
-        return list(seen.values())
+        return tuple(seen.values())
 
     @cached_property
-    def subgroup_order(self) -> list[Subgroup]:
+    def subgroup_order(self) -> tuple[Subgroup, ...]:
         """`rankseq`."""
-        return [s for _g, s in self._group_subgroup_rows if s is not None]
+        return tuple(s for _g, s in self._group_subgroup_rows if s is not None)
 
     @cached_property
-    def _group_subgroup_rows(self) -> list[tuple[Group, Subgroup | None]]:
+    def _group_subgroup_rows(self) -> tuple[tuple[Group, Subgroup | None], ...]:
         """`Classes LEFT JOIN Ranks ORDER BY Classes.sortorder,
         Ranks.sortorder, class, rank`, names compared as `NOCASE`."""
         rows: list[tuple[Group, Subgroup | None]] = []
@@ -311,9 +315,9 @@ class Standings:
                 subgroup.id if subgroup else 0,
             )
 
-        return sorted(rows, key=order)
+        return tuple(sorted(rows, key=order))
 
-    def catalog(self) -> list[CatalogEntry]:
+    def catalog(self) -> tuple[CatalogEntry, ...]:
         """`standings_catalog()`: every standings presentation, in order."""
         use_groups = len(self.event.groups) > 1
         use_subgroups = self.settings.use_subgroups
@@ -325,7 +329,7 @@ class Standings:
         subgroups = self.subgroup_order
         next_subgroup = 0
         for group in self.group_order:
-            rounds = list(self.rounds_of.get(group.id, []))
+            rounds = list(self.rounds_of.get(group.id, ()))
             if not rounds:
                 catalog.append(
                     CatalogEntry(group.name, qualifier_key(group.id), "qual")
@@ -379,7 +383,7 @@ class Standings:
                         "qual",
                     )
                 )
-        return catalog
+        return tuple(catalog)
 
 
 def _rolls_up_to(groups: Sequence[Group]) -> dict[int, list[int]]:

@@ -27,6 +27,7 @@ from racing.services.playlist import (
     start_waiting_step,
 )
 from racing.services.rounds import (
+    Entrants,
     delete_round_roster,
     playlist_finalists,
     prepare_new_round,
@@ -273,10 +274,7 @@ def test_a_waiting_step_ignores_continue_racing():
 def test_a_final_with_fewer_than_2_racers_keeps_the_intermission_open():
     """D28: no chart is made, and the waiting step cannot start."""
     replay, _ = two_step_playlist(waits=True, continue_racing=False)
-    one = [replay.racer(car=108)]
-
-    def finalists_for(entry, round):
-        return one
+    finalists_for = one_finalist(replay)
 
     round = start_playlist(replay.event, finalists_for)
     race(round)
@@ -336,7 +334,7 @@ def test_a_changed_result_rebuilds_the_waiting_final_until_it_races():
     first_four = list(final_round.roster.values_list("racer_id", flat=True))
 
     others = [replay.racer(car=c) for c in (101, 102, 103)]
-    assert rebuild_waiting_round(replay.event, lambda entry, r: others)
+    assert rebuild_waiting_round(replay.event, lambda entry, r: Entrants(tuple(others)))
     assert sorted(final_round.roster.values_list("racer_id", flat=True)) == sorted(
         r.pk for r in others
     )
@@ -410,7 +408,7 @@ def test_a_changed_result_leaves_a_waiting_round_of_another_group_alone():
 
 def one_finalist(replay):
     one = [replay.racer(car=108)]
-    return lambda entry, round: one
+    return lambda entry, round: Entrants(tuple(one))
 
 
 def test_skipping_a_final_with_fewer_than_2_racers_tees_up_the_next_step():
@@ -505,3 +503,30 @@ def test_a_waiting_step_with_no_chart_says_why(change, code, description):
     assert caught.value.code == code
     assert caught.value.description.startswith(description)
     assert state(replay).waiting_entry is not None and not state(replay).racing
+
+
+def test_an_extra_racer_joins_only_the_final_they_were_allowed_into():
+    """D32: extras belong to one step's round, so two finals in one playlist
+    keep their own."""
+    replay = race_day(4, 8)
+    scouts, outlaws = replay.group("Scouts"), replay.group("Outlaw")
+    extra = replay.racer(car=110)
+    finalists_for = playlist_finalists(extras={(scouts.pk, 2): [extra]})
+    replay.ids.sync()
+    round = start_playlist(replay.event, finalists_for)
+    while True:
+        race(round)
+        round_ended(round, finalists_for)
+        if state(replay).waiting_entry is None:
+            break
+        round = start_waiting_step(replay.event)
+    finals = {
+        group: set(
+            Round.objects.get(group=group, number=2).roster.values_list(
+                "racer_id", flat=True
+            )
+        )
+        for group in (scouts, outlaws)
+    }
+    assert extra.pk in finals[scouts]
+    assert extra.pk not in finals[outlaws]

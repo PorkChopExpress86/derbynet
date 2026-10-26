@@ -40,23 +40,14 @@ class Snapshot:
         return speed_awards(self.standings, self.inputs.trophies)
 
 
-_cache: dict[int, Snapshot] = {}
-
-
 def standings_snapshot(event) -> Snapshot:
-    """The event's standings, computed again only when a result, a racer,
-    a roster, a round, a group or a setting they read has changed.
+    """The event's standings, computed from its rows as they are now.
 
-    The cache compares the rows read with the rows it was computed from,
-    so no writer has to bump a version, and the 0.5 s `award.current` poll
-    reads the rows but does not compute the standings and awards again."""
-    inputs = _read(event)
-    cached = _cache.get(event.id)
-    if cached is not None and cached.inputs == inputs:
-        return cached
-    snapshot = Snapshot(inputs)
-    _cache[event.id] = snapshot
-    return snapshot
+    Nothing is cached. Reading the rows takes most of the time (#106: 21 ms
+    of 28 ms for 200 racers and 1200 results), so a cache keyed on the rows
+    would save only the 7 ms of computing, even for the 0.5 s
+    `award.current` poll."""
+    return Snapshot(_read(event))
 
 
 def current_award(event) -> CurrentAward | None:

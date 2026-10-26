@@ -11,9 +11,10 @@ and `playlist_finalists` choose a new round's racers from the standings
 needs.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from types import MappingProxyType
 
 from django.db import transaction
 from django.db.models.functions import Lower
@@ -112,11 +113,33 @@ RosterSource = FollowOn | FromAggregate | NewAggregate
 
 
 @dataclass(frozen=True)
+class Entrants:
+    """A new round's racers in roster order, and the cut's concerns, which
+    the playlist's intermission shows for D28."""
+
+    racers: tuple[Racer, ...]
+    concerns: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class NewRoster:
     round: Round
     qualifiers: tuple[finalists.Finalist, ...]
     extras: tuple[Racer, ...]
     concerns: tuple[str, ...]
+
+
+def _choose(
+    cut: finalists.Cut, extras: Sequence[Racer]
+) -> tuple[finalists.Cut, tuple[Racer, ...], tuple[Racer, ...]]:
+    """The cut with each racer once, the qualifiers' racers, and the extras
+    who did not qualify, each once (D32)."""
+    cut = cut.unique()
+    qualifiers = cut.finalists
+    by_id = Racer.objects.in_bulk([f.racer_id for f in qualifiers])
+    chosen = set(by_id)
+    added = tuple({r.pk: r for r in extras if r.pk not in chosen}.values())
+    return cut, tuple(by_id[f.racer_id] for f in qualifiers), added
 
 
 def new_round_roster(
@@ -133,11 +156,17 @@ def new_round_roster(
     Extras are racers the race coordinator allowed in (D32). They follow the
     qualifiers and never take a qualifier's place, so a rebuild that passes
     the same extras keeps them. Fails with `no_racers`, and changes nothing,
-    when the roster would be empty.
+    when the roster would be empty or a new aggregate draws from nothing.
     """
-    event_id = (
-        source.round.event_id if isinstance(source, FollowOn) else _event_of(source)
-    )
+    if isinstance(source, FollowOn):
+        event_id = source.round.event_id
+    elif isinstance(source, FromAggregate):
+        event_id = source.group.event_id
+    else:
+        members = [*source.groups, *source.subgroups]
+        if not members:
+            raise RoundFailure(Failure.NO_RACERS, "No eligible racers found.")
+        event_id = members[0].event_id
     with transaction.atomic():
         lock_race_state(event_id)
         if isinstance(source, FollowOn):
@@ -152,23 +181,13 @@ def new_round_roster(
             round = prepare_new_round(group, 1)
             choose = finalists.for_aggregate
         standings = standings_snapshot(round.event).standings
-        cut = choose(standings, group.id, bucketed=bucketed, limit=top)
-        qualifiers = _unique(cut.finalists)
-        by_id = Racer.objects.in_bulk([f.racer_id for f in qualifiers])
-        chosen = {f.racer_id for f in qualifiers}
-        added = tuple(_unique_racers(r for r in extras if r.pk not in chosen))
-        roster = [by_id[f.racer_id] for f in qualifiers] + list(added)
-        if not roster:
+        cut, qualifiers, added = _choose(
+            choose(standings, group.id, bucketed=bucketed, limit=top), extras
+        )
+        if not qualifiers and not added:
             raise RoundFailure(Failure.NO_RACERS, "No eligible racers found.")
-        write_roster(round, roster)
-        return NewRoster(round, qualifiers, added, cut.concerns)
-
-
-def _event_of(source: FromAggregate | NewAggregate) -> int:
-    if isinstance(source, FromAggregate):
-        return source.group.event_id
-    members = [*source.groups, *source.subgroups]
-    return members[0].event_id
+        write_roster(round, qualifiers + added)
+        return NewRoster(round, cut.finalists, added, cut.concerns)
 
 
 def _new_aggregate(event_id, source: NewAggregate) -> Group:
@@ -182,29 +201,23 @@ def _new_aggregate(event_id, source: NewAggregate) -> Group:
     return group
 
 
-def _unique(cut: Iterable[finalists.Finalist]) -> tuple[finalists.Finalist, ...]:
-    """The first place of each racer. A racer can qualify from two of the
-    groups an aggregate draws from; PHP would enter the racer twice."""
-    seen: dict[int, finalists.Finalist] = {}
-    for finalist in cut:
-        seen.setdefault(finalist.racer_id, finalist)
-    return tuple(seen.values())
+StepKey = tuple[int, int]
+"""A playlist step's round: its group's id and its round number."""
 
 
-def _unique_racers(racers: Iterable[Racer]) -> list[Racer]:
-    return list({r.pk: r for r in racers}.values())
-
-
-def playlist_finalists(extras: Sequence[Racer] = ()):
+def playlist_finalists(
+    extras: Mapping[StepKey, Sequence[Racer]] = MappingProxyType({}),
+):
     """The playlist's `FinalistsFor`: the racers of a step's round, as
-    `activate_playlist_entry()` chooses them, then `extras` (D32).
+    `activate_playlist_entry()` chooses them, then that round's extras
+    (D32), keyed by the step's group and round number.
 
     Round 1 of a group is an aggregate's first round; any later round
     follows on from the group's own standings. The step's `bucket_limit`
     and `bucketed` set the cut.
     """
 
-    def finalists_for(entry: PlaylistEntry, round: Round) -> list[Racer]:
+    def finalists_for(entry: PlaylistEntry, round: Round) -> Entrants:
         standings = standings_snapshot(round.event).standings
         choose = (
             finalists.for_aggregate if entry.round_number == 1 else finalists.follow_on
@@ -215,12 +228,10 @@ def playlist_finalists(extras: Sequence[Racer] = ()):
             bucketed=entry.bucketed,
             limit=entry.bucket_limit,
         )
-        qualifiers = _unique(cut.finalists)
-        by_id = Racer.objects.in_bulk([f.racer_id for f in qualifiers])
-        chosen = {f.racer_id for f in qualifiers}
-        return [by_id[f.racer_id] for f in qualifiers] + _unique_racers(
-            r for r in extras if r.pk not in chosen
+        cut, qualifiers, added = _choose(
+            cut, extras.get((entry.group_id, entry.round_number), ())
         )
+        return Entrants(qualifiers + added, cut.concerns)
 
     return finalists_for
 

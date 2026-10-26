@@ -29,4 +29,4 @@ EVENT = oracle.Event(
 @pytest.mark.parametrize("limit", [0, 1])
 def test_a_score_of_zero_makes_a_top_zero_cut(limit):
     cut = finalists.follow_on(oracle.Standings(EVENT), 1, bucketed=False, limit=limit)
-    assert cut == finalists.Cut((finalists.Finalist(3, 0.0),), ())
+    assert (cut.finalists, cut.concerns) == ((finalists.Finalist(3, 0.0),), ())
