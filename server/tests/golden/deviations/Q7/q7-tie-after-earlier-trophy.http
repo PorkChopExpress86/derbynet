@@ -1,0 +1,471 @@
+### 003 export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 7705
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Group",
+                "Den",
+                "Excluded?"
+            ],
+            [
+                "Ann",
+                "Abbot",
+                "",
+                301,
+                "",
+                "All Racers",
+                "Lions",
+                0
+            ],
+            [
+                "Ben",
+                "Baker",
+                "",
+                302,
+                "",
+                "All Racers",
+                "Tigers",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "All Racers",
+                1,
+                1,
+                1,
+                "Ann",
+                "Abbot",
+                301,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "All Racers",
+                1,
+                1,
+                2,
+                "Ben",
+                "Baker",
+                302,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "All Racers",
+                1,
+                2,
+                1,
+                "Ben",
+                "Baker",
+                302,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "All Racers",
+                1,
+                2,
+                2,
+                "Ann",
+                "Abbot",
+                301,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Group",
+                "In Group",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                "T1",
+                301,
+                "Ann Abbot",
+                "All Racers",
+                "T1",
+                "Lions",
+                1,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                "T1",
+                302,
+                "Ben Baker",
+                "All Racers",
+                "T1",
+                "Tigers",
+                1,
+                2,
+                3,
+                3,
+                3
+            ]
+        ]
+    ],
+    [
+        "Standings All Racers",
+        [
+            [
+                "Standings for All Racers"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Group",
+                "In Group",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                "T1",
+                301,
+                "Ann Abbot",
+                "All Racers",
+                "T1",
+                "Lions",
+                1,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                "T1",
+                302,
+                "Ben Baker",
+                "All Racers",
+                "T1",
+                "Tigers",
+                1,
+                2,
+                3,
+                3,
+                3
+            ]
+        ]
+    ],
+    [
+        "Standings All Racers - Lions",
+        [
+            [
+                "Standings for All Racers \/ Lions"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Group",
+                "In Group",
+                "Den",
+                "In Den",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                301,
+                "Ann Abbot",
+                "All Racers",
+                "T1",
+                "Lions",
+                1,
+                "T1",
+                2,
+                3,
+                3,
+                3
+            ]
+        ]
+    ],
+    [
+        "Standings All Racers - Tigers",
+        [
+            [
+                "Standings for All Racers \/ Tigers"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Group",
+                "In Group",
+                "Den",
+                "In Den",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                302,
+                "Ben Baker",
+                "All Racers",
+                "T1",
+                "Tigers",
+                1,
+                "T1",
+                2,
+                3,
+                3,
+                3
+            ]
+        ]
+    ],
+    [
+        "Standings Lions Only",
+        [
+            [
+                "Standings for Lions Only"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Group",
+                "In Group",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                301,
+                "Ann Abbot",
+                "All Racers",
+                "",
+                "Lions",
+                1,
+                2,
+                3,
+                3,
+                3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Group",
+                "Den",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Lions Only",
+                "Speed Trophy",
+                "Lions Only",
+                null,
+                "Ann",
+                "Abbot",
+                301,
+                ""
+            ],
+            [
+                "Fastest in All Racers",
+                "Speed Trophy",
+                "All Racers",
+                null,
+                "Ben",
+                "Baker",
+                302,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 005 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2199
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "All Racers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 1,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                },
+                {
+                    "rankid": 2,
+                    "count": 1,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Lions Only",
+            "aggregate-by-subgroup": true,
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "All Racers"
+                }
+            ],
+            "constituent-ranks": [
+                {
+                    "rankid": 1,
+                    "name": "Lions",
+                    "classid": 1,
+                    "class": "All Racers"
+                }
+            ]
+        }
+    ]
+}
+
