@@ -2,6 +2,7 @@ import functools
 import operator
 from contextlib import contextmanager
 from dataclasses import replace
+from types import MappingProxyType
 from unittest import mock
 
 from racing.engine.standings import finalists, oracle, scoring, speed_awards, tracker
@@ -31,9 +32,11 @@ def _strict_add(self, score, racer_id):
     return place
 
 
-def _count_one_more(result, standings):
-    for key in list(standings.catalog_counts)[:1]:
-        standings.catalog_counts[key] += 1
+def _count_one_more(result, standings, *_args):
+    counts = dict(standings.catalog_counts)
+    for key in list(counts)[:1]:
+        counts[key] += 1
+    standings.catalog_counts = MappingProxyType(counts)
     return result
 
 
@@ -77,7 +80,7 @@ CONTROLS = {
         lambda: _wrap(
             oracle.Standings,
             "catalog",
-            lambda c, s: [e for e in c if e.presentation != "qual"],
+            lambda c, s: tuple(e for e in c if e.presentation != "qual"),
         ),
     ),
     "an aggregate has no class key": (
