@@ -307,6 +307,9 @@ def test_a_final_with_no_racers_says_why(remove, description):
     assert caught.value.code == schedule.Failure.TOO_FEW_RACERS
     assert caught.value.description == description
     assert state(replay).waiting_entry is not None and not state(replay).racing
+    assert Round.objects.filter(group=round.group, number=2).exists() == (
+        remove == "clear the roster"
+    )
 
 
 def test_start_waiting_step_without_an_intermission_fails():

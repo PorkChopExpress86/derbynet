@@ -204,7 +204,8 @@ def _rename_duplicates(ctx, rows, table, id_column, column, fold, max_length):
             if len(name) > max_length:
                 reasons.append(f"is longer than {max_length} characters")
             if n > 1:
-                reasons.append("matches an earlier name with case ignored")
+                cut = "its cut " if len(name) > max_length else ""
+                reasons.append(f"{cut}matches an earlier name with case ignored")
             ctx.report.add(
                 Kind.CHANGED_VALUE,
                 table,

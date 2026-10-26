@@ -67,7 +67,7 @@ Owner decision D31 sets two rules where PHP behaves otherwise.
 
 - A real rule change deletes every round, chart, aggregate link, group award and playlist step, and is refused with `results-exist` once any heat has a result. Applying the rule already in force writes nothing and succeeds, even once results exist.
 - Partition names are unique per event with case ignored. Adding or renaming a partition to a name that matches another partition in any case is refused with `name-taken` (an exact match on `partition.add` keeps PHP's `already-exists`). `find_or_create_partition` returns the partition that matches, so a racer imported with `LIONS` joins `Lions`. The services compare `Partition.name_key`, Python's `casefold()`, because SQLite's `lower()` folds only ASCII letters. The importer renames a legacy partition that matches an earlier one in any case.
-If the waiting round has no racers in its roster, because its roster was deleted during the intermission, `start_waiting_step` says so instead of D28's "The final needs at least 2 racers."
+A final with fewer than 2 racers, zero included, gets D28's "The final needs at least 2 racers." from `start_waiting_step` (D34). Only a waiting round that was deleted during the intermission, and so is remade empty, says "The waiting round has no racers in its roster."
 
 The finalists of a follow-on or aggregate round come from the standings (#26), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
 

@@ -62,10 +62,10 @@ An award that people choose, such as best paint job or most scout-like.
 _Avoid_: Design award (only one kind of judged award)
 
 **Award scope**:
-The racers an award can go to: one partition, or all partitions that count for all-partition awards.
+The racers an award can go to: one partition, or all partitions.
 
 **All-partition award**:
-An award open to every partition that counts for all-partition awards, such as fastest in the pack. A partition such as Parents or Siblings can be left out.
+An award open to all partitions, such as fastest in the pack. A partition such as Parents or Siblings can be set to stay out of all-partition awards.
 
 **Not eligible for any award**:
 A racer who races but can win neither speed awards nor judged awards.

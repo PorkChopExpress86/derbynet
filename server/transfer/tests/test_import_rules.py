@@ -531,7 +531,12 @@ def test_long_names_that_collide_once_cut_are_renamed(tmp_path):
         if group.name.startswith("AAA")
     }
     assert names == {long, "A" * 71 + " (2)"}
-    assert len(_findings(report, "changed-value")) == 2
+    details = sorted(f["detail"] for f in _findings(report, "changed-value"))
+    assert details == [
+        f"class '{long}x' is longer than 75 characters; renamed '{long}'",
+        f"class '{long}y' is longer than 75 characters and its cut matches"
+        f" an earlier name with case ignored; renamed '{'A' * 71} (2)'",
+    ]
 
 
 def test_a_snapshot_basename_naming_the_cropped_folder_is_dropped(tmp_path):
