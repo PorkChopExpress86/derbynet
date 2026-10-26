@@ -212,7 +212,7 @@ def start_waiting_step(event) -> Round:
         if not HeatLane.objects.filter(round=round).exists():
             failure = _schedule(round, entry)
             if failure is not None:
-                raise _waiting_failure(state, entry, failure) from failure
+                raise _waiting_failure(state, entry, round, failure) from failure
             state.refresh_from_db()
         state.waiting_entry = None
         state.ended_round = None
@@ -223,15 +223,16 @@ def start_waiting_step(event) -> Round:
 
 
 def _waiting_failure(
-    state: RaceState, entry: PlaylistEntry, failure: ScheduleFailure
+    state: RaceState, entry: PlaylistEntry, round: Round, failure: ScheduleFailure
 ) -> PlaylistFailure:
+    """A roster deleted during the intermission leaves the round with no
+    racers, which is not a final short of racers (D28)."""
     description = failure.description
-    if (
-        failure.code == schedule.Failure.TOO_FEW_RACERS
-        and state.ended_round is not None
-        and _feeds(state.ended_round, entry)
-    ):
-        description = "The final needs at least 2 racers."
+    if failure.code == schedule.Failure.TOO_FEW_RACERS:
+        if not round.roster.exists():
+            description = "The waiting round has no racers in its roster."
+        elif state.ended_round is not None and _feeds(state.ended_round, entry):
+            description = "The final needs at least 2 racers."
     return PlaylistFailure(failure.code, description)
 
 
