@@ -208,11 +208,14 @@ def start_waiting_step(event) -> Round:
             raise PlaylistFailure(
                 Failure.NO_INTERMISSION, "No playlist step is waiting."
             )
-        round = _round_of(entry) or make_new_round(entry.group, entry.round_number)
+        round = _round_of(entry)
+        remade = round is None
+        if remade:
+            round = make_new_round(entry.group, entry.round_number)
         if not HeatLane.objects.filter(round=round).exists():
             failure = _schedule(round, entry)
             if failure is not None:
-                raise _waiting_failure(state, entry, failure) from failure
+                raise _waiting_failure(state, entry, remade, failure) from failure
             state.refresh_from_db()
         state.waiting_entry = None
         state.ended_round = None
@@ -223,15 +226,17 @@ def start_waiting_step(event) -> Round:
 
 
 def _waiting_failure(
-    state: RaceState, entry: PlaylistEntry, failure: ScheduleFailure
+    state: RaceState, entry: PlaylistEntry, remade: bool, failure: ScheduleFailure
 ) -> PlaylistFailure:
+    """A final short of racers, zero included, gets D28's message. A round
+    whose roster was deleted during the intermission was remade empty, which
+    is not a final short of racers."""
     description = failure.description
-    if (
-        failure.code == schedule.Failure.TOO_FEW_RACERS
-        and state.ended_round is not None
-        and _feeds(state.ended_round, entry)
-    ):
-        description = "The final needs at least 2 racers."
+    if failure.code == schedule.Failure.TOO_FEW_RACERS:
+        if remade:
+            description = "The waiting round has no racers in its roster."
+        elif state.ended_round is not None and _feeds(state.ended_round, entry):
+            description = "The final needs at least 2 racers."
     return PlaylistFailure(failure.code, description)
 
 

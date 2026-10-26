@@ -200,11 +200,17 @@ def _rename_duplicates(ctx, rows, table, id_column, column, fold, max_length):
             suffix = f" ({n})"
             candidate = name[: max_length - len(suffix)] + suffix
         if candidate != name:
+            reasons = []
+            if len(name) > max_length:
+                reasons.append(f"is longer than {max_length} characters")
+            if n > 1:
+                cut = "its cut " if len(name) > max_length else ""
+                reasons.append(f"{cut}matches an earlier name with case ignored")
             ctx.report.add(
                 Kind.CHANGED_VALUE,
                 table,
                 row[id_column],
-                f"{column} {name!r} is taken or too long; renamed {candidate!r}",
+                f"{column} {name!r} {' and '.join(reasons)}; renamed {candidate!r}",
             )
             row[column] = candidate
         seen.add(fold(candidate))
@@ -249,13 +255,14 @@ def _subgroup(row, ctx):
 
 def _partitions(ctx):
     rows = _fill_sort_order(ctx, "partitions", "partitionid")
+    # PHP's UNIQUE compares the exact name; Django ignores case (D31).
     return _rename_duplicates(
         ctx,
         rows,
         "partitions",
         "partitionid",
         "name",
-        str,
+        Partition.name_key,
         Partition._meta.get_field("name").max_length,
     )
 

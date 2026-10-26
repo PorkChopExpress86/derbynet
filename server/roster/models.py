@@ -119,7 +119,13 @@ class Subgroup(EventScoped):
 
 
 class Partition(EventScoped):
-    """Legacy `Partitions`. Several partitions can share one subgroup."""
+    """Legacy `Partitions`. Several partitions can share one subgroup.
+
+    The services keep names unique per event with case ignored (D31), and
+    the constraint below checks the exact name. They compare `name_key`, not
+    the database's `lower()`, which folds only ASCII on SQLite, so both
+    databases refuse the same names.
+    """
 
     name = models.CharField(max_length=200)
     subgroup = models.ForeignKey(
@@ -136,6 +142,10 @@ class Partition(EventScoped):
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def name_key(name: str) -> str:
+        return name.casefold()
 
 
 class Racer(EventScoped):
