@@ -5,13 +5,11 @@ The chart services call `reassign_master_heats` through
 """
 
 from django.db import transaction
-from django.db.models import Case, F, Max, Q, Value, When
+from django.db.models import Case, F, Max, Value, When
 
 from core.models import Event, RaceState
 from racing.engine.scheduling.master import assign_master_heats
-from racing.models import HeatLane
-
-HAS_RESULT = Q(finish_time__isnull=False) | Q(finish_place__isnull=False)
+from racing.models import HAS_RESULT, HeatLane
 
 
 def reassign_master_heats(event: Event) -> None:
@@ -26,7 +24,7 @@ def reassign_master_heats(event: Event) -> None:
         rows = HeatLane.objects.filter(event=event)
         highest = rows.filter(HAS_RESULT).aggregate(n=Max("master_heat"))["n"] or 0
         unraced = (
-            rows.filter(finish_time__isnull=True, finish_place__isnull=True)
+            rows.exclude(HAS_RESULT)
             .values_list("round__number", "round_id", "heat")
             .distinct()
         )
