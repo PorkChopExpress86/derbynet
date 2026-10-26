@@ -7,7 +7,7 @@ A record holds the value and, where PHP read an undefined array key, its
 import json
 import re
 
-from racing.engine.standings.ordinals import nth_fastest, nth_fastest_in_pack, ordinal
+from racing.engine.standings.ordinals import nth_fastest, ordinal
 
 from .golden import GOLDEN_DIR
 
@@ -39,8 +39,3 @@ def test_the_quirks_q10_keeps():
     assert ordinal(0) is None
     assert ordinal("T0") == "T"
     assert nth_fastest(0, "Den") == " Fastest in Den"
-
-
-def test_nth_fastest_in_pack_names_the_supergroup():
-    assert nth_fastest_in_pack(1, "Pack") == "Fastest in Pack"
-    assert nth_fastest_in_pack(22, "Troop") == "22nd Fastest in Troop"

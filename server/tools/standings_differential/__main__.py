@@ -7,10 +7,10 @@ website at /var/www/html; it defaults to `derbynet-local`. The command
 generates seeded random events (`generate.py`), runs PHP on them in
 throwaway `docker run --rm` containers (`harness.php`), runs the Django
 engine on the same events (`compare.py`), and prints the counts. It exits 1
-when any comparison differs other than by the three differences that
-`compare.py` counts apart (Q7, Q8, a malformed number in a key), when a
-seeded fault goes unreported (`--controls`), or when
-PHP could not run an event.
+when any comparison differs other than by the deliberate differences that
+`compare.py` counts apart (Q7, Q8), when a seeded fault goes unreported
+(`--controls`), or when PHP could not run an event. A `current_award_key`
+that makes PHP's `award.current` throw is recorded as naming no award.
 """
 
 import argparse

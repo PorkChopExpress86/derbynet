@@ -1,0 +1,1445 @@
+### 004 points=0 scoring=0 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 249
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ]
+    }
+}
+
+### 005 points=0 scoring=0 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 006 points=0 scoring=0 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 473
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                11
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ]
+    }
+}
+
+### 007 points=0 scoring=0 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 008 points=0 scoring=1 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 165
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11,
+                21,
+                31,
+                41
+            ]
+        ]
+    }
+}
+
+### 009 points=0 scoring=1 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 010 points=0 scoring=1 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 305
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11,
+                21,
+                31,
+                41
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                11,
+                21,
+                31,
+                41
+            ]
+        ]
+    }
+}
+
+### 011 points=0 scoring=1 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 012 points=0 scoring=2 subgroups=0 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 249
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ]
+    }
+}
+
+### 013 points=0 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 014 points=0 scoring=2 subgroups=1 standings
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 473
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                11
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ],
+        "st-rr1-1": [
+            [
+                11
+            ],
+            [
+                41
+            ],
+            [
+                21
+            ],
+            [
+                31
+            ]
+        ]
+    }
+}
+
+### 015 points=0 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 028 one-trophy-per=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 029 one-trophy-per=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 030 n-rank-trophies=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 031 n-rank-trophies=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+
+### 032 n-rank-trophies=3 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2604
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 2,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 18,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 18,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 17,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 15,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 15,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        }
+    ]
+}
+

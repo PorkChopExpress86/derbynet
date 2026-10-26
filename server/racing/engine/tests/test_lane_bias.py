@@ -8,9 +8,13 @@ a debugging line, and `warnings`, `rows_warnings` and `rows_error` are PHP
 notices. A critical-f-value record is compared on `value`, without PHP's
 `warnings`.
 
-Q9 changes every critical value, so the cases where Django differs from PHP
-are listed in `tests/golden/deviations.json` with Django's records under
-`tests/golden/deviations/Q9/`. To write both again after a change, run
+Two Fix quirks of #20 make Django differ. Q9 changes every critical value.
+Q24 changes the F statistic: PHP's sums of squares count the second-to-last
+lane twice and leave out the last lane, and Django counts every lane once.
+Each case where Django differs from PHP is listed once in
+`tests/golden/deviations.json`: under Q24 when the F statistic differs,
+else under Q9, with Django's records under `tests/golden/deviations/Q9/`
+and `Q24/`. To write them again after a change, run
 `uv run python -m racing.engine.tests.test_lane_bias` from `server/`.
 """
 
@@ -29,10 +33,28 @@ from .golden import DEVIATIONS_FILE, GOLDEN_DIR, canonical, engine_deviations
 
 LANE_BIAS = "engine/lane-bias.json"
 CRITICAL_F_VALUE = "engine/critical-f-value.json"
-Q9_REASON = {
-    LANE_BIAS: "Django compares F with the critical value for df1; PHP uses df1 + 1.",
-    CRITICAL_F_VALUE: "Django reads table column df1 - 1; PHP reads column df1.",
+REASON = {
+    ("Q9", LANE_BIAS): (
+        "Django compares F with the critical value for df1; PHP uses df1 + 1."
+    ),
+    ("Q9", CRITICAL_F_VALUE): (
+        "Django reads table column df1 - 1; PHP reads column df1."
+    ),
+    ("Q24", LANE_BIAS): (
+        "Django's sums of squares count every lane once; PHP counts the "
+        "second-to-last lane twice and leaves out the last. The critical "
+        "value is Q9's."
+    ),
 }
+
+
+def quirk_of(fixture, django, php):
+    """The quirk a differing case is listed under."""
+    if fixture == LANE_BIAS and (django["result"] or {}).get("f-statistic") != (
+        php["result"] or {}
+    ).get("f-statistic"):
+        return "Q24"
+    return "Q9"
 
 
 def lane_times(kind, nlanes, lane, j):
@@ -157,38 +179,50 @@ def test_too_little_evidence_has_no_result():
     assert lane_bias_analysis([[3.0, 3.0], [3.1, 3.1]]) is None
 
 
-def write_q9_deviations():
+def test_the_f_statistic_counts_every_lane_once():
+    """A one-way ANOVA worked by hand: lane means 3.2, 3.3 and 3.6 over three
+    runs each, so the sums of squares are 0.26 between lanes and 0.06
+    within, and F = (0.26 / 2) / (0.06 / 6) = 13."""
+    lanes = [[3.1, 3.2, 3.3], [3.2, 3.3, 3.4], [3.5, 3.6, 3.7]]
+    bias = lane_bias_analysis(lanes)
+    assert bias.f_statistic == pytest.approx(13.0)
+    assert lane_bias_analysis(lanes[::-1]).f_statistic == pytest.approx(13.0)
+
+
+def write_lane_bias_deviations():
     listing = json.loads(DEVIATIONS_FILE.read_text())
     others = [
         entry
         for entry in listing["deviations"]
-        if not (entry["quirk"] == "Q9" and entry["fixture"] in DJANGO_RECORD)
+        if not (entry["quirk"] in ("Q9", "Q24") and entry["fixture"] in DJANGO_RECORD)
     ]
     entries = []
-    for fixture, make_record in DJANGO_RECORD.items():
+    for (quirk, fixture), reason in REASON.items():
         differing = {}
         for case_id, php_record in php_records(fixture).items():
-            django = make_record(case_id)
-            if canonical(django) != canonical(php_record):
+            django = DJANGO_RECORD[fixture](case_id)
+            if canonical(django) != canonical(php_record) and (
+                quirk_of(fixture, django, php_record) == quirk
+            ):
                 differing[case_id] = django
-        expected = f"deviations/Q9/{fixture.removeprefix('engine/')}"
+        expected = f"deviations/{quirk}/{fixture.removeprefix('engine/')}"
         lines = [f"{canonical(k)}: {canonical(v)}" for k, v in differing.items()]
         path = GOLDEN_DIR / expected
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{\n" + ",\n".join(lines) + "\n}\n")
         entries.append(
             {
-                "quirk": "Q9",
+                "quirk": quirk,
                 "fixture": fixture,
                 "cases": list(differing),
-                "reason": Q9_REASON[fixture],
+                "reason": reason,
                 "expected": expected,
             }
         )
-        print(f"{fixture}: {len(differing)} cases differ, written to {expected}")
-    listing["deviations"] = others + entries
+        print(f"{quirk} {fixture}: {len(differing)} cases, written to {expected}")
+    listing["deviations"] = sorted(others + entries, key=lambda e: int(e["quirk"][1:]))
     DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2) + "\n")
 
 
 if __name__ == "__main__":
-    write_q9_deviations()
+    write_lane_bias_deviations()

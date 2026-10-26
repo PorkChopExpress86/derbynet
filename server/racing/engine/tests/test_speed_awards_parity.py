@@ -14,20 +14,22 @@ An award's `sort` is in no fixture: `award.list` leaves it out and the
 export only orders by it. The differential check against PHP (#26) covers
 it.
 
-Q7 is a Fix (#20): PHP gives a tie's place to a null racer when the tie's
-first racer already holds a trophy under `one-trophy-per`, and Django gives
-it to the next racer of the tie. The exchanges of
-`q7-tie-after-earlier-trophy.http` where Django differs are listed in
-`tests/golden/deviations.json` with Django's exchanges under
-`tests/golden/deviations/Q7/`. To write both again after a change, run
+Three Fixes of #20 make Django differ. Q7: PHP gives a tie's place to a
+null racer when the tie's first racer already holds a trophy under
+`one-trophy-per`, and Django gives it to the next racer of the tie. Q22:
+PHP's tie letter runs past "z", and from the 32nd racer the key is not
+UTF-8, so `award.list` answers an empty line; Django names those awards
+`aa`, `ab`, and on. Q23: time scoring over heats that hold places only
+gives a racer a NULL score, and PHP answers 500 or awards from rung -1. The
+exchanges where Django differs are listed in `tests/golden/deviations.json`
+with Django's exchanges under `tests/golden/deviations/<quirk>/`. To write
+both again after a change, run
 `uv run python -m racing.engine.tests.test_speed_awards_parity` from
 `server/`.
 """
 
 import json
 import re
-
-import pytest
 
 from racing.engine.standings import oracle
 from racing.engine.standings.oracle import Standings
@@ -56,34 +58,6 @@ Q7_REASON = (
     "Django gives a tie's place to the tie's next racer when its first racer "
     "already holds a trophy; PHP gives it to a null racer."
 )
-
-# See NULL_SCORE_500 in test_standings_parity.py: the awards read the same
-# standings, so PHP answers 500, or awards places from a ladder with a rung
-# -1. With points on and best-heat scoring, 56 racers tie for first in the
-# full field of suite-aggregate-classes, and `chr(ord('a') + $i)` (awards.inc
-# line 119) runs past "z" and, from the 32nd racer, past 0x7f. The key is
-# then not UTF-8, `json_encode()` returns false, and action.php answers 200
-# with an empty line.
-NULL_SCORE_500 = "a NULL score in time scoring: TypeError at standings.inc:382"
-NULL_SCORE_RUNG = "a NULL score in time scoring: PHP awards from rung -1"
-TIE_PAST_Z = "a tie of more than 31 racers: the key's letter is not UTF-8"
-POINTS = "suite-points-racing"
-AGGREGATES = "suite-aggregate-classes"
-UNCOMPARABLE = {
-    (POINTS, "005 points=0 scoring=0 subgroups=0 award.list"): NULL_SCORE_500,
-    (POINTS, "007 points=0 scoring=0 subgroups=1 award.list"): NULL_SCORE_500,
-    (POINTS, "009 points=0 scoring=1 subgroups=0 award.list"): NULL_SCORE_RUNG,
-    (POINTS, "011 points=0 scoring=1 subgroups=1 award.list"): NULL_SCORE_RUNG,
-    (POINTS, "013 points=0 scoring=2 subgroups=0 award.list"): NULL_SCORE_500,
-    (POINTS, "015 points=0 scoring=2 subgroups=1 award.list"): NULL_SCORE_500,
-    (POINTS, "028 one-trophy-per=0 award.list"): NULL_SCORE_500,
-    (POINTS, "029 one-trophy-per=1 award.list"): NULL_SCORE_500,
-    (POINTS, "030 n-rank-trophies=0 award.list"): NULL_SCORE_500,
-    (POINTS, "031 n-rank-trophies=1 award.list"): NULL_SCORE_500,
-    (POINTS, "032 n-rank-trophies=3 award.list"): NULL_SCORE_500,
-    (AGGREGATES, "025 points=1 scoring=2 subgroups=0 award.list"): TIE_PAST_Z,
-    (AGGREGATES, "027 points=1 scoring=2 subgroups=1 award.list"): TIE_PAST_Z,
-}
 
 FIXTURES = sorted(
     path.stem
@@ -143,8 +117,7 @@ def compared_award_lists():
     for stem in FIXTURES:
         fixture = Fixture(stem)
         for name in fixture.named(AWARD_LIST):
-            if (stem, name) not in UNCOMPARABLE:
-                yield fixture, name
+            yield fixture, name
 
 
 def test_every_award_list_matches_php_or_its_deviation():
@@ -158,11 +131,11 @@ def test_every_award_list_matches_php_or_its_deviation():
         if django != expected:
             wrong[(fixture.stem, name)] = (django, expected)
         if name in fixture.deviated:
-            php = body(fixture.exchanges[name])["speed-awards"]
-            assert django != php, f"{name} no longer differs from PHP"
+            assert differs_from_php(fixture, name, django_body(fixture, name)), (
+                f"{name} no longer differs from PHP"
+            )
     assert wrong == {}
-    total = sum(len(Fixture(s).named(AWARD_LIST)) for s in FIXTURES)
-    assert compared + len(UNCOMPARABLE) == total
+    assert compared == sum(len(Fixture(s).named(AWARD_LIST)) for s in FIXTURES)
 
 
 def test_every_awards_sheet_matches_php_or_its_deviation():
@@ -174,32 +147,6 @@ def test_every_awards_sheet_matches_php_or_its_deviation():
             assert django == speed_rows(body(fixture.expected(name))), (stem, name)
             if name in fixture.deviated:
                 assert django != speed_rows(body(fixture.exchanges[name])), name
-
-
-@pytest.mark.parametrize(("stem", "exchange"), sorted(UNCOMPARABLE))
-def test_uncomparable_exchanges_are_what_the_list_says(stem, exchange):
-    fixture = Fixture(stem)
-    php = fixture.exchanges[exchange]
-    standings, awards = django_awards(fixture, exchange)
-    reason = UNCOMPARABLE[(stem, exchange)]
-    if reason == TIE_PAST_Z:
-        assert (php["status"], php["body"]) == ("200", b"\n")
-        assert any(len(rung) > 31 for rung in standings.ladders.values())
-        assert any(not a.key.isascii() for a in awards)
-        return
-    scores = {r.summary.score is None for r in standings.rows}
-    assert scores == {True, False}, "some racers have a score and some have none"
-    if reason == NULL_SCORE_500:
-        assert (php["status"], php["body"]) == ("500", b"")
-    else:
-        assert php["status"] == "200"
-        (standings_exchange,) = [
-            n
-            for n in fixture.named(STANDINGS)
-            if n.split(" ")[1:-1] == exchange.split(" ")[1:-1]
-        ]
-        ladders = body(fixture.exchanges[standings_exchange])["standings"]
-        assert all("-1" in ladder for ladder in ladders.values())
 
 
 def test_the_award_settings_the_ticket_lists_are_compared():
@@ -232,9 +179,9 @@ def test_the_award_settings_the_ticket_lists_are_compared():
 def test_current_speed_award_finds_each_award_by_its_key():
     """`query=award.current` looks an award up by its key among all the
     speed awards. A `full-field-calc` aggregate's award is presented as the
-    pack's, under `speed-<place>`, and no name says "(Tie)". A tie of more
-    than 26 racers gives keys whose letter is past "z", which PHP's lookup
-    cannot read, so those awards are never found."""
+    pack's, under `speed-<place>`, and no name says "(Tie)". The awards of a
+    tie of more than 26 racers are found by their `aa`-style letters
+    (Q22)."""
     wrong = []
     for fixture, name in compared_award_lists():
         standings, awards = django_awards(fixture, name)
@@ -246,8 +193,6 @@ def test_current_speed_award_finds_each_award_by_its_key():
             expected = CurrentAward(
                 key, award.name.removesuffix(" (Tie)"), award.racer_id
             )
-            if not re.fullmatch(r"speed-\d+[a-z]?(-\d+){0,2}", award.key):
-                expected = None
             found = current_speed_award(award.key, standings, awards)
             if found != expected:
                 wrong.append((fixture.stem, name, award.key, found, expected))
@@ -321,21 +266,73 @@ def test_php_json_writes_every_fixture_body_as_php_did():
 
 
 def django_body(fixture: Fixture, exchange: str) -> bytes | None:
-    """Django's answer to an `award.list` or `export-json.php` exchange:
-    PHP's, with the speed awards replaced by the engine's."""
+    """Django's answer to a `query=standings`, `award.list` or
+    `export-json.php` exchange: PHP's, with the standings or the speed
+    awards replaced by the engine's. Where PHP answered no JSON, the rest of
+    the answer comes from another exchange of the same request in the
+    transcript, which reads no standings."""
     item = fixture.exchanges[exchange]
-    if item["request"] not in (AWARD_LIST, EXPORT):
+    request = item["request"]
+    if request not in (STANDINGS, AWARD_LIST, EXPORT):
         return None
-    php = json.loads(item["body"])
-    rest = item["body"].removeprefix(php_json(php))
+    template = item
+    if not item["body"].startswith(b"{") and not item["body"].startswith(b"["):
+        template = next(
+            fixture.exchanges[n]
+            for n in fixture.named(request)
+            if fixture.exchanges[n]["body"].startswith(b"{")
+        )
+    php = json.loads(template["body"])
+    rest = template["body"].removeprefix(php_json(php))
     assert rest in (b"", b"\n")
     standings, awards = django_awards(fixture, exchange)
-    if item["request"] == AWARD_LIST:
+    if request == STANDINGS:
+        php = {
+            "standings": {
+                key: [list(rung) for rung in ladder]
+                for key, ladder in standings.ladders.items()
+            }
+        }
+    elif request == AWARD_LIST:
         php["speed-awards"] = [speed_award_json(a) for a in awards]
     else:
         sheet = dict(php)["Awards"]
         sheet[1 : 1 + len(speed_rows(php))] = awards_sheet_rows(standings, awards)
     return php_json(php) + rest
+
+
+def differs_from_php(fixture: Fixture, exchange: str, django: bytes) -> bool:
+    item = fixture.exchanges[exchange]
+    if item["status"] != "200" or not item["body"].startswith((b"{", b"[")):
+        return True
+    if item["request"] == STANDINGS:
+        return json.loads(django) != json.loads(item["body"])
+    return django != item["body"]
+
+
+def quirk_of(fixture: Fixture, exchange: str) -> str:
+    """Why Django's exchange differs from PHP's (#20)."""
+    if fixture.stem == Q7:
+        return "Q7"
+    standings, _ = django_awards(fixture, exchange)
+    if any(r.summary.score is None for r in standings.rows):
+        return "Q23"
+    if any(len(rung) > 26 for ladder in standings.ladders.values() for rung in ladder):
+        return "Q22"
+    raise AssertionError(f"{fixture.stem} {exchange} differs from PHP")
+
+
+REASONS = {
+    "Q7": Q7_REASON,
+    "Q22": (
+        "Django names the 27th award of a tie and on aa, ab, and on; PHP's "
+        "letter runs past z, and from the 32nd its key is not UTF-8."
+    ),
+    "Q23": (
+        "Django gives a racer with no score in time scoring no place; PHP "
+        "throws a TypeError or files the racer under rung -1."
+    ),
+}
 
 
 def raw_headers(path) -> dict[str, bytes]:
@@ -352,38 +349,52 @@ def raw_headers(path) -> dict[str, bytes]:
     return headers
 
 
-def write_q7_deviations():
-    fixture = Fixture(Q7)
-    headers = raw_headers(GOLDEN_DIR / Q7_FIXTURE)
-    out = b""
-    differing = []
-    for name, item in fixture.exchanges.items():
-        django = django_body(fixture, name)
-        if django is None or django == item["body"]:
+def write_standings_deviations():
+    """Every standings transcript exchange where Django differs, listed
+    under its quirk, with Django's exchanges under `deviations/<quirk>/`."""
+    written: dict[tuple[str, str], tuple[list[str], bytes]] = {}
+    for path in sorted(STANDINGS_DIR.glob("*.http")):
+        if path.stem in ("award-settings", "edge-cases-setup"):
             continue
-        differing.append(name)
-        head = re.sub(
-            rb"\nlength: \d+", f"\nlength: {len(django)}".encode(), headers[name]
-        )
-        out += head + b"\nbody:\n" + django + b"\n"
-    expected = f"deviations/Q7/{Q7}.http"
-    path = GOLDEN_DIR / expected
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(out)
-    entry = {
-        "quirk": "Q7",
-        "fixture": Q7_FIXTURE,
-        "exchanges": differing,
-        "reason": Q7_REASON,
-        "expected": expected,
-    }
+        fixture = Fixture(path.stem)
+        headers = raw_headers(path)
+        for name in fixture.exchanges:
+            django = django_body(fixture, name)
+            if django is None or not differs_from_php(fixture, name, django):
+                continue
+            head = re.sub(
+                rb"\nlength: \d+", f"\nlength: {len(django)}".encode(), headers[name]
+            )
+            head = re.sub(rb"\nstatus: \d+", b"\nstatus: 200", head)
+            names, out = written.get((fixture.stem, quirk_of(fixture, name)), ([], b""))
+            written[(fixture.stem, quirk_of(fixture, name))] = (
+                [*names, name],
+                out + head + b"\nbody:\n" + django + b"\n",
+            )
     listing = json.loads(DEVIATIONS_FILE.read_text())
-    entries = listing["deviations"]
-    at = next((i for i, e in enumerate(entries) if e["quirk"] == "Q7"), len(entries))
-    listing["deviations"] = [*entries[:at], entry, *entries[at + 1 :]]
+    kept = [
+        e
+        for e in listing["deviations"]
+        if not e["fixture"].startswith("http/standings/")
+    ]
+    for (stem, quirk), (names, out) in sorted(written.items()):
+        expected = f"deviations/{quirk}/{stem}.http"
+        path = GOLDEN_DIR / expected
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(out)
+        kept.append(
+            {
+                "quirk": quirk,
+                "fixture": f"http/standings/{stem}.http",
+                "exchanges": names,
+                "reason": REASONS[quirk],
+                "expected": expected,
+            }
+        )
+        print(f"{quirk} {stem}: {len(names)} exchanges, written to {expected}")
+    listing["deviations"] = sorted(kept, key=lambda e: int(e["quirk"][1:]))
     DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2) + "\n")
-    print(f"{Q7_FIXTURE}: {differing} differ, written to {expected}")
 
 
 if __name__ == "__main__":
-    write_q7_deviations()
+    write_standings_deviations()

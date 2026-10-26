@@ -123,7 +123,12 @@ function current_award($requested_key) {
   write_raceinfo('current_award_key', $requested_key);
   $GLOBALS['json_out'] = array();
   $GLOBALS['failure'] = null;
-  include('ajax/query.award.current.inc');
+  try {
+    include('ajax/query.award.current.inc');
+  } catch (Throwable $t) {
+    return array('key' => $requested_key, 'failure' => null, 'current' => null, 'racerid' => null,
+                 'error' => get_class($t).': '.$t->getMessage());
+  }
   $current = isset($GLOBALS['json_out']['current']) ? $GLOBALS['json_out']['current'] : null;
   return array('key' => $requested_key,
                'failure' => $GLOBALS['failure'],

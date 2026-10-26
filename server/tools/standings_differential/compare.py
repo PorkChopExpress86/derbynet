@@ -19,7 +19,6 @@ that it read a missing racer.
 """
 
 import json
-import re
 from collections import Counter
 from contextlib import ExitStack
 from dataclasses import dataclass, field
@@ -179,7 +178,13 @@ class _ModelAwarding(speed_awards._Awarding):
                 name += " (Tie)"
             for i in range(len(remaining)):
                 racer_id = remaining.get(i)
-                letter = chr(ord("a") + i) if len(rung) > 1 else ""
+                letter = ""
+                if len(rung) > 1:
+                    letter = (
+                        chr(ord("a") + i)
+                        if self.php_indexing
+                        else speed_awards.tie_letters(i)
+                    )
                 key = f"speed-{1 + place}{letter}"
                 if group_id is not None:
                     key += f"-{group_id}"
@@ -374,25 +379,6 @@ def _compare_category(out: Outcome, category: str, php_items, django_items) -> N
         out.diffs[category] = first
 
 
-def _malformed_number(key: str) -> bool:
-    """A key whose place or id is a number PHP compares loosely but Django
-    does not read as one: `speed-1.0`, `speed-02`, `speed-1- 7`. PHP's `==`
-    takes such text as the number, and its `ordinal()` misnames it."""
-    parts = key.split("-")[1:]
-    if not parts:
-        return False
-    if parts[0] and "a" <= parts[0][-1] <= "z":
-        parts[0] = parts[0][:-1]
-    return any(
-        _PHP_NUMERIC.match(p) and not (p.isdigit() and str(int(p)) == p) for p in parts
-    )
-
-
-_PHP_NUMERIC = re.compile(
-    r"[ \t\n\r\v\f]*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?[ \t\n\r\v\f]*\Z"
-)
-
-
 def _topological(ev: dict, order: list[int]) -> bool:
     position = {g: i for i, g in enumerate(order)}
     return all(
@@ -490,10 +476,6 @@ def compare(ev: dict, php: dict) -> Outcome:
     award_keys = {a["key"] for a in php["awards"]}
     split = {"current": ([], []), "current_odd_keys": ([], [])}
     for key, p, d in zip(keys, php["current"], django_current, strict=True):
-        if key not in award_keys and _canon(p) != _canon(d) and _malformed_number(key):
-            out.deviations.append("malformed number in key")
-            out.compared["current_odd_keys"] += 1
-            continue
         php_items, django_items = split[
             "current" if key in award_keys else "current_odd_keys"
         ]

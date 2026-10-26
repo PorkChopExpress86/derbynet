@@ -99,9 +99,11 @@ def lane_bias_analysis(times_by_lane: Sequence[Sequence[float]]) -> LaneBias | N
     isn't enough evidence: no finished run, one lane, as many finished runs
     as lanes, or no variation within lanes.
 
-    As in PHP, the sums of squares count the second-to-last lane twice and
-    leave out the last lane, while the grand mean and the degrees of freedom
-    count every lane. `lanes` holds every lane's own stats.
+    The sums of squares count every lane once. PHP's second loop,
+    `foreach ($lanes as $lane)`, writes through the reference its first
+    loop left on the last lane, so PHP counts the second-to-last lane twice
+    and leaves out the last lane (Q24). `lanes` holds every lane's own
+    stats.
     """
     nlanes = len(times_by_lane)
     lanes = []
@@ -126,10 +128,7 @@ def lane_bias_analysis(times_by_lane: Sequence[Sequence[float]]) -> LaneBias | N
     grand_mean = total / nn
     ssbetween = 0.0
     sswithin = 0.0
-    # PHP's `foreach ($lanes as $lane)` assigns through the reference `$lane`
-    # that the first loop left on the last lane, so the sums see the
-    # second-to-last lane twice and the last lane not at all.
-    for n, _dnfs, mean, lane_sswithin in (*lanes[:-1], lanes[-2]):
+    for n, _dnfs, mean, lane_sswithin in lanes:
         ssbetween += n * (mean - grand_mean) * (mean - grand_mean)
         sswithin += lane_sswithin
     msbetween = ssbetween / (nlanes - 1)

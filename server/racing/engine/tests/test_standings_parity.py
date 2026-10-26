@@ -10,10 +10,11 @@ presentation's sheet, in catalog order, with its title and name, and each
 row's places, heats, scores and names.
 
 A deviation listed in `tests/golden/deviations.json` replaces PHP's exchange
-with Django's (D25). The speed-award test owns the Q7 entries.
-
-`UNCOMPARABLE` lists the exchanges where PHP gave no standings to compare,
-each with the reason, and each is checked to be what the list says.
+with Django's (D25), and must still differ from PHP's. Q23 is one: time
+scoring over heats that hold places only gives a racer a NULL score, PHP
+then throws a TypeError at `standings.inc` line 382 or files the racer under
+rung -1, and Django gives the racer no place. `test_speed_awards_parity`
+writes the entries.
 """
 
 import pytest
@@ -37,27 +38,6 @@ from .standings_fixtures import (
     standings_transcripts,
 )
 
-# Time scoring over heats that hold places only, as test-points-racing.sh
-# leaves its first round: a racer with no time has a NULL score, which
-# StandingsTracker::AddEntry compares as a tie with last_score -1 and files
-# under rung -1. The next racer with a score then gets a place past the end
-# of the ladder, and `count($this->all_standings[$key][$place])`
-# (standings.inc line 382) throws a TypeError, so PHP answers 500. Under
-# scoring 1 every timed racer scores 0, joins the "tie", and PHP answers a
-# ladder that is an object keyed from "-1". Django gives the NULL score no
-# place (`oracle.Row`).
-NULL_SCORE_500 = "a NULL score in time scoring: TypeError at standings.inc:382"
-NULL_SCORE_RUNG = "a NULL score in time scoring: PHP files it under rung -1"
-POINTS = "suite-points-racing"
-UNCOMPARABLE = {
-    (POINTS, "004 points=0 scoring=0 subgroups=0 standings"): NULL_SCORE_500,
-    (POINTS, "006 points=0 scoring=0 subgroups=1 standings"): NULL_SCORE_500,
-    (POINTS, "008 points=0 scoring=1 subgroups=0 standings"): NULL_SCORE_RUNG,
-    (POINTS, "010 points=0 scoring=1 subgroups=1 standings"): NULL_SCORE_RUNG,
-    (POINTS, "012 points=0 scoring=2 subgroups=0 standings"): NULL_SCORE_500,
-    (POINTS, "014 points=0 scoring=2 subgroups=1 standings"): NULL_SCORE_500,
-}
-
 FIXTURES = standings_transcripts()
 EXPORTING = sorted({*FIXTURES, "award-settings"} - {SNAPSHOT})
 
@@ -78,10 +58,11 @@ def test_every_ladder_matches_php(fixture):
     compared = 0
     wrong = {}
     for name in fixture.named(STANDINGS):
-        if (fixture.stem, name) in UNCOMPARABLE:
-            continue
         php = body(fixture.expected(name))["standings"]
-        django = Standings(fixture.event(name)).ladders
+        django = {
+            key: [list(rung) for rung in ladder]
+            for key, ladder in Standings(fixture.event(name)).ladders.items()
+        }
         compared += 1
         for key in php.keys() | django.keys():
             if php.get(key) != django.get(key):
@@ -89,25 +70,13 @@ def test_every_ladder_matches_php(fixture):
                     named_ladder(fixture, django.get(key)),
                     named_ladder(fixture, php.get(key)),
                 )
+        if name in fixture.deviated:
+            item = fixture.exchanges[name]
+            assert item["status"] != "200" or body(item)["standings"] != django, (
+                f"{name} no longer differs from PHP"
+            )
     assert wrong == {}
-    assert compared + sum(s == fixture.stem for s, _ in UNCOMPARABLE) == len(
-        fixture.named(STANDINGS)
-    )
-
-
-@pytest.mark.parametrize(("stem", "exchange"), sorted(UNCOMPARABLE))
-def test_uncomparable_exchanges_are_what_the_list_says(stem, exchange):
-    fixture = Fixture(stem)
-    php = fixture.exchanges[exchange]
-    rows = Standings(fixture.event(exchange)).rows
-    assert any(r.summary.score is None for r in rows), "a racer has no score"
-    assert any(r.summary.score is not None for r in rows), "a racer has a score"
-    if UNCOMPARABLE[(stem, exchange)] == NULL_SCORE_500:
-        assert (php["status"], php["body"]) == ("500", b"")
-    else:
-        ladders = body(php)["standings"].values()
-        assert php["status"] == "200"
-        assert all(isinstance(ladder, dict) and "-1" in ladder for ladder in ladders)
+    assert compared == len(fixture.named(STANDINGS))
 
 
 @pytest.mark.parametrize("stem", EXPORTING)

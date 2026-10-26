@@ -9,11 +9,13 @@ subgroup order. With `one-trophy-per`, a racer who already holds a speed
 award is passed over and the award goes to the next racer.
 """
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 from racing.engine.groups.aggregates import Aggregate, topological_order
+from racing.engine.phpcompat import php_equals, php_intval, php_numeric
 from racing.engine.standings.oracle import Standings
 from racing.engine.standings.ordinals import nth_fastest
 from racing.engine.standings.tracker import Ladder
@@ -121,7 +123,7 @@ class _Awarding:
             if len(recipients) > 1:
                 name += " (Tie)"
             for i, racer_id in enumerate(recipients):
-                letter = chr(ord("a") + i) if len(rung) > 1 else ""
+                letter = tie_letters(i) if len(rung) > 1 else ""
                 key = f"speed-{1 + place}{letter}"
                 if group_id is not None:
                     key += f"-{group_id}"
@@ -140,6 +142,27 @@ class _Awarding:
                 )
                 self.holders.append(racer_id)
             place += 1
+
+
+def tie_letters(i: int) -> str:
+    """The letters of the `i`-th award of a tied place: `a` to `z`, then
+    `aa`, `ab`, and on. PHP writes `chr(ord('a') + $i)`, which runs past
+    `z` into punctuation and, from the 32nd racer, bytes that are not
+    UTF-8 (Q22)."""
+    letters = ""
+    i += 1
+    while i:
+        i, rest = divmod(i - 1, 26)
+        letters = chr(ord("a") + rest) + letters
+    return letters
+
+
+def tie_index(letters: str) -> int:
+    """The inverse of `tie_letters`."""
+    i = 0
+    for letter in letters:
+        i = i * 26 + ord(letter) - ord("a") + 1
+    return i - 1
 
 
 def speed_awards(standings: Standings, trophies: TrophySettings) -> SpeedAwards:
@@ -272,43 +295,59 @@ def current_speed_award(
     `<place>` may end in a tie letter, `1b` for the second award of first
     place. A group key for the `full-field-calc` aggregate is presented as
     the pack's award, under the key `speed-<place>`. None when the key is
-    not a speed key or names no award."""
+    not a speed key or names no award.
+
+    The key is read as PHP reads it. A place without a tie letter stays
+    text and is compared with PHP 8's `==`, so `speed-02` and `speed-2.0`
+    find second place, and an id compares the same way, so `speed-2- 1`
+    finds group 1's award. A name looks its group or subgroup up by the
+    id's number, as SQLite compares text with an integer column. A place
+    PHP cannot do arithmetic on, `speed-x1`, makes PHP answer 500; here it
+    names no award."""
     parts = key.split("-")
     if len(parts) < 2 or parts[0] != "speed":
         return None
-    place_text = parts[1]
+    place: int | str = parts[1]
     index = 0
-    if place_text and "a" <= place_text[-1] <= "z":
-        index = ord(place_text[-1]) - ord("a")
-        place_text = place_text[:-1]
-    if not place_text.isdigit():
-        return None
-    place = int(place_text)
+    letters = re.search(r"[a-z]+\Z", place)
+    if letters:
+        # PHP reads one letter; two or more name a tie past "z" (Q22).
+        tie = letters[0] if len(letters[0]) > 1 else letters[0][-1]
+        index = tie_index(tie)
+        place = php_intval(place[: len(place) - len(tie)])
     label = standings.settings.supergroup_label
 
-    group_id = subgroup_id = None
-    if len(parts) == 4:
-        subgroup_id = _int(parts[3])
-        subgroup = standings.subgroups.get(subgroup_id)
-        name = nth_fastest(place, subgroup.name if subgroup else "")
-    elif len(parts) == 3:
-        group_id = _int(parts[2])
-        if group_id != standings.settings.full_field_calc:
-            group = standings.groups.get(group_id)
-            name = nth_fastest(place, group.name if group else "")
+    def named(table, id_text: str) -> str:
+        number = php_numeric(id_text)
+        found = table.get(number) if number is not None else None
+        return nth_fastest(place, found.name if found else "")
+
+    def is_place(award: SpeedAward) -> bool:
+        if isinstance(place, int):
+            return award.place == place
+        return php_equals(award.place, place)
+
+    try:
+        if len(parts) == 4:
+            name = named(standings.subgroups, parts[3])
+        elif len(parts) == 3:
+            if php_numeric(parts[2]) != standings.settings.full_field_calc:
+                name = named(standings.groups, parts[2])
+            else:
+                key = f"speed-{place}"
+                name = nth_fastest(place, label)
         else:
-            key = f"speed-{place}"
             name = nth_fastest(place, label)
-    else:
-        name = nth_fastest(place, label)
+    except TypeError:
+        return None
 
     for award in awards:
-        if award.place != place:
+        if not is_place(award):
             continue
         if len(parts) == 4:
-            match = award.subgroup_id == subgroup_id
+            match = php_equals(award.subgroup_id, parts[3])
         elif len(parts) == 3:
-            match = award.group_id == group_id
+            match = php_equals(award.group_id, parts[2])
         else:
             match = True
         if match:
@@ -316,10 +355,3 @@ def current_speed_award(
                 return CurrentAward(key, name, award.racer_id)
             index -= 1
     return None
-
-
-def _int(text: str) -> int | str | None:
-    """The id in a key, compared with an award's as PHP's `==` compares
-    them: empty text equals a null id, and other text that is not a number
-    equals no id, so it stays text."""
-    return int(text) if text.isdigit() else (text or None)
