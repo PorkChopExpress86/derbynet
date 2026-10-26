@@ -31,9 +31,6 @@ pytestmark = pytest.mark.django_db
 
 
 def replay_script(replay, fixture, raced_after=()):
-    """Send the script's roster changes, racing each round the script races
-    after the call named for it, and compare every `roster.new` with PHP's
-    reply."""
     for name, exchange in suite(fixture).items():
         recorded = json.loads(exchange["body"])
         code, roster = replay.roster_change(exchange["request-body"])
@@ -50,9 +47,6 @@ def replay_script(replay, fixture, raced_after=()):
 
 
 def test_new_rounds_on_the_basic_racing_database():
-    """Follow-on rounds by group and by subgroup, and aggregates by group,
-    bucketed and not, with an excluded racer and a racer moved between
-    groups."""
     replay_script(basic_racing(), "new-rounds-basic")
 
 
@@ -69,13 +63,10 @@ def test_master_schedule_then_new_rounds():
 
 
 def test_aggregate_rounds():
-    """Aggregates by subgroup and by group, a second round of an aggregate,
-    and an aggregate of aggregates, each final raced before the next."""
     replay_script(aggregate_rounds(), "aggregate-rounds", AGGREGATE_ROUNDS_RACED_AFTER)
 
 
 def test_aggregate_classes():
-    """Round 1 of an aggregate made with `class.add`, by subgroup."""
     replay_script(aggregate_classes(), "aggregate-classes")
 
 

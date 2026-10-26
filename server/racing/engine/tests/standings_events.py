@@ -1,7 +1,3 @@
-"""Seeded random events for the standings tests: two groups of two
-subgroups each, an aggregate over both, round 1 for every group and round 1
-of the aggregate, with times on three decimals so ties happen."""
-
 import random
 from dataclasses import replace
 

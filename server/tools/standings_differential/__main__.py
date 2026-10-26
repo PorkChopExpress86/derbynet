@@ -59,7 +59,6 @@ def run_php(image: str, name: str, workdir: Path, chunk: str) -> None:
 
 
 def plan(args) -> list[tuple[str, str | None, list[int]]]:
-    """(chunk name, batch, seeds) for every container to run."""
     chunks = []
     seeds = list(range(args.seed, args.seed + args.events))
     for i in range(0, len(seeds), args.chunk):
@@ -137,7 +136,6 @@ def main(argv=None) -> int:
 
 
 def run_controls(events, results) -> int:
-    """Each fault must make its category differ in at least one event."""
     print("\nseeded faults (events whose category differs):")
     missed = 0
     for name, (category, _patch) in CONTROLS.items():

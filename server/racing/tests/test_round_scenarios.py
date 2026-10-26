@@ -97,9 +97,6 @@ class Export:
 
 
 class Rounds(Replay):
-    """A replay that also knows the scripts' name lookups and their racing,
-    which comes from `export`."""
-
     def __init__(self, export: Export | None = None):
         super().__init__()
         self.export = export
@@ -144,14 +141,12 @@ class Rounds(Replay):
             )
 
     def check_in(self):
-        """Pass the racers the export's Roster sheet lists."""
         cars = [row[1] for row in self.export.roster]
         Racer.objects.filter(event=self.event, car_number__in=cars).update(
             passed_inspection=True
         )
 
     def passed(self):
-        """The passed racers as the Roster sheet lists them."""
         use_subgroups = self.settings.use_subgroups
         return sorted(
             (
@@ -201,8 +196,6 @@ class Rounds(Replay):
         return Round.objects.get(group=self.group(prefix), number=number)
 
     def race(self, round):
-        """Enter the round's chart and results as the export lists them,
-        which stands in for `schedule.generate` and `run_heat`."""
         assert not HeatLane.objects.filter(round=round).exists(), round
         racers = {
             (r.car_number, f"{r.first_name} {r.last_name}"): r
@@ -397,7 +390,6 @@ def aggregate_rounds() -> Rounds:
     return replay
 
 
-# The rounds `test-aggregate-rounds.sh` races after each `roster.new`.
 AGGREGATE_ROUNDS_RACED_AFTER = {
     "003 roster.new": ("Younger Finals", 1),
     "004 roster.new": ("Older Finals", 1),

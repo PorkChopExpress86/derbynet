@@ -1,8 +1,3 @@
-"""Seeded faults that prove the comparison can fail. Each control breaks the
-Django engine in one way, and the comparison must report a difference in
-the category named for it. `--controls` runs them on the events of the run.
-"""
-
 import functools
 import operator
 from contextlib import contextmanager

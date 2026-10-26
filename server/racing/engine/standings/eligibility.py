@@ -12,8 +12,6 @@ from enum import StrEnum
 
 
 class NotEligible(StrEnum):
-    """Why a racer's row takes no place in a ladder."""
-
     ANY_AWARD = "not eligible for any award"
     SPEED_AWARDS = "not eligible for speed awards"
     ALL_PARTITION_AWARDS = "partition does not count for all-partition awards"
@@ -21,10 +19,6 @@ class NotEligible(StrEnum):
 
 @dataclass(frozen=True)
 class AwardSettings:
-    """A racer's two award settings, and whether the racer's partition
-    counts for all-partition awards. `not_eligible_for_any_award` is the
-    legacy `exclude`."""
-
     not_eligible_for_any_award: bool = False
     not_eligible_for_speed_awards: bool = False
     partition_counts_for_all_partition_awards: bool = True

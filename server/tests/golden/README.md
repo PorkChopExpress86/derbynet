@@ -154,6 +154,9 @@ These are recorded as found and are not fixed here:
 - A `FINISHED` for the wrong heat answers `<failure code='wrong-heat'>` and then `<success/>`.
 - With `one-trophy-per`, a tied rung whose first racer already holds a trophy gets a speed award with `racerid` null, and the other racer in the rung gets none (#20 Q7, `http/standings/q7-tie-after-earlier-trophy.http`).
 - Reading the standings writes `scoring=1` to RaceInfo when the legacy `drop-slowest` key is set and `scoring` is not (#20 Q13, `http/standings/q13-drop-slowest.http`).
+- `lane_bias_analysis()`'s second loop, `foreach ($lanes as $lane)`, writes through the reference the first loop left on the last lane, so the sums of squares count the second-to-last lane twice and leave out the last lane (`engine/lane-bias.json`). The port reproduces it until the owner decides; no quirk id covers it yet.
+- Time scoring over heats that record places only gives a racer a NULL score. `StandingsTracker::AddEntry` files it under rung -1, and with scoring 0 or 2 `compute_all_standings()` then throws a `TypeError`, so `query=standings` and `query=award.list` answer 500 with an empty body (`http/standings/suite-points-racing.http` 004, 006, 012, 014). With scoring 1 the ladders come back keyed from `"-1"` (008, 010). Django gives a racer with no score no place.
+- A tie of more than 26 racers runs the award key letter past `z`, and past 31 racers `chr()` makes a key that is not UTF-8, so `json_encode()` fails and `award.list` answers only a newline (`http/standings/suite-aggregate-classes.http` 025 and 027).
 
 ## Known risks
 

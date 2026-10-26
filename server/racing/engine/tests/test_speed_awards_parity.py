@@ -304,8 +304,6 @@ def test_current_speed_award_matches_php_award_current():
 
 
 def test_php_json_writes_every_fixture_body_as_php_did():
-    """The expected Q7 exchanges are PHP's with one part changed, written
-    the way PHP writes JSON."""
     checked = 0
     for path in sorted((GOLDEN_DIR / "http").rglob("*.http")):
         for item in read_transcript(path).values():
@@ -320,9 +318,6 @@ def test_php_json_writes_every_fixture_body_as_php_did():
             )
             checked += 1
     assert checked > 700
-
-
-# ----- the Q7 deviation -----
 
 
 def django_body(fixture: Fixture, exchange: str) -> bytes | None:
@@ -344,8 +339,6 @@ def django_body(fixture: Fixture, exchange: str) -> bytes | None:
 
 
 def raw_headers(path) -> dict[str, bytes]:
-    """`{exchange name: its lines before the body}`, as the transcript has
-    them, read as `read_transcript()` reads them."""
     data = path.read_bytes()
     headers = {}
     pos = 0
@@ -360,8 +353,6 @@ def raw_headers(path) -> dict[str, bytes]:
 
 
 def write_q7_deviations():
-    """Writes the Q7 entry in `deviations.json`, listing the exchanges of
-    the Q7 transcript where Django differs from PHP, and those exchanges."""
     fixture = Fixture(Q7)
     headers = raw_headers(GOLDEN_DIR / Q7_FIXTURE)
     out = b""

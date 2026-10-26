@@ -21,15 +21,12 @@ from roster.tests.php_replay import Replay
 
 pytestmark = pytest.mark.django_db
 
-# Seconds per heat for each Lions racer, fastest first.
 LIONS = [3.01, 3.02, 3.03, 3.04, 3.05, 3.06, 3.07]
 TIGERS = [3.015, 3.025, 3.035]
 
 
 @pytest.fixture
 def replay():
-    """Lions and Tigers, each racing round 1 with two heats per racer at the
-    times above."""
     replay = Replay()
     RaceSettings.objects.filter(event=replay.event).update(lane_count=4)
     for den, times in (("Lions", LIONS), ("Tigers", TIGERS)):

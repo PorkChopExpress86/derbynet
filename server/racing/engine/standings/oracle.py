@@ -21,9 +21,10 @@ place in that ladder (D33, D34; see `eligibility`). Every place, ladder and
 `T` mark is then what PHP gives with that racer removed.
 """
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from functools import cached_property
+from types import MappingProxyType
 
 from racing.engine.phpcompat import ascii_fold
 from racing.engine.standings.eligibility import ELIGIBLE, AwardSettings, NotEligible
@@ -93,8 +94,6 @@ class Racer:
 
 @dataclass(frozen=True)
 class Result:
-    """One heat lane's result: a time, a place, or both."""
-
     round_id: int
     racer_id: int
     finish_time: float | None
@@ -133,7 +132,7 @@ class Event:
     settings: Settings = Settings()
 
 
-@dataclass
+@dataclass(frozen=True)
 class Row:
     """One racer's showing in one round. `outcome` maps each ladder the row
     takes a place in to that place, in PHP's key order. `not_eligible` maps
@@ -144,8 +143,8 @@ class Row:
     racer: Racer
     summary: Summary
     nonfinal: bool = False
-    outcome: dict[str, Place] = field(default_factory=dict)
-    not_eligible: dict[str, NotEligible] = field(default_factory=dict)
+    outcome: Mapping[str, Place] = MappingProxyType({})
+    not_eligible: Mapping[str, NotEligible] = MappingProxyType({})
 
 
 @dataclass(frozen=True)
@@ -166,17 +165,16 @@ class Standings:
         for round in sorted(event.rounds, key=lambda r: -r.number):
             self.rounds_of.setdefault(round.group_id, []).append(round)
         self.rolls_up_to = _rolls_up_to(event.groups)
-        self.rows = _rows(event)
         self.ladders: dict[str, Ladder] = {}
         self.catalog_counts: dict[str, int] = {}
-        self._place_rows()
+        self.rows: tuple[Row, ...] = self._place_rows(_rows(event))
 
-    # ----- computing -----
-
-    def _keys(self, row: Row) -> list[str]:
+    def _keys(self, row: Row) -> tuple[list[str], bool]:
+        """The ladders a row bears on, in PHP's order, and whether its round
+        is a finished round other than its group's final one."""
         keys = [round_key(row.round.id)]
         if not row.round.finished:
-            return keys
+            return keys, False
         subgroup = round_subgroup_key(row.round.id, row.racer.subgroup_id)
         rounds = self.rounds_of[row.round.group_id]
         if rounds and rounds[0].id == row.round.id:
@@ -187,15 +185,12 @@ class Standings:
                 if not only or row.racer.subgroup_id in only:
                     keys.append(qualifier_key(aggregate_id))
             keys.append(FULL_FIELD)
-        else:
-            row.nonfinal = True
-            if self.settings.use_subgroups:
-                keys.append(subgroup)
-        return keys
+            return keys, False
+        if self.settings.use_subgroups:
+            keys.append(subgroup)
+        return keys, True
 
     def _is_pack_ladder(self, key: str, row: Row) -> bool:
-        """The full field, and every ladder of the `full-field-calc`
-        aggregate group: its qualifier standings and its rounds."""
         pack = self.settings.pack_group_id
         if key == FULL_FIELD:
             return True
@@ -205,29 +200,41 @@ class Standings:
             row.round.group_id == pack and not key.startswith("st-q")
         )
 
-    def _place_rows(self) -> None:
+    def _place_rows(self, drafts: list[Row]) -> tuple[Row, ...]:
         trackers: dict[str, StandingsTracker] = {}
-        places: list[tuple[Row, str, int]] = []
-        for row in self.rows:
-            if row.summary.score is None:
-                continue
-            for key in self._keys(row):
-                why = row.racer.awards.why_not(
-                    all_partitions=self._is_pack_ladder(key, row)
-                )
-                if why is not None:
-                    row.not_eligible[key] = why
-                    continue
-                tracker = trackers.setdefault(key, StandingsTracker())
-                places.append((row, key, tracker.add(row.summary.score, row.racer.id)))
+        marks: list[tuple[bool, dict[str, int], dict[str, NotEligible]]] = []
+        for row in drafts:
+            placed: dict[str, int] = {}
+            not_eligible: dict[str, NotEligible] = {}
+            nonfinal = False
+            if row.summary.score is not None:
+                keys, nonfinal = self._keys(row)
+                for key in keys:
+                    why = row.racer.awards.why_not(
+                        all_partitions=self._is_pack_ladder(key, row)
+                    )
+                    if why is not None:
+                        not_eligible[key] = why
+                        continue
+                    tracker = trackers.setdefault(key, StandingsTracker())
+                    placed[key] = tracker.add(row.summary.score, row.racer.id)
+            marks.append((nonfinal, placed, not_eligible))
         for key, tracker in trackers.items():
             self.ladders[key] = tracker.rungs
             self.catalog_counts[key] = tracker.count
-        for row, key, place in places:
-            tied = len(self.ladders[key][place]) > 1
-            row.outcome[key] = f"T{place + 1}" if tied else place + 1
 
-    # ----- reading -----
+        def place(key: str, rung: int) -> Place:
+            return f"T{rung + 1}" if len(self.ladders[key][rung]) > 1 else rung + 1
+
+        return tuple(
+            replace(
+                row,
+                nonfinal=nonfinal,
+                outcome=MappingProxyType({k: place(k, r) for k, r in placed.items()}),
+                not_eligible=MappingProxyType(not_eligible),
+            )
+            for row, (nonfinal, placed, not_eligible) in zip(drafts, marks, strict=True)
+        )
 
     @property
     def has_full_field_standings(self) -> bool:

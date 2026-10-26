@@ -130,7 +130,6 @@ ROUND_TABLE = {
     "suite-aggregate-classes": "aggregate-classes",
 }
 
-# The transcript of the scenario that captured a fixture's racer.list.
 SETUP = {
     "edge-cases-six-heats-of-nine": "edge-cases-setup",
     "edge-cases-all-heats": "edge-cases-setup",
@@ -138,7 +137,6 @@ SETUP = {
 
 
 def standings_transcripts() -> list[str]:
-    """Every transcript in the directory that records `query=standings`."""
     return [
         path.stem
         for path in sorted(STANDINGS_DIR.glob("*.http"))
@@ -147,8 +145,6 @@ def standings_transcripts() -> list[str]:
 
 
 def label(exchange: str) -> str:
-    """`"004 points=0 scoring=1 subgroups=0 standings"` is
-    `"points=0 scoring=1 subgroups=0"`."""
     words = exchange.split(" ")[1:-1]
     return " ".join(words)
 
@@ -184,8 +180,7 @@ def matrix_states(left: State) -> dict[str, State]:
 
 def award_settings_states(exchanges: dict[str, dict], left: State) -> dict[str, State]:
     """`12-standings-quirks.sh`'s award settings, each kept for the
-    exchanges after it. Group and subgroup trophy counts are in the
-    `classes` lists themselves."""
+    exchanges after it."""
     states = {}
     state = left
     for name, exchange in exchanges.items():
@@ -208,8 +203,6 @@ class _Round:
 
 
 class Fixture:
-    """One standings transcript and the event behind it."""
-
     def __init__(self, stem: str):
         self.stem = stem
         self.exchanges = read_transcript(STANDINGS_DIR / f"{stem}.http")
@@ -234,22 +227,17 @@ class Fixture:
                 if isinstance(data := _json_object(item), dict) and "rounds" in data
             ][-1]
 
-    # ----- per exchange -----
-
     def expected(self, exchange: str) -> dict:
         """What Django must answer: PHP's exchange, or its deviation (D25)."""
         return self.deviated.get(exchange, self.exchanges[exchange])
 
     def named(self, request: str) -> list[str]:
-        """The exchanges that sent this request, in order."""
         return [n for n, e in self.exchanges.items() if e["request"] == request]
 
     def state(self, exchange: str) -> State:
         return self._states.get(label(exchange), self._left)
 
     def classes(self, exchange: str | None = None) -> list[dict]:
-        """The last `classes` list PHP returned at or before the exchange,
-        else the first one it returned."""
         lists = [
             (_number(name), data["classes"])
             for name, item in self.exchanges.items()
@@ -300,10 +288,7 @@ class Fixture:
         )
 
     def car_of(self, racer_id: int) -> str:
-        """The racer key of a PHP racerid, for messages."""
         return {v: k for k, v in self.racer_ids.items()}.get(racer_id, str(racer_id))
-
-    # ----- reading the fixtures -----
 
     def _read_export(self) -> None:
         export = body(self.exchanges[self.named(EXPORT)[0]])
@@ -334,7 +319,6 @@ class Fixture:
             )
 
     def _read_snapshot(self) -> None:
-        """The tables of the snapshot `q13-drop-slowest` uploads, ids and all."""
         text = (STANDINGS_DIR / f"{SNAPSHOT}.snapshot.xml").read_text()
         cdata = text.split("<![CDATA[", 1)[1].rsplit("]]>", 1)[0]
         tables = {t["table"]: t["rows"] for t in json.loads(cdata)}
@@ -402,8 +386,6 @@ class Fixture:
         }
 
     def _add_heat(self, group: str, number: int, key: str, time, place) -> None:
-        """One lane of a heat. A lane with no result leaves its round
-        unfinished; a result counts only for a racer who passed check-in."""
         round = self._rounds.setdefault((group, number), _Round(group, number))
         if time is None and place is None:
             round.finished = False
@@ -413,7 +395,6 @@ class Fixture:
 
     @cached_property
     def racer_ids(self) -> dict[str, int]:
-        """`{racer key: PHP racerid}` for every racer the fixtures name."""
         ids = dict(self._known_ids)
 
         def add(key, racer_id):
@@ -449,8 +430,6 @@ class Fixture:
 
     @cached_property
     def round_ids(self) -> dict[tuple[str, int], int]:
-        """`{(group name, round number): PHP roundid}`, from the ladders, and
-        from the round table where the fixtures have one."""
         by_id = {v: k for k, v in self.racer_ids.items()}
         named: dict[int, set[str]] = {}
         for name in self.named(STANDINGS):
@@ -473,8 +452,6 @@ class Fixture:
             for r in self._round_table:
                 where = (r["class"], r["round"])
                 assert ids.setdefault(where, r["roundid"]) == r["roundid"], where
-                # A round with a roster and no heats yet is in no export
-                # sheet, and still decides which round is a group's last.
                 self._rounds.setdefault(where, _Round(*where, finished=False))
             assert len(self._rounds) == len(self._round_table), self.stem
         else:
@@ -532,7 +509,6 @@ def _number(exchange: str) -> int:
 
 
 def _json_object(item: dict):
-    """The JSON body, or None for an empty or XML one."""
     if not item["body"].strip().startswith((b"{", b"[")):
         return None
     return json.loads(item["body"])
@@ -594,7 +570,6 @@ def _membership(names: list[str], classes: list[dict]) -> tuple[int, int]:
 
 
 def deviated_exchanges(fixture: str) -> dict[str, dict]:
-    """`{exchange name: Django's exchange}` for a transcript's deviations."""
     found = {}
     for entry in deviations():
         if entry["fixture"] == fixture:

@@ -1,5 +1,3 @@
-"""The lane bias test over an event's results, for the history page (#49)."""
-
 from core.models import Event, RaceSettings
 from racing.engine.standings.lane_bias import LaneBias, lane_bias_analysis
 from racing.models import HAS_RESULT, HeatLane

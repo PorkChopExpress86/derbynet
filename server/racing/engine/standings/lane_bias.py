@@ -12,8 +12,6 @@ from dataclasses import dataclass
 
 DNF_TIME = 9.9
 
-# F_DISTRIBUTION_10[df2][df1 - 1] is the critical value at alpha 0.10. The
-# rows past 30 stand for every df2 up to the next row.
 F_DISTRIBUTION_10 = {
     1: (39.8635, 49.5000, 53.5932, 55.8330, 57.2401, 58.2044, 58.9060),
     2: (8.5263, 9.0000, 9.1618, 9.2434, 9.2926, 9.3255, 9.3491),
@@ -70,8 +68,6 @@ def critical_f_value(df1: int, df2: int) -> float | None:
 
 @dataclass(frozen=True)
 class LaneStats:
-    """One lane's row on the history page."""
-
     runs: int
     dnfs: int
     mean: float

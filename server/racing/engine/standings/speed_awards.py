@@ -18,9 +18,6 @@ from racing.engine.standings.oracle import Standings
 from racing.engine.standings.ordinals import nth_fastest
 from racing.engine.standings.tracker import Ladder
 
-SPEED_TROPHY_TYPE_ID = 5
-SPEED_TROPHY_TYPE = "Speed Trophy"
-
 
 class Category(StrEnum):
     SUPERGROUP = "supergroup"
@@ -308,9 +305,9 @@ def current_speed_award(
     for award in awards:
         if award.place != place:
             continue
-        if subgroup_id is not None or len(parts) == 4:
+        if len(parts) == 4:
             match = award.subgroup_id == subgroup_id
-        elif group_id is not None or len(parts) == 3:
+        elif len(parts) == 3:
             match = award.group_id == group_id
         else:
             match = True

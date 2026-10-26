@@ -88,7 +88,6 @@ DJANGO_RECORD = {LANE_BIAS: lane_bias_record, CRITICAL_F_VALUE: critical_f_value
 
 
 def php_records(fixture):
-    """The fixture's records with only the fields Django produces."""
     records = json.loads((GOLDEN_DIR / fixture).read_text())
     fields = {LANE_BIAS: ("result",), CRITICAL_F_VALUE: ("value",)}[fixture]
     return {
@@ -159,8 +158,6 @@ def test_too_little_evidence_has_no_result():
 
 
 def write_q9_deviations():
-    """Writes each fixture's Q9 entry in `deviations.json`, listing the cases
-    where Django differs from PHP, and its expected records."""
     listing = json.loads(DEVIATIONS_FILE.read_text())
     others = [
         entry

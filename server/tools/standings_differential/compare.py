@@ -54,11 +54,9 @@ LISTS = (
     "rank_keys",
     "finalists",
 )
-"""The categories compared item by item as they come."""
 
 
 def build_event(ev: dict) -> tuple[oracle.Event, speed_awards.TrophySettings]:
-    """The event as `racing.services.standings` reads it from the database."""
     s = ev["settings"]
     racers = {r["racerid"]: r for r in ev["RegistrationInfo"]}
     with_result = [
@@ -241,8 +239,6 @@ def _current_out(standings, awards, keys: list[str]) -> list[dict | None]:
 def _speed_awards_as(
     standings, trophies, *, awarding=None, order: list[int] | None = None
 ):
-    """Django's `speed_awards`, with its `_Awarding` replaced by a model,
-    or the aggregate order replaced by PHP's."""
     with ExitStack() as stack:
         if awarding is not None:
             stack.enter_context(mock.patch.object(speed_awards, "_Awarding", awarding))
@@ -352,10 +348,6 @@ def _canon(x) -> str:
 
 @dataclass
 class Outcome:
-    """One event's comparison. `compared` and `differing` count items per
-    category; `deviations` names the deliberate differences found;
-    `diffs` holds the first differing item of each category."""
-
     event_id: str
     compared: Counter = field(default_factory=Counter)
     differing: Counter = field(default_factory=Counter)
@@ -366,7 +358,6 @@ class Outcome:
 
 
 def _compare_category(out: Outcome, category: str, php_items, django_items) -> None:
-    """Compares two lists item by item, in order."""
     n = max(len(php_items), len(django_items))
     out.compared[category] += n
     bad = 0
@@ -403,7 +394,6 @@ _PHP_NUMERIC = re.compile(
 
 
 def _topological(ev: dict, order: list[int]) -> bool:
-    """Every aggregate comes before the aggregates it draws from."""
     position = {g: i for i, g in enumerate(order)}
     return all(
         position[c["classid"]] < position[x]
@@ -517,8 +507,6 @@ def compare(ev: dict, php: dict) -> Outcome:
 
 
 def tags(ev: dict, php: dict) -> set[str]:
-    """The features an event exercised, read from the event and PHP's
-    results rather than from the knobs that made it."""
     s = ev["settings"]
     t = set()
     t.add(f"scoring {s['scoring']}")

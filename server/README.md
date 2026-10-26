@@ -70,9 +70,32 @@ Owner decision D31 sets two rules where PHP behaves otherwise.
 
 A final with fewer than 2 racers, zero included, gets D28's "The final needs at least 2 racers." from `start_waiting_step` (D34). Only a waiting round that was deleted during the intermission, and so is remade empty, says "The waiting round has no racers in its roster."
 
-The finalists of a follow-on or aggregate round come from the standings (#26), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
+The finalists of a follow-on or aggregate round come from the standings (see below), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
 
 `roster/tests/test_group_scenarios.py` and `racing/tests/test_round_scenarios.py` replay the group and round scripts of the shell suite through these services, using `roster/tests/php_replay.py`, and compare the state with what PHP recorded. PHP rebuilds the groups, with new ids, when a script applies the rule in force, so the replay checks that Django changes nothing and then rebuilds them itself, so later requests find the rows they name.
+
+## Standings and speed awards
+
+`racing/engine/standings/` ports PHP's standings (`website/inc/standings.inc`), finalist cut (`website/inc/roster.inc`), speed awards (`website/inc/awards.inc`), award names (`website/inc/ordinals.inc`) and lane bias test (`website/inc/lane-bias.inc`) as pure Python. `oracle.Standings(event)` gives the result rows, best first, each with its places, and the ladders keyed as PHP keys them: `st-r<round>`, `st-rr<round>-<subgroup>`, `st-q<group>` and `st-ff`. Scores follow PHP's SQLite rules on every database: `math.fsum` for `SUM`, NULLs left out as SQL leaves them, a single heat scoring as itself under drop-slowest (Q12), and names compared as `NOCASE`, which folds ASCII letters only.
+
+`racing/services/standings.py` reads an event with a few ORM queries. `standings_snapshot(event)` returns the standings, and its `speed_awards`, and keeps them per event until any row they were computed from changes, so the award kiosk's 0.5 s `award.current` poll does not compute them again. `current_award(event)` resolves `RaceState.current_award_key` for speed awards. `racing/services/lane_bias.py` holds `lane_bias(event)`.
+
+`racing/services/rounds.py` holds `new_round_roster(source, top, bucketed, extras)`, the service behind `roster.new`. The source is `FollowOn(round)`, `FromAggregate(group)` or `NewAggregate(name, groups, subgroups)`; a new aggregate becomes the `full-field-calc` group, as in PHP. In one transaction it makes the round or clears its roster, cuts the standings, and enters the qualifiers, then the extra racers the race coordinator allowed in (D32), which never take a qualifier's place. When the roster would be empty it fails with `no_racers` and changes nothing. `playlist_finalists(extras)` is the `finalists_for` the playlist services take, so a D27 rebuild that passes the same extras keeps them.
+
+Award eligibility follows owner decisions D33 and D34:
+
+- A racer has two award settings. `Racer.exclude` is "not eligible for any award", and `Racer.not_eligible_for_speed_awards` is new. The legacy API reads and writes `exclude` only.
+- `Partition.counts_for_all_partition_awards`, on by default, decides whether the partition's racers can win all-partition awards: the pack's speed awards, from the full field or from the `full-field-calc` group.
+- A racer who cannot win a ladder's speed awards keeps the standings rows, marked in `Row.not_eligible` with the reason, and takes no place and adds no `T` mark there. Every other place, ladder, speed award and finalist is then what PHP gives with that racer removed. A racer whose partition does not count is marked only in the pack's ladders: `st-ff`, and every ladder of the `full-field-calc` group.
+- A cut skips any racer who cannot win the speed awards of the group the new round is for, and takes the next racer.
+
+`racing/engine/tests/test_standings_parity.py`, `test_speed_awards_parity.py`, `test_ordinals.py` and `test_lane_bias.py` compare the engine with every PHP standings, award and engine fixture, and `racing/tests/test_finalists.py` replays every `roster.new` and playlist cut of the shell suite. To time `standings_snapshot()` and the speed awards on a 200-racer event with 1200 results:
+
+```sh
+export DATABASE_URL=sqlite:////tmp/standings-timing.sqlite3
+uv run python manage.py migrate -v 0
+uv run python -m tools.time_standings
+```
 
 ## Standings differential test against PHP
 

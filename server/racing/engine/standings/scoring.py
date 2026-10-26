@@ -81,7 +81,6 @@ def _score(finish: list[float], count: int, scoring: Scoring) -> float | None:
 def _points(
     places: list[int], count: int, scoring: Scoring, lane_count: int
 ) -> int | None:
-    """The point total: a heat's place p is worth `lane_count + 1 - p`."""
     if not places:
         return None
     if scoring == Scoring.AVERAGE:

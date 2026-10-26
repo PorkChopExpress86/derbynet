@@ -23,8 +23,6 @@ PARENTS = AwardSettings(partition_counts_for_all_partition_awards=False)
 
 
 def parents_lead(seed, full_field_calc):
-    """The event, and the racers of the subgroup of its fastest racer, who
-    form the Parents partition."""
     event = random_event(seed, full_field_calc=full_field_calc)
     standings = Standings(event)
     pack_ladder = (

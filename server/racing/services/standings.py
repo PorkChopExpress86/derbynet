@@ -1,16 +1,3 @@
-"""The standings and speed awards of an event (#26).
-
-`standings_snapshot(event)` reads the rows the standings need with a few
-ORM queries, no SQL of any one database, and hands them to
-`racing.engine.standings`. A snapshot is cached per event and reused while
-everything it was computed from is unchanged, so the award presentation
-kiosk, which polls `award.current` every 0.5 s, does not recompute the
-standings and every speed award each time. The cache compares the inputs
-themselves, so no writer has to remember to invalidate it.
-
-A snapshot is shared between callers. Treat it as read-only.
-"""
-
 from dataclasses import dataclass
 from functools import cached_property
 
@@ -58,7 +45,11 @@ _cache: dict[int, Snapshot] = {}
 
 def standings_snapshot(event) -> Snapshot:
     """The event's standings, computed again only when a result, a racer,
-    a roster, a round, a group or a setting they read has changed."""
+    a roster, a round, a group or a setting they read has changed.
+
+    The cache compares the rows read with the rows it was computed from,
+    so no writer has to bump a version, and the 0.5 s `award.current` poll
+    reads the rows but does not compute the standings and awards again."""
     inputs = _read(event)
     cached = _cache.get(event.id)
     if cached is not None and cached.inputs == inputs:

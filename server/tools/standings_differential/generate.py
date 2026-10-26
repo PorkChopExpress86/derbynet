@@ -1,9 +1,6 @@
 """Seeded random events in the shape `harness.php` loads: PHP's tables as
 JSON, the RaceInfo settings, the finalist requests to replay, and extra
 `current_award_key` values to resolve.
-
-`Knobs` holds the odds of each feature. `BATCHES` names the targeted
-batches, each a set of knob overrides that forces one feature on.
 """
 
 import random
@@ -161,8 +158,6 @@ class _Builder:
     def sort_order(self, i: int) -> int:
         return self.rng.randrange(1, 3) if self.chance(self.k.shared_sort_order) else i
 
-    # ----- registration -----
-
     def add_groups(self) -> None:
         rng = self.rng
         n = rng.randint(*self.k.groups)
@@ -283,8 +278,6 @@ class _Builder:
                     entrants = rng.sample(pool, rng.randint(1, min(len(pool), 8)))
                     self.add_rounds(classid, entrants)
 
-    # ----- racing -----
-
     def time(self, tie_heavy: bool) -> float:
         rng = self.rng
         if self.chance(0.02):
@@ -296,8 +289,6 @@ class _Builder:
     def add_round(
         self, classid: int, number: int, entrants: list[dict], state: str
     ) -> None:
-        """A round and its roster. `state` is "unscheduled", "unfinished"
-        or "finished"."""
         rng = self.rng
         roundid = self.next_round
         self.next_round += rng.randint(1, 3)
@@ -408,8 +399,6 @@ class _Builder:
             if self.chance(0.7):
                 entrants = [r for r in entrants if r["passedinspection"]]
             self.add_rounds(group["classid"], entrants)
-
-    # ----- settings and requests -----
 
     def settings(self) -> dict:
         rng = self.rng

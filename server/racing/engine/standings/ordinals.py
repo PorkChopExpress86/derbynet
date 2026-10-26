@@ -25,8 +25,6 @@ def ordinal(n: int | str) -> str | None:
 
 
 def nth_fastest(n: int, label: str) -> str:
-    """`Fastest in <label>` for place 1, `<ordinal> Fastest in <label>` for
-    any other place."""
     prefix = "" if n == 1 else f"{ordinal(n) or ''} "
     return f"{prefix}Fastest in {label}"
 
