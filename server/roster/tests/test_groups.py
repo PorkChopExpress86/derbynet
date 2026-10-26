@@ -5,8 +5,8 @@ from django.test.utils import CaptureQueriesContext
 from awards.models import Award, BallotAward
 from awards.tests.factories import AwardFactory, BallotAwardFactory
 from core.models import RaceSettings
-from racing.models import HeatLane, RosterEntry, Round
-from racing.tests.factories import HeatLaneFactory
+from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round
+from racing.tests.factories import HeatLaneFactory, PlaylistEntryFactory
 from roster.models import Group, Partition, Racer, Subgroup
 from roster.services import groups
 from roster.services.groups import Failure, GroupFailure, GroupRef
@@ -395,24 +395,127 @@ def test_rank_edit_gives_a_subgroup_with_no_partition_a_partitions_name(replay):
     assert partition(replay, "Lions").subgroup.group == group(replay, "Lions")
 
 
-@pytest.mark.parametrize("names", [("École", "école"), ("ΟΔΟΣ", "οδοσ")])
-def test_by_partition_folds_case_as_the_group_name_constraint_does(replay, names):
-    """Postgres's `lower()` folds every letter, so each pair makes one group.
-    SQLite's folds ASCII letters only, so each pair makes two. Python's
-    `lower()` agrees with neither: it folds a final `Σ` to `ς`."""
+def test_by_partition_folds_case_of_names_cut_to_a_group_name(replay):
+    """Two partitions whose names differ past the first 75 characters, and
+    in case before them, give one group: group names ignore case."""
+    names = ["L" * 75 + " one", "l" * 75 + " two"]
     for i, name in enumerate(names):
         replay.import_racer(str(i), "Racer", name)
+    groups.form_groups_by_rule(replay.event, "custom")
     groups.form_groups_by_rule(replay.event, "by-partition")
-    made = {
-        g.pk: g.name for g in Group.objects.filter(event=replay.event).order_by("id")
-    }
-    folds = connection.vendor == "postgresql"
-    assert sorted(made.values()) == sorted(names[:1] if folds else names)
-    for p in Partition.objects.filter(event=replay.event):
-        assert made[p.subgroup.group_id] == (names[0] if folds else p.name)
-        assert set(
-            Racer.objects.filter(partition=p).values_list("group", flat=True)
-        ) == {p.subgroup.group_id}
+    made = list(Group.objects.filter(event=replay.event))
+    assert [g.name for g in made] == ["L" * 75]
+    assert set(
+        Racer.objects.filter(event=replay.event).values_list("group", flat=True)
+    ) == {made[0].pk}
+
+
+# ----- D31 ------------------------------------------------------------------
+
+
+def _writes(queries):
+    return [
+        q["sql"]
+        for q in queries
+        if q["sql"].lstrip().split()[0].upper() in {"INSERT", "UPDATE", "DELETE"}
+    ]
+
+
+@pytest.mark.parametrize("with_result", [False, True])
+@pytest.mark.parametrize("rule", list(groups.Rule))
+def test_applying_the_rule_in_force_writes_nothing(replay, rule, with_result):
+    """A re-applied rule keeps the rounds, results and playlist steps a real
+    rule change deletes, and succeeds even once a heat has a result."""
+    with_dens(replay)
+    groups.form_groups_by_rule(replay.event, "custom")
+    groups.form_groups_by_rule(replay.event, rule)
+    round = Round.objects.filter(event=replay.event).order_by("id").first()
+    Round.objects.create(event=replay.event, group=round.group, number=2)
+    step = PlaylistEntryFactory(group=round.group, round_number=2)
+    if with_result:
+        racer = round.roster.first().racer
+        HeatLaneFactory(round=round, racer=racer, finish_place=1)
+    before = read_state(replay.event)
+
+    with CaptureQueriesContext(connection) as queries:
+        groups.form_groups_by_rule(replay.event, rule)
+
+    assert _writes(queries) == []
+    assert read_state(replay.event) == before
+    assert PlaylistEntry.objects.filter(pk=step.pk).exists()
+    assert RaceSettings.objects.get(event=replay.event).group_formation_rule == rule
+
+
+# Pairs that differ only in case. SQLite's `lower()` folds the ASCII pair
+# only, so each pair here proves both databases refuse the same names.
+CASE_PAIRS = [("Lions", "LIONS"), ("École", "éCOLE"), ("ΟΔΟΣ", "οδος")]
+
+
+@pytest.mark.parametrize("taken, name", CASE_PAIRS)
+def test_partition_add_refuses_a_name_another_partition_holds_in_any_case(
+    replay, taken, name
+):
+    with_dens(replay, dens=(taken, "Tigers"))
+    assert failure_of(groups.add_partition, replay.event, name) == Failure.NAME_TAKEN
+    assert Partition.objects.filter(event=replay.event).count() == 2
+
+
+@pytest.mark.parametrize("taken, name", CASE_PAIRS)
+def test_partition_edit_refuses_a_name_another_partition_holds_in_any_case(
+    replay, taken, name
+):
+    """Under one group no group takes the partition's name, so only the
+    partition names collide."""
+    with_dens(replay, dens=(taken, "Tigers"))
+    groups.form_groups_by_rule(replay.event, "one-group")
+    tigers = partition(replay, "Tigers")
+    assert failure_of(groups.rename_partition, tigers, name) == Failure.NAME_TAKEN
+    assert partition(replay, "Tigers") == tigers
+
+
+@pytest.mark.parametrize("taken, name", CASE_PAIRS)
+def test_rank_edit_refuses_a_partition_name_in_any_case(replay, taken, name):
+    with_dens(replay, dens=(taken, "Tigers"))
+    groups.form_groups_by_rule(replay.event, "one-group")
+    tigers = partition(replay, "Tigers").subgroup
+    assert failure_of(groups.rename_subgroup, tigers, name) == Failure.NAME_TAKEN
+    assert partition(replay, "Tigers").subgroup == tigers
+
+
+def test_class_edit_refuses_a_partition_name_in_any_case(replay):
+    """By partition, the group's partition takes the group's name."""
+    with_dens(replay)
+    Group.objects.filter(event=replay.event, name="Lions").update(name="Den A")
+    assert failure_of(groups.rename_group, group(replay, "Tigers"), "LIONS") == (
+        Failure.NAME_TAKEN
+    )
+
+
+def test_a_partition_takes_its_own_name_in_another_case(replay):
+    with_dens(replay)
+    groups.rename_partition(partition(replay, "Lions"), "LIONS")
+    assert partition(replay, "LIONS").subgroup.group == group(replay, "LIONS")
+
+
+@pytest.mark.parametrize("taken, name", CASE_PAIRS)
+def test_a_racer_imported_into_a_partition_name_in_another_case_joins_it(
+    replay, taken, name
+):
+    """`find_or_create_partition` finds the partition rather than refusing,
+    so a racer list that writes `LIONS` puts its racers in `Lions`."""
+    with_dens(replay, dens=(taken, "Tigers"))
+    found = partition(replay, taken)
+    racer = replay.import_racer("New", "Racer", name)
+    assert racer.partition == found
+    assert Partition.objects.filter(event=replay.event).count() == 2
+
+
+def test_a_subgroup_partition_name_taken_in_another_case_counts_up(replay):
+    with_dens(replay, dens=("Webelos", "Arrows"))
+    arrows = group(replay, "Arrows")
+    groups.add_partition(replay.event, "ARROWS-WEBELOS")
+    groups.find_or_create_subgroup(arrows, "Webelos")
+    assert partition(replay, "Arrows-Webelos-1").subgroup.group == arrows
 
 
 def test_order_partitions_gives_a_group_its_lowest_partition_sort_order(replay):

@@ -245,7 +245,18 @@ class Replay:
         )
 
     def do_partition_apply_rule(self, values, params):
-        groups.form_groups_by_rule(self.event, values["rule"])
+        rule = values["rule"]
+        if rule != self.settings.group_formation_rule:
+            groups.form_groups_by_rule(self.event, rule)
+            return
+        # D31: the rule in force changes nothing in Django. PHP rebuilds the
+        # groups with new ids, which later requests name, so the replay
+        # rebuilds them the way a real rule change does.
+        before = self.state()
+        groups.form_groups_by_rule(self.event, rule)
+        assert self.state() == before
+        groups.form_groups_by_rule(self.event, groups.Rule.CUSTOM)
+        groups.form_groups_by_rule(self.event, rule)
 
     def do_partition_move(self, values, params):
         source = None

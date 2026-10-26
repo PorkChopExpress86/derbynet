@@ -381,6 +381,24 @@ def test_subgroups_sharing_a_name_become_renamed_partitions(tmp_path):
     assert report["invariants"] == {}
 
 
+def test_partitions_differing_only_in_case_are_renamed(tmp_path):
+    """PHP's UNIQUE compares the exact name; Django ignores case (D31)."""
+    database = legacy_folder(
+        tmp_path,
+        "v10",
+        sql=["UPDATE Partitions SET name = 'BEARS AND FRÈRES' WHERE partitionid = 4"],
+    )
+    report, _ = _import(tmp_path, database)
+    names = set(
+        Partition.objects.filter(event=_event(report)).values_list("name", flat=True)
+    )
+    assert {"Bears and Frères", "BEARS AND FRÈRES (2)"} <= names
+    renamed = [
+        f for f in _findings(report, "changed-value") if f["table"] == "partitions"
+    ]
+    assert [f["legacy_id"] for f in renamed] == [4]
+
+
 def test_constituent_csv_and_rows_are_merged_and_differences_reported(tmp_path):
     database = legacy_folder(
         tmp_path,

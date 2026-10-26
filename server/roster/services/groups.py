@@ -153,6 +153,16 @@ def _fold(name: str) -> str:
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 
 
+def _partition_named(partitions, name: str) -> Partition | None:
+    """The first of `partitions`, by id, whose name equals `name` ignoring
+    case (D31)."""
+    key = Partition.name_key(name)
+    return next(
+        (p for p in partitions.order_by("id") if Partition.name_key(p.name) == key),
+        None,
+    )
+
+
 def _temporary_name() -> str:
     return f"(regrouping {uuid.uuid4().hex})"
 
@@ -370,9 +380,8 @@ def find_or_create_subgroup(
             if partition.subgroup_id != subgroup.id:
                 base = f"{group.name}-{name}"
                 candidate, n = base, 0
-                while Partition.objects.filter(
-                    event_id=group.event_id, name=candidate
-                ).exists():
+                partitions = Partition.objects.filter(event_id=group.event_id)
+                while _partition_named(partitions, candidate):
                     n += 1
                     candidate = f"{base}-{n}"
                 _create_partition(group.event_id, candidate, subgroup)
@@ -380,7 +389,8 @@ def find_or_create_subgroup(
 
 
 def find_or_create_partition(event_id, name: str) -> Partition:
-    """`find_or_create_partition()`: by exact name.
+    """`find_or_create_partition()`: by name, ignoring case. PHP matches the
+    exact name, and so makes `cubs` beside `Cubs`.
 
     A new partition gets a subgroup of its name: under `one-group` in the
     first group, otherwise in the group of its name.
@@ -388,7 +398,7 @@ def find_or_create_partition(event_id, name: str) -> Partition:
     name = name.strip()
     with transaction.atomic():
         lock_race_state(event_id)
-        found = Partition.objects.filter(event_id=event_id, name=name).first()
+        found = _partition_named(Partition.objects.filter(event_id=event_id), name)
         if found:
             return found
         if _rule(event_id) == Rule.ONE_GROUP:
@@ -487,6 +497,9 @@ def form_groups_by_rule(event, rule: str) -> None:
     aggregate link, group and subgroup award, and playlist step, and reset the
     full-field rule. `custom` changes only the rule. PHP leaves the playlist
     rows in place, where they name whichever new group took the old id.
+
+    The rule already in force changes nothing and succeeds, even once
+    results exist (D31). PHP rebuilds the groups again.
     """
     try:
         rule = Rule(rule)
@@ -496,9 +509,11 @@ def form_groups_by_rule(event, rule: str) -> None:
         ) from None
     with transaction.atomic():
         lock_race_state(event.id)
+        settings = RaceSettings.objects.get(event=event)
+        if settings.group_formation_rule == rule:
+            return
         if HeatLane.objects.filter(event=event).filter(HAS_RESULT).exists():
             raise GroupFailure(Failure.RESULTS_EXIST, "Racing results already exist.")
-        settings = RaceSettings.objects.get(event=event)
         settings.group_formation_rule = rule
         settings.save(update_fields=["group_formation_rule"])
         if rule == Rule.ONE_GROUP:
@@ -612,17 +627,22 @@ def _form_by_partition(event_id) -> None:
 
 
 def add_partition(event, name: str) -> Partition:
-    """`partition.add`."""
+    """`partition.add`. The exact name of another partition is
+    `already-exists`, as in PHP, and the name with case ignored is
+    `name-taken` (D31)."""
     name = name.strip()
     with transaction.atomic():
         lock_race_state(event.id)
         label = labels(RaceSettings.objects.get(event=event)).partition.lower()
         if not name:
             raise GroupFailure(Failure.NO_NAME, f"A {label} must have a name.")
-        if Partition.objects.filter(event=event, name=name).exists():
+        found = _partition_named(Partition.objects.filter(event=event), name)
+        if found is not None and found.name == name:
             raise GroupFailure(
                 Failure.ALREADY_EXISTS, f"A {label} named {name} already exists."
             )
+        if found is not None:
+            raise _name_taken(name)
         return find_or_create_partition(event.id, name)
 
 
@@ -630,8 +650,10 @@ def rename_partition(partition: Partition, name: str) -> None:
     """`partition.edit`: rename the partition and its subgroup, and under
     `by-partition` its group too.
 
-    A name another group holds, ignoring case, is `name-taken` as well; PHP
-    fails there with a database error after renaming the partition.
+    A name another partition holds, ignoring case, is `name-taken` (D31);
+    PHP compares the exact name. Under `by-partition`, a name another group
+    holds is `name-taken` as well; PHP fails there with a database error
+    after renaming the partition.
     """
     name = name.strip()
     event_id = partition.event_id
@@ -641,11 +663,8 @@ def rename_partition(partition: Partition, name: str) -> None:
             raise GroupFailure(Failure.EMPTY_NAME, "Name must not be empty")
         subgroup = Subgroup.objects.get(pk=partition.subgroup_id)
         by_partition = _rule(event_id) == Rule.BY_PARTITION
-        if (
-            Partition.objects.filter(event_id=event_id, name=name)
-            .exclude(pk=partition.pk)
-            .exists()
-        ) or (
+        others = Partition.objects.filter(event_id=event_id).exclude(pk=partition.pk)
+        if _partition_named(others, name) or (
             by_partition
             and _group_name_taken(event_id, name[:NAME_WIDTH], exclude=subgroup.group)
         ):
@@ -835,8 +854,9 @@ def add_group(
 
 def rename_group(group: Group, name: str, n_trophies=KEEP) -> None:
     """`class.edit`. Under `by-partition` the group's subgroups and their
-    partitions take the name too. A name another group or partition holds
-    is `name-taken`; PHP fails there with a database error."""
+    partitions take the name too. A name another group or partition holds,
+    ignoring case, is `name-taken`; PHP fails there with a database
+    error."""
     name = _cut(name)
     event_id = group.event_id
     with transaction.atomic():
@@ -847,9 +867,12 @@ def rename_group(group: Group, name: str, n_trophies=KEEP) -> None:
             by_partition
             and (
                 partitions.count() > 1
-                or Partition.objects.filter(event_id=event_id, name=name)
-                .exclude(subgroup__group=group)
-                .exists()
+                or _partition_named(
+                    Partition.objects.filter(event_id=event_id).exclude(
+                        subgroup__group=group
+                    ),
+                    name,
+                )
             )
         ):
             raise _name_taken(name)
@@ -912,22 +935,20 @@ def add_subgroup(event, group_id: int, name: str) -> Subgroup:
 def rename_subgroup(subgroup: Subgroup, name: str, n_trophies=KEEP) -> None:
     """`rank.edit`: rename the subgroup and its partitions.
 
-    For a subgroup with partitions, a name another partition holds is
-    `name-taken`, and so is any name when it has more than one, since they
-    cannot share it. PHP fails both with a database error after renaming the
-    subgroup. A subgroup with no partition takes any name.
+    For a subgroup with partitions, a name another partition holds, ignoring
+    case, is `name-taken`, and so is any name when it has more than one,
+    since they cannot share it. PHP fails both with a database error after
+    renaming the subgroup. A subgroup with no partition takes any name.
     """
     name = _cut(name)
     with transaction.atomic():
         lock_race_state(subgroup.event_id)
         partitions = Partition.objects.filter(subgroup=subgroup)
         n = partitions.count()
-        if n > 1 or (
-            n == 1
-            and Partition.objects.filter(event_id=subgroup.event_id, name=name)
-            .exclude(subgroup=subgroup)
-            .exists()
-        ):
+        others = Partition.objects.filter(event_id=subgroup.event_id).exclude(
+            subgroup=subgroup
+        )
+        if n > 1 or (n == 1 and _partition_named(others, name)):
             raise _name_taken(name)
         Subgroup.objects.filter(pk=subgroup.pk).update(name=name)
         partitions.update(name=name)

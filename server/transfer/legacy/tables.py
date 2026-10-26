@@ -249,13 +249,14 @@ def _subgroup(row, ctx):
 
 def _partitions(ctx):
     rows = _fill_sort_order(ctx, "partitions", "partitionid")
+    # PHP's UNIQUE compares the exact name; Django ignores case (D31).
     return _rename_duplicates(
         ctx,
         rows,
         "partitions",
         "partitionid",
         "name",
-        str,
+        Partition.name_key,
         Partition._meta.get_field("name").max_length,
     )
 
