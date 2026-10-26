@@ -74,6 +74,18 @@ The finalists of a follow-on or aggregate round come from the standings (#26), s
 
 `roster/tests/test_group_scenarios.py` and `racing/tests/test_round_scenarios.py` replay the group and round scripts of the shell suite through these services, using `roster/tests/php_replay.py`, and compare the state with what PHP recorded. PHP rebuilds the groups, with new ids, when a script applies the rule in force, so the replay checks that Django changes nothing and then rebuilds them itself, so later requests find the rows they name.
 
+## Standings differential test against PHP
+
+`tools/standings_differential/` runs the real PHP standings, finalists and speed-award code and the Django engine in `racing/engine/standings/` on the same seeded random events, and compares every result row, ladder, catalog entry, class and rank key, finalist cut, speed award and `award.current` answer. It needs Docker and a local image with `php84` and the website at `/var/www/html`. From this directory, run:
+
+```sh
+uv run python -m tools.standings_differential [IMAGE] --controls
+```
+
+`IMAGE` defaults to `derbynet-local`. The run makes 2000 random events and 200 events for each targeted batch in `generate.py`, takes about two minutes, and exits 1 if any comparison differs. `--controls` also breaks the engine in a dozen seeded ways and checks that the comparison reports each. Each PHP run is a `docker run --rm` container named after `--name-prefix`, with no volume. pytest does not collect the tool, because CI has no PHP image.
+
+The comparison counts three known differences apart. Q7 and Q8 are deliberate (#20). An event counts as Q7 only when a model of PHP's award loop, changed only in its tie indexing, gives Django's awards one way and PHP's the other. "Malformed number in key" is a `current_award_key` such as `speed-1.0` or `speed-02`. PHP's `==` reads such text as a number and its `ordinal()` misnames the award, so PHP answers where Django finds no award, or names the award differently. It is not an approved deviation.
+
 ## Inspect an event
 
 The server has no Django admin (ADR-16). To see what one event holds, print its rows for every event-scoped model as JSON:
