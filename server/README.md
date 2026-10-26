@@ -59,6 +59,24 @@ uv run python -m timeit -n 3 -r 3 -s 'from racing.engine.scheduling.ordered impo
 
 `generate_schedule` and `unschedule` renumber the event's master heats in the same transaction as the chart, through `racing.services.master.reassign_master_heats(event)`. As in PHP, this runs whether `use-master-sched` is on or off. Raced heats keep their numbers. The unraced heats are numbered from 1 above the highest raced number, interleaved across the rounds of each round level by weight. The engine is `racing/engine/scheduling/master.py`. `assign_master_heats` does the numbering, and `master_target` gives the heat that `next-up`, `next` and `prev` land on. `racing/engine/tests/test_master_parity.py` checks the numbering against `tests/golden/http/master-schedule/half-weights.http`.
 
+## Rescheduling
+
+`racing.services.reschedule.reschedule(round, racer_id=None, dry_run=False)` adjusts a round that has started. It fits a late racer into the remaining heats, or with no `racer_id` every passed racer of the roster who has no heat. It also turns departed racers into byes and squeezes out heats whose racers can fill byes elsewhere. A late racer joins only this way: the race coordinator previews with `dry_run=True`, then presses Add to schedule, which makes the same call without it (D32). The dry run changes nothing, racing state included (Q5). The call returns the reply's `chart` strings. It fails with `RescheduleFailure` and code `busy`, `nochart`, `alreadyscheduled` (the racer already has heats in the round, as after a second press of Add to schedule) or `nlanes` (the chart uses lanes past the lane count). `racing.services.rounds.adjustments(event)` lists the unscheduled and departed racers of each round, for the poll's `adjustments` field.
+
+The search is `racing/engine/scheduling/adjuster.py`, a port of PHP's `ScheduleAdjuster` that keeps its algorithm and loop order, the heat-index-0 quirk (Q3) included. PHP stops each search on the clock. The service passes a `DeadlineBudget` with PHP's deadlines, and tests pass a `NodeBudget`, which stops after a number of proposals and so always gives the same chart. The search runs on a snapshot, outside any transaction. The write then rechecks the snapshot under the `RaceState` lock, tries once more if a result or the roster changed, and then fails with `busy` (Q15). `RaceState.reschedule_started_at` keeps a second reschedule of the event out for up to 120 s.
+
+Django differs from PHP in two ways (D34 and Q21 in #20).
+
+- The running heat, the one `RaceState` names, and the staged heat after it (in master-heat order under the master schedule) keep their racers, lanes and heat numbers. Under the master schedule they also keep their master numbers, so the staged heat is still next. A late racer goes into later heats, or into heats added at the end, and no heat before them is squeezed out. A departed racer in either heat stays there until it runs. A committed squeeze in the current round still turns racing off, and a current heat that has already run follows its new number.
+- PHP adds up to one heat per usable lane for a racer who does not fit, but never searches with the last one, so it can answer `nochart`. Django searches with it. Every chart PHP does produce stays the same.
+
+`racing/engine/tests/test_reschedule_parity.py` replays each reschedule PHP recorded, rebuilding the chart it started from with `racing/engine/tests/reschedule_replay.py`, and compares the charts. After a change to the adjuster, regenerate the Q20 and Q21 deviation entries, and commit them:
+
+```sh
+uv run python tools/reschedule_deviations.py
+uv run python tools/reschedule_deviations.py --check   # exits 1 if they are out of date
+```
+
 ## Groups, rounds and the playlist
 
 `roster/services/groups.py` holds the partition, group (legacy class) and subgroup (legacy rank) services behind `action.partition.*`, `action.class.*` and `action.rank.*`, and `form_groups_by_rule(event, rule)` for the three group formation rules. `racing/services/rounds.py` holds `prepare_new_round`, `write_roster(round, finalists)`, `delete_round_roster`, `round_counts` and `ready_aggregate_groups`. `racing/services/playlist.py` runs the playlist: `start_playlist`, `round_ended`, and the operator gate. When a round ends and the next step has `waits_for_operator`, the next round is scheduled and selected, racing stays off, and `RaceState.waiting_entry` and `ended_round` hold the intermission until `start_waiting_step(event)` starts it or `skip_waiting_step(event, finalists_for)` passes over it to the next step (D28). `rebuild_waiting_round` makes a waiting round's roster and chart again after a result in the round that feeds it changes (D27). A domain failure raises `GroupFailure`, `RoundFailure` or `PlaylistFailure` with PHP's code. Every service that changes a roster takes the `RaceState` lock first, as `generate_schedule` needs.

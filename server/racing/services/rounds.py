@@ -12,7 +12,7 @@ needs.
 """
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from django.db import transaction
@@ -123,13 +123,76 @@ class RoundCounts:
     heats_run: int
 
 
+@dataclass(frozen=True)
+class Adjustments:
+    """The racers a reschedule of one round would change, as
+    `sql_for_unscheduled` and `sql_for_departed` in `website/inc/rounds.inc`
+    find them.
+
+    `unscheduled` holds the passed racers in the roster with no heat in the
+    round, in roster order, which is the order a reschedule fits them in.
+    `departed` holds the racers in a lane with no result who are no longer
+    passed and in the roster, by racer id.
+    """
+
+    unscheduled: tuple[int, ...] = ()
+    departed: tuple[int, ...] = ()
+
+
+@dataclass
+class _RoundRows:
+    """One round's roster and chart rows, read once for every count."""
+
+    roster: dict[int, bool] = field(default_factory=dict)  # racer: passed
+    charted: set[int] = field(default_factory=set)
+    unraced: set[int] = field(default_factory=set)  # racers in lanes with no result
+    heats: set[int] = field(default_factory=set)
+    run: set[int] = field(default_factory=set)
+
+    def adjustments(self) -> Adjustments:
+        passed = [racer for racer, ok in self.roster.items() if ok]
+        return Adjustments(
+            unscheduled=tuple(r for r in passed if r not in self.charted),
+            departed=tuple(sorted(self.unraced.difference(passed))),
+        )
+
+
+def _rows_by_round(rounds) -> dict[int, _RoundRows]:
+    rows = {round_id: _RoundRows() for round_id in rounds.values_list("id", flat=True)}
+    for round_id, racer_id, passed in (
+        RosterEntry.objects.filter(round__in=rounds)
+        .order_by("id")
+        .values_list("round_id", "racer_id", "racer__passed_inspection")
+    ):
+        rows[round_id].roster[racer_id] = passed
+    for round_id, heat, racer_id, time, place in HeatLane.objects.filter(
+        round__in=rounds
+    ).values_list("round_id", "heat", "racer_id", "finish_time", "finish_place"):
+        round = rows[round_id]
+        round.charted.add(racer_id)
+        round.heats.add(heat)
+        if time is not None or place is not None:
+            round.run.add(heat)
+        else:
+            round.unraced.add(racer_id)
+    return rows
+
+
+def adjustments(event) -> dict[int, Adjustments]:
+    """`{round id: Adjustments}` for every round of the event."""
+    rows = _rows_by_round(Round.objects.filter(event=event))
+    return {round_id: r.adjustments() for round_id, r in rows.items()}
+
+
+def round_adjustments(round: Round) -> Adjustments:
+    return _rows_by_round(Round.objects.filter(pk=round.pk))[round.id].adjustments()
+
+
 def round_counts(event) -> list[RoundCounts]:
     """Every round of the event, by group sort order, group name and round
     number, with its roster and chart counts.
 
-    `unscheduled` counts passed racers in the roster with no heat.
-    `departed` counts racers in unraced heats who are no longer passed and in
-    the roster. A heat is run once one of its lanes has a result.
+    A heat is run once one of its lanes has a result.
     """
     rounds = list(
         Round.objects.filter(event=event)
@@ -146,44 +209,24 @@ def round_counts(event) -> list[RoundCounts]:
         )
     )
     with_group = Group.objects.filter(event=event).count() > 1
-
-    roster: dict[int, dict[int, bool]] = {}
-    for round_id, racer_id, passed in RosterEntry.objects.filter(
-        event=event
-    ).values_list("round_id", "racer_id", "racer__passed_inspection"):
-        roster.setdefault(round_id, {})[racer_id] = passed
-
-    charted: dict[int, set[int]] = {}
-    heats: dict[int, set[int]] = {}
-    run: dict[int, set[int]] = {}
-    unraced: dict[int, set[int]] = {}
-    lanes = HeatLane.objects.filter(event=event).values_list(
-        "round_id", "heat", "racer_id", "finish_time", "finish_place"
-    )
-    for round_id, heat, racer_id, time, place in lanes:
-        charted.setdefault(round_id, set()).add(racer_id)
-        heats.setdefault(round_id, set()).add(heat)
-        if time is not None or place is not None:
-            run.setdefault(round_id, set()).add(heat)
-        else:
-            unraced.setdefault(round_id, set()).add(racer_id)
+    rows = _rows_by_round(Round.objects.filter(event=event))
 
     counts = []
     for round in rounds:
-        entered = roster.get(round.id, {})
-        passed = {racer for racer, ok in entered.items() if ok}
+        r = rows[round.id]
+        pending = r.adjustments()
         name = f"Round {round.number}"
         counts.append(
             RoundCounts(
                 round=round,
                 name=f"{round.group.name}, {name}" if with_group else name,
                 aggregate=round.group_id in aggregates,
-                roster_size=len(entered),
-                passed=len(passed),
-                unscheduled=len(passed - charted.get(round.id, set())),
-                departed=len(unraced.get(round.id, set()) - passed),
-                heats_scheduled=len(heats.get(round.id, ())),
-                heats_run=len(run.get(round.id, ())),
+                roster_size=len(r.roster),
+                passed=sum(r.roster.values()),
+                unscheduled=len(pending.unscheduled),
+                departed=len(pending.departed),
+                heats_scheduled=len(r.heats),
+                heats_run=len(r.run),
             )
         )
     return counts

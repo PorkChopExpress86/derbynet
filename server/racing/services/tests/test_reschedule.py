@@ -1,0 +1,579 @@
+import json
+import threading
+from datetime import timedelta
+
+import pytest
+from django.db import connection
+from django.utils import timezone
+
+from core.models import RaceSettings, RaceState
+from kiosks.models import Kiosk
+from racing.engine.scheduling.adjuster import NodeBudget
+from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
+from racing.models import HAS_RESULT, HeatLane, RosterEntry
+from racing.services.reschedule import (
+    GUARD_EXPIRY,
+    Failure,
+    RescheduleFailure,
+    reschedule,
+)
+from racing.services.rounds import Adjustments, adjustments
+from racing.services.schedule import generate_schedule
+from racing.tests.factories import RosterEntryFactory, RoundFactory
+from roster.models import Racer
+from roster.tests.factories import RacerFactory
+
+pytestmark = pytest.mark.django_db
+
+UNLIMITED = 10**12
+
+
+def new_round(car_numbers, n_times_per_lane=1, event=None, **race):
+    """A scheduled round of passed racers, entered in car number order."""
+    round = RoundFactory(group__event=event) if event else RoundFactory()
+    race.setdefault("lane_count", 4)
+    RaceSettings.objects.filter(event=round.event).update(**race)
+    for car in car_numbers:
+        RosterEntryFactory(
+            round=round,
+            racer=RacerFactory(
+                group=round.group, car_number=car, passed_inspection=True
+            ),
+        )
+    generate_schedule(round, n_times_per_lane)
+    return round
+
+
+def late_racer(round, car_number):
+    """A racer who passes check-in after the round was scheduled."""
+    return RosterEntryFactory(
+        round=round,
+        racer=RacerFactory(
+            group=round.group, car_number=car_number, passed_inspection=True
+        ),
+    ).racer
+
+
+def race(round, *heats):
+    HeatLane.objects.filter(round=round, heat__in=heats).update(finish_time=3.0)
+
+
+def make_current(round, heat, racing=True):
+    RaceState.objects.filter(event=round.event).update(
+        current_round=round, current_group=round.group, current_heat=heat, racing=racing
+    )
+
+
+def state_of(round):
+    return RaceState.objects.get(event=round.event)
+
+
+def by_car(round):
+    """`{heat: [car number or None per lane]}` as written."""
+    rows = HeatLane.objects.filter(round=round).select_related("racer")
+    width = RaceSettings.objects.get(event=round.event).lane_count
+    heats = {}
+    for row in rows:
+        heats.setdefault(row.heat, [None] * width)[row.lane - 1] = row.racer.car_number
+    return dict(sorted(heats.items()))
+
+
+def heat_rows(round, heat):
+    return set(
+        HeatLane.objects.filter(round=round, heat=heat).values_list(
+            "lane", "racer_id", "finish_time"
+        )
+    )
+
+
+def cars_of(round, chart):
+    """A reply chart with racer ids replaced by car numbers."""
+    car = dict(Racer.objects.filter(event=round.event).values_list("id", "car_number"))
+    return [
+        None
+        if heat is None
+        else " ".join(r if r == "-" else str(car[int(r)]) for r in heat.split())
+        for heat in chart
+    ]
+
+
+def php_reply(fixture, exchange):
+    return json.loads(read_transcript(GOLDEN_DIR / fixture)[exchange]["body"])
+
+
+def failure_of(call):
+    with pytest.raises(RescheduleFailure) as caught:
+        call()
+    return caught.value
+
+
+# ----- Departed racers, squeezes and racing state (Q5) ----------------------
+
+
+def q5_round():
+    """`http/reschedule/dry-run-while-racing.http`: 11 racers, heat 1 run,
+    heat 2 racing, and car 110 no longer passed. Car 1NN is PHP's racer NN."""
+    round = new_round(range(101, 112))
+    race(round, 1)
+    make_current(round, 2)
+    Racer.objects.filter(event=round.event, car_number=110).update(
+        passed_inspection=False
+    )
+    return round
+
+
+def test_a_dry_run_that_squeezes_a_heat_leaves_racing_on():
+    round = q5_round()
+    Kiosk.objects.create(event=round.event, address="kiosk-1")
+    before = by_car(round)
+
+    result = reschedule(round, dry_run=True, budget=NodeBudget(UNLIMITED))
+
+    php = php_reply(
+        "http/reschedule/dry-run-while-racing.http", "002 dry-run-squeezes-a-heat"
+    )
+    assert cars_of(round, result.chart) == cars_of_php(php["chart"])
+    assert len(result.chart) == len(before) - 1
+    assert state_of(round).racing is True
+    assert by_car(round) == before
+    assert not Kiosk.objects.filter(reload_requested=True).exists()
+    assert state_of(round).reschedule_started_at is None
+
+
+def cars_of_php(chart):
+    """PHP's reply chart from a capture where racer NN has car 1NN."""
+    return [
+        None
+        if heat is None
+        else " ".join(r if r == "-" else str(100 + int(r)) for r in heat.split())
+        for heat in chart
+    ]
+
+
+def test_the_q5_deviation_records_racing_left_on():
+    expected = read_transcript(
+        GOLDEN_DIR / "deviations" / "Q5" / "dry-run-while-racing.http"
+    )
+    for name in ("002 dry-run-squeezes-a-heat", "003 racing-after"):
+        body = json.loads(expected[name]["body"])
+        assert body["current-heat"]["now_racing"] is True, name
+        php = php_reply("http/reschedule/dry-run-while-racing.http", name)
+        assert php["current-heat"]["now_racing"] is False, name
+
+
+def test_committing_a_squeeze_in_the_current_round_stops_racing():
+    round = q5_round()
+    Kiosk.objects.create(event=round.event, address="kiosk-1")
+
+    dry = reschedule(round, dry_run=True, budget=NodeBudget(UNLIMITED))
+    result = reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart == dry.chart
+    assert len(by_car(round)) == len(result.chart)
+    assert state_of(round).racing is False
+    assert state_of(round).current_heat == 2
+    assert Kiosk.objects.get().reload_requested is True
+
+
+def test_a_squeeze_in_another_round_leaves_racing_on():
+    round = q5_round()
+    other = new_round(range(201, 206), event=round.event)
+    make_current(other, 1)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert state_of(round).racing is True
+
+
+def test_a_squeeze_renumbers_raced_heats_as_php_does():
+    """`http/suite/reschedule.http` 016: car 161 leaves Lions & Tigers, whose
+    heat 4 has run, while another round races. Car 1NN is PHP's racer NN."""
+    round = new_round(range(101, 182, 5), lane_count=4, unused_lane_mask=2)
+    race(round, 4)
+    raced = {(lane, car) for lane, car in enumerate(by_car(round)[4], 1)}
+    RosterEntry.objects.filter(round=round, racer__car_number=161).delete()
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    php = php_reply("http/suite/reschedule.http", "016 schedule.reschedule")["chart"]
+    written = by_car(round)
+    assert [
+        None
+        if HeatLane.objects.filter(round=round, heat=h).filter(HAS_RESULT)
+        else " ".join("-" if c is None else str(c) for c in heat)
+        for h, heat in written.items()
+    ] == cars_of_php(php)
+    assert {(lane, car) for lane, car in enumerate(written[3], 1)} == raced
+    assert set(
+        HeatLane.objects.filter(round=round)
+        .filter(HAS_RESULT)
+        .values_list("heat", flat=True)
+    ) == {3}
+
+
+def test_a_racer_removed_from_the_roster_is_departed():
+    round = new_round(range(101, 109))
+    race(round, 1)
+    RosterEntry.objects.filter(round=round, racer__car_number=105).delete()
+    gone = Racer.objects.get(event=round.event, car_number=105)
+
+    assert adjustments(round.event)[round.id].departed == (gone.id,)
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    unraced = HeatLane.objects.filter(round=round).exclude(HAS_RESULT)
+    assert not unraced.filter(racer=gone).exists()
+    assert adjustments(round.event)[round.id] == Adjustments()
+
+
+# ----- Late racers (D32) and the running and staged heats (D34) -------------
+
+
+def test_a_late_racer_joins_only_through_add_to_schedule():
+    round = new_round(range(101, 110))
+    race(round, 1, 2)
+    racer = late_racer(round, 120)
+
+    assert not HeatLane.objects.filter(racer=racer).exists()
+    assert adjustments(round.event)[round.id].unscheduled == (racer.id,)
+
+    preview = reschedule(round, racer.id, dry_run=True, budget=NodeBudget(UNLIMITED))
+    assert not HeatLane.objects.filter(racer=racer).exists()
+    raced = {h: heat_rows(round, h) for h in (1, 2)}
+
+    added = reschedule(round, racer.id, budget=NodeBudget(UNLIMITED))
+
+    assert added.chart == preview.chart
+    written = by_car(round)
+    assert [
+        None if h in raced else " ".join("-" if c is None else str(c) for c in heat)
+        for h, heat in written.items()
+    ] == cars_of(round, added.chart)
+    lanes = HeatLane.objects.filter(racer=racer).exclude(HAS_RESULT)
+    assert sorted(lanes.values_list("lane", flat=True)) == [1, 2, 3, 4]
+    assert {h: heat_rows(round, h) for h in (1, 2)} == raced
+    assert adjustments(round.event)[round.id] == Adjustments()
+
+
+def test_a_late_racer_never_changes_the_running_or_the_staged_heat():
+    round = new_round(range(101, 111))
+    race(round, 1, 2)
+    make_current(round, 3)
+    kept = {h: heat_rows(round, h) for h in (3, 4)}
+    racer = late_racer(round, 120)
+
+    result = reschedule(round, racer.id, budget=NodeBudget(UNLIMITED))
+
+    assert {h: heat_rows(round, h) for h in (3, 4)} == kept
+    assert state_of(round).current_heat == 3
+    assert state_of(round).racing is True
+    lanes = HeatLane.objects.filter(racer=racer)
+    assert sorted(lanes.values_list("lane", flat=True)) == [1, 2, 3, 4]
+    assert not lanes.filter(heat__in=(1, 2, 3, 4)).exists()
+    assert cars_of(round, result.chart)[2:4] == [
+        " ".join(str(c) for c in by_car(round)[h]) for h in (3, 4)
+    ]
+
+
+def test_with_no_heat_after_the_staged_heat_the_racer_gets_new_heats():
+    round = new_round(range(101, 105))
+    race(round, 1, 2)
+    make_current(round, 3)
+    kept = {h: heat_rows(round, h) for h in (3, 4)}
+    racer = late_racer(round, 120)
+
+    reschedule(round, racer.id, budget=NodeBudget(UNLIMITED))
+
+    assert {h: heat_rows(round, h) for h in (3, 4)} == kept
+    assert state_of(round).current_heat == 3
+    heats = set(HeatLane.objects.filter(racer=racer).values_list("heat", flat=True))
+    assert min(heats) == 5
+    assert max(by_car(round)) == max(heats)
+
+
+def test_no_heat_before_the_running_heat_is_squeezed_out():
+    """Heats 1 to 3 were skipped. When car 104 leaves, PHP squeezes out one
+    of them, which renumbers heat 4, the running heat 5 and the staged heat
+    6."""
+    round = new_round(range(101, 112))
+    race(round, 4)
+    make_current(round, 5)
+    Racer.objects.filter(event=round.event, car_number=104).update(
+        passed_inspection=False
+    )
+    before = {h: heat_rows(round, h) for h in (4, 5, 6)}
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert {h: heat_rows(round, h) for h in (4, 5, 6)} == before
+    assert state_of(round).current_heat == 5
+
+
+def test_the_staged_heat_follows_master_heat_order():
+    round = new_round(range(101, 109), use_master_sched=True)
+    other = new_round(range(201, 209), event=round.event)
+    first = HeatLane.objects.filter(round=round, heat=1).first().master_heat
+    staged = (
+        HeatLane.objects.filter(event=round.event, master_heat=first + 1)
+        .values_list("round_id", "heat")
+        .first()
+    )
+    assert staged[0] == other.id
+    make_current(round, 1)
+    racer = late_racer(other, 220)
+    kept = heat_rows(other, staged[1])
+
+    reschedule(other, racer.id, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(other, staged[1]) == kept
+
+
+def test_under_the_master_schedule_racing_and_the_current_heat_stay():
+    """Q6, `http/reschedule/master-schedule.http`: PHP's cancel branch never
+    runs. Car 1NN is PHP's racer NN."""
+    round = new_round(range(101, 106), use_master_sched=True)
+    race(round, 1, 2)
+    make_current(round, 3)
+    late_racer(round, 106)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    php = php_reply("http/reschedule/master-schedule.http", "003 racing-after")[
+        "current-heat"
+    ]
+    assert (state_of(round).current_heat, state_of(round).racing) == (
+        php["heat"],
+        php["now_racing"],
+    )
+
+
+# ----- The recheck under the lock (Q15) and the guard -----------------------
+
+
+class OnSearch(NodeBudget):
+    """A NodeBudget that runs `hook` when each search starts."""
+
+    def __init__(self, hook):
+        super().__init__(UNLIMITED)
+        self.hook = hook
+
+    def start(self):
+        super().start()
+        self.hook()
+
+
+def test_a_result_written_during_the_search_is_kept():
+    round = new_round(range(101, 110))
+    race(round, 1)
+    racer = late_racer(round, 120)
+    searches = []
+
+    def finish_heat_2():
+        if not searches:
+            race(round, 2)
+        searches.append(1)
+
+    reschedule(round, racer.id, budget=OnSearch(finish_heat_2))
+
+    assert len(searches) == 2
+    assert set(
+        HeatLane.objects.filter(round=round)
+        .filter(HAS_RESULT)
+        .values_list("heat", flat=True)
+    ) == {1, 2}
+    assert not HeatLane.objects.filter(round=round, heat=2, racer=racer).exists()
+    rows = list(HeatLane.objects.filter(round=round).values_list("heat", "racer_id"))
+    assert len(rows) == len(set(rows))
+
+
+def test_a_round_that_keeps_changing_fails_with_busy():
+    round = new_round(range(101, 110))
+    racer = late_racer(round, 120)
+    heats = iter(range(1, 10))
+
+    caught = failure_of(
+        lambda: reschedule(
+            round, racer.id, budget=OnSearch(lambda: race(round, next(heats)))
+        )
+    )
+
+    assert caught.code == Failure.BUSY
+    assert not HeatLane.objects.filter(racer=racer).exists()
+    assert state_of(round).reschedule_started_at is None
+
+
+def test_nothing_to_change_is_nochart_and_releases_the_guard():
+    round = new_round(range(101, 109))
+
+    assert failure_of(lambda: reschedule(round)).code == Failure.NOCHART
+    assert state_of(round).reschedule_started_at is None
+
+
+def test_a_recent_guard_is_busy_and_an_expired_one_is_not():
+    round = q5_round()
+    now = timezone.now()
+    state = RaceState.objects.filter(event=round.event)
+
+    state.update(reschedule_started_at=now - GUARD_EXPIRY + timedelta(seconds=1))
+    assert failure_of(lambda: reschedule(round, dry_run=True)).code == Failure.BUSY
+
+    state.update(reschedule_started_at=now - GUARD_EXPIRY)
+    reschedule(round, dry_run=True, budget=NodeBudget(UNLIMITED), clock=lambda: now)
+    assert state_of(round).reschedule_started_at is None
+
+
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_two_concurrent_reschedules_give_one_success_and_one_busy():
+    round = q5_round()
+    searching, release = threading.Event(), threading.Event()
+    outcomes = {}
+
+    def wait_in_search():
+        searching.set()
+        assert release.wait(30)
+
+    def first():
+        try:
+            outcomes["first"] = reschedule(round, budget=OnSearch(wait_in_search))
+        except Exception as e:
+            outcomes["first"] = e
+        finally:
+            connection.close()
+
+    racer = late_racer(round, 150)
+    thread = threading.Thread(target=first)
+    thread.start()
+    assert searching.wait(30)
+    try:
+        second = failure_of(lambda: reschedule(round, racer.id, dry_run=True))
+    finally:
+        release.set()
+        thread.join()
+
+    assert second.code == Failure.BUSY
+    assert not isinstance(outcomes["first"], Exception), outcomes["first"]
+    assert HeatLane.objects.filter(racer=racer).exists()
+
+
+# ----- Findings of the #24 review -------------------------------------------
+
+
+def test_adding_a_racer_who_already_has_heats_is_refused():
+    """A second press of Add to schedule must not fit the racer in again."""
+    round = new_round(range(101, 110))
+    racer = late_racer(round, 120)
+    reschedule(round, racer.id, budget=NodeBudget(UNLIMITED))
+    rows = by_car(round)
+
+    caught = failure_of(lambda: reschedule(round, racer.id, budget=NodeBudget(10)))
+
+    assert caught.code == Failure.ALREADY_SCHEDULED
+    assert by_car(round) == rows
+
+
+def test_under_the_master_schedule_the_staged_heat_stays_next():
+    round = new_round(range(101, 105), use_master_sched=True)
+    other = new_round(range(201, 205), event=round.event)
+    race(round, 1)
+    race(other, 1)
+    make_current(round, 2)
+
+    def next_after(ref):
+        rows = HeatLane.objects.filter(event=round.event)
+        number = rows.filter(round_id=ref[0], heat=ref[1]).first().master_heat
+        return (
+            rows.exclude(HAS_RESULT)
+            .filter(master_heat__gt=number)
+            .order_by("master_heat")
+            .values_list("round_id", "heat")
+            .first()
+        )
+
+    def lowest_unraced():
+        rows = HeatLane.objects.filter(event=round.event).exclude(HAS_RESULT)
+        return rows.order_by("master_heat").values_list("round_id", "heat").first()
+
+    staged = next_after((round.id, 2))
+    assert staged == (other.id, 2)
+    kept = heat_rows(other, 2)
+
+    reschedule(round, late_racer(round, 120).id, budget=NodeBudget(UNLIMITED))
+
+    assert lowest_unraced() == (round.id, 2)
+    assert next_after((round.id, 2)) == staged
+    assert heat_rows(other, 2) == kept
+
+
+def test_a_current_heat_that_has_run_follows_its_new_number():
+    """Heat 4 has run and is still current. Cars 105 and 106 leave heat 2, so
+    heat 3 moves into its byes and heat 4 becomes heat 3."""
+    round = RoundFactory()
+    RaceSettings.objects.filter(event=round.event).update(lane_count=2)
+    racers = {}
+    for car in range(101, 107):
+        racers[car] = RosterEntryFactory(
+            round=round,
+            racer=RacerFactory(
+                group=round.group, car_number=car, passed_inspection=car < 105
+            ),
+        ).racer
+    chart = {1: (101, 102), 2: (105, 106), 3: (103, 104), 4: (102, 101)}
+    for heat, cars in chart.items():
+        for lane, car in enumerate(cars, start=1):
+            HeatLane.objects.create(
+                event=round.event, round=round, heat=heat, lane=lane, racer=racers[car]
+            )
+    race(round, 1, 4)
+    make_current(round, 4, racing=False)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert by_car(round) == {1: [101, 102], 2: [103, 104], 3: [102, 101]}
+    assert state_of(round).current_heat == 3
+    assert HeatLane.objects.filter(round=round, heat=3).filter(HAS_RESULT).count() == 2
+
+
+def test_a_departed_racer_stays_in_the_running_and_staged_heats():
+    """D34 keeps both heats as they are, so a racer who left one of them is
+    still listed as departed until the heat runs."""
+    round = q5_round()
+    gone = Racer.objects.get(event=round.event, car_number=110)
+    Racer.objects.filter(pk=gone.pk).update(passed_inspection=True)
+    in_staged = HeatLane.objects.filter(round=round, heat=3).first().racer
+    Racer.objects.filter(pk=in_staged.pk).update(passed_inspection=False)
+    kept = heat_rows(round, 3)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(round, 3) == kept
+    later = HeatLane.objects.filter(round=round, heat__gt=3)
+    assert not later.filter(racer=in_staged).exists()
+    assert adjustments(round.event)[round.id].departed == (in_staged.id,)
+
+
+def test_a_chart_wider_than_the_track_is_refused():
+    round = new_round(range(101, 109))
+    RaceSettings.objects.filter(event=round.event).update(lane_count=3)
+    racer = late_racer(round, 120)
+
+    caught = failure_of(lambda: reschedule(round, racer.id, dry_run=True))
+
+    assert caught.code == Failure.NLANES
+
+
+def test_the_retry_renews_the_guard():
+    round = new_round(range(101, 110))
+    racer = late_racer(round, 120)
+    times = iter(timezone.now() + timedelta(seconds=10 * i) for i in range(1000))
+    guards = []
+
+    def finish_a_heat_once():
+        guards.append(state_of(round).reschedule_started_at)
+        if len(guards) == 1:
+            race(round, 1)
+
+    reschedule(
+        round, racer.id, budget=OnSearch(finish_a_heat_once), clock=lambda: next(times)
+    )
+
+    assert guards[1] > guards[0]
+    assert state_of(round).reschedule_started_at is None

@@ -167,11 +167,13 @@ def unschedule(round: Round) -> int:
     return deleted
 
 
-def after_chart_change(round: Round) -> None:
+def after_chart_change(round: Round, keep=()) -> None:
     """Runs inside the transaction of every change to a round's chart.
 
     PHP follows each one with `assign_master_heats()`, then under the master
     schedule `advance_heat(current, 'next-up')`, and `schedule.unschedule`
     also cancels the round if it is current. #27 adds the last two here.
+    `keep` holds heats whose master numbers stay, as `reassign_master_heats`
+    describes.
     """
-    reassign_master_heats(round.event)
+    reassign_master_heats(round.event, keep)
