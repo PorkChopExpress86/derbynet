@@ -257,6 +257,7 @@ class Replay:
         assert self.state() == before
         groups.form_groups_by_rule(self.event, groups.Rule.CUSTOM)
         groups.form_groups_by_rule(self.event, rule)
+        assert self.state() == before
 
     def do_partition_move(self, values, params):
         source = None
