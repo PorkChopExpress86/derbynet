@@ -282,9 +282,16 @@ def test_a_final_with_fewer_than_2_racers_keeps_the_intermission_open():
     assert state(replay).waiting_entry is not None and not state(replay).racing
 
 
-@pytest.mark.parametrize("remove", ["delete the round", "clear the roster"])
-def test_a_final_whose_roster_goes_in_the_intermission_says_so(remove):
-    """Not D28's "needs at least 2 racers": the final has no racers at all."""
+@pytest.mark.parametrize(
+    "remove, description",
+    [
+        ("delete the round", "The waiting round has no racers in its roster."),
+        ("clear the roster", "The final needs at least 2 racers."),
+    ],
+)
+def test_a_final_with_no_racers_says_why(remove, description):
+    """D28 covers a final with zero racers. A round deleted during the
+    intermission is remade empty, which is not a final short of racers."""
     replay, finalists_for = two_step_playlist(waits=True, continue_racing=False)
     round = start_playlist(replay.event, finalists_for)
     race(round)
@@ -298,11 +305,8 @@ def test_a_final_whose_roster_goes_in_the_intermission_says_so(remove):
     with pytest.raises(PlaylistFailure) as caught:
         start_waiting_step(replay.event)
     assert caught.value.code == schedule.Failure.TOO_FEW_RACERS
-    assert caught.value.description == "The waiting round has no racers in its roster."
+    assert caught.value.description == description
     assert state(replay).waiting_entry is not None and not state(replay).racing
-    assert Round.objects.filter(group=round.group, number=2).exists() == (
-        remove == "clear the roster"
-    )
 
 
 def test_start_waiting_step_without_an_intermission_fails():

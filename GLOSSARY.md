@@ -61,12 +61,25 @@ _Avoid_: Speed trophy (one award type, not the concept)
 An award that people choose, such as best paint job or most scout-like.
 _Avoid_: Design award (only one kind of judged award)
 
+**Award scope**:
+The racers an award can go to: one partition, or all partitions that count for all-partition awards.
+
+**All-partition award**:
+An award open to every partition that counts for all-partition awards, such as fastest in the pack. A partition such as Parents or Siblings can be left out.
+
 **Not eligible for any award**:
 A racer who races but can win neither speed awards nor judged awards.
 _Avoid_: Excluded (the legacy field is `exclude`)
 
 **Not eligible for speed awards**:
 A racer who races and can win judged awards, but no speed awards.
+
+**Staged heat**:
+The next heat to run, whose cars the race crew is lining up, or has lined up, while the current heat runs.
+_Avoid_: Next-up (the legacy name)
+
+**On-deck report**:
+The display that shows the race crew the photos, names, and car numbers of the cars in the coming heats.
 
 **Rerun**:
 Racing a heat again after the timer fails, so that the new times replace the old ones.
