@@ -321,5 +321,8 @@ def current_speed_award(
     return None
 
 
-def _int(text: str) -> int | None:
-    return int(text) if text.isdigit() else None
+def _int(text: str) -> int | str | None:
+    """The id in a key, compared with an award's as PHP's `==` compares
+    them: empty text equals a null id, and other text that is not a number
+    equals no id, so it stays text."""
+    return int(text) if text.isdigit() else (text or None)
