@@ -3,8 +3,9 @@ gate.
 
 `http/race-day/` records the day on PHP: Scouts race round 1 and a top 4
 final, then Outlaws race round 1 and a top 8 final, all queued in one
-playlist. Finalists come from PHP's recorded round 1 ladders until #26
-chooses them. Results stand in for the timer, which #27 ports.
+playlist. `playlist_finalists` chooses each final from the standings
+(#26). Results stand in for the timer, which #27 ports, with the times
+`capture/scenarios/06-race-day.sh` sent.
 """
 
 import json
@@ -25,7 +26,11 @@ from racing.services.playlist import (
     start_playlist,
     start_waiting_step,
 )
-from racing.services.rounds import delete_round_roster, prepare_new_round
+from racing.services.rounds import (
+    delete_round_roster,
+    playlist_finalists,
+    prepare_new_round,
+)
 from racing.services.schedule import generate_schedule, unschedule
 from racing.tests.test_round_scenarios import Rounds
 
@@ -92,22 +97,23 @@ def race_day(scouts_final, outlaws_final):
     return replay
 
 
-def finalists_from_ladders(replay):
-    """The racers PHP's standings put in each final, in standings order."""
-
-    def finalists_for(entry, round):
-        first_round = Round.objects.get(group=entry.group, number=1)
-        ladder = LADDERS[f"st-r{replay.php('round', first_round)}"]
-        return [replay.get("racer", r) for r in top(ladder, entry.bucket_limit)]
-
-    return finalists_for
+# The salt `race_round` in `06-race-day.sh` races each round with, and the
+# times its timer sends for the first heat of the day.
+SALT = {("Scouts", 1): 0, ("Scouts", 2): 7, ("Outlaw", 1): 3, ("Outlaw", 2): 5}
+FIRST_HEAT = {1: 2.411, 2: 2.522, 3: 2.633, 4: 2.744}
 
 
 def race(round):
     """Results on every lane, then racing off, as #27's advance leaves the
-    race when it finds the round complete."""
-    for lane in HeatLane.objects.filter(round=round):
-        lane.finish_time = 2.5 + lane.lane / 10
+    race when it finds the round complete. A time depends on car number,
+    lane and the round's salt, as `race_round` makes it."""
+    key = (round.group.name, round.number)
+    for lane in HeatLane.objects.filter(round=round).select_related("racer"):
+        if key == ("Scouts", 1) and lane.heat == 1:
+            lane.finish_time = FIRST_HEAT[lane.lane]
+        else:
+            car, salt = lane.racer.car_number, SALT[key]
+            lane.finish_time = (2000 + (car * 37 + lane.lane * 11 + salt) % 1000) / 1000
         lane.completed = timezone.now()
         lane.save()
     RaceState.objects.filter(event_id=round.event_id).update(racing=False)
@@ -143,7 +149,7 @@ def test_the_recorded_day_with_a_top_4_and_a_top_8_final():
     """Each round ends in an intermission with the next round scheduled and
     its first heat selected, as PHP leaves it, and one call starts it."""
     replay = race_day(4, 8)
-    finalists_for = finalists_from_ladders(replay)
+    finalists_for = playlist_finalists()
     replay.ids.sync()
 
     round = start_playlist(replay.event, finalists_for)
@@ -191,7 +197,7 @@ def test_the_recorded_day_with_a_top_4_and_a_top_8_final():
 @pytest.mark.parametrize("scouts_final, outlaws_final", [(4, 8), (8, 4)])
 def test_each_final_holds_the_top_racers_and_ties(scouts_final, outlaws_final):
     replay = race_day(scouts_final, outlaws_final)
-    finalists_for = finalists_from_ladders(replay)
+    finalists_for = playlist_finalists()
     replay.ids.sync()
     round = start_playlist(replay.event, finalists_for)
     intermissions = 0
@@ -230,7 +236,7 @@ def two_step_playlist(waits, continue_racing):
     )
     PlaylistEntry.objects.filter(pk=entries[1].pk).update(waits_for_operator=waits)
     replay.ids.sync()
-    return replay, finalists_from_ladders(replay)
+    return replay, playlist_finalists()
 
 
 def test_a_step_that_does_not_wait_starts_when_the_round_ends():
@@ -366,7 +372,7 @@ def test_the_intermission_names_the_round_that_ended_when_a_raced_step_is_skippe
     """The next step's round is already raced, so the step after it waits.
     `ended_round` is still the round that just ended."""
     replay = race_day(4, 8)
-    finalists_for = finalists_from_ladders(replay)
+    finalists_for = playlist_finalists()
     replay.ids.sync()
     scouts = start_playlist(replay.event, finalists_for)
     outlaws = Round.objects.get(group__name="Outlaw", number=1)
@@ -386,7 +392,7 @@ def test_a_changed_result_leaves_a_waiting_round_of_another_group_alone():
     """D27 rebuilds a final from the round that fed it. Outlaw round 1 waits
     after the Scouts final, and no Scouts result picks its racers."""
     replay = race_day(4, 8)
-    finalists_for = finalists_from_ladders(replay)
+    finalists_for = playlist_finalists()
     replay.ids.sync()
     scouts = start_playlist(replay.event, finalists_for)
     race(scouts)
@@ -457,7 +463,7 @@ def test_skipping_into_a_step_that_does_not_wait_starts_it():
 def test_skip_waiting_step_without_an_intermission_fails():
     replay = race_day(4, 8)
     with pytest.raises(PlaylistFailure) as caught:
-        skip_waiting_step(replay.event, finalists_from_ladders(replay))
+        skip_waiting_step(replay.event, playlist_finalists())
     assert caught.value.code == Failure.NO_INTERMISSION
 
 
