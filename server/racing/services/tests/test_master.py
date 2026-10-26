@@ -7,7 +7,7 @@ from django.test.utils import CaptureQueriesContext
 
 from core.models import RaceSettings
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
-from racing.models import HeatLane
+from racing.models import HAS_RESULT, HeatLane
 from racing.services import master
 from racing.services.master import reassign_master_heats
 from racing.services.schedule import generate_schedule, unschedule
@@ -157,7 +157,7 @@ def check_invariants(event, before, raced):
         assert numbers[heat] == before[heat], heat
     with_result = set(
         HeatLane.objects.filter(event=event)
-        .filter(master.HAS_RESULT)
+        .filter(HAS_RESULT)
         .values_list("round_id", "heat")
     )
     highest = max((before[heat] for heat in with_result), default=0)
@@ -208,7 +208,7 @@ def test_numbering_holds_over_any_sequence_of_chart_and_result_changes(seed):
             if op == "unschedule":
                 unschedule(round)
                 raced = {heat for heat in raced if heat[0] != round.id}
-            elif HeatLane.objects.filter(round=round).filter(master.HAS_RESULT):
+            elif HeatLane.objects.filter(round=round).filter(HAS_RESULT):
                 reassign_master_heats(event)
             else:
                 generate_schedule(round, rng.randint(1, 2))

@@ -78,3 +78,14 @@ def new_event(name):
 
     SiteState.objects.get_or_create(pk=1, defaults={"active_event": event})
     return event
+
+
+def lock_race_state(event_id):
+    """Lock the event's `RaceState` row and return it.
+
+    Call it first inside `transaction.atomic()`. Every writer of the roster,
+    inspection status, lane settings, or results takes this lock, because
+    `generate_schedule` rechecks those inputs under it (#20, "Transactions
+    and locks").
+    """
+    return RaceState.objects.select_for_update().get(event_id=event_id)

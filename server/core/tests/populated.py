@@ -32,7 +32,7 @@ def populated_event():
     HeatLaneFactory(round=round_, racer=racer, lane=1)
     link = GroupConstituentFactory(aggregate__event=event)
     GroupConstituentSubgroupFactory(aggregate=link.aggregate, subgroup=racer.subgroup)
-    PlaylistEntryFactory(group=round_.group, scene_at_finish=scene)
+    step = PlaylistEntryFactory(group=round_.group, scene_at_finish=scene)
     TimerSettingFactory(event=event)
     lane_result = AuditLaneResultFactory(
         audit_event__event=event,
@@ -62,6 +62,8 @@ def populated_event():
         current_round=round_,
         current_scene=scene,
         playlist_scene=scene,
+        waiting_entry=step,
+        ended_round=round_,
     )
     TimerStatus.objects.filter(event=event).update(
         staged_round=round_, test_saved_round=round_

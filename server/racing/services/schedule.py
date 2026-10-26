@@ -8,13 +8,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from django.db import transaction
-from django.db.models import Q
 
 from core.models import RaceSettings, RaceState
 from racing.engine.scheduling.lanes import count_one_bits
 from racing.engine.scheduling.rough import CantFulfill, max_runs_per_lane
 from racing.engine.scheduling.round import TooFewRacers, make_chart
-from racing.models import HeatLane, RosterEntry, Round
+from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from racing.services.master import reassign_master_heats
 
 
@@ -62,9 +61,7 @@ def _read_inputs(round: Round) -> _Inputs:
         max_runs_per_car=settings.max_runs_per_car,
         rotation=settings.rotation_schedule,
         roster=tuple(roster.values_list("racer_id", flat=True)),
-        results_exist=HeatLane.objects.filter(round=round)
-        .filter(Q(finish_time__isnull=False) | Q(finish_place__isnull=False))
-        .exists(),
+        results_exist=HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists(),
     )
 
 
