@@ -62,6 +62,14 @@ capture_scenario() {
   fi
 }
 
+# form_fields <body>: each &-separated field of a form body on its own line, with
+# spaces and glob characters kept as written.
+form_fields() {
+  local -a fields=()
+  [ -z "$1" ] || IFS='&' read -r -a fields <<< "$1"
+  [ "${#fields[@]}" -eq 0 ] || printf '%s\n' "${fields[@]}"
+}
+
 # capture <name> <request>
 capture() {
   local name="$1" request="$2"
@@ -82,7 +90,7 @@ capture() {
       else
         local field
         args+=(-F "${CAPTURE_UPLOAD%%=*}=@$RAW/${CAPTURE_UPLOAD#*=}")
-        for field in ${body//&/ }; do args+=(--form-string "$field"); done
+        while IFS= read -r field; do args+=(--form-string "$field"); done < <(form_fields "$body")
       fi ;;
     *) echo "capture: unsupported method $method" >&2; return 1 ;;
   esac

@@ -16,6 +16,10 @@ user_login_timer
 # (Tigers) tie in every heat.  The nonracing aggregate "Lions Only" holds Lions
 # alone, and add_speed_awards() awards aggregates before groups, so Abbot wins it
 # and is on the no-trophies list when the group's first rung is [Abbot, Baker].
+# #20's layout, an aggregate over both groups, cannot show Q7: the tied racers
+# tie in the aggregate too, a tied place awards every racer of its rung, so both
+# hold a trophy and the group's rung has nobody left.  The aggregate has to hold
+# the tie's first racer without the second, so it draws from one subgroup.
 use_session coord
 reset_database
 user_login_coordinator
