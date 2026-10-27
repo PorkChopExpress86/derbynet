@@ -62,10 +62,8 @@ An award that people choose, such as best paint job or most scout-like.
 _Avoid_: Design award (only one kind of judged award)
 
 **Award scope**:
-The racers an award can go to: one partition, or all partitions.
-
-**All-partition award**:
-An award open to all partitions, such as fastest in the pack. A partition such as Parents or Siblings can be set to stay out of all-partition awards.
+The partitions an award can go to, listed on the award. A list is all partitions until the race coordinator narrows it, so fastest in the pack can leave out Parents or Siblings.
+_Avoid_: All-partition award (D34's setting, replaced by the list)
 
 **Not eligible for any award**:
 A racer who races but can win neither speed awards nor judged awards.

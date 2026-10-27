@@ -1,6 +1,7 @@
 import pytest
 from django.utils import timezone
 
+from awards.services import set_partition_list
 from core.models import FullFieldRule, RaceSettings, RaceState
 from racing.engine.standings.eligibility import NotEligible
 from racing.engine.standings.oracle import FULL_FIELD, round_key
@@ -145,26 +146,34 @@ def test_both_award_settings_show_in_the_snapshot_with_no_place(replay):
     assert ladder[0] == (lions[2].pk,)
 
 
-def test_a_final_of_the_pack_aggregate_skips_a_partition_that_does_not_count(
-    replay,
-):
+def test_an_aggregate_final_skips_a_partition_its_list_leaves_out(replay):
+    """D35: the cut reads the list of the group the final is for. The pack's
+    list marks the pack's ladder only, and changes no cut."""
     lions, tigers = racers_of(replay, "Lions"), racers_of(replay, "Tigers")
-    Partition.objects.filter(name="Tigers").update(
-        counts_for_all_partition_awards=False
+    lions_only = [Partition.objects.get(event=replay.event, name="Lions")]
+    set_partition_list(replay.event, lions_only)
+    standings = standings_snapshot(replay.event).standings
+    tiger_rows = [r for r in standings.rows if r.racer.group_id == tigers[0].group_id]
+    assert tiger_rows and all(
+        dict(r.not_eligible) == {FULL_FIELD: NotEligible.PARTITION_NOT_LISTED}
+        for r in tiger_rows
     )
+    assert all(r.outcome for r in tiger_rows), "places in the group stay"
+
     made = new_round_roster(
         NewAggregate("Grand Final", groups=[lions[0].group, tigers[0].group]),
         top=4,
     )
+    final = made.round.group
+    assert set(roster(made.round)) == {*lions[:2], *tigers[:2]}, (
+        "the pack's list changes no cut"
+    )
     settings = RaceSettings.objects.get(event=replay.event)
     assert settings.full_field_rule == FullFieldRule.GROUP
-    assert settings.full_field_group == made.round.group
-    assert roster(made.round) == lions[:4]
+    assert settings.full_field_group == final
 
-    standings = standings_snapshot(replay.event).standings
-    tiger_rows = [r for r in standings.rows if r.racer.group_id == tigers[0].group_id]
-    assert all(FULL_FIELD in r.not_eligible for r in tiger_rows)
-    assert all(r.outcome for r in tiger_rows), "places in the group stay"
+    set_partition_list(replay.event, lions_only, group=final)
+    assert roster(new_round_roster(FromAggregate(final), top=4).round) == lions[:4]
 
 
 def test_no_eligible_racer_fails_and_changes_nothing(replay):

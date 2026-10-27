@@ -132,9 +132,6 @@ class Partition(EventScoped):
         Subgroup, on_delete=models.PROTECT, related_name="partitions"
     )
     sort_order = models.IntegerField()
-    # Award scope (D34): off leaves the partition's racers out of the pack's
-    # speed awards, such as fastest in the pack, but not their own group's.
-    counts_for_all_partition_awards = models.BooleanField(default=True)
 
     class Meta:
         constraints = [

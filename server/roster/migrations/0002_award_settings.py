@@ -8,11 +8,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name="partition",
-            name="counts_for_all_partition_awards",
-            field=models.BooleanField(default=True),
-        ),
-        migrations.AddField(
             model_name="racer",
             name="not_eligible_for_speed_awards",
             field=models.BooleanField(default=False),

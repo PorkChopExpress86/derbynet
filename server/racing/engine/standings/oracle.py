@@ -17,8 +17,10 @@ while round 2 is scheduled and unraced, round 1 adds no `st-q` or `st-ff`
 place. A round is finished when it has a chart and every lane has a result.
 
 A racer who cannot win a ladder's speed awards keeps the row and takes no
-place in that ladder (D33, D34; see `eligibility`). Every place, ladder and
-`T` mark is then what PHP gives with that racer removed.
+place in that ladder (D33, D35; see `eligibility`). Every place, ladder and
+`T` mark is then what PHP gives with that racer removed. A unit's partition
+list marks only the ladder its awards read; award settings mark every
+ladder.
 """
 
 from collections.abc import Mapping, Sequence
@@ -27,7 +29,15 @@ from functools import cached_property
 from types import MappingProxyType
 
 from racing.engine.phpcompat import ascii_fold
-from racing.engine.standings.eligibility import ELIGIBLE, AwardSettings, NotEligible
+from racing.engine.standings.eligibility import (
+    ELIGIBLE,
+    PACK,
+    AwardSettings,
+    AwardUnit,
+    NotEligible,
+    PartitionLists,
+    why_not,
+)
 from racing.engine.standings.scoring import Scoring, Summary, summarize
 from racing.engine.standings.tracker import Ladder, StandingsTracker
 
@@ -90,6 +100,7 @@ class Racer:
     group_id: int
     subgroup_id: int
     awards: AwardSettings = ELIGIBLE
+    partition_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -130,6 +141,7 @@ class Event:
     racers: tuple[Racer, ...]
     results: tuple[Result, ...]
     settings: Settings = Settings()
+    partition_lists: PartitionLists = MappingProxyType({})
 
 
 @dataclass(frozen=True)
@@ -137,12 +149,14 @@ class Row:
     """One racer's showing in one round. `outcome` maps each ladder the row
     takes a place in to that place, in PHP's key order. `not_eligible` maps
     each ladder the row would bear on but takes no place in to the reason.
-    A row with no score in the scoring mode takes no place anywhere."""
+    `ladders` is every ladder the row bears on, in PHP's key order. A row
+    with no score in the scoring mode takes no place anywhere."""
 
     round: Round
     racer: Racer
     summary: Summary
     nonfinal: bool = False
+    ladders: tuple[str, ...] = ()
     outcome: Mapping[str, Place] = MappingProxyType({})
     not_eligible: Mapping[str, NotEligible] = MappingProxyType({})
 
@@ -168,6 +182,7 @@ class Standings:
             {g: tuple(rounds) for g, rounds in rounds_of.items()}
         )
         self.rolls_up_to = _rolls_up_to(event.groups)
+        self._units = self._award_units()
         self.ladders: Mapping[str, Ladder] = MappingProxyType({})
         self.catalog_counts: Mapping[str, int] = MappingProxyType({})
         self.rows: tuple[Row, ...] = self._place_rows(_rows(event))
@@ -193,35 +208,48 @@ class Standings:
             keys.append(subgroup)
         return keys, True
 
-    def _is_pack_ladder(self, key: str, row: Row) -> bool:
-        pack = self.settings.pack_group_id
-        if key == FULL_FIELD:
-            return True
-        if pack is None:
-            return False
-        return key == qualifier_key(pack) or (
-            row.round.group_id == pack and not key.startswith("st-q")
+    def why_not(self, racer: Racer, unit: AwardUnit | None) -> NotEligible | None:
+        """The rule of `eligibility`, for this event's partition lists."""
+        return why_not(
+            racer.awards, racer.partition_id, unit, self.event.partition_lists
         )
+
+    def _award_units(self) -> dict[str, AwardUnit]:
+        """The unit whose speed awards read each award ladder. The
+        `full-field-calc` aggregate's ladder is the pack's."""
+        units = {}
+        for subgroup in self.event.subgroups:
+            key = self._subgroup_award_key(subgroup.id)
+            if key is not None:
+                units[key] = AwardUnit(subgroup_id=subgroup.id)
+        pack = self.settings.pack_group_id
+        for group in self.event.groups:
+            unit = PACK if group.id == pack else AwardUnit(group_id=group.id)
+            units[self._group_award_key(group.id)] = unit
+        if self.has_full_field_standings:
+            units[FULL_FIELD] = PACK
+        return units
 
     def _place_rows(self, drafts: list[Row]) -> tuple[Row, ...]:
         trackers: dict[str, StandingsTracker] = {}
-        marks: list[tuple[bool, dict[str, int], dict[str, NotEligible]]] = []
+        marks: list[
+            tuple[bool, tuple[str, ...], dict[str, int], dict[str, NotEligible]]
+        ] = []
         for row in drafts:
             placed: dict[str, int] = {}
             not_eligible: dict[str, NotEligible] = {}
             nonfinal = False
+            keys: list[str] = []
             if row.summary.score is not None:
                 keys, nonfinal = self._keys(row)
                 for key in keys:
-                    why = row.racer.awards.why_not(
-                        all_partitions=self._is_pack_ladder(key, row)
-                    )
+                    why = self.why_not(row.racer, self._units.get(key))
                     if why is not None:
                         not_eligible[key] = why
                         continue
                     tracker = trackers.setdefault(key, StandingsTracker())
                     placed[key] = tracker.add(row.summary.score, row.racer.id)
-            marks.append((nonfinal, placed, not_eligible))
+            marks.append((nonfinal, tuple(keys), placed, not_eligible))
         self.ladders = MappingProxyType({k: t.ladder for k, t in trackers.items()})
         self.catalog_counts = MappingProxyType(
             {k: t.count for k, t in trackers.items()}
@@ -234,10 +262,13 @@ class Standings:
             replace(
                 row,
                 nonfinal=nonfinal,
+                ladders=keys,
                 outcome=MappingProxyType({k: place(k, r) for k, r in placed.items()}),
                 not_eligible=MappingProxyType(not_eligible),
             )
-            for row, (nonfinal, placed, not_eligible) in zip(drafts, marks, strict=True)
+            for row, (nonfinal, keys, placed, not_eligible) in zip(
+                drafts, marks, strict=True
+            )
         )
 
     @property
@@ -267,17 +298,21 @@ class Standings:
         return self.ladders.get(FULL_FIELD, ())
 
     def award_ladder_class(self, group_id: int) -> Ladder:
+        return self.ladders.get(self._group_award_key(group_id), ())
+
+    def award_ladder_subgroup(self, subgroup_id: int) -> Ladder:
+        key = self._subgroup_award_key(subgroup_id)
+        return () if key is None else self.ladders.get(key, ())
+
+    def _group_award_key(self, group_id: int) -> str:
         """A group's highest round, finished or not, else its qualifier
         standings."""
         rounds = self.rounds_of.get(group_id, ())
-        key = round_key(rounds[0].id) if rounds else qualifier_key(group_id)
-        return self.ladders.get(key, ())
+        return round_key(rounds[0].id) if rounds else qualifier_key(group_id)
 
-    def award_ladder_subgroup(self, subgroup_id: int) -> Ladder:
+    def _subgroup_award_key(self, subgroup_id: int) -> str | None:
         rounds = self.rounds_of.get(self.subgroups[subgroup_id].group_id, ())
-        if not rounds:
-            return ()
-        return self.ladders.get(round_subgroup_key(rounds[0].id, subgroup_id), ())
+        return round_subgroup_key(rounds[0].id, subgroup_id) if rounds else None
 
     @cached_property
     def group_order(self) -> tuple[Group, ...]:

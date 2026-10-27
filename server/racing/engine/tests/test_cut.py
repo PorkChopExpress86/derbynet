@@ -15,3 +15,12 @@ def test_a_racer_in_two_buckets_counts_in_the_first_only():
     unique = cut.unique()
     assert [f.racer_id for f in unique.finalists] == [1, 2, 3]
     assert unique.concerns == ("There are only 1 eligible Finals racer(s).",)
+
+
+def test_a_bucket_that_reaches_its_limit_has_no_concern():
+    """PHP's `count($bucket) < $limit`: a top 0 cut is never short."""
+    cut = Cut((Bucket("Lions", ()), Bucket("Tigers", (Finalist(1, 3.0),))), limit=0)
+    assert cut.concerns == ()
+    assert Cut((Bucket("Lions", ()),), limit=1).concerns == (
+        "There are no eligible Lions racer(s).",
+    )

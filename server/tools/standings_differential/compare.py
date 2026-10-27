@@ -1,12 +1,14 @@
 """Feeds an event to the Django standings engine and compares what it gives
 with what `harness.php` recorded from PHP.
 
-Every racer's partition counts for all-partition awards, and the only award
+Every partition list holds every partition, and the only award
 setting is `exclude`, which is "not eligible for any award". Django keeps an
 excluded racer's rows with no place; PHP leaves them out, so the comparison
 drops them from Django's rows.
 
-Two differences are deliberate (#20). Q7: with `one-trophy-per`, PHP awards
+Three differences are deliberate (#20). Q22: a key whose place ends in two
+or more letters names a tie award past z in Django; PHP reads its last
+letter only. Q7: with `one-trophy-per`, PHP awards
 nobody and skips a racer when the first racer of a tie already holds an
 award; Django awards the remaining racers in rung order. Q8: PHP orders the
 aggregate groups with a comparator that is not transitive; Django uses a
@@ -19,6 +21,7 @@ that it read a missing racer.
 """
 
 import json
+import re
 from collections import Counter
 from contextlib import ExitStack
 from dataclasses import dataclass, field
@@ -150,9 +153,7 @@ class _ModelAwarding(speed_awards._Awarding):
 
     php_indexing = False
 
-    def award(
-        self, n, bias, group_id, subgroup_id, label, ladder, all_partitions=False
-    ):
+    def award(self, n, bias, group_id, subgroup_id, label, ladder, unit):
         racers = self.standings.racers
         place = 0
         rung_index = 0
@@ -167,7 +168,7 @@ class _ModelAwarding(speed_awards._Awarding):
                 i: r
                 for i, r in enumerate(rung)
                 if r not in self.holders
-                and racers[r].awards.why_not(all_partitions=all_partitions) is None
+                and self.standings.why_not(racers[r], unit) is None
             }
             if not remaining:
                 continue
@@ -476,6 +477,9 @@ def compare(ev: dict, php: dict) -> Outcome:
     award_keys = {a["key"] for a in php["awards"]}
     split = {"current": ([], []), "current_odd_keys": ([], [])}
     for key, p, d in zip(keys, php["current"], django_current, strict=True):
+        if _canon(p) != _canon(d) and re.fullmatch(r"speed-[^-]*[a-z]{2,}(-.*)?", key):
+            out.deviations.append("Q22")
+            continue
         php_items, django_items = split[
             "current" if key in award_keys else "current_odd_keys"
         ]

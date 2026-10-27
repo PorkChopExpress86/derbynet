@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from functools import cached_property
+from types import MappingProxyType
 
 from django.db.models import Exists, OuterRef
 
+from awards.models import AwardPartition
 from core.models import FullFieldRule, RaceSettings, RaceState
 from racing.engine.standings import oracle
-from racing.engine.standings.eligibility import AwardSettings
+from racing.engine.standings.eligibility import AwardSettings, AwardUnit
 from racing.engine.standings.scoring import Scoring
 from racing.engine.standings.speed_awards import (
     CurrentAward,
@@ -116,8 +118,8 @@ def _read(event) -> _Inputs:
             awards=AwardSettings(
                 not_eligible_for_any_award=exclude,
                 not_eligible_for_speed_awards=no_speed,
-                partition_counts_for_all_partition_awards=counts,
             ),
+            partition_id=partition_id,
         )
         for (
             id,
@@ -129,7 +131,7 @@ def _read(event) -> _Inputs:
             subgroup_id,
             exclude,
             no_speed,
-            counts,
+            partition_id,
         ) in Racer.objects.filter(event=event, passed_inspection=True)
         .order_by("id")
         .values_list(
@@ -142,7 +144,7 @@ def _read(event) -> _Inputs:
             "subgroup_id",
             "exclude",
             "not_eligible_for_speed_awards",
-            "partition__counts_for_all_partition_awards",
+            "partition_id",
         )
     )
     entered = RosterEntry.objects.filter(
@@ -163,6 +165,7 @@ def _read(event) -> _Inputs:
             rounds=rounds,
             racers=racers,
             results=results,
+            partition_lists=_partition_lists(event),
             settings=oracle.Settings(
                 use_points=settings.use_points,
                 scoring=Scoring(settings.scoring),
@@ -179,6 +182,16 @@ def _read(event) -> _Inputs:
             one_trophy_per=settings.one_trophy_per,
         ),
     )
+
+
+def _partition_lists(event) -> MappingProxyType:
+    """The narrowed lists of the speed-award units (D35)."""
+    lists: dict[AwardUnit, set[int]] = {}
+    for group_id, subgroup_id, partition_id in AwardPartition.objects.filter(
+        event=event, award__isnull=True
+    ).values_list("group_id", "subgroup_id", "partition_id"):
+        lists.setdefault(AwardUnit(group_id, subgroup_id), set()).add(partition_id)
+    return MappingProxyType({u: frozenset(p) for u, p in lists.items()})
 
 
 def _full_field_calc(settings: RaceSettings) -> int:

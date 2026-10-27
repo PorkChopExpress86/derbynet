@@ -9,16 +9,17 @@ equals the last score it took, so a tie at the cut joins the round and a
 top 4 can hold 5 racers.
 
 A cut skips every racer who cannot win the speed awards of the group the
-round is for, and takes the next one (D34). Racers with an award setting
-have no place in any ladder already; a cut for the `full-field-calc`
-aggregate also skips racers whose partition does not count for
-all-partition awards, because their places in the groups it draws from
-still stand.
+round is for, and takes the next one (D34): a racer with an award setting,
+or whose partition is not in that group's list (D35). The pack's list
+never changes a cut. A racer left out of a group's list has no place in
+that group's award ladder, so a cut walks every ladder a row bears on, not
+only those it has a place in, and the rule alone decides.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from racing.engine.standings.eligibility import AwardUnit
 from racing.engine.standings.oracle import Standings
 
 
@@ -51,9 +52,11 @@ class Cut:
         concerns = []
         for bucket in self.buckets:
             n = len(bucket.finalists)
+            if n >= self.limit:
+                continue
             if n == 0:
                 concerns.append(f"There are no eligible {bucket.name} racer(s).")
-            elif n < self.limit:
+            else:
                 concerns.append(f"There are only {n} eligible {bucket.name} racer(s).")
         return tuple(concerns)
 
@@ -81,12 +84,12 @@ def from_keys(
 ) -> Cut:
     """`calculate_roster_from_keys()`. Without `bucketed`, every key fills
     one bucket. `for_group` is the group the new round belongs to."""
-    all_partitions = for_group == standings.settings.pack_group_id
+    unit = AwardUnit(group_id=for_group)
     buckets: list[list[Finalist]] = [[] for _ in keys]
     for row in standings.rows:
-        if row.racer.awards.why_not(all_partitions=all_partitions) is not None:
+        if standings.why_not(row.racer, unit) is not None:
             continue
-        for key in row.outcome:
+        for key in row.ladders:
             if key not in keys:
                 continue
             bucket = buckets[keys.index(key) if bucketed else 0]

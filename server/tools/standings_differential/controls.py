@@ -6,7 +6,6 @@ from types import MappingProxyType
 from unittest import mock
 
 from racing.engine.standings import finalists, oracle, scoring, speed_awards, tracker
-from racing.engine.standings.eligibility import AwardSettings
 
 
 def _wrap(target, name, after):
@@ -76,7 +75,7 @@ CONTROLS = {
     ),
     "excluded racers take places": (
         "rows",
-        lambda: mock.patch.object(AwardSettings, "why_not", lambda self, **kw: None),
+        lambda: mock.patch.object(oracle.Standings, "why_not", lambda *a: None),
     ),
     "a catalog count is one more": (
         "catalog_counts",
