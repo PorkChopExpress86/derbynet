@@ -8,16 +8,17 @@ drops them from Django's rows.
 
 Three differences are deliberate (#20). Q22: a key whose place ends in two
 or more letters names a tie award past z in Django; PHP reads its last
-letter only. Q7: with `one-trophy-per`, PHP awards
-nobody and skips a racer when the first racer of a tie already holds an
-award; Django awards the remaining racers in rung order. Q8: PHP orders the
-aggregate groups with a comparator that is not transitive; Django uses a
-real topological sort. An order difference counts as Q8 only when PHP's
-order is not topological and Django's is. An award difference counts as
-Q8 when Django, given PHP's order, gives exactly PHP's awards, and as Q7
-when a model of the award loop gives Django's awards with Django's tie
-indexing and exactly PHP's with PHP's (`_ModelAwarding`), and PHP warned
-that it read a missing racer.
+letter only. Such a key counts as Q22 only when Django answers with its own
+award of that key, or with nothing when it has none. Q7: with
+`one-trophy-per`, PHP awards nobody and skips a racer when the first racer
+of a tie already holds an award; Django awards the remaining racers in rung
+order. Q8: PHP orders the aggregate groups with a comparator that is not
+transitive; Django uses a real topological sort. An order difference counts
+as Q8 only when PHP's order is not topological and Django's is. An award
+difference counts as Q8 when Django, given PHP's order, gives exactly PHP's
+awards, and as Q7 when a model of the award loop gives Django's awards with
+Django's tie indexing and exactly PHP's with PHP's (`_ModelAwarding`), and
+PHP warned that it read a missing racer.
 """
 
 import json
@@ -469,9 +470,12 @@ def compare(ev: dict, php: dict) -> Outcome:
     django_current = _match_awards(out, php, dj)
 
     award_keys = {a["key"] for a in php["awards"]}
+    django_holders = {a["key"]: a["racerid"] for a in dj["awards"]}
     split = {"current": ([], []), "current_odd_keys": ([], [])}
-    for key, p, d in zip(keys, php["current"], django_current, strict=True):
-        if _canon(p) != _canon(d) and re.fullmatch(r"speed-[^-]*[a-z]{2,}(-.*)?", key):
+    for key, p, d, own in zip(
+        keys, php["current"], django_current, dj["current"], strict=True
+    ):
+        if _canon(p) != _canon(d) and _is_q22(key, own, django_holders):
             out.deviations.append("Q22")
             continue
         php_items, django_items = split[
@@ -484,6 +488,17 @@ def compare(ev: dict, php: dict) -> Outcome:
 
     out.tags |= tags(ev, php)
     return out
+
+
+def _is_q22(key: str, answer: dict | None, holders: dict[str, int]) -> bool:
+    """Q22: the key's place ends in two or more letters, which name a tie
+    award past z, and Django answers with its own award of that key, or
+    with nothing when it has none."""
+    if not re.fullmatch(r"speed-[^-]*[a-z]{2,}(-.*)?", key):
+        return False
+    if key not in holders:
+        return answer is None
+    return answer is not None and answer["racerid"] == holders[key]
 
 
 def tags(ev: dict, php: dict) -> set[str]:

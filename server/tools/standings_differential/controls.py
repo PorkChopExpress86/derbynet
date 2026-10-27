@@ -55,6 +55,13 @@ def _drop_tie_awards(current, key, *args):
     return None if place[-1:].isalpha() else current
 
 
+def _past_z_names_the_last_award(current, key, standings, awards):
+    place = key.split("-")[1] if key.startswith("speed-") else ""
+    if len(place) - len(place.rstrip("abcdefghijklmnopqrstuvwxyz")) < 2 or not awards:
+        return current
+    return speed_awards.CurrentAward(key, "", awards[-1].racer_id)
+
+
 def _left_to_right(values):
     """Plain float addition. Python's `sum` compensates, so it would not do."""
     return functools.reduce(operator.add, values, 0.0)
@@ -126,6 +133,12 @@ CONTROLS = {
     "a tied award key names no award": (
         "current",
         lambda: _wrap(speed_awards, "current_speed_award", _drop_tie_awards),
+    ),
+    "a key past z names the last award": (
+        "current_odd_keys",
+        lambda: _wrap(
+            speed_awards, "current_speed_award", _past_z_names_the_last_award
+        ),
     ),
 }
 
