@@ -1,9 +1,10 @@
 """`capture/scenarios/13-heat-state.sh` replayed through the services.
 
 `timer/partial-and-non-numeric-results.http`: a `FINISHED` that leaves lane 4
-unposted (Q11), then one whose lane 1 time is `---` (Q16). PHP stores the
-dashes as a time, shows it as 0 and gives it first place; Django counts it as
-not posted, so the heat has no places and lane 1 no result.
+unposted (Q11), then one whose lane 1 time is `---` (Q16). PHP leaves lane 4
+with no result, and stores the dashes as a time that shows as 0 and places
+first. Django gives both cars the did-not-finish time and places them last
+(D42).
 
 `suite/points-rerun-reinstate.http`: a rerun and a reinstate under points
 racing (Q4). PHP brings back only the places; Django brings back the times
@@ -30,22 +31,28 @@ from racing.engine.tests.golden import (
 
 TIMER = "http/timer/partial-and-non-numeric-results.http"
 POINTS = "http/suite/points-rerun-reinstate.http"
-Q16_EXCHANGES = [
-    "004 heat-results-with-a-dashed-time",
-    "005 standings-with-a-dashed-time",
-]
-Q4_EXCHANGE = "003 reinstate-under-points"
-REASONS = {
+DEVIATIONS = {
+    ("Q11", TIMER): (
+        ["002 poll-after-a-lane-without-a-result"],
+        "PHP leaves lane 4, which the timer did not report, without a result."
+        " Django gives the car a did-not-finish time, 9.999 s, and places the"
+        " heat from the times (D42).",
+    ),
     ("Q16", TIMER): (
+        ["004 heat-results-with-a-dashed-time", "005 standings-with-a-dashed-time"],
         "PHP stores a time of --- as text, shows it as 0 and places it first."
-        " Django counts it as not posted, so lane 1 has no result and the heat"
-        " no places."
+        " Django gives the car a did-not-finish time, 9.999 s, so it places"
+        " last (D42).",
     ),
     ("Q4", POINTS): (
+        ["003 reinstate-under-points"],
         "Under points racing PHP's rerun saves only the places, so a reinstate"
-        " leaves the times empty. Django brings back each lane's time and place."
+        " leaves the times empty. Django brings back each lane's time and place.",
     ),
 }
+FPS_TO_SCALE_MPH = 3600 * 25 / 5280
+"""`json_heat_results` in `website/inc/json-heat-results.inc`, with the
+default 40 ft track."""
 
 
 def php(fixture):
@@ -109,14 +116,19 @@ def django_replay():
     return computed
 
 
+def _speed(time):
+    if not time:
+        return "--"
+    return float(f"{40 / time * FPS_TO_SCALE_MPH:4.1f}")
+
+
 def expected_body(name, php_body, computed):
     """PHP's body with the computed fields replaced."""
     body = json.loads(php_body)
-    if name.endswith("heat-results-with-a-dashed-time"):
-        speeds = {r["lane"]: r["speed"] for r in body["heat-results"]}
+    if isinstance(computed, list) and computed and isinstance(computed[0], dict):
         body["heat-results"] = [
             {"lane": r["lane"], "time": r["time"], "place": r["place"]}
-            | {"speed": speeds[r["lane"]]}
+            | {"speed": _speed(r["time"])}
             for r in computed
         ]
     elif name.endswith("standings-with-a-dashed-time"):
@@ -138,27 +150,9 @@ def computed():
     return django_replay()
 
 
-def test_the_partial_result_matches_php():
-    """Q11: lane 4 has no result in either, and the heat advances."""
-    from racing.models import HeatLane
-    from racing.services.heats import select_heat
-    from racing.services.results import record_timer_result
-    from racing.services.tests.race import current, fields, setup_race
-
-    replay, round = setup_race()
-    select_heat(replay.event, round_id=round.id, now_racing=True)
-    record_timer_result(replay.event, fields("lane1=3.100&lane2=3.200&lane3=3.300"))
-    body = json.loads(php(TIMER)["002 poll-after-a-lane-without-a-result"]["body"])
-    rows = HeatLane.objects.filter(round=round, heat=1).exclude(finish_time=None)
-    assert [r["lane"] for r in body["heat-results"]] == sorted(
-        rows.values_list("lane", flat=True)
-    )
-    assert current(replay.event)[1:] == (body["current-heat"]["heat"], True)
-
-
 @pytest.mark.parametrize(
     ("fixture", "name"),
-    [(TIMER, n) for n in Q16_EXCHANGES] + [(POINTS, Q4_EXCHANGE)],
+    [(fixture, n) for (_, fixture), (names, _) in DEVIATIONS.items() for n in names],
 )
 def test_the_services_give_the_deviation(computed, fixture, name):
     quirk, deviation = transcript_deviations(fixture)[name]
@@ -172,12 +166,9 @@ def write_deviations():
     computed = django_replay()
     listing = json.loads(DEVIATIONS_FILE.read_text())
     entries = [
-        e
-        for e in listing["deviations"]
-        if (e["quirk"], "http/" + e["fixture"].removeprefix("http/")) not in REASONS
+        e for e in listing["deviations"] if (e["quirk"], e["fixture"]) not in DEVIATIONS
     ]
-    for (quirk, fixture), reason in REASONS.items():
-        names = Q16_EXCHANGES if quirk == "Q16" else [Q4_EXCHANGE]
+    for (quirk, fixture), (names, reason) in DEVIATIONS.items():
         raw = (GOLDEN_DIR / fixture).read_bytes()
         out = b""
         for name in names:
@@ -194,7 +185,7 @@ def write_deviations():
         entries.append(
             {
                 "quirk": quirk,
-                "fixture": fixture.removeprefix("http/").join(["http/", ""]),
+                "fixture": fixture,
                 "exchanges": names,
                 "reason": reason,
                 "expected": expected,

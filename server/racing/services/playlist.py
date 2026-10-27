@@ -287,12 +287,22 @@ def _feeds(ended: Round, entry: PlaylistEntry) -> bool:
     ).exists()
 
 
+def _same_finalists(round: Round, entry: PlaylistEntry, finalists_for) -> bool:
+    """The round has a chart and its roster is the racers the cut picks now,
+    so a rebuild would make the same roster again."""
+    if not HeatLane.objects.filter(round=round).exists():
+        return False
+    roster = set(round.roster.values_list("racer_id", flat=True))
+    return roster == {racer.pk for racer in finalists_for(entry, round).racers}
+
+
 def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
     """Owner decision D27: after a result in the ended round changes, make the
     waiting round's roster and chart again, when the waiting round draws its
-    racers from the ended round and none of its heats has a result. Returns
-    whether it rebuilt them. A current heat outside the waiting round, as
-    during a rerun of the ended round, stays current."""
+    racers from the ended round, none of its heats has a result, and the cut
+    now picks other racers. Returns whether it rebuilt them. A current heat
+    outside the waiting round, as during a rerun of the ended round, stays
+    current."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         if state.waiting_entry_id is None or state.ended_round_id is None:
@@ -306,6 +316,8 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
         )
         if round is not None:
             if HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists():
+                return False
+            if _same_finalists(round, entry, finalists_for):
                 return False
             unschedule(round)
             prepare_new_round(entry.group, entry.round_number)

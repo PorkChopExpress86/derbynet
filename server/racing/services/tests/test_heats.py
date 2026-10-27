@@ -7,6 +7,7 @@ from django.utils import timezone
 from core.models import RaceSettings
 from kiosks.models import Kiosk, Scene
 from racing.engine.heat_state import Code
+from racing.engine.results import DID_NOT_FINISH
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
 from racing.models import EmptiedHeat, HeatLane, PlaylistEntry, Round
 from racing.services import playlist
@@ -176,16 +177,16 @@ def test_every_result_write_sets_completed_and_every_clear_empties_it(race):
     assert not HeatLane.objects.filter(event=event, completed__isnull=False)
 
 
-def test_a_partial_result_writes_completed_on_every_lane(race):
-    """Q11: `completed` is set on a lane with no time, and the round stays
-    unfinished because that lane has no result."""
+def test_a_partial_timer_result_finishes_the_heat_with_did_not_finish_times(race):
+    """D42: a car the timer gives no time did not finish and places last.
+    Every lane gets `completed`."""
     event, round = race
     finish(event, "lane1=3.1&lane2=3.2")
     assert lanes(round, 1) == {
-        1: (3.1, None),
-        2: (3.2, None),
-        3: (None, None),
-        4: (None, None),
+        1: (3.1, 1),
+        2: (3.2, 2),
+        3: (DID_NOT_FINISH, 3),
+        4: (DID_NOT_FINISH, 3),
     }
     assert (
         HeatLane.objects.filter(round=round, heat=1, completed__isnull=True).count()
@@ -202,6 +203,19 @@ def test_a_manual_result_for_a_heat_that_moved_writes_nothing(race):
     assert recorded.outcome is Outcome.WRONG_HEAT
     assert lanes(round, 2) == {lane: (None, None) for lane in (1, 2, 3, 4)}
     assert lanes(round, 1)[1] == (3.1, 1)
+
+
+def test_a_manual_result_leaves_an_unposted_lane_without_a_result(race):
+    """D42 is the timer's rule only; the race coordinator types what they
+    mean."""
+    event, round = race
+    record_manual_result(event, fields("lane1=3.1&lane2=---"))
+    assert lanes(round, 1) == {
+        1: (3.1, None),
+        2: (None, None),
+        3: (None, None),
+        4: (None, None),
+    }
 
 
 def test_a_legacy_manual_result_goes_to_the_current_heat(race):

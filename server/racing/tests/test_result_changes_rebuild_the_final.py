@@ -136,3 +136,31 @@ def test_a_change_to_another_round_keeps_the_final(intermission):
     assert list(HeatLane.objects.filter(round=final).values_list("id", flat=True)) == (
         before
     )
+
+
+def test_a_change_that_keeps_the_finalists_keeps_the_final_chart(intermission):
+    """A reinstate of the results the heat already has changes no finalist,
+    so the final's chart is not made again."""
+    event, round1, final, entry, finalists_for = intermission
+    chart = sorted(HeatLane.objects.filter(round=final).values_list("id", flat=True))
+    heat = last_heat(round1)
+    now = state_of_event(event)
+    now.last_heat = {
+        "round_id": round1.id,
+        "heat": heat,
+        "results": None,
+        "lanes": [
+            {"lane": lane, "time": time, "place": place}
+            for lane, time, place in HeatLane.objects.filter(
+                round=round1, heat=heat
+            ).values_list("lane", "finish_time", "finish_place")
+        ],
+    }
+    now.save()
+    before = roster(final)
+    assert reinstate(event) is None
+    assert roster(final) == before == standings_say(final, entry, finalists_for)
+    assert (
+        sorted(HeatLane.objects.filter(round=final).values_list("id", flat=True))
+        == chart
+    )

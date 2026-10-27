@@ -13,6 +13,7 @@ import re
 
 import pytest
 
+from racing.engine.results import DID_NOT_FINISH
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
 from racing.services import replay
 from racing.services.heats import rerun, select_heat
@@ -106,8 +107,9 @@ def test_reverse_lanes_mirrors_the_timers_lanes():
     select_heat(event, round_id=round.id, now_racing=True)
     settings(event).__class__.objects.filter(event=event).update(reverse_lanes=True)
     assert replay_timer(event, round, transcript("reverse-lanes")) == 2
-    # Timer lanes 2 to 4 are track lanes 3 to 1; track lane 4 got no time.
-    assert lanes(round, 1) == {2: (3.3, None), 3: (3.2, None), 4: (None, None)}
+    # Timer lanes 2 to 4 are track lanes 3 to 1. Track lane 4's car got no
+    # time, so it did not finish (D42).
+    assert lanes(round, 1) == {2: (3.3, 2), 3: (3.2, 1), 4: (DID_NOT_FINISH, 3)}
 
 
 def test_the_replay_command_sequence():

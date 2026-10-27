@@ -7,7 +7,7 @@ the `reverse-lanes` mirrors in `website/ajax/action.timer-message.inc`.
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from racing.engine.phpcompat import php_empty, php_intval, php_numeric
 
@@ -98,6 +98,29 @@ def merge_results(stored: list[LaneResult], posted: list[Posted]) -> list[LaneRe
                 place = i + 2
         merged = [LaneResult(r.lane, r.time, places[r.lane]) for r in merged]
     return merged
+
+
+DID_NOT_FINISH = 9.999
+"""The time of a car the timer reports no time for (D42), as the standings
+already read 9.9 seconds or more as a car that did not finish."""
+
+
+def merge_timer_results(
+    stored: list[LaneResult], posted: list[Posted]
+) -> list[LaneResult]:
+    """`merge_results` for the timer (D42). When the timer reports times, a
+    scheduled lane it gives no time, or a time that is not a number, did not
+    finish and gets `DID_NOT_FINISH`, so every car has a time and the places
+    follow from them. A timer that reports places only finishes no car."""
+    if all(sent.time is None for sent in posted):
+        return merge_results(stored, posted)
+    filled = list(posted)
+    for row in stored:
+        if 0 < row.lane <= len(filled) and _number(filled[row.lane - 1].time) is None:
+            filled[row.lane - 1] = replace(
+                filled[row.lane - 1], time=str(DID_NOT_FINISH)
+            )
+    return merge_results(stored, filled)
 
 
 def non_numeric_times(posted: Iterable[Posted]) -> list[int]:

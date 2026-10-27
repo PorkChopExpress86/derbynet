@@ -24,6 +24,7 @@ from racing.engine.results import (
     Posted,
     is_all_zeroes,
     merge_results,
+    merge_timer_results,
     mirror_results,
     non_numeric_times,
     parse_heat_results,
@@ -61,7 +62,7 @@ class Recorded:
     failure: hs.Failure | None = None
 
 
-def _merged(state: RaceState, posted: list[Posted]) -> list[LaneResult]:
+def _merged(state: RaceState, posted: list[Posted], merge=merge_results):
     if state.timer_test or state.current_round_id is None:
         return []
     rows = HeatLane.objects.filter(
@@ -71,7 +72,7 @@ def _merged(state: RaceState, posted: list[Posted]) -> list[LaneResult]:
         LaneResult(lane, time, place)
         for lane, time, place in rows.values_list("lane", "finish_time", "finish_place")
     ]
-    return merge_results(stored, posted)
+    return merge(stored, posted)
 
 
 def _posted(fields: Fields, settings: RaceSettings, mirror: bool) -> list[Posted]:
@@ -106,8 +107,10 @@ def record_timer_result(
     """A timer `FINISHED`: write the current heat's results, replay, and move
     on to the next heat, or refuse with `notracing`, `wrong-heat` or
     `nocurrentround`. An all-zero result replays, stops racing and writes
-    nothing. The timer writes only the current heat, which only the race
-    coordinator selects, so the results lock (D32) never refuses it."""
+    nothing. A car the timer gives no time, or a time that is not a number,
+    did not finish and gets `DID_NOT_FINISH` (D42). The timer writes only the
+    current heat, which only the race coordinator selects, so the results
+    lock (D32) never refuses it."""
     fields = list(fields)
     now = timezone.now()
     with transaction.atomic():
@@ -116,7 +119,7 @@ def record_timer_result(
         posted = _posted(fields, settings, mirror=True)
         ref = (state.current_round_id, state.current_heat)
         ended = state.ended_round_id
-        results = _merged(state, posted)
+        results = _merged(state, posted, merge_timer_results)
         decision = transition(
             state,
             hs.TimerResult(

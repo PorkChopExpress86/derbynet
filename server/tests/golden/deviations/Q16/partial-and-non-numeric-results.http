@@ -3,7 +3,7 @@ request: GET action.php?query=poll.coordinator&roundid=1&heat=2
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 3035
+length: 3147
 body:
 {
     "current-heat": {
@@ -82,21 +82,27 @@ body:
     "refused-results": 0,
     "heat-results": [
         {
+            "lane": 1,
+            "time": 9.999,
+            "place": 4,
+            "speed": 68.2
+        },
+        {
             "lane": 2,
             "time": 3.2,
-            "place": null,
+            "place": 1,
             "speed": 213.1
         },
         {
             "lane": 3,
             "time": 3.3,
-            "place": null,
+            "place": 2,
             "speed": 206.6
         },
         {
             "lane": 4,
             "time": 3.4,
-            "place": null,
+            "place": 3,
             "speed": 200.5
         }
     ],
@@ -140,7 +146,7 @@ request: GET action.php?query=standings
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 235
+length: 314
 body:
 {
     "standings": {
@@ -155,6 +161,11 @@ body:
                 3,
                 5,
                 6
+            ],
+            [],
+            [],
+            [
+                2
             ]
         ]
     }
