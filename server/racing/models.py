@@ -94,6 +94,40 @@ class EmptiedHeat(EventScoped):
         ]
 
 
+class FinalRequest(EventScoped):
+    """A racer who missed round 1 asking for a place in the group's final
+    (D32). Django only. It keys on the group, because the final may not
+    exist yet when the racer checks in. The allowed racers of a final are
+    read from these rows, never from the roster, so every rebuild of the
+    final enters them again (`racing.services.finals`)."""
+
+    class State(models.TextChoices):
+        REQUESTED = "requested"
+        ALLOWED = "allowed"
+        DECLINED = "declined"
+
+    racer = models.ForeignKey(
+        "roster.Racer", on_delete=models.CASCADE, related_name="final_requests"
+    )
+    group = models.ForeignKey(
+        "roster.Group", on_delete=models.CASCADE, related_name="final_requests"
+    )
+    state = models.CharField(
+        max_length=10, choices=State.choices, default=State.REQUESTED
+    )
+    requested_at = models.DateTimeField(default=timezone.now)
+    # When the race coordinator last allowed or declined it. Allowed racers
+    # follow the qualifiers in this order.
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "racer", "group"], name="finalrequest_unique_racer"
+            ),
+        ]
+
+
 class PlaylistEntry(EventScoped):
     """Legacy `Playlist`: one step of the race-day queue, ordered by `seq`."""
 

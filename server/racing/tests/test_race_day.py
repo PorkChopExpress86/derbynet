@@ -15,8 +15,9 @@ from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
-from racing.models import HeatLane, PlaylistEntry, Round
+from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, Round
 from racing.services import schedule
+from racing.services.finals import allow_final_request, request_final_place
 from racing.services.playlist import (
     Failure,
     PlaylistFailure,
@@ -26,6 +27,7 @@ from racing.services.playlist import (
     start_playlist,
     start_waiting_step,
 )
+from racing.services.reschedule import reschedule
 from racing.services.rounds import (
     Entrants,
     delete_round_roster,
@@ -530,3 +532,51 @@ def test_an_extra_racer_joins_only_the_final_they_were_allowed_into():
     }
     assert extra.pk in finals[scouts]
     assert extra.pk not in finals[outlaws]
+
+
+def test_a_scout_who_checks_in_after_round_1_races_in_the_allowed_final():
+    """D32 on the owner's day: a scout misses Scouts round 1, passes
+    check-in during the intermission and asks for a place in the final. The
+    race coordinator allows it, previews and presses Add to schedule, and
+    the scout races the final."""
+    replay = race_day(4, 8)
+    replay.post(
+        "action=racer.import&firstname=Scout11&lastname=Racer"
+        "&carnumber=111&partition=Scouts"
+    )
+    late = replay.racer(car=111)
+    assert not late.passed_inspection
+    finalists_for = playlist_finalists()
+    replay.ids.sync()
+
+    scouts = start_playlist(replay.event, finalists_for)
+    assert not HeatLane.objects.filter(round=scouts, racer=late).exists()
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    final = Round.objects.get(group=scouts.group, number=2)
+    qualifiers = set(final.roster.values_list("racer_id", flat=True))
+    assert len(qualifiers) == 4
+
+    replay.ids.sync()
+    replay.post(f"action=racer.pass&racer={replay.php('racer', late)}")
+    late.refresh_from_db()
+    allow_final_request(request_final_place(late))
+    assert late.pk in {
+        int(car)
+        for heat in reschedule(final, late.pk, dry_run=True).chart
+        for car in (heat or "").split()
+        if car.isdigit()
+    }
+    reschedule(final, late.pk)
+
+    assert start_waiting_step(replay.event) == final
+    race(final)
+    round_ended(final, finalists_for)
+    raced = HeatLane.objects.filter(round=final, racer=late)
+    assert raced.exists() and not raced.exclude(HAS_RESULT).exists()
+    assert set(final.roster.values_list("racer_id", flat=True)) == qualifiers | {
+        late.pk
+    }
+    late.refresh_from_db()
+    assert late.not_eligible_for_speed_awards
+    assert state(replay).waiting_entry.group.name == "Outlaw"
