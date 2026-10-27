@@ -112,6 +112,53 @@ def test_a_rebuilt_final_keeps_its_extra_racer(replay):
     assert HeatLane.objects.filter(round=final, racer=late).exists()
 
 
+def test_a_playlist_final_gets_only_its_own_rounds_extras(replay):
+    """D32: an extra racer allowed into a group's round 3 is not entered in
+    the same group's round 2."""
+    lions = racers_of(replay, "Lions")
+    late = lions[6]
+    group = first_round(replay, "Lions").group
+    finalists_for = playlist_finalists(extras={(group.pk, 3): [late]})
+    entrants = {}
+    for number in (2, 3):
+        entry = PlaylistEntry.objects.create(
+            event=replay.event,
+            seq=number,
+            group=group,
+            round_number=number,
+            bucket_limit=2,
+        )
+        round = Round.objects.create(event=replay.event, group=group, number=number)
+        entrants[number] = list(finalists_for(entry, round).racers)
+    assert entrants == {2: lions[:2], 3: [*lions[:2], late]}
+
+
+def test_a_racer_who_qualifies_from_two_groups_is_entered_once(replay):
+    """An aggregate of Lions and of an aggregate drawn from Lions: the Lions
+    leaders qualify from both, and each is entered once."""
+    lions = racers_of(replay, "Lions")
+    lions_final = new_round_roster(
+        NewAggregate("Lions final", groups=[lions[0].group]), top=2
+    ).round
+    for lane, racer in enumerate(roster(lions_final), 1):
+        HeatLane.objects.create(
+            event=replay.event,
+            round=lions_final,
+            heat=1,
+            lane=lane,
+            racer=racer,
+            finish_time=3.0 + lane / 100,
+            completed=timezone.now(),
+        )
+    grand = new_round_roster(
+        NewAggregate("Grand", groups=[lions[0].group, lions_final.group]),
+        top=2,
+        bucketed=True,
+    )
+    assert roster(grand.round) == lions[:2]
+    assert grand.concerns == ("There are no eligible Lions final racer(s).",)
+
+
 def test_a_cut_skips_a_racer_not_eligible_for_speed_awards(replay):
     """D34: the second fastest is passed over and the fifth goes in. The
     skipped racer keeps the standings rows, marked, with no place."""

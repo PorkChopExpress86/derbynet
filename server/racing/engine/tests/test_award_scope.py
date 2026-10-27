@@ -127,6 +127,21 @@ def test_a_subgroup_list_places_its_awards_the_same_way(seed):
 
 
 @pytest.mark.parametrize("seed", range(30))
+def test_a_group_list_leaves_its_subgroups_awards_alone(seed):
+    """The group's list leaves out the partition of a subgroup's leader. The
+    leader loses the group's awards and keeps the subgroup's."""
+    event = partitioned(random_event(seed, use_subgroups=True))
+    counting = Standings(event)
+    subgroup = leader(counting, counting.award_ladder_class(RED)).subgroup_id
+    first = leader(counting, counting.award_ladder_subgroup(subgroup))
+    marked = Standings(listing(event, AwardUnit(group_id=RED), first.partition_id))
+
+    assert first.id not in {a.racer_id for a in awards_of(marked, RED)}
+    assert awards_of(marked, RED, subgroup) == awards_of(counting, RED, subgroup)
+    assert awards_of(marked, RED, subgroup)[0].racer_id == first.id
+
+
+@pytest.mark.parametrize("seed", range(30))
 def test_under_one_group_the_group_and_the_pack_agree_on_the_same_list(seed):
     """One group whose subgroups are the partitions, as the
     one-group rule makes it. Fastest in the group and fastest in the pack
