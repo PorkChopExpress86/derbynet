@@ -70,6 +70,27 @@ class HeatLane(EventScoped):
         ]
 
 
+class EmptiedHeat(EventScoped):
+    """A running or staged heat whose cars were all taken off the roster
+    (D39). It has no `HeatLane` rows left, so this row keeps its heat number
+    and master number while the race crew runs or skips it. Django only, and
+    held only while the heat is running or staged: the next reschedule
+    drops it once the race has moved past it."""
+
+    round = models.ForeignKey(
+        Round, on_delete=models.CASCADE, related_name="emptied_heats"
+    )
+    heat = models.PositiveSmallIntegerField()
+    master_heat = models.PositiveIntegerField(default=0)  # 0 means unused
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "round", "heat"], name="emptiedheat_unique_heat"
+            ),
+        ]
+
+
 class PlaylistEntry(EventScoped):
     """Legacy `Playlist`: one step of the race-day queue, ordered by `seq`."""
 

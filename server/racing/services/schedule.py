@@ -13,7 +13,7 @@ from core.models import RaceSettings, RaceState
 from racing.engine.scheduling.lanes import count_one_bits
 from racing.engine.scheduling.rough import CantFulfill, max_runs_per_lane
 from racing.engine.scheduling.round import TooFewRacers, make_chart
-from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
+from racing.models import HAS_RESULT, EmptiedHeat, HeatLane, RosterEntry, Round
 from racing.services.master import reassign_master_heats
 
 
@@ -138,6 +138,7 @@ def generate_schedule(round: Round, n_times_per_lane: int) -> int:
             if _read_inputs(round) != inputs:
                 continue
             HeatLane.objects.filter(round=round).delete()
+            EmptiedHeat.objects.filter(round=round).delete()
             HeatLane.objects.bulk_create(
                 HeatLane(
                     event_id=round.event_id,
@@ -163,6 +164,7 @@ def unschedule(round: Round) -> int:
     with transaction.atomic():
         RaceState.objects.select_for_update().get(event_id=round.event_id)
         deleted, _ = HeatLane.objects.filter(round=round).delete()
+        EmptiedHeat.objects.filter(round=round).delete()
         after_chart_change(round)
     return deleted
 

@@ -13,7 +13,7 @@ from racing.engine.scheduling.adjuster import NodeBudget
 from racing.engine.scheduling.master import master_target
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
 from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
-from racing.services.master import reassign_master_heats
+from racing.services.master import master_index, reassign_master_heats
 from racing.services.reschedule import (
     GUARD_EXPIRY,
     Failure,
@@ -24,7 +24,7 @@ from racing.services.reschedule import (
     reschedule,
 )
 from racing.services.rounds import Adjustments, adjustments
-from racing.services.schedule import generate_schedule
+from racing.services.schedule import generate_schedule, unschedule
 from racing.tests.factories import RosterEntryFactory, RoundFactory
 from roster.models import Racer
 from roster.tests.factories import RacerFactory
@@ -517,17 +517,7 @@ def test_under_the_master_schedule_the_staged_heat_is_next_in_master_order():
 def master_next(round, heat):
     """The heat `next` lands on from `round`'s `heat` under the master
     schedule."""
-    index = HeatLane.objects.filter(event=round.event).order_by("id")
-    return master_target(
-        (
-            (n, r, h, time is not None or place is not None)
-            for n, r, h, time, place in index.values_list(
-                "master_heat", "round_id", "heat", "finish_time", "finish_place"
-            )
-        ),
-        (round.id, heat),
-        "next",
-    )
+    return master_target(master_index(round.event), (round.id, heat), "next")
 
 
 def master_number(round, heat):
@@ -938,6 +928,7 @@ def test_under_the_master_schedule_an_emptied_running_heat_stays_current():
     assert heat_rows(round, 2) == set()
     assert state_of(round).current_heat == 2
     assert master_number(other, 2) == number
+    assert master_next(round, 2) == (other.id, 2)
 
 
 def test_a_racer_of_another_group_is_refused():
@@ -971,3 +962,117 @@ def test_a_racer_not_picked_for_the_final_is_refused():
 
     assert caught.code == Failure.NOT_ON_ROSTER
     assert by_car(final) == rows
+
+
+def test_an_emptied_staged_last_heat_keeps_its_number():
+    """D39: heat 7 is running and heat 8, the round's last, is staged when all
+    its cars leave. A late racer then goes after heat 8, not into it."""
+    round = new_round(range(101, 109))
+    race(round, *range(1, 7))
+    make_current(round, 7)
+    depart_all_of(round, 8)
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+    late = late_racer(round, 120)
+
+    result = reschedule(round, late.id, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart[7] == "- - - -"
+    assert heat_rows(round, 8) == set()
+    heats = set(HeatLane.objects.filter(racer=late).values_list("heat", flat=True))
+    assert min(heats) == 9
+
+
+def master_pair():
+    """Round A's last heat 4 is running under the master schedule, and round
+    B's heat 1 is next in master order, so it is staged."""
+    round = new_round(range(101, 105), use_master_sched=True)
+    other = new_round(range(201, 209), event=round.event)
+    Round.objects.filter(pk=other.pk).update(number=2)
+    race(round, 1, 2, 3)
+    reassign_master_heats(round.event)
+    make_current(round, 4)
+    assert master_next(round, 4) == (other.id, 1)
+    return round, other
+
+
+def test_under_the_master_schedule_an_emptied_staged_heat_stays_next():
+    """D39: every car of the staged heat B1 leaves. B1 keeps its number and
+    stays next in master order, with no cars."""
+    round, other = master_pair()
+    depart_all_of(other, 1)
+
+    reschedule(other, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(other, 1) == set()
+    assert master_next(round, 4) == (other.id, 1)
+
+
+def test_under_the_master_schedule_an_emptied_staged_heat_is_never_refilled():
+    """D39: after B1 runs empty, a reschedule that fits four late racers into
+    B leaves B1 empty and still next."""
+    round, other = master_pair()
+    depart_all_of(other, 1)
+    reschedule(other, budget=NodeBudget(UNLIMITED))
+    for car in (220, 221, 222, 223):
+        late_racer(other, car)
+
+    reschedule(other, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(other, 1) == set()
+    assert master_next(round, 4) == (other.id, 1)
+
+
+def test_under_the_master_schedule_next_from_an_emptied_staged_heat_moves_on():
+    """D39: the crew skips the empty B1 by pressing next, which lands on the
+    heat after it in master order."""
+    round, other = master_pair()
+    after = master_next(other, 1)
+    depart_all_of(other, 1)
+
+    reschedule(other, budget=NodeBudget(UNLIMITED))
+
+    assert master_next(other, 1) == after
+
+
+def test_an_emptied_heat_is_released_once_the_race_moves_past_it():
+    """D39 holds an emptied heat only while it is running or staged. Once the
+    crew skips past it, it is a gap like any skipped heat, which the next
+    reschedule may fill, and unscheduling the round drops it."""
+    round = new_round(range(101, 113))
+    race(round, 1, 2)
+    make_current(round, 3)
+    depart_all_of(round, 4)
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+    make_current(round, 5)
+    late_racer(round, 120)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(round, 4) != set()
+
+    depart_all_of(round, 5)
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+    assert heat_rows(round, 5) == set()
+    unschedule(round)
+
+    assert master_index(round.event) == []
+
+
+def test_a_racer_taken_off_the_roster_during_the_search_is_refused():
+    """D39: the roster is checked again under the lock, so a racer removed
+    while the search ran is not written into the chart."""
+    round = new_round(range(101, 113))
+    race(round, 1, 2)
+    make_current(round, 3)
+    late = late_racer(round, 120)
+    rows = by_car(round)
+
+    def remove_late_racer():
+        RosterEntry.objects.filter(round=round, racer=late).delete()
+
+    caught = failure_of(
+        lambda: reschedule(round, late.id, budget=OnSearch(remove_late_racer))
+    )
+
+    assert caught.code == Failure.NOT_ON_ROSTER
+    assert by_car(round) == rows

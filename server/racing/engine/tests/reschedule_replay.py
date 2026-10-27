@@ -111,7 +111,9 @@ class Server:
 
     def roster(self, roundid):
         """Racer ids in the round's roster, in roster row order. A racer moved
-        by `racer.edit` keeps its row, and rows were made in racer id order."""
+        by `racer.edit` keeps its row, and rows were made in racer id order.
+        `round_of` puts each racer on one roster only, as the scripts have no
+        final, so a racer on a first round and a final is not modeled."""
         return sorted(r for r, rid in self.round_of.items() if rid == roundid)
 
     def import_racer(self, roundid):
