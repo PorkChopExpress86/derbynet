@@ -3,13 +3,20 @@
 answers were recorded from PHP 8.4 by running `tools/standings_differential`'s
 `harness.php` on this event: one group, one subgroup, two racers, one heat,
 and `n-rank-trophies` 2, with `full-field-calc` 0 and then 1. A key PHP
-answers with a TypeError (`speed-x1`) names no award."""
+answers with a TypeError (`speed-x1`) names no award.
+
+A place too large for an int, such as `speed-1e999` or `speed-1e19a`,
+names no award in PHP. PHP reads infinity as the int 0 and a number past
+the int range as `PHP_INT_MAX` or `PHP_INT_MIN`
+(`test_a_place_converts_to_int_as_php_converts_it`)."""
 
 from dataclasses import replace
 
 import pytest
 
+from racing.engine.phpcompat import php_intval
 from racing.engine.standings import oracle
+from racing.engine.standings.ordinals import nth_fastest, ordinal
 from racing.engine.standings.speed_awards import (
     TrophySettings,
     current_speed_award,
@@ -73,6 +80,31 @@ EVENT = oracle.Event(
         (1, "speed-02-1", ("speed-02", " Fastest in Pack", 5)),
         (1, "speed-1a-1", ("speed-1", "Fastest in Pack", 3)),
         (1, "speed-2-1.0", ("speed-2", "2nd Fastest in Pack", 5)),
+        *(
+            (full_field_calc, key, None)
+            for full_field_calc in (0, 1)
+            for key in (
+                "speed-1e999",
+                "speed-1e999a",
+                "speed-1e999b",
+                "speed-2e400",
+                "speed-1e309",
+                "speed--1e999",
+                "speed-1e999-1",
+                "speed-2e999a-1",
+                "speed-1e999-1-2",
+                "speed-1-1e999",
+                "speed-1-1-1e999",
+                "speed-1e19",
+                "speed-1e19a",
+                "speed--1e19a",
+                "speed-1.5e19-1",
+                "speed-9223372036854775808",
+                "speed-9223372036854775807a",
+                "speed-99999999999999999999a",
+                "speed-123456789012345678901",
+            )
+        ),
     ],
 )
 def test_an_oddly_written_key_resolves_as_php_resolves_it(
@@ -86,3 +118,69 @@ def test_an_oddly_written_key_resolves_as_php_resolves_it(
     current = current_speed_award(key, standings, awards)
     got = None if current is None else (current.key, current.name, current.racer_id)
     assert got == expected
+
+
+INT_MAX = 9223372036854775807
+INT_MIN = -9223372036854775808
+
+
+@pytest.mark.parametrize(
+    ("text", "intval", "ordinal_text", "name"),
+    [
+        ("1e999", 0, "1e999th", "1e999th Fastest in Pack"),
+        ("1e309", 0, "1e309th", "1e309th Fastest in Pack"),
+        ("2e400", 0, "2e400th", "2e400th Fastest in Pack"),
+        ("-1e999", 0, None, " Fastest in Pack"),
+        ("1e19", INT_MAX, "1.0E+187th", "1.0E+187th Fastest in Pack"),
+        ("-1e19", INT_MIN, None, " Fastest in Pack"),
+        ("1.5e19", INT_MAX, "1.5E+187th", "1.5E+187th Fastest in Pack"),
+        (
+            "9223372036854775807",
+            INT_MAX,
+            "9.2233720368548E+177th",
+            "9.2233720368548E+177th Fastest in Pack",
+        ),
+        (
+            "9223372036854775808",
+            INT_MAX,
+            "9.2233720368548E+177th",
+            "9.2233720368548E+177th Fastest in Pack",
+        ),
+        ("-9223372036854775809", INT_MIN, None, " Fastest in Pack"),
+        ("99999999999999999999", INT_MAX, "1.0E+197th", "1.0E+197th Fastest in Pack"),
+        (
+            "123456789012345678901",
+            INT_MAX,
+            "1.2345678901235E+197th",
+            "1.2345678901235E+197th Fastest in Pack",
+        ),
+        ("1e18", 1000000000000000000, "1e18th", "1e18th Fastest in Pack"),
+        ("1e999a", 0, None, " Fastest in Pack"),
+        ("1e19a", INT_MAX, None, " Fastest in Pack"),
+        ("-1e19a", INT_MIN, None, " Fastest in Pack"),
+        ("99999999999999999999a", INT_MAX, "1.0E+197th", "1.0E+197th Fastest in Pack"),
+        (
+            "123456789012345",
+            123456789012345,
+            "123456789012345th",
+            "123456789012345th Fastest in Pack",
+        ),
+        ("2.5e1", 25, "25th", "25th Fastest in Pack"),
+    ],
+)
+def test_a_place_converts_to_int_as_php_converts_it(text, intval, ordinal_text, name):
+    """`intval()`, `ordinal()` and `nth_fastest(…, 'Pack')` of a key's place
+    text, recorded from PHP 8.4's `inc/ordinals.inc`."""
+    assert (php_intval(text), ordinal(text), nth_fastest(text, "Pack")) == (
+        intval,
+        ordinal_text,
+        name,
+    )
+
+
+@pytest.mark.parametrize(
+    ("n", "expected"),
+    [(INT_MAX, "9.2233720368548E+177th"), (INT_MIN, None), (21, "21st")],
+)
+def test_an_int_place_at_the_ends_of_the_int_range_has_phps_ordinal(n, expected):
+    assert ordinal(n) == expected

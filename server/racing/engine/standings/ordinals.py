@@ -13,6 +13,7 @@ from racing.engine.phpcompat import (
     php_array_key,
     php_compare,
     php_equals,
+    php_int,
 )
 
 _FIRST_THREE = {1: "1st", 2: "2nd", 3: "3rd"}
@@ -31,18 +32,25 @@ def ordinal(n: int | str) -> str | None:
         return "T" + (ordinal(n[1:]) or "")
     if php_compare(n, 20) > 0:
         value = n if isinstance(n, int) else php_arithmetic_operand(n)
-        rest = int(math.fmod(int(value), 10))
+        whole = php_int(value)
+        rest = abs(whole) % 10 * (1 if whole >= 0 else -1)
         if rest != 0:
-            return f"{_float_text(math.floor(value / 10))}{ordinal(rest) or ''}"
+            return f"{_float_text(float(math.floor(value / 10)))}{ordinal(rest) or ''}"
     if php_compare(n, 4) < 0:
         return _FIRST_THREE.get(n if isinstance(n, int) else php_array_key(n))
     return f"{n}th"
 
 
-def _float_text(value: int) -> str:
-    """PHP's text for the float `floor()` returns, for the places a key can
-    name."""
-    return str(int(value))
+def _float_text(value: float) -> str:
+    """PHP's text for a float at its default `precision` of 14 digits, as
+    `.` writes the float `floor()` returns: `25`, or `1.0E+18` where
+    Python's `%.14G` writes `1E+18`."""
+    mantissa, _, exponent = f"{value:.14G}".partition("E")
+    if not exponent:
+        return mantissa
+    if "." not in mantissa:
+        mantissa += ".0"
+    return f"{mantissa}E{exponent[0]}{int(exponent[1:])}"
 
 
 def nth_fastest(n: int | str, label: str) -> str:

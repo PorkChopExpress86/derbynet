@@ -46,10 +46,28 @@ def php_numeric(text: str) -> int | float | None:
     return None
 
 
+PHP_INT_MAX = 2**63 - 1
+PHP_INT_MIN = -(2**63)
+
+
+def php_int(number: int | float) -> int:
+    """The int PHP 8 takes from a string's number, in `intval()` and in
+    integer arithmetic such as `%`: cut toward zero, infinity as 0, and a
+    number past the int range as `PHP_INT_MAX` or `PHP_INT_MIN`. So
+    `intval("1e999")` is 0 and `intval("1e19")` is `PHP_INT_MAX`."""
+    if isinstance(number, float):
+        if not math.isfinite(number):
+            return 0
+        if not -(2.0**63) <= number < 2.0**63:
+            return PHP_INT_MAX if number > 0 else PHP_INT_MIN
+        return int(number)
+    return min(max(number, PHP_INT_MIN), PHP_INT_MAX)
+
+
 def php_intval(text: str) -> int:
-    """`intval($text)`: the leading number, cut toward zero, or 0."""
+    """`intval($text)`: the leading number as `php_int` converts it, or 0."""
     match = _NUMBER.match(text)
-    return int(_number(match[1])) if match else 0
+    return php_int(_number(match[1])) if match else 0
 
 
 def php_equals(value: int | None, text: str) -> bool:
