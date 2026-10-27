@@ -45,3 +45,19 @@ use_session coord
 capture ondeck-after-one-heat "GET action.php?query=poll&values=ondeck,current-heat"
 capture regenerate-round-4-after-a-heat-ran "POST action.php action=schedule.generate&roundid=4"
 capture ondeck-after-regenerating "GET action.php?query=poll&values=ondeck,current-heat"
+
+# A failed schedule.generate (#20 Q18, decided Fix in D30).  Race the heat with
+# the highest master number out of order, so the numbers of the heats left are
+# stale, then regenerate round 1, which has a result.  PHP refuses with
+# results-exist but still renumbers the unraced heats of every round after the
+# raced one, and moves the current heat to the first of them.
+post_ok "action=heat.select&roundid=4&heat=9&now_racing=1"
+use_session timer
+curl_post action.php "action=timer-message&message=STARTED" | check_success
+capture finished-last-master-heat-out-of-order "POST action.php action=timer-message&message=FINISHED&lane1=3.300&lane2=3.400"
+use_session coord
+capture coordinator-before-results-exist "GET action.php?query=poll.coordinator"
+capture ondeck-before-results-exist "GET action.php?query=poll&values=ondeck,current-heat"
+capture generate-round-1-results-exist "POST action.php action=schedule.generate&roundid=1"
+capture coordinator-after-results-exist "GET action.php?query=poll.coordinator"
+capture ondeck-after-results-exist "GET action.php?query=poll&values=ondeck,current-heat"

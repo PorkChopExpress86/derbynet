@@ -1,16 +1,31 @@
 import json
+import os
 import random
+import re
 
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
 from core.models import RaceSettings
-from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
+from racing.engine.tests.golden import (
+    DEVIATIONS_FILE,
+    GOLDEN_DIR,
+    read_transcript,
+    transcript_deviations,
+)
 from racing.models import HAS_RESULT, HeatLane
 from racing.services import master
+from racing.services.heats import select_heat
 from racing.services.master import reassign_master_heats
-from racing.services.schedule import generate_schedule, unschedule
+from racing.services.results import record_timer_result
+from racing.services.schedule import (
+    Failure,
+    ScheduleFailure,
+    generate_schedule,
+    unschedule,
+)
+from racing.services.tests.race import current, fields
 from racing.tests.factories import RosterEntryFactory, RoundFactory
 from roster.tests.factories import GroupFactory, RacerFactory
 
@@ -52,33 +67,153 @@ def finish(round, heat):
     HeatLane.objects.filter(round=round, heat=heat).update(finish_time=3.0)
 
 
-def php_ondeck(exchange):
-    php = read_transcript(GOLDEN_DIR / "http" / "master-schedule" / "half-weights.http")
+HALF_WEIGHTS = "http/master-schedule/half-weights.http"
+Q18_EXPECTED = "deviations/Q18/half-weights.http"
+# Q18: the polls after the refused generate, and the polls before it, which
+# hold the state Django keeps.
+Q18_EXCHANGES = {
+    "018 coordinator-after-results-exist": "015 coordinator-before-results-exist",
+    "019 ondeck-after-results-exist": "016 ondeck-before-results-exist",
+}
+Q18_REASON = (
+    "A refused schedule.generate renumbers the unraced heats and moves the current"
+    " heat to the first of them in PHP. Django changes nothing (D30)."
+)
+
+
+def php_body(exchange, path=HALF_WEIGHTS):
+    return json.loads(read_transcript(GOLDEN_DIR / path)[exchange]["body"])
+
+
+def chart_numbers(body):
+    """`{(roundid, heat): masterheat}` from a `values=ondeck` poll."""
     return {
         (row["roundid"], row["heat"]): row["masterheat"]
-        for row in json.loads(php[exchange]["body"])["ondeck"]["chart"]
+        for row in body["ondeck"]["chart"]
     }
+
+
+def php_ondeck(exchange):
+    return chart_numbers(php_body(exchange))
+
+
+def half_weights_race():
+    """`capture/scenarios/05-master-schedule.sh`: rounds of 2, 3, 5 and 9
+    racers on two lanes under the master schedule. Returns the rounds and
+    `php_id`, which maps their ids to PHP's roundids 1 to 4."""
+    first = new_round(2)
+    event = first.event
+    RaceSettings.objects.filter(event=event).update(lane_count=2, use_master_sched=True)
+    rounds = [first] + [new_round(n, event) for n in (3, 5, 9)]
+    return rounds, {round.id: i for i, round in enumerate(rounds, start=1)}
+
+
+def php_numbers(event, php_id):
+    """`single_numbers` keyed by PHP's roundids."""
+    return {(php_id[r], h): n for (r, h), n in single_numbers(event).items()}
 
 
 def test_the_half_weights_race_numbers_heats_as_php():
     """`capture/scenarios/05-master-schedule.sh` through the services: PHP
     roundids 1 to 4 are the rounds made here, in order."""
-    first = new_round(2)
-    event = first.event
-    RaceSettings.objects.filter(event=event).update(lane_count=2, use_master_sched=True)
-    rounds = [first] + [new_round(n, event) for n in (3, 5, 9)]
-    php_id = {round.id: i for i, round in enumerate(rounds, start=1)}
-
-    def as_php(numbers):
-        return {(php_id[r], h): n for (r, h), n in numbers.items()}
+    rounds, php_id = half_weights_race()
+    first, event = rounds[0], rounds[0].event
 
     for round in rounds:
         generate_schedule(round, 1)
-    assert as_php(single_numbers(event)) == php_ondeck("007 ondeck-in-master-order")
+    assert php_numbers(event, php_id) == php_ondeck("007 ondeck-in-master-order")
 
     finish(first, 1)
     generate_schedule(rounds[3], 1)
-    assert as_php(single_numbers(event)) == php_ondeck("013 ondeck-after-regenerating")
+    assert php_numbers(event, php_id) == php_ondeck("013 ondeck-after-regenerating")
+
+
+def test_a_refused_generate_renumbers_nothing():
+    """Q18 (D30), exchanges 014 to 019 of the half-weights race. Heat 9 of
+    round 4, which holds the highest master number, races out of order, so
+    the numbers of the heats left are stale. Regenerating round 1, which has
+    a result, is refused with `results-exist`. PHP renumbers the unraced
+    heats from 20 and moves the current heat to round 1 heat 2. Django keeps
+    the numbers and the current heat of the polls before the request."""
+    rounds, php_id = half_weights_race()
+    event = rounds[0].event
+    for round in rounds:
+        generate_schedule(round, 1)
+    finish(rounds[0], 1)
+    generate_schedule(rounds[3], 1)
+    select_heat(event, round_id=rounds[3].id, heat=9, now_racing=True)
+    finished = read_transcript(GOLDEN_DIR / HALF_WEIGHTS)[
+        "014 finished-last-master-heat-out-of-order"
+    ]["request-body"]
+    record_timer_result(event, fields(finished.split("message=FINISHED&", 1)[1]))
+
+    def state():
+        roundid, heat, racing = current(event)
+        return php_numbers(event, php_id), (php_id[roundid], heat, racing)
+
+    def php_state(coordinator, ondeck):
+        heat = coordinator["current-heat"]
+        return chart_numbers(ondeck), (
+            heat["roundid"],
+            heat["heat"],
+            heat["now_racing"],
+        )
+
+    before = state()
+    assert before == php_state(
+        php_body("015 coordinator-before-results-exist"),
+        php_body("016 ondeck-before-results-exist"),
+    )
+
+    with pytest.raises(ScheduleFailure) as refused:
+        generate_schedule(rounds[0], 1)
+
+    assert refused.value.code == Failure.RESULTS_EXIST
+    assert state() == before
+    expected = transcript_deviations(HALF_WEIGHTS)
+    assert state() == php_state(
+        *(json.loads(expected[name][1]["body"]) for name in Q18_EXCHANGES)
+    )
+    php_after = php_state(*(php_body(name) for name in Q18_EXCHANGES))
+    assert php_after[0] != before[0] and php_after[1] != before[1]
+
+
+def write_q18_deviation():
+    """Each Q18 exchange keeps PHP's header and takes the body of the poll
+    before the refused request, which `test_a_refused_generate_renumbers_nothing`
+    checks is Django's state after it."""
+    raw = (GOLDEN_DIR / HALF_WEIGHTS).read_bytes()
+    php = read_transcript(GOLDEN_DIR / HALF_WEIGHTS)
+    out = b""
+    for name, before in Q18_EXCHANGES.items():
+        start = raw.index(b"### " + name.encode())
+        header = raw[start : raw.index(b"\nbody:\n", start)].decode()
+        data = php[before]["body"]
+        header = re.sub(r"length: \d+", f"length: {len(data)}", header)
+        out += header.encode() + b"\nbody:\n" + data + b"\n"
+    (GOLDEN_DIR / Q18_EXPECTED).parent.mkdir(parents=True, exist_ok=True)
+    (GOLDEN_DIR / Q18_EXPECTED).write_bytes(out)
+    listing = json.loads(DEVIATIONS_FILE.read_text())
+    entries = [e for e in listing["deviations"] if e["quirk"] != "Q18"]
+    entries.append(
+        {
+            "quirk": "Q18",
+            "fixture": HALF_WEIGHTS,
+            "exchanges": list(Q18_EXCHANGES),
+            "reason": Q18_REASON,
+            "expected": Q18_EXPECTED,
+        }
+    )
+    listing["deviations"] = sorted(entries, key=lambda e: int(e["quirk"][1:]))
+    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the Q18 deviation"
+)
+def test_write_q18_deviation():
+    """`WRITE_DEVIATIONS=1 uv run pytest racing/services/tests/test_master.py`"""
+    write_q18_deviation()
 
 
 def test_unschedule_renumbers_what_is_left():
