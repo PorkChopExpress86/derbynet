@@ -29,7 +29,9 @@ from racing.services.results import (
 from racing.services.schedule import generate_schedule, unschedule
 from racing.services.standings import standings_snapshot
 from racing.services.tests.race import (
+    connect_replay,
     current,
+    drain,
     fields,
     lanes,
     setup_race,
@@ -107,6 +109,21 @@ def test_rerun_and_reinstate_bring_back_places_in_points_racing(race):
             4: (None, 3),
         }
     )
+
+
+def test_a_rerun_of_the_last_heat_of_another_round_names_its_own_group():
+    """C57 in #64: PHP keeps the new round's `ClassID`, so its `START` names
+    no class and no round."""
+    event, wolves, bears = two_round_master_race()
+    RaceSettings.objects.filter(event=event).update(use_master_sched=False)
+    select_heat(event, round_id=wolves.id, now_racing=True)
+    finish(event, "lane1=3.1&lane2=3.2")
+    select_heat(event, round_id=bears.id, heat=1)
+    connect_replay(event)
+    rerun(event, "last")
+    start = "START Wolves_Round1_Heat01"
+    assert drain(event) == ["CANCEL", start, start]
+    assert state(event).current_group_id == wolves.group_id
 
 
 def test_a_rerun_heat_keeps_only_its_new_results(race):
