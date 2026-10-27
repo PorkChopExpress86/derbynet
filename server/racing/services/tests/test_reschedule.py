@@ -10,6 +10,7 @@ from django.utils import timezone
 from core.models import RaceSettings, RaceState
 from kiosks.models import Kiosk
 from racing.engine.scheduling.adjuster import NodeBudget
+from racing.engine.scheduling.master import master_target
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
 from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from racing.services.master import reassign_master_heats
@@ -508,6 +509,80 @@ def test_under_the_master_schedule_the_staged_heat_is_next_in_its_round():
     assert unraced_in_master_order()[0] == (round.id, 2)
 
 
+def master_next(round, heat):
+    """The heat `next` lands on from `round`'s `heat` under the master
+    schedule."""
+    index = HeatLane.objects.filter(event=round.event).order_by("id")
+    return master_target(
+        (
+            (n, r, h, time is not None or place is not None)
+            for n, r, h, time, place in index.values_list(
+                "master_heat", "round_id", "heat", "finish_time", "finish_place"
+            )
+        ),
+        (round.id, heat),
+        "next",
+    )
+
+
+def master_number(round, heat):
+    return HeatLane.objects.filter(round=round, heat=heat).values_list(
+        "master_heat", flat=True
+    )[0]
+
+
+def test_under_the_master_schedule_next_follows_a_current_heat_that_has_run():
+    """Round B's heat 2 is current with a result in lane 1, and `next` lands
+    on round A's heat 2. Fitting a late racer into B renumbers B's unraced
+    heats but not heat 2."""
+    a = new_round(range(101, 109), use_master_sched=True)
+    b = new_round(range(201, 213), event=a.event)
+    race(a, 1)
+    race(b, 1)
+    HeatLane.objects.filter(round=b, heat=2, lane=1).update(finish_time=3.0)
+    make_current(b, 2)
+    assert master_next(b, 2) == (a.id, 2)
+
+    reschedule(b, late_racer(b, 230).id, budget=NodeBudget(UNLIMITED))
+
+    assert master_next(b, 2) == (a.id, 2)
+
+
+def test_under_the_master_schedule_a_current_heat_that_moves_keeps_its_number():
+    """Heat 4 is current with a result in lane 1 only, and round B races
+    alongside. Cars 105 and 106 leave heat 2, so heat 4 becomes heat 3 and
+    keeps its master number."""
+    round = RoundFactory()
+    RaceSettings.objects.filter(event=round.event).update(
+        lane_count=2, use_master_sched=True
+    )
+    racers = {}
+    for car in range(101, 107):
+        racers[car] = RosterEntryFactory(
+            round=round,
+            racer=RacerFactory(
+                group=round.group, car_number=car, passed_inspection=car < 105
+            ),
+        ).racer
+    chart = {1: (101, 102), 2: (105, 106), 3: (103, 104), 4: (102, 101)}
+    for heat, cars in chart.items():
+        for lane, car in enumerate(cars, start=1):
+            HeatLane.objects.create(
+                event=round.event, round=round, heat=heat, lane=lane, racer=racers[car]
+            )
+    new_round(range(201, 205), event=round.event, lane_count=2)
+    race(round, 1)
+    HeatLane.objects.filter(round=round, heat=4, lane=1).update(finish_time=3.0)
+    reassign_master_heats(round.event)
+    make_current(round, 4, racing=False)
+    number = master_number(round, 4)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert state_of(round).current_heat == 3
+    assert master_number(round, 3) == number
+
+
 def test_a_current_heat_that_has_run_follows_its_new_number():
     """Heat 4 has run and is still current. Cars 105 and 106 leave heat 2, so
     heat 3 moves into its byes and heat 4 becomes heat 3."""
@@ -573,6 +648,31 @@ def test_a_chart_wider_than_the_track_is_refused():
     caught = failure_of(lambda: reschedule(round, racer.id, dry_run=True))
 
     assert caught.code == Failure.NLANES
+
+
+@pytest.mark.parametrize(
+    ("heat_1", "others", "code"),
+    [
+        ({"heat": 0}, "keep", Failure.NOCHART),
+        ({"heat": 0}, "delete", Failure.NOCHART),
+        ({"lane": 0}, "keep", Failure.NLANES),
+    ],
+    ids=["heat-0", "only-heat-0", "lane-0"],
+)
+def test_a_chart_with_a_heat_or_lane_0_is_refused(heat_1, others, code):
+    """Only an imported database can hold one. Car 101's row in heat 1 is
+    moved to heat 0 or lane 0, and the other heats are kept or deleted."""
+    round = new_round(range(101, 105))
+    if others == "delete":
+        HeatLane.objects.filter(round=round).exclude(heat=1).delete()
+    HeatLane.objects.filter(round=round, heat=1, racer__car_number=101).update(**heat_1)
+    racer = late_racer(round, 130)
+
+    caught = failure_of(
+        lambda: reschedule(round, racer.id, dry_run=True, budget=NodeBudget(UNLIMITED))
+    )
+
+    assert caught.code == code
 
 
 def test_the_retry_renews_the_guard():

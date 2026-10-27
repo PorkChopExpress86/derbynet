@@ -67,10 +67,12 @@ class Rescheduled:
 
 @dataclass(frozen=True)
 class _RacePosition:
-    """Where the race stands (D34). The running heat is the heat `RaceState`
-    names as current. The staged heat is the next unraced heat after it in
-    the same round, even under the master schedule (D36)."""
+    """Where the race stands (D34). The current heat is the heat `RaceState`
+    names; it is the running heat while none of its lanes has a result. The
+    staged heat is the next unraced heat after it in the same round, even
+    under the master schedule (D36)."""
 
+    current: HeatRef | None
     running: HeatRef | None
     staged: HeatRef | None
     master: bool
@@ -80,10 +82,16 @@ class _RacePosition:
         refs = (self.running, self.staged)
         return frozenset(ref[1] for ref in refs if ref and ref[0] == round.id)
 
-    def pinned(self) -> frozenset[HeatRef]:
+    def pinned(self, round: Round, renumbered: dict[int, int]) -> frozenset[HeatRef]:
         """Under the master schedule, the heat whose master number must stay
-        first once the event is renumbered."""
-        return frozenset((self.running,) if self.running and self.master else ())
+        first once the event is renumbered, so `next` follows it: the
+        current heat, run or not, since master numbering renumbers a heat
+        with a result in only some lanes. `renumbered` is this round's heat
+        renumbering, which can move a current heat that has run."""
+        if not (self.master and self.current):
+            return frozenset()
+        r, heat = self.current
+        return frozenset({(r, renumbered.get(heat, heat) if r == round.id else heat)})
 
 
 type _Row = tuple[int, int, int, int, bool]
@@ -94,14 +102,14 @@ def _race_position(
     rows: list[_Row], state: RaceState, use_master_sched: bool
 ) -> _RacePosition:
     if state.current_round_id is None or state.current_heat is None:
-        return _RacePosition(None, None, use_master_sched)
+        return _RacePosition(None, None, None, use_master_sched)
     current = (state.current_round_id, state.current_heat)
     # A heat is run once one of its lanes has a result.
     run = {(r, heat) for r, heat, _, _, done in rows if done}
     unraced = {(r, heat) for r, heat, _, _, _ in rows} - run
     running = current if current in unraced else None
     later = [h for h in unraced if h[0] == current[0] and h[1] > current[1]]
-    return _RacePosition(running, min(later, default=None), use_master_sched)
+    return _RacePosition(current, running, min(later, default=None), use_master_sched)
 
 
 @dataclass(frozen=True)
@@ -168,7 +176,13 @@ def _adjust(
     """The search, as the PHP action runs it, outside any transaction."""
     if not snapshot.rows:
         raise RescheduleFailure(Failure.NOCHART, "The round has no schedule.")
-    if any(lane > snapshot.lane_count for _, lane, _, _ in snapshot.rows):
+    if any(heat < 1 for heat, _, _, _ in snapshot.rows):
+        # Only an imported database can hold one; every writer here counts
+        # heats from 1.
+        raise RescheduleFailure(
+            Failure.NOCHART, "The schedule has a heat 0, which cannot be adjusted."
+        )
+    if any(not 1 <= lane <= snapshot.lane_count for _, lane, _, _ in snapshot.rows):
         raise RescheduleFailure(
             Failure.NLANES,
             "The schedule uses lanes the track no longer has. Restore the lane"
@@ -236,7 +250,7 @@ def _write(
         for lane, racer_id in enumerate(racers, start=1)
         if racer_id is not None
     )
-    after_chart_change(round, keep=snapshot.position.pinned())
+    after_chart_change(round, keep=snapshot.position.pinned(round, renumbered))
     if state.current_round_id == round.id:
         # A current heat that has run can still move down; follow it.
         state.current_heat = renumbered.get(state.current_heat, state.current_heat)
@@ -278,15 +292,16 @@ def reschedule(
     without it, fit in every passed racer of the roster who has no heat.
     Either way, departed racers become byes and heats of byes are squeezed
     out. Heats with a result, the running heat and the staged heat keep
-    their racers, lanes and numbers, and a departed racer stays in the
-    running or staged heat. With `dry_run`, return the chart and change
-    nothing (Q5).
+    their racers, lanes and numbers, except that a departed racer's lane in
+    the running or staged heat runs empty (D37). With `dry_run`, return the
+    chart and change nothing (Q5).
 
     Raises RescheduleFailure: `busy` when another reschedule of the event is
     running, or when the round changed under two searches in a row (Q15);
-    `nochart` when nothing would change or a racer could not be fitted in;
+    `nochart` when nothing would change, a racer could not be fitted in, or
+    the chart has a heat 0;
     `alreadyscheduled` when `racer_id` already has heats in the round;
-    `nlanes` when the chart uses lanes past the lane count; `noracer`
+    `nlanes` when the chart uses lane 0 or lanes past the lane count; `noracer`
     when `racer_id` is not a racer of the round's event. `budget`
     replaces PHP's deadline, for tests.
     """

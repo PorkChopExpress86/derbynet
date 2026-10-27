@@ -22,8 +22,8 @@ def reassign_master_heats(event: Event, keep: Iterable[HeatRef] = ()) -> None:
     keep theirs. Runs whether or not `use-master-sched` is on, as in PHP.
 
     The heats in `keep`, `(roundid, heat)`, keep their numbers too, and the
-    others are numbered after them. A reschedule passes the running heat and
-    the staged heat, so they stay first in master order (D34).
+    others are numbered after them. Under the master schedule, a reschedule
+    passes the current heat, so it stays first in master order (D34).
     """
     keep = set(keep)
     with transaction.atomic():
