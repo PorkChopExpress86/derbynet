@@ -45,10 +45,10 @@ class Snapshot:
 def standings_snapshot(event) -> Snapshot:
     """The event's standings, computed from its rows as they are now.
 
-    Nothing is cached. Reading the rows takes most of the time (#106: 21 ms
-    of 28 ms for 200 racers and 1200 results), so a cache keyed on the rows
-    would save only the 7 ms of computing, even for the 0.5 s
-    `award.current` poll."""
+    Nothing is cached. Reading the rows takes most of the time (#106: 8.8 ms
+    of 11.6 ms for 200 racers and 1200 results on SQLite, from
+    `tools/time_standings.py`), so a cache keyed on the rows would save only
+    the 2.5 ms of computing, even for the 0.5 s `award.current` poll."""
     return Snapshot(_read(event))
 
 
