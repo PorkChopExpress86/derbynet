@@ -64,6 +64,12 @@ def php_int(number: int | float) -> int:
     return min(max(number, PHP_INT_MIN), PHP_INT_MAX)
 
 
+def php_empty(text: str) -> bool:
+    """`empty($text)` for a posted string: true for `""` and `"0"` only, so
+    `"0.0"` is not empty."""
+    return text in ("", "0")
+
+
 def php_intval(text: str) -> int:
     """`intval($text)`: the leading number as `php_int` converts it, or 0."""
     match = _NUMBER.match(text)
