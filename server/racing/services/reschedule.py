@@ -337,6 +337,10 @@ def _hold_emptied_heats(
                 round=round,
                 heat=heat,
                 defaults={"master_heat": number.get((round.id, heat), 0)},
+                create_defaults={
+                    "master_heat": number.get((round.id, heat), 0),
+                    "held_at": timezone.now(),
+                },
             )
 
 

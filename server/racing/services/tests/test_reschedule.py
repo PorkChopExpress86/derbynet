@@ -64,6 +64,13 @@ def race(round, *heats):
     HeatLane.objects.filter(round=round, heat__in=heats).update(finish_time=3.0)
 
 
+def record_results(round, *heats):
+    """Results as the timer writes them, with `completed` set to now."""
+    HeatLane.objects.filter(round=round, heat__in=heats).update(
+        finish_time=3.0, completed=timezone.now()
+    )
+
+
 def make_current(round, heat, racing=True):
     RaceState.objects.filter(event=round.event).update(
         current_round=round, current_group=round.group, current_heat=heat, racing=racing
@@ -1035,7 +1042,7 @@ def test_under_the_master_schedule_next_from_an_emptied_staged_heat_moves_on():
 
 
 def test_an_emptied_heat_is_released_once_the_race_moves_past_it():
-    """D39 holds an emptied heat until a later heat of its round has a
+    """D39 holds an emptied heat until a later heat of its round gets a
     result. Then it is a gap like any skipped heat, which the next
     reschedule may fill, and unscheduling the round drops it."""
     round = new_round(range(101, 113))
@@ -1043,7 +1050,7 @@ def test_an_emptied_heat_is_released_once_the_race_moves_past_it():
     make_current(round, 3)
     depart_all_of(round, 4)
     reschedule(round, budget=NodeBudget(UNLIMITED))
-    race(round, 3, 5)
+    record_results(round, 3, 5)
     make_current(round, 6)
     late_racer(round, 120)
 
@@ -1116,9 +1123,9 @@ def emptied_b2_then_b3_run():
     assert master_next(a, 2) == (b.id, 2)
     depart_all_of(b, 2)
     reschedule(b, budget=NodeBudget(UNLIMITED))
-    race(a, 2)
+    record_results(a, 2)
     make_current(b, 3)
-    race(b, 3)
+    record_results(b, 3)
     return a, b
 
 
@@ -1165,3 +1172,47 @@ def test_a_passed_emptied_heat_is_never_staged_again():
     )
     listed = {(r, h) for _, r, h, _ in master_index(a.event)}
     assert heat_rows(b, 2) != set() or (b.id, 2) not in listed
+
+
+def test_a_result_before_the_heat_emptied_never_passes_it():
+    """D39: heat 6 was run by hand before heat 4, the staged heat, ran empty.
+    Only a result written after heat 4 emptied passes it, so heat 4 stays
+    held and late racers go elsewhere."""
+    round = new_round(range(101, 113))
+    record_results(round, 1, 2, 6)
+    make_current(round, 3)
+    depart_all_of(round, 4)
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+    for car in (120, 121, 122, 123):
+        late_racer(round, car)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(round, 4) == set()
+
+
+def test_under_the_master_schedule_renumbering_never_passes_an_emptied_heat():
+    """D39: B3, staged behind A2, runs empty. A result in one lane of A2,
+    and round C's schedule, renumber A2 above B3, which must not pass B3.
+    Late racers then leave B3 empty."""
+    b = new_round(range(201, 209), use_master_sched=True)
+    a = new_round(range(101, 109), event=b.event)
+    reassign_master_heats(b.event)
+    record_results(b, 1)
+    record_results(a, 1)
+    record_results(b, 2)
+    make_current(a, 2)
+    assert master_next(a, 2) == (b.id, 3)
+    depart_all_of(b, 3)
+    reschedule(b, budget=NodeBudget(UNLIMITED))
+    lane = HeatLane.objects.filter(round=a, heat=2).order_by("lane").first()
+    lane.finish_time = 3.0
+    lane.completed = timezone.now()
+    lane.save()
+    new_round(range(301, 305), event=b.event)
+    for car in (220, 221, 222, 223):
+        late_racer(b, car)
+
+    reschedule(b, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(b, 3) == set()

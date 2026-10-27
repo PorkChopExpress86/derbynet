@@ -7,9 +7,9 @@ The chart services call `reassign_master_heats` through
 from collections.abc import Iterable
 
 from django.db import transaction
-from django.db.models import Case, F, Max, Value, When
+from django.db.models import Case, Exists, F, Max, OuterRef, Value, When
 
-from core.models import Event, RaceSettings, RaceState
+from core.models import Event, RaceState
 from racing.engine.scheduling.master import HeatRef, assign_master_heats
 from racing.models import HAS_RESULT, EmptiedHeat, HeatLane
 
@@ -19,22 +19,20 @@ type HeldEmptiedHeat = tuple[int, int, int, int]
 
 def _emptied_heats(event: Event) -> tuple[list[HeldEmptiedHeat], list[int]]:
     """The event's held emptied heats, and the ids of its passed ones."""
-    rows = list(
-        EmptiedHeat.objects.filter(event=event).values_list(
-            "id", "round__number", "round_id", "heat", "master_heat"
-        )
+    later_result = HeatLane.objects.filter(
+        round_id=OuterRef("round_id"),
+        heat__gt=OuterRef("heat"),
+        completed__gte=OuterRef("held_at"),
     )
-    if not rows:
-        return [], []
-    run = HeatLane.objects.filter(event=event).filter(HAS_RESULT)
-    last_run = dict(
-        run.values("round_id").annotate(n=Max("heat")).values_list("round_id", "n")
+    rows = (
+        EmptiedHeat.objects.filter(event=event)
+        .annotate(passed=Exists(later_result))
+        .order_by("id")
+        .values_list("id", "round__number", "round_id", "heat", "master_heat", "passed")
     )
-    master = RaceSettings.objects.get(event=event).use_master_sched
-    top = (run.aggregate(n=Max("master_heat"))["n"] or 0) if master else 0
     held, passed = [], []
-    for pk, level, roundid, heat, n in rows:
-        if last_run.get(roundid, 0) > heat or top > n:
+    for pk, level, roundid, heat, n, gone in rows:
+        if gone:
             passed.append(pk)
         else:
             held.append((level, roundid, heat, n))
@@ -43,9 +41,11 @@ def _emptied_heats(event: Event) -> tuple[list[HeldEmptiedHeat], list[int]]:
 
 def held_emptied_heats(event: Event) -> list[HeldEmptiedHeat]:
     """The emptied heats (D39) that still hold their numbers. An emptied heat
-    is passed once a later heat of its round has a result, or under the
-    master schedule a heat with a higher master number, and is then ignored
-    whichever round is current. Every reader of `EmptiedHeat` goes through
+    is passed once a later heat of its own round gets a result after it was
+    held, by `completed`, and is then ignored whichever round is current.
+    Results written before it emptied and master renumbering never pass it,
+    so under the master schedule a heat of a round that does not run again
+    stays held with its number. Every reader of `EmptiedHeat` goes through
     here."""
     return _emptied_heats(event)[0]
 
