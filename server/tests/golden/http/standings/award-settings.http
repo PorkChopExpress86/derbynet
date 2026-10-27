@@ -1,0 +1,7279 @@
+### 001 racers
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2859
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Cal",
+            "lastname": "Ames",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Red",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Red",
+            "rankid": 1,
+            "rank": "Red",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Dot",
+            "lastname": "Bell",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Red",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Red",
+            "rankid": 1,
+            "rank": "Red",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Eve",
+            "lastname": "Cobb",
+            "carnumber": 203,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Red",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Red",
+            "rankid": 1,
+            "rank": "Red",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Fay",
+            "lastname": "Dunn",
+            "carnumber": 204,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Blue",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Blue",
+            "rankid": 2,
+            "rank": "Blue",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Gil",
+            "lastname": "Eads",
+            "carnumber": 205,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Blue",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Blue",
+            "rankid": 2,
+            "rank": "Blue",
+            "passed": true,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Hap",
+            "lastname": "Fox",
+            "carnumber": 206,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Blue",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Blue",
+            "rankid": 2,
+            "rank": "Blue",
+            "passed": true,
+            "seq": 0
+        }
+    ]
+}
+
+### 002 classes
+request: GET action.php?query=class.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1197
+body:
+{
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 003 full-field-calc=0 award.calc-rule
+request: POST action.php
+request-body: action=award.calc-rule&full-field-calc=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 199
+body:
+{
+    "action": {
+        "action": "award.calc-rule",
+        "full-field-calc": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 004 full-field-calc=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4090
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 005 full-field-calc=0 export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 18038
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Subgroup",
+                "Excluded?"
+            ],
+            [
+                "Cal",
+                "Ames",
+                "",
+                201,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Dot",
+                "Bell",
+                "",
+                202,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Eve",
+                "Cobb",
+                "",
+                203,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Fay",
+                "Dunn",
+                "",
+                204,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Gil",
+                "Eads",
+                "",
+                205,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Hap",
+                "Fox",
+                "",
+                206,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                1,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                2,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                1,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                2,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                1,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                2,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                1,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                2,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                1,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                2,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                1,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                2,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red",
+        [
+            [
+                "Standings for Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red - Red",
+        [
+            [
+                "Standings for Red \/ Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                3,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                6,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Blue",
+        [
+            [
+                "Standings for Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Blue - Blue",
+        [
+            [
+                "Standings for Blue \/ Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                4,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                5,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Both",
+        [
+            [
+                "Standings for Both"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                "",
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                "",
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                "",
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                "",
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                "",
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                "",
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "Subgroup",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "3rd Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Eve",
+                "Cobb",
+                203,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ],
+            [
+                "3rd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Hap",
+                "Fox",
+                206,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 006 full-field-calc=-1 award.calc-rule
+request: POST action.php
+request-body: action=award.calc-rule&full-field-calc=-1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 200
+body:
+{
+    "action": {
+        "action": "award.calc-rule",
+        "full-field-calc": -1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 007 full-field-calc=-1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3571
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 008 full-field-calc=-1 export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 15268
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Subgroup",
+                "Excluded?"
+            ],
+            [
+                "Cal",
+                "Ames",
+                "",
+                201,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Dot",
+                "Bell",
+                "",
+                202,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Eve",
+                "Cobb",
+                "",
+                203,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Fay",
+                "Dunn",
+                "",
+                204,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Gil",
+                "Eads",
+                "",
+                205,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Hap",
+                "Fox",
+                "",
+                206,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                1,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                2,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                1,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                2,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                1,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                2,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                1,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                2,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                1,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                2,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                1,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                2,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings Red",
+        [
+            [
+                "Standings for Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red - Red",
+        [
+            [
+                "Standings for Red \/ Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                3,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                6,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Blue",
+        [
+            [
+                "Standings for Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Blue - Blue",
+        [
+            [
+                "Standings for Blue \/ Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                4,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                5,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Both",
+        [
+            [
+                "Standings for Both"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                "",
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                "",
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                "",
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                "",
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                "",
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                "",
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "Subgroup",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "3rd Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Eve",
+                "Cobb",
+                203,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ],
+            [
+                "3rd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Hap",
+                "Fox",
+                206,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 009 full-field-calc=Both award.calc-rule
+request: POST action.php
+request-body: action=award.calc-rule&full-field-calc=3
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 199
+body:
+{
+    "action": {
+        "action": "award.calc-rule",
+        "full-field-calc": 3
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 010 full-field-calc=Both award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3571
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-1",
+            "place": 3,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 011 full-field-calc=Both export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 15268
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Subgroup",
+                "Excluded?"
+            ],
+            [
+                "Cal",
+                "Ames",
+                "",
+                201,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Dot",
+                "Bell",
+                "",
+                202,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Eve",
+                "Cobb",
+                "",
+                203,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Fay",
+                "Dunn",
+                "",
+                204,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Gil",
+                "Eads",
+                "",
+                205,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Hap",
+                "Fox",
+                "",
+                206,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                1,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                2,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                1,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                2,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                1,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                2,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                1,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                2,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                1,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                2,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                1,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                2,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings Red",
+        [
+            [
+                "Standings for Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red - Red",
+        [
+            [
+                "Standings for Red \/ Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                3,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                6,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Blue",
+        [
+            [
+                "Standings for Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Blue - Blue",
+        [
+            [
+                "Standings for Blue \/ Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                4,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                5,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Both",
+        [
+            [
+                "Standings for Both"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                "",
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                "",
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                "",
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                "",
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                "",
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                "",
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "Subgroup",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Pack",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "3rd Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Eve",
+                "Cobb",
+                203,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ],
+            [
+                "3rd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Hap",
+                "Fox",
+                206,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 012 full-field-calc=0 again award.calc-rule
+request: POST action.php
+request-body: action=award.calc-rule&full-field-calc=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 199
+body:
+{
+    "action": {
+        "action": "award.calc-rule",
+        "full-field-calc": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 013 group-ntrophies=1 class.edit
+request: POST action.php
+request-body: action=class.edit&classid=1&name=Red&ntrophies=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "action": {
+        "action": "class.edit",
+        "classid": 1,
+        "name": "Red",
+        "ntrophies": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 014 group-ntrophies=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3697
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": 1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 015 group-ntrophies=1 export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 17576
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Subgroup",
+                "Excluded?"
+            ],
+            [
+                "Cal",
+                "Ames",
+                "",
+                201,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Dot",
+                "Bell",
+                "",
+                202,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Eve",
+                "Cobb",
+                "",
+                203,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Fay",
+                "Dunn",
+                "",
+                204,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Gil",
+                "Eads",
+                "",
+                205,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Hap",
+                "Fox",
+                "",
+                206,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                1,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                2,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                1,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                2,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                1,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                2,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                1,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                2,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                1,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                2,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                1,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                2,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red",
+        [
+            [
+                "Standings for Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red - Red",
+        [
+            [
+                "Standings for Red \/ Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                3,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                6,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Blue",
+        [
+            [
+                "Standings for Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Blue - Blue",
+        [
+            [
+                "Standings for Blue \/ Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                4,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                5,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Both",
+        [
+            [
+                "Standings for Both"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                "",
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                "",
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                "",
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                "",
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                "",
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                "",
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "Subgroup",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ],
+            [
+                "3rd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Hap",
+                "Fox",
+                206,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 016 subgroup-ntrophies=2 rank.edit
+request: POST action.php
+request-body: action=rank.edit&rankid=2&name=Blue&ntrophies=2
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1424
+body:
+{
+    "action": {
+        "action": "rank.edit",
+        "rankid": 2,
+        "name": "Blue",
+        "ntrophies": 2
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": 1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": 2,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 017 subgroup-ntrophies=2 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4148
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2-2",
+            "place": 1,
+            "category": "subgroup",
+            "classid": 2,
+            "rankid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2-2",
+            "place": 2,
+            "category": "subgroup",
+            "classid": 2,
+            "rankid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": 1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": 2,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 018 subgroup-ntrophies=2 export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 18042
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Subgroup",
+                "Excluded?"
+            ],
+            [
+                "Cal",
+                "Ames",
+                "",
+                201,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Dot",
+                "Bell",
+                "",
+                202,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Eve",
+                "Cobb",
+                "",
+                203,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Fay",
+                "Dunn",
+                "",
+                204,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Gil",
+                "Eads",
+                "",
+                205,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Hap",
+                "Fox",
+                "",
+                206,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                1,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                2,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                1,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                2,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                1,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                2,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                1,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                2,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                1,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                2,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                1,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                2,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red",
+        [
+            [
+                "Standings for Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red - Red",
+        [
+            [
+                "Standings for Red \/ Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                3,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                6,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Blue",
+        [
+            [
+                "Standings for Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Blue - Blue",
+        [
+            [
+                "Standings for Blue \/ Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                4,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                5,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Both",
+        [
+            [
+                "Standings for Both"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                "",
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                "",
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                "",
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                "",
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                "",
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                "",
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "Subgroup",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ],
+            [
+                "3rd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Hap",
+                "Fox",
+                206,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                "Blue",
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                "Blue",
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 019 one-trophy-per=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2912
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": 1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": 2,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 020 one-trophy-per=1 export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 16654
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Subgroup",
+                "Excluded?"
+            ],
+            [
+                "Cal",
+                "Ames",
+                "",
+                201,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Dot",
+                "Bell",
+                "",
+                202,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Eve",
+                "Cobb",
+                "",
+                203,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Fay",
+                "Dunn",
+                "",
+                204,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Gil",
+                "Eads",
+                "",
+                205,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Hap",
+                "Fox",
+                "",
+                206,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                1,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                2,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                1,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                2,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                1,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                2,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                1,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                2,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                1,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                2,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                1,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                2,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red",
+        [
+            [
+                "Standings for Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red - Red",
+        [
+            [
+                "Standings for Red \/ Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                3,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                6,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Blue",
+        [
+            [
+                "Standings for Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Blue - Blue",
+        [
+            [
+                "Standings for Blue \/ Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                4,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                5,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Both",
+        [
+            [
+                "Standings for Both"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                "",
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                "",
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                "",
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                "",
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                "",
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                "",
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "Subgroup",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ],
+            [
+                "2nd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Hap",
+                "Fox",
+                206,
+                ""
+            ],
+            [
+                "3rd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Eve",
+                "Cobb",
+                203,
+                ""
+            ]
+        ]
+    ]
+]
+
+### 021 one-trophy-per=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4148
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-1-2-2",
+            "place": 1,
+            "category": "subgroup",
+            "classid": 2,
+            "rankid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-2-2",
+            "place": 2,
+            "category": "subgroup",
+            "classid": 2,
+            "rankid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": 1,
+            "name": "Red",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Red"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Blue",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": 2,
+                    "name": "Blue"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Both",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Red"
+                },
+                {
+                    "classid": 2,
+                    "name": "Blue"
+                }
+            ]
+        }
+    ]
+}
+
+### 022 one-trophy-per=0 export-json
+request: GET export-json.php
+status: 200
+content-type: application/json
+cache-control: no-store, no-cache, must-revalidate
+length: 18042
+body:
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Subgroup",
+                "Excluded?"
+            ],
+            [
+                "Cal",
+                "Ames",
+                "",
+                201,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Dot",
+                "Bell",
+                "",
+                202,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Eve",
+                "Cobb",
+                "",
+                203,
+                "",
+                "Red",
+                "Red",
+                0
+            ],
+            [
+                "Fay",
+                "Dunn",
+                "",
+                204,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Gil",
+                "Eads",
+                "",
+                205,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ],
+            [
+                "Hap",
+                "Fox",
+                "",
+                206,
+                "",
+                "Blue",
+                "Blue",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                1,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                1,
+                2,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                1,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                2,
+                2,
+                "Fay",
+                "Dunn",
+                204,
+                "",
+                2.95,
+                231.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                1,
+                "Hap",
+                "Fox",
+                206,
+                "",
+                3.2,
+                213.1,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Blue",
+                1,
+                3,
+                2,
+                "Gil",
+                "Eads",
+                205,
+                "",
+                3.1,
+                219.9,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                1,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                1,
+                2,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                1,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                2,
+                2,
+                "Cal",
+                "Ames",
+                201,
+                "",
+                2.9,
+                235.1,
+                1,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                1,
+                "Eve",
+                "Cobb",
+                203,
+                "",
+                3.3,
+                206.6,
+                2,
+                "<timestamp>"
+            ],
+            [
+                "Red",
+                1,
+                3,
+                2,
+                "Dot",
+                "Bell",
+                202,
+                "",
+                3,
+                227.3,
+                1,
+                "<timestamp>"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red",
+        [
+            [
+                "Standings for Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Red - Red",
+        [
+            [
+                "Standings for Red \/ Red"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                1,
+                "Red",
+                1,
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                202,
+                "Dot Bell",
+                "Red",
+                2,
+                "Red",
+                2,
+                3,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                3,
+                203,
+                "Eve Cobb",
+                "Red",
+                3,
+                "Red",
+                3,
+                6,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Standings Blue",
+        [
+            [
+                "Standings for Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Blue - Blue",
+        [
+            [
+                "Standings for Blue \/ Blue"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "In Pack",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                204,
+                "Fay Dunn",
+                "Blue",
+                1,
+                "Blue",
+                1,
+                2,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                2,
+                205,
+                "Gil Eads",
+                "Blue",
+                2,
+                "Blue",
+                2,
+                4,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                3,
+                206,
+                "Hap Fox",
+                "Blue",
+                3,
+                "Blue",
+                3,
+                5,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ]
+        ]
+    ],
+    [
+        "Standings Both",
+        [
+            [
+                "Standings for Both"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Subgroup",
+                "In Subgroup",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ],
+            [
+                1,
+                201,
+                "Cal Ames",
+                "Red",
+                "",
+                "Red",
+                1,
+                2,
+                2.9,
+                2.9,
+                2.9
+            ],
+            [
+                2,
+                204,
+                "Fay Dunn",
+                "Blue",
+                "",
+                "Blue",
+                1,
+                2,
+                2.95,
+                2.95,
+                2.95
+            ],
+            [
+                3,
+                202,
+                "Dot Bell",
+                "Red",
+                "",
+                "Red",
+                2,
+                2,
+                3,
+                3,
+                3
+            ],
+            [
+                4,
+                205,
+                "Gil Eads",
+                "Blue",
+                "",
+                "Blue",
+                2,
+                2,
+                3.1,
+                3.1,
+                3.1
+            ],
+            [
+                5,
+                206,
+                "Hap Fox",
+                "Blue",
+                "",
+                "Blue",
+                3,
+                2,
+                3.2,
+                3.2,
+                3.2
+            ],
+            [
+                6,
+                203,
+                "Eve Cobb",
+                "Red",
+                "",
+                "Red",
+                3,
+                2,
+                3.3,
+                3.3,
+                3.3
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "Subgroup",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Pack",
+                "Speed Trophy",
+                null,
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "2nd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "3rd Fastest in Both",
+                "Speed Trophy",
+                "Both",
+                null,
+                "Dot",
+                "Bell",
+                202,
+                ""
+            ],
+            [
+                "Fastest in Red",
+                "Speed Trophy",
+                "Red",
+                null,
+                "Cal",
+                "Ames",
+                201,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ],
+            [
+                "3rd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                null,
+                "Hap",
+                "Fox",
+                206,
+                ""
+            ],
+            [
+                "Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                "Blue",
+                "Fay",
+                "Dunn",
+                204,
+                ""
+            ],
+            [
+                "2nd Fastest in Blue",
+                "Speed Trophy",
+                "Blue",
+                "Blue",
+                "Gil",
+                "Eads",
+                205,
+                ""
+            ]
+        ]
+    ]
+]
+

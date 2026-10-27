@@ -25,6 +25,7 @@ from django.db.models import Count, Max, Min, Q, Value
 from django.db.models.functions import Left, Lower
 
 from awards.models import Award, BallotAward
+from awards.services import reconcile_partition_lists
 from core.models import FullFieldRule, RaceSettings, RaceState
 from core.services import lock_race_state
 from racing.models import (
@@ -708,6 +709,7 @@ def delete_partition(partition: Partition) -> None:
         ):
             GroupConstituent.objects.filter(constituent=group).delete()
             delete_group_rows(group)
+        reconcile_partition_lists(event_id)
 
 
 def move_partition(
@@ -752,6 +754,7 @@ def move_partition(
         fill_in_missing_roster_entries(event_id)
         clean_up_empty_groups_and_subgroups(event_id)
         _reorder_partitions(event_id)
+        reconcile_partition_lists(event_id)
 
 
 def order_partitions(event, partitions: Sequence[Partition]) -> None:
@@ -898,6 +901,7 @@ def delete_group(group: Group) -> None:
                 Failure.CONSTITUENT, "Unable to delete a constituent class"
             )
         delete_group_rows(group)
+        reconcile_partition_lists(group.event_id)
 
 
 def order_groups(event, groups: Sequence[Group]) -> None:
@@ -970,6 +974,7 @@ def delete_subgroup(subgroup: Subgroup) -> None:
                 Failure.EXISTING_RACERS, "Unable to delete a rank with racers"
             )
         _delete_subgroup(subgroup)
+        reconcile_partition_lists(subgroup.event_id)
 
 
 def move_subgroup(subgroup: Subgroup, group: Group | None) -> None:
@@ -1001,6 +1006,7 @@ def move_subgroup(subgroup: Subgroup, group: Group | None) -> None:
         else:
             entries.update(round=first_round)
         clean_up_empty_groups_and_subgroups(event_id)
+        reconcile_partition_lists(event_id)
 
 
 def order_subgroups(event, subgroups: Sequence[Subgroup]) -> None:

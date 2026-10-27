@@ -1,0 +1,1714 @@
+### 025 points=1 scoring=2 subgroups=0 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 20909
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [
+        {
+            "awardid": 4,
+            "awardname": "Test Pack Award",
+            "awardtype": "Speed General",
+            "awardtypeid": 2,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": 0,
+            "racerid": 22,
+            "firstname": "Dexter",
+            "lastname": "Dawes",
+            "carnumber": 222,
+            "sort": 1,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 5,
+            "awardname": "NewThird",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": null,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": null,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 2,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 2,
+            "awardname": "Test Den Award",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": 0,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 3,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 1,
+            "awardname": "Test Award",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": 0,
+            "racerid": 2,
+            "firstname": "Angelo",
+            "lastname": "Alas",
+            "carnumber": 202,
+            "sort": 4,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 7,
+            "awardname": "Exclusive",
+            "awardtype": "Speed General",
+            "awardtypeid": 2,
+            "adhoc": false,
+            "classid": 1,
+            "eligible-classids": [
+                1
+            ],
+            "eligible-rankids": [
+                8
+            ],
+            "rankid": 8,
+            "racerid": 1,
+            "firstname": "Adolfo \"Dolf\"",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "sort": 6,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 10,
+            "awardname": "NewFourth",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": null,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": null,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 7,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 9,
+            "awardname": "Most Glittery",
+            "awardtype": "Ad Hoc",
+            "awardtypeid": 6,
+            "adhoc": true,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 12,
+            "firstname": "Christoper",
+            "lastname": "Chauncey",
+            "carnumber": 212,
+            "sort": 999,
+            "ballot_depth": 0,
+            "votes": []
+        }
+    ],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 12,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 22,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 17,
+            "key": "speed-1h",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 16,
+            "key": "speed-1i",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 27,
+            "key": "speed-1j",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 32,
+            "key": "speed-1k",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 31,
+            "key": "speed-1l",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 36,
+            "key": "speed-1m",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 37,
+            "key": "speed-1n",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1o",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 39,
+            "key": "speed-1p",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 42,
+            "key": "speed-1q",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 44,
+            "key": "speed-1r",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 49,
+            "key": "speed-1s",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 46,
+            "key": "speed-1t",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 56,
+            "key": "speed-1u",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 61,
+            "key": "speed-1v",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 71,
+            "key": "speed-1w",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 66,
+            "key": "speed-1x",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 76,
+            "key": "speed-1y",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 81,
+            "key": "speed-1z",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 82,
+            "key": "speed-1aa",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 26,
+            "key": "speed-2c",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 51,
+            "key": "speed-2d",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 52,
+            "key": "speed-2e",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 62,
+            "key": "speed-2f",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 72,
+            "key": "speed-2g",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 16,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 31,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 36,
+            "key": "speed-1e-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1f-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 46,
+            "key": "speed-1g-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 56,
+            "key": "speed-1h-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 61,
+            "key": "speed-1i-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 71,
+            "key": "speed-1j-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 66,
+            "key": "speed-1k-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 76,
+            "key": "speed-1l-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 81,
+            "key": "speed-1m-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 26,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 51,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 12,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 22,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 17,
+            "key": "speed-1d-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 27,
+            "key": "speed-1e-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 32,
+            "key": "speed-1f-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 37,
+            "key": "speed-1g-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 42,
+            "key": "speed-1h-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 82,
+            "key": "speed-1i-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2a-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 52,
+            "key": "speed-2b-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 62,
+            "key": "speed-2c-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 72,
+            "key": "speed-2d-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 39,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 44,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 49,
+            "key": "speed-1c-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "rankid": 8,
+                    "count": 1,
+                    "ntrophies": -1,
+                    "name": "Private"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TheLastClass",
+            "subgroups": [
+                {
+                    "rankid": 7,
+                    "count": 0,
+                    "ntrophies": -1,
+                    "name": "TheLastClass"
+                }
+            ]
+        }
+    ]
+}
+
+### 027 points=1 scoring=2 subgroups=1 award.list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 20909
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [
+        {
+            "awardid": 4,
+            "awardname": "Test Pack Award",
+            "awardtype": "Speed General",
+            "awardtypeid": 2,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": 0,
+            "racerid": 22,
+            "firstname": "Dexter",
+            "lastname": "Dawes",
+            "carnumber": 222,
+            "sort": 1,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 5,
+            "awardname": "NewThird",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": null,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": null,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 2,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 2,
+            "awardname": "Test Den Award",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": 0,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 3,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 1,
+            "awardname": "Test Award",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": 0,
+            "racerid": 2,
+            "firstname": "Angelo",
+            "lastname": "Alas",
+            "carnumber": 202,
+            "sort": 4,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 7,
+            "awardname": "Exclusive",
+            "awardtype": "Speed General",
+            "awardtypeid": 2,
+            "adhoc": false,
+            "classid": 1,
+            "eligible-classids": [
+                1
+            ],
+            "eligible-rankids": [
+                8
+            ],
+            "rankid": 8,
+            "racerid": 1,
+            "firstname": "Adolfo \"Dolf\"",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "sort": 6,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 10,
+            "awardname": "NewFourth",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": null,
+            "eligible-classids": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "eligible-rankids": [
+                1,
+                8,
+                2,
+                3,
+                4,
+                5,
+                7
+            ],
+            "rankid": null,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 7,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 9,
+            "awardname": "Most Glittery",
+            "awardtype": "Ad Hoc",
+            "awardtypeid": 6,
+            "adhoc": true,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 12,
+            "firstname": "Christoper",
+            "lastname": "Chauncey",
+            "carnumber": 212,
+            "sort": 999,
+            "ballot_depth": 0,
+            "votes": []
+        }
+    ],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1b",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1c",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-1d",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1e",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 12,
+            "key": "speed-1f",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 22,
+            "key": "speed-1g",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 17,
+            "key": "speed-1h",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 16,
+            "key": "speed-1i",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 27,
+            "key": "speed-1j",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 32,
+            "key": "speed-1k",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 31,
+            "key": "speed-1l",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 36,
+            "key": "speed-1m",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 37,
+            "key": "speed-1n",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1o",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 39,
+            "key": "speed-1p",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 42,
+            "key": "speed-1q",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 44,
+            "key": "speed-1r",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 49,
+            "key": "speed-1s",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 46,
+            "key": "speed-1t",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 56,
+            "key": "speed-1u",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 61,
+            "key": "speed-1v",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 71,
+            "key": "speed-1w",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 66,
+            "key": "speed-1x",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 76,
+            "key": "speed-1y",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 81,
+            "key": "speed-1z",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 82,
+            "key": "speed-1aa",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2a",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2b",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 26,
+            "key": "speed-2c",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 51,
+            "key": "speed-2d",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 52,
+            "key": "speed-2e",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 62,
+            "key": "speed-2f",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 72,
+            "key": "speed-2g",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1a-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-1b-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 16,
+            "key": "speed-1c-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 31,
+            "key": "speed-1d-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 36,
+            "key": "speed-1e-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 41,
+            "key": "speed-1f-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 46,
+            "key": "speed-1g-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 56,
+            "key": "speed-1h-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 61,
+            "key": "speed-1i-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 71,
+            "key": "speed-1j-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 66,
+            "key": "speed-1k-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 76,
+            "key": "speed-1l-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 81,
+            "key": "speed-1m-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 21,
+            "key": "speed-2a-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 26,
+            "key": "speed-2b-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 51,
+            "key": "speed-2c-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 7,
+            "key": "speed-1a-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 12,
+            "key": "speed-1b-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 22,
+            "key": "speed-1c-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 17,
+            "key": "speed-1d-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 27,
+            "key": "speed-1e-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 32,
+            "key": "speed-1f-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 37,
+            "key": "speed-1g-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 42,
+            "key": "speed-1h-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 82,
+            "key": "speed-1i-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-2a-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 52,
+            "key": "speed-2b-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 62,
+            "key": "speed-2c-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 72,
+            "key": "speed-2d-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 3,
+            "key": "speed-1a-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 8,
+            "key": "speed-1b-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 39,
+            "key": "speed-1a-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 44,
+            "key": "speed-1b-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        },
+        {
+            "type": "speed-award",
+            "racerid": 49,
+            "key": "speed-1c-4",
+            "place": 1,
+            "category": "group",
+            "classid": 4
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions & Tigers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Lions & Tigers"
+                },
+                {
+                    "rankid": 8,
+                    "count": 1,
+                    "ntrophies": -1,
+                    "name": "Private"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 17,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "White's Wolves",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 17,
+                    "ntrophies": -1,
+                    "name": "White's Wolves"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Bears and Fr\u00e8res",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Bears and Fr\u00e8res"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 16,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Webelos (\"Webes\")",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Webelos (\"Webes\")"
+                }
+            ]
+        },
+        {
+            "classid": 5,
+            "count": 16,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Arrows <<--<<",
+            "subgroups": [
+                {
+                    "rankid": 5,
+                    "count": 16,
+                    "ntrophies": -1,
+                    "name": "Arrows <<--<<"
+                }
+            ]
+        },
+        {
+            "classid": 7,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TheLastClass",
+            "subgroups": [
+                {
+                    "rankid": 7,
+                    "count": 0,
+                    "ntrophies": -1,
+                    "name": "TheLastClass"
+                }
+            ]
+        }
+    ]
+}
+

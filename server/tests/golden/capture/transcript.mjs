@@ -6,6 +6,9 @@
 //   request: <METHOD> <path and query>
 //   user-agent: <value>            (only when the client sent a chosen one)
 //   request-body: <exact body>     (POST only, one line)
+//   request-upload: <field>=<file> (a multipart/form-data POST only: the file, under
+//                                   http/, sent in <field>; request-body then
+//                                   gives the other fields, form-encoded)
 //   status: <HTTP status>
 //   content-type: <value>          (when present)
 //   location: <value>              (when present)
@@ -28,6 +31,7 @@ export function serialize(ex) {
   const head = [`### ${ex.name}`, `request: ${ex.request}`];
   if (ex.userAgent) head.push(`user-agent: ${ex.userAgent}`);
   if (ex.requestBody !== undefined && ex.requestBody !== null) head.push(`request-body: ${ex.requestBody}`);
+  if (ex.requestUpload) head.push(`request-upload: ${ex.requestUpload}`);
   head.push(`status: ${ex.status}`);
   if (ex.contentType) head.push(`content-type: ${ex.contentType}`);
   if (ex.location) head.push(`location: ${ex.location}`);
@@ -58,6 +62,7 @@ export function parse(buf) {
         case 'request:': ex.request = value; break;
         case 'user-agent:': ex.userAgent = value; break;
         case 'request-body:': ex.requestBody = value; break;
+        case 'request-upload:': ex.requestUpload = value; break;
         case 'status:': ex.status = Number(value); break;
         case 'content-type:': ex.contentType = value; break;
         case 'location:': ex.location = value; break;
