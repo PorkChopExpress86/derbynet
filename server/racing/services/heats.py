@@ -23,7 +23,7 @@ from racing.engine import heat_state as hs
 from racing.engine.results import LaneResult, Posted
 from racing.models import HAS_RESULT, EmptiedHeat, HeatLane, Round, TimerStatus
 from racing.services import audit, replay
-from racing.services.master import held_emptied_heats
+from racing.services.master import held_emptied_heats, master_index
 
 type FinalistsFor = Callable
 """`racing.services.playlist.FinalistsFor`."""
@@ -105,13 +105,14 @@ def transition(
     lock on `state`, which is saved."""
     inputs = inputs or Inputs()
     settings = RaceSettings.objects.get(event_id=state.event_id)
+    was_in = state.current_round_id
     decision = hs.decide(
         engine_state(state),
         event,
         load_chart(state.event_id, settings.use_master_sched),
     )
     _write_state(state, decision.state)
-    effects = _Effects(state, settings, inputs)
+    effects = _Effects(state, settings, inputs, was_in)
     for effect in decision.effects:
         effects.do(effect)
     state.save()
@@ -141,10 +142,17 @@ def _write_state(state: RaceState, new: hs.State) -> None:
 
 
 class _Effects:
-    def __init__(self, state: RaceState, settings: RaceSettings, inputs: Inputs):
+    def __init__(
+        self,
+        state: RaceState,
+        settings: RaceSettings,
+        inputs: Inputs,
+        was_in: int | None,
+    ):
         self.state = state
         self.settings = settings
         self.inputs = inputs
+        self.was_in = was_in
 
     def do(self, effect: hs.Effect) -> None:
         handler = getattr(self, "_" + type(effect).__name__)
@@ -160,8 +168,14 @@ class _Effects:
         replay.send(self.state.event_id, command, self.inputs.now)
 
     def _Moved(self, effect: hs.Moved) -> None:
-        if effect.round_id is not None and effect.round_id > 0:
-            release_emptied_heats_left_behind(self.state.event_id, effect.round_id)
+        if effect.round_id is None or effect.round_id <= 0:
+            return
+        if effect.round_id != self.was_in:
+            release_emptied_heats_left_behind(
+                self.state.event_id,
+                (effect.round_id, effect.heat),
+                self.settings.use_master_sched,
+            )
 
     def _WriteResults(self, effect: hs.WriteResults) -> None:
         round_id, heat = effect.ref
@@ -268,13 +282,20 @@ def _start_command(round_id: int | None, heat: int | None) -> str:
     return replay.start(round.group.name, round.number, heat or 0)
 
 
-def release_emptied_heats_left_behind(event_id: int, round_id: int) -> None:
-    """D40: once the current heat moves to another round, an emptied heat
+def release_emptied_heats_left_behind(
+    event_id: int, current: hs.HeatRef, use_master_sched: bool
+) -> None:
+    """D40: when the current heat moves to another round, an emptied heat
     with no heat after it in its own round is let go, so moving to the next
-    heat never lands on it again."""
+    heat never lands on it again. The staged heat, the next heat on the
+    track, stays (D39); outside the master schedule it is in the current
+    round."""
+    staged = _staged(event_id, current) if use_master_sched else None
     for emptied in EmptiedHeat.objects.filter(event_id=event_id).exclude(
-        round_id=round_id
+        round_id=current[0]
     ):
+        if (emptied.round_id, emptied.heat) == staged:
+            continue
         later = (
             HeatLane.objects.filter(
                 round_id=emptied.round_id, heat__gt=emptied.heat
@@ -287,7 +308,38 @@ def release_emptied_heats_left_behind(event_id: int, round_id: int) -> None:
             emptied.delete()
 
 
+def _staged(event_id: int, current: hs.HeatRef) -> hs.HeatRef | None:
+    """Under the master schedule, the unraced heat with the next master
+    number after the current heat, as the reschedule reads it."""
+    index = master_index(Event(pk=event_id))
+    after = next((n for n, r, h, _ in index if (r, h) == current), 0)
+    unraced = {(r, h) for _, r, h, done in index if not done} - {
+        (r, h) for _, r, h, done in index if done
+    }
+    later = [(n, (r, h)) for n, r, h, _ in index if (r, h) in unraced and n > after]
+    return min(later, default=(None, None))[1]
+
+
 # ----- the services -----
+
+
+def rebuild_waiting_final(
+    event: Event,
+    changed: Sequence[int] | None,
+    ended_before: int | None,
+    finalists_for: FinalistsFor | None,
+) -> None:
+    """D27: a change to the results of the round that ended before an open
+    intermission rebuilds the waiting final. `changed` holds the round ids
+    whose results changed, or None for every round; `ended_before` is the
+    ended round as the intermission named it before the change. Runs in
+    the caller's transaction."""
+    # The playlist moves the current heat through `transition`.
+    from racing.services import playlist, rounds
+
+    if ended_before is None or (changed is not None and ended_before not in changed):
+        return
+    playlist.rebuild_waiting_round(event, finalists_for or rounds.playlist_finalists())
 
 
 def results_locked(round_id: int) -> bool:
@@ -375,7 +427,11 @@ def maybe_cancel_running_round(state: RaceState, round_id: int) -> None:
 
 
 def rerun(
-    event: Event, which: str = "current", *, control_race: bool = True
+    event: Event,
+    which: str = "current",
+    *,
+    control_race: bool = True,
+    finalists_for: FinalistsFor | None = None,
 ) -> hs.Failure | None:
     """`heat.rerun`: race the current heat, or the last heat with a result,
     again. Its results are saved for a reinstate and then cleared, so only
@@ -394,13 +450,21 @@ def rerun(
             locked = locked_failure(target[0], control_race)
             if locked is not None:
                 return locked
+        ended = state.ended_round_id
         decision = transition(state, hs.Rerun(target))
+        if decision.failure is None:
+            rebuild_waiting_final(event, [target[0]], ended, finalists_for)
     if decision.failure is None:
         audit.write(event.id, [audit.discarded(target)])
     return decision.failure
 
 
-def reinstate(event: Event, *, control_race: bool = True) -> hs.Failure | None:
+def reinstate(
+    event: Event,
+    *,
+    control_race: bool = True,
+    finalists_for: FinalistsFor | None = None,
+) -> hs.Failure | None:
     """`heat.reinstate`: bring back the times and places a rerun saved
     (Q4), then racing off."""
     with transaction.atomic():
@@ -410,7 +474,10 @@ def reinstate(event: Event, *, control_race: bool = True) -> hs.Failure | None:
             locked = locked_failure(target[0], control_race)
             if locked is not None:
                 return locked
+        ended = state.ended_round_id
         transition(state, hs.Reinstate())
+        if target is not None:
+            rebuild_waiting_final(event, [target[0]], ended, finalists_for)
     if target is not None:
         audit.write(event.id, [audit.reinstated(target)])
     return None

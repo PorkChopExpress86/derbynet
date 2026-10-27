@@ -37,6 +37,7 @@ from racing.services.tests.race import (
     setup_race,
     state,
 )
+from roster.models import Group
 
 pytestmark = pytest.mark.django_db
 
@@ -325,6 +326,37 @@ def test_round_1_results_lock_once_a_heat_of_the_final_has_run(raced_final, chan
     assert final_chart(final) == chart
 
 
+def test_a_combined_round_locks_the_rounds_it_was_drawn_from():
+    """D41: a round of an aggregate of Den2 and Den3 locks their rounds'
+    results once one of its heats has a result."""
+    replay, den2 = setup_race(racers=4, partition="Den2", first_car=201)
+    event = replay.event
+    for car in (301, 302, 303, 304):
+        replay.post(
+            f"action=racer.import&firstname=F{car}&lastname=L{car}"
+            f"&carnumber={car}&partition=Den3"
+        )
+    den3 = Round.objects.get(event=event, group__name="Den3", number=1)
+    ids = [replay.ids.of("class", r.group) for r in (den2, den3)]
+    replay.post(
+        f"action=class.add&name=TwoThree&constituent_{ids[0]}&constituent_{ids[1]}"
+    )
+    two_three = Round.objects.create(
+        event=event, group=Group.objects.get(event=event, name="TwoThree"), number=1
+    )
+    racer = HeatLane.objects.filter(round=den2).first().racer
+    HeatLane.objects.create(event=event, round=two_three, heat=1, lane=1, racer=racer)
+    for round in (den2, den3):
+        assert delete_results(event, round, control_race=False) is None
+    HeatLane.objects.filter(round=two_three).update(
+        finish_time=3.0, completed=timezone.now()
+    )
+    for round in (den2, den3):
+        failure = delete_results(event, round, control_race=False)
+        assert failure.code is Code.RESULTS_LOCKED
+        assert delete_results(event, round) is None
+
+
 # ----- emptied heats (D39, D40) -----
 
 
@@ -389,6 +421,70 @@ def test_the_heat_state_machine_reads_the_master_index_with_its_emptied_heats():
     chart = load_chart(event.id, use_master_sched=True)
     assert chart.master_index() == master_index(event)
     assert (wolves.id, 2) in {(r, h) for _, r, h in chart.emptied}
+
+
+def staged_emptied_heat():
+    """Wolves and Bears interleaved: W1 B1 W2 B2 W3 raced, B3 running, and
+    the staged W4 emptied by a reschedule (D39)."""
+    event, wolves, bears = two_round_master_race()
+    select_heat(event, round_id=wolves.id, heat=1, now_racing=True)
+    for _ in range(5):
+        record_timer_result(event, fields("lane1=3.1&lane2=3.2"))
+    assert current(event) == (bears.id, 3, True)
+    empty_heat(wolves, 4)
+    return event, wolves, bears
+
+
+@pytest.mark.parametrize("crew", ["rerun", "race-again", "chart-change"])
+def test_the_staged_emptied_heat_stays_while_the_running_heat_stays(crew):
+    """D40 lets an emptied heat go only when the current heat moves to
+    another round, and D39 never lets the staged heat go."""
+    event, wolves, bears = staged_emptied_heat()
+    if crew == "rerun":
+        assert rerun(event, "current") is None
+    elif crew == "race-again":
+        select_heat(event, round_id=bears.id, heat=3, now_racing=True)
+    else:
+        # What a chart change does under the master schedule.
+        advance(event, "next-up")
+        assert current(event) == (bears.id, 3, True)
+    assert EmptiedHeat.objects.filter(round=wolves, heat=4).exists()
+    record_timer_result(event, fields("lane1=3.1&lane2=3.2"))
+    assert current(event)[:2] == (wolves.id, 4)
+    assert advance(event, "next") is None
+
+
+def test_an_emptied_heat_stays_until_the_crew_moves_to_another_round():
+    """D40: a rerun of the running heat is no move, even when the emptied
+    heat is not staged."""
+    event, wolves, bears = two_round_master_race()
+    RaceSettings.objects.filter(event=event).update(use_master_sched=False)
+    select_heat(event, round_id=bears.id, now_racing=True)
+    empty_heat(wolves, 4)
+    assert rerun(event, "current") is None
+    assert EmptiedHeat.objects.filter(round=wolves, heat=4).exists()
+    select_heat(event, round_id=wolves.id, heat=1)
+    select_heat(event, round_id=bears.id, heat=1)
+    assert not EmptiedHeat.objects.filter(round=wolves, heat=4).exists()
+
+
+def test_the_staged_emptied_heat_stays_when_the_crew_moves_onto_its_round():
+    event, wolves, bears = staged_emptied_heat()
+    select_heat(event, round_id=wolves.id, heat=3)
+    assert EmptiedHeat.objects.filter(round=wolves, heat=4).exists()
+
+
+def test_a_move_to_another_round_keeps_the_heat_staged_after_it():
+    """Bears 4, the last heat, empties while it runs. The crew goes back to
+    Wolves 3, and Bears 4 is the next heat on the track again."""
+    event, wolves, bears = two_round_master_race()
+    select_heat(event, round_id=wolves.id, heat=1, now_racing=True)
+    for _ in range(7):
+        record_timer_result(event, fields("lane1=3.1&lane2=3.2"))
+    assert current(event) == (bears.id, 4, True)
+    empty_heat(bears, 4)
+    select_heat(event, round_id=wolves.id, heat=3)
+    assert EmptiedHeat.objects.filter(round=bears, heat=4).exists()
 
 
 def test_an_emptied_heat_with_heats_after_it_is_kept_when_the_crew_moves_on():

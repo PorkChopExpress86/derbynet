@@ -91,9 +91,14 @@ def _racing_on(state: RaceState, by: hs.By = hs.By.PLAYLIST) -> None:
     heats.transition(state, hs.RacingOn(by))
 
 
-def _activate(state: RaceState, entry: PlaylistEntry, finalists_for: FinalistsFor):
+def _activate(
+    state: RaceState,
+    entry: PlaylistEntry,
+    finalists_for: FinalistsFor,
+    select: bool = True,
+):
     """`activate_playlist_entry()`: the step's round with a roster and a
-    chart, its first heat selected."""
+    chart, its first heat selected unless `select` is false."""
     round = _round_of(entry) or make_new_round(entry.group, entry.round_number)
     if not round.roster.exists():
         write_roster(round, finalists_for(entry, round).racers)
@@ -102,7 +107,8 @@ def _activate(state: RaceState, entry: PlaylistEntry, finalists_for: FinalistsFo
         # `start_waiting_step` reports the failure.
         _schedule(round, entry)
         state.refresh_from_db()
-    _select(state, round)
+    if select:
+        _select(state, round)
     return round
 
 
@@ -285,7 +291,8 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
     """Owner decision D27: after a result in the ended round changes, make the
     waiting round's roster and chart again, when the waiting round draws its
     racers from the ended round and none of its heats has a result. Returns
-    whether it rebuilt them."""
+    whether it rebuilt them. A current heat outside the waiting round, as
+    during a rerun of the ended round, stays current."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         if state.waiting_entry_id is None or state.ended_round_id is None:
@@ -294,12 +301,16 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
         if not _feeds(state.ended_round, entry):
             return False
         round = _round_of(entry)
+        select = state.current_round_id is None or (
+            round is not None and state.current_round_id == round.id
+        )
         if round is not None:
             if HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists():
                 return False
             unschedule(round)
             prepare_new_round(entry.group, entry.round_number)
-        _activate(state, entry, finalists_for)
+            state.refresh_from_db()
+        _activate(state, entry, finalists_for, select)
         state.save()
         return True
 

@@ -30,7 +30,13 @@ from racing.engine.results import (
 )
 from racing.models import HeatLane, Round
 from racing.services import audit
-from racing.services.heats import FinalistsFor, Inputs, locked_failure, transition
+from racing.services.heats import (
+    FinalistsFor,
+    Inputs,
+    locked_failure,
+    rebuild_waiting_final,
+    transition,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +115,7 @@ def record_timer_result(
         settings = RaceSettings.objects.get(event_id=event.id)
         posted = _posted(fields, settings, mirror=True)
         ref = (state.current_round_id, state.current_heat)
+        ended = state.ended_round_id
         results = _merged(state, posted)
         decision = transition(
             state,
@@ -120,6 +127,8 @@ def record_timer_result(
             ),
             Inputs(results, posted, finalists_for, now),
         )
+        if _outcome(decision) is Outcome.RECORDED:
+            rebuild_waiting_final(event, [ref[0]], ended, finalists_for)
     outcome = _outcome(decision)
     if outcome is Outcome.NOT_RACING:
         audit.write(
@@ -157,6 +166,7 @@ def record_manual_result(
             return Recorded(Outcome.RESULTS_LOCKED, locked)
         posted = _posted(fields, settings, mirror=False)
         ref = (state.current_round_id, state.current_heat)
+        ended = state.ended_round_id
         results = _merged(state, posted)
         decision = transition(
             state,
@@ -168,6 +178,8 @@ def record_manual_result(
             ),
             Inputs(results, posted, finalists_for, now),
         )
+        if _outcome(decision) is Outcome.RECORDED:
+            rebuild_waiting_final(event, [ref[0]], ended, finalists_for)
     outcome = _outcome(decision)
     if outcome is Outcome.RECORDED and ref[0] is not None:
         audit.write(
@@ -186,11 +198,12 @@ def delete_results(
     heat: int | None = None,
     *,
     control_race: bool = True,
+    finalists_for: FinalistsFor | None = None,
 ) -> hs.Failure | None:
     """`result.delete`: clear the results of every round, of one round, or
     of one heat of it. The current heat and racing stay as they are."""
     with transaction.atomic():
-        lock_race_state(event.id)
+        ended = lock_race_state(event.id).ended_round_id
         rows = HeatLane.objects.filter(event=event)
         rounds = Round.objects.filter(event=event)
         if round is not None:
@@ -203,6 +216,8 @@ def delete_results(
             if locked is not None:
                 return locked
         rows.update(finish_time=None, finish_place=None, completed=None)
+        changed = None if round is None else [round.id]
+        rebuild_waiting_final(event, changed, ended, finalists_for)
     if round is not None and heat is not None:
         audit.write(event.id, [audit.discarded((round.id, heat))])
     return None
