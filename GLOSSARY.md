@@ -86,6 +86,10 @@ Racing a heat again after the timer fails, so that the new times replace the old
 A racer who passes check-in after some heats of their round have already run.
 _Avoid_: Late arrival, latecomer
 
+**Allowed racer**:
+A racer who missed round 1 and whom the race coordinator lets into the group's final. The racer is extra, never takes a qualifier's place, and is not eligible for speed awards.
+_Avoid_: Wildcard, extra finalist
+
 **Departed racer**:
 A racer taken off a round's roster, or whose check-in was reverted, whose car leaves its unraced heats. A racer who only goes home is not departed.
 
