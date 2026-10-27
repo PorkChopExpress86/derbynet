@@ -114,13 +114,13 @@ def _finished(sent: Posted) -> bool:
 def is_false_start(lanes: Iterable[int], posted: list[Posted]) -> bool:
     """The timer reported times, but no scheduled lane has one above zero, so
     no car finished. It stops racing as `is_all_zeroes` does, rather than
-    giving every car `DID_NOT_FINISH` (D42). A timer that reports places
-    only reports no times."""
+    giving every car `DID_NOT_FINISH` (D42). A heat with a place on a
+    scheduled lane is recorded, as PHP records it."""
     if all(sent.time is None for sent in posted):
         return False
-    return not any(
-        _finished(posted[lane - 1]) for lane in lanes if 0 < lane <= len(posted)
-    )
+    used = [posted[lane - 1] for lane in lanes if 0 < lane <= len(posted)]
+    placed = any(_number(sent.place) is not None for sent in used)
+    return not placed and not any(_finished(sent) for sent in used)
 
 
 def merge_timer_results(
@@ -129,9 +129,10 @@ def merge_timer_results(
     """`merge_results` for the timer (D42). When the timer reports times, a
     scheduled lane it gives no time, a zero, or a time that is not a number,
     did not finish and gets `DID_NOT_FINISH`, so every car has a time and the
-    places follow from them. A timer that reports places only finishes no
-    car."""
-    if all(sent.time is None for sent in posted):
+    places follow from them. With no time above zero on a scheduled lane,
+    as from a timer that reports places only, no car gets it."""
+    used = [posted[r.lane - 1] for r in stored if 0 < r.lane <= len(posted)]
+    if not any(_finished(sent) for sent in used):
         return merge_results(stored, posted)
     filled = list(posted)
     for row in stored:

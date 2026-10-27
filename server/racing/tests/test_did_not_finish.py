@@ -81,3 +81,16 @@ def test_a_timer_test_records_its_times():
     assert recorded.outcome is Outcome.RECORDED
     status = TimerStatus.objects.get(event=replay.event)
     assert status.test_results == {"1": {"time": "3.1"}, "2": {"time": "3.2"}}
+
+
+def test_places_with_zero_times_are_recorded_as_php_records_them():
+    """A heat with places is no false start: the places stand, and with no
+    time above zero no car gets the did-not-finish time."""
+    replay, round = setup_race(mask=12)
+    select_heat(replay.event, round_id=round.id, now_racing=True)
+    recorded = record_timer_result(
+        replay.event, fields("lane1=0&place1=2&lane2=0&place2=1")
+    )
+    assert recorded.outcome is Outcome.RECORDED
+    assert lanes(round, 1) == {1: (None, 2), 2: (None, 1)}
+    assert current(replay.event) == (round.id, 2, True)

@@ -169,9 +169,17 @@ def test_an_unscheduled_lane_never_gets_a_time():
         ("lane1=0&lane2=3.2", False),
         ("place1=1&place2=2", False),
         ("lane3=3.1", True),
+        ("lane1=0&place1=2&lane2=0&place2=1", False),
     ],
 )
 def test_a_heat_with_no_positive_time_on_a_scheduled_lane_is_a_false_start(
     body, false_start
 ):
     assert is_false_start([1, 2], parse(body)) is false_start
+
+
+def test_places_with_no_positive_time_keep_the_times_as_php_writes_them():
+    merged = merge_timer_results(
+        stored(1, 2), parse("lane1=0&place1=2&lane2=0&place2=1")
+    )
+    assert merged == [LaneResult(1, None, 2), LaneResult(2, None, 1)]
