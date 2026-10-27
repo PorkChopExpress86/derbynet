@@ -161,24 +161,53 @@ def test_a_squeeze_never_adds_heats(case):
     assert len(adjuster.chart_debug()) <= before
 
 
-@settings(max_examples=300, deadline=None)
-@given(cases(min_unraced=2), st.booleans())
-def test_the_running_and_staged_heats_keep_racers_lanes_and_numbers(case, last):
-    """D34: heats `nraced + 1` and `nraced + 2` are running and staged."""
-    if last:
-        case.chart = case.chart[: case.nraced + 2]
+@st.composite
+def race_positions(draw):
+    """A case whose raced heats are any of its heats, with the running heat
+    any unraced heat and the staged heat the next unraced heat after it, or
+    none. Unraced heats before the running heat were skipped."""
+    case = draw(cases(min_unraced=1))
+    nheats = len(case.chart)
+    raced = draw(st.sets(st.integers(0, nheats - 1), max_size=nheats - 1))
+    unraced = [h for h in range(nheats) if h not in raced]
+    running = draw(st.sampled_from(unraced))
+    later = [h for h in unraced if h > running]
+    if draw(st.booleans()) and later:
+        # No heat after the staged heat.
+        case.chart = case.chart[: later[0] + 1]
+        raced = {h for h in raced if h <= later[0]}
         assume(any(r for heat in case.chart for r in heat))
-    kept = [case.nraced, case.nraced + 1]
-    adjuster = run(case, case.adjuster(kept))
-    chart = adjuster.updated_chart()
+    return case, raced, [running, *later[:1]]
+
+
+def text(heat):
+    return " ".join("-" if r is None else str(r) for r in heat)
+
+
+@settings(max_examples=500, deadline=None)
+@given(race_positions())
+def test_the_running_and_staged_heats_keep_racers_lanes_and_numbers(position):
+    """D34, with the running heat anywhere in the round."""
+    case, raced, kept = position
+    adjuster = ScheduleAdjuster(
+        case.chart,
+        {h: h + 1 for h in raced},
+        case.mask,
+        case.nlanes,
+        n_runs_per_lane(case.chart),
+        NodeBudget(case.budget),
+        kept=kept,
+    )
+    chart = run(case, adjuster).updated_chart()
     if chart is None:
         return
     debug = adjuster.chart_debug()
     for h in kept:
         assert chart[h] is None
-        assert debug[h] == " ".join("-" if r is None else str(r) for r in case.chart[h])
-    assert all(h + 1 not in adjuster.renumbering_map() for h in kept)
-    if last:
+        assert debug[h] == text(case.chart[h])
+    renumbered = adjuster.renumbering_map()
+    assert all(old > max(kept) + 1 for old in renumbered)
+    if raced | set(kept) == set(range(len(case.chart))):
         for racer in case.late:
             heats = [h for h, heat in enumerate(chart) if heat and racer in heat]
             assert heats and min(heats) >= len(case.chart)
