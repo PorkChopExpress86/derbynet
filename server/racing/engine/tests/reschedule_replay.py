@@ -47,8 +47,9 @@ on a perfect score or with every proposal tried."""
 
 class Reply(NamedTuple):
     """The reply's `chart`, None for PHP's `nochart`, the keys of its
-    `timing.internal`, and the heats the call kept (D34) as they stood
-    before it, `{heat number: chart string}`."""
+    `timing.internal`, and the heats the call kept (D34) as they must stand
+    after it, departed racers' lanes empty (D37), `{heat number: chart
+    string}`."""
 
     chart: list[str | None] | None
     timing_keys: list[str]
@@ -156,7 +157,6 @@ class Server:
         """The adjuster's reply, as a `Reply`."""
         round = self.rounds[roundid]
         kept = self.kept_heats(roundid)
-        before = {h: heat_text(round.chart[h - 1]) for h in sorted(kept)}
         on_chart = {r for heat in round.chart for r in heat if r is not None}
         in_unraced = {
             r
@@ -175,9 +175,13 @@ class Server:
             NodeBudget(UNLIMITED),
             kept={h - 1 for h in kept},
         )
-        adjuster.remove_departed(
-            sorted(in_unraced - {r for r in roster if r in self.passed})
-        )
+        departed = sorted(in_unraced - {r for r in roster if r in self.passed})
+        # A departed racer's lane in a kept heat runs empty (D37).
+        before = {
+            h: heat_text([None if r in departed else r for r in round.chart[h - 1]])
+            for h in sorted(kept)
+        }
+        adjuster.remove_departed(departed)
         if racerid is not None:
             adjuster.inject(racerid)
         else:
@@ -190,7 +194,9 @@ class Server:
             return Reply(None, adjuster.timing_keys, before)
         debug = adjuster.chart_debug()
         if not dry_run:
-            self._commit(roundid, chart, adjuster.renumbering_map(), kept)
+            self._commit(
+                roundid, chart, adjuster.renumbering_map(), adjuster.kept_heats()
+            )
             if adjuster.heats_squeezed_out and self.current[0] == roundid:
                 self.racing = False
         return Reply(debug, adjuster.timing_keys, before)
@@ -202,9 +208,9 @@ class Server:
             if heat is None:
                 number = index + 1
                 source = next(
-                    h for h in old.raced | kept if renumbering.get(h, h) == number
+                    h for h in old.raced | set(kept) if renumbering.get(h, h) == number
                 )
-                heat = old.chart[source - 1]
+                heat = kept.get(source, old.chart[source - 1])
             new.chart.append(heat)
         # A heat is its rows, so heats of byes at the end are not written.
         while new.chart and not any(new.chart[-1]):

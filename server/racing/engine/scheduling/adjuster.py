@@ -111,8 +111,9 @@ class ScheduleAdjuster:
     `raced` maps the index of each heat with a result to its heat number.
     `kept` holds the indices of unraced heats that must not change either:
     the running heat and the staged heat (D34). Kept heats are treated as
-    raced, except that `chart_debug` shows their racers and no heat before
-    the last kept heat is squeezed out, so none of them changes its number.
+    raced, except that `chart_debug` shows their racers, no heat before the
+    last kept heat is squeezed out, so none of them changes its number, and
+    a departed racer's lane in one becomes a bye that no racer fills (D37).
 
     As in PHP, `remove_departed` is what first looks for byes, so call it,
     with no racers if none departed, before `inject`.
@@ -192,6 +193,11 @@ class ScheduleAdjuster:
             if number is not None and number != index + 1
         }
 
+    def kept_heats(self) -> dict[int, Heat]:
+        """`{heat number: racers}` for each kept heat, with byes where
+        departed racers were."""
+        return deepcopy(self._kept)
+
     def chart_debug(self) -> list[str | None]:
         """PHP's reply `chart`: one string per heat, `-` for a bye, None for a
         raced heat. A kept heat shows its racers."""
@@ -213,9 +219,10 @@ class ScheduleAdjuster:
     # ----- Departed racers and byes -------------------------------------------
 
     def remove_departed(self, racer_ids: Iterable[int]) -> None:
-        """Turn each departed racer's lanes in the unraced heats into byes."""
+        """Turn each departed racer's lanes in the unraced heats, the kept
+        heats included, into byes."""
         for gone in racer_ids:
-            for heat in self._chart:
+            for heat in [*self._chart, *self._kept.values()]:
                 if heat is not None:
                     for lane in range(self._nlanes):
                         if heat[lane] == gone:

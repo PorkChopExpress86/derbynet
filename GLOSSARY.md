@@ -75,7 +75,7 @@ _Avoid_: Excluded (the legacy field is `exclude`)
 A racer who races and can win judged awards, but no speed awards.
 
 **Staged heat**:
-The next heat to run, whose cars the race crew is lining up, or has lined up, while the current heat runs.
+The next heat to run in the current round, whose cars the race crew is lining up, or has lined up, while the current heat runs.
 _Avoid_: Next-up (the legacy name)
 
 **On-deck report**:
@@ -89,7 +89,7 @@ A racer who passes check-in after some heats of their round have already run.
 _Avoid_: Late arrival, latecomer
 
 **Departed racer**:
-A racer taken off a round's roster or whose check-in was reverted, whose car leaves its unraced heats. A racer who only goes home is not departed.
+A racer taken off a round's roster, or whose check-in was reverted, whose car leaves its unraced heats. A racer who only goes home is not departed.
 
 **Closed lane**:
-A lane the race coordinator takes out of use during a round because it is damaged, which stays out of use until the next round is scheduled.
+A lane the race coordinator takes out of use during a round because it is damaged, and which stays out of use until the next round is scheduled.

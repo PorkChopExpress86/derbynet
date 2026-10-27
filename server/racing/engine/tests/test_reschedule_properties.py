@@ -204,7 +204,9 @@ def test_the_running_and_staged_heats_keep_racers_lanes_and_numbers(position):
     debug = adjuster.chart_debug()
     for h in kept:
         assert chart[h] is None
-        assert debug[h] == text(case.chart[h])
+        assert debug[h] == text(
+            [None if r in case.departed else r for r in case.chart[h]]
+        )
     renumbered = adjuster.renumbering_map()
     assert all(old > max(kept) + 1 for old in renumbered)
     if raced | set(kept) == set(range(len(case.chart))):

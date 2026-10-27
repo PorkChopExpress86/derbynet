@@ -68,8 +68,8 @@ class Rescheduled:
 @dataclass(frozen=True)
 class _RacePosition:
     """Where the race stands (D34). The running heat is the heat `RaceState`
-    names as current. The staged heat is the next unraced heat after it, in
-    heat order, or in master-heat order under the master schedule."""
+    names as current. The staged heat is the next unraced heat after it in
+    the same round, even under the master schedule (D36)."""
 
     running: HeatRef | None
     staged: HeatRef | None
@@ -81,14 +81,13 @@ class _RacePosition:
         return frozenset(ref[1] for ref in refs if ref and ref[0] == round.id)
 
     def pinned(self) -> frozenset[HeatRef]:
-        """Under the master schedule, the heats whose master numbers must
-        stay first, so the staged heat is still the one after the running
-        heat once the event is renumbered."""
-        return frozenset(r for r in (self.running, self.staged) if r and self.master)
+        """Under the master schedule, the heat whose master number must stay
+        first once the event is renumbered."""
+        return frozenset((self.running,) if self.running and self.master else ())
 
 
-type _Row = tuple[int, int, int, int, int, bool]
-"""round id, heat, lane, racer id, master heat, whether it has a result"""
+type _Row = tuple[int, int, int, int, bool]
+"""round id, heat, lane, racer id, whether it has a result"""
 
 
 def _race_position(
@@ -98,18 +97,11 @@ def _race_position(
         return _RacePosition(None, None, use_master_sched)
     current = (state.current_round_id, state.current_heat)
     # A heat is run once one of its lanes has a result.
-    run = {(r, heat) for r, heat, _, _, _, done in rows if done}
-    master = {(r, heat): number for r, heat, _, _, number, _ in rows}
-    unraced = set(master) - run
+    run = {(r, heat) for r, heat, _, _, done in rows if done}
+    unraced = {(r, heat) for r, heat, _, _, _ in rows} - run
     running = current if current in unraced else None
-    if use_master_sched:
-        number = master.get(current)
-        later = [] if number is None else [h for h in unraced if master[h] > number]
-        staged = min(later, key=master.get, default=None)
-    else:
-        later = [h for h in unraced if h[0] == current[0] and h[1] > current[1]]
-        staged = min(later, default=None)
-    return _RacePosition(running, staged, use_master_sched)
+    later = [h for h in unraced if h[0] == current[0] and h[1] > current[1]]
+    return _RacePosition(running, min(later, default=None), use_master_sched)
 
 
 @dataclass(frozen=True)
@@ -142,19 +134,13 @@ def _snapshot(round: Round) -> _Snapshot:
     state = RaceState.objects.get(event_id=round.event_id)
     # One query, so the round's heats and the race position agree.
     rows: list[_Row] = [
-        (r, heat, lane, racer, number, time is not None or place is not None)
-        for r, heat, lane, racer, number, time, place in HeatLane.objects.filter(
+        (r, heat, lane, racer, time is not None or place is not None)
+        for r, heat, lane, racer, time, place in HeatLane.objects.filter(
             event_id=round.event_id
         )
         .order_by("heat", "lane")
         .values_list(
-            "round_id",
-            "heat",
-            "lane",
-            "racer_id",
-            "master_heat",
-            "finish_time",
-            "finish_place",
+            "round_id", "heat", "lane", "racer_id", "finish_time", "finish_place"
         )
     ]
     pending = round_adjustments(round)
@@ -163,7 +149,7 @@ def _snapshot(round: Round) -> _Snapshot:
         unused_lane_mask=settings.unused_lane_mask,
         rows=tuple(
             (heat, lane, racer, done)
-            for r, heat, lane, racer, _, done in rows
+            for r, heat, lane, racer, done in rows
             if r == round.id
         ),
         unscheduled=pending.unscheduled,
@@ -226,9 +212,12 @@ def _write(
     fixed = {heat for heat, _, _, done in snapshot.rows if done}
     # As PHP's DELETE, never a row with a result, even one written by a
     # writer that skipped the lock.
-    rows.exclude(heat__in=fixed | snapshot.position.kept_in(round)).exclude(
-        HAS_RESULT
-    ).delete()
+    held = adjuster.kept_heats()
+    rows.exclude(heat__in=fixed | held.keys()).exclude(HAS_RESULT).delete()
+    # A departed racer's lane in a kept heat runs empty (D37).
+    for heat, racers in held.items():
+        vacated = [lane for lane, racer in enumerate(racers, start=1) if racer is None]
+        rows.filter(heat=heat, lane__in=vacated).exclude(HAS_RESULT).delete()
     renumbered = adjuster.renumbering_map()
     # Heats only move down, so in this order no heat moves onto one that has
     # not moved yet.

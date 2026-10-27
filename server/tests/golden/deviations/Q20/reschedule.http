@@ -345,7 +345,7 @@ body:
 ### 019 schedule.reschedule
 request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=2
-length: 498
+length: 497
 body:
 {
     "chart": [
@@ -355,7 +355,7 @@ body:
         "42 - 52 61",
         "47 - 57 72",
         null,
-        "52 - 62 77",
+        "52 - - 77",
         "12 - 22 37",
         "17 - 27 42",
         "57 - 67 82",
@@ -377,7 +377,7 @@ body:
 ### 021 schedule.reschedule
 request: POST action.php
 request-body: action=schedule.reschedule&trace=1&roundid=2
-length: 703
+length: 702
 body:
 {
     "chart": [
@@ -387,7 +387,7 @@ body:
         "42 - 52 61",
         "47 - 57 72",
         null,
-        "52 - 62 77",
+        "52 - - 77",
         "12 - 22 37",
         "17 - 27 42",
         "57 - 67 82",
