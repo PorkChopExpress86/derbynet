@@ -15,7 +15,7 @@ the standings (#26), so each call takes a `FinalistsFor`.
 """
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from enum import StrEnum
 
 from django.db import transaction
@@ -23,8 +23,10 @@ from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
+from kiosks.services import apply_scene
+from racing.engine import heat_state as hs
 from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, Round
-from racing.services import schedule
+from racing.services import heats, schedule
 from racing.services.rounds import (
     Entrants,
     make_new_round,
@@ -73,31 +75,30 @@ def _first_unraced_heat(round: Round) -> int | None:
 
 
 def _select(state: RaceState, round: Round) -> None:
-    """Make the round's first unraced heat current, with racing off. With no
-    such heat the current heat stays, as `advance_heat` leaves it."""
+    """`advance_heat` to the round's first unraced heat, as
+    `activate_playlist_entry()` does. With no such heat, racing turns off
+    and the current heat stays."""
     heat = _first_unraced_heat(round)
-    state.racing = False
-    state.refused_results = 0
-    if heat is not None:
-        state.current_round = round
-        state.current_group_id = round.group_id
-        state.current_heat = heat
+    if heat is None:
+        heats.transition(state, hs.RacingOff())
+    else:
+        heats.transition(state, hs.Advance(heat, round_id=round.id))
 
 
-def _racing_on(state: RaceState) -> None:
+def _racing_on(state: RaceState, by: hs.By = hs.By.PLAYLIST) -> None:
     """`set_racing_state(1)`: only with a current heat that has lanes and no
-    result yet. Replay `START` belongs to #27."""
-    lanes = HeatLane.objects.filter(
-        round_id=state.current_round_id, heat=state.current_heat
-    )
-    if lanes.exists() and not lanes.filter(HAS_RESULT).exists():
-        state.racing = True
-        state.refused_results = 0
+    result yet."""
+    heats.transition(state, hs.RacingOn(by))
 
 
-def _activate(state: RaceState, entry: PlaylistEntry, finalists_for: FinalistsFor):
+def _activate(
+    state: RaceState,
+    entry: PlaylistEntry,
+    finalists_for: FinalistsFor,
+    select: bool = True,
+):
     """`activate_playlist_entry()`: the step's round with a roster and a
-    chart, its first heat selected."""
+    chart, its first heat selected unless `select` is false."""
     round = _round_of(entry) or make_new_round(entry.group, entry.round_number)
     if not round.roster.exists():
         write_roster(round, finalists_for(entry, round).racers)
@@ -106,7 +107,8 @@ def _activate(state: RaceState, entry: PlaylistEntry, finalists_for: FinalistsFo
         # `start_waiting_step` reports the failure.
         _schedule(round, entry)
         state.refresh_from_db()
-    _select(state, round)
+    if select:
+        _select(state, round)
     return round
 
 
@@ -200,8 +202,8 @@ def start_waiting_step(event) -> Round:
 
     A round with no chart is scheduled now. If that fails, the intermission
     stays open and the failure is raised with `generate_schedule`'s code. A
-    final with fewer than 2 racers says so (D28). Applying the racing scene
-    belongs to #27 and #34.
+    final with fewer than 2 racers says so (D28). Racing on applies the
+    racing scene.
     """
     with transaction.atomic():
         state = lock_race_state(event.id)
@@ -222,7 +224,7 @@ def start_waiting_step(event) -> Round:
         state.waiting_entry = None
         state.ended_round = None
         _select(state, round)
-        _racing_on(state)
+        _racing_on(state, hs.By.WAITING_STEP)
         state.save()
         return round
 
@@ -268,7 +270,7 @@ def skip_waiting_step(event, finalists_for: FinalistsFor) -> Round | None:
         else:
             state.waiting_entry = None
             state.ended_round = None
-            state.racing = False
+            heats.transition(state, hs.RacingOff())
             if after is not None:
                 _racing_on(state)
         state.save()
@@ -285,11 +287,23 @@ def _feeds(ended: Round, entry: PlaylistEntry) -> bool:
     ).exists()
 
 
+def _same_finalists(round: Round, entry: PlaylistEntry, finalists_for) -> bool:
+    """The round has a chart and its roster is the racers the cut picks now,
+    in the cut's order, which is the order the schedule reads, so a rebuild
+    would make the same roster and chart again."""
+    if not HeatLane.objects.filter(round=round).exists():
+        return False
+    roster = list(round.roster.order_by("id").values_list("racer_id", flat=True))
+    return roster == [racer.pk for racer in finalists_for(entry, round).racers]
+
+
 def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
     """Owner decision D27: after a result in the ended round changes, make the
     waiting round's roster and chart again, when the waiting round draws its
-    racers from the ended round and none of its heats has a result. Returns
-    whether it rebuilt them."""
+    racers from the ended round, none of its heats has a result, and the cut
+    now picks other racers. Returns whether it rebuilt them. A current heat
+    outside the waiting round, as during a rerun of the ended round, stays
+    current."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         if state.waiting_entry_id is None or state.ended_round_id is None:
@@ -298,11 +312,33 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
         if not _feeds(state.ended_round, entry):
             return False
         round = _round_of(entry)
+        select = state.current_round_id is None or (
+            round is not None and state.current_round_id == round.id
+        )
         if round is not None:
             if HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists():
                 return False
+            if _same_finalists(round, entry, finalists_for):
+                return False
             unschedule(round)
             prepare_new_round(entry.group, entry.round_number)
-        _activate(state, entry, finalists_for)
+            state.refresh_from_db()
+        _activate(state, entry, finalists_for, select)
+        state.save()
+        return True
+
+
+def apply_due_scene(event, now: datetime) -> bool:
+    """`maybe_apply_playlist_scene()`: show the finished step's scene once
+    its due time has passed. The kiosk poll (#34) and a periodic check call
+    it, so the scene changes even with no kiosk polling. Returns whether it
+    applied the scene."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        if state.playlist_scene_at is None or not state.playlist_scene_at < now:
+            return False
+        state.playlist_scene_at = None
+        if state.playlist_scene_id is not None:
+            apply_scene(state, state.playlist_scene_id)
         state.save()
         return True

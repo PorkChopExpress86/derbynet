@@ -9,6 +9,8 @@
 #                            membership by name after each step of the group
 #                            scripts, for issue #25
 #   replay commands          the replay.message exchanges, for issues #27 and #34
+#   playlist race state      test-playlist.sh's poll.coordinator and poll.kiosk
+#                            exchanges, for issue #27
 #   reschedule               schedule.reschedule, where the search ends before
 #                            its deadline
 #
@@ -49,6 +51,9 @@ standings_matrix standings/suite-points-racing
 
 # ----- Rounds playlist -----
 record_script suite/playlist "$FINALISTS,replay.message" 0 test-playlist.sh
+# The same script again, recording the race state the script reads before each
+# heat and after each step, for #27's playlist replay.
+record_script suite/playlist-states "poll.coordinator,poll.kiosk" 0 test-playlist.sh
 standings_matrix standings/suite-playlist
 
 # ----- Racing groups and partitions (ex1) -----

@@ -112,7 +112,8 @@ def master_index(event: Event) -> list[tuple[int, int, int, bool]]:
     """The index `master_target` reads, `(masterheat, roundid, heat,
     has_result)`: each lane row in row id order, as PHP's query returns them,
     then each emptied heat (D39) as one heat with no result, so `next` can
-    land on it and move on from it. The heat state machine (#27) reads it."""
+    land on it and move on from it. `racing.services.heats.load_chart` gives
+    the heat state machine the same index, which a test checks."""
     rows = HeatLane.objects.filter(event=event).order_by("id")
     lanes = [
         (n, r, h, time is not None or place is not None)

@@ -105,6 +105,24 @@
       "expected": "deviations/Q1/more-than-200-cars.http"
     },
     {
+      "quirk": "Q4",
+      "fixture": "http/suite/basic-racing.http",
+      "exchanges": [
+        "004 heat.reinstate"
+      ],
+      "reason": "PHP's rerun saves one column, the times in time racing, so a reinstate leaves every place empty. Django saves and restores the time and the place of each lane.",
+      "expected": "deviations/Q4/basic-racing.http"
+    },
+    {
+      "quirk": "Q4",
+      "fixture": "http/suite/points-rerun-reinstate.http",
+      "exchanges": [
+        "003 reinstate-under-points"
+      ],
+      "reason": "Under points racing PHP's rerun saves only the places, so a reinstate leaves the times empty. Django brings back each lane's time and place.",
+      "expected": "deviations/Q4/points-rerun-reinstate.http"
+    },
+    {
       "quirk": "Q5",
       "fixture": "http/reschedule/dry-run-while-racing.http",
       "exchanges": [
@@ -1238,6 +1256,25 @@
       ],
       "reason": "Django reads table column df1 - 1; PHP reads column df1.",
       "expected": "deviations/Q9/critical-f-value.json"
+    },
+    {
+      "quirk": "Q11",
+      "fixture": "http/timer/partial-and-non-numeric-results.http",
+      "exchanges": [
+        "002 poll-after-a-lane-without-a-result"
+      ],
+      "reason": "PHP leaves lane 4, which the timer did not report, without a result. Django gives the car a did-not-finish time, 9.999 s, and places the heat from the times (D42).",
+      "expected": "deviations/Q11/partial-and-non-numeric-results.http"
+    },
+    {
+      "quirk": "Q16",
+      "fixture": "http/timer/partial-and-non-numeric-results.http",
+      "exchanges": [
+        "004 heat-results-with-a-dashed-time",
+        "005 standings-with-a-dashed-time"
+      ],
+      "reason": "PHP stores a time of --- as text, shows it as 0 and places it first. Django gives the car a did-not-finish time, 9.999 s, so it places last (D42).",
+      "expected": "deviations/Q16/partial-and-non-numeric-results.http"
     },
     {
       "quirk": "Q20",

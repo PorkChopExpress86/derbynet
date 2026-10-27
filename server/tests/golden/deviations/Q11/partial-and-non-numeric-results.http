@@ -1,0 +1,143 @@
+### 002 poll-after-a-lane-without-a-result
+request: GET action.php?query=poll.coordinator&roundid=1&heat=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3147
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 6
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 2,
+            "name": "First102 Last102",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 4,
+            "name": "First104 Last104",
+            "carname": "",
+            "carnumber": 104,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 6,
+            "name": "First106 Last106",
+            "carname": "",
+            "carnumber": 106,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 3,
+            "name": "First103 Last103",
+            "carname": "",
+            "carnumber": 103,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img/status/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img/status/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [
+        {
+            "lane": 1,
+            "time": 3.1,
+            "place": 1,
+            "speed": 219.9
+        },
+        {
+            "lane": 2,
+            "time": 3.2,
+            "place": 2,
+            "speed": 213.1
+        },
+        {
+            "lane": 3,
+            "time": 3.3,
+            "place": 3,
+            "speed": 206.6
+        },
+        {
+            "lane": 4,
+            "time": 9.999,
+            "place": 4,
+            "speed": 68.2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 6,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Wolves",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 6,
+            "passed": 6,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 1,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
