@@ -30,9 +30,12 @@ QUIRK_DECISIONS = {
     "Q15": "fix",
     "Q16": "fix",
     "Q17": "reproduce",
+    "Q20": "fix",
+    "Q21": "fix",
     "Q22": "fix",
     "Q23": "fix",
     "Q24": "fix",
+    "Q25": "fix",
 }
 
 
@@ -119,4 +122,15 @@ def engine_deviations(fixture: str) -> dict[str, dict]:
             records = json.loads((GOLDEN_DIR / entry["expected"]).read_text())
             for case_id in entry["cases"]:
                 expected[case_id] = records[case_id]
+    return expected
+
+
+def transcript_deviations(fixture: str) -> dict[str, tuple[str, dict]]:
+    """`{exchange name: (quirk, expected Django exchange)}` for a transcript."""
+    expected = {}
+    for entry in deviations():
+        if entry["fixture"] == fixture:
+            exchanges = read_transcript(GOLDEN_DIR / entry["expected"])
+            for name in entry["exchanges"]:
+                expected[name] = (entry["quirk"], exchanges[name])
     return expected

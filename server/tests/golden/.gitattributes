@@ -3,3 +3,4 @@
 engine/** -text linguist-generated=true
 http/** -text linguist-generated=true
 provenance.txt -text
+deviations/** -text

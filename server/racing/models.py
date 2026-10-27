@@ -70,6 +70,30 @@ class HeatLane(EventScoped):
         ]
 
 
+class EmptiedHeat(EventScoped):
+    """A running or staged heat whose cars were all taken off the roster
+    (D39). It has no `HeatLane` rows left, so this row keeps its heat number
+    and master number while the race crew runs or skips it. Django only. It
+    is passed, and ignored, once a later heat of its own round gets a result
+    after `held_at`, as `completed` records it
+    (`racing.services.master.held_emptied_heats`). Results written before
+    the heat emptied, and master renumbering, never pass it."""
+
+    round = models.ForeignKey(
+        Round, on_delete=models.CASCADE, related_name="emptied_heats"
+    )
+    heat = models.PositiveSmallIntegerField()
+    master_heat = models.PositiveIntegerField(default=0)  # 0 means unused
+    held_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "round", "heat"], name="emptiedheat_unique_heat"
+            ),
+        ]
+
+
 class PlaylistEntry(EventScoped):
     """Legacy `Playlist`: one step of the race-day queue, ordered by `seq`."""
 

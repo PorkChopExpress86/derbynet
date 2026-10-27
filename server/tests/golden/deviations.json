@@ -105,6 +105,16 @@
       "expected": "deviations/Q1/more-than-200-cars.http"
     },
     {
+      "quirk": "Q5",
+      "fixture": "http/reschedule/dry-run-while-racing.http",
+      "exchanges": [
+        "002 dry-run-squeezes-a-heat",
+        "003 racing-after"
+      ],
+      "reason": "A dry run that squeezes out a heat of the current round turns racing off in PHP. Django's dry run changes nothing, so racing stays on.",
+      "expected": "deviations/Q5/dry-run-while-racing.http"
+    },
+    {
       "quirk": "Q7",
       "fixture": "http/standings/q7-tie-after-earlier-trophy.http",
       "exchanges": [
@@ -1230,6 +1240,53 @@
       "expected": "deviations/Q9/critical-f-value.json"
     },
     {
+      "quirk": "Q20",
+      "fixture": "http/suite/reschedule.http",
+      "exchanges": [
+        "001 schedule.reschedule",
+        "002 schedule.reschedule",
+        "003 schedule.reschedule",
+        "004 schedule.reschedule",
+        "005 schedule.reschedule",
+        "006 schedule.reschedule",
+        "007 schedule.reschedule",
+        "008 schedule.reschedule",
+        "010 schedule.reschedule",
+        "011 schedule.reschedule",
+        "012 schedule.reschedule",
+        "014 schedule.reschedule",
+        "015 schedule.reschedule",
+        "019 schedule.reschedule",
+        "021 schedule.reschedule",
+        "039 schedule.reschedule",
+        "040 schedule.reschedule",
+        "041 schedule.reschedule",
+        "042 schedule.reschedule",
+        "043 schedule.reschedule",
+        "044 schedule.reschedule"
+      ],
+      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
+      "expected": "deviations/Q20/reschedule.http"
+    },
+    {
+      "quirk": "Q20",
+      "fixture": "http/reschedule/master-schedule.http",
+      "exchanges": [
+        "002 late-racer-in-the-running-round"
+      ],
+      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
+      "expected": "deviations/Q20/master-schedule.http"
+    },
+    {
+      "quirk": "Q21",
+      "fixture": "http/reschedule/last-added-heat.http",
+      "exchanges": [
+        "002 dry-run-runs-out-of-added-heats"
+      ],
+      "reason": "PHP never searches with the last heat it adds and answers nochart; Django searches with it and fits the racer in. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
+      "expected": "deviations/Q21/last-added-heat.http"
+    },
+    {
       "quirk": "Q22",
       "fixture": "http/standings/suite-aggregate-classes.http",
       "exchanges": [
@@ -1362,6 +1419,31 @@
       ],
       "reason": "Django compares each lane with a finished run once; PHP counts the second-to-last lane twice, leaves out the last, and counts a lane with no finished run in both degrees of freedom. The critical value is Q9's.",
       "expected": "deviations/Q24/lane-bias.json"
+    },
+    {
+      "quirk": "Q25",
+      "fixture": "http/suite/reschedule.http",
+      "exchanges": [
+        "022 schedule.reschedule",
+        "023 schedule.reschedule",
+        "024 schedule.reschedule",
+        "025 schedule.reschedule",
+        "026 schedule.reschedule",
+        "027 schedule.reschedule",
+        "028 schedule.reschedule",
+        "029 schedule.reschedule",
+        "030 schedule.reschedule",
+        "031 schedule.reschedule",
+        "032 schedule.reschedule",
+        "033 schedule.reschedule",
+        "034 schedule.reschedule",
+        "035 schedule.reschedule",
+        "036 schedule.reschedule",
+        "037 schedule.reschedule",
+        "038 schedule.reschedule"
+      ],
+      "reason": "D39: Django refuses to fit in a racer who is not on the round's roster and answers notonroster; PHP fits the racer in. The expected reply holds only the service's failure code; #31 records the rest.",
+      "expected": "deviations/Q25/reschedule.http"
     }
   ]
 }

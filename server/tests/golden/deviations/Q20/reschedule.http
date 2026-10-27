@@ -1,0 +1,629 @@
+### 001 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=5&trace=1
+length: 393
+body:
+{
+    "chart": [
+        null,
+        "15 5 35 25",
+        "25 15 5 35",
+        "80 25 15 5",
+        "35 80 - -",
+        "- - 80 -",
+        "- - - 80"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 002 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=5&trace=1
+length: 254
+body:
+{
+    "chart": [
+        null,
+        "15 5 35 25",
+        "25 15 5 35",
+        "- 25 15 5",
+        "35 - - -",
+        "- - - -",
+        "- - - -"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>"
+        }
+    }
+}
+### 003 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=5&trace=1
+length: 393
+body:
+{
+    "chart": [
+        null,
+        "15 5 35 25",
+        "25 15 5 35",
+        "- 80 15 5",
+        "80 - - -",
+        "35 - 80 -",
+        "- 25 - 80"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 004 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 363
+body:
+{
+    "chart": [
+        null,
+        "11 - 1 -",
+        "- - 11 1",
+        "6 - - -",
+        "- - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 005 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 365
+body:
+{
+    "chart": [
+        null,
+        "11 - 1 16",
+        "16 - 11 1",
+        "6 - - -",
+        "- - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 006 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 368
+body:
+{
+    "chart": [
+        null,
+        "11 - 1 21",
+        "16 - 11 1",
+        "21 - 16 6",
+        "6 - - 11",
+        "- - 6 -"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 007 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 380
+body:
+{
+    "chart": [
+        null,
+        null,
+        "16 - 11 1",
+        "21 - 16 11",
+        "6 - - -",
+        "- - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 008 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 373
+body:
+{
+    "chart": [
+        null,
+        null,
+        null,
+        "21 - 16 11",
+        "6 - - -",
+        "- - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 010 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 702
+body:
+{
+    "chart": [
+        null,
+        "11 - 1 -",
+        "- - 11 1",
+        "1 - 11 6",
+        "11 - 6 1",
+        "6 - 1 11",
+        "6 - - -",
+        "- - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>",
+            "run-1-extra-0-start": "<seconds>",
+            "run-1-extra-1-start": "<seconds>",
+            "run-1-extra-2-start": "<seconds>",
+            "run-1-extra-3-start": "<seconds>",
+            "run-1-injected": "<seconds>",
+            "run-1-racechart": "<seconds>"
+        }
+    }
+}
+### 011 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 611
+body:
+{
+    "chart": [
+        null,
+        "11 - 1 16",
+        "16 - 11 1",
+        "6 - 11 16",
+        "11 - 6 1",
+        "16 - 1 6",
+        "6 - 16 11",
+        "1 - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>",
+            "run-1-extra-0-start": "<seconds>",
+            "run-1-extra-1-start": "<seconds>",
+            "run-1-injected": "<seconds>",
+            "run-1-racechart": "<seconds>"
+        }
+    }
+}
+### 012 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 588
+body:
+{
+    "chart": [
+        null,
+        "11 - 1 21",
+        "16 - 11 1",
+        "6 - 16 11",
+        "1 - 6 16",
+        "11 - 16 21",
+        "16 - 21 6",
+        "6 - 1 11",
+        "21 - 11 6",
+        "21 - 6 1"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>",
+            "run-1-extra-0-start": "<seconds>",
+            "run-1-injected": "<seconds>",
+            "run-1-racechart": "<seconds>"
+        }
+    }
+}
+### 014 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 641
+body:
+{
+    "chart": [
+        null,
+        null,
+        null,
+        "21 - 16 11",
+        "1 - 11 16",
+        "6 - 16 21",
+        "16 - 6 1",
+        "21 - 1 6",
+        "11 - 21 6",
+        "6 - - 11",
+        "- - 6 -"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>",
+            "run-1-extra-0-start": "<seconds>",
+            "run-1-extra-1-start": "<seconds>",
+            "run-1-injected": "<seconds>",
+            "run-1-racechart": "<seconds>"
+        }
+    }
+}
+### 015 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&racerid=6&dry-run=1&trace=1
+length: 700
+body:
+{
+    "chart": [
+        null,
+        null,
+        null,
+        null,
+        "1 - 11 16",
+        "11 - 16 21",
+        "6 - 21 1",
+        "21 - 6 11",
+        "16 - 1 6",
+        "6 - - -",
+        "- - 6 -",
+        "- - - 6"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>",
+            "run-1-extra-0-start": "<seconds>",
+            "run-1-extra-1-start": "<seconds>",
+            "run-1-extra-2-start": "<seconds>",
+            "run-1-injected": "<seconds>",
+            "run-1-racechart": "<seconds>"
+        }
+    }
+}
+### 019 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&trace=1&roundid=2
+length: 497
+body:
+{
+    "chart": [
+        "61 - 12 27",
+        "7 - 17 32",
+        "37 - 61 -",
+        "42 - 52 61",
+        "47 - 57 72",
+        null,
+        "52 - - 77",
+        "12 - 22 37",
+        "17 - 27 42",
+        "57 - 67 82",
+        "- - 72 2",
+        "22 - 32 47",
+        "67 - 77 7",
+        "27 - 37 52",
+        "32 - 42 57",
+        "72 - 82 12",
+        "77 - 2 17",
+        "2 - 47 67"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>"
+        }
+    }
+}
+### 021 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&trace=1&roundid=2
+length: 702
+body:
+{
+    "chart": [
+        "41 - 12 27",
+        "7 - 41 32",
+        "37 - 61 41",
+        "42 - 52 61",
+        "47 - 57 72",
+        null,
+        "52 - - 77",
+        "12 - 22 37",
+        "17 - 27 42",
+        "57 - 67 82",
+        "- - 72 2",
+        "22 - 32 47",
+        "67 - 77 7",
+        "27 - 37 52",
+        "32 - 42 57",
+        "72 - 82 12",
+        "77 - 2 17",
+        "2 - 47 67",
+        "61 - 17 -"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-extra-1-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 039 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=83
+length: 673
+body:
+{
+    "chart": [
+        null,
+        "7 17 32 61",
+        "12 22 37 67",
+        "17 27 41 72",
+        "22 32 42 77",
+        "27 37 47 82",
+        "32 41 52 83",
+        "37 83 57 7",
+        "83 47 61 12",
+        "42 52 67 17",
+        "47 57 72 22",
+        "52 61 77 27",
+        "57 67 82 32",
+        "61 72 2 37",
+        "67 77 7 41",
+        "72 82 83 42",
+        "77 2 17 47",
+        "82 7 22 52",
+        "41 42 12 2"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 040 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=84
+length: 673
+body:
+{
+    "chart": [
+        null,
+        "7 17 32 61",
+        "12 22 37 67",
+        "17 27 41 72",
+        "22 32 42 77",
+        "27 37 47 82",
+        "32 41 52 84",
+        "37 84 57 7",
+        "84 47 61 12",
+        "42 52 67 17",
+        "47 57 72 22",
+        "52 61 77 27",
+        "57 67 82 32",
+        "61 72 2 37",
+        "67 77 7 41",
+        "72 82 84 42",
+        "77 2 17 47",
+        "82 7 22 52",
+        "41 42 12 2"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 041 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=85
+length: 673
+body:
+{
+    "chart": [
+        null,
+        "7 17 32 61",
+        "12 22 37 67",
+        "17 27 41 72",
+        "22 32 42 77",
+        "27 37 47 82",
+        "32 41 52 85",
+        "37 85 57 7",
+        "85 47 61 12",
+        "42 52 67 17",
+        "47 57 72 22",
+        "52 61 77 27",
+        "57 67 82 32",
+        "61 72 2 37",
+        "67 77 7 41",
+        "72 82 85 42",
+        "77 2 17 47",
+        "82 7 22 52",
+        "41 42 12 2"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 042 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=86
+length: 673
+body:
+{
+    "chart": [
+        null,
+        "7 17 32 61",
+        "12 22 37 67",
+        "17 27 41 72",
+        "22 32 42 77",
+        "27 37 47 82",
+        "32 41 52 86",
+        "37 86 57 7",
+        "86 47 61 12",
+        "42 52 67 17",
+        "47 57 72 22",
+        "52 61 77 27",
+        "57 67 82 32",
+        "61 72 2 37",
+        "67 77 7 41",
+        "72 82 86 42",
+        "77 2 17 47",
+        "82 7 22 52",
+        "41 42 12 2"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 043 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=87
+length: 673
+body:
+{
+    "chart": [
+        null,
+        "7 17 32 61",
+        "12 22 37 67",
+        "17 27 41 72",
+        "22 32 42 77",
+        "27 37 47 82",
+        "32 41 52 87",
+        "37 87 57 7",
+        "87 47 61 12",
+        "42 52 67 17",
+        "47 57 72 22",
+        "52 61 77 27",
+        "57 67 82 32",
+        "61 72 2 37",
+        "67 77 7 41",
+        "72 82 87 42",
+        "77 2 17 47",
+        "82 7 22 52",
+        "41 42 12 2"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}
+### 044 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=88
+length: 673
+body:
+{
+    "chart": [
+        null,
+        "7 17 32 61",
+        "12 22 37 67",
+        "17 27 41 72",
+        "22 32 42 77",
+        "27 37 47 82",
+        "32 41 52 88",
+        "37 88 57 7",
+        "88 47 61 12",
+        "42 52 67 17",
+        "47 57 72 22",
+        "52 61 77 27",
+        "57 67 82 32",
+        "61 72 2 37",
+        "67 77 7 41",
+        "72 82 88 42",
+        "77 2 17 47",
+        "82 7 22 52",
+        "41 42 12 2"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>",
+            "run-0-extra-0-start": "<seconds>",
+            "run-0-injected": "<seconds>",
+            "run-0-racechart": "<seconds>"
+        }
+    }
+}

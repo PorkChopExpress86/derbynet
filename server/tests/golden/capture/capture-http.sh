@@ -94,7 +94,9 @@ capture() {
       fi ;;
     *) echo "capture: unsupported method $method" >&2; return 1 ;;
   esac
-  curl "${args[@]}" "$BASE_URL/$path"
+  # The wall time, which normalize.mjs needs to judge a schedule.reschedule.
+  local seconds
+  seconds="$(curl "${args[@]}" -w '%{time_total}' "$BASE_URL/$path")"
 
   CAPTURE_STATUS="$(head -n 1 "$headers" | tr -d '\r' | cut -d' ' -f2)"
   local ctype location cache_control
@@ -114,6 +116,7 @@ capture() {
     [ -z "$location" ] || printf 'location: %s\n' "$location"
     grep -i '^set-cookie:' "$headers" | tr -d '\r' | cut -d' ' -f2- | sed 's/^/set-cookie: /' || true
     [ -z "$cache_control" ] || printf 'cache-control: %s\n' "$cache_control"
+    LC_ALL=C awk -v s="$seconds" 'BEGIN { printf "elapsed-ms: %d\n", s * 1000 }'
     printf 'length: %s\nbody:\n' "$(wc -c < "$CAPTURE_BODY")"
     cat "$CAPTURE_BODY"
     printf '\n'
