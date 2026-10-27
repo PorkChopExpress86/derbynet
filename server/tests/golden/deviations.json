@@ -1360,7 +1360,7 @@
         "lanes=8 kind=with-dnf runs=6",
         "lanes=8 kind=with-dnf runs=30"
       ],
-      "reason": "Django's sums of squares count every lane once; PHP counts the second-to-last lane twice and leaves out the last. The critical value is Q9's.",
+      "reason": "Django compares each lane with a finished run once; PHP counts the second-to-last lane twice, leaves out the last, and counts a lane with no finished run in both degrees of freedom. The critical value is Q9's.",
       "expected": "deviations/Q24/lane-bias.json"
     }
   ]

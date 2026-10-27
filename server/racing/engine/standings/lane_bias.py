@@ -97,15 +97,16 @@ def lane_bias_analysis(times_by_lane: Sequence[Sequence[float]]) -> LaneBias | N
 
     None where PHP returns an empty array and `history.php` says there
     isn't enough evidence: no finished run, one lane, as many finished runs
-    as lanes, or no variation within lanes.
+    as lanes, or no variation within lanes. Lanes count here only when they
+    have a finished run.
 
-    The sums of squares count every lane once. PHP's second loop,
-    `foreach ($lanes as $lane)`, writes through the reference its first
-    loop left on the last lane, so PHP counts the second-to-last lane twice
-    and leaves out the last lane (Q24). `lanes` holds every lane's own
-    stats.
+    The test compares the lanes with a finished run, each once (Q24). PHP's
+    second loop, `foreach ($lanes as $lane)`, writes through the reference
+    its first loop left on the last lane, so PHP counts the second-to-last
+    lane twice and leaves out the last lane. PHP also counts an unused lane,
+    or one of DNFs only, in both degrees of freedom. `lanes` holds every
+    lane's own stats.
     """
-    nlanes = len(times_by_lane)
     lanes = []
     total = 0.0
     nn = 0
@@ -123,22 +124,23 @@ def lane_bias_analysis(times_by_lane: Sequence[Sequence[float]]) -> LaneBias | N
         total += lane_total
         nn += n
 
-    if nn == 0 or nlanes <= 1 or nn == nlanes:
+    used = [lane for lane in lanes if lane[0] > 0]
+    if len(used) <= 1 or nn == len(used):
         return None
     grand_mean = total / nn
     ssbetween = 0.0
     sswithin = 0.0
-    for n, _dnfs, mean, lane_sswithin in lanes:
+    for n, _dnfs, mean, lane_sswithin in used:
         ssbetween += n * (mean - grand_mean) * (mean - grand_mean)
         sswithin += lane_sswithin
-    msbetween = ssbetween / (nlanes - 1)
-    mswithin = sswithin / (nn - nlanes)
+    df1 = len(used) - 1
+    df2 = nn - len(used)
+    msbetween = ssbetween / df1
+    mswithin = sswithin / df2
     if mswithin == 0:
         return None
 
     f_statistic = msbetween / mswithin
-    df1 = nlanes - 1
-    df2 = nn - nlanes
     critical_value = critical_f_value(df1, df2)
     if critical_value is None:
         biased = f_statistic != 0

@@ -10,7 +10,9 @@ notices. A critical-f-value record is compared on `value`, without PHP's
 
 Two Fix quirks of #20 make Django differ. Q9 changes every critical value.
 Q24 changes the F statistic: PHP's sums of squares count the second-to-last
-lane twice and leave out the last lane, and Django counts every lane once.
+lane twice and leave out the last lane, and PHP counts a lane with no
+finished run in both degrees of freedom. Django compares each lane with a
+finished run once. No PHP fixture has such a lane.
 Each case where Django differs from PHP is listed once in
 `tests/golden/deviations.json`: under Q24 when the F statistic differs,
 else under Q9, with Django's records under `tests/golden/deviations/Q9/`
@@ -41,8 +43,9 @@ REASON = {
         "Django reads table column df1 - 1; PHP reads column df1."
     ),
     ("Q24", LANE_BIAS): (
-        "Django's sums of squares count every lane once; PHP counts the "
-        "second-to-last lane twice and leaves out the last. The critical "
+        "Django compares each lane with a finished run once; PHP counts "
+        "the second-to-last lane twice, leaves out the last, and counts a "
+        "lane with no finished run in both degrees of freedom. The critical "
         "value is Q9's."
     ),
 }
@@ -187,6 +190,29 @@ def test_the_f_statistic_counts_every_lane_once():
     bias = lane_bias_analysis(lanes)
     assert bias.f_statistic == pytest.approx(13.0)
     assert lane_bias_analysis(lanes[::-1]).f_statistic == pytest.approx(13.0)
+
+
+def test_a_lane_with_no_finished_run_is_left_out_of_the_test():
+    """Lane 3 is unused, so the test compares three lanes. Their means are
+    3.015, 3.055 and 3.015 over four runs each, so the sums of squares are
+    0.0128 / 3 between lanes and 0.0015 within, and
+    F = (0.0128 / 6) / (0.0015 / 9) = 12.8 with df (2, 9). Counting the
+    unused lane gives F = 7.59 with df (3, 8). A lane of DNFs only is left
+    out the same way, and keeps its runs in the lane stats."""
+    used = [
+        [3.01, 3.02, 3.00, 3.03],
+        [3.05, 3.06, 3.04, 3.07],
+        [3.02, 3.01, 3.03, 3.00],
+    ]
+    for empty in ([], [9.9, 10.2]):
+        bias = lane_bias_analysis([used[0], used[1], empty, used[2]])
+        assert (bias.f_statistic, bias.df1, bias.df2) == (pytest.approx(12.8), 2, 9)
+        assert bias.critical_value == critical_f_value(2, 9)
+        assert bias.lanes[2].runs == len(empty)
+
+
+def test_one_used_lane_has_no_result():
+    assert lane_bias_analysis([[3.0, 3.1, 3.2, 3.3], [], [9.9]]) is None
 
 
 def write_lane_bias_deviations():
