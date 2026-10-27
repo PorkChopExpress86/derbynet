@@ -48,6 +48,26 @@ capture generate-round-3-at-the-limit "POST action.php action=schedule.generate&
 capture generate-round-99-no-such-round "POST action.php action=schedule.generate&roundid=99"
 unschedule_all
 
+# The same request over a chart (#20 Q1, #98): PHP deletes the chart, writes
+# nothing, and replies success.
+start_variant cant-fulfill-over-a-chart-4-lanes
+capture generate-round-3-at-the-limit "POST action.php action=schedule.generate&roundid=3&n_times_per_lane=6"
+capture select-round-3 "POST action.php action=heat.select&roundid=3&now_racing=0"
+capture schedule-round-3-at-the-limit "GET action.php?query=poll&values=schedule,rounds"
+capture generate-round-3-too-many-runs "POST action.php action=schedule.generate&roundid=3&n_times_per_lane=7"
+capture schedule-round-3-after-too-many-runs "GET action.php?query=poll&values=schedule,rounds"
+unschedule_all
+
+# Zero runs per lane over a chart (#98): PHP deletes the chart and replies
+# success with no heats.
+start_variant zero-runs-over-a-chart-4-lanes
+capture generate-round-3 "POST action.php action=schedule.generate&roundid=3"
+capture select-round-3 "POST action.php action=heat.select&roundid=3&now_racing=0"
+capture schedule-round-3 "GET action.php?query=poll&values=schedule,rounds"
+capture generate-round-3-zero-runs "POST action.php action=schedule.generate&roundid=3&n_times_per_lane=0"
+capture schedule-round-3-after-zero-runs "GET action.php?query=poll&values=schedule,rounds"
+unschedule_all
+
 start_variant rotation-schedule-4-lanes
 post_ok "action=settings.write&rotation-schedule=1"
 schedule_each_round rotation

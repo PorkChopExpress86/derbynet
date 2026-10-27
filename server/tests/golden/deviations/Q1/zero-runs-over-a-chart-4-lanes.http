@@ -1,0 +1,136 @@
+### 005 generate-round-3-zero-runs
+request: POST action.php
+request-body: action=schedule.generate&roundid=3&n_times_per_lane=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 3,
+        "n_times_per_lane": 0
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "cant-fulfill",
+        "description": "Choose at least one run per lane."
+    }
+}
+### 006 schedule-round-3-after-zero-runs
+request: GET action.php?query=poll&values=schedule,rounds
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2020
+body:
+{
+    "schedule": [
+        [
+            5,
+            15,
+            25,
+            49
+        ],
+        [
+            10,
+            20,
+            30,
+            5
+        ],
+        [
+            25,
+            35,
+            45,
+            20
+        ],
+        [
+            40,
+            49,
+            10,
+            35
+        ],
+        [
+            20,
+            30,
+            40,
+            15
+        ],
+        [
+            35,
+            45,
+            5,
+            30
+        ],
+        [
+            15,
+            25,
+            35,
+            10
+        ],
+        [
+            30,
+            40,
+            49,
+            25
+        ],
+        [
+            45,
+            5,
+            15,
+            40
+        ],
+        [
+            49,
+            10,
+            20,
+            45
+        ]
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 20,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 19,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 10,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ]
+}
+
