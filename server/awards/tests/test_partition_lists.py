@@ -203,3 +203,29 @@ def test_a_subgroup_moved_out_takes_its_partitions_out_of_the_groups_list(event,
     assert named(partition_list(event, group=den)) == ["Lions"]
     groups.move_subgroup(Subgroup.objects.get(pk=wolves.pk), den)
     assert named(partition_list(event, group=den)) == ["Lions"]
+
+
+def test_deleting_a_subgroup_leaving_a_full_group_list_is_all(event, den):
+    groups.move_partition(partition(event, "Wolves"), GroupRef("rankid", -den.pk))
+    wolves = partition(event, "Wolves").subgroup
+    set_partition_list(
+        event, [partition(event, "Lions"), partition(event, "Tigers")], group=den
+    )
+    groups.delete_subgroup(wolves)
+    assert not AwardPartition.objects.filter(event=event).exists()
+
+
+def test_deleting_a_group_leaving_a_full_pack_list_is_all(event, den):
+    set_partition_list(event, [partition(event, n) for n in ("Lions", "Tigers")])
+    groups.delete_partition(partition(event, "Wolves"))
+    groups.delete_group(partition(event, "Parents").subgroup.group)
+    assert not AwardPartition.objects.filter(event=event).exists()
+
+
+def test_a_rule_change_keeps_the_packs_list_and_drops_the_groups(event, den):
+    narrowed = [partition(event, "Lions"), partition(event, "Tigers")]
+    set_partition_list(event, narrowed)
+    set_partition_list(event, narrowed, group=den)
+    groups.form_groups_by_rule(event, "one-group")
+    assert named(partition_list(event)) == ["Lions", "Tigers"]
+    assert not AwardPartition.objects.filter(event=event, group__isnull=False).exists()

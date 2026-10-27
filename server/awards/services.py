@@ -2,10 +2,12 @@
 
 A unit is the pack, a group, a subgroup, or a judged award, named by at
 most one of `group`, `subgroup` and `award`. A unit draws from the
-partitions its racers can come from: the pack from every partition, a group
-from the partitions in it (an aggregate from its constituents' or its
-subgroups'), a subgroup from its own, and a judged award from those of the
-group or subgroup it is for.
+partitions its racers can come from, the ones the standings rank in its
+ladder. The pack draws from every partition. A group or subgroup draws from
+the partitions in it and the partitions of the racers in it. An aggregate
+draws from every group that rolls up to it, filtered by its own subgroups
+when it has them. A judged award draws from its subgroup, else its group,
+else the pack.
 
 - A unit with no stored list is "all partitions", which always means every
   partition the unit draws from, so it picks up a partition added to the
@@ -14,13 +16,14 @@ group or subgroup it is for.
 - A narrowed list keeps exactly its partitions, so a new partition stays
   out of it.
 - A list never holds a partition its unit does not draw from. Deleting a
-  partition deletes it from every list (`on_delete=CASCADE`), and moving it
-  out of a group takes it out of that group's lists. After either, a list
-  left holding every partition its unit draws from, or none, becomes "all
-  partitions" (`reconcile_partition_lists`).
+  partition deletes it from every list (`on_delete=CASCADE`), and moving it,
+  or its subgroup, out of a group takes it out of that group's lists.
+  After either, a list left holding every partition its unit draws from,
+  or none, becomes "all partitions" (`reconcile_partition_lists`).
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 
 from django.db import transaction
 
@@ -31,6 +34,7 @@ from roster.models import (
     GroupConstituent,
     GroupConstituentSubgroup,
     Partition,
+    Racer,
     Subgroup,
 )
 
@@ -41,41 +45,79 @@ def _unit(group, subgroup, award) -> dict:
     return {"group": group, "subgroup": subgroup, "award": award}
 
 
-def _group_draws_from(group_id, seen: frozenset = frozenset()) -> set[int]:
-    filters = GroupConstituentSubgroup.objects.filter(aggregate_id=group_id)
-    if filters.exists():
-        return set(
-            Partition.objects.filter(
-                subgroup_id__in=filters.values("subgroup_id")
-            ).values_list("id", flat=True)
+@dataclass(frozen=True)
+class _Places:
+    """Where an event's partitions and racers sit, read once.
+
+    `places` holds a (partition, group, subgroup) triple for each
+    partition's own subgroup and for each racer's group and subgroup. The
+    two differ after a `partition.move` with a filter leaves some of the
+    partition's racers behind, and the standings rank racers where the
+    racers are.
+    """
+
+    partitions: frozenset[int]
+    places: frozenset[tuple[int, int, int]]
+    constituents: Mapping[int, tuple[int, ...]]
+    subgroup_filters: Mapping[int, frozenset[int]]
+
+    @classmethod
+    def read(cls, event_id) -> _Places:
+        partitions = Partition.objects.filter(event_id=event_id)
+        places = set(partitions.values_list("id", "subgroup__group_id", "subgroup_id"))
+        places |= set(
+            Racer.objects.filter(
+                event_id=event_id, partition__isnull=False
+            ).values_list("partition_id", "group_id", "subgroup_id")
         )
-    ids = set(
-        Partition.objects.filter(subgroup__group_id=group_id).values_list(
-            "id", flat=True
+        constituents: dict[int, list[int]] = {}
+        for aggregate, constituent in GroupConstituent.objects.filter(
+            event_id=event_id
+        ).values_list("aggregate_id", "constituent_id"):
+            constituents.setdefault(aggregate, []).append(constituent)
+        filters: dict[int, set[int]] = {}
+        for aggregate, subgroup in GroupConstituentSubgroup.objects.filter(
+            event_id=event_id
+        ).values_list("aggregate_id", "subgroup_id"):
+            filters.setdefault(aggregate, set()).add(subgroup)
+        return cls(
+            partitions=frozenset(partitions.values_list("id", flat=True)),
+            places=frozenset(places),
+            constituents={a: tuple(c) for a, c in constituents.items()},
+            subgroup_filters={a: frozenset(s) for a, s in filters.items()},
         )
-    )
-    seen = seen | {group_id}
-    for constituent in GroupConstituent.objects.filter(
-        aggregate_id=group_id
-    ).values_list("constituent_id", flat=True):
-        if constituent not in seen:
-            ids |= _group_draws_from(constituent, seen)
-    return ids
+
+    def draws_from(self, group_id, subgroup_id) -> set[int]:
+        """The partitions a unit draws from, as the standings rank it. An
+        aggregate draws from every group that rolls up to it, through
+        aggregates of aggregates, filtered by its own subgroups only, as
+        `Standings._keys` reads `add_rolls_up_to_relation()`."""
+        if subgroup_id is not None:
+            return {p for p, _, s in self.places if s == subgroup_id}
+        if group_id is None:
+            return set(self.partitions)
+        members, todo = {group_id}, [group_id]
+        while todo:
+            for constituent in self.constituents.get(todo.pop(), ()):
+                if constituent not in members:
+                    members.add(constituent)
+                    todo.append(constituent)
+        only = self.subgroup_filters.get(group_id)
+        return {
+            p for p, g, s in self.places if g in members and (only is None or s in only)
+        }
+
+
+def _scope(group_id, subgroup_id, award_id) -> tuple:
+    """The group and subgroup whose racers a unit's awards go to."""
+    if award_id is None:
+        return group_id, subgroup_id
+    return tuple(Award.objects.values_list("group_id", "subgroup_id").get(pk=award_id))
 
 
 def _draws_from(event_id, group_id, subgroup_id, award_id) -> set[int]:
     """The ids of the partitions the unit draws from."""
-    if award_id is not None:
-        group_id, subgroup_id = Award.objects.values_list(
-            "group_id", "subgroup_id"
-        ).get(pk=award_id)
-    if subgroup_id is not None:
-        partitions = Partition.objects.filter(subgroup_id=subgroup_id)
-    elif group_id is not None:
-        return _group_draws_from(group_id)
-    else:
-        partitions = Partition.objects.filter(event_id=event_id)
-    return set(partitions.values_list("id", flat=True))
+    return _Places.read(event_id).draws_from(*_scope(group_id, subgroup_id, award_id))
 
 
 def _ids(group, subgroup, award) -> tuple:
@@ -137,9 +179,12 @@ def reconcile_partition_lists(event_id) -> None:
         event_id=event_id
     ).values_list("id", "group_id", "subgroup_id", "award_id", "partition_id"):
         lists.setdefault(tuple(unit), {})[partition_id] = row_id
+    if not lists:
+        return
+    places = _Places.read(event_id)
     doomed: list[int] = []
     for unit, rows in lists.items():
-        every = _draws_from(event_id, *unit)
+        every = places.draws_from(*_scope(*unit))
         kept = rows.keys() & every
         doomed.extend(
             row_id for p, row_id in rows.items() if p not in kept or kept == every

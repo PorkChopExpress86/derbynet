@@ -522,7 +522,6 @@ def form_groups_by_rule(event, rule: str) -> None:
         elif rule == Rule.BY_PARTITION:
             _form_by_partition(event.id)
         clean_up_empty_groups_and_subgroups(event.id)
-        reconcile_partition_lists(event.id)
         settings.use_subgroups = rule != Rule.BY_PARTITION
         settings.save(update_fields=["use_subgroups"])
 
@@ -902,6 +901,7 @@ def delete_group(group: Group) -> None:
                 Failure.CONSTITUENT, "Unable to delete a constituent class"
             )
         delete_group_rows(group)
+        reconcile_partition_lists(group.event_id)
 
 
 def order_groups(event, groups: Sequence[Group]) -> None:
@@ -974,6 +974,7 @@ def delete_subgroup(subgroup: Subgroup) -> None:
                 Failure.EXISTING_RACERS, "Unable to delete a rank with racers"
             )
         _delete_subgroup(subgroup)
+        reconcile_partition_lists(subgroup.event_id)
 
 
 def move_subgroup(subgroup: Subgroup, group: Group | None) -> None:
