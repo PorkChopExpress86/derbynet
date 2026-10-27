@@ -1035,24 +1035,25 @@ def test_under_the_master_schedule_next_from_an_emptied_staged_heat_moves_on():
 
 
 def test_an_emptied_heat_is_released_once_the_race_moves_past_it():
-    """D39 holds an emptied heat only while it is running or staged. Once the
-    crew skips past it, it is a gap like any skipped heat, which the next
+    """D39 holds an emptied heat until a later heat of its round has a
+    result. Then it is a gap like any skipped heat, which the next
     reschedule may fill, and unscheduling the round drops it."""
     round = new_round(range(101, 113))
     race(round, 1, 2)
     make_current(round, 3)
     depart_all_of(round, 4)
     reschedule(round, budget=NodeBudget(UNLIMITED))
-    make_current(round, 5)
+    race(round, 3, 5)
+    make_current(round, 6)
     late_racer(round, 120)
 
     reschedule(round, budget=NodeBudget(UNLIMITED))
 
     assert heat_rows(round, 4) != set()
 
-    depart_all_of(round, 5)
+    depart_all_of(round, 6)
     reschedule(round, budget=NodeBudget(UNLIMITED))
-    assert heat_rows(round, 5) == set()
+    assert heat_rows(round, 6) == set()
     unschedule(round)
 
     assert master_index(round.event) == []
@@ -1076,3 +1077,91 @@ def test_a_racer_taken_off_the_roster_during_the_search_is_refused():
 
     assert caught.code == Failure.NOT_ON_ROSTER
     assert by_car(round) == rows
+
+
+def test_an_emptied_heat_stays_held_while_the_race_is_in_another_round():
+    """D39: round B's running heat 3 runs empty. The crew switches to round A,
+    and a reschedule of A leaves B's heat 3 held. Back on B, a reschedule
+    with late racers leaves heat 3 empty and the staged heat 4 as it was."""
+    a = new_round(range(101, 113))
+    b = new_round(range(201, 213), event=a.event)
+    race(b, 1, 2)
+    make_current(b, 3)
+    depart_all_of(b, 3)
+    reschedule(b, budget=NodeBudget(UNLIMITED))
+    make_current(a, 1)
+    late_racer(a, 120)
+    reschedule(a, budget=NodeBudget(UNLIMITED))
+    make_current(b, 3)
+    staged = heat_rows(b, 4)
+    for car in (220, 221, 222, 223):
+        late_racer(b, car)
+
+    reschedule(b, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(b, 3) == set()
+    assert heat_rows(b, 4) == staged
+
+
+def emptied_b2_then_b3_run():
+    """Rounds A and B race in master order A1 B1 A2 B2 A3 B3. B2, staged
+    behind A2, runs empty. The crew runs A2, skips B2 and runs B3, so B2 is
+    passed."""
+    a = new_round(range(101, 109), use_master_sched=True)
+    b = new_round(range(201, 209), event=a.event)
+    race(a, 1)
+    race(b, 1)
+    reassign_master_heats(a.event)
+    make_current(a, 2)
+    assert master_next(a, 2) == (b.id, 2)
+    depart_all_of(b, 2)
+    reschedule(b, budget=NodeBudget(UNLIMITED))
+    race(a, 2)
+    make_current(b, 3)
+    race(b, 3)
+    return a, b
+
+
+def test_a_passed_emptied_heat_is_ignored_when_another_round_is_scheduled():
+    """D39: once B3 has a result, B2 is passed. Scheduling round C numbers
+    the master heats again without B2, so `next` never lands on it."""
+    a, b = emptied_b2_then_b3_run()
+
+    new_round(range(301, 305), event=a.event)
+
+    assert (b.id, 2) not in {(r, h) for _, r, h, _ in master_index(a.event)}
+    make_current(a, 3)
+    assert master_next(a, 3) != (b.id, 2)
+
+
+def test_a_passed_emptied_heat_is_never_staged_again():
+    """D39: after round C is scheduled and A3 runs, a reschedule of B with
+    late racers keeps the real staged heat, the next in master order, as it
+    was, and does not hold B2 again."""
+    a, b = emptied_b2_then_b3_run()
+    new_round(range(301, 305), event=a.event)
+    race(a, 3)
+    make_current(a, 4)
+    staged = master_next(a, 4)
+    kept = {
+        row
+        for row in HeatLane.objects.filter(
+            round_id=staged[0], heat=staged[1]
+        ).values_list("lane", "racer_id", "finish_time")
+    }
+    for car in (220, 221, 222, 223):
+        late_racer(b, car)
+
+    reschedule(b, budget=NodeBudget(UNLIMITED))
+
+    assert master_next(a, 4) == staged
+    assert (
+        set(
+            HeatLane.objects.filter(round_id=staged[0], heat=staged[1]).values_list(
+                "lane", "racer_id", "finish_time"
+            )
+        )
+        == kept
+    )
+    listed = {(r, h) for _, r, h, _ in master_index(a.event)}
+    assert heat_rows(b, 2) != set() or (b.id, 2) not in listed

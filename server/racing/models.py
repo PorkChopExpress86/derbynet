@@ -73,9 +73,10 @@ class HeatLane(EventScoped):
 class EmptiedHeat(EventScoped):
     """A running or staged heat whose cars were all taken off the roster
     (D39). It has no `HeatLane` rows left, so this row keeps its heat number
-    and master number while the race crew runs or skips it. Django only, and
-    held only while the heat is running or staged: the next reschedule
-    drops it once the race has moved past it."""
+    and master number while the race crew runs or skips it. Django only. It
+    is passed, and ignored, once a later heat of its round has a result, or
+    under the master schedule a heat with a higher master number
+    (`racing.services.master.held_emptied_heats`)."""
 
     round = models.ForeignKey(
         Round, on_delete=models.CASCADE, related_name="emptied_heats"

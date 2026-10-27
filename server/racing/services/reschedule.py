@@ -31,6 +31,7 @@ from racing.engine.scheduling.adjuster import (
 )
 from racing.engine.scheduling.master import HeatRef
 from racing.models import HAS_RESULT, EmptiedHeat, HeatLane, RosterEntry, Round
+from racing.services.master import held_emptied_heats
 from racing.services.rounds import round_adjustments
 from racing.services.schedule import after_chart_change
 from roster.models import Racer
@@ -74,16 +75,19 @@ class _RacePosition:
     the master schedule the unraced heat with the next master number, in any
     round (D39). A running or staged heat whose cars have all left has no
     lanes, and an `EmptiedHeat` keeps its number and master number, so it
-    stays the running or the staged heat (D39)."""
+    stays the running or the staged heat until the race passes it (D39)."""
 
     current: HeatRef | None
     running: HeatRef | None
     staged: HeatRef | None
     master: bool
+    emptied: frozenset[HeatRef] = frozenset()  # held emptied heats (D39)
 
     def kept_in(self, round: Round) -> frozenset[int]:
-        """The heat numbers of this round that must not change."""
-        refs = (self.running, self.staged)
+        """The heat numbers of this round that must not change: the running
+        heat, the staged heat, and every held emptied heat, whichever round
+        is current (D39)."""
+        refs = (self.running, self.staged, *self.emptied)
         return frozenset(ref[1] for ref in refs if ref and ref[0] == round.id)
 
     def pinned(self, round: Round, renumbered: dict[int, int]) -> frozenset[HeatRef]:
@@ -113,8 +117,9 @@ def _race_position(
     state: RaceState,
     use_master_sched: bool,
 ) -> _RacePosition:
+    held = frozenset((r, heat) for r, heat, _ in emptied)
     if state.current_round_id is None or state.current_heat is None:
-        return _RacePosition(None, None, None, use_master_sched)
+        return _RacePosition(None, None, None, use_master_sched, held)
     current = (state.current_round_id, state.current_heat)
     number = {(r, heat): n for r, heat, _, _, _, n in rows}
     number |= {(r, heat): n for r, heat, n in emptied}
@@ -135,7 +140,7 @@ def _race_position(
             (h for h in unraced if h[0] == current[0] and h[1] > current[1]),
             default=None,
         )
-    return _RacePosition(current, running, staged, use_master_sched)
+    return _RacePosition(current, running, staged, use_master_sched, held)
 
 
 @dataclass(frozen=True)
@@ -189,9 +194,7 @@ def _snapshot(round: Round, racer_id: int | None = None) -> _Snapshot:
         )
     ]
     emptied = tuple(
-        EmptiedHeat.objects.filter(event_id=round.event_id)
-        .order_by("round_id", "heat")
-        .values_list("round_id", "heat", "master_heat")
+        sorted((r, heat, n) for _, r, heat, n in held_emptied_heats(round.event))
     )
     pending = round_adjustments(round)
     return _Snapshot(
@@ -320,13 +323,8 @@ def _hold_emptied_heats(
     round: Round, snapshot: _Snapshot, held: dict[int, list[int | None]]
 ) -> None:
     """Record each kept heat of the round that this write leaves with no
-    cars, with its master number, and drop each emptied heat the race has
-    moved past, which is no longer running or staged (D39)."""
-    position = snapshot.position
-    keep = {ref for ref in (position.running, position.staged) if ref}
-    for r, heat, _ in snapshot.emptied:
-        if (r, heat) not in keep:
-            EmptiedHeat.objects.filter(round_id=r, heat=heat).delete()
+    cars, with its master number (D39). `after_chart_change` then deletes
+    the emptied heats the race has passed."""
     number = {(r, heat): n for r, heat, n in snapshot.emptied}
     lanes = HeatLane.objects.filter(round=round, heat__in=held.keys())
     number |= {
