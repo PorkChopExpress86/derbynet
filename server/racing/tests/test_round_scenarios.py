@@ -490,10 +490,16 @@ def test_aggregate_classes():
 
 
 def test_aggregate_nonracing():
-    """`test-aggregate-nonracing.sh`. Its fixture records nothing, because the
-    script stops before its `roster.new`, so this checks what the script
-    asserts against PHP: both Tigers and Younger are ready once their
-    constituents have raced."""
+    """`test-aggregate-nonracing.sh`, whose fixture records its `class.add`
+    and `poll.coordinator` exchanges. The script polls before each heat, so
+    poll 020, the first of White's round, is the first after both Tiger
+    rounds have raced, when Tigers is ready. Poll 038 follows the `class.add`
+    of Younger, and both are ready, as the script asserts."""
+    php = suite("aggregate-nonracing")
+
+    def php_ready(name):
+        return json.loads(php[name]["body"])["ready-aggregate"]
+
     replay = Rounds(Export("aggregate-nonracing"))
     replay.import_roster()
     replay.post("action=settings.write&unused-lane-mask=0&n-lanes=4")
@@ -509,11 +515,14 @@ def test_aggregate_nonracing():
             f"action=racer.edit&rankid={replay.php('rank', tiger_b)}"
             f"&racerid={replay.php('racer', replay.racer(car=car))}"
         )
-    for prefix in ("Tiger A", "Tiger B", "White"):
+    for prefix in ("Tiger A", "Tiger B"):
         replay.race(replay.first_round(prefix))
+    assert replay.ready() == php_ready("020 poll.coordinator")
+    replay.race(replay.first_round("White"))
     white, tigers = (replay.php("class", replay.group(n)) for n in ("White", "Tigers"))
     replay.post(
         f"action=class.add&constituent_{white}=1&constituent_{tigers}=1&name=Younger"
     )
 
+    assert replay.ready() == php_ready("038 poll.coordinator")
     assert sorted(g["class"] for g in replay.ready()) == ["Tigers", "Younger"]
