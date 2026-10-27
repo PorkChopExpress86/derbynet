@@ -7,3 +7,4 @@ unused-lane masks: 304
 ordinals cases: 363
 lane-bias cases: 140
 critical-f-value cases: 1242
+aggregate cases: 509
