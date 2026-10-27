@@ -1,10 +1,11 @@
 """Every `schedule.reschedule` PHP recorded, replayed through the adjuster.
 
-`reschedule_replay` rebuilds the chart each call started from. On PHP's
-inputs the adjuster must give PHP's chart exactly, except where PHP answers
-`nochart` for want of one more search (Q21). On Django's inputs, which also
-keep the running heat and the staged heat (D34), it must give PHP's chart or
-the chart a deviation entry names.
+`reschedule_replay` rebuilds the chart each call started from. Each reply is
+compared in `django_reply` form: the chart and the `timing.internal` keys. On
+PHP's inputs the adjuster must give PHP's reply exactly, except where PHP
+answers `nochart` for want of one more search (Q21). On Django's inputs,
+which also keep the running heat and the staged heat (D34), it must give
+PHP's reply or the one a deviation entry records.
 
 The capture tool leaves out any reschedule whose search could have reached
 its deadline (`tests/golden/README.md`, "Reschedules"), and notes each one it
@@ -25,82 +26,85 @@ from racing.engine.tests.golden import (
 from racing.engine.tests.reschedule_replay import (
     QUIRK_FIXTURES,
     SUITE_FIXTURE,
+    django_reply,
+    engine,
     php_changed_a_kept_heat,
     replay,
     replay_quirks,
 )
 
 FIXTURES = [SUITE_FIXTURE, *QUIRK_FIXTURES]
+CHART_QUIRKS = ("Q20", "Q21")
 
 
-def php_charts():
-    """`{(fixture, exchange): (chart or None for nochart, flagged)}`."""
-    charts = {}
+def php_replies():
+    """`{(fixture, exchange): (django_reply form of PHP's reply, flagged)}`."""
+    replies = {}
     for fixture in FIXTURES:
         for name, exchange in read_transcript(GOLDEN_DIR / fixture).items():
             if "action=schedule.reschedule" not in exchange.get("request-body", ""):
                 continue
             assert exchange["note"].startswith("deterministic"), (fixture, name)
             body = json.loads(exchange["body"])
+            internal = body.get("timing", {}).get("internal", {})
+            flagged = any(key.endswith("-timed-out") for key in internal)
             success = body["outcome"]["code"] == "success"
-            flagged = any(
-                key.endswith("-timed-out")
-                for key in body.get("timing", {}).get("internal", {})
-            )
-            charts[fixture, name] = (body["chart"] if success else None, flagged)
-    return charts
+            reply = django_reply(body["chart"], internal) if success else None
+            replies[fixture, name] = (reply, flagged)
+    return replies
 
 
-PHP = php_charts()
+PHP = php_replies()
 IDS = [
     f"{fixture}:{name}{' (timed-out flag)' if flagged else ''}"
     for (fixture, name), (_, flagged) in PHP.items()
 ]
 
 
-def replayed(keep_staged_heats):
-    replies = [((SUITE_FIXTURE, name), r) for name, r in replay(keep_staged_heats)]
-    replies += replay_quirks(keep_staged_heats)
+def replayed(new_server):
+    replies = [((SUITE_FIXTURE, name), r) for name, r in replay(new_server)]
+    replies += replay_quirks(new_server)
     return dict(replies)
 
 
 @pytest.fixture(scope="module")
 def on_php_inputs():
-    return replayed(False)
+    return replayed(engine(False))
 
 
 @pytest.fixture(scope="module")
 def on_django_inputs():
-    return replayed(True)
+    return replayed(engine(True))
 
 
-def expected_django_chart(fixture, name):
-    _, deviation = transcript_deviations(fixture).get(name, (None, None))
-    if deviation is None:
+def expected_django_reply(fixture, name):
+    """A chart deviation's expected body, or else PHP's reply in
+    `django_reply` form. A chart deviation records only what the service
+    computes (#31 ports the rest of the reply). Q5 leaves the chart PHP's."""
+    quirk, deviation = transcript_deviations(fixture).get(name, (None, None))
+    if quirk not in CHART_QUIRKS:
         return PHP[fixture, name][0]
-    body = json.loads(deviation["body"])
-    return body["chart"] if body["outcome"]["code"] == "success" else None
-
-
-def charts(replies):
-    return {key: reply.chart for key, reply in replies.items()}
+    return json.loads(deviation["body"])
 
 
 def test_every_recorded_reschedule_is_replayed(on_php_inputs, on_django_inputs):
-    assert list(charts(on_php_inputs)) == list(PHP)
-    assert list(charts(on_django_inputs)) == list(PHP)
+    assert list(on_php_inputs) == list(PHP)
+    assert list(on_django_inputs) == list(PHP)
 
 
 @pytest.mark.parametrize("key", list(PHP), ids=IDS)
-def test_php_inputs_give_the_php_chart(on_php_inputs, key):
+def test_php_inputs_give_the_php_reply(on_php_inputs, key):
+    """The chart and the `timing.internal` keys, in PHP's order."""
     quirk, _ = transcript_deviations(key[0]).get(key[1], (None, None))
-    expected = expected_django_chart(*key) if quirk == "Q21" else PHP[key][0]
-    assert on_php_inputs[key].chart == expected
+    expected = expected_django_reply(*key) if quirk == "Q21" else PHP[key][0]
+    reply = on_php_inputs[key]
+    assert django_reply(reply.chart, reply.timing_keys) == expected
 
 
 @pytest.mark.parametrize("key", list(PHP), ids=IDS)
 def test_django_inputs_give_the_php_chart_or_the_deviation(on_django_inputs, key):
-    assert on_django_inputs[key].chart == expected_django_chart(*key)
+    reply = on_django_inputs[key]
+    assert django_reply(reply.chart, reply.timing_keys) == expected_django_reply(*key)
 
 
 def test_django_keeps_the_running_and_staged_heats(on_django_inputs):
@@ -112,6 +116,10 @@ def test_django_keeps_the_running_and_staged_heats(on_django_inputs):
     assert kept > 40
 
 
+def chart_of(reply):
+    return None if reply is None else reply["chart"]
+
+
 def test_each_q20_deviation_is_a_kept_heat_php_changed(on_django_inputs):
     """D34 explains a Q20 entry only where PHP changed the running heat or the
     staged heat, so any other difference from PHP needs its own quirk."""
@@ -119,7 +127,8 @@ def test_each_q20_deviation_is_a_kept_heat_php_changed(on_django_inputs):
         for name, (quirk, _) in transcript_deviations(fixture).items():
             if quirk == "Q20":
                 reply = on_django_inputs[fixture, name]
-                assert php_changed_a_kept_heat(PHP[fixture, name][0], reply.kept), name
+                php = chart_of(PHP[fixture, name][0])
+                assert php_changed_a_kept_heat(php, reply.kept), name
 
 
 def test_each_chart_deviation_still_differs_from_php():
@@ -127,5 +136,6 @@ def test_each_chart_deviation_still_differs_from_php():
     the service tests check."""
     for fixture in FIXTURES:
         for name, (quirk, _) in transcript_deviations(fixture).items():
-            if quirk in ("Q20", "Q21"):
-                assert expected_django_chart(fixture, name) != PHP[fixture, name][0]
+            if quirk in CHART_QUIRKS:
+                expected = chart_of(expected_django_reply(fixture, name))
+                assert expected != chart_of(PHP[fixture, name][0])

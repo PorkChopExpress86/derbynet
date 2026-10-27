@@ -1,25 +1,9 @@
 ### 002 dry-run-runs-out-of-added-heats
 request: POST action.php
 request-body: action=schedule.reschedule&roundid=1&racerid=5&dry-run=1&trace=1
-status: 200
-content-type: application/json; charset=utf-8
-cache-control: no-store, no-cache, must-revalidate
-length: 4136
+length: 761
 body:
 {
-    "action": {
-        "action": "schedule.reschedule",
-        "roundid": 1,
-        "racerid": 5,
-        "dry-run": 1,
-        "trace": 1
-    },
-    "outcome": {
-        "summary": "success",
-        "code": "success",
-        "description": ""
-    },
-    "adjuster": "<sha256 8facb7e824faaa662c7a77592dc805f807d19d3c082f30b3ec9f984384117684 of 8801 bytes>",
     "chart": [
         null,
         null,
@@ -32,10 +16,6 @@ body:
         "- - - 5"
     ],
     "timing": {
-        "load": "<seconds>",
-        "inject": "<seconds>",
-        "update": "<seconds>",
-        "master-heat": "<seconds>",
         "internal": {
             "constructed": "<seconds>",
             "run-0-extra-0-start": "<seconds>",
@@ -50,123 +30,5 @@ body:
             "run-1-injected": "<seconds>",
             "run-1-racechart": "<seconds>"
         }
-    },
-    "current-heat": {
-        "now_racing": false,
-        "use_master_sched": false,
-        "use_points": false,
-        "classid": 2,
-        "roundid": 2,
-        "round": 1,
-        "tbodyid": 2,
-        "heat": 1,
-        "number-of-heats": 3,
-        "class": "Tigers"
-    },
-    "racers": [
-        {
-            "lane": 1,
-            "racerid": 3,
-            "name": "Tiger1 Racer",
-            "carname": "",
-            "carnumber": 201,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        },
-        {
-            "lane": 4,
-            "racerid": 4,
-            "name": "Tiger2 Racer",
-            "carname": "",
-            "carnumber": 202,
-            "note": "",
-            "photo": "",
-            "finishtime": "",
-            "finishplace": ""
-        }
-    ],
-    "timer-state": {
-        "lanes": 4,
-        "last-contact": "<epoch>",
-        "state": 3,
-        "icon": "img\/status\/ok.png",
-        "remote-start": false,
-        "message": "Staging"
-    },
-    "replay-state": {
-        "last_contact": 0,
-        "state": 1,
-        "icon": "img\/status\/not_connected.png",
-        "connected": false,
-        "message": "NOT CONNECTED"
-    },
-    "last-heat": "available",
-    "refused-results": 0,
-    "heat-results": [],
-    "classes": [
-        {
-            "classid": 1,
-            "count": 3,
-            "nrounds": 1,
-            "ntrophies": -1,
-            "name": "Lions",
-            "subgroups": [
-                {
-                    "rankid": 1,
-                    "count": 3,
-                    "ntrophies": -1,
-                    "name": "Lions"
-                }
-            ]
-        },
-        {
-            "classid": 2,
-            "count": 2,
-            "nrounds": 0,
-            "ntrophies": -1,
-            "name": "Tigers",
-            "subgroups": [
-                {
-                    "rankid": 2,
-                    "count": 2,
-                    "ntrophies": -1,
-                    "name": "Tigers"
-                }
-            ]
-        }
-    ],
-    "rounds": [
-        {
-            "roundid": 1,
-            "classid": 1,
-            "class": "Lions",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 3,
-            "passed": 2,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 6,
-            "heats_run": 3,
-            "name": "Lions, Round 1"
-        },
-        {
-            "roundid": 2,
-            "classid": 2,
-            "class": "Tigers",
-            "round": 1,
-            "aggregate": false,
-            "roster_size": 2,
-            "passed": 2,
-            "unscheduled": 0,
-            "adjustments": [],
-            "heats_scheduled": 3,
-            "heats_run": 0,
-            "name": "Tigers, Round 1"
-        }
-    ],
-    "ready-aggregate": []
+    }
 }
-

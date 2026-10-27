@@ -21,8 +21,9 @@ reschedule_case() {   # reschedule_case <racers> <partition>: a fresh event
 }
 
 # Q5: a dry run that squeezes out a heat of the round being raced.  Racer 10
-# leaves after heat 1, so its four lanes become byes, and heat 2's racers can
-# fill them.  PHP turns racing off although the dry run changes nothing.
+# leaves after heat 1, so its four lanes become byes, and PHP squeezes out
+# heat 9, whose racers fill them; heats 2 and 3 are unchanged.  PHP turns
+# racing off although the dry run changes nothing.
 reschedule_case 11 Racers
 post_ok "action=racer.bulk&who=all&what=checkin"
 post_ok "action=schedule.generate&roundid=1"

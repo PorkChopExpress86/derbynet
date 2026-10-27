@@ -157,7 +157,7 @@
         "043 schedule.reschedule",
         "044 schedule.reschedule"
       ],
-      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. Only the chart is Django's; #31 completes the rest of each reply.",
+      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
       "expected": "deviations/Q20/reschedule.http"
     },
     {
@@ -166,7 +166,7 @@
       "exchanges": [
         "002 late-racer-in-the-running-round"
       ],
-      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. Only the chart is Django's; #31 completes the rest of each reply.",
+      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
       "expected": "deviations/Q20/master-schedule.http"
     },
     {
@@ -175,7 +175,7 @@
       "exchanges": [
         "002 dry-run-runs-out-of-added-heats"
       ],
-      "reason": "PHP never searches with the last heat it adds and answers nochart; Django searches with it and fits the racer in.",
+      "reason": "PHP never searches with the last heat it adds and answers nochart; Django searches with it and fits the racer in. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
       "expected": "deviations/Q21/last-added-heat.http"
     }
   ]

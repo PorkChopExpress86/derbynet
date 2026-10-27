@@ -13,12 +13,10 @@ quirk and fixture:
 - Q21: PHP answers `nochart` where one more search with its last added heat
   fits the racer in.
 
-An expected exchange is PHP's with the `chart` replaced. For Q21 the reply
-becomes PHP's success reply: the chart, the `timing` keys, and the
-coordinator poll payload of the exchange before it, which the dry run did not
-change. The rest of each reply is PHP's. The poll payload of a Q20 reply can
-differ too (the current heat's racers, the heat counts), which #31 records
-when it ports the handler.
+An expected exchange keeps PHP's request and holds only what the reschedule
+service computes: the chart and the `timing.internal` keys
+(`reschedule_replay.django_reply`). The outcome, the coordinator poll payload
+and the HTTP headers belong to the handler, which #31 ports and records.
 """
 
 import argparse
@@ -36,6 +34,8 @@ from racing.engine.tests.golden import (  # noqa: E402
 )
 from racing.engine.tests.reschedule_replay import (  # noqa: E402
     SUITE_FIXTURE,
+    django_reply,
+    engine,
     php_changed_a_kept_heat,
     replay,
     replay_quirks,
@@ -45,70 +45,29 @@ REASONS = {
     "Q20": (
         "D34: Django keeps the running heat and the staged heat as they are"
         " and fits the racer into later or added heats; PHP can change both."
-        " Only the chart is Django's; #31 completes the rest of each reply."
+        " The expected reply holds only the chart and timing keys the service"
+        " computes; #31 records the rest."
     ),
     "Q21": (
         "PHP never searches with the last heat it adds and answers nochart;"
-        " Django searches with it and fits the racer in."
+        " Django searches with it and fits the racer in. The expected reply"
+        " holds only the chart and timing keys the service computes; #31"
+        " records the rest."
     ),
 }
 
 
-def php_json(value) -> str:
-    """`json_encode(..., JSON_PRETTY_PRINT)` as PHP writes it."""
-    return json.dumps(value, indent=4).replace("/", "\\/") + "\n"
-
-
-def chart_block(chart) -> str:
-    lines = ",\n".join(f"        {json.dumps(heat)}" for heat in chart)
-    return f'"chart": [\n{lines}\n    ]'
-
-
-def with_chart(body: str, chart) -> str:
-    start = body.index('"chart": [')
-    end = body.index("\n    ]", start) + len("\n    ]")
-    return body[:start] + chart_block(chart) + body[end:]
-
-
-def success_reply(php: dict, previous: dict, chart, timing_keys) -> str:
-    """PHP's success reply for a dry run that PHP answered with nochart."""
-    assert previous["request"].startswith("GET action.php?query=poll.coordinator")
-    failed = json.loads(php["body"])
-    poll = json.loads(previous["body"])
-    reply = {
-        "action": failed["action"],
-        "outcome": {"summary": "success", "code": "success", "description": ""},
-        **{k: v for k, v in failed.items() if k not in ("action", "outcome")},
-        "chart": chart,
-        "timing": {
-            key: "<seconds>" for key in ("load", "inject", "update", "master-heat")
-        }
-        | {
-            "internal": {
-                key: True if key.endswith("-timed-out") else "<seconds>"
-                for key in timing_keys
-            }
-        },
-        **poll,
-    }
-    text = php_json(reply)
-    assert php_json(poll) == previous["body"].decode(), "php_json is not PHP's"
-    return text
-
-
-def exchange_text(name: str, exchange: dict, body: str) -> str:
-    data = body.encode()
-    headers = "".join(
-        f"{key}: {value}\n"
-        for key, value in exchange.items()
-        if key not in ("body", "length", "note")
+def exchange_text(name: str, exchange: dict, reply: dict) -> str:
+    body = json.dumps(reply, indent=4)
+    request = "".join(
+        f"{key}: {exchange[key]}\n" for key in ("request", "request-body")
     )
-    return f"### {name}\n{headers}length: {len(data)}\nbody:\n{body}\n"
+    return f"### {name}\n{request}length: {len(body.encode())}\nbody:\n{body}\n"
 
 
 def expected_files() -> tuple[dict[Path, str], list[dict]]:
-    replies = [((SUITE_FIXTURE, name), r) for name, r in replay(True)]
-    replies += replay_quirks(True)
+    replies = [((SUITE_FIXTURE, name), r) for name, r in replay(engine(True))]
+    replies += replay_quirks(engine(True))
     files: dict[tuple[str, str], list[str]] = {}
     names: dict[tuple[str, str], list[str]] = {}
     transcripts = {}
@@ -123,17 +82,17 @@ def expected_files() -> tuple[dict[Path, str], list[dict]]:
             continue
         if php_chart is None:
             quirk = "Q21"
-            previous = list(exchanges.values())[list(exchanges).index(name) - 1]
-            text = success_reply(php, previous, reply.chart, reply.timing_keys)
         elif php_changed_a_kept_heat(php_chart, reply.kept):
             quirk = "Q20"
-            text = with_chart(php["body"].decode(), reply.chart)
         else:
             raise SystemExit(
                 f"{fixture} {name}: Django's chart differs from PHP's, and"
                 " PHP kept the running and staged heats, so D34 does not explain it"
             )
-        files.setdefault((quirk, fixture), []).append(exchange_text(name, php, text))
+        expected = django_reply(reply.chart, reply.timing_keys)
+        files.setdefault((quirk, fixture), []).append(
+            exchange_text(name, php, expected)
+        )
         names.setdefault((quirk, fixture), []).append(name)
     written = {}
     entries = []

@@ -6,13 +6,17 @@ module rebuilds that chart: it keeps the script's roster, check-ins, charts,
 results and current heat as plain data, schedules rounds with the ported
 generator, and applies each committed reschedule, as the PHP server did.
 
-Each reschedule runs twice. `php` runs the adjuster on PHP's inputs, where
-only heats with a result stay fixed, and must give PHP's chart. `django` also
-keeps the running heat and the staged heat, as the reschedule service does
-(D34), and starts from the charts Django itself committed.
+The script runs against a server: `engine(False)` runs the adjuster on
+PHP's inputs, where only heats with a result stay fixed, and must give PHP's
+chart. `engine(True)` also keeps the running heat and the staged heat, as the
+reschedule service does (D34), and starts from the charts it committed
+itself. `racing/services/tests/test_reschedule_replay.py` runs the same
+script against the database and the real service, so this copy of the
+service's rules cannot drift from it unnoticed.
 """
 
 import re
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
@@ -51,6 +55,18 @@ class Reply(NamedTuple):
     kept: dict[int, str]
 
 
+def django_reply(chart, timing_keys) -> dict | None:
+    """The part of a `schedule.reschedule` reply the reschedule service
+    computes, None for `nochart`: the chart and the `timing.internal` keys,
+    their values as the capture normalizes them."""
+    if chart is None:
+        return None
+    internal = {
+        key: True if key.endswith("-timed-out") else "<seconds>" for key in timing_keys
+    }
+    return {"chart": chart, "timing": {"internal": internal}}
+
+
 def heat_text(heat):
     return " ".join("-" if r is None else str(r) for r in heat)
 
@@ -75,29 +91,14 @@ class Server:
     """The PHP server's state as `test-reschedule.sh` drives it."""
 
     keep_staged_heats: bool
-    lane_count: int = 4
+    round_of: dict[int, int]  # racer -> round
     mask: int = 0
-    round_of: dict[int, int] = field(default_factory=dict)  # racer -> round
+    master: bool = False  # one round, so master order is heat order here
+    lane_count: int = 4
     passed: set[int] = field(default_factory=set)
     rounds: dict[int, Round] = field(default_factory=dict)
     current: tuple[int, int] | None = None
     racing: bool = False
-
-    @classmethod
-    def after_import(cls, keep_staged_heats):
-        server = cls(keep_staged_heats)
-        lines = [
-            line
-            for line in ROSTER_SCRIPT.read_text().splitlines()
-            if not line.lstrip().startswith("#") and "action=racer.import" in line
-        ]
-        cars = [int(re.search(r"carnumber=(\d+)", line)[1]) for line in lines]
-        # The last racer imported is deleted again, and SQLite reuses its id.
-        for racerid, car in enumerate(cars[:-1], start=1):
-            assert car % 100 == racerid, (car, racerid)
-            server.round_of[racerid] = ROUND_OF_HUNDREDS[car // 100]
-        server.rounds = {roundid: Round() for roundid in ROUND_OF_HUNDREDS.values()}
-        return server
 
     def roster(self, roundid):
         """Racer ids in the round's roster, in roster row order. A racer moved
@@ -205,10 +206,41 @@ class Server:
                 )
                 heat = old.chart[source - 1]
             new.chart.append(heat)
+        # A heat is its rows, so heats of byes at the end are not written.
+        while new.chart and not any(new.chart[-1]):
+            new.chart.pop()
         self.rounds[roundid] = new
 
 
-def replay(keep_staged_heats):
+def imported_roster() -> dict[int, int]:
+    """`{racer id: round}` after `testing/import-roster.sh`."""
+    lines = [
+        line
+        for line in ROSTER_SCRIPT.read_text().splitlines()
+        if not line.lstrip().startswith("#") and "action=racer.import" in line
+    ]
+    cars = [int(re.search(r"carnumber=(\d+)", line)[1]) for line in lines]
+    round_of = {}
+    # The last racer imported is deleted again, and SQLite reuses its id.
+    for racerid, car in enumerate(cars[:-1], start=1):
+        assert car % 100 == racerid, (car, racerid)
+        round_of[racerid] = ROUND_OF_HUNDREDS[car // 100]
+    return round_of
+
+
+type NewServer = Callable[..., Server]
+"""`new_server(round_of, mask=0, master=False)`: a server with the roster
+`{racer id: round}`, every racer not passed, and no round scheduled."""
+
+
+def engine(keep_staged_heats: bool) -> NewServer:
+    def new_server(round_of, mask=0, master=False):
+        return Server(keep_staged_heats, dict(round_of), mask, master)
+
+    return new_server
+
+
+def replay(new_server: NewServer) -> Iterator[tuple[str, Reply]]:
     """Yield `(exchange, Reply)` for each reschedule that
     `http/suite/reschedule.http` holds, in transcript order."""
     seq = iter(range(1, 1000))
@@ -216,7 +248,7 @@ def replay(keep_staged_heats):
     def name():
         return f"{next(seq):03d} schedule.reschedule"
 
-    s = Server.after_import(keep_staged_heats)
+    s = new_server(imported_roster())
     s.passed |= {5, 15, 25, 35}
     s.generate(ARROWS)
     s.select(ARROWS)
@@ -229,7 +261,7 @@ def replay(keep_staged_heats):
     yield name(), s.reschedule(ARROWS)
 
     for n_times_per_lane in (1, 2):
-        s = Server.after_import(keep_staged_heats) if n_times_per_lane == 1 else s
+        s = new_server(imported_roster()) if n_times_per_lane == 1 else s
         s.mask = 2
         s.passed |= {1, 11}
         for added, heats in ((None, 1), (16, 1), (21, 4)):
@@ -275,13 +307,13 @@ def replay(keep_staged_heats):
         yield name(), s.reschedule(WHITE, s.import_racer(WHITE))
 
 
-def replay_quirks(keep_staged_heats):
+def replay_quirks(new_server: NewServer) -> Iterator[tuple[tuple[str, str], Reply]]:
     """Yield `((fixture, exchange), Reply)` for each reschedule
     of `capture/scenarios/11-reschedule-quirks.sh`. Every case starts from an
     empty database, so racer ids count from 1 in import order."""
     dry_run_fixture, master_fixture, last_heat_fixture = QUIRK_FIXTURES
 
-    s = Server(keep_staged_heats, round_of=dict.fromkeys(range(1, 12), 1))
+    s = new_server(dict.fromkeys(range(1, 12), 1))
     s.passed |= set(s.round_of)
     s.generate(1)
     s.select(1)
@@ -292,7 +324,7 @@ def replay_quirks(keep_staged_heats):
         s.reschedule(1, dry_run=True),
     )
 
-    s = Server(keep_staged_heats, round_of=dict.fromkeys(range(1, 7), 1))
+    s = new_server(dict.fromkeys(range(1, 7), 1), master=True)
     s.passed |= set(range(1, 6))
     s.generate(1)
     s.select(1)
@@ -301,7 +333,7 @@ def replay_quirks(keep_staged_heats):
     s.passed.add(6)
     yield (master_fixture, "002 late-racer-in-the-running-round"), s.reschedule(1)
 
-    s = Server(keep_staged_heats, mask=2, round_of={1: 1, 2: 1, 3: 2, 4: 2, 5: 1})
+    s = new_server({1: 1, 2: 1, 3: 2, 4: 2, 5: 1}, mask=2)
     s.passed |= {1, 2, 3, 4}
     s.generate(1, 2)
     s.generate(2)
