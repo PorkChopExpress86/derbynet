@@ -87,3 +87,9 @@ Racing a heat again after the timer fails, so that the new times replace the old
 **Late racer**:
 A racer who passes check-in after some heats of their round have already run.
 _Avoid_: Late arrival, latecomer
+
+**Departed racer**:
+A racer taken off a round's roster or whose check-in was reverted, whose car leaves its unraced heats. A racer who only goes home is not departed.
+
+**Closed lane**:
+A lane the race coordinator takes out of use during a round because it is damaged, which stays out of use until the next round is scheduled.
