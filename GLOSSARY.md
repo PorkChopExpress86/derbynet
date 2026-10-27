@@ -75,7 +75,7 @@ _Avoid_: Excluded (the legacy field is `exclude`)
 A racer who races and can win judged awards, but no speed awards.
 
 **Staged heat**:
-The next heat to run in the current round, whose cars the race crew is lining up, or has lined up, while the current heat runs.
+The next heat to run, whose cars the race crew is lining up, or has lined up, while the current heat runs. It is the next heat of the current round, or under the master schedule the next heat in master order, which can be in another round.
 _Avoid_: Next-up (the legacy name)
 
 **On-deck report**:

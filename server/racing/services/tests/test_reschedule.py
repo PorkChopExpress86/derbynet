@@ -314,27 +314,29 @@ def test_no_heat_before_the_running_heat_is_squeezed_out():
     assert state_of(round).current_heat == 5
 
 
-def test_under_the_master_schedule_a_heat_of_another_round_is_never_staged():
-    """D36: round A's last heat is running and round B's heat 1 is next in
-    master order. B's heat 1 is not staged, so car 201, who left, loses it."""
+def test_under_the_master_schedule_the_next_heat_of_another_round_is_staged():
+    """D39: round A's last heat is running and round B's heat 1 is next in
+    master order, so B's heat 1 is staged. Car 201, who left, loses its lane
+    there, every other car keeps its lane, and the late car 220 goes later."""
     round = new_round(range(101, 105), use_master_sched=True)
-    other = new_round(range(201, 205), event=round.event)
+    other = new_round(range(201, 209), event=round.event)
     Round.objects.filter(pk=other.pk).update(number=2)
     race(round, 1, 2, 3)
     reassign_master_heats(round.event)
     make_current(round, 4)
-    rows = HeatLane.objects.filter(event=round.event).exclude(HAS_RESULT)
-    assert list(
-        rows.order_by("master_heat").values_list("round_id", "heat").distinct()[:2]
-    ) == [(round.id, 4), (other.id, 1)]
-    Racer.objects.filter(event=round.event, car_number=201).update(
-        passed_inspection=False
-    )
+    assert master_next(round, 4) == (other.id, 1)
+    gone = Racer.objects.get(event=round.event, car_number=201)
+    assert gone.id in {racer for _, racer, _ in heat_rows(other, 1)}
+    Racer.objects.filter(pk=gone.pk).update(passed_inspection=False)
+    staged = {row for row in heat_rows(other, 1) if row[1] != gone.id}
+    late = late_racer(other, 220)
 
     reschedule(other, budget=NodeBudget(UNLIMITED))
 
-    assert 201 not in by_car(other).get(1, [])
-    assert 201 not in {car for heat in by_car(other).values() for car in heat}
+    assert heat_rows(other, 1) == staged
+    assert master_next(round, 4) == (other.id, 1)
+    assert HeatLane.objects.filter(racer=late).exists()
+    assert not HeatLane.objects.filter(racer=late, heat=1).exists()
 
 
 def test_under_the_master_schedule_racing_and_the_current_heat_stay():
@@ -480,9 +482,10 @@ def test_adding_a_racer_who_already_has_heats_is_refused():
     assert by_car(round) == rows
 
 
-def test_under_the_master_schedule_the_staged_heat_is_next_in_its_round():
-    """D36: with heat 2 of round A running, the staged heat is A's heat 3,
-    not round B's heat 2, which is next in master order."""
+def test_under_the_master_schedule_the_staged_heat_is_next_in_master_order():
+    """D39: with heat 2 of round A running, the staged heat is round B's
+    heat 2, which is next in master order, not A's heat 3. Fitting a late
+    racer into B leaves B's heat 2 as it was, and still next."""
     round = new_round(range(101, 104), use_master_sched=True)
     other = new_round(range(201, 204), event=round.event)
     race(round, 1)
@@ -500,13 +503,15 @@ def test_under_the_master_schedule_the_staged_heat_is_next_in_its_round():
         (other.id, 2),
         (round.id, 3),
     ]
-    assert None in by_car(round)[3]
-    kept = {h: heat_rows(round, h) for h in (2, 3)}
+    staged = heat_rows(other, 2)
+    late = late_racer(other, 220)
 
-    reschedule(round, late_racer(round, 120).id, budget=NodeBudget(UNLIMITED))
+    reschedule(other, late.id, budget=NodeBudget(UNLIMITED))
 
-    assert {h: heat_rows(round, h) for h in (2, 3)} == kept
-    assert unraced_in_master_order()[0] == (round.id, 2)
+    assert heat_rows(other, 2) == staged
+    assert unraced_in_master_order()[:2] == [(round.id, 2), (other.id, 2)]
+    assert master_next(round, 2) == (other.id, 2)
+    assert not HeatLane.objects.filter(racer=late, heat__lte=2).exists()
 
 
 def master_next(round, heat):
@@ -828,3 +833,141 @@ def test_a_racer_of_another_event_is_refused():
 
     assert caught.code == Failure.NO_RACER
     assert state_of(round).reschedule_started_at is None
+
+
+# ----- D39: emptied heats, and late racers off the roster ---------------------
+
+
+def depart_all_of(round, heat):
+    """Take every car of the heat off the roster, and return their ids."""
+    gone = {racer for _, racer, _ in heat_rows(round, heat)}
+    RosterEntry.objects.filter(round=round, racer_id__in=gone).delete()
+    return gone
+
+
+def test_an_emptied_staged_heat_keeps_its_number():
+    """D39: every car of the staged heat 4 leaves. Heat 4 runs empty, and no
+    later heat takes its number."""
+    round = new_round(range(101, 113))
+    race(round, 1, 2)
+    make_current(round, 3)
+    running = heat_rows(round, 3)
+    gone = depart_all_of(round, 4)
+    running = {row for row in running if row[1] not in gone}
+
+    result = reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart[3] == "- - - -"
+    assert heat_rows(round, 3) == running
+    assert heat_rows(round, 4) == set()
+    assert min(h for h in by_car(round) if h > 4) == 5
+    assert state_of(round).current_heat == 3
+
+    late = late_racer(round, 120)
+    reschedule(round, late.id, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(round, 3) == running
+    assert heat_rows(round, 4) == set()
+    assert not HeatLane.objects.filter(racer=late, heat__lte=4).exists()
+
+
+def test_an_emptied_running_heat_keeps_its_number():
+    """D39: every car of the running heat 3 leaves. Heat 3 stays current with
+    no cars, the staged heat 4 keeps its other cars, and a later reschedule
+    fits a late racer in neither heat."""
+    round = new_round(range(101, 113))
+    race(round, 1, 2)
+    make_current(round, 3)
+    gone = depart_all_of(round, 3)
+    staged = {row for row in heat_rows(round, 4) if row[1] not in gone}
+
+    result = reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart[2] == "- - - -"
+    assert heat_rows(round, 3) == set()
+    assert heat_rows(round, 4) == staged
+    assert state_of(round).current_heat == 3
+
+    late = late_racer(round, 120)
+    result = reschedule(round, late.id, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart[2] == "- - - -"
+    assert heat_rows(round, 3) == set()
+    assert heat_rows(round, 4) == staged
+    assert state_of(round).current_heat == 3
+    assert not HeatLane.objects.filter(racer=late, heat__lte=4).exists()
+
+
+def test_an_emptied_last_heat_keeps_its_number_while_running():
+    """D39: heat 8, the round's last, is running when all its cars leave. A
+    late racer then goes into heats added after it."""
+    round = new_round(range(101, 109))
+    race(round, *range(1, 8))
+    make_current(round, 8)
+    depart_all_of(round, 8)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert max(by_car(round)) == 7
+    late = late_racer(round, 120)
+    result = reschedule(round, late.id, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart[7] == "- - - -"
+    assert heat_rows(round, 8) == set()
+    heats = set(HeatLane.objects.filter(racer=late).values_list("heat", flat=True))
+    assert min(heats) == 9
+    assert state_of(round).current_heat == 8
+
+
+def test_under_the_master_schedule_an_emptied_running_heat_stays_current():
+    """D39: every car of round A's running heat 2 leaves. The heat stays
+    current with no cars, and round B's heat 2, next in master order, stays
+    next."""
+    round = new_round(range(101, 109), use_master_sched=True)
+    other = new_round(range(201, 209), event=round.event)
+    race(round, 1)
+    race(other, 1)
+    reassign_master_heats(round.event)
+    make_current(round, 2)
+    assert master_next(round, 2) == (other.id, 2)
+    number = master_number(other, 2)
+    depart_all_of(round, 2)
+
+    reschedule(round, budget=NodeBudget(UNLIMITED))
+
+    assert heat_rows(round, 2) == set()
+    assert state_of(round).current_heat == 2
+    assert master_number(other, 2) == number
+
+
+def test_a_racer_of_another_group_is_refused():
+    """D39: a late racer is fitted only into a round whose roster has them."""
+    round = new_round(range(101, 109))
+    other = new_round(range(201, 205), event=round.event)
+    stranger = late_racer(other, 220)
+    rows = by_car(round)
+
+    caught = failure_of(lambda: reschedule(round, stranger.id, dry_run=True))
+
+    assert caught.code == Failure.NOT_ON_ROSTER
+    assert by_car(round) == rows
+    assert state_of(round).reschedule_started_at is None
+
+
+def test_a_racer_not_picked_for_the_final_is_refused():
+    """D39: a racer of the group who did not make the final is not fitted
+    into it."""
+    first = new_round(range(101, 109))
+    final = RoundFactory(group=first.group, number=2)
+    racers = list(Racer.objects.filter(event=first.event).order_by("car_number"))
+    for racer in racers[:4]:
+        RosterEntryFactory(round=final, racer=racer)
+    generate_schedule(final, 1)
+    rows = by_car(final)
+
+    caught = failure_of(
+        lambda: reschedule(final, racers[5].id, budget=NodeBudget(UNLIMITED))
+    )
+
+    assert caught.code == Failure.NOT_ON_ROSTER
+    assert by_car(final) == rows

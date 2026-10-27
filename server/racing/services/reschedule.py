@@ -30,7 +30,7 @@ from racing.engine.scheduling.adjuster import (
     n_runs_per_lane,
 )
 from racing.engine.scheduling.master import HeatRef
-from racing.models import HAS_RESULT, HeatLane, Round
+from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from racing.services.rounds import round_adjustments
 from racing.services.schedule import after_chart_change
 from roster.models import Racer
@@ -47,6 +47,7 @@ class Failure(StrEnum):
     NLANES = "nlanes"
     ALREADY_SCHEDULED = "alreadyscheduled"
     NO_RACER = "noracer"
+    NOT_ON_ROSTER = "notonroster"
 
 
 class RescheduleFailure(Exception):
@@ -69,8 +70,10 @@ class Rescheduled:
 class _RacePosition:
     """Where the race stands (D34). The current heat is the heat `RaceState`
     names; it is the running heat while none of its lanes has a result. The
-    staged heat is the next unraced heat after it in the same round, even
-    under the master schedule (D36)."""
+    staged heat is the next unraced heat after it in the same round, or under
+    the master schedule the unraced heat with the next master number, in any
+    round (D39). A heat whose cars have all left has no lanes but keeps its
+    number, so it can still be the running or the staged heat (D39)."""
 
     current: HeatRef | None
     running: HeatRef | None
@@ -83,19 +86,21 @@ class _RacePosition:
         return frozenset(ref[1] for ref in refs if ref and ref[0] == round.id)
 
     def pinned(self, round: Round, renumbered: dict[int, int]) -> frozenset[HeatRef]:
-        """Under the master schedule, the heat whose master number must stay
-        first once the event is renumbered, so `next` follows it: the
-        current heat, run or not, since master numbering renumbers a heat
-        with a result in only some lanes. `renumbered` is this round's heat
-        renumbering, which can move a current heat that has run."""
+        """Under the master schedule, the heats whose master numbers must stay
+        once the event is renumbered, so `next` goes from the current heat to
+        the staged heat: the current heat, run or not, since master numbering
+        renumbers a heat with a result in only some lanes, and the staged
+        heat. `renumbered` is this round's heat renumbering, which can move a
+        current heat that has run."""
         if not (self.master and self.current):
             return frozenset()
         r, heat = self.current
-        return frozenset({(r, renumbered.get(heat, heat) if r == round.id else heat)})
+        current = (r, renumbered.get(heat, heat) if r == round.id else heat)
+        return frozenset({current, *((self.staged,) if self.staged else ())})
 
 
-type _Row = tuple[int, int, int, int, bool]
-"""round id, heat, lane, racer id, whether it has a result"""
+type _Row = tuple[int, int, int, int, bool, int]
+"""round id, heat, lane, racer id, whether it has a result, master heat"""
 
 
 def _race_position(
@@ -105,11 +110,36 @@ def _race_position(
         return _RacePosition(None, None, None, use_master_sched)
     current = (state.current_round_id, state.current_heat)
     # A heat is run once one of its lanes has a result.
-    run = {(r, heat) for r, heat, _, _, done in rows if done}
-    unraced = {(r, heat) for r, heat, _, _, _ in rows} - run
+    run = {(r, heat) for r, heat, _, _, done, _ in rows if done}
+    last: dict[int, int] = {}
+    for r, heat, *_ in rows:
+        last[r] = max(last.get(r, 0), heat)
+    # A heat number with no lanes below a round's last heat, or a current
+    # heat just past it, is a heat whose cars all left (D39). A current heat
+    # further on is stale, as after the round was scheduled again.
+    unraced = {(r, heat) for r, top in last.items() for heat in range(1, top + 1)}
+    if current[1] == last.get(current[0], 0) + 1:
+        unraced.add(current)
+    unraced -= run
     running = current if current in unraced else None
-    later = [h for h in unraced if h[0] == current[0] and h[1] > current[1]]
-    return _RacePosition(current, running, min(later, default=None), use_master_sched)
+    if use_master_sched:
+        # A heat with no lanes has no master number, so it is never staged
+        # here, and from a current heat with none, the next heat is the
+        # lowest unraced number, where `next-up` lands.
+        number = {(r, heat): n for r, heat, _, _, _, n in rows}
+        after = number.get(current, 0)
+        later = [
+            (n, ref)
+            for ref, n in number.items()
+            if ref in unraced and ref != current and n > after
+        ]
+        staged = min(later, default=(None, None))[1]
+    else:
+        staged = min(
+            (h for h in unraced if h[0] == current[0] and h[1] > current[1]),
+            default=None,
+        )
+    return _RacePosition(current, running, staged, use_master_sched)
 
 
 @dataclass(frozen=True)
@@ -124,8 +154,11 @@ class _Snapshot:
     departed: tuple[int, ...]
     position: _RacePosition
 
-    def chart(self) -> list[list[int | None]]:
+    def chart(self, kept: frozenset[int] = frozenset()) -> list[list[int | None]]:
+        """The heats by lane, through the last heat with lanes or the last
+        kept heat, so a kept heat whose cars all left keeps its place."""
         nheats = max((heat for heat, _, _, _ in self.rows), default=0)
+        nheats = max(nheats, *kept) if kept else nheats
         chart: list[list[int | None]] = [
             [None] * self.lane_count for _ in range(nheats)
         ]
@@ -142,13 +175,19 @@ def _snapshot(round: Round) -> _Snapshot:
     state = RaceState.objects.get(event_id=round.event_id)
     # One query, so the round's heats and the race position agree.
     rows: list[_Row] = [
-        (r, heat, lane, racer, time is not None or place is not None)
-        for r, heat, lane, racer, time, place in HeatLane.objects.filter(
+        (r, heat, lane, racer, time is not None or place is not None, master)
+        for r, heat, lane, racer, time, place, master in HeatLane.objects.filter(
             event_id=round.event_id
         )
         .order_by("heat", "lane")
         .values_list(
-            "round_id", "heat", "lane", "racer_id", "finish_time", "finish_place"
+            "round_id",
+            "heat",
+            "lane",
+            "racer_id",
+            "finish_time",
+            "finish_place",
+            "master_heat",
         )
     ]
     pending = round_adjustments(round)
@@ -157,7 +196,7 @@ def _snapshot(round: Round) -> _Snapshot:
         unused_lane_mask=settings.unused_lane_mask,
         rows=tuple(
             (heat, lane, racer, done)
-            for r, heat, lane, racer, done in rows
+            for r, heat, lane, racer, done, _ in rows
             if r == round.id
         ),
         unscheduled=pending.unscheduled,
@@ -193,7 +232,8 @@ def _adjust(
         raise RescheduleFailure(
             Failure.ALREADY_SCHEDULED, "The racer already has heats in this round."
         )
-    chart = snapshot.chart()
+    kept = snapshot.position.kept_in(round)
+    chart = snapshot.chart(kept)
     n_runs = n_runs_per_lane(chart)
     if budget is None:
         budget = DeadlineBudget(
@@ -206,7 +246,7 @@ def _adjust(
         snapshot.lane_count,
         n_runs,
         budget,
-        kept=[heat - 1 for heat in snapshot.position.kept_in(round)],
+        kept=[heat - 1 for heat in kept],
     )
     adjuster.remove_departed(snapshot.departed)
     started = clock()
@@ -288,13 +328,13 @@ def reschedule(
 ) -> Rescheduled:
     """Adjust the round's unraced heats and return the new chart.
 
-    With `racer_id`, a racer of the round's event, fit that racer in;
+    With `racer_id`, a racer on the round's roster, fit that racer in;
     without it, fit in every passed racer of the roster who has no heat.
     Either way, departed racers become byes and heats of byes are squeezed
     out. Heats with a result, the running heat and the staged heat keep
     their racers, lanes and numbers, except that a departed racer's lane in
-    the running or staged heat runs empty (D37). With `dry_run`, return the
-    chart and change nothing (Q5).
+    the running or staged heat runs empty (D37), even when no car is left in
+    it (D39). With `dry_run`, return the chart and change nothing (Q5).
 
     Raises RescheduleFailure: `busy` when another reschedule of the event is
     running, or when the round changed under two searches in a row (Q15);
@@ -302,14 +342,20 @@ def reschedule(
     the chart has a heat 0;
     `alreadyscheduled` when `racer_id` already has heats in the round;
     `nlanes` when the chart uses lane 0 or lanes past the lane count; `noracer`
-    when `racer_id` is not a racer of the round's event. `budget`
-    replaces PHP's deadline, for tests.
+    when `racer_id` is not a racer of the round's event; `notonroster` when
+    the racer is not on the round's roster, as a racer of another group or
+    one not picked for a final (D39). `budget` replaces PHP's deadline, for
+    tests.
     """
-    if (
-        racer_id is not None
-        and not Racer.objects.filter(pk=racer_id, event_id=round.event_id).exists()
-    ):
-        raise RescheduleFailure(Failure.NO_RACER, "No such racer in this event.")
+    if racer_id is not None:
+        if not Racer.objects.filter(pk=racer_id, event_id=round.event_id).exists():
+            raise RescheduleFailure(Failure.NO_RACER, "No such racer in this event.")
+        if not RosterEntry.objects.filter(round=round, racer_id=racer_id).exists():
+            raise RescheduleFailure(
+                Failure.NOT_ON_ROSTER,
+                "The racer is not on this round's roster. Add the racer to the"
+                " roster first.",
+            )
     held = clock()
     if not _take_guard(round, held):
         raise RescheduleFailure(Failure.BUSY, _UNDERWAY)

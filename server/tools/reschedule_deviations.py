@@ -1,4 +1,4 @@
-"""Write the Q20 and Q21 deviation entries for the reschedule transcripts.
+"""Write the Q20, Q21 and Q25 deviation entries for the reschedule transcripts.
 
     uv run python tools/reschedule_deviations.py            # write them
     uv run python tools/reschedule_deviations.py --check    # fail if they differ
@@ -12,6 +12,8 @@ quirk and fixture:
 - Q20 (D34): Django keeps the running heat and the staged heat.
 - Q21: PHP answers `nochart` where one more search with its last added heat
   fits the racer in.
+- Q25 (D39): Django refuses to fit in a racer who is not on the round's
+  roster, with `notonroster`. Its expected reply is `{"failure": code}`.
 
 An expected exchange keeps PHP's request and holds only what the reschedule
 service computes: the chart and the `timing.internal` keys
@@ -34,7 +36,6 @@ from racing.engine.tests.golden import (  # noqa: E402
 )
 from racing.engine.tests.reschedule_replay import (  # noqa: E402
     SUITE_FIXTURE,
-    django_reply,
     engine,
     php_changed_a_kept_heat,
     replay,
@@ -53,6 +54,11 @@ REASONS = {
         " Django searches with it and fits the racer in. The expected reply"
         " holds only the chart and timing keys the service computes; #31"
         " records the rest."
+    ),
+    "Q25": (
+        "D39: Django refuses to fit in a racer who is not on the round's"
+        " roster and answers notonroster; PHP fits the racer in. The expected"
+        " reply holds only the service's failure code; #31 records the rest."
     ),
 }
 
@@ -78,9 +84,11 @@ def expected_files() -> tuple[dict[Path, str], list[dict]]:
         php = exchanges[name]
         body = json.loads(php["body"])
         php_chart = body["chart"] if body["outcome"]["code"] == "success" else None
-        if reply.chart == php_chart:
+        if reply.failure is None and reply.chart == php_chart:
             continue
-        if php_chart is None:
+        if reply.failure == "notonroster":
+            quirk = "Q25"
+        elif php_chart is None:
             quirk = "Q21"
         elif php_changed_a_kept_heat(php_chart, reply.kept):
             quirk = "Q20"
@@ -89,7 +97,7 @@ def expected_files() -> tuple[dict[Path, str], list[dict]]:
                 f"{fixture} {name}: Django's chart differs from PHP's, and"
                 " PHP kept the running and staged heats, so D34 does not explain it"
             )
-        expected = django_reply(reply.chart, reply.timing_keys)
+        expected = reply.django()
         files.setdefault((quirk, fixture), []).append(
             exchange_text(name, php, expected)
         )
@@ -113,7 +121,7 @@ def expected_files() -> tuple[dict[Path, str], list[dict]]:
 
 def merged_deviations(entries: list[dict]) -> str:
     current = json.loads(DEVIATIONS_FILE.read_text())
-    ours = {"Q20", "Q21"}
+    ours = {"Q20", "Q21", "Q25"}
     kept = [e for e in current["deviations"] if e["quirk"] not in ours]
     return json.dumps({**current, "deviations": kept + entries}, indent=2) + "\n"
 

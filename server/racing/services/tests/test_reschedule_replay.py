@@ -15,7 +15,6 @@ from racing.engine.tests.reschedule_replay import (
     SUITE_FIXTURE,
     UNLIMITED,
     Reply,
-    django_reply,
     replay,
     replay_quirks,
 )
@@ -117,6 +116,8 @@ class Database:
                 self.rounds[roundid], racer, dry_run, budget=NodeBudget(UNLIMITED)
             )
         except RescheduleFailure as failure:
+            if failure.code == Failure.NOT_ON_ROSTER:
+                return Reply(None, [], {}, str(failure.code))
             assert failure.code == Failure.NOCHART, failure
             return Reply(None, [], {})
         chart = [
@@ -135,4 +136,4 @@ def test_the_service_gives_each_recorded_reply_or_its_deviation():
     assert [key for key, _ in replies] == list(PHP)
     for key, reply in replies:
         expected = expected_django_reply(*key)
-        assert django_reply(reply.chart, reply.timing_keys) == expected, key
+        assert reply.django() == expected, key

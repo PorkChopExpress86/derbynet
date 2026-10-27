@@ -133,6 +133,20 @@
         "015 schedule.reschedule",
         "019 schedule.reschedule",
         "021 schedule.reschedule",
+        "039 schedule.reschedule",
+        "040 schedule.reschedule",
+        "041 schedule.reschedule",
+        "042 schedule.reschedule",
+        "043 schedule.reschedule",
+        "044 schedule.reschedule"
+      ],
+      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
+      "expected": "deviations/Q20/reschedule.http"
+    },
+    {
+      "quirk": "Q25",
+      "fixture": "http/suite/reschedule.http",
+      "exchanges": [
         "022 schedule.reschedule",
         "023 schedule.reschedule",
         "024 schedule.reschedule",
@@ -149,16 +163,10 @@
         "035 schedule.reschedule",
         "036 schedule.reschedule",
         "037 schedule.reschedule",
-        "038 schedule.reschedule",
-        "039 schedule.reschedule",
-        "040 schedule.reschedule",
-        "041 schedule.reschedule",
-        "042 schedule.reschedule",
-        "043 schedule.reschedule",
-        "044 schedule.reschedule"
+        "038 schedule.reschedule"
       ],
-      "reason": "D34: Django keeps the running heat and the staged heat as they are and fits the racer into later or added heats; PHP can change both. The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
-      "expected": "deviations/Q20/reschedule.http"
+      "reason": "D39: Django refuses to fit in a racer who is not on the round's roster and answers notonroster; PHP fits the racer in. The expected reply holds only the service's failure code; #31 records the rest.",
+      "expected": "deviations/Q25/reschedule.http"
     },
     {
       "quirk": "Q20",

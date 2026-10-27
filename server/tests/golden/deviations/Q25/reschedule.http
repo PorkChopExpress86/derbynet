@@ -1,0 +1,136 @@
+### 022 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 023 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 024 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 025 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 026 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 027 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 028 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 029 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 030 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 031 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 032 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 033 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 034 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 035 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 036 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 037 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}
+### 038 schedule.reschedule
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=2&racerid=6&dry-run=1
+length: 32
+body:
+{
+    "failure": "notonroster"
+}

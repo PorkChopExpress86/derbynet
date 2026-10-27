@@ -34,7 +34,7 @@ from racing.engine.tests.reschedule_replay import (
 )
 
 FIXTURES = [SUITE_FIXTURE, *QUIRK_FIXTURES]
-CHART_QUIRKS = ("Q20", "Q21")
+CHART_QUIRKS = ("Q20", "Q21", "Q25")
 
 
 def php_replies():
@@ -80,7 +80,8 @@ def on_django_inputs():
 def expected_django_reply(fixture, name):
     """A chart deviation's expected body, or else PHP's reply in
     `django_reply` form. A chart deviation records only what the service
-    computes (#31 ports the rest of the reply). Q5 leaves the chart PHP's."""
+    computes (#31 ports the rest of the reply), or for Q25 the refusal's
+    code. Q5 leaves the chart PHP's."""
     quirk, deviation = transcript_deviations(fixture).get(name, (None, None))
     if quirk not in CHART_QUIRKS:
         return PHP[fixture, name][0]
@@ -97,14 +98,12 @@ def test_php_inputs_give_the_php_reply(on_php_inputs, key):
     """The chart and the `timing.internal` keys, in PHP's order."""
     quirk, _ = transcript_deviations(key[0]).get(key[1], (None, None))
     expected = expected_django_reply(*key) if quirk == "Q21" else PHP[key][0]
-    reply = on_php_inputs[key]
-    assert django_reply(reply.chart, reply.timing_keys) == expected
+    assert on_php_inputs[key].django() == expected
 
 
 @pytest.mark.parametrize("key", list(PHP), ids=IDS)
 def test_django_inputs_give_the_php_chart_or_the_deviation(on_django_inputs, key):
-    reply = on_django_inputs[key]
-    assert django_reply(reply.chart, reply.timing_keys) == expected_django_reply(*key)
+    assert on_django_inputs[key].django() == expected_django_reply(*key)
 
 
 def test_django_keeps_the_running_and_staged_heats(on_django_inputs):
@@ -117,7 +116,7 @@ def test_django_keeps_the_running_and_staged_heats(on_django_inputs):
 
 
 def chart_of(reply):
-    return None if reply is None else reply["chart"]
+    return None if reply is None else reply.get("chart")
 
 
 def test_each_q20_deviation_is_a_kept_heat_php_changed(on_django_inputs):
@@ -132,8 +131,8 @@ def test_each_q20_deviation_is_a_kept_heat_php_changed(on_django_inputs):
 
 
 def test_each_chart_deviation_still_differs_from_php():
-    """Q20 and Q21 change the chart. Q5 changes only the racing state, which
-    the service tests check."""
+    """Q20 and Q21 change the chart, and Q25 refuses the request. Q5 changes
+    only the racing state, which the service tests check."""
     for fixture in FIXTURES:
         for name, (quirk, _) in transcript_deviations(fixture).items():
             if quirk in CHART_QUIRKS:

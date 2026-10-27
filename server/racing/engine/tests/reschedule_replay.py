@@ -49,11 +49,19 @@ class Reply(NamedTuple):
     """The reply's `chart`, None for PHP's `nochart`, the keys of its
     `timing.internal`, and the heats the call kept (D34) as they must stand
     after it, departed racers' lanes empty (D37), `{heat number: chart
-    string}`."""
+    string}`. `failure` is the code of a request Django refuses before any
+    search, where PHP has no refusal (Q25)."""
 
     chart: list[str | None] | None
     timing_keys: list[str]
     kept: dict[int, str]
+    failure: str | None = None
+
+    def django(self) -> dict | None:
+        """The reply in `django_reply` form, or `{"failure": code}`."""
+        if self.failure:
+            return {"failure": self.failure}
+        return django_reply(self.chart, self.timing_keys)
 
 
 def django_reply(chart, timing_keys) -> dict | None:
@@ -154,7 +162,11 @@ class Server:
         return ({running} & set(unraced)) | set(later[:1])
 
     def reschedule(self, roundid, racerid=None, dry_run=False):
-        """The adjuster's reply, as a `Reply`."""
+        """The adjuster's reply, as a `Reply`. Django refuses a racer who is
+        not on the round's roster (D39, Q25)."""
+        if self.keep_staged_heats and racerid is not None:
+            if self.round_of[racerid] != roundid:
+                return Reply(None, [], {}, "notonroster")
         round = self.rounds[roundid]
         kept = self.kept_heats(roundid)
         on_chart = {r for heat in round.chart for r in heat if r is not None}
