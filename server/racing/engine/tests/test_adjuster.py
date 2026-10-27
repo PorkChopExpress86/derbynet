@@ -54,3 +54,23 @@ def test_a_deadline_counts_whole_seconds_as_php_time_does():
     assert not budget.exhausted()
     now[0] = 106.0
     assert budget.exhausted()
+
+
+def test_fitting_in_two_racers_names_each_timing_key_once():
+    """PHP's `times` is keyed by name, so a second racer's run 0 sets the
+    first racer's keys again and adds none."""
+    chart = [[1, 2], [3, 4], [2, 1], [4, 3]]
+    adjuster = ScheduleAdjuster(chart, {0: 1}, 0, 2, 1, NodeBudget(1000))
+    adjuster.remove_departed([])
+    adjuster.inject(5)
+    once = list(adjuster.timing_keys)
+    adjuster.inject(6)
+
+    assert adjuster.updated_chart() is not None
+    assert once == [
+        "constructed",
+        "run-0-extra-0-start",
+        "run-0-injected",
+        "run-0-racechart",
+    ]
+    assert adjuster.timing_keys == once

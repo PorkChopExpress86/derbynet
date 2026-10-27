@@ -166,6 +166,11 @@ class ScheduleAdjuster:
         self._displacement_heats: list[int | None] = []
         self._to_race: list[Heat | None] = []
 
+    def _time(self, key: str) -> None:
+        """PHP's `$this->times[key] = ...`: a key set again keeps its place."""
+        if key not in self.timing_keys:
+            self.timing_keys.append(key)
+
     def _active(self, lane: int) -> bool:
         return self._lane_mask & (1 << lane) == 0
 
@@ -288,13 +293,13 @@ class ScheduleAdjuster:
             # when the racer needs a new heat in every lane (Q21 in #20,
             # fixed for D34). The extra search runs only where PHP fails.
             for extra in range(self._nlanes_usable + 1):
-                self.timing_keys.append(f"run-{run}-extra-{extra}-start")
+                self._time(f"run-{run}-extra-{extra}-start")
                 self._best = None
                 self._inject_once(racer_id)
                 if self._best is not None or not self._keep_going:
                     if not self._keep_going:
-                        self.timing_keys.append(f"run-{run}-timed-out")
-                    self.timing_keys.append(f"run-{run}-injected")
+                        self._time(f"run-{run}-timed-out")
+                    self._time(f"run-{run}-injected")
                     break
                 self._add_heat()
                 self._nheats_new += 1
@@ -302,7 +307,7 @@ class ScheduleAdjuster:
                 _, injection, displacement = self._best
                 self._chart = self._injected_chart(injection, displacement, racer_id)
                 self._modified = True
-                self.timing_keys.append(f"run-{run}-racechart")
+                self._time(f"run-{run}-racechart")
             else:
                 self._failed = True
 
