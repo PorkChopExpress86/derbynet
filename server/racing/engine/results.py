@@ -105,18 +105,37 @@ DID_NOT_FINISH = 9.999
 already read 9.9 seconds or more as a car that did not finish."""
 
 
+def _finished(sent: Posted) -> bool:
+    """A posted time a car can finish in: a number above zero."""
+    number = _number(sent.time)
+    return number is not None and number > 0
+
+
+def is_false_start(lanes: Iterable[int], posted: list[Posted]) -> bool:
+    """The timer reported times, but no scheduled lane has one above zero, so
+    no car finished. It stops racing as `is_all_zeroes` does, rather than
+    giving every car `DID_NOT_FINISH` (D42). A timer that reports places
+    only reports no times."""
+    if all(sent.time is None for sent in posted):
+        return False
+    return not any(
+        _finished(posted[lane - 1]) for lane in lanes if 0 < lane <= len(posted)
+    )
+
+
 def merge_timer_results(
     stored: list[LaneResult], posted: list[Posted]
 ) -> list[LaneResult]:
     """`merge_results` for the timer (D42). When the timer reports times, a
-    scheduled lane it gives no time, or a time that is not a number, did not
-    finish and gets `DID_NOT_FINISH`, so every car has a time and the places
-    follow from them. A timer that reports places only finishes no car."""
+    scheduled lane it gives no time, a zero, or a time that is not a number,
+    did not finish and gets `DID_NOT_FINISH`, so every car has a time and the
+    places follow from them. A timer that reports places only finishes no
+    car."""
     if all(sent.time is None for sent in posted):
         return merge_results(stored, posted)
     filled = list(posted)
     for row in stored:
-        if 0 < row.lane <= len(filled) and _number(filled[row.lane - 1].time) is None:
+        if 0 < row.lane <= len(filled) and not _finished(filled[row.lane - 1]):
             filled[row.lane - 1] = replace(
                 filled[row.lane - 1], time=str(DID_NOT_FINISH)
             )

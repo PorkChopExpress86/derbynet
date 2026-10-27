@@ -150,6 +150,24 @@ def computed():
     return django_replay()
 
 
+def test_a_partial_result_advances_as_php_does():
+    """Q11 and D42 change lane 4's result, not the advance: as in PHP, heat 2
+    is current next, with racing on."""
+    from racing.services.heats import select_heat
+    from racing.services.results import record_timer_result
+    from racing.services.tests.race import current, fields, setup_race
+
+    exchanges = php(TIMER)
+    replay, round = setup_race()
+    select_heat(replay.event, round_id=round.id, now_racing=True)
+    body = exchanges["001 finished-without-lane-4"]["request-body"]
+    record_timer_result(replay.event, fields(body.split("message=FINISHED&", 1)[1]))
+    heat = json.loads(exchanges["002 poll-after-a-lane-without-a-result"]["body"])[
+        "current-heat"
+    ]
+    assert current(replay.event) == (round.id, heat["heat"], heat["now_racing"])
+
+
 @pytest.mark.parametrize(
     ("fixture", "name"),
     [(fixture, n) for (_, fixture), (names, _) in DEVIATIONS.items() for n in names],

@@ -23,6 +23,7 @@ from racing.engine.results import (
     LaneResult,
     Posted,
     is_all_zeroes,
+    is_false_start,
     merge_results,
     merge_timer_results,
     mirror_results,
@@ -123,7 +124,10 @@ def record_timer_result(
         decision = transition(
             state,
             hs.TimerResult(
-                all_zero=is_all_zeroes(posted),
+                all_zero=is_all_zeroes(posted)
+                or (
+                    bool(results) and is_false_start([r.lane for r in results], posted)
+                ),
                 written=tuple((r.lane, _has_result(r)) for r in results),
                 posted_round=_named(fields, "roundid"),
                 posted_heat=_named(fields, "heat"),

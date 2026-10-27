@@ -7,7 +7,7 @@ import pytest
 from django.utils import timezone
 
 from core.models import RaceState
-from racing.models import HeatLane, Round
+from racing.models import HeatLane, RosterEntry, Round
 from racing.services.heats import reinstate, rerun
 from racing.services.playlist import round_ended, start_playlist
 from racing.services.results import (
@@ -163,4 +163,28 @@ def test_a_change_that_keeps_the_finalists_keeps_the_final_chart(intermission):
     assert (
         sorted(HeatLane.objects.filter(round=final).values_list("id", flat=True))
         == chart
+    )
+
+
+def test_a_reordered_cut_rebuilds_the_final_in_its_new_order(intermission):
+    """The same finalists in another order make another chart, as a fresh
+    activation would, so the roster follows the cut's order."""
+    event, round1, final, entry, finalists_for = intermission
+    fastest = [r.pk for r in finalists_for(entry, final).racers][-1]
+    for lane in HeatLane.objects.filter(round=round1, racer_id=fastest).order_by(
+        "heat"
+    ):
+        now = state_of_event(event)
+        now.current_round_id, now.current_heat = round1.id, lane.heat
+        now.save()
+        record_manual_result(event, fields(f"lane{lane.lane}=1.001"))
+    cut = [r.pk for r in finalists_for(entry, final).racers]
+    assert sorted(cut) == roster(final) and cut[0] == fastest
+    assert (
+        list(
+            RosterEntry.objects.filter(round=final)
+            .order_by("id")
+            .values_list("racer_id", flat=True)
+        )
+        == cut
     )

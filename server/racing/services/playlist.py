@@ -289,11 +289,12 @@ def _feeds(ended: Round, entry: PlaylistEntry) -> bool:
 
 def _same_finalists(round: Round, entry: PlaylistEntry, finalists_for) -> bool:
     """The round has a chart and its roster is the racers the cut picks now,
-    so a rebuild would make the same roster again."""
+    in the cut's order, which is the order the schedule reads, so a rebuild
+    would make the same roster and chart again."""
     if not HeatLane.objects.filter(round=round).exists():
         return False
-    roster = set(round.roster.values_list("racer_id", flat=True))
-    return roster == {racer.pk for racer in finalists_for(entry, round).racers}
+    roster = list(round.roster.order_by("id").values_list("racer_id", flat=True))
+    return roster == [racer.pk for racer in finalists_for(entry, round).racers]
 
 
 def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:

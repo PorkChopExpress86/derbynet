@@ -5,6 +5,7 @@ from racing.engine.results import (
     LaneResult,
     Posted,
     is_all_zeroes,
+    is_false_start,
     merge_results,
     merge_timer_results,
     mirror_mask,
@@ -136,8 +137,8 @@ def test_a_car_with_no_time_from_the_timer_did_not_finish_and_places_last():
     ]
 
 
-@pytest.mark.parametrize("time", ["---", "", "0"])
-def test_a_time_that_is_not_a_number_did_not_finish(time):
+@pytest.mark.parametrize("time", ["---", "", "0", "0.0", "0.000"])
+def test_a_time_that_is_not_a_positive_number_did_not_finish(time):
     merged = merge_timer_results(stored(1, 2), parse(f"lane1={time}&lane2=3.2"))
     assert merged == [LaneResult(1, DID_NOT_FINISH, 2), LaneResult(2, 3.2, 1)]
 
@@ -157,3 +158,20 @@ def test_a_timer_that_reports_places_only_finishes_no_car():
 def test_an_unscheduled_lane_never_gets_a_time():
     merged = merge_timer_results(stored(2, 3), parse("lane1=3.0&lane2=3.1"))
     assert merged == [LaneResult(2, 3.1, 1), LaneResult(3, DID_NOT_FINISH, 2)]
+
+
+@pytest.mark.parametrize(
+    ("body", "false_start"),
+    [
+        ("lane1=0&lane2=0", True),
+        ("lane1=0.000&lane2=", True),
+        ("lane1=---&lane2=0.0", True),
+        ("lane1=0&lane2=3.2", False),
+        ("place1=1&place2=2", False),
+        ("lane3=3.1", True),
+    ],
+)
+def test_a_heat_with_no_positive_time_on_a_scheduled_lane_is_a_false_start(
+    body, false_start
+):
+    assert is_false_start([1, 2], parse(body)) is false_start

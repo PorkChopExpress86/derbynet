@@ -4,11 +4,13 @@ car that does not finish in a round's last heat never stops the playlist."""
 
 import pytest
 
+from core.models import RaceState
 from racing.engine.results import DID_NOT_FINISH
-from racing.models import HeatLane
+from racing.models import HeatLane, TimerStatus
+from racing.services.heats import select_heat
 from racing.services.playlist import start_playlist
 from racing.services.results import Outcome, record_timer_result
-from racing.services.tests.race import fields
+from racing.services.tests.race import current, fields, lanes, setup_race
 from racing.tests.test_race_day import state, two_step_playlist
 
 pytestmark = pytest.mark.django_db
@@ -46,3 +48,36 @@ def test_a_car_that_does_not_finish_the_last_heat_moves_the_playlist_on(last_lan
     if last_lane != "3.2":
         assert times[lanes[-1]] == DID_NOT_FINISH
         assert places[lanes[-1]] == len(lanes), "the car that did not finish is last"
+
+
+@pytest.mark.parametrize("body", ["lane1=0&lane2=0", "lane1=0.000&lane2=---"])
+def test_no_positive_time_on_the_used_lanes_is_a_false_start(body):
+    """Lanes 3 and 4 are masked. With no real time, no car finished, so the
+    heat is the all-zero stop and not two cars that did not finish."""
+    replay, round = setup_race(mask=12)
+    select_heat(replay.event, round_id=round.id, now_racing=True)
+    assert record_timer_result(replay.event, fields(body)).outcome is (Outcome.ALL_ZERO)
+    assert lanes(round, 1) == {1: (None, None), 2: (None, None)}
+    assert current(replay.event) == (round.id, 1, False)
+
+
+def test_a_zero_time_beside_real_times_did_not_finish():
+    replay, round = setup_race()
+    select_heat(replay.event, round_id=round.id, now_racing=True)
+    record_timer_result(
+        replay.event, fields("lane1=3.1&lane2=0.000&lane3=3.3&lane4=3.4")
+    )
+    assert lanes(round, 1)[2] == (DID_NOT_FINISH, 4)
+
+
+def test_a_timer_test_records_its_times():
+    """The false-start rule reads the current heat's lanes, and a timer test
+    has none."""
+    replay, round = setup_race()
+    RaceState.objects.filter(event=replay.event).update(
+        timer_test=True, current_round=None, current_heat=1, racing=True
+    )
+    recorded = record_timer_result(replay.event, fields("lane1=3.1&lane2=3.2"))
+    assert recorded.outcome is Outcome.RECORDED
+    status = TimerStatus.objects.get(event=replay.event)
+    assert status.test_results == {"1": {"time": "3.1"}, "2": {"time": "3.2"}}
