@@ -92,4 +92,4 @@ _Avoid_: Late arrival, latecomer
 A racer taken off a round's roster, or whose check-in was reverted, whose car leaves its unraced heats. A racer who only goes home is not departed.
 
 **Closed lane**:
-A lane the race coordinator takes out of use during a round because it is damaged, and which stays out of use until the next round is scheduled.
+A lane the race coordinator takes out of use during a round because it is damaged. It stays closed in the following rounds until the race coordinator reopens it, which is possible only before the next round is scheduled.
