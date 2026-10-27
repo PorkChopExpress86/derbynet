@@ -1,9 +1,10 @@
 import json
+import random
 import threading
 from datetime import timedelta
 
 import pytest
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
@@ -15,6 +16,9 @@ from racing.services.reschedule import (
     GUARD_EXPIRY,
     Failure,
     RescheduleFailure,
+    _adjust,
+    _snapshot,
+    _write,
     reschedule,
 )
 from racing.services.rounds import Adjustments, adjustments
@@ -576,4 +580,140 @@ def test_the_retry_renews_the_guard():
     )
 
     assert guards[1] > guards[0]
+    assert state_of(round).reschedule_started_at is None
+
+
+# ----- Findings of the second #24 review ------------------------------------
+
+
+def race_lane(round, heat, lane):
+    HeatLane.objects.filter(round=round, heat=heat, lane=lane).update(finish_time=3.0)
+
+
+def test_a_current_heat_with_a_result_in_one_lane_counts_as_raced():
+    """A heat is run once one of its lanes has a result, so the partly run
+    current heat stays as it is and heat 4 is the staged heat."""
+    round = new_round(range(101, 111))
+    race(round, 1, 2)
+    race_lane(round, 3, 1)
+    make_current(round, 3)
+    kept = {h: heat_rows(round, h) for h in (3, 4)}
+    racer = late_racer(round, 120)
+
+    result = reschedule(round, racer.id, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart[2] is None
+    assert {h: heat_rows(round, h) for h in (3, 4)} == kept
+    assert not HeatLane.objects.filter(racer=racer, heat__lte=4).exists()
+    assert state_of(round).current_heat == 3
+
+
+def test_a_staged_heat_with_a_result_in_one_lane_is_passed_over():
+    """Heat 4 has a result in lane 2, so it counts as raced and heat 5 is
+    the staged heat."""
+    round = new_round(range(101, 111))
+    race(round, 1, 2)
+    race_lane(round, 4, 2)
+    make_current(round, 3)
+    kept = {h: heat_rows(round, h) for h in (3, 4, 5)}
+    racer = late_racer(round, 120)
+
+    result = reschedule(round, racer.id, budget=NodeBudget(UNLIMITED))
+
+    assert result.chart[3] is None
+    assert {h: heat_rows(round, h) for h in (3, 4, 5)} == kept
+    assert not HeatLane.objects.filter(racer=racer, heat__lte=5).exists()
+
+
+def test_no_state_the_database_can_hold_makes_the_adjuster_raise():
+    """Results in any lanes of any heats, any current heat, either schedule,
+    departed and late racers: every call succeeds or fails with a
+    RescheduleFailure."""
+    rng = random.Random(24)
+    outcomes = set()
+    for case in range(40):
+        round = new_round(
+            range(101, 101 + rng.randint(3, 9)),
+            rng.choice((1, 2)),
+            lane_count=rng.choice((2, 3, 4)),
+            use_master_sched=rng.random() < 0.3,
+        )
+        rows = list(HeatLane.objects.filter(round=round))
+        for row in rng.sample(rows, rng.randint(0, len(rows))):
+            row.finish_place = 1
+            row.save()
+        nheats = max(row.heat for row in rows)
+        make_current(round, rng.randint(1, nheats + 1))
+        for racer in Racer.objects.filter(event=round.event):
+            if rng.random() < 0.15:
+                Racer.objects.filter(pk=racer.pk).update(passed_inspection=False)
+        racer = late_racer(round, 200 + case) if rng.random() < 0.7 else None
+        try:
+            reschedule(
+                round,
+                racer.id if racer else None,
+                dry_run=rng.random() < 0.5,
+                budget=NodeBudget(2000),
+            )
+            outcomes.add("success")
+        except RescheduleFailure as failure:
+            outcomes.add(failure.code)
+    assert "success" in outcomes
+
+
+def test_a_retry_whose_guard_was_taken_fails_with_busy():
+    """The first search ran past the guard's expiry, and another request
+    took the guard; the retry must not go on without it."""
+    round = new_round(range(101, 110))
+    racer = late_racer(round, 120)
+    other = timezone.now() + timedelta(hours=1)
+    searches = []
+
+    def finish_a_heat_and_lose_the_guard():
+        if not searches:
+            race(round, 1)
+            RaceState.objects.filter(event=round.event).update(
+                reschedule_started_at=other
+            )
+        searches.append(1)
+
+    caught = failure_of(
+        lambda: reschedule(
+            round, racer.id, budget=OnSearch(finish_a_heat_and_lose_the_guard)
+        )
+    )
+
+    assert caught.code == Failure.BUSY
+    assert len(searches) == 1
+    assert not HeatLane.objects.filter(racer=racer).exists()
+    assert state_of(round).reschedule_started_at == other
+
+
+def test_the_write_never_deletes_a_result_the_snapshot_missed():
+    """A result writer that skips the lock records heat 2 lane 1 after the
+    recheck. The write may fail on the occupied lane, but keeps the result."""
+    round = new_round(range(101, 110))
+    race(round, 1)
+    racer = late_racer(round, 120)
+    snapshot = _snapshot(round)
+    adjuster = _adjust(round, snapshot, racer.id, NodeBudget(UNLIMITED), timezone.now)
+    race_lane(round, 2, 1)
+    result = heat_rows(round, 2)
+
+    try:
+        with transaction.atomic():
+            _write(round, state_of(round), snapshot, adjuster)
+    except IntegrityError:
+        pass
+
+    assert {r for r in result if r[2] is not None} <= heat_rows(round, 2)
+
+
+def test_a_racer_of_another_event_is_refused():
+    round = new_round(range(101, 109))
+    stranger = late_racer(new_round(range(201, 205)), 220)
+
+    caught = failure_of(lambda: reschedule(round, stranger.id, dry_run=True))
+
+    assert caught.code == Failure.NO_RACER
     assert state_of(round).reschedule_started_at is None

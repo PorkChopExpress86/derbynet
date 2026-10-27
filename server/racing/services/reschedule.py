@@ -29,14 +29,16 @@ from racing.engine.scheduling.adjuster import (
     SearchBudget,
     n_runs_per_lane,
 )
+from racing.engine.scheduling.master import HeatRef
 from racing.models import HAS_RESULT, HeatLane, Round
 from racing.services.rounds import round_adjustments
 from racing.services.schedule import after_chart_change
+from roster.models import Racer
 
 GUARD_EXPIRY = timedelta(seconds=2 * OVERALL_TIME_LIMIT)
 """A guard older than this is from a request that died without clearing it."""
 
-type HeatRef = tuple[int, int]  # (round id, heat)
+_UNDERWAY = "Another schedule adjustment is already underway"
 
 
 class Failure(StrEnum):
@@ -44,6 +46,7 @@ class Failure(StrEnum):
     BUSY = "busy"
     NLANES = "nlanes"
     ALREADY_SCHEDULED = "alreadyscheduled"
+    NO_RACER = "noracer"
 
 
 class RescheduleFailure(Exception):
@@ -84,31 +87,29 @@ class _RacePosition:
         return frozenset(r for r in (self.running, self.staged) if r and self.master)
 
 
-def _race_position(round: Round, settings: RaceSettings) -> _RacePosition:
-    state = RaceState.objects.get(event_id=round.event_id)
+type _Row = tuple[int, int, int, int, int, bool]
+"""round id, heat, lane, racer id, master heat, whether it has a result"""
+
+
+def _race_position(
+    rows: list[_Row], state: RaceState, use_master_sched: bool
+) -> _RacePosition:
     if state.current_round_id is None or state.current_heat is None:
-        return _RacePosition(None, None, settings.use_master_sched)
+        return _RacePosition(None, None, use_master_sched)
     current = (state.current_round_id, state.current_heat)
-    unraced = HeatLane.objects.filter(event_id=round.event_id).exclude(HAS_RESULT)
-    running_rows = unraced.filter(round_id=current[0], heat=current[1])
-    running = current if running_rows.exists() else None
-    if settings.use_master_sched:
-        number = (
-            HeatLane.objects.filter(round_id=current[0], heat=current[1])
-            .values_list("master_heat", flat=True)
-            .first()
-        )
-        later = unraced.filter(master_heat__gt=number) if number is not None else None
-        order = ("master_heat", "id")
+    # A heat is run once one of its lanes has a result.
+    run = {(r, heat) for r, heat, _, _, _, done in rows if done}
+    master = {(r, heat): number for r, heat, _, _, number, _ in rows}
+    unraced = set(master) - run
+    running = current if current in unraced else None
+    if use_master_sched:
+        number = master.get(current)
+        later = [] if number is None else [h for h in unraced if master[h] > number]
+        staged = min(later, key=master.get, default=None)
     else:
-        later = unraced.filter(round_id=current[0], heat__gt=current[1])
-        order = ("heat",)
-    staged = (
-        later.order_by(*order).values_list("round_id", "heat").first()
-        if later is not None
-        else None
-    )
-    return _RacePosition(running, staged, settings.use_master_sched)
+        later = [h for h in unraced if h[0] == current[0] and h[1] > current[1]]
+        staged = min(later, default=None)
+    return _RacePosition(running, staged, use_master_sched)
 
 
 @dataclass(frozen=True)
@@ -138,20 +139,36 @@ class _Snapshot:
 
 def _snapshot(round: Round) -> _Snapshot:
     settings = RaceSettings.objects.get(event_id=round.event_id)
-    rows = tuple(
-        (heat, lane, racer, time is not None or place is not None)
-        for heat, lane, racer, time, place in HeatLane.objects.filter(round=round)
+    state = RaceState.objects.get(event_id=round.event_id)
+    # One query, so the round's heats and the race position agree.
+    rows: list[_Row] = [
+        (r, heat, lane, racer, number, time is not None or place is not None)
+        for r, heat, lane, racer, number, time, place in HeatLane.objects.filter(
+            event_id=round.event_id
+        )
         .order_by("heat", "lane")
-        .values_list("heat", "lane", "racer_id", "finish_time", "finish_place")
-    )
+        .values_list(
+            "round_id",
+            "heat",
+            "lane",
+            "racer_id",
+            "master_heat",
+            "finish_time",
+            "finish_place",
+        )
+    ]
     pending = round_adjustments(round)
     return _Snapshot(
         lane_count=settings.lane_count,
         unused_lane_mask=settings.unused_lane_mask,
-        rows=rows,
+        rows=tuple(
+            (heat, lane, racer, done)
+            for r, heat, lane, racer, _, done in rows
+            if r == round.id
+        ),
         unscheduled=pending.unscheduled,
         departed=pending.departed,
-        position=_race_position(round, settings),
+        position=_race_position(rows, state, settings.use_master_sched),
     )
 
 
@@ -202,10 +219,16 @@ def _adjust(
     return adjuster
 
 
-def _write(round: Round, state: RaceState, snapshot: _Snapshot, adjuster):
+def _write(
+    round: Round, state: RaceState, snapshot: _Snapshot, adjuster: ScheduleAdjuster
+):
     rows = HeatLane.objects.filter(round=round)
     fixed = {heat for heat, _, _, done in snapshot.rows if done}
-    rows.exclude(heat__in=fixed | snapshot.position.kept_in(round)).delete()
+    # As PHP's DELETE, never a row with a result, even one written by a
+    # writer that skipped the lock.
+    rows.exclude(heat__in=fixed | snapshot.position.kept_in(round)).exclude(
+        HAS_RESULT
+    ).delete()
     renumbered = adjuster.renumbering_map()
     # Heats only move down, so in this order no heat moves onto one that has
     # not moved yet.
@@ -274,20 +297,25 @@ def reschedule(
     running, or when the round changed under two searches in a row (Q15);
     `nochart` when nothing would change or a racer could not be fitted in;
     `alreadyscheduled` when `racer_id` already has heats in the round;
-    `nlanes` when the chart uses lanes past the lane count. `budget`
+    `nlanes` when the chart uses lanes past the lane count; `noracer`
+    when `racer_id` is not a racer of the round's event. `budget`
     replaces PHP's deadline, for tests.
     """
+    if (
+        racer_id is not None
+        and not Racer.objects.filter(pk=racer_id, event_id=round.event_id).exists()
+    ):
+        raise RescheduleFailure(Failure.NO_RACER, "No such racer in this event.")
     held = clock()
     if not _take_guard(round, held):
-        raise RescheduleFailure(
-            Failure.BUSY, "Another schedule adjustment is already underway"
-        )
+        raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
     try:
         for attempt in range(2):
             if attempt:
                 # A second search may run past the first one's guard expiry.
                 renewed = clock()
-                _take_guard(round, renewed, held)
+                if not _take_guard(round, renewed, held):
+                    raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
                 held = renewed
             snapshot = _snapshot(round)
             adjuster = _adjust(round, snapshot, racer_id, budget, clock)
