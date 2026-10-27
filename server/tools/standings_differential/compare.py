@@ -153,8 +153,7 @@ class _ModelAwarding(speed_awards._Awarding):
 
     php_indexing = False
 
-    def award(self, n, bias, group_id, subgroup_id, label, ladder, unit):
-        racers = self.standings.racers
+    def award(self, n, bias, group_id, subgroup_id, label, ladder):
         place = 0
         rung_index = 0
         while place < n:
@@ -164,12 +163,7 @@ class _ModelAwarding(speed_awards._Awarding):
                 continue
             rung = ladder[rung_index]
             rung_index += 1
-            remaining = {
-                i: r
-                for i, r in enumerate(rung)
-                if r not in self.holders
-                and self.standings.why_not(racers[r], unit) is None
-            }
+            remaining = {i: r for i, r in enumerate(rung) if r not in self.holders}
             if not remaining:
                 continue
             if not self.php_indexing:

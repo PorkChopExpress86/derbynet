@@ -17,7 +17,6 @@ from enum import StrEnum
 
 from racing.engine.groups.aggregates import Aggregate, topological_order
 from racing.engine.phpcompat import php_equals, php_intval, php_numeric
-from racing.engine.standings.eligibility import PACK, AwardUnit
 from racing.engine.standings.oracle import Standings
 from racing.engine.standings.ordinals import nth_fastest
 from racing.engine.standings.tracker import Ladder
@@ -92,18 +91,18 @@ class _Awarding:
         subgroup_id: int | None,
         label: str,
         ladder: Ladder,
-        unit: AwardUnit,
     ) -> None:
         """`add_speed_group()`. A missing rung moves the place on, an empty
         rung after a tie does not, and a rung whose racers all hold an
-        award passes the place to the next rung.
+        award passes the place to the next rung. The ladder holds only the
+        racers who can win the unit's awards: the standings decide that for
+        each award ladder (D33, D35).
 
         PHP indexes the remaining racers of a rung by their old positions
         (Q7, C9), so when the first racer of a tie already holds an award
         it awards nobody and skips the next racer. Here the remaining
         racers get the place in rung order.
         """
-        racers = self.standings.racers
         place = 0
         rung_index = 0
         while place < n:
@@ -113,12 +112,7 @@ class _Awarding:
                 continue
             rung = ladder[rung_index]
             rung_index += 1
-            recipients = [
-                r
-                for r in rung
-                if r not in self.holders
-                and self.standings.why_not(racers[r], unit) is None
-            ]
+            recipients = [r for r in rung if r not in self.holders]
             if not recipients:
                 continue
             name = nth_fastest(1 + place, label)
@@ -201,7 +195,6 @@ def speed_awards(standings: Standings, trophies: TrophySettings) -> SpeedAwards:
             None,
             label,
             standings.award_ladder_full_field(),
-            PACK,
         )
     elif pack_id is not None:
         awarding.award(
@@ -211,7 +204,6 @@ def speed_awards(standings: Standings, trophies: TrophySettings) -> SpeedAwards:
             None,
             label,
             standings.award_ladder_class(pack_id),
-            PACK,
         )
 
     ordinal_group = 0
@@ -227,7 +219,6 @@ def speed_awards(standings: Standings, trophies: TrophySettings) -> SpeedAwards:
             None,
             aggregate.name,
             standings.award_ladder_class(aggregate.id),
-            AwardUnit(group_id=aggregate.id),
         )
 
     group_id = None
@@ -247,7 +238,6 @@ def speed_awards(standings: Standings, trophies: TrophySettings) -> SpeedAwards:
                 None,
                 group.name,
                 standings.award_ladder_class(group_id),
-                AwardUnit(group_id=group_id),
             )
         subgroup_within_group += 1
         # PHP biases a subgroup by `n-den-trophies`, not by the group's own
@@ -265,7 +255,6 @@ def speed_awards(standings: Standings, trophies: TrophySettings) -> SpeedAwards:
             subgroup.id,
             subgroup.name,
             standings.award_ladder_subgroup(subgroup.id),
-            AwardUnit(subgroup_id=subgroup.id),
         )
 
     return SpeedAwards(tuple(awarding.awards), reserved_overall)
