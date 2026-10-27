@@ -30,8 +30,10 @@ both again after a change, run
 
 import json
 import re
+from dataclasses import replace
 
 from racing.engine.standings import oracle
+from racing.engine.standings.eligibility import PACK, AwardUnit
 from racing.engine.standings.oracle import Standings
 from racing.engine.standings.speed_awards import (
     CurrentAward,
@@ -136,6 +138,33 @@ def test_every_award_list_matches_php_or_its_deviation():
             )
     assert wrong == {}
     assert compared == sum(len(Fixture(s).named(AWARD_LIST)) for s in FIXTURES)
+
+
+def listing_every_partition(event: oracle.Event) -> oracle.Event:
+    """The event with a partition per subgroup, and every award unit's list
+    narrowed to every partition (D35)."""
+    everyone = frozenset(s.id for s in event.subgroups)
+    units = [
+        PACK,
+        *(AwardUnit(group_id=g.id) for g in event.groups),
+        *(AwardUnit(subgroup_id=s.id) for s in event.subgroups),
+    ]
+    return replace(
+        event,
+        racers=tuple(replace(r, partition_id=r.subgroup_id) for r in event.racers),
+        partition_lists=dict.fromkeys(units, everyone),
+    )
+
+
+def test_every_award_list_matches_php_with_every_list_at_all_partitions():
+    wrong = []
+    for fixture, name in compared_award_lists():
+        standings = Standings(listing_every_partition(fixture.event(name)))
+        awards = speed_awards(standings, fixture.state(name).trophies).awards
+        django = [speed_award_json(a) for a in awards]
+        if django != body(fixture.expected(name))["speed-awards"]:
+            wrong.append((fixture.stem, name))
+    assert wrong == []
 
 
 def test_every_awards_sheet_matches_php_or_its_deviation():

@@ -128,7 +128,7 @@ def test_a_subgroup_list_places_its_awards_the_same_way(seed):
 
 @pytest.mark.parametrize("seed", range(30))
 def test_under_one_group_the_group_and_the_pack_agree_on_the_same_list(seed):
-    """Finding 7: one group whose subgroups are the partitions, as the
+    """One group whose subgroups are the partitions, as the
     one-group rule makes it. Fastest in the group and fastest in the pack
     go to the same racer when both units list the same partitions."""
     event = partitioned(random_event(seed))
@@ -158,7 +158,7 @@ def test_under_one_group_the_group_and_the_pack_agree_on_the_same_list(seed):
 
 @pytest.mark.parametrize("seed", range(30))
 def test_a_cut_reads_the_list_of_the_group_it_is_for(seed):
-    """Finding 11: one rule decides an aggregate's awards and its final's
+    """One rule decides an aggregate's awards and its final's
     cut, and the pack's list changes no cut."""
     event = partitioned(random_event(seed))
     counting = Standings(event)

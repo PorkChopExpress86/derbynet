@@ -1,8 +1,7 @@
 """Award partition lists (D35): the partitions each award unit can go to.
 
 A unit is the pack, a group, a subgroup, or a judged award, named by at
-most one of `group`, `subgroup` and `award`. These defaults wait on the
-owner's confirmation, and each is one line below:
+most one of `group`, `subgroup` and `award`.
 
 - A unit with no stored list goes to every partition, those added later
   too. Setting a list back to every partition, or to none, stores nothing,
