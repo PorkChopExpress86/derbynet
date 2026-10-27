@@ -1,0 +1,5 @@
+{
+"lanes=2 kind=even runs=2": {"result":{"biased":false,"f-statistic":0.17677136596055978,"df1":1,"df2":2,"critical-value":8.5263}},
+"lanes=2 kind=biased runs=2": {"result":{"biased":true,"f-statistic":25.0708546384224,"df1":1,"df2":2,"critical-value":8.5263}},
+"lanes=2 kind=one-slow runs=2": {"result":{"biased":true,"f-statistic":52.18553688823985,"df1":1,"df2":2,"critical-value":8.5263}}
+}

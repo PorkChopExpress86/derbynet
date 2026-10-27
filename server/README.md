@@ -89,9 +89,44 @@ Owner decision D31 sets two rules where PHP behaves otherwise.
 
 A final with fewer than 2 racers, zero included, gets D28's "The final needs at least 2 racers." from `start_waiting_step` (D34). Only a waiting round that was deleted during the intermission, and so is remade empty, says "The waiting round has no racers in its roster."
 
-The finalists of a follow-on or aggregate round come from the standings (#26), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
+The finalists of a follow-on or aggregate round come from the standings (see below), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
 
 `roster/tests/test_group_scenarios.py` and `racing/tests/test_round_scenarios.py` replay the group and round scripts of the shell suite through these services, using `roster/tests/php_replay.py`, and compare the state with what PHP recorded. PHP rebuilds the groups, with new ids, when a script applies the rule in force, so the replay checks that Django changes nothing and then rebuilds them itself, so later requests find the rows they name.
+
+## Standings and speed awards
+
+`racing/engine/standings/` ports PHP's standings (`website/inc/standings.inc`), finalist cut (`website/inc/roster.inc`), speed awards (`website/inc/awards.inc`), award names (`website/inc/ordinals.inc`) and lane bias test (`website/inc/lane-bias.inc`) as pure Python. `oracle.Standings(event)` gives the result rows, best first, each with its places, and the ladders keyed as PHP keys them: `st-r<round>`, `st-rr<round>-<subgroup>`, `st-q<group>` and `st-ff`. Scores follow PHP's SQLite rules on every database: `math.fsum` for `SUM`, NULLs left out as SQL leaves them, a single heat scoring as itself under drop-slowest (Q12), and names compared as `NOCASE`, which folds ASCII letters only.
+
+`racing/services/standings.py` reads an event with a few ORM queries. `standings_snapshot(event)` returns the standings, and its `speed_awards`, computed from the rows as they are. It caches nothing: reading the rows is most of the time (8.8 ms of 11.6 ms for 200 racers and 1200 results on SQLite, measured with `tools/time_standings.py` on an i7-10510U laptop), so a cache would save little even for the award kiosk's 0.5 s `award.current` poll. The ladders and orders it returns are tuples and read-only mappings. `current_award(event)` resolves `RaceState.current_award_key` for speed awards. `racing/services/lane_bias.py` holds `lane_bias(event)`.
+
+`racing/services/rounds.py` holds `new_round_roster(source, top, bucketed, extras)`, the service behind `roster.new`. The source is `FollowOn(round)`, `FromAggregate(group)` or `NewAggregate(name, groups, subgroups)`; a new aggregate becomes the `full-field-calc` group, as in PHP. In one transaction it makes the round or clears its roster, cuts the standings, and enters the qualifiers, then the extra racers the race coordinator allowed in (D32), which never take a qualifier's place. When the roster would be empty it fails with `no_racers` and changes nothing. `playlist_finalists(extras)` is the `finalists_for` the playlist services take, with each final's extras keyed by its group and round number, so a D27 rebuild that passes the same extras keeps them and no other final gets them. It returns the racers with the cut's concerns, for the intermission to show (D28).
+
+Award eligibility follows owner decisions D33, D34 and D35:
+
+- A racer has two award settings. `Racer.exclude` is "not eligible for any award", and `Racer.not_eligible_for_speed_awards` is new. The legacy API reads and writes `exclude` only.
+- Every award unit lists the partitions its awards can go to: the pack, each group (aggregates included), each subgroup, and later each judged award (#33). `awards.models.AwardPartition` stores a list only where it is narrowed, and `awards/services.py` reads and sets them. No stored list means every partition, those added later too; a narrowed list keeps exactly its partitions; deleting a partition deletes it from every list, and a list left empty goes back to all partitions. The legacy API neither reads nor writes the lists.
+- A racer who cannot win a ladder's speed awards keeps the standings rows, marked in `Row.not_eligible` with the reason, and takes no place and adds no `T` mark there. Every other place, ladder, speed award and finalist is then what PHP gives with that racer removed. A racer whose partition a unit's list leaves out is marked only in the ladder that unit's awards read, and keeps every other place. The `full-field-calc` group's award ladder is the pack's.
+- A cut skips any racer who cannot win the speed awards of the group the new round is for, and takes the next racer. It reads that group's list, never the pack's. `racing/engine/standings/eligibility.py` holds the one rule the ladders, the awards and the cut share.
+
+`racing/engine/tests/test_standings_parity.py`, `test_speed_awards_parity.py`, `test_ordinals.py` and `test_lane_bias.py` compare the engine with every PHP standings, award and engine fixture, and `racing/tests/test_finalists.py` replays every `roster.new` and playlist cut of the shell suite. To time `standings_snapshot()` and the speed awards on a 200-racer event with 1200 results:
+
+```sh
+export DATABASE_URL=sqlite:////tmp/standings-timing.sqlite3
+uv run python manage.py migrate -v 0
+uv run python -m tools.time_standings
+```
+
+## Standings differential test against PHP
+
+`tools/standings_differential/` runs the real PHP standings, finalists and speed-award code and the Django engine in `racing/engine/standings/` on the same seeded random events, and compares every result row, ladder, catalog entry, class and rank key, finalist cut, speed award and `award.current` answer. It needs Docker and a local image with `php84` and the website at `/var/www/html`. From this directory, run:
+
+```sh
+uv run python -m tools.standings_differential [IMAGE] --controls
+```
+
+`IMAGE` defaults to `derbynet-local`. The run makes 2000 random events and 200 events for each targeted batch in `generate.py`, takes about two minutes, and exits 1 if any comparison differs. `--controls` also breaks the engine in a dozen seeded ways and checks that the comparison reports each. Each PHP run is a `docker run --rm` container named after `--name-prefix`, with no volume. pytest does not run the tool against PHP, because CI has no PHP image.
+
+The comparison counts three deliberate differences apart, Q7, Q8 and Q22 (#20). A key whose place ends in two or more letters, such as `speed-1ab`, names the 28th award of a tie in Django, where PHP reads its last letter only. It counts as Q22 only when Django answers with the award its letters name: as in PHP, a key counts the awards of its place that match its ids, every group's and subgroup's when it has none. An event counts as Q7 only when a model of PHP's award loop, changed only in its tie indexing, gives Django's awards one way and PHP's the other. A `current_award_key` with an oddly written number, such as `speed-02` or `speed-2- 1`, is compared like any other: the engine reads it with PHP 8's comparison rules. A key that makes PHP's `award.current` throw, such as `speed-x1`, is recorded as naming no award, which is what the engine answers. `racing/engine/tests/test_differential_controls.py` runs every seeded fault in CI against the engine's own answers.
 
 ## Inspect an event
 

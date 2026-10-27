@@ -15,8 +15,11 @@
 #
 # where <request> is "GET path?query", "POST path form-encoded-body", or
 # "POST path?query form-encoded-body".  Set CAPTURE_UA before a call to send that
-# User-Agent; otherwise requests send "golden-capture".  After a call, the
-# response body is in $CAPTURE_BODY and its status in $CAPTURE_STATUS.
+# User-Agent; otherwise requests send "golden-capture".  Set CAPTURE_UPLOAD to
+# <field>=<file>, a path under the transcripts' directory, to send a POST as
+# multipart/form-data with that file in <field>, beside the body's fields (sent as
+# written, not URL-decoded).  After a
+# call, the response body is in $CAPTURE_BODY and its status in $CAPTURE_STATUS.
 #
 # Raw transcripts land in a work directory, then normalize.mjs writes the files
 # under <outdir>/http with every volatile value masked.
@@ -59,6 +62,14 @@ capture_scenario() {
   fi
 }
 
+# form_fields <body>: each &-separated field of a form body on its own line, with
+# spaces and glob characters kept as written.
+form_fields() {
+  local -a fields=()
+  [ -z "$1" ] || IFS='&' read -r -a fields <<< "$1"
+  [ "${#fields[@]}" -eq 0 ] || printf '%s\n' "${fields[@]}"
+}
+
 # capture <name> <request>
 capture() {
   local name="$1" request="$2"
@@ -73,7 +84,14 @@ capture() {
   local args=(-s -A "$ua" -b "$COOKIES_CURL" -c "$COOKIES_CURL" -D "$headers" -o "$CAPTURE_BODY")
   case "$method" in
     GET) ;;
-    POST) args+=(-d "$body") ;;
+    POST)
+      if [ -z "${CAPTURE_UPLOAD:-}" ]; then
+        args+=(-d "$body")
+      else
+        local field
+        args+=(-F "${CAPTURE_UPLOAD%%=*}=@$RAW/${CAPTURE_UPLOAD#*=}")
+        while IFS= read -r field; do args+=(--form-string "$field"); done < <(form_fields "$body")
+      fi ;;
     *) echo "capture: unsupported method $method" >&2; return 1 ;;
   esac
   # The wall time, which normalize.mjs needs to judge a schedule.reschedule.
@@ -92,6 +110,7 @@ capture() {
     printf 'request: %s %s\n' "$method" "$path"
     [ -z "${CAPTURE_UA:-}" ] || printf 'user-agent: %s\n' "$CAPTURE_UA"
     [ "$method" != POST ] || printf 'request-body: %s\n' "$body"
+    [ "$method" != POST ] || [ -z "${CAPTURE_UPLOAD:-}" ] || printf 'request-upload: %s\n' "$CAPTURE_UPLOAD"
     printf 'status: %s\n' "$CAPTURE_STATUS"
     [ -z "$ctype" ] || printf 'content-type: %s\n' "$ctype"
     [ -z "$location" ] || printf 'location: %s\n' "$location"

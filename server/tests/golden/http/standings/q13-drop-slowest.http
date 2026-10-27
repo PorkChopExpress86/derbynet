@@ -1,0 +1,198 @@
+### 001 standings before the snapshot
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 274
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                2
+            ],
+            [
+                1
+            ]
+        ],
+        "st-ff": [
+            [
+                2
+            ],
+            [
+                1
+            ]
+        ]
+    }
+}
+
+### 002 snapshot.put
+request: POST action.php
+request-body: action=snapshot.put
+request-upload: snapshot=standings/q13-drop-slowest.snapshot.xml
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2225
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="snapshot.put">
+<uploaded-file name="q13-drop-slowest.snapshot.xml" size="9921">
+<table name="Classes" rows-before="0" idcolumn="classid">
+  <table-summary rows-received="1"/>
+</table>
+<table name="Ranks" rows-before="0" idcolumn="rankid">
+  <table-summary rows-received="1"/>
+</table>
+<table name="RegistrationInfo" rows-before="0" idcolumn="racerid">
+  <table-summary rows-received="2"/>
+</table>
+<table name="Rounds" rows-before="0" idcolumn="roundid">
+  <table-summary rows-received="1"/>
+</table>
+<table name="AwardTypes" rows-before="6" idcolumn="awardtypeid">
+  <table-summary rows-received="6"/>
+</table>
+<table name="Awards" rows-before="0" idcolumn="awardid">
+  <table-summary rows-received="0"/>
+</table>
+<table name="Roster" rows-before="0" idcolumn="rosterid">
+  <table-summary rows-received="2"/>
+</table>
+<table name="RaceChart" rows-before="0" idcolumn="resultid">
+  <table-summary rows-received="4"/>
+</table>
+<table name="RaceInfo" rows-before="6" idcolumn="raceinfoid">
+  <table-summary rows-received="21"/>
+</table>
+<table name="SceneKiosk" rows-before="14" idcolumn="scenekioskid">
+  <table-summary rows-received="14"/>
+</table>
+<table name="Scenes" rows-before="6" idcolumn="sceneid">
+  <table-summary rows-received="6"/>
+</table>
+<table name="Playlist" rows-before="0" idcolumn="queueid">
+  <table-summary rows-received="0"/>
+</table>
+<table name="BallotAwards" rows-before="0" idcolumn="ballotid">
+  <table-summary rows-received="0"/>
+</table>
+<table name="Voters" rows-before="0" idcolumn="voterid">
+  <table-summary rows-received="0"/>
+</table>
+<table name="Votes" rows-before="0" idcolumn="voteid">
+  <table-summary rows-received="0"/>
+</table>
+<table name="Partitions" rows-before="0" idcolumn="partitionid">
+  <table-summary rows-received="1"/>
+</table>
+<table name="ConstituentClasses" rows-before="0" idcolumn="antecedent">
+  <table-summary rows-received="0"/>
+</table>
+<table name="Events" rows-before="0" idcolumn="seq">
+  <table-summary rows-received="0"/>
+</table>
+<table name="EventLaneDetails" rows-before="0" idcolumn="tresultid">
+  <table-summary rows-received="0"/>
+</table>
+<success/>
+</uploaded-file>
+</action-response>
+
+### 003 settings.list after the snapshot
+request: GET action.php?query=settings.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 888
+body:
+{
+    "settings": {
+        "db-connection": "sqlite:\/var\/lib\/derbynet\/2026\/testdb\/derbynet.sqlite3",
+        "schema": 10,
+        "photos-on-now-racing": "head",
+        "show-cars-on-deck": 1,
+        "show-racer-photos-rr": 1,
+        "show-car-photos-rr": 1,
+        "upload-videos": 1,
+        "photo-directory": "\/var\/lib\/derbynet\/2026\/testdb\/racers",
+        "car-photo-directory": "\/var\/lib\/derbynet\/2026\/testdb\/cars",
+        "video-directory": "\/var\/lib\/derbynet\/2026\/testdb\/videos",
+        "logs-directory": "\/var\/lib\/derbynet\/2026\/testdb\/logs",
+        "lane_count": 2,
+        "unused-lane-mask": 0,
+        "NowRacingState": 0,
+        "refused-results": 0,
+        "RoundID": 1,
+        "Heat": 2,
+        "ClassID": 1,
+        "remote-start-go": 0,
+        "last_heat": "1#2",
+        "timer_current": "",
+        "drop-slowest": 1
+    }
+}
+
+### 004 standings after the snapshot
+request: GET action.php?query=standings
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 274
+body:
+{
+    "standings": {
+        "st-r1": [
+            [
+                1
+            ],
+            [
+                2
+            ]
+        ],
+        "st-ff": [
+            [
+                1
+            ],
+            [
+                2
+            ]
+        ]
+    }
+}
+
+### 005 settings.list after standings
+request: GET action.php?query=settings.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 910
+body:
+{
+    "settings": {
+        "db-connection": "sqlite:\/var\/lib\/derbynet\/2026\/testdb\/derbynet.sqlite3",
+        "schema": 10,
+        "photos-on-now-racing": "head",
+        "show-cars-on-deck": 1,
+        "show-racer-photos-rr": 1,
+        "show-car-photos-rr": 1,
+        "upload-videos": 1,
+        "photo-directory": "\/var\/lib\/derbynet\/2026\/testdb\/racers",
+        "car-photo-directory": "\/var\/lib\/derbynet\/2026\/testdb\/cars",
+        "video-directory": "\/var\/lib\/derbynet\/2026\/testdb\/videos",
+        "logs-directory": "\/var\/lib\/derbynet\/2026\/testdb\/logs",
+        "lane_count": 2,
+        "unused-lane-mask": 0,
+        "NowRacingState": 0,
+        "refused-results": 0,
+        "RoundID": 1,
+        "Heat": 2,
+        "ClassID": 1,
+        "remote-start-go": 0,
+        "last_heat": "1#2",
+        "timer_current": "",
+        "drop-slowest": 1,
+        "scoring": 1
+    }
+}
+

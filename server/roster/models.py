@@ -171,7 +171,10 @@ class Racer(EventScoped):
     headshot = models.CharField(max_length=255, blank=True, default="")
     car_photo = models.CharField(max_length=255, blank=True, default="")
     note = models.CharField(max_length=255, blank=True, default="")
+    # The two award settings (D33). `exclude` is the legacy name of "not
+    # eligible for any award", speed and judged awards alike.
     exclude = models.BooleanField(default=False)
+    not_eligible_for_speed_awards = models.BooleanField(default=False)
 
     class Meta:
         constraints = [

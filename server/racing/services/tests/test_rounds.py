@@ -6,6 +6,7 @@ from core.models import RaceSettings, RaceState
 from racing.models import HeatLane, PlaylistEntry, Round
 from racing.services import playlist, rounds
 from racing.services.rounds import (
+    Entrants,
     Failure,
     RoundFailure,
     delete_round_roster,
@@ -209,10 +210,10 @@ def _writers(replay):
         "rename_partition": lambda: groups.rename_partition(lions_partition, "Cubs"),
         "add_group": lambda: groups.add_group(replay.event, "Bears"),
         "start_playlist": lambda: playlist.start_playlist(
-            replay.event, lambda e, r: []
+            replay.event, lambda e, r: Entrants(())
         ),
         "round_ended": lambda: playlist.round_ended(
-            Round.objects.get(group=lions, number=1), lambda e, r: []
+            Round.objects.get(group=lions, number=1), lambda e, r: Entrants(())
         ),
         "add_partition": lambda: groups.add_partition(replay.event, "Cubs"),
         "delete_partition": lambda: groups.delete_partition(wolves),
@@ -250,10 +251,10 @@ def _writers(replay):
         ),
         "start_waiting_step": lambda: playlist.start_waiting_step(replay.event),
         "skip_waiting_step": lambda: playlist.skip_waiting_step(
-            replay.event, lambda e, r: []
+            replay.event, lambda e, r: Entrants(())
         ),
         "rebuild_waiting_round": lambda: playlist.rebuild_waiting_round(
-            replay.event, lambda e, r: racers(replay, "Lions")
+            replay.event, lambda e, r: Entrants(tuple(racers(replay, "Lions")))
         ),
     }
 

@@ -14,7 +14,7 @@ PHP does.
 the standings (#26), so each call takes a `FinalistsFor`.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import timedelta
 from enum import StrEnum
 
@@ -26,16 +26,18 @@ from core.services import lock_race_state
 from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, Round
 from racing.services import schedule
 from racing.services.rounds import (
+    Entrants,
     make_new_round,
     prepare_new_round,
     round_is_complete,
     write_roster,
 )
 from racing.services.schedule import ScheduleFailure, generate_schedule, unschedule
-from roster.models import GroupConstituent, Racer
+from roster.models import GroupConstituent
 
-FinalistsFor = Callable[[PlaylistEntry, Round], Sequence[Racer]]
-"""The racers of a step's round, in roster order, when it has no roster yet."""
+FinalistsFor = Callable[[PlaylistEntry, Round], Entrants]
+"""The racers of a step's round, in roster order, when it has no roster
+yet, with the cut's concerns."""
 
 PLAYLIST_SCENE_DELAY = timedelta(seconds=10)
 
@@ -98,7 +100,7 @@ def _activate(state: RaceState, entry: PlaylistEntry, finalists_for: FinalistsFo
     chart, its first heat selected."""
     round = _round_of(entry) or make_new_round(entry.group, entry.round_number)
     if not round.roster.exists():
-        write_roster(round, finalists_for(entry, round))
+        write_roster(round, finalists_for(entry, round).racers)
     if not HeatLane.objects.filter(round=round).exists():
         # PHP's schedule_one_round writes no chart and reports nothing.
         # `start_waiting_step` reports the failure.

@@ -59,6 +59,14 @@ class PhpIds:
         return self.php[kind][row.pk]
 
 
+RACER_FIELDS = {
+    "firstname": "first_name",
+    "lastname": "last_name",
+    "carname": "car_name",
+    "note_from": "note",
+}
+
+
 def _ordered(params, prefix):
     """`[value]` of keys `<prefix><n>`, by `n`."""
     keyed = [
@@ -177,10 +185,17 @@ class Replay:
         )
 
     def do_racer_edit(self, values, params):
-        """`racer.edit` with a new partition or subgroup: the racer's round 1
-        entry follows it to the new group's round 1."""
+        """`racer.edit`. With a new partition or subgroup, the racer's round
+        1 entry follows it to the new group's round 1."""
         racer = self.get("racer", values.get("racerid") or values.get("racer"))
         old_group = racer.group_id
+        for posted, field in RACER_FIELDS.items():
+            if posted in values:
+                setattr(racer, field, values[posted].strip())
+        if "carno" in values:
+            racer.car_number = int(values["carno"])
+        if "exclude" in values:
+            racer.exclude = values["exclude"] == "1"
         if "partitionid" in values:
             racer.partition = self.get("partition", values["partitionid"])
             racer.subgroup = racer.partition.subgroup
@@ -332,8 +347,10 @@ class Replay:
 
     def seed(self, state):
         """Rebuild a recorded state that an unrecorded script made, as
-        `import-roster.sh` does: the partitions in order, then the racers in
-        the order PHP gave them ids, which is car number mod 100 there."""
+        `import-roster.sh` does: the partitions in order, then the racers by
+        car number mod 100. That is the order PHP gave them ids except for
+        Webelos, whom `import-roster.sh` renumbers, so a replay that needs
+        racer ids runs the script itself (`Rounds.import_roster`)."""
         for partition in state["partitions"]:
             groups.find_or_create_partition(self.event.id, partition["name"])
         rows = [json.loads(row) for row in state["roster"]]

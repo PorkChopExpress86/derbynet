@@ -123,7 +123,9 @@ def merged_deviations(entries: list[dict]) -> str:
     current = json.loads(DEVIATIONS_FILE.read_text())
     ours = {"Q20", "Q21", "Q25"}
     kept = [e for e in current["deviations"] if e["quirk"] not in ours]
-    return json.dumps({**current, "deviations": kept + entries}, indent=2) + "\n"
+    # By quirk number, as the lane-bias and speed-award writers order them.
+    merged = sorted(kept + entries, key=lambda e: int(e["quirk"][1:]))
+    return json.dumps({**current, "deviations": merged}, indent=2) + "\n"
 
 
 def main() -> int:

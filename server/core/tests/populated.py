@@ -1,3 +1,4 @@
+from awards.models import AwardPartition
 from awards.tests.factories import AwardFactory, BallotAwardFactory, VoteFactory
 from core.models import RaceSettings, RaceState
 from core.tests.factories import ActionLogFactory, EventFactory
@@ -45,7 +46,10 @@ def populated_event():
     AuditEvent.objects.filter(pk=lane_result.audit_event_id).update(
         result_of=lane_result.audit_event_id
     )
-    AwardFactory(event=event, group=racer.group, subgroup=racer.subgroup, racer=racer)
+    award = AwardFactory(
+        event=event, group=racer.group, subgroup=racer.subgroup, racer=racer
+    )
+    AwardPartition.objects.create(event=event, award=award, partition=racer.partition)
     VoteFactory(voter__event=event)
     BallotAwardFactory(award__event=event)
     KioskFactory(event=event)

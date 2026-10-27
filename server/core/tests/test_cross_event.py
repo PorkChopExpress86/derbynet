@@ -37,8 +37,16 @@ REFERENCES = sorted(
     key=lambda pair: (pair[0]._meta.label_lower, pair[1].name),
 )
 
-# A check constraint ties this field to another column.
-ALSO_SET = {("core.racesettings", "full_field_group"): {"full_field_rule": "group"}}
+# A check constraint ties this field to other columns.
+ALSO_SET = {
+    ("core.racesettings", "full_field_group"): {"full_field_rule": "group"},
+    **{
+        ("awards.awardpartition", unit): {
+            other: None for other in ("group", "subgroup", "award") if other != unit
+        }
+        for unit in ("group", "subgroup", "award")
+    },
+}
 
 
 def _label(model, field):
