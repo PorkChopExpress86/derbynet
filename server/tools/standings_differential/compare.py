@@ -8,17 +8,17 @@ drops them from Django's rows.
 
 Three differences are deliberate (#20). Q22: a key whose place ends in two
 or more letters names a tie award past z in Django; PHP reads its last
-letter only. Such a key counts as Q22 only when Django answers with its own
-award of that key, or with nothing when it has none. Q7: with
-`one-trophy-per`, PHP awards nobody and skips a racer when the first racer
-of a tie already holds an award; Django awards the remaining racers in rung
-order. Q8: PHP orders the aggregate groups with a comparator that is not
-transitive; Django uses a real topological sort. An order difference counts
-as Q8 only when PHP's order is not topological and Django's is. An award
-difference counts as Q8 when Django, given PHP's order, gives exactly PHP's
-awards, and as Q7 when a model of the award loop gives Django's awards with
-Django's tie indexing and exactly PHP's with PHP's (`_ModelAwarding`), and
-PHP warned that it read a missing racer.
+letter only. Such a key counts as Q22 only when Django answers with the
+award its letters name (`_is_q22`). Q7: with `one-trophy-per`, PHP awards
+nobody and skips a racer when the first racer of a tie already holds an
+award; Django awards the remaining racers in rung order. Q8: PHP orders the
+aggregate groups with a comparator that is not transitive; Django uses a
+real topological sort. An order difference counts as Q8 only when PHP's
+order is not topological and Django's is. An award difference counts as Q8
+when Django, given PHP's order, gives exactly PHP's awards, and as Q7 when
+a model of the award loop gives Django's awards with Django's tie indexing
+and exactly PHP's with PHP's (`_ModelAwarding`), and PHP warned that it
+read a missing racer.
 """
 
 import json
@@ -470,12 +470,11 @@ def compare(ev: dict, php: dict) -> Outcome:
     django_current = _match_awards(out, php, dj)
 
     award_keys = {a["key"] for a in php["awards"]}
-    django_holders = {a["key"]: a["racerid"] for a in dj["awards"]}
     split = {"current": ([], []), "current_odd_keys": ([], [])}
     for key, p, d, own in zip(
         keys, php["current"], django_current, dj["current"], strict=True
     ):
-        if _canon(p) != _canon(d) and _is_q22(key, own, django_holders):
+        if _canon(p) != _canon(d) and _is_q22(key, own, dj["awards"]):
             out.deviations.append("Q22")
             continue
         php_items, django_items = split[
@@ -490,15 +489,30 @@ def compare(ev: dict, php: dict) -> Outcome:
     return out
 
 
-def _is_q22(key: str, answer: dict | None, holders: dict[str, int]) -> bool:
+def _is_q22(key: str, answer: dict | None, awards: list[dict]) -> bool:
     """Q22: the key's place ends in two or more letters, which name a tie
-    award past z, and Django answers with its own award of that key, or
-    with nothing when it has none."""
-    if not re.fullmatch(r"speed-[^-]*[a-z]{2,}(-.*)?", key):
+    award past z, and Django answers with that award. As in PHP, the key
+    counts the awards of its place that match its ids, every group's and
+    subgroup's included when it has none, and its letters pick one of them:
+    `aa` the 27th. Only a key with a plain place and ids is checked; any
+    other differs."""
+    match = re.fullmatch(r"speed-([1-9][0-9]*)([a-z]{2,})((?:-[0-9]+){0,2})", key)
+    if not match:
         return False
-    if key not in holders:
+    place, letters, ids = int(match[1]), match[2], match[3].split("-")[1:]
+    index = 0
+    for letter in letters:
+        index = index * 26 + ord(letter) - ord("a") + 1
+    named = [
+        a["racerid"]
+        for a in awards
+        if a["place"] == place
+        and (len(ids) < 1 or str(a["classid"]) == ids[0])
+        and (len(ids) < 2 or str(a["rankid"]) == ids[1])
+    ]
+    if index > len(named):
         return answer is None
-    return answer is not None and answer["racerid"] == holders[key]
+    return answer is not None and answer["racerid"] == named[index - 1]
 
 
 def tags(ev: dict, php: dict) -> set[str]:
