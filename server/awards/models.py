@@ -78,13 +78,15 @@ class Vote(EventScoped):
 
 
 class AwardPartition(EventScoped):
-    """One partition in an award unit's narrowed partition list (D35).
+    """One partition in an award unit's narrowed partition list (D35, D38).
 
     A unit is the pack (no group, subgroup or award), a group, an aggregate
-    included, a subgroup, or a judged award. A unit with no row lists every
-    partition, those added later too, so an empty list is never stored.
-    Deleting a partition, or the unit, deletes its rows, and a list left
-    empty goes back to all partitions. Speed awards read the lists now;
+    included, a subgroup, or a judged award. A unit with no row is "all
+    partitions", every partition it draws from, those added or moved in
+    later too, so neither an empty list nor a full one is stored. A row
+    names only a partition its unit draws from. Deleting a partition, or
+    the unit, deletes its rows, and `awards.services` keeps the rest of
+    that rule. Speed awards read the lists now;
     `award.winner` reads a judged award's in #33. The legacy API neither
     reads nor writes them.
     """
