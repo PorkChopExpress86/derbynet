@@ -277,7 +277,7 @@ def test_unschedule_deletes_the_chart_and_its_results():
 def test_both_services_run_the_chart_change_hook(monkeypatch):
     round, _ = new_round()
     seen = []
-    monkeypatch.setattr(schedule, "after_chart_change", lambda r: seen.append(r))
+    monkeypatch.setattr(schedule, "after_chart_change", lambda r, **_: seen.append(r))
     generate_schedule(round, 1)
     unschedule(round)
     assert seen == [round, round]

@@ -105,6 +105,15 @@
       "expected": "deviations/Q1/more-than-200-cars.http"
     },
     {
+      "quirk": "Q4",
+      "fixture": "http/suite/basic-racing.http",
+      "exchanges": [
+        "004 heat.reinstate"
+      ],
+      "reason": "PHP's rerun saves one column, the times in time racing, so a reinstate leaves every place empty. Django saves and restores the time and the place of each lane.",
+      "expected": "deviations/Q4/basic-racing.http"
+    },
+    {
       "quirk": "Q5",
       "fixture": "http/reschedule/dry-run-while-racing.http",
       "exchanges": [

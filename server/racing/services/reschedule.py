@@ -21,6 +21,7 @@ from django.utils import timezone
 from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
 from kiosks.models import Kiosk
+from racing.engine.heat_state import RacingOff
 from racing.engine.scheduling.adjuster import (
     INJECTION_TIME_LIMIT,
     OVERALL_TIME_LIMIT,
@@ -31,6 +32,7 @@ from racing.engine.scheduling.adjuster import (
 )
 from racing.engine.scheduling.master import HeatRef
 from racing.models import HAS_RESULT, EmptiedHeat, HeatLane, RosterEntry, Round
+from racing.services import heats
 from racing.services.master import held_emptied_heats
 from racing.services.rounds import round_adjustments
 from racing.services.schedule import after_chart_change
@@ -307,15 +309,16 @@ def _write(
         for lane, racer_id in enumerate(racers, start=1)
         if racer_id is not None
     )
-    after_chart_change(round, keep=snapshot.position.pinned(round, renumbered))
+    after_chart_change(
+        round, keep=snapshot.position.pinned(round, renumbered), advance=False
+    )
     if state.current_round_id == round.id:
         # A current heat that has run can still move down; follow it.
         state.current_heat = renumbered.get(state.current_heat, state.current_heat)
+        state.save(update_fields=["current_heat"])
         if adjuster.heats_squeezed_out:
             # Q5: only a committed change stops racing, never a dry run.
-            state.racing = False
-            state.refused_results = 0
-        state.save(update_fields=["current_heat", "racing", "refused_results"])
+            heats.transition(state, RacingOff())
     Kiosk.objects.filter(event_id=round.event_id).update(reload_requested=True)
 
 

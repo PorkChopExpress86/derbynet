@@ -28,6 +28,7 @@ from awards.models import Award, BallotAward
 from awards.services import reconcile_partition_lists
 from core.models import FullFieldRule, RaceSettings, RaceState
 from core.services import lock_race_state
+from racing.engine.heat_state import Cancel
 from racing.models import (
     HAS_RESULT,
     HeatLane,
@@ -36,6 +37,7 @@ from racing.models import (
     Round,
     TimerStatus,
 )
+from racing.services import heats
 from roster.models import (
     Group,
     GroupConstituent,
@@ -228,22 +230,8 @@ def fill_in_missing_roster_entries(event_id) -> int:
 
 
 def _cancel_running_round(state: RaceState) -> None:
-    """`cancel_running_round()`: racing off and no current heat. The replay
-    `CANCEL` that PHP sends when racing was on belongs to #27."""
-    state.racing = False
-    state.refused_results = 0
-    state.current_round = None
-    state.current_heat = None
-    state.current_group = None
-    state.save(
-        update_fields=[
-            "racing",
-            "refused_results",
-            "current_round",
-            "current_heat",
-            "current_group",
-        ]
-    )
+    """`cancel_running_round()`: racing off and no current heat."""
+    heats.transition(state, Cancel())
 
 
 def delete_rounds(event_id, rounds) -> None:

@@ -10,10 +10,12 @@ from enum import StrEnum
 from django.db import transaction
 
 from core.models import RaceSettings, RaceState
+from racing.engine.heat_state import Advance
 from racing.engine.scheduling.lanes import count_one_bits
 from racing.engine.scheduling.rough import CantFulfill, max_runs_per_lane
 from racing.engine.scheduling.round import TooFewRacers, make_chart
 from racing.models import HAS_RESULT, EmptiedHeat, HeatLane, RosterEntry, Round
+from racing.services import heats
 from racing.services.master import reassign_master_heats
 
 
@@ -165,17 +167,25 @@ def unschedule(round: Round) -> int:
         RaceState.objects.select_for_update().get(event_id=round.event_id)
         deleted, _ = HeatLane.objects.filter(round=round).delete()
         EmptiedHeat.objects.filter(round=round).delete()
-        after_chart_change(round)
+        after_chart_change(round, cancel_current=True)
     return deleted
 
 
-def after_chart_change(round: Round, keep=()) -> None:
-    """Runs inside the transaction of every change to a round's chart.
+def after_chart_change(
+    round: Round, keep=(), *, cancel_current: bool = False, advance: bool = True
+) -> None:
+    """Runs inside the transaction of every change to a round's chart, as
+    PHP follows each one with `assign_master_heats()` and, under the master
+    schedule, `advance_heat(current, 'next-up')`. `keep` holds heats whose
+    master numbers stay, as `reassign_master_heats` describes.
 
-    PHP follows each one with `assign_master_heats()`, then under the master
-    schedule `advance_heat(current, 'next-up')`, and `schedule.unschedule`
-    also cancels the round if it is current. #27 adds the last two here.
-    `keep` holds heats whose master numbers stay, as `reassign_master_heats`
-    describes.
+    `cancel_current` is `schedule.unschedule`'s: the round stops being
+    current first. A reschedule passes `advance=False`, because PHP's never
+    runs (Q6).
     """
     reassign_master_heats(round.event, keep)
+    state = RaceState.objects.get(event_id=round.event_id)
+    if cancel_current:
+        heats.maybe_cancel_running_round(state, round.id)
+    if advance and RaceSettings.objects.get(event_id=round.event_id).use_master_sched:
+        heats.transition(state, Advance("next-up"))
