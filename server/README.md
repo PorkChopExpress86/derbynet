@@ -73,12 +73,13 @@ Rules the services keep:
 
 - Only `next` runs the playlist hook, and a move to another round sets the current group (Q2, C4 in #64).
 - A rerun saves each lane's time and place in `RaceState.last_heat`, and a reinstate brings both back (Q4, C6 in #64). A last heat imported from PHP keeps PHP's one column and reinstates it as PHP does.
-- `next` lands on a held emptied heat, which the race crew runs or skips by hand (D39). Once the current heat moves to another round, an emptied heat with no heat after it in its own round is let go, so `next-up` never returns to it (D40).
-- Once a heat of a final has a result, a caller without `CONTROL_RACE` gets `results-locked` for a manual result, a delete, a rerun or a reinstate on a round the final was chosen from (D32). The timer is never refused.
+- `next` lands on a held emptied heat, which the race crew runs or skips by hand (D39). Once the current heat moves to another round, an emptied heat with no heat after it in its own round is let go, so `next-up` never returns to it (D40). A rerun or a new chart that keeps the current round is no move, and the staged heat, the next heat on the track, always stays.
+- A rerun, a reinstate, a manual result, a result delete or a timer result on the round that ended before an open intermission rebuilds the waiting final in the same transaction (D27), until a heat of the final has a result.
+- Once a heat of a final has a result, a caller without `CONTROL_RACE` gets `results-locked` for a manual result, a delete, a rerun or a reinstate on a round the final was chosen from, or a combined round of several groups was drawn from (D32, D41). The timer is never refused.
 - `unschedule` of the current round cancels it, and under the master schedule each chart change except a reschedule (Q6) moves to `next-up`.
 - `racing.services.audit.write` records the timer and heat audit (D19) after the race-state transaction, in its own durable transaction. It waits at most 1 s for the database, and on a timeout or any database error logs a warning and skips the records, so it never delays the timer (D26).
 
-`racing/services/tests/test_timer_transcripts.py` replays the timer and replay transcripts of `tests/golden/http/` through the services, `racing/tests/test_playlist_script.py` replays `testing/test-playlist.sh`, and `racing/services/tests/test_heat_concurrency.py` runs the lock under real threads on SQLite and on Postgres.
+`racing/services/tests/test_timer_transcripts.py` replays the timer and replay transcripts of `tests/golden/http/` through the services, `racing/tests/test_playlist_script.py` replays `testing/test-playlist.sh` and compares the race state at each of its polls with `http/suite/playlist-states.http`, `racing/services/tests/test_heat_state_parity.py` replays `capture/scenarios/13-heat-state.sh` (Q4, Q11, Q16), and `racing/services/tests/test_heat_concurrency.py` runs the lock under real threads on SQLite and on Postgres.
 
 ## Rescheduling
 

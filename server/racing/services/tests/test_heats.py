@@ -127,6 +127,18 @@ def test_a_rerun_of_the_last_heat_of_another_round_names_its_own_group():
     assert state(event).current_group_id == wolves.group_id
 
 
+def test_a_racing_advance_into_another_round_starts_that_rounds_heat():
+    """C58 in #64: under the master schedule PHP's `START` for the next heat
+    keeps the class and round of the heat that just ran."""
+    event, wolves, bears = two_round_master_race()
+    select_heat(event, heat="next-up", now_racing=True)
+    assert current(event) == (wolves.id, 1, True)
+    connect_replay(event)
+    finish(event, "lane1=3.1&lane2=3.2")
+    assert current(event) == (bears.id, 1, True)
+    assert drain(event) == ["REPLAY 4000 2 50", "CANCEL", "START Bears_Round1_Heat01"]
+
+
 def test_a_rerun_heat_keeps_only_its_new_results(race):
     event, round = race
     finish(event, "lane1=3.1&lane2=3.2&lane3=3.3&lane4=3.4")

@@ -114,6 +114,15 @@
       "expected": "deviations/Q4/basic-racing.http"
     },
     {
+      "quirk": "Q4",
+      "fixture": "http/suite/points-rerun-reinstate.http",
+      "exchanges": [
+        "003 reinstate-under-points"
+      ],
+      "reason": "Under points racing PHP's rerun saves only the places, so a reinstate leaves the times empty. Django brings back each lane's time and place.",
+      "expected": "deviations/Q4/points-rerun-reinstate.http"
+    },
+    {
       "quirk": "Q5",
       "fixture": "http/reschedule/dry-run-while-racing.http",
       "exchanges": [
@@ -1247,6 +1256,16 @@
       ],
       "reason": "Django reads table column df1 - 1; PHP reads column df1.",
       "expected": "deviations/Q9/critical-f-value.json"
+    },
+    {
+      "quirk": "Q16",
+      "fixture": "http/timer/partial-and-non-numeric-results.http",
+      "exchanges": [
+        "004 heat-results-with-a-dashed-time",
+        "005 standings-with-a-dashed-time"
+      ],
+      "reason": "PHP stores a time of --- as text, shows it as 0 and places it first. Django counts it as not posted, so lane 1 has no result and the heat no places.",
+      "expected": "deviations/Q16/partial-and-non-numeric-results.http"
     },
     {
       "quirk": "Q20",

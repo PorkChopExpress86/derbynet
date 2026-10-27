@@ -1,0 +1,3186 @@
+### 001 poll.kiosk
+request: GET action.php?query=poll.kiosk&address=FAKE-KIOSK1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 127
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/identify.kiosk",
+        "parameters": "{}",
+        "reload": false
+    }
+}
+
+### 002 poll.kiosk
+request: GET action.php?query=poll.kiosk&address=FAKE-KIOSK1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 150
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/welcome.kiosk",
+        "name": "Main",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 003 poll.kiosk
+request: GET action.php?query=poll.kiosk&address=FAKE-KIOSK1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 153
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/now-racing.kiosk",
+        "name": "Main",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 004 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4215
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Den1"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "First102 Last102",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 3,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den2, Round 1",
+            "next-round": true
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1"
+        }
+    ],
+    "ready-aggregate": [
+        {
+            "classid": 4,
+            "by-subgroup": false,
+            "class": "TwoThree"
+        }
+    ]
+}
+
+### 005 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4207
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Den1"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "First102 Last102",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 3,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den2, Round 1",
+            "next-round": true
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1"
+        }
+    ],
+    "ready-aggregate": [
+        {
+            "classid": 4,
+            "by-subgroup": false,
+            "class": "TwoThree"
+        }
+    ]
+}
+
+### 006 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4206
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Den1"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "First102 Last102",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 3,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den2, Round 1",
+            "next-round": true
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1"
+        }
+    ],
+    "ready-aggregate": [
+        {
+            "classid": 4,
+            "by-subgroup": false,
+            "class": "TwoThree"
+        }
+    ]
+}
+
+### 007 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4211
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 2,
+        "class": "Den1"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 2,
+            "name": "First102 Last102",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 1,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 3,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den2, Round 1",
+            "next-round": true
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1"
+        }
+    ],
+    "ready-aggregate": [
+        {
+            "classid": 4,
+            "by-subgroup": false,
+            "class": "TwoThree"
+        }
+    ]
+}
+
+### 008 poll.kiosk
+request: GET action.php?query=poll.kiosk&address=FAKE-KIOSK1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 162
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/award-presentations.kiosk",
+        "name": "Main",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 009 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4108
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 1,
+        "number-of-heats": 3,
+        "class": "Den2"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 5,
+            "name": "First203 Last203",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1",
+            "next-round": true
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 010 poll.kiosk
+request: GET action.php?query=poll.kiosk&address=FAKE-KIOSK1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 153
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/now-racing.kiosk",
+        "name": "Main",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 011 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4107
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 1,
+        "number-of-heats": 3,
+        "class": "Den2"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 5,
+            "name": "First203 Last203",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1",
+            "next-round": true
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 012 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4094
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 2,
+        "number-of-heats": 3,
+        "class": "Den2"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 4,
+            "name": "First202 Last202",
+            "carname": "",
+            "carnumber": 202,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 1,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1",
+            "next-round": true
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 013 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4094
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 3,
+        "number-of-heats": 3,
+        "class": "Den2"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 5,
+            "name": "First203 Last203",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 4,
+            "name": "First202 Last202",
+            "carname": "",
+            "carnumber": 202,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 2,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 2,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Den3, Round 1",
+            "next-round": true
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 014 poll.kiosk
+request: GET action.php?query=poll.kiosk&address=FAKE-KIOSK1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 153
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/now-racing.kiosk",
+        "name": "Main",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 015 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4062
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 3,
+        "roundid": 3,
+        "round": 1,
+        "tbodyid": 3,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Den3"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 6,
+            "name": "First301 Last301",
+            "carname": "",
+            "carnumber": 301,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 7,
+            "name": "First302 Last302",
+            "carname": "",
+            "carnumber": 302,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Den3, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 016 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4062
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 3,
+        "roundid": 3,
+        "round": 1,
+        "tbodyid": 3,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Den3"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 6,
+            "name": "First301 Last301",
+            "carname": "",
+            "carnumber": 301,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 7,
+            "name": "First302 Last302",
+            "carname": "",
+            "carnumber": 302,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Den3, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 017 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4062
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 3,
+        "roundid": 3,
+        "round": 1,
+        "tbodyid": 3,
+        "heat": 2,
+        "number-of-heats": 2,
+        "class": "Den3"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 7,
+            "name": "First302 Last302",
+            "carname": "",
+            "carnumber": 302,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 6,
+            "name": "First301 Last301",
+            "carname": "",
+            "carnumber": 301,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 1,
+            "name": "Den3, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 018 poll.kiosk
+request: GET action.php?query=poll.kiosk&address=FAKE-KIOSK1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 153
+body:
+{
+    "kiosk-setting": {
+        "page": "kiosks\/now-racing.kiosk",
+        "name": "Main",
+        "reload": false,
+        "parameters": "{}"
+    }
+}
+
+### 019 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4445
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 4,
+        "roundid": 4,
+        "round": 1,
+        "tbodyid": 4,
+        "heat": 1,
+        "number-of-heats": 6,
+        "class": "TwoThree"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 5,
+            "name": "First203 Last203",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den3, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "TwoThree",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 0,
+            "name": "TwoThree, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 020 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4445
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 4,
+        "roundid": 4,
+        "round": 1,
+        "tbodyid": 4,
+        "heat": 1,
+        "number-of-heats": 6,
+        "class": "TwoThree"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 5,
+            "name": "First203 Last203",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den3, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "TwoThree",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 0,
+            "name": "TwoThree, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 021 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4445
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 4,
+        "roundid": 4,
+        "round": 1,
+        "tbodyid": 4,
+        "heat": 2,
+        "number-of-heats": 6,
+        "class": "TwoThree"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 7,
+            "name": "First302 Last302",
+            "carname": "",
+            "carnumber": 302,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 5,
+            "name": "First203 Last203",
+            "carname": "",
+            "carnumber": 203,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den3, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "TwoThree",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 1,
+            "name": "TwoThree, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 022 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4445
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 4,
+        "roundid": 4,
+        "round": 1,
+        "tbodyid": 4,
+        "heat": 3,
+        "number-of-heats": 6,
+        "class": "TwoThree"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 7,
+            "name": "First302 Last302",
+            "carname": "",
+            "carnumber": 302,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den3, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "TwoThree",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 2,
+            "name": "TwoThree, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 023 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4473
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 2,
+        "roundid": 2,
+        "round": 1,
+        "tbodyid": 2,
+        "heat": 2,
+        "number-of-heats": 3,
+        "class": "Den2"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 4,
+            "name": "First202 Last202",
+            "carname": "",
+            "carnumber": 202,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 2,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den3, Round 1",
+            "next-round": true
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "TwoThree",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 2,
+            "name": "TwoThree, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 024 poll.coordinator
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4445
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 4,
+        "roundid": 4,
+        "round": 1,
+        "tbodyid": 4,
+        "heat": 3,
+        "number-of-heats": 6,
+        "class": "TwoThree"
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 3,
+            "name": "First201 Last201",
+            "carname": "",
+            "carnumber": 201,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 7,
+            "name": "First302 Last302",
+            "carname": "",
+            "carnumber": 302,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den1",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den1"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Den2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Den3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Den3"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 0,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "TwoThree",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 2,
+                    "name": "Den2"
+                },
+                {
+                    "classid": 3,
+                    "name": "Den3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Den1",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den1, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Den2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 3,
+            "name": "Den2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Den3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 2,
+            "name": "Den3, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "TwoThree",
+            "round": 1,
+            "aggregate": true,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 6,
+            "heats_run": 2,
+            "name": "TwoThree, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
