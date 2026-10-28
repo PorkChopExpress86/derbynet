@@ -84,6 +84,13 @@ export const RULES = [
       : text,
   },
   {
+    id: 'checkin-time',
+    doc: 'The "seq" of a racer in query=racer.list, its check-in time in epoch milliseconds (RegistrationInfo.checkin_time), when not zero.',
+    apply: (ex, text) => isJson(ex)
+      ? text.replace(/("seq": )[1-9]\d{9,}/g, '$1"<epoch-ms>"')
+      : text,
+  },
+  {
     id: 'award-duration',
     doc: 'The "duration" query=award.current reports, a measured time in seconds.',
     apply: (ex, text) => isJson(ex)

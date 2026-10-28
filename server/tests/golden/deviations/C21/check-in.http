@@ -1,0 +1,69 @@
+### 025 bulk number
+request: POST action.php
+request-body: action=racer.bulk&what=number&who=c3&start=501&renumber=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 276
+body:
+{
+    "action": {
+        "action": "racer.bulk",
+        "what": "number",
+        "who": "c3",
+        "start": 501,
+        "renumber": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "reload": true
+}
+
+### 026 bulk unknown who
+request: POST action.php
+request-body: action=racer.bulk&what=checkin&who=x
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 258
+body:
+{
+    "action": {
+        "action": "racer.bulk",
+        "what": "checkin",
+        "who": "x"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "who",
+        "description": "Unrecognized 'who' parameter: x"
+    },
+    "reload": true
+}
+
+### 027 bulk eligibility
+request: POST action.php
+request-body: action=racer.bulk&what=eligibility&who=d2&value=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 256
+body:
+{
+    "action": {
+        "action": "racer.bulk",
+        "what": "eligibility",
+        "who": "d2",
+        "value": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "reload": true
+}
+

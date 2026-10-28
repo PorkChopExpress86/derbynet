@@ -1,0 +1,92 @@
+### 001 pass PWDwi new car
+request: POST action.php
+request-body: action=racer.pass&barcode=PWDwi7&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 319
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWDwi7",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Default",
+        "firstname": "Walk-In",
+        "lastname": 7
+    }
+}
+
+### 002 list after walk-in
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1482
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 1,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 2,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Walk-In",
+            "lastname": 7,
+            "carnumber": 7,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Default",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Default",
+            "rankid": 3,
+            "rank": "Default",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        }
+    ]
+}
+

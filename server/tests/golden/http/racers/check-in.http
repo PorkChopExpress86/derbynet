@@ -1,0 +1,1731 @@
+### 001 list order=name
+request: GET action.php?query=racer.list&order=name
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3406
+body:
+{
+    "racers": [
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 301,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Twin",
+            "lastname": "One",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Twin",
+            "lastname": "Two",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
+### 002 list order=class
+request: GET action.php?query=racer.list&order=class
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3406
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 301,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Twin",
+            "lastname": "One",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Twin",
+            "lastname": "Two",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
+### 003 list order=rank
+request: GET action.php?query=racer.list&order=rank
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3406
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 301,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Twin",
+            "lastname": "One",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Twin",
+            "lastname": "Two",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
+### 004 list order=car
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3406
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 301,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Twin",
+            "lastname": "One",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Twin",
+            "lastname": "Two",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
+### 005 pass by racer
+request: POST action.php
+request-body: action=racer.pass&racer=1&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 313
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "racer": 1,
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Lions",
+        "firstname": "Adolfo",
+        "lastname": "Asher"
+    }
+}
+
+### 006 pass PWDid
+request: POST action.php
+request-body: action=racer.pass&barcode=PWDid3&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 326
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWDid3",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Tigers",
+        "firstname": "Antoine",
+        "lastname": "Akiyama"
+    }
+}
+
+### 007 pass PWD carno
+request: POST action.php
+request-body: action=racer.pass&barcode=PWD102
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 303
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWD102"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Lions",
+        "firstname": "Ben",
+        "lastname": "Bittinger"
+    }
+}
+
+### 008 pass PWD shared carno
+request: POST action.php
+request-body: action=racer.pass&barcode=PWD302&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWD302",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "notunique",
+        "description": "Need to identify racer uniquely."
+    },
+    "reload": true
+}
+
+### 009 pass PWD unknown carno
+request: POST action.php
+request-body: action=racer.pass&barcode=PWD999&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWD999",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "notunique",
+        "description": "Need to identify racer uniquely."
+    },
+    "reload": true
+}
+
+### 010 pass PWDwi existing car
+request: POST action.php
+request-body: action=racer.pass&barcode=PWDwi301&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 325
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWDwi301",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Bears",
+        "firstname": "Freeman",
+        "lastname": "Fizer"
+    }
+}
+
+### 011 pass PWDwi new car
+request: POST action.php
+request-body: action=racer.pass&barcode=PWDwi250&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 322
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWDwi250",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Tigers",
+        "firstname": "Walk-In",
+        "lastname": 250
+    }
+}
+
+### 012 list PWDwi new car
+request: GET action.php?query=racer.list&barcode=PWDwi310
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1403
+body:
+{
+    "new-row": {
+        "racerid": 9,
+        "rowno": true,
+        "denscheduled": false,
+        "exclude": false,
+        "partitionid": 3,
+        "partition": "Bears",
+        "partition_sortorder": 3,
+        "note": "",
+        "classid": 3,
+        "class": "Bears",
+        "rankid": 3,
+        "rank": "Bears",
+        "rankseq": 3,
+        "carnumber": 310,
+        "headshot": "img\/photo-headshot.png",
+        "carphoto": "img\/photo-car.png",
+        "firstname": "Walk-In",
+        "lastname": 310,
+        "carname": "",
+        "scheduled": false,
+        "passed": false,
+        "xbs": 0
+    },
+    "car-numbers": [
+        {
+            "partitionid": 1,
+            "next_carnumber": 103
+        },
+        {
+            "partitionid": 2,
+            "next_carnumber": 203
+        },
+        {
+            "partitionid": 3,
+            "next_carnumber": 303
+        }
+    ],
+    "racers": [
+        {
+            "racerid": 9,
+            "firstname": "Walk-In",
+            "lastname": 310,
+            "carnumber": 310,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
+### 013 list PWD carno
+request: GET action.php?query=racer.list&barcode=PWD202
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 514
+body:
+{
+    "racers": [
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
+### 014 list PWDid
+request: GET action.php?query=racer.list&barcode=PWDid3
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 523
+body:
+{
+    "racers": [
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        }
+    ]
+}
+
+### 015 list order=checkin
+request: GET action.php?query=racer.list&order=checkin
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4457
+body:
+{
+    "racers": [
+        {
+            "racerid": 9,
+            "firstname": "Walk-In",
+            "lastname": 310,
+            "carnumber": 310,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 7,
+            "firstname": "Twin",
+            "lastname": "Two",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 6,
+            "firstname": "Twin",
+            "lastname": "One",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 8,
+            "firstname": "Walk-In",
+            "lastname": 250,
+            "carnumber": 250,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 5,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 301,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 2,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        }
+    ]
+}
+
+### 016 revert by racer
+request: POST action.php
+request-body: action=racer.pass&racer=1&value=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 204
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "racer": 1,
+        "value": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 017 list order=checkin after revert
+request: GET action.php?query=racer.list&order=checkin
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4458
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 9,
+            "firstname": "Walk-In",
+            "lastname": 310,
+            "carnumber": 310,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 7,
+            "firstname": "Twin",
+            "lastname": "Two",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 6,
+            "firstname": "Twin",
+            "lastname": "One",
+            "carnumber": 302,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 8,
+            "firstname": "Walk-In",
+            "lastname": 250,
+            "carnumber": 250,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 5,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 301,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 2,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        }
+    ]
+}
+
+### 018 photo role pass PWD carno
+request: POST action.php
+request-body: action=racer.pass&barcode=PWD201&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 326
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWD201",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Tigers",
+        "firstname": "Antoine",
+        "lastname": "Akiyama"
+    }
+}
+
+### 019 add
+request: POST action.php
+request-body: action=racer.add&firstname=Fred&lastname=Flintstone&carno=&carname=Rock&partitionid=1&note_from=Bedrock
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1249
+body:
+{
+    "action": {
+        "action": "racer.add",
+        "firstname": "Fred",
+        "lastname": "Flintstone",
+        "carno": "",
+        "carname": "Rock",
+        "partitionid": 1,
+        "note_from": "Bedrock"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "new-row": {
+        "racerid": 10,
+        "rowno": true,
+        "denscheduled": false,
+        "exclude": false,
+        "partitionid": 1,
+        "partition": "Lions",
+        "partition_sortorder": 1,
+        "note": "Bedrock",
+        "classid": 1,
+        "class": "Lions",
+        "rankid": 1,
+        "rank": "Lions",
+        "rankseq": 1,
+        "carnumber": 103,
+        "headshot": "img\/photo-headshot.png",
+        "carphoto": "img\/photo-car.png",
+        "firstname": "Fred",
+        "lastname": "Flintstone",
+        "carname": "Rock",
+        "scheduled": false,
+        "passed": false,
+        "xbs": 0
+    },
+    "car-numbers": [
+        {
+            "partitionid": 1,
+            "next_carnumber": 104
+        },
+        {
+            "partitionid": 2,
+            "next_carnumber": 203
+        },
+        {
+            "partitionid": 3,
+            "next_carnumber": 303
+        }
+    ]
+}
+
+### 020 add with no partition
+request: POST action.php
+request-body: action=racer.add&firstname=Wilma&lastname=Flintstone&carno=&carname=&note_from=
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 1294
+body:
+{
+    "action": {
+        "action": "racer.add",
+        "firstname": "Wilma",
+        "lastname": "Flintstone",
+        "carno": "",
+        "carname": "",
+        "note_from": ""
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "new-row": {
+        "racerid": 11,
+        "rowno": true,
+        "denscheduled": false,
+        "exclude": false,
+        "partitionid": 4,
+        "partition": "Default",
+        "partition_sortorder": 4,
+        "note": "",
+        "classid": 4,
+        "class": "Default",
+        "rankid": 4,
+        "rank": "Default",
+        "rankseq": 4,
+        "carnumber": 401,
+        "headshot": "img\/photo-headshot.png",
+        "carphoto": "img\/photo-car.png",
+        "firstname": "Wilma",
+        "lastname": "Flintstone",
+        "carname": "",
+        "scheduled": false,
+        "passed": false,
+        "xbs": 0
+    },
+    "car-numbers": [
+        {
+            "partitionid": 1,
+            "next_carnumber": 104
+        },
+        {
+            "partitionid": 2,
+            "next_carnumber": 203
+        },
+        {
+            "partitionid": 3,
+            "next_carnumber": 303
+        },
+        {
+            "partitionid": 4,
+            "next_carnumber": 402
+        }
+    ]
+}
+
+### 021 edit duplicate car
+request: POST action.php
+request-body: action=racer.edit&racer=10&firstname=Fred&lastname=Flintstone&carno=101&carname=Rock
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 353
+body:
+{
+    "action": {
+        "action": "racer.edit",
+        "racer": 10,
+        "firstname": "Fred",
+        "lastname": "Flintstone",
+        "carno": 101,
+        "carname": "Rock"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "warning": [
+        "Duplicate car number "
+    ]
+}
+
+### 022 edit partition -1
+request: POST action.php
+request-body: action=racer.edit&racer=10&partitionid=-1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 275
+body:
+{
+    "action": {
+        "action": "racer.edit",
+        "racer": 10,
+        "partitionid": -1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "nopartition",
+        "description": "Invalid segment number -1"
+    },
+    "partition-sortorder": false
+}
+
+### 023 edit partition
+request: POST action.php
+request-body: action=racer.edit&racer=10&partitionid=3&carno=303
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "action": {
+        "action": "racer.edit",
+        "racer": 10,
+        "partitionid": 3,
+        "carno": 303
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "partition-sortorder": 3
+}
+
+### 024 delete
+request: POST action.php
+request-body: action=racer.delete&racer=11
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 207
+body:
+{
+    "action": {
+        "action": "racer.delete",
+        "racer": 11
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "reload": true
+}
+
+### 025 bulk number
+request: POST action.php
+request-body: action=racer.bulk&what=number&who=c3&start=501&renumber=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 277
+body:
+ {
+    "action": {
+        "action": "racer.bulk",
+        "what": "number",
+        "who": "c3",
+        "start": 501,
+        "renumber": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "reload": true
+}
+
+### 026 bulk unknown who
+request: POST action.php
+request-body: action=racer.bulk&what=checkin&who=x
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+ {
+    "action": {
+        "action": "racer.bulk",
+        "what": "checkin",
+        "who": "x"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "who",
+        "description": "Unrecognized 'who' parameter: x"
+    },
+    "reload": true
+}
+
+### 027 bulk eligibility
+request: POST action.php
+request-body: action=racer.bulk&what=eligibility&who=d2&value=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 257
+body:
+ {
+    "action": {
+        "action": "racer.bulk",
+        "what": "eligibility",
+        "who": "d2",
+        "value": 0
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "reload": true
+}
+
+### 028 list order=car at the end
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4955
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 2,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 4,
+            "firstname": "Diego",
+            "lastname": "de la Cruz",
+            "carnumber": 202,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 8,
+            "firstname": "Walk-In",
+            "lastname": 250,
+            "carnumber": 250,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Tigers",
+            "rankid": 2,
+            "rank": "Tigers",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 5,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 501,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 6,
+            "firstname": "Twin",
+            "lastname": "One",
+            "carnumber": 502,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 7,
+            "firstname": "Twin",
+            "lastname": "Two",
+            "carnumber": 503,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 9,
+            "firstname": "Walk-In",
+            "lastname": 310,
+            "carnumber": 504,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": true,
+            "seq": "<epoch-ms>"
+        },
+        {
+            "racerid": 10,
+            "firstname": "Fred",
+            "lastname": "Flintstone",
+            "carnumber": 505,
+            "carname": "Rock",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "Bedrock",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+

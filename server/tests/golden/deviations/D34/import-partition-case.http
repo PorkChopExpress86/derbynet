@@ -1,0 +1,48 @@
+### 002 list after LIONS
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 986
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Leo",
+            "lastname": "Upper",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+

@@ -37,6 +37,10 @@ QUIRK_DECISIONS = {
     "Q23": "fix",
     "Q24": "fix",
     "Q25": "fix",
+    # Rows of #64 and owner decisions that change a recorded PHP exchange (#29).
+    "C14": "fix",
+    "C21": "fix",
+    "D34": "fix",
 }
 
 

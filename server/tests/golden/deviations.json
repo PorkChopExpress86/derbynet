@@ -1794,6 +1794,36 @@
       ],
       "reason": "D39: Django refuses to fit in a racer who is not on the round's roster and answers notonroster; PHP fits the racer in. The expected reply holds only the service's failure code; #31 records the rest.",
       "expected": "deviations/Q25/reschedule.http"
+    },
+    {
+      "quirk": "C21",
+      "fixture": "http/racers/check-in.http",
+      "exchanges": [
+        "025 bulk number",
+        "026 bulk unknown who",
+        "027 bulk eligibility"
+      ],
+      "reason": "action.racer.bulk.inc starts with a space before <?php, so PHP's racer.bulk body is not clean JSON, the file that writes its XML refusal (C21). Django writes the JSON alone.",
+      "expected": "deviations/C21/check-in.http"
+    },
+    {
+      "quirk": "D34",
+      "fixture": "http/racers/import-partition-case.http",
+      "exchanges": [
+        "002 list after LIONS"
+      ],
+      "reason": "PHP's racer.import makes a partition LIONS beside Lions. Django joins Lions, the partition named with case ignored (D34).",
+      "expected": "deviations/D34/import-partition-case.http"
+    },
+    {
+      "quirk": "C14",
+      "fixture": "http/racers/walk-in-multiplier-0.http",
+      "exchanges": [
+        "001 pass PWDwi new car",
+        "002 list after walk-in"
+      ],
+      "reason": "With car-numbering multiplier 0 PHP assigns $partition, not $partitionid, so a PWDwi walk-in falls to Default. Django puts it in the last partition (C14).",
+      "expected": "deviations/C14/walk-in-multiplier-0.http"
     }
   ]
 }
