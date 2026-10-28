@@ -36,6 +36,9 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("query", "settings.list"): {},
     ("action", "settings.write"): {"partition-label": "Patrol"},
     ("action", "database.execute"): {"script": "schema"},
+    # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
+    # for a run that sets it.
+    ("action", "test.setup"): {"slide": "s.png"},
 }
 
 # Response keys that carry a row id, and the model the id belongs to.

@@ -40,3 +40,16 @@ def log_in(client, permissions, role="Tester"):
 
 def post(client, body, path="/action.php"):
     return client.post(path, body, content_type="application/x-www-form-urlencoded")
+
+
+@pytest.fixture
+def test_endpoints():
+    """Turn on the test-only endpoints for one test, then off again."""
+    from django.test import override_settings
+
+    from legacy_api.handlers import testing
+
+    with override_settings(ENABLE_TEST_ENDPOINTS=True):
+        testing.sync()
+        yield
+    testing.sync()
