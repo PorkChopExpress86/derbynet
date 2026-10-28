@@ -11,11 +11,22 @@ TIMEOUT_MIN=${3:-90}
 GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 
-head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+# A network error from gh is retried, so one dropped request does not end the wait.
+head_of() {
+  local n
+  for n in 1 2 3 4 5; do
+    "$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid 2>/dev/null && return
+    sleep ${PR_WAIT_RETRY_SLEEP:-10}
+  done
+  echo "gh could not read PR #$PR after 5 tries" >&2
+  return 1
+}
+
+head=$(head_of)
 echo "PR #$PR head $head" >&2
 deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
 while :; do
-  now_head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+  now_head=$(head_of)
   if [ "$now_head" != "$head" ]; then
     echo "head moved to $now_head while waiting; rerun pr-wait" >&2
     exit 2

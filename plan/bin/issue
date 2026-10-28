@@ -1,0 +1,12 @@
+#!/bin/bash
+# Prints an issue's title, state, body, and comments.  `gh issue view --comments`
+# prints nothing on some gh versions, so this reads the JSON.
+#
+# Usage: plan/bin/issue <number>
+set -euo pipefail
+N=${1:?usage: issue <number>}
+GH=${GH:-gh}
+REPO=${REPO:-PorkChopExpress86/derbynet}
+"$GH" issue view "$N" --repo "$REPO" --json title,state,body,comments --jq '
+  "#\(env.N) [\(.state)] \(.title)\n\n\(.body)\n\n=== COMMENTS ===\n" +
+  ([.comments[] | "--- \(.author.login):\n\(.body)"] | join("\n"))'
