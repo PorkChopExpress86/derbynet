@@ -1299,6 +1299,16 @@
       "expected": "deviations/Q16/partial-and-non-numeric-results.http"
     },
     {
+      "quirk": "Q18",
+      "fixture": "http/master-schedule/half-weights.http",
+      "exchanges": [
+        "018 coordinator-after-results-exist",
+        "019 ondeck-after-results-exist"
+      ],
+      "reason": "A refused schedule.generate renumbers the unraced heats and moves the current heat to the first of them in PHP. Django changes nothing (D30).",
+      "expected": "deviations/Q18/half-weights.http"
+    },
+    {
       "quirk": "Q20",
       "fixture": "http/suite/reschedule.http",
       "exchanges": [
