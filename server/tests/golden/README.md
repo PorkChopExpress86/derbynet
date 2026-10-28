@@ -99,7 +99,7 @@ Files, by directory (`find http -type f` lists them all):
 - `http/kiosks/` Kiosk polling (#34): `pages.http`, `poll-kiosk.http`
 - `http/login/` role.login, role.list and the XML stubs (#16): `role-login.http`
 - `http/master-schedule/` Master schedule with half weights (#23), and a refused `schedule.generate` after a heat raced out of master order, which still renumbers (#20 Q18, exchanges 014 to 019): `half-weights.http`
-- `http/poll/` Poll payloads at fixed points: `race-day-polls.http`
+- `http/poll/` Poll payloads at fixed points, and `query=poll.results` before and during racing, with `details`, for a named round and under points (#31, `capture/scenarios/16-poll-results.sh`): `poll-results.http`, `race-day-polls.http`
 - `http/racers/` The racer, check-in and import endpoints (#29): `racer.list` in all five orders, `racer.pass` by each barcode form, walk-in racers from `racer.pass` and `racer.list`, `racer.add`, `racer.edit`, `racer.delete` and `racer.bulk`; the D34 and C14 rosters; and the requests Django refuses on purpose: `check-in.http`, `import-partition-case.http`, `refusals.http`, `walk-in-multiplier-0.http`
 - `http/race-day/` The owner race day: playlist, top-4 and top-8 finals: `outlaws.http`, `playlist-queue.http`, `scouts.http`; the same day on 6 lanes, with a tie at fourth that makes a Scouts final of 5 with a bye in every heat (#98): `six-lanes.http`
 - `http/replay/` Replay command sequence (#27, #34): `command-sequence.http`

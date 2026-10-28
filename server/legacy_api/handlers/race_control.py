@@ -410,6 +410,8 @@ def poll(ctx: LegacyContext) -> None:
     + (
         "R8: the body starts at `{`; PHP's query.poll.results.inc writes a"
         " space before its JSON.",
+        "R9: with `details` each column appears once, by name; PHP's rows"
+        ' also repeat every column under its position, "0" to "7".',
     ),
 )
 def poll_results(ctx: LegacyContext) -> None:

@@ -575,6 +575,52 @@ def test_the_race_day_polls_match_php(client, event):
     assert s.mismatches() == []
 
 
+# ----- capture/scenarios/16-poll-results.sh ---------------------------------------
+
+
+def run_poll_results(client) -> Scenario:
+    """`query=poll.results` before racing, with the current round unraced,
+    after two heats (and with `details`), after the next round starts, for a
+    named round, and under points."""
+    s = Scenario(client)
+    s.reset()
+    s.post_ok("action=settings.write&unused-lane-mask=0&n-lanes=4")
+    for i in range(1, 6):
+        s.import_racer(
+            f"firstname=Lion{i}&lastname=Racer&carnumber={100 + i}&partition=Lions"
+        )
+        s.import_racer(
+            f"firstname=Tiger{i}&lastname=Racer&carnumber={200 + i}&partition=Tigers"
+        )
+    s.learn_rows()
+    s.post_ok("action=racer.bulk&who=all&what=checkin")
+    s.post_ok("action=schedule.generate&roundid=1")
+    s.post_ok("action=schedule.generate&roundid=2")
+
+    s.scenario("http/poll/poll-results.http")
+    s.capture("before-racing")
+    s.post_ok("action=heat.select&roundid=1&now_racing=1")
+    s.capture("current-round-not-raced")
+    s.race_round(max_heats=2)
+    s.capture("after-two-heats")
+    s.capture("after-two-heats-details")
+    s.race_round()
+    s.post_ok("action=heat.select&roundid=2&now_racing=1")
+    s.capture("next-round-keeps-recent-results")
+    s.capture("named-round")
+    s.race_round(salt=7, max_heats=1)
+    s.post_ok("action=settings.write&use-points-checkbox=1&use-points=1")
+    s.capture("under-points")
+    s.post_ok("action=settings.write&use-points-checkbox=1")
+    return s
+
+
+def test_the_poll_results_scenario_matches_php(client, event):
+    s = run_poll_results(client)
+    _dump(s)
+    assert s.mismatches() == []
+
+
 # ----- the deviation entries -----------------------------------------------------
 
 SCHEDULE = "http/schedule/{}.http"
@@ -583,6 +629,7 @@ SCENARIOS = {
     "master-schedule": run_master_schedule,
     "reschedule-quirks": run_reschedule_quirks,
     "race-day-polls": run_race_day_polls,
+    "poll-results": run_poll_results,
 }
 
 # quirk: (reason, scenario, {fixture: [exchange names]}, expected file name)
@@ -676,6 +723,31 @@ DEVIATIONS = {
         " (D34, Q20 on the reschedule before it); PHP's chart changed them.",
         "reschedule-quirks",
         {"http/reschedule/master-schedule.http": ["003 racing-after"]},
+        None,
+    ),
+    "R8": (
+        "PHP's query.poll.results.inc writes a space before its JSON; Django's"
+        " body starts at `{` (#31, for the owner to confirm).",
+        "poll-results",
+        {
+            "http/poll/poll-results.http": [
+                "001 before-racing",
+                "002 current-round-not-raced",
+                "003 after-two-heats",
+                "005 next-round-keeps-recent-results",
+                "006 named-round",
+                "007 under-points",
+            ]
+        },
+        None,
+    ),
+    "R9": (
+        "With details, PHP's poll.results rows repeat every column under its"
+        ' position, "0" to "7", as PDO\'s default fetch mode returns them;'
+        " Django gives each column once, by name. The reply also shows R8's"
+        " missing leading space (#31, for the owner to confirm).",
+        "poll-results",
+        {"http/poll/poll-results.http": ["004 after-two-heats-details"]},
         None,
     ),
 }
