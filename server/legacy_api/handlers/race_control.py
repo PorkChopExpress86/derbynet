@@ -74,16 +74,12 @@ PAYLOAD = (
     "R3: with no current heat after a round stops being current, classid and"
     " heat are null; PHP reports the -1 that set_current_heat(-1, -1) wrote.",
 )
-REFUSED_WITH_PAYLOAD = PAYLOAD + (
-    "R4: an anonymous caller is refused in the dispatcher, with no payload"
-    " (D5). A logged-in caller without CONTROL_RACE gets PHP's notauthorized"
-    " and the coordinator payload, which poll.coordinator already shows them.",
-)
 
 
 def _may_control(ctx: LegacyContext) -> bool:
     """PHP refuses `heat.select` and `heat.rerun` inside the handler and
-    still appends the coordinator payload."""
+    still appends the coordinator payload, which `poll.coordinator` shows
+    anyone."""
     if granted_for(ctx.session) & Perm.CONTROL_RACE:
         return True
     ctx.failure("notauthorized", REFUSALS["notauthorized"])
@@ -91,7 +87,7 @@ def _may_control(ctx: LegacyContext) -> bool:
     return False
 
 
-@action("heat.select", permission=Access.LOGGED_IN, divergences=REFUSED_WITH_PAYLOAD)
+@action("heat.select", permission=Access.ANONYMOUS, divergences=PAYLOAD)
 def heat_select(ctx: LegacyContext) -> None:
     """`roundid` alone means its heat 1; `heat` is a number or `next`,
     `prev`, `next-up` or `first`; `now_racing` applies after the move."""
@@ -114,7 +110,7 @@ def heat_select(ctx: LegacyContext) -> None:
     _coordinator(ctx)
 
 
-@action("heat.rerun", permission=Access.LOGGED_IN, divergences=REFUSED_WITH_PAYLOAD)
+@action("heat.rerun", permission=Access.ANONYMOUS, divergences=PAYLOAD)
 def heat_rerun(ctx: LegacyContext) -> None:
     """`heat=current` reruns the current heat, anything else the last heat
     with a result."""
@@ -372,11 +368,17 @@ def roster_delete(ctx: LegacyContext) -> None:
 # ----- polls ---------------------------------------------------------------------
 
 
-@query("poll.coordinator", permission=Access.LOGGED_IN, divergences=PAYLOAD)
+@query(
+    "poll.coordinator",
+    permission=Access.ANONYMOUS,
+    divergences=PAYLOAD,
+)
 def poll_coordinator(ctx: LegacyContext) -> None:
     """`roundid` and `heat` name the heat the coordinator page shows, for
-    `heat-results`. PHP answers anyone; the payload names racers, so it
-    needs a login (#17, D5)."""
+    `heat-results`. Anonymous, as in PHP and as #31 says, where #17's table
+    asks for a login: `run_heat` in `testing/common.sh` polls it as the Timer
+    role, whose empty password counts as no login, and `query=poll` already
+    shows the kiosks the same racers."""
     payload = polls.coordinator(ctx.event, _text(ctx, "roundid"), _text(ctx, "heat"))
     for key, value in payload.items():
         ctx.put(key, value)

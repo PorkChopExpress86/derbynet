@@ -106,12 +106,11 @@ def test_poll_coordinator_answers_phps_ten_keys(client, event):
     assert list(coordinator(client)) == COORDINATOR_KEYS
 
 
-def test_poll_coordinator_needs_a_login(client, event):
-    """#17: PHP answers anyone, but the payload names racers (D5)."""
-    found = coordinator(client)
+def test_poll_coordinator_answers_anyone_as_php_does(client, event):
+    """The Timer role, which `run_heat` polls as, has no password."""
+    setup_race(client)
 
-    assert found["outcome"]["code"] == "notauthorized"
-    assert "racers" not in found
+    assert list(coordinator(Client())) == COORDINATOR_KEYS
 
 
 def test_heat_results_follow_the_heat_the_page_shows(client, event):
@@ -199,13 +198,13 @@ def test_a_logged_in_caller_who_cannot_race_gets_the_payload_with_a_refusal(
         assert list(found)[2:] == COORDINATOR_KEYS, name
 
 
-def test_an_anonymous_rerun_is_refused_without_the_payload(client, event):
+def test_an_anonymous_rerun_is_refused_with_the_payload(client, event):
     setup_race(client)
 
     found = reply(post(Client(), "action=heat.rerun&heat=current"))
 
     assert found["outcome"]["code"] == "notauthorized"
-    assert "current-heat" not in found
+    assert list(found)[2:] == COORDINATOR_KEYS
 
 
 # ----- the PHP defects ----------------------------------------------------------
