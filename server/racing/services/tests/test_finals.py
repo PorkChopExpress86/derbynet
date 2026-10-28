@@ -35,6 +35,7 @@ from racing.services.results import Outcome, record_manual_result
 from racing.services.rounds import (
     FollowOn,
     NewAggregate,
+    make_new_round,
     new_round_roster,
     playlist_finalists,
     round_adjustments,
@@ -747,6 +748,50 @@ def test_an_allow_with_two_rounds_waiting_goes_into_the_one_made_first(day):
     day.allowed_late_racer()
     assert LATE in day.roster(final)
     assert LATE not in day.roster(grand)
+
+
+def hand_built_final_with_allowed_racer(day) -> Round:
+    """The final is made empty, the late racer is allowed while its roster
+    is still empty, and the race coordinator fills the roster by hand with
+    `add_to_final`, the allowed racer included. Then the final races."""
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    final = make_new_round(day.group, 2)
+    day.allowed_late_racer()
+    assert FinalRequest.objects.get().placed_round is None
+    for car in (101, 102, 103, 104, LATE):
+        add_to_final(day.racer(car), final)
+    generate_schedule(final, 1)
+    day.race(final)
+    return final
+
+
+def test_add_to_final_places_an_allowed_racer(day):
+    """Review gap 1 on #115: the racer is on the final's roster, so the
+    request is spent on it, and a combined round built after the final has
+    run does not take the racer again."""
+    final = hand_built_final_with_allowed_racer(day)
+    assert FinalRequest.objects.get().placed_round == final
+    grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2)
+    assert day.roster(grand.round) == [101, 102]
+
+
+def test_an_allow_into_an_empty_final_waits_until_the_racer_is_on_a_roster(day):
+    """Review gap 2 on #115. Allow puts nobody on an empty roster, so the
+    request stays unplaced until the roster is written, which then places
+    it. A final built without the racer leaves the request for the next
+    round the group races in (D44)."""
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    final = make_new_round(day.group, 2)
+    day.allowed_late_racer()
+    assert FinalRequest.objects.get().placed_round is None
+    made = new_round_roster(FollowOn(round_1), top=4)
+    assert made.round == final
+    assert LATE in day.roster(final)
+    assert FinalRequest.objects.get().placed_round == final
 
 
 def test_declining_unbinds_so_a_new_allow_finds_the_next_round(day):

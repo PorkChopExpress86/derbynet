@@ -366,6 +366,8 @@ def add_to_final(racer: Racer, final: Round) -> None:
         if final.roster.filter(racer=racer).exists():
             raise FinalsFailure(Failure.ON_ROSTER, "The racer is already in the final.")
         final.roster.create(event_id=final.event_id, racer=racer)
+        # An allowed racer put on the roster by hand is spent on it too.
+        place_allowed_racers(final, [racer.pk])
 
 
 def remove_from_final(racer: Racer, final: Round) -> None:
