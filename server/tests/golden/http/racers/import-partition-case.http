@@ -1,0 +1,71 @@
+### 001 import LIONS
+request: POST action.php
+request-body: action=racer.import&firstname=Leo&lastname=Upper&partition=LIONS
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "firstname": "Leo",
+        "lastname": "Upper",
+        "partition": "LIONS"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 2
+}
+
+### 002 list after LIONS
+request: GET action.php?query=racer.list&order=car
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 986
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Leo",
+            "lastname": "Upper",
+            "carnumber": 201,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "LIONS",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+

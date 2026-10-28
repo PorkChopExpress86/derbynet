@@ -112,6 +112,25 @@ jobs:
           bash reset-database.sh http://127.0.0.1:8080
           DBCHECK=1 bash reset-database.sh http://127.0.0.1:8080
 
+      # The racer and check-in suites of #29, in the order
+      # testing/exercise-one-database.sh runs them, as far as Django serves
+      # them: import-roster.sh, test-den-changes.sh (#30), then
+      # test-basic-checkins.sh, which test-basic-racing.sh starts with.  They
+      # run from the repository root, where testing/common.sh keeps its
+      # scratch files.  test-racer-query.sh needs the rest of
+      # test-basic-racing.sh (#31) and test-awards.sh (#33) first, and
+      # test-car-numbers.sh needs query=poll (#31).
+      - name: Run the racer and check-in suites against Django
+        working-directory: .
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-den-changes.sh http://127.0.0.1:8080
+          bash testing/test-basic-checkins.sh http://127.0.0.1:8080
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-csv-roster.sh http://127.0.0.1:8080 testing/data/outlaw-class.csv
+          DBCHECK=1 bash testing/import-csv-roster.sh http://127.0.0.1:8080 testing/data/outlaw-class.csv
+
       - name: Show the Django server log
         if: failure()
         run: cat "$RUNNER_TEMP/server.log"

@@ -1794,6 +1794,73 @@
       ],
       "reason": "D39: Django refuses to fit in a racer who is not on the round's roster and answers notonroster; PHP fits the racer in. The expected reply holds only the service's failure code; #31 records the rest.",
       "expected": "deviations/Q25/reschedule.http"
+    },
+    {
+      "quirk": "D5",
+      "fixture": "http/racers/refusals.http",
+      "exchanges": [
+        "003 anonymous list"
+      ],
+      "reason": "PHP lists every racer to anyone. Django's racer.list needs a role that works with racers; the anonymous VIEW_RACE_RESULTS is not enough (D5).",
+      "expected": "deviations/D5/refusals.http"
+    },
+    {
+      "quirk": "S23",
+      "fixture": "http/racers/refusals.http",
+      "exchanges": [
+        "004 anonymous pass PWD carno"
+      ],
+      "reason": "PHP checks a racer in for anyone. Django needs CHECK_IN_RACERS or PHOTO_UPLOAD (S23, #15).",
+      "expected": "deviations/S23/refusals.http"
+    },
+    {
+      "quirk": "R1",
+      "fixture": "http/racers/refusals.http",
+      "exchanges": [
+        "001 edit unknown racer",
+        "002 pass unknown racer"
+      ],
+      "reason": "PHP answers success for a racer id that names no racer, and changes nothing. Django answers racer.edit with noracer and racer.pass with notunique (#29, for the owner to confirm).",
+      "expected": "deviations/R1/refusals.http"
+    },
+    {
+      "quirk": "R2",
+      "fixture": "http/racers/refusals.http",
+      "exchanges": [
+        "005 import text car number"
+      ],
+      "reason": "PHP stores a car number such as A12 as text. Django's car number is an integer column, so it refuses one that is not a whole number with invalid-carnumber (#29, for the owner to decide).",
+      "expected": "deviations/R2/refusals.http"
+    },
+    {
+      "quirk": "C21",
+      "fixture": "http/racers/check-in.http",
+      "exchanges": [
+        "025 bulk number",
+        "026 bulk unknown who",
+        "027 bulk eligibility"
+      ],
+      "reason": "action.racer.bulk.inc starts with a space before <?php, so PHP's racer.bulk body is not clean JSON, the file that writes its XML refusal (C21). Django writes the JSON alone.",
+      "expected": "deviations/C21/check-in.http"
+    },
+    {
+      "quirk": "D34",
+      "fixture": "http/racers/import-partition-case.http",
+      "exchanges": [
+        "002 list after LIONS"
+      ],
+      "reason": "PHP's racer.import makes a partition LIONS beside Lions. Django joins Lions, the partition named with case ignored (D34).",
+      "expected": "deviations/D34/import-partition-case.http"
+    },
+    {
+      "quirk": "C14",
+      "fixture": "http/racers/walk-in-multiplier-0.http",
+      "exchanges": [
+        "001 pass PWDwi new car",
+        "002 list after walk-in"
+      ],
+      "reason": "With car-numbering multiplier 0 PHP assigns $partition, not $partitionid, so a PWDwi walk-in falls to Default. Django puts it in the last partition (C14).",
+      "expected": "deviations/C14/walk-in-multiplier-0.http"
     }
   ]
 }

@@ -70,6 +70,14 @@ def php_empty(text: str) -> bool:
     return text in ("", "0")
 
 
+def php_truthy(value) -> bool:
+    """A posted value as PHP's `if ($value)` reads it: a string is false
+    only when `php_empty` holds."""
+    if isinstance(value, str):
+        return not php_empty(value)
+    return bool(value)
+
+
 def php_intval(text: str) -> int:
     """`intval($text)`: the leading number as `php_int` converts it, or 0."""
     match = _NUMBER.match(text)
