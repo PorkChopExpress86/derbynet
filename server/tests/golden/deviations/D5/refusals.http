@@ -1,0 +1,15 @@
+### 003 anonymous list
+request: GET action.php?query=racer.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 162
+body:
+{
+    "outcome": {
+        "summary": "failure",
+        "code": "notauthorized",
+        "description": "Not authorized -- please see race coordinator."
+    }
+}
+

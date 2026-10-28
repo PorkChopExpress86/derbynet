@@ -80,15 +80,15 @@ def test_test_cars_far_above_do_not_disturb_numbering(event):
     assert [add(event, "Bears").car_number for _ in range(3)] == [1, 2, 3]
 
 
-def test_a_full_hundred_runs_past_its_bound(event):
-    """PHP would store a null car number here."""
+def test_a_full_hundred_has_no_next_number(event):
+    """PHP's query finds no number and returns null."""
     lions = groups.find_or_create_partition(event.id, "Lions")
     groups.find_or_create_partition(event.id, "Tigers")
     for car in range(101, 201):
         add(event, "Lions", str(car))
     add(event, "Tigers", "201")
 
-    assert car_numbers.next_car_number_for_partition(lions) == 202
+    assert car_numbers.next_car_number_for_partition(lions) is None
 
 
 def test_base_numbers_by_partition(event):

@@ -24,7 +24,7 @@ from accounts.permissions import Perm
 from core.models import RaceState
 from core.services import lock_race_state
 from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
-from racing.services.reschedule import Rescheduled, reschedule
+from racing.services.reschedule import Rescheduled, adjust_rounds
 from roster.models import Racer
 
 RESCHEDULE_PERMISSION: Final = Perm.CONTROL_RACE
@@ -89,7 +89,7 @@ class Added:
 
 def add_to_round_in_progress(racer: Racer, granted: int) -> Added:
     """Yes: fit the car into the remaining heats of the round in progress,
-    with `reschedule(roundid, racer_id)`, no dry run and no preview.
+    as `reschedule(roundid, racer_id)` does, with no dry run and no preview.
 
     `granted` is the caller's permission bits (-1 for all). It needs
     `CHECK_IN_RACERS` or `CONTROL_RACE`, and only `CONTROL_RACE` once check-in
@@ -97,18 +97,39 @@ def add_to_round_in_progress(racer: Racer, granted: int) -> Added:
     `not-in-progress`, `alreadyscheduled` for a car with heats in the round,
     and `notauthorized`. The reschedule's own failures pass through as
     `RescheduleFailure`.
+
+    The checks run under the `RaceState` lock, and again in the transaction
+    that writes the chart, after the search, so a No answered meanwhile still
+    leaves the car to the race coordinator. The search itself runs outside
+    the lock, as every reschedule does.
     """
+    with transaction.atomic():
+        lock_race_state(racer.event_id)
+        round = _allowed_round(racer, granted)
+
+    def recheck(state, racing):
+        _allowed_round(racer, granted, round)
+
+    [rescheduled] = adjust_rounds(
+        racer.event_id, lambda: [round], racer.pk, also=recheck
+    )
+    return Added(round, rescheduled)
+
+
+def _allowed_round(racer: Racer, granted: int, expected: Round | None = None) -> Round:
+    """The round in progress the caller may add the racer's car to, or a
+    `CheckInFailure`. The caller holds the `RaceState` lock."""
     racer = Racer.objects.get(pk=racer.pk)
     if not racer.passed_inspection:
         raise CheckInFailure(
             Failure.NOT_CHECKED_IN, "The racer has not passed check-in."
         )
     round = _running_round(racer)
-    if round is None:
+    if round is None or (expected is not None and round != expected):
         raise CheckInFailure(
             Failure.NOT_IN_PROGRESS, "No round of the racer's group is in progress."
         )
-    if HeatLane.objects.filter(round=round, racer=racer).exists():
+    if expected is None and HeatLane.objects.filter(round=round, racer=racer).exists():
         raise CheckInFailure(
             Failure.ALREADY_SCHEDULED, "The car already has heats in this round."
         )
@@ -118,7 +139,7 @@ def add_to_round_in_progress(racer: Racer, granted: int) -> Added:
         raise CheckInFailure(
             Failure.NOT_AUTHORIZED, "Only the race coordinator can add this car now."
         )
-    return Added(round, reschedule(round, racer.pk))
+    return round
 
 
 def leave_out_of_round_in_progress(racer: Racer, granted: int) -> Round:

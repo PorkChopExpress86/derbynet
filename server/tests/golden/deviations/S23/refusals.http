@@ -1,0 +1,21 @@
+### 004 anonymous pass PWD carno
+request: POST action.php
+request-body: action=racer.pass&barcode=PWD101&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWD101",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "notauthorized",
+        "description": "Not authorized -- please see race coordinator."
+    }
+}
+

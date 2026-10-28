@@ -85,3 +85,19 @@ post_ok "action=racer.import&firstname=Antoine&lastname=Akiyama&partition=Tigers
 capture_scenario racers/walk-in-multiplier-0
 capture "pass PWDwi new car" "POST action.php action=racer.pass&barcode=PWDwi7&value=1"
 capture "list after walk-in" "GET action.php?query=racer.list&order=car"
+
+# ----- Requests Django answers differently on purpose (#29), each listed in
+# deviations.json: an unknown racer id in racer.edit and racer.pass, an
+# anonymous racer list and check-in (D5, S23), and a car number that is not a
+# whole number, last so no later list shows it.
+reset_database
+user_login_coordinator
+post_ok "action=racer.import&firstname=Adolfo&lastname=Asher&partition=Lions&carnumber=101"
+capture_scenario racers/refusals
+capture "edit unknown racer" "POST action.php action=racer.edit&racer=9999&firstname=Nobody"
+capture "pass unknown racer" "POST action.php action=racer.pass&racer=9999&value=1"
+use_session anonymous
+capture "anonymous list" "GET action.php?query=racer.list"
+capture "anonymous pass PWD carno" "POST action.php action=racer.pass&barcode=PWD101&value=1"
+use_session coord
+capture "import text car number" "POST action.php action=racer.import&firstname=Text&lastname=Car&partition=Lions&carnumber=A12"

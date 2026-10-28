@@ -29,7 +29,7 @@ from awards.models import Award
 from awards.services import reconcile_partition_lists
 from core.models import ActionLog, RaceSettings, RaceState
 from core.services import lock_race_state
-from racing.engine.phpcompat import php_empty, php_intval, php_numeric
+from racing.engine.phpcompat import php_intval, php_numeric, php_truthy
 from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from roster.fake_names import FAKE_NAMES
 from roster.models import Group, Partition, Racer, Subgroup
@@ -55,6 +55,8 @@ class Failure(StrEnum):
     MISSING_REQUIRED = "missingrequired"
     # Django only: PHP stores any text in the car number column.
     INVALID_CAR_NUMBER = "invalid-carnumber"
+    # Django only: PHP stores a null car number when a partition is full.
+    NO_CAR_NUMBER = "no-carnumber"
 
 
 class RacerFailure(Exception):
@@ -67,13 +69,6 @@ class RacerFailure(Exception):
 def _record(event_id, request: dict) -> None:
     """A synthetic history entry, as PHP's `record_action()` writes one."""
     ActionLog.objects.create(event_id=event_id, request=request)
-
-
-def php_truthy(value) -> bool:
-    """A posted value as PHP's `if ($value)` reads it."""
-    if isinstance(value, str):
-        return not php_empty(value)
-    return bool(value)
 
 
 def _epoch_ms(moment) -> int:
@@ -126,6 +121,12 @@ def insert_new_racer(
             )
         if car_number is None or (isinstance(car_number, str) and car_number == ""):
             car_number = car_numbers.next_car_number_for_partition(partition)
+            if car_number is None:
+                # PHP stores a null car number; the column here has none.
+                raise RacerFailure(
+                    Failure.NO_CAR_NUMBER,
+                    f"Every car number of {partition.name} is taken.",
+                )
         warnings = []
         if isinstance(car_number, str):
             number = _car_number(car_number.strip())
@@ -195,8 +196,9 @@ def find_or_create_walk_in(event, car_number: int) -> tuple[Racer | None, bool]:
 
     The walk-in racer is `Walk-In <carno>`. With a car-numbering multiplier
     the partition is the one whose range holds the number, or the last one
-    before it; with multiplier 0 it is the last partition in sort order
-    (PHP assigns the wrong variable and leaves it undefined, C14). With no
+    before it; with multiplier 0 it is the partition with the highest id,
+    as PHP's `COALESCE(MAX(partitionid), 1)` means (PHP assigns the wrong
+    variable and leaves it undefined, C14). With no
     such partition it is `Default`. The check and the insert share one
     locked transaction, so two scanners posting the same barcode make one
     racer.
@@ -218,7 +220,10 @@ def find_or_create_walk_in(event, car_number: int) -> tuple[Racer | None, bool]:
             # intdiv() cuts toward zero.
             century = int((car_number - rule.smallest) / rule.multiplier) + 1
             partitions = partitions.filter(sort_order__lte=century)
-        partition = partitions.order_by("-sort_order", "-id").first()
+        if rule.multiplier > 0:
+            partition = partitions.order_by("-sort_order", "-id").first()
+        else:
+            partition = partitions.order_by("-id").first()
         new = insert_new_racer(
             event,
             first_name=WALK_IN_FIRST_NAME,
@@ -346,9 +351,9 @@ def delete_racer(event, racer: Racer | None, posted_id) -> None:
     """`racer.delete`: refused for a racer with heats (`scheduled`) or in
     more than one round (`rosters`). The history gets `racer.*delete` with
     the posted id, as PHP writes it whether or not the delete happened."""
-    with transaction.atomic():
-        lock_race_state(event.id)
-        try:
+    try:
+        with transaction.atomic():
+            lock_race_state(event.id)
             if racer is not None:
                 if HeatLane.objects.filter(racer=racer).exists():
                     raise RacerFailure(
@@ -362,8 +367,9 @@ def delete_racer(event, racer: Racer | None, posted_id) -> None:
                 RosterEntry.objects.filter(racer=racer).delete()
                 racer.delete()
                 reconcile_partition_lists(event.id)
-        finally:
-            _record(event.id, {"action": "racer.*delete", "racerid": posted_id})
+    finally:
+        # After the transaction, so a refusal's rollback keeps the entry.
+        _record(event.id, {"action": "racer.*delete", "racerid": posted_id})
 
 
 # ----- Check-in ---------------------------------------------------------------

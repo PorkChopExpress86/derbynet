@@ -1,0 +1,123 @@
+### 001 edit unknown racer
+request: POST action.php
+request-body: action=racer.edit&racer=9999&firstname=Nobody
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 218
+body:
+{
+    "action": {
+        "action": "racer.edit",
+        "racer": 9999,
+        "firstname": "Nobody"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 002 pass unknown racer
+request: POST action.php
+request-body: action=racer.pass&racer=9999&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 207
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "racer": 9999,
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+
+### 003 anonymous list
+request: GET action.php?query=racer.list
+status: 200
+content-type: application/json; charset=utf-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
+length: 507
+body:
+{
+    "racers": [
+        {
+            "racerid": 1,
+            "firstname": "Adolfo",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions",
+            "rankid": 1,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
+### 004 anonymous pass PWD carno
+request: POST action.php
+request-body: action=racer.pass&barcode=PWD101&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 322
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "barcode": "PWD101",
+        "value": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "details": {
+        "class": "Lions",
+        "firstname": "Adolfo",
+        "lastname": "Asher"
+    }
+}
+
+### 005 import text car number
+request: POST action.php
+request-body: action=racer.import&firstname=Text&lastname=Car&partition=Lions&carnumber=A12
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 298
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "firstname": "Text",
+        "lastname": "Car",
+        "partition": "Lions",
+        "carnumber": "A12"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 2
+}
+

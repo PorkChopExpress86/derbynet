@@ -9,9 +9,9 @@ or `PHOTO_UPLOAD`, which the Photo role of the photo stand holds. PHP's
 the JSON (C21); here it is a JSON `notauthorized`.
 """
 
-from accounts.permissions import Perm, granted_for
+from accounts.permissions import Access, Perm, granted_for
 from legacy_api.registry import REFUSALS, LegacyContext, action, query
-from racing.engine.phpcompat import php_intval, php_numeric
+from racing.engine.phpcompat import php_intval, php_numeric, php_truthy
 from roster.models import Partition, Racer, Subgroup
 from roster.services import barcode, car_numbers, racers
 from roster.services.racers import Bulk, Edit, EditFailure, RacerFailure
@@ -73,7 +73,7 @@ def racer_add(ctx: LegacyContext) -> None:
             car_name=_text(ctx, "carname"),
             note=_text(ctx, "note_from"),
             partition=partition,
-            exclude=racers.php_truthy(_text(ctx, "exclude")),
+            exclude=php_truthy(_text(ctx, "exclude")),
         )
     except RacerFailure as failure:
         _fail(ctx, failure)
@@ -117,12 +117,13 @@ def racer_edit(ctx: LegacyContext) -> None:
         car_number=_optional(ctx, "carno"),
         car_name=_optional(ctx, "carname"),
         note=_optional(ctx, "note_from"),
-        exclude=None if exclude is None else racers.php_truthy(exclude),
+        exclude=None if exclude is None else php_truthy(exclude),
     )
     try:
         result = racers.edit_racer(racer, edit)
     except EditFailure as failure:
-        ctx.put("partition-sortorder", failure.result.partition_sort_order)
+        if partition is not None:
+            ctx.put("partition-sortorder", failure.result.partition_sort_order)
         _fail(ctx, failure)
         return
     except RacerFailure as failure:
@@ -147,14 +148,20 @@ def racer_delete(ctx: LegacyContext) -> None:
     ctx.put("reload", True)
 
 
-@action("racer.bulk", permission=Perm.EDIT_RACER)
+# Every caller reaches the handler, which refuses without EDIT_RACER.
+@action("racer.bulk", permission=Access.ANONYMOUS)
 def racer_bulk(ctx: LegacyContext) -> None:
+    # PHP writes its refusal and then `reload` as for any other outcome.
+    if not granted_for(ctx.session) & Perm.EDIT_RACER:
+        _refuse(ctx)
+        ctx.put("reload", True)
+        return
     bulk = Bulk(
         who=_text(ctx, "who"),
         what=_text(ctx, "what"),
         value=_text(ctx, "value", "1"),
         start=_text(ctx, "start"),
-        auto=racers.php_truthy(_text(ctx, "auto")),
+        auto=php_truthy(_text(ctx, "auto")),
         may_revert=bool(granted_for(ctx.session) & Perm.REVERT_CHECK_IN),
     )
     try:
@@ -171,7 +178,7 @@ def racer_bulk(ctx: LegacyContext) -> None:
     permission=Perm.CHECK_IN_RACERS | Perm.PHOTO_UPLOAD | Perm.REVERT_CHECK_IN,
 )
 def racer_pass(ctx: LegacyContext) -> None:
-    passed = racers.php_truthy(_text(ctx, "value", "1"))
+    passed = php_truthy(_text(ctx, "value", "1"))
     needed = CHECK_IN if passed else Perm.REVERT_CHECK_IN
     if not granted_for(ctx.session) & needed:
         _refuse(ctx)
@@ -241,7 +248,7 @@ def racer_fake(ctx: LegacyContext) -> None:
         ctx.event,
         n_groups=php_intval(_text(ctx, "ngroups")),
         per_group=php_intval(_text(ctx, "racers_per_group")),
-        check_in=racers.php_truthy(_text(ctx, "check_in")),
+        check_in=php_truthy(_text(ctx, "check_in")),
     )
     ctx.success()
 
@@ -262,7 +269,7 @@ def racer_list(ctx: LegacyContext) -> None:
         if found.created:
             ctx.put("new-row", racers.checkin_row(found.racer))
             ctx.put("car-numbers", car_numbers.next_car_numbers(ctx.event.id))
-    elif racers.php_truthy(_text(ctx, "racerid")):
+    elif php_truthy(_text(ctx, "racerid")):
         number = php_numeric(_text(ctx, "racerid"))
         racer_id = int(number) if number is not None else 0
     ctx.put(

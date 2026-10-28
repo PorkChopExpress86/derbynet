@@ -1,0 +1,23 @@
+### 005 import text car number
+request: POST action.php
+request-body: action=racer.import&firstname=Text&lastname=Car&partition=Lions&carnumber=A12
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 327
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "firstname": "Text",
+        "lastname": "Car",
+        "partition": "Lions",
+        "carnumber": "A12"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "invalid-carnumber",
+        "description": "Car number A12 is not a whole number."
+    }
+}
+

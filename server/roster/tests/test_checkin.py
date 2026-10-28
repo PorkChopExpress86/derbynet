@@ -167,3 +167,30 @@ def test_a_session_without_check_in_cannot_answer(race):
         add_to_round_in_progress(racer, int(Perm.PHOTO_UPLOAD))
     with pytest.raises(CheckInFailure):
         leave_out_of_round_in_progress(racer, int(Perm.PHOTO_UPLOAD))
+
+
+def test_a_no_answered_during_the_search_still_refuses_the_race_crew(
+    client, race, monkeypatch
+):
+    """A second check-in station answers No while the first one's Yes is
+    searching. The No wins: only the race coordinator adds the car now."""
+    from racing.services import reschedule
+
+    event, round = race
+    run_first_heat(round)
+    racer = late_racer(event, 201)
+    crew_bits = crew(client)
+    search = reschedule._adjust
+
+    def no_meanwhile(*args, **kwargs):
+        if not RosterEntry.objects.get(round=round, racer=racer).left_out_at:
+            leave_out_of_round_in_progress(racer, crew_bits)
+        return search(*args, **kwargs)
+
+    monkeypatch.setattr(reschedule, "_adjust", no_meanwhile)
+
+    with pytest.raises(CheckInFailure) as refused:
+        add_to_round_in_progress(racer, crew_bits)
+
+    assert refused.value.code == checkin.Failure.NOT_AUTHORIZED
+    assert heats_of(racer, round) == 0

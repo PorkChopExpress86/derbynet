@@ -40,7 +40,13 @@ QUIRK_DECISIONS = {
     # Rows of #64 and owner decisions that change a recorded PHP exchange (#29).
     "C14": "fix",
     "C21": "fix",
+    "D5": "fix",
     "D34": "fix",
+    "S23": "fix",
+    # Proposed in #29, for the owner to confirm: R1 an unknown racer id is
+    # refused, R2 a car number must be a whole number.
+    "R1": "fix",
+    "R2": "fix",
 }
 
 

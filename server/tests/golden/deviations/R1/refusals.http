@@ -1,0 +1,43 @@
+### 001 edit unknown racer
+request: POST action.php
+request-body: action=racer.edit&racer=9999&firstname=Nobody
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 232
+body:
+{
+    "action": {
+        "action": "racer.edit",
+        "racer": 9999,
+        "firstname": "Nobody"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "noracer",
+        "description": "No such racer."
+    }
+}
+
+### 002 pass unknown racer
+request: POST action.php
+request-body: action=racer.pass&racer=9999&value=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "action": {
+        "action": "racer.pass",
+        "racer": 9999,
+        "value": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "notunique",
+        "description": "Need to identify racer uniquely."
+    },
+    "reload": true
+}
+

@@ -289,7 +289,10 @@ def test_bulk_without_edit_racer_answers_json(client, event):
     response = post(client, "action=racer.bulk&who=all&what=checkin")
 
     assert response["Content-Type"].startswith("application/json")
-    assert json.loads(response.content)["outcome"]["code"] == "notauthorized"
+    reply = json.loads(response.content)
+    assert reply["outcome"]["code"] == "notauthorized"
+    # PHP writes reload after its refusal too.
+    assert reply["reload"] is True
 
 
 def test_bulk_un_check_in_without_revert_answers_json(client, event):
@@ -575,3 +578,56 @@ def test_fake_racers_get_pictures(coordinator, event, tmp_path):
         == 1
     )
     assert HeatLane.objects.count() == 0
+
+
+# ----- review fixes -----
+
+
+def test_a_refused_delete_is_still_logged(coordinator, event):
+    """PHP records `racer.*delete` before it checks the outcome."""
+    racer = imported(coordinator, "firstname=A&lastname=B&partition=Lions")
+    HeatLaneFactory(round=Round.objects.get(group=racer.group), racer=racer)
+
+    act(coordinator, f"action=racer.delete&racer={racer.pk}")
+
+    assert ActionLog.objects.filter(
+        event=event, request={"action": "racer.*delete", "racerid": str(racer.pk)}
+    ).exists()
+
+
+def test_a_refused_bulk_still_reloads(coordinator):
+    assert act(coordinator, "action=racer.bulk&who=all&what=x")["reload"] is True
+    assert act(coordinator, "action=racer.bulk&who=x&what=checkin")["reload"] is True
+
+
+def test_an_unknown_rankid_alone_sends_no_partition_sortorder(coordinator):
+    racer = imported(coordinator, "firstname=A&lastname=B&partition=Lions")
+
+    reply = act(coordinator, f"action=racer.edit&racer={racer.pk}&rankid=-1")
+
+    assert reply["outcome"]["code"] == "noclass"
+    assert "partition-sortorder" not in reply
+
+
+def test_an_anonymous_bulk_is_refused_with_reload(client, coordinator, event):
+    racer = imported(coordinator, "firstname=A&lastname=B")
+    client.post("/action.php", {"action": "role.login", "name": ""})
+
+    reply = act(client, "action=racer.bulk&who=all&what=checkin")
+
+    assert (reply["outcome"]["code"], reply["reload"]) == ("notauthorized", True)
+    assert not Racer.objects.get(pk=racer.pk).passed_inspection
+
+
+def test_a_full_partition_refuses_a_blank_car_number(coordinator, event):
+    groups.find_or_create_partition(event.id, "Lions")
+    groups.find_or_create_partition(event.id, "Tigers")
+    imported(coordinator, "firstname=T&lastname=T&partition=Tigers&carnumber=201")
+    for car in range(101, 201):
+        imported(coordinator, f"firstname=A&lastname=B&partition=Lions&carnumber={car}")
+
+    reply = act(
+        coordinator, "action=racer.import&firstname=C&lastname=D&partition=Lions"
+    )
+
+    assert reply["outcome"]["code"] == "no-carnumber"

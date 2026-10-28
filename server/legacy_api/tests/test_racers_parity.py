@@ -9,7 +9,7 @@ PHP's body byte for byte. The exchanges `deviations.json` lists must match
 their expected Django output instead, and must differ from PHP's (D25).
 
 `WRITE_DEVIATIONS=1 uv run pytest legacy_api/tests/test_racers_parity.py`
-rewrites the C21, D34 and C14 entries and their expected transcripts.
+rewrites the #29 entries and their expected transcripts.
 """
 
 import json
@@ -51,6 +51,8 @@ def distinct_check_in_times(monkeypatch):
 
 
 ID_KEYS = ("racerid", "partitionid", "classid", "rankid")
+# The scenario names no row with ids from here up.
+UNKNOWN_ID = 9999
 SEQ = re.compile(r'("seq": )[1-9]\d{9,}')
 
 CHECK_IN_SETUP = [
@@ -86,6 +88,8 @@ class Ids:
         for django_id, known in self.to_php[key].items():
             if known == php_id:
                 return django_id
+        if php_id >= UNKNOWN_ID:
+            return php_id  # an id the scenario chose to name no row
         raise KeyError(f"{key} {php_id} has not appeared yet")
 
     def as_php(self, value):
@@ -251,6 +255,16 @@ def run_walk_in_multiplier_0(client):
     return run
 
 
+def run_refusals(client):
+    reset(client)
+    import_racers(client, [CHECK_IN_SETUP[0]])
+    run = Run("http/racers/refusals.http")
+    anonymous = Client()
+    for name in run.php:
+        run.replay(anonymous if "anonymous" in name else client, name)
+    return run
+
+
 def test_check_in_matches_php(client, event):
     run_check_in(client).check()
 
@@ -271,9 +285,47 @@ def test_a_walk_in_with_multiplier_0_matches_php_but_for_c14(client, event):
     run_walk_in_multiplier_0(client).check()
 
 
+def test_the_refusals_differ_from_php_as_listed(client, event):
+    run_refusals(client).check()
+
+
 # ----- Writing the deviation entries -----------------------------------------
 
 DEVIATIONS = {
+    "D5": (
+        "http/racers/refusals.http",
+        ["003 anonymous list"],
+        "PHP lists every racer to anyone. Django's racer.list needs a role that"
+        " works with racers; the anonymous VIEW_RACE_RESULTS is not enough (D5).",
+        "deviations/D5/refusals.http",
+        run_refusals,
+    ),
+    "S23": (
+        "http/racers/refusals.http",
+        ["004 anonymous pass PWD carno"],
+        "PHP checks a racer in for anyone. Django needs CHECK_IN_RACERS or"
+        " PHOTO_UPLOAD (S23, #15).",
+        "deviations/S23/refusals.http",
+        run_refusals,
+    ),
+    "R1": (
+        "http/racers/refusals.http",
+        ["001 edit unknown racer", "002 pass unknown racer"],
+        "PHP answers success for a racer id that names no racer, and changes"
+        " nothing. Django answers racer.edit with noracer and racer.pass with"
+        " notunique (#29, for the owner to confirm).",
+        "deviations/R1/refusals.http",
+        run_refusals,
+    ),
+    "R2": (
+        "http/racers/refusals.http",
+        ["005 import text car number"],
+        "PHP stores a car number such as A12 as text. Django's car number is an"
+        " integer column, so it refuses one that is not a whole number with"
+        " invalid-carnumber (#29, for the owner to decide).",
+        "deviations/R2/refusals.http",
+        run_refusals,
+    ),
     "C21": (
         "http/racers/check-in.http",
         ["025 bulk number", "026 bulk unknown who", "027 bulk eligibility"],
@@ -313,7 +365,7 @@ def _exchange_text(name, php, body: bytes) -> bytes:
 
 
 @pytest.mark.skipif(
-    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the C21, D34 and C14 entries"
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the #29 entries"
 )
 def test_write_racer_deviations(event):
     listing = json.loads(DEVIATIONS_FILE.read_text())

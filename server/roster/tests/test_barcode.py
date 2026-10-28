@@ -157,3 +157,14 @@ def test_two_scanners_posting_one_walk_in_make_one_racer():
     assert errors == []
     cars = list(Racer.objects.filter(event=event).values_list("car_number", flat=True))
     assert sorted(cars) == [101, 102, 103, 104, 105]
+
+
+def test_pwdwi_with_multiplier_zero_picks_the_highest_partition_id(event):
+    """PHP means `COALESCE(MAX(partitionid), 1)`, which a reorder does not
+    change."""
+    RaceSettings.objects.filter(event=event).update(car_numbering="0+1")
+    lions = groups.find_or_create_partition(event.id, "Lions")
+    tigers = groups.find_or_create_partition(event.id, "Tigers")
+    groups.order_partitions(event, [tigers, lions])
+
+    assert barcode.resolve(event, "PWDwi7").racer.partition == tigers

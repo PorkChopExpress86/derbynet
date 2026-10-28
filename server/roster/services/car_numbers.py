@@ -79,12 +79,11 @@ def next_car_numbers(event_id) -> list[dict]:
     return rows
 
 
-def next_car_number_for_partition(partition: Partition) -> int:
+def next_car_number_for_partition(partition: Partition) -> int | None:
     """`next_car_number_for_partition()`: the partition's lower bound if it
     is free, else one past the end of the first run of taken numbers from
-    there. PHP returns null when every number up to the upper bound is
-    taken; this returns one past the end of the run instead, past the
-    bound, so a racer always gets a number."""
+    there that ends below the upper bound. None when every number up to the
+    upper bound is taken, as PHP's query finds none."""
     rule = numbering(partition.event_id)
     taken = _taken(partition.event_id)
     low = rule.lower_bound(partition)
@@ -92,9 +91,8 @@ def next_car_number_for_partition(partition: Partition) -> int:
         return low
     ends = [n for n in _ends_of_runs(taken) if n >= low]
     if rule.multiplier != 0:
-        inside = [n for n in ends if n < rule.upper_bound(partition)]
-        ends = inside or ends
-    return 1 + ends[0]
+        ends = [n for n in ends if n < rule.upper_bound(partition)]
+    return 1 + ends[0] if ends else None
 
 
 def base_car_number_by_partition(event_id) -> int | dict[int, int]:
