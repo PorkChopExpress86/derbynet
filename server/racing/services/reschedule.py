@@ -99,17 +99,17 @@ class _RacePosition:
         refs = (self.running, self.staged, *self.emptied)
         return frozenset(ref[1] for ref in refs if ref and ref[0] == round.id)
 
-    def pinned(self, round: Round, renumbered: dict[int, int]) -> frozenset[HeatRef]:
+    def pinned(self, renumbered: dict[int, dict[int, int]]) -> frozenset[HeatRef]:
         """Under the master schedule, the heats whose master numbers must stay
         once the event is renumbered, so `next` goes from the current heat to
         the staged heat: the current heat, run or not, since master numbering
         renumbers a heat with a result in only some lanes, and the staged
-        heat. `renumbered` is this round's heat renumbering, which can move a
-        current heat that has run."""
+        heat. `renumbered` maps each round rewritten to its heat renumbering,
+        which can move a current heat that has run."""
         if not (self.master and self.current):
             return frozenset()
         r, heat = self.current
-        current = (r, renumbered.get(heat, heat) if r == round.id else heat)
+        current = (r, renumbered.get(r, {}).get(heat, heat))
         return frozenset({current, *((self.staged,) if self.staged else ())})
 
 
@@ -302,9 +302,12 @@ def _adjust(
 
 def _write(
     round: Round, state: RaceState, snapshot: _Snapshot, adjuster: ScheduleAdjuster
-):
+) -> bool:
+    """Write the round's new chart, and return whether there was one. The
+    caller renumbers master heats once every round is written, with
+    `_renumber`, so a heat one round moved is pinned at its new number."""
     if adjuster.updated_chart() is None:
-        return  # a lane closure that changes no heat
+        return False  # a lane closure that changes no heat
     rows = HeatLane.objects.filter(round=round)
     fixed = {heat for heat, _, _, done in snapshot.rows if done}
     # As PHP's DELETE, never a row with a result, even one written by a
@@ -334,9 +337,6 @@ def _write(
         for lane, racer_id in enumerate(racers, start=1)
         if racer_id is not None
     )
-    after_chart_change(
-        round, keep=snapshot.position.pinned(round, renumbered), advance=False
-    )
     if state.current_round_id == round.id:
         # A current heat that has run can still move down; follow it.
         state.current_heat = renumbered.get(state.current_heat, state.current_heat)
@@ -345,6 +345,7 @@ def _write(
             # Q5: only a committed change stops racing, never a dry run.
             heats.transition(state, RacingOff())
     Kiosk.objects.filter(event_id=round.event_id).update(reload_requested=True)
+    return True
 
 
 def _hold_emptied_heats(
@@ -492,8 +493,19 @@ def adjust_rounds(
                     for round, snapshot, _ in work
                 ):
                     continue
-                for round, snapshot, adjuster in work:
-                    _write(round, state, snapshot, adjuster)
+                written = [
+                    (round, snapshot, adjuster)
+                    for round, snapshot, adjuster in work
+                    if _write(round, state, snapshot, adjuster)
+                ]
+                if written:
+                    round, snapshot, _ = written[0]
+                    renumbered = {
+                        r.id: adjuster.renumbering_map() for r, _, adjuster in written
+                    }
+                    after_chart_change(
+                        round, keep=snapshot.position.pinned(renumbered), advance=False
+                    )
                 if also is not None:
                     also(state, rounds)
             return results

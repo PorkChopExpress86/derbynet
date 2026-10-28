@@ -3,6 +3,7 @@
 from unittest import mock
 
 import pytest
+from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from racing.engine.scheduling.adjuster import ScheduleAdjuster
@@ -655,3 +656,51 @@ def test_reopening_a_lane_the_track_does_not_have_is_refused(race):
     assert failure_of(lambda: reopen_lanes(event, {0})) == Failure.NO_SUCH_LANE
     assert failure_of(lambda: reopen_lanes(event, {9})) == Failure.NO_SUCH_LANE
     assert mask(event) == 0b0100
+
+
+def test_under_the_master_schedule_the_current_and_staged_heats_keep_their_numbers():
+    """Two rounds rewritten in one closure. The current heat, Wolves heat 3,
+    has a result in one lane. A Wolves racer has left the roster, so once
+    lane 4 closes the closure squeezes out a heat before heat 3, which moves
+    down; the staged heat is in the Bears' round. Both keep their master
+    numbers, so `next` still goes from one to the other."""
+    replay, wolves = setup_race(racers=6, lanes=4)
+    event = replay.event
+    bears = new_group(replay, "Bears", racers=6)
+    set_settings(event, use_master_sched=True)
+    generate_schedule(wolves, 1)
+    generate_schedule(bears, 1)
+    lane = min(
+        HeatLane.objects.filter(round=wolves, heat=3).values_list("lane", flat=True)
+    )
+    HeatLane.objects.filter(round=wolves, heat=3, lane=lane).update(
+        finish_time=3.1, completed=timezone.now()
+    )
+    RaceState.objects.filter(event=event).update(
+        current_round=wolves, current_group=wolves.group, current_heat=3
+    )
+    RosterEntry.objects.filter(round=wolves).order_by("racer_id")[1].delete()
+    number = {(r, h): n for n, r, h, _ in master_index(event)}
+    staged = min(
+        (n, (r, h)) for (r, h), n in number.items() if n > number[(wolves.id, 3)]
+    )[1]
+    assert staged[0] == bears.id
+    current_racers = set(
+        HeatLane.objects.filter(round=wolves, heat=3).values_list("racer_id", "lane")
+    )
+
+    close_lanes(event, {4})
+
+    moved = RaceState.objects.get(event=event).current_heat
+    assert moved < 3
+    assert (
+        set(
+            HeatLane.objects.filter(round=wolves, heat=moved).values_list(
+                "racer_id", "lane"
+            )
+        )
+        == current_racers
+    )
+    after = {(r, h): n for n, r, h, _ in master_index(event)}
+    assert after[(wolves.id, moved)] == number[(wolves.id, 3)]
+    assert after[staged] == number[staged]
