@@ -51,6 +51,9 @@ class RosterEntry(EventScoped):
     racer = models.ForeignKey(
         "roster.Racer", on_delete=models.PROTECT, related_name="roster_entries"
     )
+    # When check-in answered No to adding the car to this round while it
+    # was in progress (D36). Only the race coordinator adds it after that.
+    left_out_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name_plural = "roster entries"

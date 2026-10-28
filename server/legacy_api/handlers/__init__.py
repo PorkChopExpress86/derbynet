@@ -6,6 +6,7 @@ write through the ORM themselves (#17).
 
 from legacy_api.handlers import (  # noqa: F401
     database,
+    racers,
     roles,
     session,
     settings,

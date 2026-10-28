@@ -37,6 +37,14 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "settings.write"): {"partition-label": "Patrol"},
     ("action", "database.execute"): {"script": "schema"},
     ("query", "database.check"): {},
+    ("action", "racer.add"): {"firstname": "New", "lastname": "Racer", "carno": "101"},
+    ("action", "racer.edit"): {"racer": "1", "carno": "102", "rankid": "1"},
+    ("action", "racer.delete"): {"racer": "1"},
+    ("action", "racer.bulk"): {"who": "all", "what": "number", "auto": "1"},
+    ("action", "racer.pass"): {"barcode": "PWDwi777"},
+    ("action", "racer.import"): {"first-last": "New Racer", "partition": "P101"},
+    ("action", "racer.fake"): {"ngroups": "1", "racers_per_group": "3"},
+    ("query", "racer.list"): {"barcode": "PWD101", "order": "class"},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},
