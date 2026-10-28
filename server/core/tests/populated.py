@@ -8,7 +8,13 @@ from kiosks.tests.factories import (
     ReplayCommandFactory,
     SignalMessageFactory,
 )
-from racing.models import AuditEvent, EmptiedHeat, FinalRequest, TimerStatus
+from racing.models import (
+    AuditEvent,
+    EmptiedHeat,
+    FinalRequest,
+    LaneClosure,
+    TimerStatus,
+)
 from racing.tests.factories import (
     AuditLaneResultFactory,
     HeatLaneFactory,
@@ -33,6 +39,7 @@ def populated_event():
     HeatLaneFactory(round=round_, racer=racer, lane=1)
     EmptiedHeat.objects.create(event=event, round=round_, heat=2, master_heat=2)
     FinalRequest.objects.create(event=event, racer=racer, group=round_.group)
+    LaneClosure.objects.create(event=event, round=round_, mask=0b100)
     link = GroupConstituentFactory(aggregate__event=event)
     GroupConstituentSubgroupFactory(aggregate=link.aggregate, subgroup=racer.subgroup)
     step = PlaylistEntryFactory(group=round_.group, scene_at_finish=scene)

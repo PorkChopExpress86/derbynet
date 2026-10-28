@@ -84,10 +84,15 @@ class Subgroup:
 
 @dataclass(frozen=True)
 class Round:
+    """`scoring` is the round's own scoring mode, kept when a lane closure
+    changed the event's (#108). None follows `Settings.scoring`, as every
+    round does in PHP."""
+
     id: int
     group_id: int
     number: int
     finished: bool
+    scoring: Scoring | None = None
 
 
 @dataclass(frozen=True)
@@ -467,7 +472,9 @@ def _rows(event: Event) -> list[Row]:
                 [r.finish_time for r in results],
                 [r.finish_place for r in results],
                 use_points=settings.use_points,
-                scoring=settings.scoring,
+                scoring=settings.scoring
+                if rounds[round_id].scoring is None
+                else rounds[round_id].scoring,
                 lane_count=settings.lane_count,
             ),
         )

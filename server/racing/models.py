@@ -22,6 +22,10 @@ class Round(EventScoped):
     # of an organic group and for a round made before D43.
     cut_top = models.PositiveSmallIntegerField(null=True, blank=True)
     cut_bucketed = models.BooleanField(default=False)
+    # The legacy `scoring` value this round is scored by, kept once a lane
+    # closure changes the event's (#108, D36). Django only. Null follows
+    # the event setting, as every round does in PHP.
+    scoring = models.SmallIntegerField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -96,6 +100,35 @@ class EmptiedHeat(EventScoped):
         constraints = [
             models.UniqueConstraint(
                 fields=["event", "round", "heat"], name="emptiedheat_unique_heat"
+            ),
+        ]
+
+
+class LaneClosure(EventScoped):
+    """Lanes the race coordinator closed because they are damaged (#108,
+    D36, D37). Django only. `mask` has the `unused-lane-mask` format: bit 0
+    is lane 1. The standings drop every result of `round` in these lanes,
+    reopened or not. `round` is null for lanes closed between rounds, which
+    drop no time. `next_round_at` is when a later round was first
+    scheduled, after which the lanes can no longer be reopened
+    (`racing.services.lanes`)."""
+
+    round = models.ForeignKey(
+        Round,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="lane_closures",
+    )
+    mask = models.PositiveIntegerField()
+    closed_at = models.DateTimeField(default=timezone.now)
+    next_round_at = models.DateTimeField(null=True, blank=True)
+    reopened_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(mask__gt=0), name="laneclosure_mask_not_empty"
             ),
         ]
 

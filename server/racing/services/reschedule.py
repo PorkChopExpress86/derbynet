@@ -31,7 +31,14 @@ from racing.engine.scheduling.adjuster import (
     n_runs_per_lane,
 )
 from racing.engine.scheduling.master import HeatRef
-from racing.models import HAS_RESULT, EmptiedHeat, HeatLane, RosterEntry, Round
+from racing.models import (
+    HAS_RESULT,
+    EmptiedHeat,
+    HeatLane,
+    LaneClosure,
+    RosterEntry,
+    Round,
+)
 from racing.services import heats
 from racing.services.master import held_emptied_heats
 from racing.services.rounds import round_adjustments
@@ -152,6 +159,7 @@ class _Snapshot:
 
     lane_count: int
     unused_lane_mask: int
+    closed_mask: int  # the lanes closed in this round, reopened or not (#108)
     rows: tuple[tuple[int, int, int, bool], ...]  # heat, lane, racer, has result
     unscheduled: tuple[int, ...]
     departed: tuple[int, ...]
@@ -199,9 +207,13 @@ def _snapshot(round: Round, racer_id: int | None = None) -> _Snapshot:
         sorted((r, heat, n) for _, r, heat, n in held_emptied_heats(round.event))
     )
     pending = round_adjustments(round)
+    closed_mask = 0
+    for mask in LaneClosure.objects.filter(round=round).values_list("mask", flat=True):
+        closed_mask |= mask
     return _Snapshot(
         lane_count=settings.lane_count,
         unused_lane_mask=settings.unused_lane_mask,
+        closed_mask=closed_mask,
         rows=tuple(
             (heat, lane, racer, done)
             for r, heat, lane, racer, done, _ in rows
@@ -223,8 +235,13 @@ def _adjust(
     racer_id: int | None,
     budget: SearchBudget | None,
     clock: Callable[[], datetime],
+    close: int = 0,
 ) -> ScheduleAdjuster:
-    """The search, as the PHP action runs it, outside any transaction."""
+    """The search, as the PHP action runs it, outside any transaction.
+
+    With `close`, a lane mask, close those lanes instead of fitting in late
+    racers (#108), and a chart that needs no change is no failure. A late
+    racer left out of the round stays out (D36)."""
     if snapshot.on_roster is False:
         raise RescheduleFailure(
             Failure.NOT_ON_ROSTER,
@@ -252,7 +269,8 @@ def _adjust(
         )
     kept = snapshot.position.kept_in(round)
     chart = snapshot.chart(kept)
-    n_runs = n_runs_per_lane(chart)
+    # A lane closed in this round still holds the cars that raced there.
+    n_runs = n_runs_per_lane(chart, snapshot.closed_mask)
     if budget is None:
         budget = DeadlineBudget(
             lambda: clock().timestamp(), INJECTION_TIME_LIMIT // n_runs
@@ -260,13 +278,18 @@ def _adjust(
     adjuster = ScheduleAdjuster(
         chart,
         snapshot.raced(),
-        snapshot.unused_lane_mask,
+        # A lane closed in this round stays closed for the rest of it, even
+        # once it is reopened for later rounds (D37).
+        snapshot.unused_lane_mask | snapshot.closed_mask,
         snapshot.lane_count,
         n_runs,
         budget,
         kept=[heat - 1 for heat in kept],
     )
     adjuster.remove_departed(snapshot.departed)
+    if close:
+        adjuster.close_lanes(close)
+        return adjuster
     started = clock()
     for late in (racer_id,) if racer_id is not None else snapshot.unscheduled:
         if (clock() - started).total_seconds() < OVERALL_TIME_LIMIT:
@@ -280,6 +303,8 @@ def _adjust(
 def _write(
     round: Round, state: RaceState, snapshot: _Snapshot, adjuster: ScheduleAdjuster
 ):
+    if adjuster.updated_chart() is None:
+        return  # a lane closure that changes no heat
     rows = HeatLane.objects.filter(round=round)
     fixed = {heat for heat, _, _, done in snapshot.rows if done}
     # As PHP's DELETE, never a row with a result, even one written by a
@@ -397,6 +422,24 @@ def reschedule(
         and not Racer.objects.filter(pk=racer_id, event_id=round.event_id).exists()
     ):
         raise RescheduleFailure(Failure.NO_RACER, "No such racer in this event.")
+    return adjust_round(round, racer_id, dry_run, budget=budget, clock=clock)
+
+
+def adjust_round(
+    round: Round,
+    racer_id: int | None = None,
+    dry_run: bool = False,
+    *,
+    close: int = 0,
+    also: Callable[[RaceState], None] | None = None,
+    budget: SearchBudget | None = None,
+    clock: Callable[[], datetime] = timezone.now,
+) -> Rescheduled:
+    """`reschedule`, under its guard, snapshot, recheck and retry (Q15).
+    With `close`, close the lanes of that mask instead of fitting in late
+    racers (#108). `also` runs in the transaction that writes the chart,
+    after the recheck, with the locked `RaceState`; whatever it raises
+    rolls the write back."""
     held = clock()
     if not _take_guard(round, held):
         raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
@@ -409,7 +452,7 @@ def reschedule(
                     raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
                 held = renewed
             snapshot = _snapshot(round, racer_id)
-            adjuster = _adjust(round, snapshot, racer_id, budget, clock)
+            adjuster = _adjust(round, snapshot, racer_id, budget, clock, close)
             result = Rescheduled(adjuster.chart_debug(), adjuster.timing_keys)
             if dry_run:
                 return result
@@ -418,6 +461,8 @@ def reschedule(
                 if _snapshot(round, racer_id) != snapshot:
                     continue
                 _write(round, state, snapshot, adjuster)
+                if also is not None:
+                    also(state)
             return result
         raise RescheduleFailure(
             Failure.BUSY,

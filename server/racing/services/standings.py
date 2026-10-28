@@ -7,6 +7,7 @@ from django.db.models import Exists, OuterRef
 from awards.models import AwardPartition
 from core.models import FullFieldRule, RaceSettings, RaceState
 from racing.engine.standings import oracle
+from racing.engine.standings.closed_lanes import HeatResult, counted_results
 from racing.engine.standings.eligibility import AwardSettings, AwardUnit
 from racing.engine.standings.scoring import Scoring
 from racing.engine.standings.speed_awards import (
@@ -16,7 +17,7 @@ from racing.engine.standings.speed_awards import (
     current_speed_award,
     speed_awards,
 )
-from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
+from racing.models import HAS_RESULT, HeatLane, LaneClosure, RosterEntry, Round
 from roster.models import (
     Group,
     GroupConstituent,
@@ -98,13 +99,13 @@ def _read(event) -> _Inputs:
     )
     lanes = HeatLane.objects.filter(round=OuterRef("pk"))
     rounds = tuple(
-        oracle.Round(*row)
+        oracle.Round(*row[:4], None if row[4] is None else Scoring(row[4]))
         for row in Round.objects.filter(event=event)
         .annotate(
             finished=Exists(lanes) & ~Exists(lanes.exclude(HAS_RESULT)),
         )
         .order_by("id")
-        .values_list("id", "group_id", "number", "finished")
+        .values_list("id", "group_id", "number", "finished", "scoring")
     )
     racers = tuple(
         oracle.Racer(
@@ -150,13 +151,30 @@ def _read(event) -> _Inputs:
     entered = RosterEntry.objects.filter(
         round=OuterRef("round"), racer=OuterRef("racer")
     )
-    results = tuple(
-        oracle.Result(*row)
-        for row in HeatLane.objects.filter(event=event)
+    rows = (
+        HeatLane.objects.filter(event=event)
         .filter(HAS_RESULT)
-        .filter(Exists(entered))
+        .annotate(entered=Exists(entered))
         .order_by("id")
-        .values_list("round_id", "racer_id", "finish_time", "finish_place")
+        .values_list(
+            "round_id",
+            "heat",
+            "lane",
+            "finish_time",
+            "finish_place",
+            "racer_id",
+            "entered",
+        )
+    )
+    # A closed lane's results still place the other cars of its heat
+    # before they move up, so they are read whether entered or not.
+    results = tuple(
+        oracle.Result(r.round_id, r.key[0], r.finish_time, r.finish_place)
+        for r in counted_results(
+            (HeatResult(*row[:5], key=row[5:]) for row in rows),
+            closed_lanes_by_round(event),
+        )
+        if r.key[1]
     )
     return _Inputs(
         event=oracle.Event(
@@ -182,6 +200,17 @@ def _read(event) -> _Inputs:
             one_trophy_per=settings.one_trophy_per,
         ),
     )
+
+
+def closed_lanes_by_round(event) -> dict[int, int]:
+    """`{round id: mask}` of the lanes closed in each round, reopened or
+    not, whose results the standings drop (#108)."""
+    closed: dict[int, int] = {}
+    for round_id, mask in LaneClosure.objects.filter(
+        event=event, round__isnull=False
+    ).values_list("round_id", "mask"):
+        closed[round_id] = closed.get(round_id, 0) | mask
+    return closed
 
 
 def _partition_lists(event) -> MappingProxyType:
