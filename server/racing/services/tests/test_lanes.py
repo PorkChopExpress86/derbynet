@@ -505,7 +505,8 @@ def test_a_round_scheduled_but_not_started_is_rescheduled_on_the_open_lanes(race
 
     assert 3 not in lanes_used(bears)
     assert once_in_each_open_lane(bears)
-    assert closed_rounds(event) == {wolves.id, bears.id}
+    # A round with no result has no time to drop, so it gets no closure.
+    assert closed_rounds(event) == {wolves.id}
     assert Round.objects.get(pk=bears.pk).scoring is None
     run_heats(event, bears, *chart(bears))
     assert scores(event, bears) == averages(bears)
@@ -594,8 +595,9 @@ def test_a_round_scheduled_during_the_closure_is_closed_too(race):
     with mock.patch.object(ScheduleAdjuster, "close_lanes", schedule_the_bears_first):
         close_lanes(event, {3})
 
+    assert len(calls) == 3  # Wolves, then Wolves and Bears again
     assert 3 not in lanes_used(bears)
-    assert closed_rounds(event) == {wolves.id, bears.id}
+    assert closed_rounds(event) == {wolves.id}
 
 
 def test_a_car_whose_only_run_to_come_is_on_the_closed_lane_gets_one_new_run():
@@ -837,3 +839,49 @@ def test_the_poll_after_a_lane_is_opened_on_the_settings_page(race):
     )
     run_heats(event, wolves, *range(3, 1 + max(chart(wolves))))
     assert poll_lanes(event)["closed-lanes"] == []
+
+
+def bears_raced_on_a_lane_opened_again(replay, wolves):
+    """The Bears were only scheduled when lane 3 closed during the Wolves'
+    round. The Wolves finish, the settings page opens lane 3, a late racer
+    is fitted into the Bears on all 4 lanes, and the Bears race."""
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    close_lanes(event, {3})
+    run_heats(event, wolves, *range(3, 1 + max(chart(wolves))))
+    set_settings(event, unused_lane_mask=0)
+    late = late_racer(bears, 250)
+    reschedule(bears, late.id)
+    assert lanes_of(bears, late) == {1, 2, 3, 4}
+    run_heats(event, bears, *chart(bears))
+    assert scores(event, bears)[late.id][0] == 4
+    return bears, late
+
+
+def lanes_of(round, racer):
+    return set(
+        HeatLane.objects.filter(round=round, racer=racer).values_list("lane", flat=True)
+    )
+
+
+def test_a_later_closure_never_drops_times_raced_while_the_lane_was_open(race):
+    replay, wolves = race
+    event = replay.event
+    bears, late = bears_raced_on_a_lane_opened_again(replay, wolves)
+
+    close_lanes(event, {3})
+
+    assert scores(event, bears) == averages(bears)
+    assert scores(event, bears)[late.id][0] == 4
+
+
+def test_closing_the_lane_again_on_the_settings_page_drops_no_time(race):
+    replay, wolves = race
+    event = replay.event
+    bears, late = bears_raced_on_a_lane_opened_again(replay, wolves)
+
+    set_settings(event, unused_lane_mask=0b0100)
+
+    assert scores(event, bears) == averages(bears)
+    assert scores(event, wolves) == averages(wolves, closed={3})

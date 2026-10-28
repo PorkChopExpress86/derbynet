@@ -121,8 +121,9 @@ def close_lanes(
 
     Every round with a heat left to run, started or not, is rescheduled on
     the open lanes through `racing.services.reschedule`, under one guard,
-    with its recheck and retry (Q15), and gets a `LaneClosure` (D45). The
-    new charts are returned, one per round in id order. With no such round
+    with its recheck and retry (Q15) (D45). Each one that was racing, with
+    a result or the running or staged heat, gets a `LaneClosure`. The new
+    charts are returned, one per round in id order. With no such round
     only later rounds change.
 
     Raises LanesFailure, with nothing changed: `no-lanes`, `no-such-lane`
@@ -157,20 +158,22 @@ def _record_closure(
     now: datetime,
     expected: int,
 ) -> None:
-    """Under the lock: the mask, a `LaneClosure` for each round, recording
-    whether it was racing, or one with no round, and the scoring."""
+    """Under the lock: the mask, a `LaneClosure` for each round that was
+    racing, or one with no round, and the scoring."""
     settings = RaceSettings.objects.get(event_id=event_id)
     new = _new_lanes(settings, lanes)
     if new != expected:
         # The reschedule rechecks the mask, so only a writer that skipped
         # the lock gets here.
         raise LanesFailure(Failure.BUSY, "The lanes changed. Try again.")
+    # A round that was only scheduled has no time to drop: its chart is
+    # rescheduled on the open lanes, and the mask keeps later charts off the
+    # lane. Only a round that was racing gets a closure.
     LaneClosure.objects.bulk_create(
         [
-            LaneClosure(
-                event_id=event_id, round=round, mask=new, started=started, closed_at=now
-            )
-            for round, started in rounds.items()
+            LaneClosure(event_id=event_id, round=round, mask=new, closed_at=now)
+            for round, racing in rounds.items()
+            if racing
         ]
         or [LaneClosure(event_id=event_id, round=None, mask=new, closed_at=now)]
     )
@@ -195,10 +198,9 @@ def _record_closure(
 def reopen_lanes(
     event: Event, lanes: Iterable[int], *, clock: Callable[[], datetime] = timezone.now
 ) -> None:
-    """Reopen closed lanes for the rounds scheduled from now on (D37), and
-    for every round that was only scheduled when they closed. A round that
-    was racing keeps the lanes closed for its remaining heats, with their
-    times dropped.
+    """Reopen closed lanes for the rounds scheduled from now on (D37). A
+    round that was racing when they closed keeps them closed for its
+    remaining heats, with their times dropped.
 
     Raises LanesFailure, with nothing changed: `not-closed` for a lane no
     open closure holds, as a lane left unused on the settings page, and
@@ -229,16 +231,6 @@ def reopen_lanes(
         now = clock()
         for closure in closing:
             kept = closure.mask & ~mask
-            if closure.round_id is not None and not closure.started:
-                # A round that was only scheduled when the lanes closed gets
-                # its reopened lanes back, for late racers and for a new
-                # chart alike.
-                if kept:
-                    closure.mask = kept
-                    closure.save(update_fields=["mask"])
-                else:
-                    closure.delete()
-                continue
             if kept:
                 # The lanes left closed get a row of their own.
                 LaneClosure.objects.create(
@@ -260,8 +252,8 @@ def poll_lanes(event: Event) -> dict:
     for later rounds or for the remaining heats of a round that was racing
     when it closed, the rounds it is closed for, and whether it can still
     be reopened, then the scoring in force: the current round's, or the
-    event's. A lane opened again on the settings page is closed only for
-    the rounds that were racing."""
+    event's. A lane opened again on the settings page stays closed only
+    for the remaining heats of the rounds it closed in."""
     unused = RaceSettings.objects.get(event=event).unused_lane_mask
     to_run = {r.pk for r in _rounds_to_close(event)}
     lanes: dict[int, dict] = {}
@@ -270,11 +262,11 @@ def poll_lanes(event: Event) -> dict:
     ).order_by("id"):
         for lane in _lanes(closure.mask):
             later = bool(unused & (1 << (lane - 1)))
-            racing = closure.started and closure.round_id in to_run
+            racing = closure.round_id in to_run
             if not (later or racing):
                 continue
             row = lanes.setdefault(lane, {"lane": lane, "roundids": [], "reopen": True})
-            if closure.round_id is not None and (later or closure.started):
+            if closure.round_id is not None:
                 row["roundids"].append(closure.round_id)
             row["reopen"] = row["reopen"] and closure.next_round_at is None
     rows = [lanes[lane] for lane in sorted(lanes)]

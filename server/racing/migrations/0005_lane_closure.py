@@ -31,7 +31,6 @@ class Migration(migrations.Migration):
                 ),
                 ("mask", models.PositiveIntegerField()),
                 ("closed_at", models.DateTimeField(default=django.utils.timezone.now)),
-                ("started", models.BooleanField(default=False)),
                 ("next_round_at", models.DateTimeField(blank=True, null=True)),
                 ("reopened_at", models.DateTimeField(blank=True, null=True)),
                 (

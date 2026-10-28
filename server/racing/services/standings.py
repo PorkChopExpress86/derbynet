@@ -224,22 +224,17 @@ def _open_lane_count(event, closed: dict[int, int]) -> dict[int, int]:
 
 
 def closed_lanes_by_round(event, round_id: int | None = None) -> dict[int, int]:
-    """`{round id: mask}` of the lanes closed for each round, whose results
-    the standings drop and whose remaining heats stay off (#108). A round
-    that was racing when a lane closed keeps it closed, reopened or not
-    (D37). A round only scheduled keeps it closed only while the lane is
-    still in `unused-lane-mask`. `event` is an event or its id; `round_id`
-    reads one round."""
-    unused = RaceSettings.objects.get(event=event).unused_lane_mask
+    """`{round id: mask}` of the lanes closed in each round, reopened or
+    not, whose results the standings drop and whose remaining heats stay
+    off them (#108, D37). Only a round that was racing has a closure.
+    `event` is an event or its id; `round_id` reads one round."""
     rows = LaneClosure.objects.filter(event=event, round__isnull=False)
     if round_id is not None:
         rows = rows.filter(round_id=round_id)
     closed: dict[int, int] = {}
-    for round_id, mask, started in rows.values_list("round_id", "mask", "started"):
-        closed[round_id] = closed.get(round_id, 0) | (
-            mask if started else mask & unused
-        )
-    return {r: mask for r, mask in closed.items() if mask}
+    for round_id, mask in rows.values_list("round_id", "mask"):
+        closed[round_id] = closed.get(round_id, 0) | mask
+    return closed
 
 
 def _partition_lists(event) -> MappingProxyType:
