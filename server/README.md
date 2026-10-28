@@ -236,7 +236,25 @@ testing/login-coordinator.sh http://localhost:8080
 testing/login-coordinator.sh http://localhost:8000
 ```
 
-The Django server serves `/action.php` with PHP's dispatch rules and envelope. Only the login handlers are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh` pass against both servers. Every other name answers `unrecognized` until M3 ports it.
+The Django server serves `/action.php` with PHP's dispatch rules and envelope. The login handlers and the database reset and settings slice (#63) are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh`, and `testing/reset-database.sh`, pass against both servers. Every other name answers `unrecognized` until M3 ports it.
+
+### Run the shell suites against Django
+
+The suites reset the database, seed slides, and check the database invariants through endpoints that a real race must not expose. Set `DERBYNET_ENABLE_TEST_ENDPOINTS=1` on the Django server that a suite runs against. With it set, `test.setup` exists and `database.check` answers anyone. Without it, `test.setup` answers `unrecognized` and `database.check` needs `SET_UP`. The CI job `server` sets it for its shell-suite steps.
+
+A new server has no event, and `reset-database.sh` needs one to reset. Create an empty active event first. The command does nothing when an event exists:
+
+```sh
+cd server
+export DERBYNET_ENABLE_TEST_ENDPOINTS=1
+uv run python manage.py migrate
+uv run python manage.py create_test_event
+uv run python manage.py runserver 127.0.0.1:8000 &
+../testing/reset-database.sh http://127.0.0.1:8000
+DBCHECK=1 ../testing/reset-database.sh http://127.0.0.1:8000
+```
+
+`DBCHECK=1` makes `testing/common.sh` call `database.check` before every POST. The script needs `curl`, `jq` and `xmllint`.
 
 ## Legacy handlers
 
@@ -277,6 +295,8 @@ Behind a proxy that ends TLS, the server takes its own scheme from the `X-Forwar
 | `DERBYNET_DEBUG` | `0` | Sets `DEBUG`. Only `0` and `1` are accepted |
 | `DERBYNET_ALLOWED_HOSTS` | `*` | Comma-separated. LAN installs are reached by bare IP address |
 | `DERBYNET_CSRF_TRUSTED_ORIGINS` | empty | Comma-separated extra origins for the new UI behind a proxy |
+| `DERBYNET_LOCK_SETTINGS` | `0` | Sets `LOCK_SETTINGS`. `settings.write` then refuses the photo, car photo, and video folders, as PHP's `settings.lock` file did for a hosted install |
+| `DERBYNET_ENABLE_TEST_ENDPOINTS` | `0` | Registers `test.setup` and lets anyone call `database.check`. Only the shell suites set it |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server generates a key into `<DERBYNET_CONFIG_DIR>/secret_key` with mode 0600 on first start, and reuses it after that |
 
 SQLite runs in WAL mode with `synchronous=NORMAL`, `IMMEDIATE` transactions, and a 20 second busy timeout (ADR-05). WAL writes `-wal` and `-shm` files next to the database, so keep `DERBYNET_DATA_DIR` on a writable local disk. A database on a network share can be corrupted. A Postgres `DATABASE_URL` is used as `dj-database-url` parses it, with no extra options.

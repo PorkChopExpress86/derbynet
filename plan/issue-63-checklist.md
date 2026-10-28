@@ -10,8 +10,8 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 - [x] Remove fake racer images on `schema` (C28).
 - [x] `test.setup` behind `DERBYNET_ENABLE_TEST_ENDPOINTS=1`, with two-argument failures (S24, C17).
 - [x] `database.check` invariants as service functions with PHP's tags, anonymous only when the test flag is on (S26).
-- [ ] `manage.py create_test_event`.
-- [ ] CI sets `DERBYNET_ENABLE_TEST_ENDPOINTS=1` for the Django shell-suite job, and the developer notes say so.
+- [x] `manage.py create_test_event`.
+- [x] CI sets `DERBYNET_ENABLE_TEST_ENDPOINTS=1` for the Django shell-suite job, and the developer notes say so.
 - [x] ActionLog rows keep the `settings.write` parameter names.
 
 ## Acceptance
@@ -21,7 +21,7 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 - [x] `test_database_execute.py`
 - [x] `test_test_setup.py`
 - [x] `test_database_check.py`
-- [ ] `testing/reset-database.sh` passes against Django twice in a row, and `DBCHECK=1` passes too.
+- [x] `testing/reset-database.sh` passes against Django twice in a row, and `DBCHECK=1` passes too (run locally on SQLite and Postgres; the CI log is the evidence once the PR runs).
 
 ## PHP defects (rows of #64)
 

@@ -74,3 +74,41 @@ jobs:
 
       - name: Test
         run: uv run pytest -v -rs
+
+      - name: Test the legacy API with the test endpoints on
+        env:
+          DERBYNET_ENABLE_TEST_ENDPOINTS: '1'
+        run: uv run pytest -v -rs legacy_api
+
+      # testing/reset-database.sh runs before every phase of the shell suites,
+      # so it is the first thing that must pass against Django (#63).  The test
+      # endpoints are on, as the suites need (test.setup, anonymous
+      # database.check).
+      - name: Run testing/reset-database.sh against Django
+        env:
+          DERBYNET_ENABLE_TEST_ENDPOINTS: '1'
+          DERBYNET_DATA_DIR: ${{ runner.temp }}/data
+          DERBYNET_CONFIG_DIR: ${{ runner.temp }}/config
+        run: |
+          command -v xmllint >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends libxml2-utils
+          }
+          mkdir -p "$DERBYNET_DATA_DIR" "$DERBYNET_CONFIG_DIR"
+          uv run python manage.py migrate
+          uv run python manage.py create_test_event
+          uv run python manage.py runserver 127.0.0.1:8080 --noreload \
+            > "$RUNNER_TEMP/server.log" 2>&1 &
+          for _ in $(seq 30); do
+            curl -sf 'http://127.0.0.1:8080/action.php?query=role.list' >/dev/null && break
+            sleep 1
+          done
+          cd ../testing
+          # Twice in a row, then with database.check before every POST.
+          bash reset-database.sh http://127.0.0.1:8080
+          bash reset-database.sh http://127.0.0.1:8080
+          DBCHECK=1 bash reset-database.sh http://127.0.0.1:8080
+
+      - name: Show the Django server log
+        if: failure()
+        run: cat "$RUNNER_TEMP/server.log"
