@@ -8,16 +8,19 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
 from core.models import RaceSettings
+from core.tests.factories import EventFactory
+from racing.engine.scheduling.master import master_target
 from racing.engine.tests.golden import (
     DEVIATIONS_FILE,
     GOLDEN_DIR,
+    read_cases,
     read_transcript,
     transcript_deviations,
 )
 from racing.models import HAS_RESULT, HeatLane
 from racing.services import master
 from racing.services.heats import select_heat
-from racing.services.master import reassign_master_heats
+from racing.services.master import master_index, reassign_master_heats
 from racing.services.results import record_timer_result
 from racing.services.schedule import (
     Failure,
@@ -348,3 +351,77 @@ def test_numbering_holds_over_any_sequence_of_chart_and_result_changes(seed):
             else:
                 generate_schedule(round, rng.randint(1, 2))
             check_invariants(event, before, raced)
+
+
+# ----- engine/master-heats.json through the services (#100) -----------------
+
+MASTER_HEATS = read_cases(GOLDEN_DIR / "engine" / "master-heats.json")
+REQUESTS = ("first", "next", "prev", "next-up")
+
+
+def load_master_case(case):
+    """The case's rounds and rows in a new event. Each PHP round is a round
+    of its own group numbered by its level, made in roundid order so the ids
+    keep PHP's order, and the rows are written in PHP's resultid order.
+    Returns the event and `{PHP roundid: round id}`."""
+    event = EventFactory()
+    ids = {}
+    for roundid, level in sorted(case["rounds"]):
+        ids[roundid] = RoundFactory(group=GroupFactory(event=event), number=level).id
+    if case["rows"]:
+        racer = RacerFactory(group=GroupFactory(event=event))
+        HeatLane.objects.bulk_create(
+            HeatLane(
+                event=event,
+                round_id=ids[roundid],
+                heat=heat,
+                lane=lane,
+                racer=racer,
+                finish_time=time,
+                finish_place=place,
+                master_heat=n,
+            )
+            for roundid, heat, lane, time, place, n in case["rows"]
+        )
+    return event, ids
+
+
+def service_navigation(event, ids, currents):
+    """`master_target` over `master_index(event)` for each current heat the
+    fixture names, in PHP's roundids. A PHP roundid with no round, the
+    heat that does not exist, maps to an id no round has."""
+    php_id = {v: k for k, v in ids.items()}
+    index = master_index(event)
+    missing = max(ids.values(), default=0) + 1000
+    answers = {}
+    for key in currents:
+        current = None
+        if key != "none":
+            roundid, heat = map(int, key.split("/"))
+            current = (ids.get(roundid, missing), heat)
+        found = [master_target(index, current, r) for r in REQUESTS]
+        answers[key] = [None if t is None else [php_id[t[0]], t[1]] for t in found]
+    return answers
+
+
+@pytest.mark.parametrize("case_id", list(MASTER_HEATS))
+def test_the_services_number_and_navigate_as_php(case_id):
+    """Each case of `engine/master-heats.json` loaded into the database, then
+    renumbered by `reassign_master_heats`: every row gets the number PHP's
+    `assign_master_heats()` wrote, and `master_target` over `master_index`
+    answers as PHP's `get_next_heat()` did, before and after."""
+    case = MASTER_HEATS[case_id]
+    event, ids = load_master_case(case)
+    assert (
+        service_navigation(event, ids, case["navigation_before"])
+        == (case["navigation_before"])
+    )
+
+    reassign_master_heats(event)
+
+    rows = HeatLane.objects.filter(event=event).order_by("id")
+    assert list(rows.values_list("master_heat", flat=True)) == case["masterheats"]
+    assert (
+        service_navigation(event, ids, case["navigation_after"])
+        == (case["navigation_after"])
+    )

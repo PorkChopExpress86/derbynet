@@ -3,14 +3,16 @@
 `capture_master_heats()` in `capture-engine.php` builds each chart state on the
 real SQLite schema, records `get_next_heat()` under `use-master-sched` for
 every request from every heat, runs `assign_master_heats()`, and records the
-numbers it wrote and the navigation again. Each case is replayed here through
-`assign_master_heats` and `master_target`, with the inputs
-`racing.services.master` reads from the same rows.
+numbers it wrote and the navigation again. Here each navigation is replayed
+through `master_target`, over the numbers PHP had. The numbering is replayed
+through `reassign_master_heats` on the database, in
+`racing/services/tests/test_master.py`, which also checks the navigation over
+the index the service builds.
 """
 
 import pytest
 
-from racing.engine.scheduling.master import assign_master_heats, master_target
+from racing.engine.scheduling.master import master_target
 
 from .golden import GOLDEN_DIR, read_cases
 
@@ -24,16 +26,6 @@ pytestmark = pytest.mark.pr
 def has_result(row):
     _roundid, _heat, _lane, time, place, _n = row
     return time is not None or place is not None
-
-
-def renumber(case):
-    """The master heat of each row after `reassign_master_heats` would run."""
-    level = dict(map(tuple, case["rounds"]))
-    rows = case["rows"]
-    unraced = {(level[row[0]], row[0], row[1]) for row in rows if not has_result(row)}
-    start = 1 + max((row[5] for row in rows if has_result(row)), default=0)
-    numbers = assign_master_heats(unraced, start)
-    return [numbers.get((row[0], row[1]), row[5]) for row in rows]
 
 
 def navigation(rows, masterheats, currents):
@@ -52,21 +44,13 @@ def navigation(rows, masterheats, currents):
 
 
 @pytest.mark.parametrize("case_id", list(CASES))
-def test_numbering_and_navigation_match_php(case_id):
+def test_navigation_matches_php(case_id):
     case = CASES[case_id]
-    before = [row[5] for row in case["rows"]]
-
-    after = renumber(case)
-
-    assert after == case["masterheats"]
-    assert (
-        navigation(case["rows"], before, case["navigation_before"])
-        == (case["navigation_before"])
-    )
-    assert (
-        navigation(case["rows"], after, case["navigation_after"])
-        == (case["navigation_after"])
-    )
+    for numbers, recorded in (
+        ([row[5] for row in case["rows"]], case["navigation_before"]),
+        (case["masterheats"], case["navigation_after"]),
+    ):
+        assert navigation(case["rows"], numbers, recorded) == recorded
 
 
 def test_the_fixture_holds_the_cases_the_ticket_names():
