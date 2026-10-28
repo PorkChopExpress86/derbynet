@@ -12,11 +12,11 @@ from legacy_api.registry import LegacyContext, query
 @query("settings.list", permission=Access.ANONYMOUS)
 def settings_list(ctx: LegacyContext) -> None:
     # PHP reports the database it connected to, which clients ignore.
-    settings: dict = {"db-connection": ""}
+    found: dict = {}
     if granted_for(ctx.session) & Perm.SET_UP:
         key = ctx.args.get("key")
         if isinstance(key, str):
-            settings.update(race_settings.read_many(ctx.event, key.split(",")))
+            found = race_settings.read_many(ctx.event, key.split(","))
         else:
-            settings.update(race_settings.all_keys(ctx.event))
-    ctx.put("settings", settings)
+            found = race_settings.all_keys(ctx.event)
+    ctx.put("settings", {"db-connection": "", **found})
