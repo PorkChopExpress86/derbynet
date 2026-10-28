@@ -66,10 +66,15 @@ def first_run() -> bool:
     return not Event.objects.exists()
 
 
+def granted_for(session) -> int:
+    """A session's permission bits. -1 holds every bit."""
+    bits = _stored_bits(session)
+    return bits | int(Perm.SET_UP) if first_run() else bits
+
+
 def granted(request: HttpRequest) -> int:
     """The request's permission bits. -1 holds every bit."""
-    bits = _stored_bits(request.session)
-    return bits | int(Perm.SET_UP) if first_run() else bits
+    return granted_for(request.session)
 
 
 def role(request: HttpRequest) -> str | None:

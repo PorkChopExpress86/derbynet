@@ -98,6 +98,14 @@ DEBUG = _env_flag("DERBYNET_DEBUG")
 # on in conftest.py.
 LEGACY_SESSION_WRITES_RAISE = DEBUG
 
+# Locks the directory settings, as PHP's `settings.lock` file did for a hosted
+# install (ADR index, question 7). `settings.write` then refuses them.
+LOCK_SETTINGS = _env_flag("DERBYNET_LOCK_SETTINGS")
+
+# The test-only endpoints of the shell suites (`test.setup`, and the anonymous
+# `database.check`). A real race never sets it (#63, #15).
+ENABLE_TEST_ENDPOINTS = _env_flag("DERBYNET_ENABLE_TEST_ENDPOINTS")
+
 ALLOWED_HOSTS = _env_list("DERBYNET_ALLOWED_HOSTS", "*")
 CSRF_TRUSTED_ORIGINS = _env_list("DERBYNET_CSRF_TRUSTED_ORIGINS")
 
