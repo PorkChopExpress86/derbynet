@@ -592,6 +592,14 @@ def photo_url(repository: str, folder: str, path: str, render: str) -> str:
     return f"photo.php/{repository}/file/{render}/{_urlencode(basename)}/{breaker}"
 
 
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def _nocase(text: str) -> str:
+    """SQLite's `COLLATE NOCASE`, which folds ASCII letters only."""
+    return text.translate(_ASCII_LOWER)
+
+
 class Order(StrEnum):
     NAME = "name"
     CLASS = "class"
@@ -602,7 +610,7 @@ class Order(StrEnum):
 
 def _sort_key(order: str):
     def name(r):
-        return (r.last_name, r.first_name)
+        return (_nocase(r.last_name), _nocase(r.first_name))
 
     match order:
         case Order.CAR:
@@ -619,8 +627,9 @@ def _sort_key(order: str):
 def list_racers(event, order: str = "", racer_id=None, render: str | None = None):
     """`query=racer.list`: every racer of the event, or one, as rows.
 
-    Sorted as PHP's SQLite sorts: by code point, case first, so the same
-    order comes back on Postgres. Rows that tie keep id order.
+    Sorted as PHP's SQLite sorts names, `COLLATE NOCASE`: ASCII letters
+    ignore case, everything else by code point, so the same order comes back
+    on Postgres. Rows that tie keep id order.
     """
     settings = RaceSettings.objects.get(event=event)
     label = render_label(render)
@@ -662,7 +671,12 @@ def _rank_seq(event, subgroup_id) -> int | None:
     subgroup order, as `classes_and_ranks()` numbers them."""
     subgroups = sorted(
         Subgroup.objects.filter(event=event).select_related("group"),
-        key=lambda s: (s.group.sort_order, s.sort_order, s.group.name, s.name),
+        key=lambda s: (
+            s.group.sort_order,
+            s.sort_order,
+            _nocase(s.group.name),
+            _nocase(s.name),
+        ),
     )
     return next((n for n, s in enumerate(subgroups, 1) if s.pk == subgroup_id), None)
 

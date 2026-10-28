@@ -112,6 +112,20 @@ jobs:
           bash reset-database.sh http://127.0.0.1:8080
           DBCHECK=1 bash reset-database.sh http://127.0.0.1:8080
 
+      # The roster imports of #29.  They run from the repository root, where
+      # testing/common.sh keeps its scratch files.  import-roster.sh's last
+      # step renumbers the Webelos by a classid from query=class.list (#30),
+      # so until #30 lands it renumbers nothing.  test-basic-checkins.sh,
+      # test-racer-query.sh and test-car-numbers.sh also need #30 and #31.
+      - name: Run the roster import suites against Django
+        working-directory: .
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-csv-roster.sh http://127.0.0.1:8080 testing/data/outlaw-class.csv
+          DBCHECK=1 bash testing/import-csv-roster.sh http://127.0.0.1:8080 testing/data/outlaw-class.csv
+
       - name: Show the Django server log
         if: failure()
         run: cat "$RUNNER_TEMP/server.log"
