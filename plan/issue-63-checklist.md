@@ -4,7 +4,7 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 
 ## Scope
 
-- [ ] `query=settings.list`: requested keys only, empty `db-connection`, no keys for an anonymous caller, `SET_UP` for every key (D5, #15, S2).
+- [x] `query=settings.list`: requested keys only, empty `db-connection`, no keys for an anonymous caller, `SET_UP` for every key (D5, #15, S2).
 - [ ] `settings.write`: declarative table of form key, RaceInfo key, type, and checkbox flag, with every PHP failure code and the read-back check.
 - [ ] `database.execute`: `schema`, `update-schema`, and `drop-message-queue-table` as a mapping, with `insecure`, `sqlnoscript`, and the `executed` and `details` keys.
 - [ ] Remove fake racer images on `schema` (C28).
@@ -17,7 +17,7 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 ## Acceptance
 
 - [ ] `test_settings_write.py`
-- [ ] `test_settings_list.py`
+- [x] `test_settings_list.py`
 - [ ] `test_database_execute.py`
 - [ ] `test_test_setup.py`
 - [ ] `test_database_check.py`
@@ -25,4 +25,4 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 
 ## PHP defects (rows of #64)
 
-- [ ] S2, S24, S26, C17, C28
+- [ ] S2 (done), S24, S26, C17, C28
