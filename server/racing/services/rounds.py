@@ -74,6 +74,13 @@ def prepare_new_round(group: Group, number: int) -> Round:
         return round
 
 
+def record_cut(round: Round, top: int, bucketed: bool) -> None:
+    """Keep the cut the round was built with, for the finalist suggestions
+    (D43)."""
+    round.cut_top, round.cut_bucketed = top, bucketed
+    Round.objects.filter(pk=round.pk).update(cut_top=top, cut_bucketed=bucketed)
+
+
 def write_roster(round: Round, finalists: Iterable[Racer]) -> None:
     """Enter the finalists in the round, in the order given, which is the
     order the schedule takes them in."""
@@ -185,11 +192,12 @@ def new_round_roster(
         standings = standings_snapshot(round.event).standings
         cut, qualifiers, added = _choose(
             choose(standings, group.id, bucketed=bucketed, limit=top),
-            [*extras, *allowed_racers(group.id, round.number)],
+            [*extras, *allowed_racers(round)],
         )
         if not qualifiers and not added:
             raise RoundFailure(Failure.NO_RACERS, "No eligible racers found.")
         write_roster(round, qualifiers + added)
+        record_cut(round, top, bucketed)
         return NewRoster(round, cut.finalists, added, cut.concerns)
 
 
@@ -236,7 +244,7 @@ def playlist_finalists(
             cut,
             [
                 *extras.get((entry.group_id, entry.round_number), ()),
-                *allowed_racers(entry.group_id, entry.round_number),
+                *allowed_racers(round),
             ],
         )
         return Entrants(qualifiers + added, cut.concerns)

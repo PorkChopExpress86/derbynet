@@ -34,13 +34,14 @@ from racing.services.reschedule import reschedule
 from racing.services.results import Outcome, record_manual_result
 from racing.services.rounds import (
     FollowOn,
+    NewAggregate,
     new_round_roster,
     playlist_finalists,
     round_adjustments,
 )
 from racing.services.schedule import generate_schedule
 from racing.services.tests.race import fields
-from roster.models import Racer
+from roster.models import Partition, Racer, Subgroup
 from roster.tests.php_replay import Replay
 
 pytestmark = pytest.mark.django_db
@@ -485,17 +486,239 @@ def test_writers_take_the_race_state_lock(day, monkeypatch):
     assert locked == [day.event.pk] * 5
 
 
-def test_a_final_round_with_no_playlist_step_needs_its_cut(day):
+def hand_built_final(day) -> Round:
+    """Round 1 raced, then a top 4 final built by hand with `roster.new`,
+    with no playlist step, and its heat 1 raced."""
     round_1 = day.start()
     day.race(round_1)
     PlaylistEntry.objects.filter(event=day.event).delete()
-    made = new_round_roster(FollowOn(round_1), top=4)
-    generate_schedule(made.round, 1)
-    with pytest.raises(FinalsFailure) as caught:
-        finalist_suggestions(made.round)
-    assert caught.value.code == Failure.NO_CUT
-    suggested = finalist_suggestions(made.round, top=4)
+    final = new_round_roster(FollowOn(round_1), top=4).round
+    generate_schedule(final, 1)
+    day.race(final, heats={1})
+    return final
+
+
+def test_a_final_built_by_hand_keeps_its_cut_for_suggestions(day):
+    """D43."""
+    final = hand_built_final(day)
+    final.refresh_from_db()
+    assert (final.cut_top, final.cut_bucketed) == (4, False)
+    coordinator_changes_time(day, 105, 2.035)
+    suggested = finalist_suggestions(final)
+    assert (day.cars(suggested.add), day.cars(suggested.remove)) == ([105], [104])
+    assert poll_finals(day.event)["finalist-suggestions"] == [
+        {
+            "roundid": final.pk,
+            "classid": day.group.pk,
+            "add": [day.racer(105).pk],
+            "remove": [day.racer(104).pk],
+        }
+    ]
+
+
+def test_a_playlist_final_keeps_the_cut_it_was_built_with(day):
+    """D43: the final keeps its number even if its playlist step changes
+    afterwards."""
+    final = raced_final(day)
+    final.refresh_from_db()
+    assert (final.cut_top, final.cut_bucketed) == (4, False)
+    PlaylistEntry.objects.filter(event=day.event, round_number=2).update(bucket_limit=5)
+    suggested = finalist_suggestions(final)
     assert (suggested.add, suggested.remove) == ((), ())
+
+
+def test_a_final_with_no_stored_cut_is_reported_by_the_poll(day):
+    """A round made before D43, as an import makes, has no stored cut. The
+    poll says so instead of leaving the final out."""
+    final = hand_built_final(day)
+    Round.objects.filter(pk=final.pk).update(cut_top=None)
+    with pytest.raises(FinalsFailure) as caught:
+        finalist_suggestions(final)
+    assert caught.value.code == Failure.NO_CUT
+    suggested = finalist_suggestions(final, top=4)
+    assert (suggested.add, suggested.remove) == ((), ())
+    assert poll_finals(day.event)["finalist-suggestions"] == [
+        {
+            "roundid": final.pk,
+            "classid": day.group.pk,
+            "failure": "no-cut",
+            "add": [],
+            "remove": [],
+        }
+    ]
+
+
+# ----- a combined final (D44) -----
+
+
+def test_an_allowed_racer_goes_into_a_combined_final_drawn_from_the_group(day):
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    day.allowed_late_racer()
+    made = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=4)
+    assert day.roster(made.round) == [101, 102, 103, 104, LATE]
+    assert made.extras == (day.racer(LATE),)
+
+
+def test_an_allowed_racer_goes_into_a_combined_final_drawn_from_subgroups(day):
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    day.allowed_late_racer()
+    subgroup = day.racer(LATE).subgroup
+    made = new_round_roster(NewAggregate("Grand", subgroups=[subgroup]), top=4)
+    assert made.extras == (day.racer(LATE),)
+    assert LATE in day.roster(made.round)
+
+
+def second_subgroup(day, car: int):
+    """Move the car into a second subgroup of the Scouts group."""
+    subgroup = Subgroup.objects.create(
+        event=day.event, group=day.group, name="Bears", sort_order=2
+    )
+    partition = Partition.objects.create(
+        event=day.event, subgroup=subgroup, name="Bears", sort_order=2
+    )
+    Racer.objects.filter(event=day.event, car_number=car).update(
+        subgroup=subgroup, partition=partition
+    )
+    return subgroup
+
+
+@pytest.mark.parametrize("draws_from", ["its subgroup", "another subgroup"])
+def test_a_combined_final_drawn_from_subgroups_takes_only_their_racers(day, draws_from):
+    """D44: the racer's group races in the combined round only through the
+    subgroups it draws from."""
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    RaceSettings.objects.filter(event=day.event).update(use_subgroups=True)
+    others = day.racer(101).subgroup
+    bears = second_subgroup(day, LATE)
+    day.allowed_late_racer()
+    subgroup = bears if draws_from == "its subgroup" else others
+    made = new_round_roster(NewAggregate("Grand", subgroups=[subgroup]), top=4)
+    assert (LATE in day.roster(made.round)) == (draws_from == "its subgroup")
+    if draws_from == "another subgroup":
+        with pytest.raises(FinalsFailure) as caught:
+            add_to_final(day.racer(LATE), made.round)
+        assert caught.value.code == Failure.WRONG_GROUP
+
+
+def test_a_racer_moved_to_another_group_is_not_entered_in_its_final(day):
+    """Review finding 1: the request names the old group, so the new
+    group's final does not take the racer either."""
+    day.race_round_1()
+    day.allowed_late_racer()
+    move_to_another_group(day, LATE)
+    webelos = day.racer(LATE).group
+    entry = PlaylistEntry.objects.create(
+        event=day.event, seq=3, group=webelos, round_number=2, bucket_limit=4
+    )
+    final = Round.objects.create(event=day.event, group=webelos, number=2)
+    entrants = playlist_finalists()(entry, final)
+    assert day.racer(LATE) not in entrants.racers
+
+
+def test_allowing_into_a_combined_final_with_a_roster_adds_the_racer(day):
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=4).round
+    generate_schedule(grand, 1)
+    late = day.allowed_late_racer()
+    assert day.roster(grand) == [101, 102, 103, 104, LATE]
+    assert round_adjustments(grand).unscheduled == (late.pk,)
+    day.race(grand, heats={1})
+    suggested = finalist_suggestions(grand)
+    assert (suggested.add, suggested.remove) == ((), ())
+
+
+def test_an_allowed_racer_joins_only_the_next_round_of_the_group(day):
+    """The group's own final came first, so a combined round built later
+    does not take the allowed racer again."""
+    day.race_round_1()
+    day.allowed_late_racer()
+    made = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=4)
+    assert LATE not in day.roster(made.round)
+
+
+# ----- requests that no longer apply -----
+
+
+def move_to_another_group(day, car: int):
+    other = day.replay.import_racer("Webelo", "Racer", "Webelos", "301")
+    Racer.objects.filter(event=day.event, car_number=car).update(
+        group=other.group, subgroup=other.subgroup, partition=other.partition
+    )
+
+
+def test_a_racer_moved_to_another_group_leaves_the_old_groups_final(day):
+    """Review finding 1: the request names the old group."""
+    final = day.race_round_1()
+    day.allowed_late_racer()
+    move_to_another_group(day, LATE)
+    HeatLane.objects.filter(round=day.round_1, racer__car_number=106).update(
+        finish_time=1.9
+    )
+    assert rebuild_waiting_round(day.event, playlist_finalists())
+    assert LATE not in day.roster(final)
+
+
+def test_allowing_a_racer_moved_to_another_group_is_refused(day):
+    final = day.race_round_1()
+    request = request_final_place(day.check_in_late())
+    move_to_another_group(day, LATE)
+    with pytest.raises(FinalsFailure) as caught:
+        allow_final_request(request)
+    assert caught.value.code == Failure.WRONG_GROUP
+    assert LATE not in day.roster(final)
+    assert FinalRequest.objects.get().state == FinalRequest.State.REQUESTED
+
+
+def test_a_reverted_check_in_leaves_the_final_at_the_next_rebuild(day):
+    """Review finding 3, D36: a reverted check-in departs the racer."""
+    final = day.race_round_1()
+    day.allowed_late_racer()
+    Racer.objects.filter(event=day.event, car_number=LATE).update(
+        passed_inspection=False
+    )
+    HeatLane.objects.filter(round=day.round_1, racer__car_number=106).update(
+        finish_time=1.9
+    )
+    assert rebuild_waiting_round(day.event, playlist_finalists())
+    assert LATE not in day.roster(final)
+
+
+def test_allowing_a_racer_whose_check_in_was_reverted_is_refused(day):
+    final = day.race_round_1()
+    request = request_final_place(day.check_in_late())
+    Racer.objects.filter(event=day.event, car_number=LATE).update(
+        passed_inspection=False
+    )
+    with pytest.raises(FinalsFailure) as caught:
+        allow_final_request(request)
+    assert caught.value.code == Failure.NOT_CHECKED_IN
+    assert LATE not in day.roster(final)
+
+
+def test_the_poll_lists_a_declined_request_so_it_can_still_be_allowed(day):
+    """Review finding 5."""
+    final = day.race_round_1()
+    late = day.check_in_late()
+    request = decline_final_request(request_final_place(late))
+    assert poll_finals(day.event)["final-requests"] == [
+        {
+            "requestid": request.pk,
+            "racerid": late.pk,
+            "classid": day.group.pk,
+            "state": "declined",
+        }
+    ]
+    allow_final_request(request)
+    assert LATE in day.roster(final)
+    assert poll_finals(day.event)["final-requests"] == []
 
 
 def test_requests_are_per_event(day):

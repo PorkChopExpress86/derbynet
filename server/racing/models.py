@@ -16,6 +16,12 @@ class Round(EventScoped):
         "roster.Group", on_delete=models.PROTECT, related_name="rounds"
     )
     number = models.PositiveSmallIntegerField()
+    # The cut a final was built with, from `roster.new` or its playlist
+    # step (D43): how many racers it takes, and whether that many come from
+    # each group or subgroup it draws from. Django only. Null for round 1
+    # of an organic group and for a round made before D43.
+    cut_top = models.PositiveSmallIntegerField(null=True, blank=True)
+    cut_bucketed = models.BooleanField(default=False)
 
     class Meta:
         constraints = [

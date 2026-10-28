@@ -1,9 +1,10 @@
 """Allowed racers in a final, and finalist suggestions (#103, owner
-decisions D32, D33, D34).
+decisions D32, D33, D34, D43, D44).
 
 A racer who passed check-in after the group's round 1 ended, with no round
-1 result, can only ask for a place in the group's final, round 2 of the
-group (#20, "Race-day flow"). The race coordinator allows or declines it.
+1 result, can only ask for a place in the next round the group races in:
+its final, round 2 of the group (#20, "Race-day flow"), or a combined round
+drawn from it (D44). The race coordinator allows or declines it.
 An allowed racer is extra: the final holds every qualifier the cut picks,
 then each allowed racer, and `racing.services.rounds` enters them at every
 build of the final from the `FinalRequest` rows. Allowing never writes a
@@ -13,8 +14,9 @@ coordinator fits the racer in with Add to schedule
 
 Once a heat of a final has a result, round 1's results are locked for all
 but the race coordinator (#27). `finalist_suggestions` compares the
-finalists the standings pick now with the final's qualifiers and changes
-nothing. `add_to_final` and `remove_from_final` act on a suggestion.
+finalists the standings pick now, with the cut the final was built with
+(D43), against the final's qualifiers, and changes nothing.
+`add_to_final` and `remove_from_final` act on a suggestion.
 
 PHP has no way to ask for a place in a final: its finalists come only
 from round 1 results (`calculate_roster_from_keys` in
@@ -28,16 +30,17 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from core.services import lock_race_state
 from racing.engine.standings import finalists
-from racing.models import HAS_RESULT, FinalRequest, HeatLane, PlaylistEntry, Round
+from racing.models import HAS_RESULT, FinalRequest, HeatLane, Round
 from racing.services.standings import standings_snapshot
 from roster.models import GroupConstituent, GroupConstituentSubgroup, Racer
 
 FINAL_ROUND = 2
-"""The round of a group that allowed racers join: its final (#20)."""
+"""A group's own final (#20)."""
 
 
 class Failure(StrEnum):
@@ -107,16 +110,32 @@ def request_final_place(racer: Racer) -> FinalRequest:
 
 
 def allow_final_request(request: FinalRequest) -> FinalRequest:
-    """The race coordinator allows the request. If the final already has a
+    """The race coordinator allows the request, open or declined before.
+    The racer goes into the next round the group races in, its final or a
+    combined round drawn from it (D44). If that round already has a
     roster, the racer joins it, after the racers there; with a chart the
-    racer has no heats until Add to schedule fits the racer in. A final
-    made later enters the racer when it is built."""
+    racer has no heats until Add to schedule fits the racer in. A round made
+    later enters the racer when it is built.
+
+    Refused with `wrong-group` when the racer has moved to another group
+    since the request, and with `not-checked-in` when the racer's check-in
+    was reverted (D36)."""
     with transaction.atomic():
         lock_race_state(request.event_id)
-        request = FinalRequest.objects.get(pk=request.pk)
+        request = FinalRequest.objects.select_related("racer").get(pk=request.pk)
+        racer = request.racer
+        if racer.group_id != request.group_id:
+            raise FinalsFailure(
+                Failure.WRONG_GROUP,
+                "The racer has moved to another group since the request.",
+            )
+        if not racer.passed_inspection:
+            raise FinalsFailure(
+                Failure.NOT_CHECKED_IN, "The racer has not passed check-in."
+            )
         if request.state != FinalRequest.State.ALLOWED:
             _decide(request, FinalRequest.State.ALLOWED)
-        final = _final_of(request.group_id)
+        final = next_round_of(racer)
         if final is not None and final.roster.exists():
             final.roster.get_or_create(
                 event_id=request.event_id, racer_id=request.racer_id
@@ -131,11 +150,14 @@ def decline_final_request(request: FinalRequest) -> FinalRequest:
     with transaction.atomic():
         lock_race_state(request.event_id)
         request = FinalRequest.objects.get(pk=request.pk)
-        if request.state != FinalRequest.State.DECLINED:
-            _decide(request, FinalRequest.State.DECLINED)
-        final = _final_of(request.group_id)
-        if final is not None:
-            final.roster.filter(racer_id=request.racer_id).delete()
+        if request.state == FinalRequest.State.DECLINED:
+            return request
+        was_allowed = request.state == FinalRequest.State.ALLOWED
+        _decide(request, FinalRequest.State.DECLINED)
+        racer = request.racer
+        final = next_round_of(racer)
+        if was_allowed and _applies(request) and final is not None:
+            final.roster.filter(racer_id=racer.pk).delete()
         return request
 
 
@@ -145,23 +167,44 @@ def _decide(request: FinalRequest, state: FinalRequest.State) -> None:
     request.save(update_fields=["state", "decided_at"])
 
 
-def _final_of(group_id: int) -> Round | None:
-    return Round.objects.filter(group_id=group_id, number=FINAL_ROUND).first()
+def next_round_of(racer: Racer) -> Round | None:
+    """The next round the racer's group races in after its round 1 (D44):
+    the group's final, or round 1 of a combined round that draws from the
+    group or from the racer's subgroup, whichever was made first."""
+    candidates = (
+        Round.objects.filter(event_id=racer.event_id)
+        .filter(
+            Q(group_id=racer.group_id, number=FINAL_ROUND)
+            | Q(number=1, group__constituent_links__constituent_id=racer.group_id)
+        )
+        .distinct()
+        .order_by("id")
+    )
+    return next((r for r in candidates if _racer_of_final(racer, r)), None)
 
 
-def allowed_racers(group_id: int, round_number: int) -> tuple[Racer, ...]:
-    """The racers allowed into round `round_number` of the group, in the
-    order the race coordinator allowed them. Only a group's final takes
-    allowed racers."""
-    if round_number != FINAL_ROUND:
-        return ()
-    return tuple(
-        r.racer
-        for r in FinalRequest.objects.filter(
-            group_id=group_id, state=FinalRequest.State.ALLOWED
+def _applies(request: FinalRequest) -> bool:
+    """A request still applies while its racer is in the group it named and
+    has passed check-in. A reverted check-in departs the racer (D36)."""
+    racer = request.racer
+    return racer.group_id == request.group_id and racer.passed_inspection
+
+
+def allowed_racers(round: Round) -> tuple[Racer, ...]:
+    """The racers allowed into the round, in the order the race coordinator
+    allowed them: those whose request still applies and whose next round
+    it is (D44)."""
+    requests = (
+        FinalRequest.objects.filter(
+            event_id=round.event_id, state=FinalRequest.State.ALLOWED
         )
         .select_related("racer")
         .order_by("decided_at", "id")
+    )
+    return tuple(
+        r.racer
+        for r in requests
+        if _applies(r) and getattr(next_round_of(r.racer), "pk", None) == round.pk
     )
 
 
@@ -194,16 +237,14 @@ def _is_aggregate(group_id: int) -> bool:
 
 def _cut(final: Round, top: int | None, bucketed: bool | None) -> finalists.Cut:
     if top is None:
-        step = PlaylistEntry.objects.filter(
-            group_id=final.group_id, round_number=final.number
-        ).first()
-        if step is None:
+        if final.cut_top is None:
             raise FinalsFailure(
                 Failure.NO_CUT,
-                "The final has no playlist step, so its cut is not known.",
+                "The final was made without a stored cut, so how many racers"
+                " it takes is not known.",
             )
-        top = step.bucket_limit
-        bucketed = step.bucketed if bucketed is None else bucketed
+        top = final.cut_top
+        bucketed = final.cut_bucketed if bucketed is None else bucketed
     bucketed = bool(bucketed)
     standings = standings_snapshot(final.event).standings
     if final.number > 1:
@@ -224,15 +265,17 @@ def finalist_suggestions(
     """Compare the finalists the standings pick now with the final's
     qualifiers, its roster less its allowed racers. Changes nothing.
 
-    The cut is the final's playlist step's, unless `top` and `bucketed`
-    give it; a final with neither fails with `no-cut`. It reads the round
+    The cut is the one the final was built with (D43), unless `top` and
+    `bucketed` give it; a round made without a stored cut, as before D43,
+    fails with `no-cut`. It reads the round
     before the final, and skips any racer who cannot win the group's speed
     awards (D34). No suggestion names a racer with either award setting.
     """
+    final = Round.objects.get(pk=final.pk)
     if not _is_final(final):
         raise FinalsFailure(Failure.NOT_A_FINAL, "The round is not a final.")
     cut = _cut(final, top, bucketed)
-    allowed = {r.pk for r in allowed_racers(final.group_id, final.number)}
+    allowed = {r.pk for r in allowed_racers(final)}
     roster = [e.racer for e in final.roster.select_related("racer").order_by("id")]
     qualifiers = {r.pk for r in roster} - allowed
     picked = [f.racer_id for f in cut.finalists]
@@ -253,16 +296,19 @@ def finalist_suggestions(
 
 
 def _racer_of_final(racer: Racer, final: Round) -> bool:
+    """Whether the final draws from the racer: a later round of the racer's
+    group, or a combined round that draws from the racer's subgroup, or,
+    drawing from no subgroup, from the racer's group. A combined round that
+    draws from subgroups also links their groups, so the group link alone
+    would take a racer of a subgroup it leaves out."""
     if final.number > 1:
         return racer.group_id == final.group_id
-    return (
-        GroupConstituent.objects.filter(
-            aggregate_id=final.group_id, constituent_id=racer.group_id
-        ).exists()
-        or GroupConstituentSubgroup.objects.filter(
-            aggregate_id=final.group_id, subgroup_id=racer.subgroup_id
-        ).exists()
-    )
+    subgroups = GroupConstituentSubgroup.objects.filter(aggregate_id=final.group_id)
+    if subgroups.exists():
+        return subgroups.filter(subgroup_id=racer.subgroup_id).exists()
+    return GroupConstituent.objects.filter(
+        aggregate_id=final.group_id, constituent_id=racer.group_id
+    ).exists()
 
 
 def add_to_final(racer: Racer, final: Round) -> None:
@@ -299,12 +345,10 @@ def remove_from_final(racer: Racer, final: Round) -> None:
         if entry is None:
             raise FinalsFailure(Failure.NOT_ON_ROSTER, "The racer is not in the final.")
         entry.delete()
-        if final.number == FINAL_ROUND:
-            for request in FinalRequest.objects.filter(
-                racer_id=racer.pk,
-                group_id=final.group_id,
-                state=FinalRequest.State.ALLOWED,
-            ):
+        for request in FinalRequest.objects.filter(
+            racer_id=racer.pk, state=FinalRequest.State.ALLOWED
+        ).select_related("racer"):
+            if _applies(request) and next_round_of(request.racer) == final:
                 _decide(request, FinalRequest.State.DECLINED)
 
 
@@ -323,17 +367,28 @@ def _raced_finals(event) -> list[Round]:
 
 
 def poll_finals(event) -> dict:
-    """The poll field for the race dashboard (#41): the open requests, and
-    for each final with a raced heat and a playlist step, the suggestions
-    that change something."""
+    """The poll field for the race dashboard (#41): the requests the race
+    coordinator can still allow, open or declined, and for each final with
+    a raced heat the suggestions that change something. A final with no
+    stored cut is listed with `"failure": "no-cut"`."""
     requests = FinalRequest.objects.filter(
-        event=event, state=FinalRequest.State.REQUESTED
+        event=event,
+        state__in=(FinalRequest.State.REQUESTED, FinalRequest.State.DECLINED),
     ).order_by("requested_at", "id")
     suggestions = []
     for final in _raced_finals(event):
         try:
             found = finalist_suggestions(final)
-        except FinalsFailure:
+        except FinalsFailure as failure:
+            suggestions.append(
+                {
+                    "roundid": final.pk,
+                    "classid": final.group_id,
+                    "failure": str(failure.code),
+                    "add": [],
+                    "remove": [],
+                }
+            )
             continue
         if found.add or found.remove:
             suggestions.append(
