@@ -170,7 +170,10 @@ def _decide(request: FinalRequest, state: FinalRequest.State) -> None:
 def next_round_of(racer: Racer) -> Round | None:
     """The next round the racer's group races in after its round 1 (D44):
     the group's final, or round 1 of a combined round that draws from the
-    group or from the racer's subgroup, whichever was made first."""
+    group or from the racer's subgroup, whichever was made first. A round
+    whose heats have all run is not next, so a racer allowed after the
+    final has run goes into a later combined round, or, with none made yet,
+    into the next round built."""
     candidates = (
         Round.objects.filter(event_id=racer.event_id)
         .filter(
@@ -180,7 +183,29 @@ def next_round_of(racer: Racer) -> Round | None:
         .distinct()
         .order_by("id")
     )
-    return next((r for r in candidates if _racer_of_final(racer, r)), None)
+    return next(
+        (r for r in candidates if _racer_of_final(racer, r) and not _finished(r)),
+        None,
+    )
+
+
+def _finished(round: Round) -> bool:
+    lanes = HeatLane.objects.filter(round=round)
+    return lanes.exists() and not lanes.exclude(HAS_RESULT).exists()
+
+
+def _allowed_on(final: Round) -> set[int]:
+    """The final's racers who are there as allowed racers, whether or not
+    the final is still their next round, for they have no result in the
+    round before it."""
+    on_roster = set(final.roster.values_list("racer_id", flat=True))
+    return {
+        r.racer_id
+        for r in FinalRequest.objects.filter(
+            racer_id__in=on_roster, state=FinalRequest.State.ALLOWED
+        ).select_related("racer")
+        if _applies(r) and _racer_of_final(r.racer, final)
+    }
 
 
 def _applies(request: FinalRequest) -> bool:
@@ -275,7 +300,7 @@ def finalist_suggestions(
     if not _is_final(final):
         raise FinalsFailure(Failure.NOT_A_FINAL, "The round is not a final.")
     cut = _cut(final, top, bucketed)
-    allowed = {r.pk for r in allowed_racers(final)}
+    allowed = _allowed_on(final)
     roster = [e.racer for e in final.roster.select_related("racer").order_by("id")]
     qualifiers = {r.pk for r in roster} - allowed
     picked = [f.racer_id for f in cut.finalists]
@@ -348,7 +373,7 @@ def remove_from_final(racer: Racer, final: Round) -> None:
         for request in FinalRequest.objects.filter(
             racer_id=racer.pk, state=FinalRequest.State.ALLOWED
         ).select_related("racer"):
-            if _applies(request) and next_round_of(request.racer) == final:
+            if _applies(request) and _racer_of_final(request.racer, final):
                 _decide(request, FinalRequest.State.DECLINED)
 
 
@@ -368,13 +393,19 @@ def _raced_finals(event) -> list[Round]:
 
 def poll_finals(event) -> dict:
     """The poll field for the race dashboard (#41): the requests the race
-    coordinator can still allow, open or declined, and for each final with
+    coordinator can still allow, open or declined, leaving out any whose
+    racer has moved to another group or had check-in reverted, and for each final with
     a raced heat the suggestions that change something. A final with no
     stored cut is listed with `"failure": "no-cut"`."""
-    requests = FinalRequest.objects.filter(
-        event=event,
-        state__in=(FinalRequest.State.REQUESTED, FinalRequest.State.DECLINED),
-    ).order_by("requested_at", "id")
+    requests = (
+        FinalRequest.objects.filter(
+            event=event,
+            state__in=(FinalRequest.State.REQUESTED, FinalRequest.State.DECLINED),
+        )
+        .select_related("racer")
+        .order_by("requested_at", "id")
+    )
+    requests = [r for r in requests if _applies(r)]
     suggestions = []
     for final in _raced_finals(event):
         try:

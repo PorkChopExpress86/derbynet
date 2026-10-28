@@ -666,6 +666,57 @@ def test_a_racer_moved_to_another_group_leaves_the_old_groups_final(day):
     assert LATE not in day.roster(final)
 
 
+def finished_final(day) -> Round:
+    """Round 1 and the whole final raced."""
+    final = day.race_round_1()
+    start_waiting_step(day.event)
+    day.race(final)
+    return final
+
+
+def test_a_racer_allowed_after_the_final_has_run_goes_into_the_combined_round(day):
+    """D44: a finished final is not the next round the group races in."""
+    final = finished_final(day)
+    grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2).round
+    day.allowed_late_racer()
+    assert LATE in day.roster(grand)
+    assert LATE not in day.roster(final)
+
+
+def test_an_allow_after_the_final_has_run_waits_for_the_next_round(day):
+    final = finished_final(day)
+    day.allowed_late_racer()
+    assert LATE not in day.roster(final)
+    grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2)
+    assert day.roster(grand.round) == [101, 102, LATE]
+
+
+def test_an_allowed_racer_in_a_finished_final_is_still_not_a_qualifier(day):
+    """The finished final is no longer the racer's next round, and the
+    racer is still there as an allowed racer, eligible or not (D33)."""
+    final = raced_final(day)
+    day.race(final)
+    Racer.objects.filter(event=day.event, car_number=LATE).update(
+        not_eligible_for_speed_awards=False
+    )
+    suggested = finalist_suggestions(final)
+    assert (suggested.add, suggested.remove) == ((), ())
+
+
+def test_removing_an_allowed_racer_from_a_finished_final_declines_it(day):
+    final = raced_final(day)
+    day.race(final)
+    remove_from_final(day.racer(LATE), final)
+    assert FinalRequest.objects.get().state == FinalRequest.State.DECLINED
+
+
+def test_the_poll_leaves_out_a_request_that_no_longer_applies(day):
+    day.race_round_1()
+    request_final_place(day.check_in_late())
+    move_to_another_group(day, LATE)
+    assert poll_finals(day.event)["final-requests"] == []
+
+
 def test_allowing_a_racer_moved_to_another_group_is_refused(day):
     final = day.race_round_1()
     request = request_final_place(day.check_in_late())
