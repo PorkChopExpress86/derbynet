@@ -117,9 +117,8 @@ jobs:
       # them: import-roster.sh, test-den-changes.sh (#30), then
       # test-basic-checkins.sh, which test-basic-racing.sh starts with.  They
       # run from the repository root, where testing/common.sh keeps its
-      # scratch files.  test-racer-query.sh needs the rest of
-      # test-basic-racing.sh (#31) and test-awards.sh (#33) first, and
-      # test-car-numbers.sh needs query=poll (#31).
+      # scratch files.  test-racer-query.sh needs test-basic-racing.sh, which
+      # needs timer-message (#32), and test-awards.sh (#33) first.
       - name: Run the racer and check-in suites against Django
         working-directory: .
         run: |
@@ -130,6 +129,26 @@ jobs:
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/import-csv-roster.sh http://127.0.0.1:8080 testing/data/outlaw-class.csv
           DBCHECK=1 bash testing/import-csv-roster.sh http://127.0.0.1:8080 testing/data/outlaw-class.csv
+
+      # The race-control and poll suites of #31 that need no endpoint of
+      # another ticket, in testing/exercise-one-database.sh order.  The racing
+      # suites post timer-message (#32) through run_heat, or read awards (#33)
+      # or export-json.php (#36), so they wait for those tickets.
+      - name: Run the race-control suites against Django
+        working-directory: .
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/test-car-numbers.sh http://127.0.0.1:8080
+          bash testing/test-extended-scheduling.sh http://127.0.0.1:8080
+          bash testing/test-rotation-schedule.sh http://127.0.0.1:8080
+          bash testing/test-model-a-club.sh http://127.0.0.1:8080
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/test-partitions.sh http://127.0.0.1:8080
+          bash testing/test-racing-groups.sh http://127.0.0.1:8080
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-den-changes.sh http://127.0.0.1:8080
+          bash testing/test-unused-lanes.sh http://127.0.0.1:8080
 
       - name: Show the Django server log
         if: failure()

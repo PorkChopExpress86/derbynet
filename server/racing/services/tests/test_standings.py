@@ -295,3 +295,19 @@ def test_a_new_aggregate_of_nothing_fails_with_no_racers(replay):
     with pytest.raises(RoundFailure) as caught:
         new_round_roster(NewAggregate("Nobody"), top=4)
     assert caught.value.code == Failure.NO_RACERS
+
+
+def test_one_snapshot_gives_the_export_its_sheets_and_awards(replay):
+    """The public entry the export (#36) calls: `standings_snapshot(event)`.
+    `.standings.catalog()` names each standings sheet, `.standings.ladders`
+    and `.standings.rows` fill them, and `.speed_awards.awards` lists the
+    speed awards, all from the same rows."""
+    snapshot = standings_snapshot(replay.event)
+
+    keys = {entry.key for entry in snapshot.standings.catalog()}
+    assert keys and keys <= set(snapshot.standings.ladders)
+    assert {row.racer.id for row in snapshot.standings.rows} == {
+        r.pk for r in Racer.objects.filter(event=replay.event)
+    }
+    assert snapshot.speed_awards.awards
+    assert snapshot.speed_awards.awards[0].racer_id == racers_of(replay, "Lions")[0].pk

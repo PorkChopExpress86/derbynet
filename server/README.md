@@ -100,6 +100,20 @@ uv run python tools/reschedule_deviations.py
 uv run python tools/reschedule_deviations.py --check   # exits 1 if they are out of date
 ```
 
+## Race control and the racing polls
+
+`legacy_api/handlers/race_control.py` serves `heat.select`, `heat.rerun`, `heat.reinstate`, `result.write`, `result.delete`, `schedule.generate`, `schedule.unschedule`, `schedule.reschedule`, `roster.new` and `roster.delete` over the services above, and `query=poll.coordinator`, `query=poll` and `query=poll.results` over `racing/services/polls.py` (#31). The services take the `RaceState` lock and read the current heat under it, so no handler reads race state before it calls one; `result.delete`'s `current` round and heat are `racing.services.results.CURRENT`, resolved under the lock.
+
+- `racing.services.polls.coordinator(event)` builds the coordinator payload, PHP's ten keys from `query.poll.coordinator.inc`. `query=poll.coordinator` serves it, the ten actions append it as PHP's `require` does, and the new dashboard (#41) reads the same function. `poll.coordinator` is anonymous, as in PHP and #31, where #17's table asks for a login: `run_heat` in `testing/common.sh` polls it as the Timer role, whose empty password counts as no login. `heat.select` and `heat.rerun` refuse a caller without `CONTROL_RACE` inside the handler and still append the payload, as PHP does.
+- `racing.services.polls.POLL_VALUES` maps each `query=poll` value key to the one function that answers it, so the key list is data. `awards` adds nothing, as in PHP, and `race-structure` adds four top-level keys.
+- `ondeck` lists every heat lane of the event outside the master schedule, because PHP's `json_ondeck()` never narrows its query (C25). It is kept for parity and is a known cost for a large event, which #52 should measure: the kiosks poll it about every half second.
+- `query=poll.results` lists the current round's results (or `roundid`'s) and every result written in the last 300 s. `polls.results_cutoff(now)` is the one place the window is computed, on aware datetimes, so the server's time zone never splits it. It now has a PHP capture, `http/poll/poll-results.http`, which matches but for R8 and R9: PHP writes a space before its JSON, and with `details` repeats each column under its position as PDO fetches it.
+- `schedule.reschedule` answers `busy` while another reschedule of the event holds `RaceState.reschedule_started_at`, or for 120 s after one that died without clearing it. It checks that before the round, as PHP checks its marker first, so a `roundid` that names no round is `busy` then and `nochart` otherwise (`reschedule.refuse_missing_round`).
+- `schedule.generate` fails in PHP's order: `nlanes`, `results-exist`, `too-few-racers`, then `cant-fulfill`. A `roundid` that names no round still gets the lane check first (`schedule.refuse_missing_round`). PHP's `trace` field adds a `trace` key to the reply; Django drops it (R6).
+- Fixes and differences from PHP are recorded on each endpoint's `divergences` in the registry, for the parity gate (#37): `roster.new` needs `CONTROL_RACE` (S17) and fails with `invalid-roundid` (C24), `result.delete` has no `sql` key (C23), and the R3 and R5 to R9 differences #31 proposes for the owner to confirm.
+
+`legacy_api/tests/test_race_control_parity.py` replays `capture/scenarios/04-schedules.sh`, `05-master-schedule.sh`, `11-reschedule-quirks.sh`, `16-poll-results.sh` and the polls of `06-race-day.sh` up to the first result through these endpoints, with ids mapped by first appearance (`legacy_api/tests/php_http.py`). The capture's timer messages (#32) and playlist steps (#34) go through the services instead. `WRITE_DEVIATIONS=1 uv run pytest legacy_api/tests/test_race_control_parity.py` rewrites its deviation entries. `legacy_api/tests/test_race_control_concurrency.py` posts two `schedule.reschedule` calls, and `heat.select` with `result.write`, at once on real transactions.
+
 ## Closed lanes
 
 `racing/services/lanes.py` lets the race coordinator close a damaged lane and reopen it (#108, D36, D37, D45). PHP has no lane closure.
@@ -260,7 +274,7 @@ DBCHECK=1 ../testing/reset-database.sh http://127.0.0.1:8000
 
 ## Legacy handlers
 
-A handler lives in `legacy_api/handlers/` and registers under its exact PHP name with `@action(...)` or `@query(...)` from `legacy_api/registry.py`. Each declares its `permission`, a `Perm` from `accounts/permissions.py` or an `Access` value. The dispatcher checks it against the session's `role` and `permissions` keys before the handler runs. A handler resolves every id from a request with `ctx.resolve(Model, raw_id)`, which finds rows of the active event only, and writes through services, never the ORM. Each new endpoint adds a request to `LEAK_REQUESTS` in `legacy_api/tests/test_event_leak.py`.
+A handler lives in `legacy_api/handlers/` and registers under its exact PHP name with `@action(...)` or `@query(...)` from `legacy_api/registry.py`. Each declares its `permission`, a `Perm` from `accounts/permissions.py` or an `Access` value. The dispatcher checks it against the session's `role` and `permissions` keys before the handler runs. A handler resolves every id from a request with `ctx.resolve(Model, raw_id)`, which finds rows of the active event only, and writes through services, never the ORM. Each new endpoint adds a request to `LEAK_REQUESTS` in `legacy_api/tests/test_event_leak.py`. An endpoint whose reply differs from PHP's on purpose lists each difference in its `divergences`, as `<id>: <what>`, where the id is a row of #64, an owner decision or a quirk of #20.
 
 ## Roles and logins
 

@@ -76,6 +76,10 @@ class Endpoint:
     session_write: bool = False
     # A query that writes on GET, as #17 lists them. No other query may.
     get_writes: bool = False
+    # Each intentional difference from PHP's reply, as `<id>: <what>`, where
+    # the id is a #64 row, an owner decision or a quirk of #20. The parity
+    # gate (#37) allows exactly these.
+    divergences: tuple[str, ...] = ()
 
     def __post_init__(self):
         if self.failure_code == "permission" and self.fmt is Format.XML:
@@ -121,10 +125,19 @@ def action(
     permission: Requirement,
     failure_code: FailureCode = "notauthorized",
     session_write: bool = False,
+    divergences: tuple[str, ...] = (),
 ):
     def register(handler):
         REGISTRY.register(
-            Endpoint("action", name, handler, permission, failure_code, session_write)
+            Endpoint(
+                "action",
+                name,
+                handler,
+                permission,
+                failure_code,
+                session_write,
+                divergences=divergences,
+            )
         )
         return handler
 
@@ -137,6 +150,7 @@ def query(
     permission: Requirement,
     session_write: bool = False,
     get_writes: bool = False,
+    divergences: tuple[str, ...] = (),
 ):
     def register(handler):
         REGISTRY.register(
@@ -147,6 +161,7 @@ def query(
                 permission,
                 session_write=session_write,
                 get_writes=get_writes,
+                divergences=divergences,
             )
         )
         return handler

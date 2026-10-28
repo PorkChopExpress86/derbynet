@@ -1,0 +1,252 @@
+### 004 after-two-heats-details
+request: GET action.php?query=poll.results&details=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 6169
+body:
+{
+    "schedule-signature": {
+        "1": "1-1\/2-5\/3-9\/4-3\/5-3\/6-7\/7-1\/8-5\/9-5\/10-9\/11-3\/12-7\/13-7\/14-1\/15-5\/16-9\/17-9\/18-3\/19-7\/20-1",
+        "2": "21-2\/22-6\/23-10\/24-4\/25-4\/26-8\/27-2\/28-6\/29-6\/30-10\/31-4\/32-8\/33-8\/34-2\/35-6\/36-10\/37-10\/38-4\/39-8\/40-2"
+    },
+    "results": [
+        {
+            "resultid": 1,
+            "roundid": 1,
+            "heat": 1,
+            "lane": 1,
+            "racerid": 1,
+            "finishtime": 2.748,
+            "finishplace": 1,
+            "completed": "<timestamp>",
+            "outcome": "x2.748"
+        },
+        {
+            "resultid": 2,
+            "roundid": 1,
+            "heat": 1,
+            "lane": 2,
+            "racerid": 5,
+            "finishtime": 2.833,
+            "finishplace": 3,
+            "completed": "<timestamp>",
+            "outcome": "x2.833"
+        },
+        {
+            "resultid": 3,
+            "roundid": 1,
+            "heat": 1,
+            "lane": 3,
+            "racerid": 9,
+            "finishtime": 2.918,
+            "finishplace": 4,
+            "completed": "<timestamp>",
+            "outcome": "x2.918"
+        },
+        {
+            "resultid": 4,
+            "roundid": 1,
+            "heat": 1,
+            "lane": 4,
+            "racerid": 3,
+            "finishtime": 2.818,
+            "finishplace": 2,
+            "completed": "<timestamp>",
+            "outcome": "x2.818"
+        },
+        {
+            "resultid": 5,
+            "roundid": 1,
+            "heat": 2,
+            "lane": 1,
+            "racerid": 3,
+            "finishtime": 2.785,
+            "finishplace": 2,
+            "completed": "<timestamp>",
+            "outcome": "x2.785"
+        },
+        {
+            "resultid": 6,
+            "roundid": 1,
+            "heat": 2,
+            "lane": 2,
+            "racerid": 7,
+            "finishtime": 2.87,
+            "finishplace": 4,
+            "completed": "<timestamp>",
+            "outcome": "x2.870"
+        },
+        {
+            "resultid": 7,
+            "roundid": 1,
+            "heat": 2,
+            "lane": 3,
+            "racerid": 1,
+            "finishtime": 2.77,
+            "finishplace": 1,
+            "completed": "<timestamp>",
+            "outcome": "x2.770"
+        },
+        {
+            "resultid": 8,
+            "roundid": 1,
+            "heat": 2,
+            "lane": 4,
+            "racerid": 5,
+            "finishtime": 2.855,
+            "finishplace": 3,
+            "completed": "<timestamp>",
+            "outcome": "x2.855"
+        },
+        {
+            "resultid": 9,
+            "roundid": 1,
+            "heat": 3,
+            "lane": 1,
+            "racerid": 5,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 10,
+            "roundid": 1,
+            "heat": 3,
+            "lane": 2,
+            "racerid": 9,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 11,
+            "roundid": 1,
+            "heat": 3,
+            "lane": 3,
+            "racerid": 3,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 12,
+            "roundid": 1,
+            "heat": 3,
+            "lane": 4,
+            "racerid": 7,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 13,
+            "roundid": 1,
+            "heat": 4,
+            "lane": 1,
+            "racerid": 7,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 14,
+            "roundid": 1,
+            "heat": 4,
+            "lane": 2,
+            "racerid": 1,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 15,
+            "roundid": 1,
+            "heat": 4,
+            "lane": 3,
+            "racerid": 5,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 16,
+            "roundid": 1,
+            "heat": 4,
+            "lane": 4,
+            "racerid": 9,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 17,
+            "roundid": 1,
+            "heat": 5,
+            "lane": 1,
+            "racerid": 9,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 18,
+            "roundid": 1,
+            "heat": 5,
+            "lane": 2,
+            "racerid": 3,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 19,
+            "roundid": 1,
+            "heat": 5,
+            "lane": 3,
+            "racerid": 7,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        },
+        {
+            "resultid": 20,
+            "roundid": 1,
+            "heat": 5,
+            "lane": 4,
+            "racerid": 1,
+            "finishtime": null,
+            "finishplace": null,
+            "completed": null,
+            "outcome": "--"
+        }
+    ],
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 3,
+        "number-of-heats": 5,
+        "class": "Lions"
+    },
+    "next-heat": {
+        "roundid": 1,
+        "heat": 4
+    }
+}
+

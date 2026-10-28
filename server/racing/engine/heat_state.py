@@ -907,7 +907,9 @@ def _describe(code: Code, ctx: Context) -> str:
             return f"No {ctx.event.requested} heat available."
         case Code.NO_SUCH_HEAT:
             round_id, heat = ctx.asked
-            return f"No heat {heat} scheduled for roundid {round_id}."
+            # PHP's get_running_round() gives RoundID -1 with no current round.
+            shown = -1 if round_id is None else round_id
+            return f"No heat {heat} scheduled for roundid {shown}."
         case Code.NOT_RACING:
             return "Not racing now."
         case Code.NO_CURRENT_ROUND:

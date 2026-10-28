@@ -6,6 +6,7 @@ belong to the handler and the view.
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import NoReturn
 
 from django.db import transaction
 from django.utils import timezone
@@ -120,6 +121,23 @@ def _make_chart(inputs: _Inputs, n_times_per_lane: int) -> list[list[int | None]
         raise ScheduleFailure(
             Failure.CANT_FULFILL, _cant_fulfill_description(inputs, n_times_per_lane)
         ) from None
+
+
+def refuse_missing_round(event_id: int, n_times_per_lane: int) -> NoReturn:
+    """Raise the ScheduleFailure PHP gives a `roundid` with no round: it checks
+    the lanes before the round, which then has no results and no roster, so
+    `nlanes` or else `too-few-racers`."""
+    settings = RaceSettings.objects.get(event_id=event_id)
+    inputs = _Inputs(
+        lane_count=settings.lane_count,
+        unused_lane_mask=settings.unused_lane_mask,
+        max_runs_per_car=settings.max_runs_per_car,
+        rotation=settings.rotation_schedule,
+        roster=(),
+        results_exist=False,
+    )
+    _make_chart(inputs, n_times_per_lane)
+    raise AssertionError("an empty roster always has too few racers")
 
 
 def generate_schedule(round: Round, n_times_per_lane: int) -> int:

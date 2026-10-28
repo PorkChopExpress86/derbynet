@@ -31,6 +31,7 @@ QUIRK_DECISIONS = {
     "Q16": "fix",
     "Q17": "reproduce",
     "Q18": "fix",
+    "Q19": "fix",  # D30
     "Q20": "fix",
     "Q21": "fix",
     "Q22": "fix",
@@ -47,6 +48,21 @@ QUIRK_DECISIONS = {
     # refused, R2 a car number must be a whole number.
     "R1": "fix",
     "R2": "fix",
+    # Rows of #64 that a #31 endpoint fixes.
+    "C23": "fix",
+    "C24": "fix",
+    "S17": "fix",
+    # Proposed in #31, for the owner to confirm: R3 no current heat reads
+    # null, R5 result.write fails in JSON, not XML, R6 no scheduler debug
+    # output, R7 the generate payload shows the state the request left, R8
+    # poll.results starts with no leading space, R9 poll.results with
+    # details names each column once.
+    "R3": "fix",
+    "R5": "fix",
+    "R6": "fix",
+    "R7": "fix",
+    "R8": "fix",
+    "R9": "fix",
 }
 
 
