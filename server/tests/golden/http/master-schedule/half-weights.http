@@ -2898,3 +2898,1383 @@ body:
     }
 }
 
+### 014 finished-last-master-heat-out-of-order
+request: POST action.php
+request-body: action=timer-message&message=FINISHED&lane1=3.300&lane2=3.400
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 186
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane1="3.300" lane2="3.400">
+  <success/>
+<remote-log send='false'/>
+</action-response>
+
+### 015 coordinator-before-results-exist
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4421
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 4,
+        "roundid": 4,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 9,
+        "number-of-heats": 9,
+        "class": "Nine",
+        "masterheat": 19,
+        "max_masterheat": 19
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 19,
+            "name": "Nine9 Racer",
+            "carname": "",
+            "carnumber": 409,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.3,
+            "finishplace": 1
+        },
+        {
+            "lane": 2,
+            "racerid": 14,
+            "name": "Nine4 Racer",
+            "carname": "",
+            "carnumber": 404,
+            "note": "",
+            "photo": "",
+            "finishtime": 3.4,
+            "finishplace": 2
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Two",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Two"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Three",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Three"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Five",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Five"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Nine",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Nine"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Two",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 1,
+            "name": "Two, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Three",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Three, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Five",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Five, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Nine",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 9,
+            "heats_run": 1,
+            "name": "Nine, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 016 ondeck-before-results-exist
+request: GET action.php?query=poll&values=ondeck,current-heat
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 13519
+body:
+{
+    "ondeck": {
+        "chart": [
+            {
+                "resultid": 1,
+                "roundid": 1,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 1,
+                "name": "Two1 Racer",
+                "carnumber": 101,
+                "masterheat": 1,
+                "result": "z3.100",
+                "carphoto": null
+            },
+            {
+                "resultid": 2,
+                "roundid": 1,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 2,
+                "name": "Two2 Racer",
+                "carnumber": 102,
+                "masterheat": 1,
+                "result": "z3.200",
+                "carphoto": null
+            },
+            {
+                "resultid": 3,
+                "roundid": 1,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 2,
+                "name": "Two2 Racer",
+                "carnumber": 102,
+                "masterheat": 2,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 4,
+                "roundid": 1,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 1,
+                "name": "Two1 Racer",
+                "carnumber": 101,
+                "masterheat": 2,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 5,
+                "roundid": 2,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 3,
+                "name": "Three1 Racer",
+                "carnumber": 201,
+                "masterheat": 3,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 6,
+                "roundid": 2,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 5,
+                "name": "Three3 Racer",
+                "carnumber": 203,
+                "masterheat": 3,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 7,
+                "roundid": 2,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 4,
+                "name": "Three2 Racer",
+                "carnumber": 202,
+                "masterheat": 4,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 8,
+                "roundid": 2,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 3,
+                "name": "Three1 Racer",
+                "carnumber": 201,
+                "masterheat": 4,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 9,
+                "roundid": 2,
+                "heat": 3,
+                "lane": 1,
+                "racerid": 5,
+                "name": "Three3 Racer",
+                "carnumber": 203,
+                "masterheat": 5,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 10,
+                "roundid": 2,
+                "heat": 3,
+                "lane": 2,
+                "racerid": 4,
+                "name": "Three2 Racer",
+                "carnumber": 202,
+                "masterheat": 5,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 11,
+                "roundid": 3,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 6,
+                "name": "Five1 Racer",
+                "carnumber": 301,
+                "masterheat": 6,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 12,
+                "roundid": 3,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 9,
+                "name": "Five4 Racer",
+                "carnumber": 304,
+                "masterheat": 6,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 13,
+                "roundid": 3,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 7,
+                "name": "Five2 Racer",
+                "carnumber": 302,
+                "masterheat": 7,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 14,
+                "roundid": 3,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 10,
+                "name": "Five5 Racer",
+                "carnumber": 305,
+                "masterheat": 7,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 15,
+                "roundid": 3,
+                "heat": 3,
+                "lane": 1,
+                "racerid": 8,
+                "name": "Five3 Racer",
+                "carnumber": 303,
+                "masterheat": 8,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 16,
+                "roundid": 3,
+                "heat": 3,
+                "lane": 2,
+                "racerid": 6,
+                "name": "Five1 Racer",
+                "carnumber": 301,
+                "masterheat": 8,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 17,
+                "roundid": 3,
+                "heat": 4,
+                "lane": 1,
+                "racerid": 9,
+                "name": "Five4 Racer",
+                "carnumber": 304,
+                "masterheat": 9,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 18,
+                "roundid": 3,
+                "heat": 4,
+                "lane": 2,
+                "racerid": 7,
+                "name": "Five2 Racer",
+                "carnumber": 302,
+                "masterheat": 9,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 19,
+                "roundid": 3,
+                "heat": 5,
+                "lane": 1,
+                "racerid": 10,
+                "name": "Five5 Racer",
+                "carnumber": 305,
+                "masterheat": 10,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 20,
+                "roundid": 3,
+                "heat": 5,
+                "lane": 2,
+                "racerid": 8,
+                "name": "Five3 Racer",
+                "carnumber": 303,
+                "masterheat": 10,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 21,
+                "roundid": 4,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 11,
+                "name": "Nine1 Racer",
+                "carnumber": 401,
+                "masterheat": 11,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 22,
+                "roundid": 4,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 15,
+                "name": "Nine5 Racer",
+                "carnumber": 405,
+                "masterheat": 11,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 23,
+                "roundid": 4,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 12,
+                "name": "Nine2 Racer",
+                "carnumber": 402,
+                "masterheat": 12,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 24,
+                "roundid": 4,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 16,
+                "name": "Nine6 Racer",
+                "carnumber": 406,
+                "masterheat": 12,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 25,
+                "roundid": 4,
+                "heat": 3,
+                "lane": 1,
+                "racerid": 13,
+                "name": "Nine3 Racer",
+                "carnumber": 403,
+                "masterheat": 13,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 26,
+                "roundid": 4,
+                "heat": 3,
+                "lane": 2,
+                "racerid": 17,
+                "name": "Nine7 Racer",
+                "carnumber": 407,
+                "masterheat": 13,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 27,
+                "roundid": 4,
+                "heat": 4,
+                "lane": 1,
+                "racerid": 14,
+                "name": "Nine4 Racer",
+                "carnumber": 404,
+                "masterheat": 14,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 28,
+                "roundid": 4,
+                "heat": 4,
+                "lane": 2,
+                "racerid": 18,
+                "name": "Nine8 Racer",
+                "carnumber": 408,
+                "masterheat": 14,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 29,
+                "roundid": 4,
+                "heat": 5,
+                "lane": 1,
+                "racerid": 15,
+                "name": "Nine5 Racer",
+                "carnumber": 405,
+                "masterheat": 15,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 30,
+                "roundid": 4,
+                "heat": 5,
+                "lane": 2,
+                "racerid": 19,
+                "name": "Nine9 Racer",
+                "carnumber": 409,
+                "masterheat": 15,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 31,
+                "roundid": 4,
+                "heat": 6,
+                "lane": 1,
+                "racerid": 16,
+                "name": "Nine6 Racer",
+                "carnumber": 406,
+                "masterheat": 16,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 32,
+                "roundid": 4,
+                "heat": 6,
+                "lane": 2,
+                "racerid": 11,
+                "name": "Nine1 Racer",
+                "carnumber": 401,
+                "masterheat": 16,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 33,
+                "roundid": 4,
+                "heat": 7,
+                "lane": 1,
+                "racerid": 17,
+                "name": "Nine7 Racer",
+                "carnumber": 407,
+                "masterheat": 17,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 34,
+                "roundid": 4,
+                "heat": 7,
+                "lane": 2,
+                "racerid": 12,
+                "name": "Nine2 Racer",
+                "carnumber": 402,
+                "masterheat": 17,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 35,
+                "roundid": 4,
+                "heat": 8,
+                "lane": 1,
+                "racerid": 18,
+                "name": "Nine8 Racer",
+                "carnumber": 408,
+                "masterheat": 18,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 36,
+                "roundid": 4,
+                "heat": 8,
+                "lane": 2,
+                "racerid": 13,
+                "name": "Nine3 Racer",
+                "carnumber": 403,
+                "masterheat": 18,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 37,
+                "roundid": 4,
+                "heat": 9,
+                "lane": 1,
+                "racerid": 19,
+                "name": "Nine9 Racer",
+                "carnumber": 409,
+                "masterheat": 19,
+                "result": "z3.300",
+                "carphoto": null
+            },
+            {
+                "resultid": 38,
+                "roundid": 4,
+                "heat": 9,
+                "lane": 2,
+                "racerid": 14,
+                "name": "Nine4 Racer",
+                "carnumber": 404,
+                "masterheat": 19,
+                "result": "z3.400",
+                "carphoto": null
+            }
+        ]
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 4,
+        "roundid": 4,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 9,
+        "number-of-heats": 9,
+        "class": "Nine",
+        "masterheat": 19,
+        "max_masterheat": 19
+    }
+}
+
+### 017 generate-round-1-results-exist
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 240
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 1
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "results-exist",
+        "description": "Race results already exist for this round"
+    }
+}
+
+### 018 coordinator-after-results-exist
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4416
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 2,
+        "class": "Two",
+        "masterheat": 20,
+        "max_masterheat": 36
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 2,
+            "name": "Two2 Racer",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 1,
+            "name": "Two1 Racer",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 2,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "CONNECTED (<n> sec.)"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Two",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Two"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Three",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Three"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Five",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Five"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 9,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Nine",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Nine"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Two",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 1,
+            "name": "Two, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Three",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Three, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Five",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Five, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Nine",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 9,
+            "heats_run": 1,
+            "name": "Nine, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 019 ondeck-after-results-exist
+request: GET action.php?query=poll&values=ondeck,current-heat
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 13611
+body:
+{
+    "ondeck": {
+        "next": {
+            "roundid": 2,
+            "heat": 1
+        },
+        "chart": [
+            {
+                "resultid": 1,
+                "roundid": 1,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 1,
+                "name": "Two1 Racer",
+                "carnumber": 101,
+                "masterheat": 1,
+                "result": "z3.100",
+                "carphoto": null
+            },
+            {
+                "resultid": 2,
+                "roundid": 1,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 2,
+                "name": "Two2 Racer",
+                "carnumber": 102,
+                "masterheat": 1,
+                "result": "z3.200",
+                "carphoto": null
+            },
+            {
+                "resultid": 37,
+                "roundid": 4,
+                "heat": 9,
+                "lane": 1,
+                "racerid": 19,
+                "name": "Nine9 Racer",
+                "carnumber": 409,
+                "masterheat": 19,
+                "result": "z3.300",
+                "carphoto": null
+            },
+            {
+                "resultid": 38,
+                "roundid": 4,
+                "heat": 9,
+                "lane": 2,
+                "racerid": 14,
+                "name": "Nine4 Racer",
+                "carnumber": 404,
+                "masterheat": 19,
+                "result": "z3.400",
+                "carphoto": null
+            },
+            {
+                "resultid": 3,
+                "roundid": 1,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 2,
+                "name": "Two2 Racer",
+                "carnumber": 102,
+                "masterheat": 20,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 4,
+                "roundid": 1,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 1,
+                "name": "Two1 Racer",
+                "carnumber": 101,
+                "masterheat": 20,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 5,
+                "roundid": 2,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 3,
+                "name": "Three1 Racer",
+                "carnumber": 201,
+                "masterheat": 21,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 6,
+                "roundid": 2,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 5,
+                "name": "Three3 Racer",
+                "carnumber": 203,
+                "masterheat": 21,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 7,
+                "roundid": 2,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 4,
+                "name": "Three2 Racer",
+                "carnumber": 202,
+                "masterheat": 22,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 8,
+                "roundid": 2,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 3,
+                "name": "Three1 Racer",
+                "carnumber": 201,
+                "masterheat": 22,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 9,
+                "roundid": 2,
+                "heat": 3,
+                "lane": 1,
+                "racerid": 5,
+                "name": "Three3 Racer",
+                "carnumber": 203,
+                "masterheat": 23,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 10,
+                "roundid": 2,
+                "heat": 3,
+                "lane": 2,
+                "racerid": 4,
+                "name": "Three2 Racer",
+                "carnumber": 202,
+                "masterheat": 23,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 11,
+                "roundid": 3,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 6,
+                "name": "Five1 Racer",
+                "carnumber": 301,
+                "masterheat": 24,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 12,
+                "roundid": 3,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 9,
+                "name": "Five4 Racer",
+                "carnumber": 304,
+                "masterheat": 24,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 13,
+                "roundid": 3,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 7,
+                "name": "Five2 Racer",
+                "carnumber": 302,
+                "masterheat": 25,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 14,
+                "roundid": 3,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 10,
+                "name": "Five5 Racer",
+                "carnumber": 305,
+                "masterheat": 25,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 15,
+                "roundid": 3,
+                "heat": 3,
+                "lane": 1,
+                "racerid": 8,
+                "name": "Five3 Racer",
+                "carnumber": 303,
+                "masterheat": 26,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 16,
+                "roundid": 3,
+                "heat": 3,
+                "lane": 2,
+                "racerid": 6,
+                "name": "Five1 Racer",
+                "carnumber": 301,
+                "masterheat": 26,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 17,
+                "roundid": 3,
+                "heat": 4,
+                "lane": 1,
+                "racerid": 9,
+                "name": "Five4 Racer",
+                "carnumber": 304,
+                "masterheat": 27,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 18,
+                "roundid": 3,
+                "heat": 4,
+                "lane": 2,
+                "racerid": 7,
+                "name": "Five2 Racer",
+                "carnumber": 302,
+                "masterheat": 27,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 19,
+                "roundid": 3,
+                "heat": 5,
+                "lane": 1,
+                "racerid": 10,
+                "name": "Five5 Racer",
+                "carnumber": 305,
+                "masterheat": 28,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 20,
+                "roundid": 3,
+                "heat": 5,
+                "lane": 2,
+                "racerid": 8,
+                "name": "Five3 Racer",
+                "carnumber": 303,
+                "masterheat": 28,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 21,
+                "roundid": 4,
+                "heat": 1,
+                "lane": 1,
+                "racerid": 11,
+                "name": "Nine1 Racer",
+                "carnumber": 401,
+                "masterheat": 29,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 22,
+                "roundid": 4,
+                "heat": 1,
+                "lane": 2,
+                "racerid": 15,
+                "name": "Nine5 Racer",
+                "carnumber": 405,
+                "masterheat": 29,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 23,
+                "roundid": 4,
+                "heat": 2,
+                "lane": 1,
+                "racerid": 12,
+                "name": "Nine2 Racer",
+                "carnumber": 402,
+                "masterheat": 30,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 24,
+                "roundid": 4,
+                "heat": 2,
+                "lane": 2,
+                "racerid": 16,
+                "name": "Nine6 Racer",
+                "carnumber": 406,
+                "masterheat": 30,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 25,
+                "roundid": 4,
+                "heat": 3,
+                "lane": 1,
+                "racerid": 13,
+                "name": "Nine3 Racer",
+                "carnumber": 403,
+                "masterheat": 31,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 26,
+                "roundid": 4,
+                "heat": 3,
+                "lane": 2,
+                "racerid": 17,
+                "name": "Nine7 Racer",
+                "carnumber": 407,
+                "masterheat": 31,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 27,
+                "roundid": 4,
+                "heat": 4,
+                "lane": 1,
+                "racerid": 14,
+                "name": "Nine4 Racer",
+                "carnumber": 404,
+                "masterheat": 32,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 28,
+                "roundid": 4,
+                "heat": 4,
+                "lane": 2,
+                "racerid": 18,
+                "name": "Nine8 Racer",
+                "carnumber": 408,
+                "masterheat": 32,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 29,
+                "roundid": 4,
+                "heat": 5,
+                "lane": 1,
+                "racerid": 15,
+                "name": "Nine5 Racer",
+                "carnumber": 405,
+                "masterheat": 33,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 30,
+                "roundid": 4,
+                "heat": 5,
+                "lane": 2,
+                "racerid": 19,
+                "name": "Nine9 Racer",
+                "carnumber": 409,
+                "masterheat": 33,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 31,
+                "roundid": 4,
+                "heat": 6,
+                "lane": 1,
+                "racerid": 16,
+                "name": "Nine6 Racer",
+                "carnumber": 406,
+                "masterheat": 34,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 32,
+                "roundid": 4,
+                "heat": 6,
+                "lane": 2,
+                "racerid": 11,
+                "name": "Nine1 Racer",
+                "carnumber": 401,
+                "masterheat": 34,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 33,
+                "roundid": 4,
+                "heat": 7,
+                "lane": 1,
+                "racerid": 17,
+                "name": "Nine7 Racer",
+                "carnumber": 407,
+                "masterheat": 35,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 34,
+                "roundid": 4,
+                "heat": 7,
+                "lane": 2,
+                "racerid": 12,
+                "name": "Nine2 Racer",
+                "carnumber": 402,
+                "masterheat": 35,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 35,
+                "roundid": 4,
+                "heat": 8,
+                "lane": 1,
+                "racerid": 18,
+                "name": "Nine8 Racer",
+                "carnumber": 408,
+                "masterheat": 36,
+                "result": "",
+                "carphoto": null
+            },
+            {
+                "resultid": 36,
+                "roundid": 4,
+                "heat": 8,
+                "lane": 2,
+                "racerid": 13,
+                "name": "Nine3 Racer",
+                "carnumber": 403,
+                "masterheat": 36,
+                "result": "",
+                "carphoto": null
+            }
+        ]
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 2,
+        "class": "Two",
+        "masterheat": 20,
+        "max_masterheat": 36
+    }
+}
+

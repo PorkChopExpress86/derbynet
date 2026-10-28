@@ -30,6 +30,7 @@ QUIRK_DECISIONS = {
     "Q15": "fix",
     "Q16": "fix",
     "Q17": "reproduce",
+    "Q18": "fix",
     "Q20": "fix",
     "Q21": "fix",
     "Q22": "fix",

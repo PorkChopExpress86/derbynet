@@ -1,6 +1,6 @@
 <?php
-// Captures what the PHP scheduling, ordinal and lane-bias code produces, with
-// no server and no HTTP.  Run from the website/ directory:
+// Captures what the PHP scheduling, master-heat, ordinal and lane-bias code
+// produces, with no server and no HTTP.  Run from the website/ directory:
 //
 //   php -d serialize_precision=-1 capture-engine.php <outdir> [options]
 //
@@ -13,7 +13,9 @@
 // for are stood in for: json_out() and json_failure(), which action.php defines
 // for the HTTP path and which here record what the engine reported, and
 // read_raceinfo(), which comes from the real inc/data.inc over an in-memory
-// SQLite database that holds just the RaceInfo and RaceChart tables.
+// SQLite database that holds just the RaceInfo and RaceChart tables.  The
+// master-heat capture runs the real inc/masterheat.inc and inc/autoadvance.inc
+// on a fresh in-memory database built from sql/sqlite/schema.inc instead.
 //
 // Every case is recorded as a canonical JSON record.  The manifests hold its
 // SHA-256, and a representative subset also gets the full record on disk.  See
@@ -528,6 +530,260 @@ function capture_lane_bias($outdir) {
 }
 
 // ---------------------------------------------------------------------------
+// The real SQLite schema, for the captures that query more than RaceInfo.
+
+// Runs $fn with the global $db swapped for a fresh in-memory database holding
+// the tables of sql/sqlite/schema.inc, then puts the harness database back.
+function with_schema_db($fn) {
+  $saved = $GLOBALS['db'];
+  $GLOBALS['dbtype'] = 'sqlite';
+  $GLOBALS['db'] = new PDO('sqlite::memory:');
+  $GLOBALS['db']->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+  foreach (include('sql/sqlite/schema.inc') as $sql) {
+    $GLOBALS['db']->exec($sql);
+  }
+  try {
+    return $fn($GLOBALS['db']);
+  } finally {
+    $GLOBALS['db'] = $saved;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// assign_master_heats() and get_next_heat() under use-master-sched (#100)
+
+const MASTER_REQUESTS = array('first', 'next', 'prev', 'next-up');
+const MASTER_RANDOM_CASES = 200;
+
+// A chart state is
+//   'rounds' => [[roundid, round level], ...]
+//   'rows'   => [[roundid, heat, lane, finishtime, finishplace, masterheat], ...]
+// with the rows in insertion (resultid) order.
+
+// get_next_heat() for each request from each heat of the chart, from no
+// current heat, and from a heat that does not exist: {"<roundid>/<heat>" or
+// "none" => [answer for each of MASTER_REQUESTS]}, an answer being
+// [roundid, heat] or null for false.
+function master_navigation($db, $missing) {
+  $currents = array('none' => array(null, null));
+  foreach ($db->query('SELECT roundid, heat FROM RaceChart GROUP BY roundid, heat'
+                      .' ORDER BY MIN(resultid)') as $row) {
+    $currents[$row[0].'/'.$row[1]] = array((int) $row[0], (int) $row[1]);
+  }
+  $currents[$missing[0].'/'.$missing[1]] = $missing;
+  $nav = array();
+  foreach ($currents as $key => $rh) {
+    $answers = array();
+    foreach (MASTER_REQUESTS as $requested) {
+      list($next, , $warnings, $error) = observe(function() use ($rh, $requested) {
+        $current = array('use_master_sched' => true, 'roundid' => $rh[0], 'heat' => $rh[1]);
+        return get_next_heat($current, $requested);
+      });
+      if ($warnings || $error !== null) {
+        $answers[] = array('warnings' => $warnings, 'error' => $error);
+      } else {
+        $answers[] = $next === false ? null : array((int) $next['roundid'], (int) $next['heat']);
+      }
+    }
+    $nav[$key] = $answers;
+  }
+  return $nav;
+}
+
+function master_record($state) {
+  return with_schema_db(function($db) use ($state) {
+    $ins = $db->prepare('INSERT INTO Rounds(roundid, classid, round, charttype, phase)'
+                        .' VALUES(:roundid, 1, :round, 0, 0)');
+    foreach ($state['rounds'] as $r) {
+      $ins->execute(array(':roundid' => $r[0], ':round' => $r[1]));
+    }
+    $ins = $db->prepare('INSERT INTO RaceChart(classid, roundid, heat, lane, racerid,'
+                        .' finishtime, finishplace, masterheat)'
+                        .' VALUES(1, :roundid, :heat, :lane, :racerid, :time, :place, :masterheat)');
+    foreach ($state['rows'] as $i => $row) {
+      $ins->execute(array(':roundid' => $row[0], ':heat' => $row[1], ':lane' => $row[2],
+                          ':racerid' => $i + 1, ':time' => $row[3], ':place' => $row[4],
+                          ':masterheat' => $row[5]));
+    }
+    // A heat no request can find: one past the highest roundid.
+    $missing = array(1 + max(array_merge(array(0), array_map(function($r) { return $r[0]; },
+                                                              $state['rounds']))), 1);
+    $rec = array('rounds' => $state['rounds'], 'rows' => $state['rows']);
+    $rec['navigation_before'] = master_navigation($db, $missing);
+    list(, , $warnings, $error) = observe(function() { assign_master_heats(); });
+    if ($warnings) { $rec['warnings'] = $warnings; }
+    if ($error !== null) { $rec['error'] = $error; }
+    $rec['masterheats'] = array();
+    foreach ($db->query('SELECT masterheat FROM RaceChart ORDER BY resultid') as $row) {
+      $rec['masterheats'][] = (int) $row[0];
+    }
+    $rec['navigation_after'] = master_navigation($db, $missing);
+    return $rec;
+  });
+}
+
+// Builds a state from heats: [roundid, heat, lanes, result, masterheat], where
+// lanes is a lane count or a list of lanes (the others are byes) and result is
+// 'none', 'time', 'place' (finishplace only), or 'partial' (a time on the first
+// lane only).
+function master_state($rounds, $heats) {
+  $rows = array();
+  foreach ($heats as $h) {
+    list($roundid, $heat, $lanes, $result, $masterheat) = $h;
+    $lanes = is_array($lanes) ? $lanes : range(1, $lanes);
+    foreach ($lanes as $i => $lane) {
+      $time = ($result == 'time' || ($result == 'partial' && $i == 0)) ? 3.0 + $lane / 8 : null;
+      $place = $result == 'place' ? $i + 1 : null;
+      $rows[] = array($roundid, $heat, $lane, $time, $place, $masterheat);
+    }
+  }
+  return array('rounds' => $rounds, 'rows' => $rows);
+}
+
+// heats_of(roundid, n, lanes, result, first masterheat): heats 1 to n of a round.
+function heats_of($roundid, $n, $lanes = 2, $result = 'none', $first_masterheat = 0) {
+  $heats = array();
+  for ($h = 1; $h <= $n; ++$h) {
+    $heats[] = array($roundid, $h, $lanes, $result, $first_masterheat ? $first_masterheat + $h - 1 : 0);
+  }
+  return $heats;
+}
+
+function master_hand_cases() {
+  $c = array();
+  // Rounds of 2, 3, 5 and 9 heats: weights 1, 1.5, 2.5 and 4.5, each on a half,
+  // where PHP rounds away from zero and Python's round() goes to even.
+  $c['half-weights'] = master_state(array(array(1, 1), array(2, 1), array(3, 1), array(4, 1)),
+                                    array_merge(heats_of(1, 2), heats_of(2, 3), heats_of(3, 5), heats_of(4, 9)));
+  $c['half-weights-after-a-heat'] = master_state(
+    array(array(1, 1), array(2, 1), array(3, 1), array(4, 1)),
+    array_merge(array(array(1, 1, 2, 'time', 1), array(1, 2, 2, 'none', 5)),
+                heats_of(2, 3), heats_of(3, 5), heats_of(4, 9)));
+  // 7 over 2 is 3.5 and 13 over 2 is 6.5: round() goes to 4 and 6.
+  $c['weights-3.5-and-6.5'] = master_state(array(array(1, 1), array(2, 1), array(3, 1)),
+                                           array_merge(heats_of(1, 2), heats_of(2, 7), heats_of(3, 13)));
+  $c['weight-just-under-a-half'] = master_state(array(array(1, 1), array(2, 1)),
+                                                array_merge(heats_of(1, 3), heats_of(2, 7)));
+  $c['heat-number-gaps'] = master_state(
+    array(array(1, 1), array(2, 1)),
+    array(array(1, 1, 2, 'none', 0), array(1, 2, 2, 'none', 0), array(1, 4, 2, 'none', 0),
+          array(1, 7, 2, 'none', 0), array(2, 2, 2, 'none', 0), array(2, 3, 2, 'none', 0)));
+  $c['round-without-a-chart'] = master_state(
+    array(array(1, 1), array(2, 1), array(3, 2), array(4, 2)),
+    array_merge(heats_of(1, 3), heats_of(4, 2)));
+  $c['several-levels'] = master_state(
+    array(array(5, 1), array(2, 1), array(3, 2), array(1, 2), array(4, 3)),
+    array_merge(heats_of(5, 4), heats_of(2, 2), heats_of(3, 3), heats_of(1, 3), heats_of(4, 2)));
+  $c['several-levels-first-raced'] = master_state(
+    array(array(1, 1), array(2, 1), array(3, 2), array(4, 2)),
+    array_merge(heats_of(1, 3, 3, 'time', 1), heats_of(2, 3, 3, 'time', 4),
+                heats_of(3, 2, 3), heats_of(4, 4, 3)));
+  $c['a-level-with-no-rounds'] = master_state(array(array(1, 1), array(2, 3), array(3, 3)),
+                                              array_merge(heats_of(1, 2), heats_of(2, 2), heats_of(3, 4)));
+  // Heat 3 of round 2 raced first, from a master order 1 to 6.
+  $c['raced-out-of-order'] = master_state(
+    array(array(1, 1), array(2, 1)),
+    array(array(1, 1, 2, 'time', 1), array(2, 1, 2, 'none', 2), array(1, 2, 2, 'none', 3),
+          array(2, 2, 2, 'none', 4), array(1, 3, 2, 'none', 5), array(2, 3, 2, 'time', 6)));
+  $c['partly-raced-heat'] = master_state(
+    array(array(1, 1), array(2, 1)),
+    array(array(1, 1, 3, 'time', 1), array(2, 1, 3, 'partial', 2), array(1, 2, 3, 'none', 3),
+          array(2, 2, 3, 'none', 4), array(1, 3, 3, 'none', 5), array(2, 3, 3, 'none', 6)));
+  $c['places-only'] = master_state(
+    array(array(1, 1), array(2, 1)),
+    array(array(1, 1, 3, 'place', 1), array(2, 1, 3, 'place', 2), array(1, 2, 3, 'none', 3),
+          array(2, 2, 3, 'none', 4)));
+  $c['all-raced'] = master_state(array(array(1, 1), array(2, 1)),
+                                 array_merge(heats_of(1, 2, 2, 'time', 1), heats_of(2, 2, 2, 'time', 3)));
+  $c['no-rounds'] = master_state(array(), array());
+  $c['rounds-without-heats'] = master_state(array(array(1, 1), array(2, 2)), array());
+  // A playlist round keeps masterheat 0 (#20 Q19), so its raced heat starts the
+  // numbering at 1.
+  $c['raced-with-master-heat-0'] = master_state(array(array(1, 1)),
+                                                array_merge(array(array(1, 1, 2, 'time', 0)),
+                                                            array_slice(heats_of(1, 3), 1)));
+  $c['two-heats-share-a-number'] = master_state(
+    array(array(1, 1), array(2, 1)),
+    array(array(1, 1, 2, 'none', 1), array(2, 1, 2, 'none', 1), array(1, 2, 2, 'none', 2),
+          array(2, 2, 2, 'none', 3)));
+  $c['byes'] = master_state(
+    array(array(1, 1), array(2, 1)),
+    array(array(1, 1, array(1, 3), 'none', 0), array(1, 2, array(2), 'none', 0),
+          array(2, 1, array(1, 2, 3, 4), 'none', 0), array(2, 2, array(4), 'none', 0),
+          array(2, 3, array(2, 3), 'none', 0)));
+  $c['numbers-from-zero'] = master_state(
+    array(array(1, 1)),
+    array(array(1, 1, 2, 'time', 0), array(1, 2, 2, 'none', 1), array(1, 3, 2, 'none', 2)));
+  return $c;
+}
+
+// A seeded random chart state: one to four round levels, some skipped, one to
+// four rounds per level with roundids out of level order, 0 to 10 heats a round
+// with gaps in the heat numbers, byes, raced heats in and out of order, partly
+// raced heats, results as times or places, and prior numbers that are a valid
+// order, random with repeats, or all 0.
+function master_random_state($seed) {
+  // A seeded mt_rand() gives the same sequence on every PHP since 7.1.
+  mt_srand($seed, MT_RAND_MT19937);
+  $roundids = range(1, 16);
+  for ($i = count($roundids) - 1; $i > 0; --$i) {
+    $j = mt_rand(0, $i);
+    list($roundids[$i], $roundids[$j]) = array($roundids[$j], $roundids[$i]);
+  }
+  $rounds = array();
+  foreach (range(1, mt_rand(1, 4)) as $level) {
+    if ($level > 1 && mt_rand(0, 4) == 0) { continue; }
+    foreach (range(1, mt_rand(1, 4)) as $unused) {
+      $rounds[] = array(array_shift($roundids), $level);
+    }
+  }
+  $nlanes = mt_rand(1, 4);
+  $prior = mt_rand(0, 2);   // 0: all 0; 1: a valid order; 2: random with repeats
+  $heats = array();
+  foreach ($rounds as $r) {
+    $n = mt_rand(0, 3) == 0 ? mt_rand(0, 2) : mt_rand(2, 10);
+    $raced = mt_rand(0, 2) == 0 ? 0 : mt_rand(0, $n);
+    $heat = 0;
+    for ($i = 0; $i < $n; ++$i) {
+      $heat += mt_rand(0, 7) == 0 ? 2 : 1;
+      $lanes = array();
+      foreach (range(1, $nlanes) as $lane) {
+        if (mt_rand(0, 4) > 0) { $lanes[] = $lane; }
+      }
+      if (!$lanes) { $lanes[] = mt_rand(1, $nlanes); }
+      $result = $i < $raced ? (mt_rand(0, 5) == 0 ? 'place' : 'time') : 'none';
+      if ($i == $raced && mt_rand(0, 5) == 0) { $result = 'partial'; }
+      if ($i > $raced && mt_rand(0, 9) == 0) { $result = 'time'; }
+      $heats[] = array($r[0], $heat, $lanes, $result, 0);
+    }
+  }
+  $order = array_keys($heats);
+  for ($i = count($order) - 1; $i > 0; --$i) {
+    $j = mt_rand(0, $i);
+    list($order[$i], $order[$j]) = array($order[$j], $order[$i]);
+  }
+  foreach ($order as $k => $i) {
+    if ($prior == 1) { $heats[$i][4] = $k + 1; }
+    else if ($prior == 2) { $heats[$i][4] = mt_rand(0, max(1, intdiv(count($heats), 2))); }
+  }
+  return master_state($rounds, $heats);
+}
+
+function capture_master_heats($outdir) {
+  require_once('inc/masterheat.inc');
+  require_once('inc/autoadvance.inc');
+  $cases = array();
+  foreach (master_hand_cases() as $name => $state) {
+    $cases[$name] = master_record($state);
+  }
+  for ($seed = 1; $seed <= MASTER_RANDOM_CASES; ++$seed) {
+    $cases["seed=$seed"] = master_record(master_random_state($seed));
+  }
+  write_json_lines("$outdir/engine/master-heats.json", $cases);
+  return count($cases);
+}
+
+// ---------------------------------------------------------------------------
 // The sweep runs under the JIT for speed.  Recompute some cases without it and
 // confirm the hashes agree.
 
@@ -607,6 +863,7 @@ function main($argv) {
   $counts['unused-lane masks'] = capture_unused_lanes($outdir);
   $counts['ordinals cases'] = capture_ordinals($outdir);
   list($counts['lane-bias cases'], $counts['critical-f-value cases']) = capture_lane_bias($outdir);
+  $counts['master-heat cases'] = capture_master_heats($outdir);
 
   $lines = array();
   foreach ($counts as $k => $v) {
