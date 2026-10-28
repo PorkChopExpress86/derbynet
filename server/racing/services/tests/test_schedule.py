@@ -1,10 +1,17 @@
 import json
+import os
+import re
 
 import pytest
 
 from core.models import RaceSettings
 from racing.engine.scheduling.round import make_chart
-from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
+from racing.engine.tests.golden import (
+    DEVIATIONS_FILE,
+    GOLDEN_DIR,
+    read_transcript,
+    transcript_deviations,
+)
 from racing.models import HeatLane, PlaylistEntry, Round
 from racing.services import schedule
 from racing.services.schedule import (
@@ -386,3 +393,174 @@ def test_finals_match_the_php_race_day(transcript, exchange, finalists):
     generate_schedule(round, 2)
     php = read_transcript(GOLDEN_DIR / "http" / "race-day" / f"{transcript}.http")
     assert chart_by_car(round) == json.loads(php[exchange]["body"])["schedule"]
+
+
+# ----- Requests that PHP lets delete a chart (Q1, #98) ----------------------
+
+# transcript: (runs for the chart, runs that fail, the poll before, the
+# generate that fails, the poll after)
+OVER_A_CHART = {
+    "cant-fulfill-over-a-chart-4-lanes": (
+        6,
+        7,
+        "004 schedule-round-3-at-the-limit",
+        "005 generate-round-3-too-many-runs",
+        "006 schedule-round-3-after-too-many-runs",
+    ),
+    "zero-runs-over-a-chart-4-lanes": (
+        1,
+        0,
+        "004 schedule-round-3",
+        "005 generate-round-3-zero-runs",
+        "006 schedule-round-3-after-zero-runs",
+    ),
+}
+OVER_A_CHART_REASON = (
+    "PHP deletes the chart, writes nothing and replies success; Django replies"
+    " cant-fulfill and keeps the chart, so the poll after shows it."
+)
+
+
+def schedule_transcript(name):
+    return read_transcript(GOLDEN_DIR / "http" / "schedule" / f"{name}.http")
+
+
+def replay_over_a_chart(name):
+    """Round 3 of `capture/scenarios/04-schedules.sh`, Div 3 of the divided
+    roster, with each racer's PHP id as its car number: the chart, then the
+    request that fails. Returns the round and the failure."""
+    good, bad, before, _, _ = OVER_A_CHART[name]
+    php = schedule_transcript(name)
+    racers = json.loads(php["001 racers"]["body"])["racers"]
+    round, _ = new_round(sorted(r["racerid"] for r in racers if r["classid"] == 3))
+    generate_schedule(round, good)
+    assert chart_by_car(round) == json.loads(php[before]["body"])["schedule"]
+    return round, failure_of(lambda: generate_schedule(round, bad))
+
+
+@pytest.mark.parametrize("name", OVER_A_CHART)
+def test_a_request_php_lets_delete_the_chart_keeps_it(name):
+    """Q1. Over a chart, 7 runs per lane is beyond the tables and 0 is too
+    few. PHP deletes the chart and replies success with no heats; Django
+    replies cant-fulfill and the poll after still shows the chart."""
+    _, _, _, generate, after = OVER_A_CHART[name]
+    round, failure = replay_over_a_chart(name)
+
+    expected = transcript_deviations(f"http/schedule/{name}.http")
+    outcome = json.loads(expected[generate][1]["body"])["outcome"]
+    assert (failure.code, failure.description) == (
+        outcome["code"],
+        outcome["description"],
+    )
+    assert chart_by_car(round) == json.loads(expected[after][1]["body"])["schedule"]
+    php = schedule_transcript(name)
+    assert json.loads(php[generate]["body"])["outcome"]["code"] == "success"
+    assert json.loads(php[after]["body"])["schedule"] == []
+
+
+def write_over_a_chart_deviations():
+    """Each generate keeps PHP's header and `action`, with Django's failure as
+    its outcome. Each poll after takes the body of the poll before, the chart
+    `test_a_request_php_lets_delete_the_chart_keeps_it` checks Django keeps."""
+    listing = json.loads(DEVIATIONS_FILE.read_text())
+    fixtures = {f"http/schedule/{name}.http": name for name in OVER_A_CHART}
+    entries = [e for e in listing["deviations"] if e["fixture"] not in fixtures]
+    for fixture, name in fixtures.items():
+        _, _, before, generate, after = OVER_A_CHART[name]
+        _, failure = replay_over_a_chart(name)
+        raw = (GOLDEN_DIR / fixture).read_bytes()
+        php = read_transcript(GOLDEN_DIR / fixture)
+        reply = {
+            "action": json.loads(php[generate]["body"])["action"],
+            "outcome": {
+                "summary": "failure",
+                "code": str(failure.code),
+                "description": failure.description,
+            },
+        }
+        bodies = {
+            generate: json.dumps(reply, indent=4, ensure_ascii=False).encode(),
+            after: php[before]["body"],
+        }
+        out = b""
+        for exchange, data in bodies.items():
+            start = raw.index(b"### " + exchange.encode())
+            header = raw[start : raw.index(b"\nbody:\n", start)].decode()
+            header = re.sub(r"length: \d+", f"length: {len(data)}", header)
+            out += header.encode() + b"\nbody:\n" + data + b"\n"
+        expected = f"deviations/Q1/{name}.http"
+        (GOLDEN_DIR / expected).write_bytes(out)
+        entries.append(
+            {
+                "quirk": "Q1",
+                "fixture": fixture,
+                "exchanges": list(bodies),
+                "reason": OVER_A_CHART_REASON,
+                "expected": expected,
+            }
+        )
+    listing["deviations"] = sorted(entries, key=lambda e: int(e["quirk"][1:]))
+    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the Q1 deviations"
+)
+def test_write_over_a_chart_deviations():
+    """`WRITE_DEVIATIONS=1 uv run pytest racing/services/tests/test_schedule.py`"""
+    write_over_a_chart_deviations()
+
+
+# ----- The owner race day on 6 lanes (#98) ----------------------------------
+
+SIX_LANES = read_transcript(GOLDEN_DIR / "http" / "race-day" / "six-lanes.http")
+
+
+def php_finalists(standings, roundid, top):
+    """The racers PHP enters in a final of the top `top`, in order: the rungs
+    of the round's standings until `top` are in, so a tie grows the final."""
+    rungs = json.loads(SIX_LANES[standings]["body"])["standings"][f"st-r{roundid}"]
+    finalists = []
+    for rung in rungs:
+        if len(finalists) >= top:
+            break
+        finalists += rung
+    return finalists
+
+
+SIX_LANE_ROUNDS = {
+    "003 scouts-round-1": (list(range(1, 11)), 1),
+    "005 scouts-final": (php_finalists("004 standings-after-scouts-round-1", 1, 4), 2),
+    "007 outlaws-round-1": (list(range(11, 25)), 1),
+    "010 outlaws-final": (
+        php_finalists("009 standings-after-outlaws-round-1", 2, 8),
+        2,
+    ),
+}
+
+
+@pytest.mark.parametrize("exchange", SIX_LANE_ROUNDS)
+def test_the_6_lane_race_day_matches_php(exchange):
+    """`http/race-day/six-lanes.http`: each round's PHP schedule once the
+    playlist tees it up, heat for heat. Each racer gets its PHP id as its car
+    number, entered in PHP's order: id order for a first round, standings
+    order for a final."""
+    roster, n_times = SIX_LANE_ROUNDS[exchange]
+    round = RoundFactory()
+    set_race(round.event, lane_count=6)
+    enter(round, roster)
+
+    generate_schedule(round, n_times)
+
+    assert chart_by_car(round) == json.loads(SIX_LANES[exchange]["body"])["schedule"]
+
+
+def test_the_6_lane_finals_grow_with_ties_and_take_byes():
+    """The tie at fourth in Scouts round 1 makes a final of 5 on 6 lanes, so
+    every heat has a bye, and the tie at eighth in Outlaws round 1 one of 9."""
+    scouts, _ = SIX_LANE_ROUNDS["005 scouts-final"]
+    outlaws, _ = SIX_LANE_ROUNDS["010 outlaws-final"]
+    assert (len(scouts), len(outlaws)) == (5, 9)
+    heats = json.loads(SIX_LANES["005 scouts-final"]["body"])["schedule"]
+    assert len(heats) == 12
+    assert all(heat.count(None) == 1 for heat in heats)
