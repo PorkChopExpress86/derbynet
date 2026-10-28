@@ -1,7 +1,7 @@
 ordered cases: 12624
 ordered full outputs: 990
 rotation cases: 4116
-out-of-range cases: 69
+out-of-range cases: 71
 scheduler-data entries: 1178
 unused-lane masks: 304
 ordinals cases: 363

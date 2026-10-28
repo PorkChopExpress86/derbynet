@@ -318,8 +318,8 @@ function capture_rotation($outdir) {
 }
 
 // ---------------------------------------------------------------------------
-// What normal scheduling does outside the tables: 7 lanes, fewer cars than
-// lanes, and more than 200 cars.
+// What normal scheduling does outside the tables: 7 lanes, 9 lanes, fewer cars
+// than lanes, and more than 200 cars.
 
 function capture_out_of_range($outdir) {
   $cases = array();
@@ -339,6 +339,10 @@ function capture_out_of_range($outdir) {
     foreach ($car_counts as $nc) {
       $add('ordered', $nl, $nc, 1);
     }
+  }
+  // More than 8 lanes has no table either (#98).
+  foreach (array(10, 17) as $nc) {
+    $add('ordered', 9, $nc, 1);
   }
   write_cases("$outdir/engine/out-of-range.json", $cases);
   return count($cases);
