@@ -910,3 +910,18 @@ def test_a_round_rescheduled_by_a_closure_keeps_off_the_lane_after_a_reopen(race
     cubs = new_group(replay, "Cubs", first_car=301)
     generate_schedule(cubs, 1)
     assert 3 in lanes_used(cubs)
+
+
+def test_with_no_closure_a_lane_opened_mid_round_takes_a_late_racer_as_in_php():
+    """No lane ever closed. The round was scheduled with lane 4 unused, and
+    the settings page opens lane 4 during the round. As in PHP, a late
+    racer is fitted into all 4 lanes."""
+    replay, round = setup_race(racers=6, lanes=4, mask=0b1000)
+    event = replay.event
+    run_heats(event, round, 1, 2)
+    set_settings(event, unused_lane_mask=0)
+    late = late_racer(round, 250)
+
+    reschedule(round, late.id)
+
+    assert lanes_of(round, late) == {1, 2, 3, 4}
