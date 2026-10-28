@@ -3,10 +3,10 @@
 `capture_aggregates()` in `capture-engine.php` runs the real
 `topological_sort()` and `compute_aggregate_constituents_tc()` on hand-made
 and seeded random aggregate graphs. Django's closure matches PHP's on every
-case. Its order is a real topological order, so it differs where PHP's
-comparator, which is not transitive, gives an invalid order, and where both
-are valid but PHP's moved unrelated groups (Q8). Those cases are listed under
-Q8 in `tests/golden/deviations.json`, written by
+case. Its order is a real topological order. On these cases it differs from
+PHP's exactly where PHP's comparator, which is not transitive, gives an
+invalid order (Q8), and equals it wherever PHP's order is valid. The cases
+that differ are listed under Q8 in `tests/golden/deviations.json`, written by
 
     uv run python -m racing.engine.tests.test_aggregates_parity
 """
@@ -85,6 +85,10 @@ def test_the_fixture_holds_the_cases_the_ticket_names():
         if case_id.startswith("seed=") and not is_topological(case, case["order"])
     ]
     assert len(invalid) >= 100
+    invalid_anywhere = {
+        c for c, case in CASES.items() if not is_topological(case, case["order"])
+    }
+    assert set(engine_deviations(FIXTURE)) == invalid_anywhere
     for case in CASES.values():
         assert "order_error" not in case and "closure_error" not in case
 
