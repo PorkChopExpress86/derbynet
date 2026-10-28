@@ -252,7 +252,7 @@ testing/login-coordinator.sh http://localhost:8080
 testing/login-coordinator.sh http://localhost:8000
 ```
 
-The Django server serves `/action.php` with PHP's dispatch rules and envelope. The login handlers, the database reset and settings slice (#63), and the class, rank and partition endpoints (#30) are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh`, and `testing/reset-database.sh`, pass against both servers. The racer, check-in and roster-import endpoints (#29) are ported too, so `testing/import-roster.sh`, `testing/import-csv-roster.sh` and `testing/test-basic-checkins.sh` pass. `test-racer-query.sh` needs `test-basic-racing.sh` (#31) and `test-awards.sh` (#33) to run before it, and `test-car-numbers.sh` needs `query=poll` (#31). Every other name answers `unrecognized` until M3 ports it.
+The Django server serves `/action.php` with PHP's dispatch rules and envelope. Each module in `legacy_api/handlers/` registers its endpoints on import, and every other name answers `unrecognized` until M3 ports it. The steps of `.github/workflows/server.yml` list the shell suites that run against Django. A suite is added there once it passes on SQLite and Postgres with no stand-in.
 
 ### Run the shell suites against Django
 

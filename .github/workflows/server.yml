@@ -72,6 +72,9 @@ jobs:
       - name: Check the generator tables match website/inc/generators
         run: uv run python tools/convert_generators.py --check
 
+      - name: Check deviations.json is in the order the tool writes
+        run: uv run python tools/reschedule_deviations.py --check
+
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
 

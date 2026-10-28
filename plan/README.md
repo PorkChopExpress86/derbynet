@@ -8,6 +8,7 @@ The plan lives in GitHub issues on PorkChopExpress86/derbynet, labeled `django-m
 | `owner-decisions.md` | Every owner decision, with the issues and ADRs that record it |
 | `lint-issues.py` | Checks every plan issue body: style, section order, cited paths, `#N` references, and forward-only dependencies with no cycles |
 | `bin/pr-wait` | Waits for every check on a PR's current head and prints one line per check |
+| `bin/issue` | Prints an issue's title, body, and comments, because `gh issue view --comments` prints nothing on some gh versions |
 | `bin/pr-merge` | Merges a PR only if every check on its current head passed, pinned to that head SHA |
 
 ## Edit an issue body

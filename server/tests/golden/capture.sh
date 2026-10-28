@@ -22,7 +22,10 @@
 #   --engine-only, --http-only   run one half, for development
 #
 # DERBYNET_TEST_PREFIX (default "derbynet-golden") names the images, container and
-# volume, as it does for run-suite.sh.
+# volume, as it does for run-suite.sh.  GOLDEN_SCENARIOS (a glob such as
+# "16-*.sh") narrows the HTTP capture to some scenarios, for developing one.
+# The capture clears http/ first, so restore the rest with
+# `git checkout -- server/tests/golden/http` before committing.
 
 set -e -E -o pipefail
 
@@ -89,7 +92,7 @@ step_engine() {
 
 step_http() {
   echo "== http" >&2
-  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e GOLDEN_SCENARIOS \
          --network "container:$SERVER" -v "$ROOT:/derbynet" "$HARNESS_IMAGE" \
          bash /derbynet/server/tests/golden/capture/capture-http.sh /derbynet/server/tests/golden
 }
