@@ -236,7 +236,7 @@ testing/login-coordinator.sh http://localhost:8080
 testing/login-coordinator.sh http://localhost:8000
 ```
 
-The Django server serves `/action.php` with PHP's dispatch rules and envelope. The login handlers and the database reset and settings slice (#63) are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh`, and `testing/reset-database.sh`, pass against both servers. Every other name answers `unrecognized` until M3 ports it.
+The Django server serves `/action.php` with PHP's dispatch rules and envelope. The login handlers and the database reset and settings slice (#63) are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh`, and `testing/reset-database.sh`, pass against both servers. The racer, check-in and roster-import endpoints (#29) are ported too, so `testing/import-roster.sh` and `testing/import-csv-roster.sh` pass; `test-basic-checkins.sh`, `test-racer-query.sh` and `test-car-numbers.sh` also need the class and poll endpoints of #30 and #31. Every other name answers `unrecognized` until M3 ports it.
 
 ### Run the shell suites against Django
 

@@ -15,6 +15,7 @@ rewrites the C21, D34 and C14 entries and their expected transcripts.
 import json
 import os
 import re
+from datetime import timedelta
 from urllib.parse import parse_qsl, quote, urlencode
 
 import pytest
@@ -30,6 +31,24 @@ from racing.engine.tests.golden import (
 )
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def distinct_check_in_times(monkeypatch):
+    """Each check-in a millisecond after the last, as the capture's curl
+    calls are, so no two racers tie on `seq` in an `order=checkin` list."""
+    from django.utils import timezone
+
+    from roster.services import racers
+
+    start = timezone.now()
+    ticks = iter(range(1, 10**6))
+    monkeypatch.setattr(
+        racers.timezone,
+        "now",
+        lambda: start + timedelta(milliseconds=next(ticks)),
+    )
+
 
 ID_KEYS = ("racerid", "partitionid", "classid", "rankid")
 SEQ = re.compile(r'("seq": )[1-9]\d{9,}')
@@ -121,6 +140,10 @@ def as_php_body(response, php_body: bytes, ids: Ids) -> bytes:
     django = json.loads(response.content)
     php = json.loads(php_body)
     ids.learn(php, django)
+    if "action" in php:
+        # The echo of the request, which named rows by Django's ids.
+        assert list(django["action"]) == list(php["action"])
+        django["action"] = php["action"]
     body = encode_php_json(ids.as_php(django)).decode()
     return SEQ.sub(r'\1"<epoch-ms>"', body).encode()
 
