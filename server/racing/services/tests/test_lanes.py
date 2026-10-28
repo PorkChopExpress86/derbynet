@@ -704,3 +704,96 @@ def test_under_the_master_schedule_the_current_and_staged_heats_keep_their_numbe
     after = {(r, h): n for n, r, h, _ in master_index(event)}
     assert after[(wolves.id, moved)] == number[(wolves.id, 3)]
     assert after[staged] == number[staged]
+
+
+# ----- A round with no result when the lane reopens ---------------------------
+
+
+def late_racer(round, car_number):
+    model = Racer.objects.filter(event=round.event, group=round.group).first()
+    racer = Racer.objects.create(
+        event=round.event,
+        group=round.group,
+        subgroup=model.subgroup,
+        partition=model.partition,
+        car_number=car_number,
+        first_name="Late",
+        last_name=f"Racer{car_number}",
+        passed_inspection=True,
+    )
+    RosterEntry.objects.create(event=round.event, round=round, racer=racer)
+    return racer
+
+
+def test_a_round_regenerated_after_a_reopen_counts_the_reopened_lane(race):
+    """The Bears' round was scheduled but not started when lane 3 closed.
+    Once lane 3 reopens and the Bears are scheduled again, their lane 3
+    times count."""
+    replay, wolves = race
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    close_lanes(event, {3})
+    reopen_lanes(event, {3})
+
+    generate_schedule(bears, 1)
+    assert 3 in lanes_used(bears)
+    run_heats(event, bears, *chart(bears))
+
+    assert scores(event, bears) == averages(bears)
+    assert all(base == 4 for base, _ in scores(event, bears).values())
+
+
+def test_a_late_racer_fitted_in_after_a_reopen_can_use_the_lane(race):
+    replay, wolves = race
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    close_lanes(event, {3})
+    reopen_lanes(event, {3})
+    late = late_racer(bears, 250)
+
+    reschedule(bears, late.id)
+
+    assert 3 in set(
+        HeatLane.objects.filter(round=bears, racer=late).values_list("lane", flat=True)
+    )
+    assert closed_rounds(event) == {wolves.id}
+
+
+def test_under_points_a_round_scheduled_after_a_closure_scores_its_lanes(race):
+    """Bears are scheduled on lanes 1, 2 and 4 after lane 3 closed, so first
+    place is worth 3 points, as in the round that closed it."""
+    replay, wolves = race
+    event = replay.event
+    set_settings(event, use_points=True)
+    close_lanes(event, {3})
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    make_current(event, bears, 1)
+    record_timer_result(event, fields("place1=1&place2=2&place4=3"))
+    first = HeatLane.objects.get(round=bears, heat=1, lane=1).racer_id
+
+    points = {
+        row.racer.id: row.summary.avg
+        for row in standings_snapshot(event).standings.rows
+        if row.round.id == bears.id
+    }
+    assert points[first] == 3
+
+
+def test_a_new_chart_keeps_only_the_closures_of_lanes_still_closed(race):
+    """Lane 3 is opened on the settings page, not reopened, and the Bears'
+    round, closed while not started, is scheduled again."""
+    replay, wolves = race
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    close_lanes(event, {3})
+    set_settings(event, unused_lane_mask=0)
+
+    generate_schedule(bears, 1)
+    run_heats(event, bears, *chart(bears))
+
+    assert scores(event, bears) == averages(bears)
+    assert closed_rounds(event) == {wolves.id}

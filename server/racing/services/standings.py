@@ -99,14 +99,12 @@ def _read(event) -> _Inputs:
     )
     lanes = HeatLane.objects.filter(round=OuterRef("pk"))
     closed = closed_lanes_by_round(event)
+    open_lanes = _open_lane_count(event, closed)
     rounds = tuple(
         oracle.Round(
             *row[:4],
             scoring=None if row[4] is None else Scoring(row[4]),
-            # Places count the lanes the round raced on (D37).
-            lane_count=settings.lane_count - closed[row[0]].bit_count()
-            if row[0] in closed
-            else None,
+            lane_count=open_lanes.get(row[0]),
         )
         for row in Round.objects.filter(event=event)
         .annotate(
@@ -208,6 +206,21 @@ def _read(event) -> _Inputs:
             one_trophy_per=settings.one_trophy_per,
         ),
     )
+
+
+def _open_lane_count(event, closed: dict[int, int]) -> dict[int, int]:
+    """`{round id: lanes}` that a round's points count (D37): the lanes its
+    chart uses, less the lanes closed in it. With no closure that is
+    `lane-count` less the unused lanes, where PHP counts `lane-count`."""
+    used: dict[int, int] = {}
+    for round_id, lane in (
+        HeatLane.objects.filter(event=event).values_list("round_id", "lane").distinct()
+    ):
+        used[round_id] = used.get(round_id, 0) | (1 << (lane - 1))
+    return {
+        round_id: (mask & ~closed.get(round_id, 0)).bit_count()
+        for round_id, mask in used.items()
+    }
 
 
 def closed_lanes_by_round(event) -> dict[int, int]:

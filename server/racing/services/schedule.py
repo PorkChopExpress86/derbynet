@@ -162,6 +162,14 @@ def generate_schedule(round: Round, n_times_per_lane: int) -> int:
                 if racer_id is not None
             )
             after_chart_change(round)
+            # A new chart, which has no result, keeps only the closures of
+            # lanes still closed (#108).
+            for closure in LaneClosure.objects.filter(round=round):
+                closure.mask &= inputs.unused_lane_mask
+                if closure.mask:
+                    closure.save(update_fields=["mask"])
+                else:
+                    closure.delete()
             # A lane closed before now can no longer be reopened (D36).
             LaneClosure.objects.filter(
                 event_id=round.event_id,

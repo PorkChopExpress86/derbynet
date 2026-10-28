@@ -190,7 +190,9 @@ def _record_closure(
 def reopen_lanes(
     event: Event, lanes: Iterable[int], *, clock: Callable[[], datetime] = timezone.now
 ) -> None:
-    """Reopen closed lanes for the rounds scheduled from now on (D37).
+    """Reopen closed lanes for the rounds scheduled from now on (D37), and
+    for every round with no result yet. A round with a result keeps the
+    lanes closed for its remaining heats, with their times dropped.
 
     Raises LanesFailure, with nothing changed: `not-closed` for a lane no
     open closure holds, as a lane left unused on the settings page, and
@@ -219,8 +221,23 @@ def reopen_lanes(
                 "A round was scheduled after the lane closed, so it stays closed.",
             )
         now = clock()
+        raced = set(
+            HeatLane.objects.filter(event=event)
+            .filter(HAS_RESULT)
+            .values_list("round_id", flat=True)
+        )
         for closure in closing:
             kept = closure.mask & ~mask
+            if closure.round_id is not None and closure.round_id not in raced:
+                # A round with no result drops no time, so its reopened
+                # lanes are open to it again, for late racers and for a new
+                # chart alike.
+                if kept:
+                    closure.mask = kept
+                    closure.save(update_fields=["mask"])
+                else:
+                    closure.delete()
+                continue
             if kept:
                 # The lanes left closed get a row of their own.
                 LaneClosure.objects.create(
