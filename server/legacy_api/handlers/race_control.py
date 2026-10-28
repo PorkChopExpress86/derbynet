@@ -10,6 +10,8 @@ PHP's `require('ajax/query.poll.coordinator.inc')` appends it, from the one
 builder `racing.services.polls.coordinator`.
 """
 
+from collections.abc import Mapping
+
 from accounts.permissions import Access, Perm, granted_for
 from legacy_api.registry import REFUSALS, LegacyContext, action, query
 from racing.engine import heat_state as hs
@@ -49,10 +51,15 @@ def _fail(ctx: LegacyContext, failure) -> None:
     ctx.failure(str(failure.code), failure.description)
 
 
+def _put_all(ctx: LegacyContext, keys: Mapping[str, object]) -> None:
+    """Put each top-level key of a service's reply, in order."""
+    for key, value in keys.items():
+        ctx.put(key, value)
+
+
 def _coordinator(ctx: LegacyContext) -> None:
     """Append the coordinator payload, as the ten actions do."""
-    for key, value in polls.coordinator(ctx.event).items():
-        ctx.put(key, value)
+    _put_all(ctx, polls.coordinator(ctx.event))
 
 
 def _done(ctx: LegacyContext, failure: hs.Failure | None) -> None:
@@ -70,7 +77,7 @@ def _fields(ctx: LegacyContext) -> list[tuple[str, str]]:
 
 
 # Every reply that carries `current-heat`: the coordinator payload and the polls.
-PAYLOAD = (
+PAYLOAD_DIVERGENCES = (
     "R3: with no current heat after a round stops being current, classid and"
     " heat are null; PHP reports the -1 that set_current_heat(-1, -1) wrote.",
 )
@@ -87,7 +94,7 @@ def _may_control(ctx: LegacyContext) -> bool:
     return False
 
 
-@action("heat.select", permission=Access.ANONYMOUS, divergences=PAYLOAD)
+@action("heat.select", permission=Access.ANONYMOUS, divergences=PAYLOAD_DIVERGENCES)
 def heat_select(ctx: LegacyContext) -> None:
     """`roundid` alone means its heat 1; `heat` is a number or `next`,
     `prev`, `next-up` or `first`; `now_racing` applies after the move."""
@@ -110,7 +117,7 @@ def heat_select(ctx: LegacyContext) -> None:
     _coordinator(ctx)
 
 
-@action("heat.rerun", permission=Access.ANONYMOUS, divergences=PAYLOAD)
+@action("heat.rerun", permission=Access.ANONYMOUS, divergences=PAYLOAD_DIVERGENCES)
 def heat_rerun(ctx: LegacyContext) -> None:
     """`heat=current` reruns the current heat, anything else the last heat
     with a result."""
@@ -121,7 +128,7 @@ def heat_rerun(ctx: LegacyContext) -> None:
     _coordinator(ctx)
 
 
-@action("heat.reinstate", permission=Perm.CONTROL_RACE, divergences=PAYLOAD)
+@action("heat.reinstate", permission=Perm.CONTROL_RACE, divergences=PAYLOAD_DIVERGENCES)
 def heat_reinstate(ctx: LegacyContext) -> None:
     failure = heats.reinstate(ctx.event)
     _done(ctx, failure)
@@ -135,7 +142,7 @@ def heat_reinstate(ctx: LegacyContext) -> None:
 @action(
     "result.write",
     permission=Perm.CONTROL_RACE,
-    divergences=PAYLOAD
+    divergences=PAYLOAD_DIVERGENCES
     + (
         "R5: PHP answers a write with no current round or for another heat"
         " with an XML <failure> inside the JSON body; Django answers a JSON"
@@ -156,7 +163,8 @@ def result_write(ctx: LegacyContext) -> None:
 @action(
     "result.delete",
     permission=Perm.CONTROL_RACE,
-    divergences=PAYLOAD + ("C23: no `sql` key; PHP returns the SQL text it ran.",),
+    divergences=PAYLOAD_DIVERGENCES
+    + ("C23: no `sql` key; PHP returns the SQL text it ran.",),
 )
 def result_delete(ctx: LegacyContext) -> None:
     """`roundid` is a round, `current` (the default) or `all`; `heat` is a
@@ -186,29 +194,24 @@ def result_delete(ctx: LegacyContext) -> None:
 @action(
     "schedule.generate",
     permission=Perm.CONTROL_RACE,
-    divergences=PAYLOAD
+    divergences=PAYLOAD_DIVERGENCES
     + (
         "Q1: a request the generator tables cannot meet fails with"
         " cant-fulfill and keeps the chart.",
         "Q18: a refused generate renumbers no master heat and moves no heat.",
         "R7: the coordinator payload shows the master heats numbered and the"
         " next-up heat selected; PHP's shows the state before.",
-        "R6: `trace` adds nothing, and under rotation-schedule nor do PHP's"
-        " debug keys nheats, ncars and heats.",
+        "R6: `trace` adds nothing, where PHP adds a `trace` key, and under"
+        " rotation-schedule nor do PHP's debug keys nheats, ncars and heats.",
     ),
 )
 def schedule_generate(ctx: LegacyContext) -> None:
     round = ctx.resolve(Round, _text(ctx, "roundid"))
     runs = _text(ctx, "n_times_per_lane")
     n_times_per_lane = 1 if runs is None else php_intval(runs)
-    if round is None:
-        # PHP schedules a round that does not exist and finds no racers.
-        ctx.failure(
-            str(schedule.Failure.TOO_FEW_RACERS),
-            "There need to be at least two racers checked in to generate a schedule.",
-        )
-        return
     try:
+        if round is None:
+            schedule.refuse_missing_round(ctx.event.pk, n_times_per_lane)
         schedule.generate_schedule(round, n_times_per_lane)
     except ScheduleFailure as failure:
         _fail(ctx, failure)
@@ -217,7 +220,9 @@ def schedule_generate(ctx: LegacyContext) -> None:
     _coordinator(ctx)
 
 
-@action("schedule.unschedule", permission=Perm.CONTROL_RACE, divergences=PAYLOAD)
+@action(
+    "schedule.unschedule", permission=Perm.CONTROL_RACE, divergences=PAYLOAD_DIVERGENCES
+)
 def schedule_unschedule(ctx: LegacyContext) -> None:
     round = ctx.resolve(Round, _text(ctx, "roundid"))
     if round is not None:
@@ -229,7 +234,7 @@ def schedule_unschedule(ctx: LegacyContext) -> None:
 @action(
     "schedule.reschedule",
     permission=Perm.CONTROL_RACE,
-    divergences=PAYLOAD
+    divergences=PAYLOAD_DIVERGENCES
     + (
         "Q5: a dry run leaves racing on.",
         "Q20, Q21, Q25: the charts and failures #20 decided.",
@@ -248,10 +253,9 @@ def schedule_reschedule(ctx: LegacyContext) -> None:
         # An id that names no racer of the event is the service's noracer.
         racer_id = racer.pk if racer is not None else 0
     dry_run = php_truthy(_text(ctx, "dry-run") or "")
-    if round is None:
-        ctx.failure(str(reschedule.Failure.NOCHART), "Unable to build new schedule")
-        return
     try:
+        if round is None:
+            reschedule.refuse_missing_round(ctx.event.pk)
         done = reschedule.reschedule(round, racer_id, dry_run)
     except RescheduleFailure as failure:
         _fail(ctx, failure)
@@ -305,7 +309,7 @@ def _roster_source(ctx: LegacyContext):
 @action(
     "roster.new",
     permission=Perm.CONTROL_RACE,
-    divergences=PAYLOAD
+    divergences=PAYLOAD_DIVERGENCES
     + (
         "S17: needs CONTROL_RACE; PHP lets anyone build a round.",
         "C24: an unknown round fails with invalid-roundid; PHP uses its"
@@ -346,7 +350,7 @@ def roster_new(ctx: LegacyContext) -> None:
     _coordinator(ctx)
 
 
-@action("roster.delete", permission=Perm.CONTROL_RACE, divergences=PAYLOAD)
+@action("roster.delete", permission=Perm.CONTROL_RACE, divergences=PAYLOAD_DIVERGENCES)
 def roster_delete(ctx: LegacyContext) -> None:
     round_text = _text(ctx, "roundid")
     if round_text is None:
@@ -371,7 +375,7 @@ def roster_delete(ctx: LegacyContext) -> None:
 @query(
     "poll.coordinator",
     permission=Access.ANONYMOUS,
-    divergences=PAYLOAD,
+    divergences=PAYLOAD_DIVERGENCES,
 )
 def poll_coordinator(ctx: LegacyContext) -> None:
     """`roundid` and `heat` name the heat the coordinator page shows, for
@@ -379,12 +383,12 @@ def poll_coordinator(ctx: LegacyContext) -> None:
     asks for a login: `run_heat` in `testing/common.sh` polls it as the Timer
     role, whose empty password counts as no login, and `query=poll` already
     shows the kiosks the same racers."""
-    payload = polls.coordinator(ctx.event, _text(ctx, "roundid"), _text(ctx, "heat"))
-    for key, value in payload.items():
-        ctx.put(key, value)
+    _put_all(
+        ctx, polls.coordinator(ctx.event, _text(ctx, "roundid"), _text(ctx, "heat"))
+    )
 
 
-@query("poll", permission=Access.ANONYMOUS, divergences=PAYLOAD)
+@query("poll", permission=Access.ANONYMOUS, divergences=PAYLOAD_DIVERGENCES)
 def poll(ctx: LegacyContext) -> None:
     """`values` lists the keys of `racing.services.polls.POLL_VALUES` to
     answer, in order. The kiosks poll it anonymously (D5)."""
@@ -396,14 +400,13 @@ def poll(ctx: LegacyContext) -> None:
         car_size=_text(ctx, "car-size"),
         repo=_text(ctx, "repo"),
     )
-    for key, value in polls.poll(ctx.event, _text(ctx, "values") or "", args).items():
-        ctx.put(key, value)
+    _put_all(ctx, polls.poll(ctx.event, _text(ctx, "values") or "", args))
 
 
 @query(
     "poll.results",
     permission=Access.ANONYMOUS,
-    divergences=PAYLOAD
+    divergences=PAYLOAD_DIVERGENCES
     + (
         "R8: the body starts at `{`; PHP's query.poll.results.inc writes a"
         " space before its JSON.",
@@ -412,8 +415,9 @@ def poll(ctx: LegacyContext) -> None:
 def poll_results(ctx: LegacyContext) -> None:
     """The results-by-racer kiosk's poll: `roundid` (the current round by
     default) and `details` for every column."""
-    found = polls.poll_results(
-        ctx.event, _text(ctx, "roundid"), details="details" in ctx.args
+    _put_all(
+        ctx,
+        polls.poll_results(
+            ctx.event, _text(ctx, "roundid"), details="details" in ctx.args
+        ),
     )
-    for key, value in found.items():
-        ctx.put(key, value)

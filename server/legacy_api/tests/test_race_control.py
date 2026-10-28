@@ -14,8 +14,9 @@ from accounts.permissions import Perm
 from core.models import RaceState
 from legacy_api.registry import REGISTRY
 from legacy_api.tests.conftest import log_in, post
-from racing.models import HeatLane, Round
+from racing.models import HeatLane, Round, TimerStatus
 from racing.services import polls, results
+from roster.models import Racer
 
 pytestmark = pytest.mark.django_db
 
@@ -381,3 +382,85 @@ def test_the_race_state_is_unchanged_by_the_polls(client, event):
     Client().get("/action.php", {"query": "poll.results", "details": "1"})
 
     assert RaceState.objects.values().get(event=event) == before
+
+
+# ----- failure order, as PHP checks ---------------------------------------------
+
+
+def test_generate_checks_the_lane_count_before_the_round(client, event):
+    """`action.schedule.generate.inc` refuses `nlanes` before it looks at the
+    round, so an unknown round with no lanes is `nlanes` too."""
+    log_in(client, -1, role="RaceCoordinator")
+
+    found = reply(post(client, "action=schedule.generate&roundid=999"))
+
+    assert found["outcome"]["code"] == "nlanes"
+
+
+def test_generate_of_an_unknown_round_with_lanes_finds_too_few_racers(client, event):
+    setup_race(client)
+
+    found = reply(post(client, "action=schedule.generate&roundid=999"))
+
+    assert found["outcome"]["code"] == "too-few-racers"
+
+
+def test_generate_checks_results_before_racers(client, event):
+    """PHP: `nlanes`, then `results-exist`, then `too-few-racers`."""
+    rounds = setup_race(client)
+    lions = rounds["Lions"]
+    ok(client, f"action=heat.select&roundid={lions.pk}&now_racing=1")
+    finish(event)
+    Racer.objects.filter(event=event).update(passed_inspection=False)
+
+    found = reply(post(client, f"action=schedule.generate&roundid={lions.pk}"))
+
+    assert found["outcome"]["code"] == "results-exist"
+
+
+def test_a_heat_with_no_current_round_names_roundid_minus_1(client, event):
+    """PHP's `get_running_round()` gives RoundID -1 when none is set."""
+    setup_race(client)
+
+    found = reply(post(client, "action=heat.select&heat=1"))
+
+    assert found["outcome"] == {
+        "summary": "failure",
+        "code": "nosuchheat",
+        "description": "No heat 1 scheduled for roundid -1.",
+    }
+
+
+def test_a_reschedule_underway_is_busy_even_for_an_unknown_round(client, event):
+    """`action.schedule.reschedule.inc` checks its marker before it builds the
+    adjuster for the round."""
+    setup_race(client)
+    RaceState.objects.filter(event=event).update(reschedule_started_at=timezone.now())
+
+    found = reply(post(client, "action=schedule.reschedule&roundid=9999"))
+
+    assert found["outcome"]["code"] == "busy"
+
+
+def test_an_unknown_round_with_no_reschedule_underway_is_nochart(client, event):
+    setup_race(client)
+
+    found = reply(post(client, "action=schedule.reschedule&roundid=9999"))
+
+    assert found["outcome"]["code"] == "nochart"
+    assert RaceState.objects.get(event=event).reschedule_started_at is None
+
+
+@pytest.mark.parametrize(
+    "values", ["racers", "heat-results,racers", "racers,heat-results"]
+)
+def test_the_timer_test_lists_every_lane_whatever_comes_first(client, event, values):
+    """PHP's `$tt` is local to each `json_common_1()` call, so `racers` never
+    sees the test mask that `heat-results` read, in either order."""
+    setup_race(client)
+    RaceState.objects.filter(event=event).update(timer_test=True)
+    TimerStatus.objects.filter(event=event).update(test_lane_mask=0b0101)
+
+    found = poll(Client(), values=values)
+
+    assert found["racers"] == [{"lane": n} for n in (1, 2, 3, 4)]

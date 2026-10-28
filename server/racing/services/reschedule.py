@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
+from typing import NoReturn
 
 from django.db import transaction
 from django.db.models import Q
@@ -388,6 +389,22 @@ def _take_guard(event_id: int, now: datetime, held: datetime | None = None) -> b
         .filter(free)
         .update(reschedule_started_at=now)
     )
+
+
+def refuse_missing_round(
+    event_id: int, clock: Callable[[], datetime] = timezone.now
+) -> NoReturn:
+    """Raise what PHP answers for a `roundid` with no round: `busy` while
+    another reschedule holds the guard, as PHP checks its marker first, else
+    `nochart`, as the adjuster finds no chart to change."""
+    started = (
+        RaceState.objects.filter(event_id=event_id)
+        .values_list("reschedule_started_at", flat=True)
+        .get()
+    )
+    if started is not None and started > clock() - GUARD_EXPIRY:
+        raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
+    raise RescheduleFailure(Failure.NOCHART, "Unable to build new schedule")
 
 
 def reschedule(

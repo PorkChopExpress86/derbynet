@@ -611,8 +611,9 @@ DEVIATIONS = {
     ),
     "R6": (
         "PHP's schedule.generate under rotation-schedule adds its scheduler's"
-        " debug output, nheats, ncars and heats, and schedule.reschedule with"
-        " trace adds the adjuster's trace; Django adds neither. These replies"
+        " debug output, nheats, ncars and heats, schedule.generate with trace"
+        " adds a `trace` key, and schedule.reschedule with trace adds the"
+        " adjuster's trace; Django adds none of them. These replies"
         " also show R3's null classid and heat (#31, for the owner to"
         " confirm).",
         "schedules",
@@ -729,5 +730,6 @@ def test_write_race_control_deviations(event):
     paths = {e["expected"] for e in written}
     listing = json.loads(DEVIATIONS_FILE.read_text())
     kept = [e for e in listing["deviations"] if e["expected"] not in paths]
-    listing["deviations"] = kept + written
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+    # By quirk number, as `tools/reschedule_deviations.py --check` expects.
+    listing["deviations"] = sorted(kept + written, key=lambda e: int(e["quirk"][1:]))
+    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2) + "\n")

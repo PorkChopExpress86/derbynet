@@ -12,6 +12,7 @@ from legacy_api.registry import (
     format_of,
     needs_event,
 )
+from racing.engine.tests.golden import QUIRK_DECISIONS, deviations
 
 DATA = Path(__file__).parent / "data"
 HANDLERS = Path(__file__).resolve().parent.parent / "handlers"
@@ -94,3 +95,24 @@ def test_handlers_never_write_through_the_orm():
     ]
 
     assert offenders == []
+
+
+DIVERGENCE = re.compile(r"(?P<ids>[A-Z]\d+(?:, [A-Z]\d+)*): \S")
+
+
+def test_every_divergence_names_a_recorded_decision():
+    """Each entry reads `<id>: <what>`, and every id is a quirk decision or a
+    recorded deviation, so the API docs never cite a row nobody decided."""
+    known = set(QUIRK_DECISIONS) | {entry["quirk"] for entry in deviations()}
+    unknown = []
+    for endpoint in REGISTRY:
+        for text in endpoint.divergences:
+            found = DIVERGENCE.match(text)
+            ids = found["ids"].split(", ") if found else [text]
+            unknown += [
+                f"{endpoint.kind} {endpoint.name}: {id}"
+                for id in ids
+                if id not in known
+            ]
+
+    assert unknown == []
