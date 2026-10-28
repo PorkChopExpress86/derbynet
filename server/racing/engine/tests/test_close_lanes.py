@@ -220,6 +220,37 @@ def test_a_departed_car_gets_no_new_run():
     assert adjuster.updated_chart() is None
 
 
+def test_a_car_whose_only_unraced_run_was_on_the_closed_lane_gets_one_new_run():
+    """Car 7 has not raced, and its one run is in the closed lane of a heat
+    still to come."""
+    adjuster = ScheduleAdjuster(
+        [[5, 6, None], [6, 5, None], [5, 6, None], [None, 5, 7]],
+        {0: 1, 1: 2},
+        0,
+        3,
+        1,
+        NodeBudget(UNLIMITED),
+        kept=[2],
+    )
+    adjuster.remove_departed([])
+    adjuster.close_lanes(0b100)
+    assert adjuster.updated_chart() == [None, None, None, [7, 5, None]]
+
+
+def test_a_departed_car_in_the_closed_lane_of_a_heat_to_come_gets_no_run():
+    adjuster = ScheduleAdjuster(
+        [[5, 6, None], [6, 5, None], [None, 5, 7]],
+        {0: 1, 1: 2},
+        0,
+        3,
+        1,
+        NodeBudget(UNLIMITED),
+    )
+    adjuster.remove_departed([7])
+    adjuster.close_lanes(0b100)
+    assert adjuster.updated_chart() == [None, None, [None, 5, None]]
+
+
 def test_runs_per_lane_counts_only_open_lanes():
     """After lane 1 closed, it holds only the raced heats' cars."""
     chart = [[1, 2, 3], [None, 3, 1], [None, 1, 2], [None, 2, 3], [None, 3, 1]]
@@ -279,3 +310,22 @@ def test_a_round_scored_by_its_own_scoring():
     )
     scores = {row.round.id: row.summary.score for row in oracle.Standings(event).rows}
     assert scores == {1: 3.0, 2: 3.5}
+
+
+def test_points_count_the_lanes_a_round_raced_on():
+    """With lane 3 of 4 closed in round 1, first place is worth 3 points
+    there and 4 in round 2 (D37)."""
+    racer = oracle.Racer(1, "A", "B", 101, "", 1, 1)
+    event = oracle.Event(
+        groups=(oracle.Group(1, "Lions", 1),),
+        subgroups=(oracle.Subgroup(1, 1, "Lions", 1),),
+        rounds=(
+            oracle.Round(1, 1, 1, True, lane_count=3),
+            oracle.Round(2, 1, 2, True),
+        ),
+        racers=(racer,),
+        results=(oracle.Result(1, 1, None, 1), oracle.Result(2, 1, None, 1)),
+        settings=oracle.Settings(use_points=True, lane_count=4),
+    )
+    points = {row.round.id: row.summary.avg for row in oracle.Standings(event).rows}
+    assert points == {1: 3, 2: 4}

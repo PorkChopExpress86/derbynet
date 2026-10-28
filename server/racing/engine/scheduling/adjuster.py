@@ -90,11 +90,16 @@ def n_runs_per_lane(chart: Iterable[Heat], lane_mask: int = 0) -> int:
     the cars that raced there before it closed."""
     chart = list(chart)
     lane = min(
-        lane
-        for heat in chart
-        for lane, r in enumerate(heat)
-        if r is not None and not lane_mask & (1 << lane)
+        (
+            lane
+            for heat in chart
+            for lane, r in enumerate(heat)
+            if r is not None and not lane_mask & (1 << lane)
+        ),
+        default=None,
     )
+    if lane is None:
+        return 1  # every car is in a closed lane
     racers = [heat[lane] for heat in chart if heat[lane] is not None]
     return len(racers) // len(set(racers))
 
@@ -310,6 +315,7 @@ class ScheduleAdjuster:
         (D37): the first bye after the last kept heat, or a heat added at
         the end. A departed racer gets none. Call `remove_departed` first.
         """
+        racers = self._racers()
         self._lane_mask |= mask
         self._nlanes_usable = self._nlanes - count_one_bits(self._lane_mask)
         for heat in self._chart:
@@ -327,20 +333,25 @@ class ScheduleAdjuster:
                 self._nheats_unraced -= 1
                 self._modified = True
         self.squeeze_out_byes()
-        for racer in self._without_an_open_run():
-            self._add_one_run(racer)
+        open_runs = {
+            racer
+            for heat in self._heats()
+            for lane, racer in enumerate(heat)
+            if racer is not None and self._active(lane)
+        }
+        for racer in racers:
+            if racer not in open_runs and racer not in self._departed:
+                self._add_one_run(racer)
 
-    def _without_an_open_run(self) -> list[int]:
-        """The racers of the round, in the order they first appear, with no
-        run in an open lane in any heat, raced, kept or unraced."""
+    def _heats(self) -> list[Heat]:
+        """Every heat of the round: raced, kept and unraced."""
         heats = [*self._raced, *self._kept.values()]
-        heats += [heat for heat in self._chart if heat is not None]
-        seen: dict[int, bool] = {}
-        for heat in heats:
-            for lane, racer in enumerate(heat):
-                if racer is not None and racer not in self._departed:
-                    seen[racer] = seen.get(racer, False) or self._active(lane)
-        return [racer for racer, has_run in seen.items() if not has_run]
+        return heats + [heat for heat in self._chart if heat is not None]
+
+    def _racers(self) -> list[int]:
+        """The racers of the round, in the order they first appear."""
+        seen = dict.fromkeys(r for heat in self._heats() for r in heat if r)
+        return list(seen)
 
     def _add_one_run(self, racer_id: int) -> None:
         for h in range(self._squeeze_from, len(self._chart)):

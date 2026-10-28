@@ -31,12 +31,11 @@ from django.utils import timezone
 
 from core.models import Event, RaceSettings, RaceState
 from core.services import lock_race_state
-from racing.engine.scheduling.adjuster import SearchBudget
 from racing.engine.scheduling.lanes import count_one_bits
 from racing.engine.standings.scoring import Scoring
 from racing.models import HAS_RESULT, HeatLane, LaneClosure, Round
 from racing.services.master import held_emptied_heats
-from racing.services.reschedule import Rescheduled, RescheduleFailure, adjust_round
+from racing.services.reschedule import Rescheduled, RescheduleFailure, adjust_rounds
 
 MIN_OPEN_LANES = 2
 
@@ -69,15 +68,19 @@ def _lanes(mask: int) -> list[int]:
     return [bit + 1 for bit in range(mask.bit_length()) if mask & (1 << bit)]
 
 
+def _check_range(settings: RaceSettings, lanes: set[int]) -> None:
+    if any(not 1 <= lane <= settings.lane_count for lane in lanes):
+        raise LanesFailure(
+            Failure.NO_SUCH_LANE, f"The track has lanes 1 to {settings.lane_count}."
+        )
+
+
 def _new_lanes(settings: RaceSettings, lanes: set[int]) -> int:
     """The mask of the lanes to close that are not closed already, or a
     failure."""
     if not lanes:
         raise LanesFailure(Failure.NO_LANES, "Choose a lane to close.")
-    if any(not 1 <= lane <= settings.lane_count for lane in lanes):
-        raise LanesFailure(
-            Failure.NO_SUCH_LANE, f"The track has lanes 1 to {settings.lane_count}."
-        )
+    _check_range(settings, lanes)
     new = _mask(lanes) & ~settings.unused_lane_mask
     if not new:
         raise LanesFailure(Failure.ALREADY_CLOSED, "Those lanes are already closed.")
@@ -90,18 +93,20 @@ def _new_lanes(settings: RaceSettings, lanes: set[int]) -> int:
     return new
 
 
-def _round_in_progress(event_id: int) -> Round | None:
-    """The current round, while it has a heat not yet run: a lane with no
-    result, or an emptied heat held under D39."""
-    state = RaceState.objects.get(event_id=event_id)
-    if state.current_round_id is None:
-        return None
-    round = Round.objects.get(pk=state.current_round_id)
-    if HeatLane.objects.filter(round=round).exclude(HAS_RESULT).exists() or any(
-        held.round_id == round.id for held in held_emptied_heats(round.event)
-    ):
-        return round
-    return None
+def _rounds_to_close(event: Event) -> list[Round]:
+    """Every round with a chart and a heat left to run (D45): a lane with no
+    result, or an emptied heat held under D39. That is every round in
+    progress, interleaved ones under the master schedule included, and
+    every round scheduled but not started."""
+    unraced = HeatLane.objects.filter(round=OuterRef("pk")).exclude(HAS_RESULT)
+    held = {round_id for _, round_id, _, _ in held_emptied_heats(event)}
+    rounds = Round.objects.filter(event=event).annotate(
+        charted=Exists(HeatLane.objects.filter(round=OuterRef("pk"))),
+        unraced=Exists(unraced),
+    )
+    return [
+        r for r in rounds.order_by("id") if r.charted and (r.unraced or r.pk in held)
+    ]
 
 
 def close_lanes(
@@ -109,16 +114,16 @@ def close_lanes(
     lanes: Iterable[int],
     scoring: int | None = None,
     *,
-    budget: SearchBudget | None = None,
     clock: Callable[[], datetime] = timezone.now,
-) -> Rescheduled | None:
+) -> list[Rescheduled]:
     """Close `lanes` (lane numbers from 1) from now on, and score by
     `scoring`, a legacy `scoring` value, or leave the scoring as it is.
 
-    With a round in progress, its remaining heats are rescheduled through
-    `racing.services.reschedule`, with its guard and its retry (Q15), and
-    the new chart is returned. Otherwise only later rounds change, and None
-    is returned.
+    Every round with a heat left to run, started or not, is rescheduled on
+    the open lanes through `racing.services.reschedule`, under one guard,
+    with its recheck and retry (Q15), and gets a `LaneClosure` (D45). The
+    new charts are returned, one per round in id order. With no such round
+    only later rounds change.
 
     Raises LanesFailure, with nothing changed: `no-lanes`, `no-such-lane`
     for a lane the track does not have, `already-closed` when every lane
@@ -129,22 +134,15 @@ def close_lanes(
     lanes = set(lanes)
     if scoring is not None and scoring not in {s.value for s in Scoring}:
         raise LanesFailure(Failure.NO_SUCH_SCORING, f"No scoring {scoring}.")
-    _new_lanes(RaceSettings.objects.get(event_id=event.id), lanes)
-    round = _round_in_progress(event.id)
-    if round is None:
-        with transaction.atomic():
-            lock_race_state(event.id)
-            _record_closure(event.id, None, lanes, scoring, clock())
-        return None
     new = _new_lanes(RaceSettings.objects.get(event_id=event.id), lanes)
     try:
-        return adjust_round(
-            round,
+        return adjust_rounds(
+            event.id,
+            lambda: _rounds_to_close(event),
             close=new,
-            also=lambda state: _record_closure(
-                event.id, round, lanes, scoring, clock(), expected=new
+            also=lambda state, rounds: _record_closure(
+                event.id, rounds, lanes, scoring, clock(), expected=new
             ),
-            budget=budget,
             clock=clock,
         )
     except RescheduleFailure as failure:
@@ -153,32 +151,39 @@ def close_lanes(
 
 def _record_closure(
     event_id: int,
-    round: Round | None,
+    rounds: list[Round],
     lanes: set[int],
     scoring: int | None,
     now: datetime,
-    expected: int | None = None,
+    expected: int,
 ) -> None:
-    """Under the lock: the mask, the `LaneClosure`, and the scoring."""
+    """Under the lock: the mask, a `LaneClosure` for each round, or one with
+    no round, and the scoring."""
     settings = RaceSettings.objects.get(event_id=event_id)
     new = _new_lanes(settings, lanes)
-    if expected is not None and new != expected:
+    if new != expected:
         # The reschedule rechecks the mask, so only a writer that skipped
         # the lock gets here.
         raise LanesFailure(Failure.BUSY, "The lanes changed. Try again.")
-    LaneClosure.objects.create(event_id=event_id, round=round, mask=new, closed_at=now)
+    LaneClosure.objects.bulk_create(
+        LaneClosure(event_id=event_id, round=round, mask=new, closed_at=now)
+        for round in rounds or [None]
+    )
     settings.unused_lane_mask |= new
     fields = ["unused_lane_mask"]
     if scoring is not None:
+        # A finished round keeps the scoring it had. A round being closed
+        # that has a result takes the new one, and a round with no result
+        # follows the event (D45).
         results = HeatLane.objects.filter(round=OuterRef("pk")).filter(HAS_RESULT)
-        earlier = Round.objects.filter(event_id=event_id, scoring__isnull=True)
-        if round is not None:
-            earlier = earlier.exclude(pk=round.pk)
-        earlier.filter(Exists(results)).update(scoring=settings.scoring)
+        raced = Round.objects.filter(event_id=event_id).filter(Exists(results))
+        closing = [r.pk for r in rounds]
+        raced.filter(scoring__isnull=True).exclude(pk__in=closing).update(
+            scoring=settings.scoring
+        )
+        raced.filter(pk__in=closing).update(scoring=scoring)
         settings.scoring = scoring
         fields.append("scoring")
-        if round is not None:
-            Round.objects.filter(pk=round.pk).update(scoring=scoring)
     settings.save(update_fields=fields)
 
 
@@ -192,9 +197,11 @@ def reopen_lanes(
     `round-scheduled` once a round was scheduled after the lane closed
     (D36).
     """
-    mask = _mask(lanes)
+    lanes = set(lanes)
     with transaction.atomic():
         lock_race_state(event.id)
+        _check_range(RaceSettings.objects.get(event=event), lanes)
+        mask = _mask(lanes)
         closures = list(
             LaneClosure.objects.filter(event=event, reopened_at__isnull=True).order_by(
                 "id"
@@ -232,22 +239,19 @@ def reopen_lanes(
 
 def poll_lanes(event: Event) -> dict:
     """The poll field for the race dashboard (#41): each lane closed now,
-    the round it closed in (null between rounds), and whether it can still
+    the rounds it closed in (none between rounds), and whether it can still
     be reopened, then the scoring in force: the current round's, or the
     event's."""
-    rows = []
+    lanes: dict[int, dict] = {}
     for closure in LaneClosure.objects.filter(
         event=event, reopened_at__isnull=True
     ).order_by("id"):
-        rows += [
-            {
-                "lane": lane,
-                "roundid": closure.round_id,
-                "reopen": closure.next_round_at is None,
-            }
-            for lane in _lanes(closure.mask)
-        ]
-    rows.sort(key=lambda row: row["lane"])
+        for lane in _lanes(closure.mask):
+            row = lanes.setdefault(lane, {"lane": lane, "roundids": [], "reopen": True})
+            if closure.round_id is not None:
+                row["roundids"].append(closure.round_id)
+            row["reopen"] = row["reopen"] and closure.next_round_at is None
+    rows = [lanes[lane] for lane in sorted(lanes)]
     scoring = RaceSettings.objects.get(event=event).scoring
     current = RaceState.objects.get(event=event).current_round_id
     if current is not None:

@@ -98,8 +98,16 @@ def _read(event) -> _Inputs:
         .values_list("id", "group_id", "name", "sort_order", "n_trophies")
     )
     lanes = HeatLane.objects.filter(round=OuterRef("pk"))
+    closed = closed_lanes_by_round(event)
     rounds = tuple(
-        oracle.Round(*row[:4], None if row[4] is None else Scoring(row[4]))
+        oracle.Round(
+            *row[:4],
+            scoring=None if row[4] is None else Scoring(row[4]),
+            # Places count the lanes the round raced on (D37).
+            lane_count=settings.lane_count - closed[row[0]].bit_count()
+            if row[0] in closed
+            else None,
+        )
         for row in Round.objects.filter(event=event)
         .annotate(
             finished=Exists(lanes) & ~Exists(lanes.exclude(HAS_RESULT)),
@@ -172,7 +180,7 @@ def _read(event) -> _Inputs:
         oracle.Result(r.round_id, r.key[0], r.finish_time, r.finish_place)
         for r in counted_results(
             (HeatResult(*row[:5], key=row[5:]) for row in rows),
-            closed_lanes_by_round(event),
+            closed,
         )
         if r.key[1]
     )

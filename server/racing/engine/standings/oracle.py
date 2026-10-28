@@ -86,13 +86,16 @@ class Subgroup:
 class Round:
     """`scoring` is the round's own scoring mode, kept when a lane closure
     changed the event's (#108). None follows `Settings.scoring`, as every
-    round does in PHP."""
+    round does in PHP. `lane_count` is the number of lanes the round's
+    places are counted on, fewer than `Settings.lane_count` once a lane
+    closed in it (D37). None follows the setting."""
 
     id: int
     group_id: int
     number: int
     finished: bool
     scoring: Scoring | None = None
+    lane_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -475,7 +478,9 @@ def _rows(event: Event) -> list[Row]:
                 scoring=settings.scoring
                 if rounds[round_id].scoring is None
                 else rounds[round_id].scoring,
-                lane_count=settings.lane_count,
+                lane_count=settings.lane_count
+                if rounds[round_id].lane_count is None
+                else rounds[round_id].lane_count,
             ),
         )
         for (round_id, racer_id), results in heats.items()

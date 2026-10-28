@@ -372,7 +372,7 @@ def _hold_emptied_heats(
             )
 
 
-def _take_guard(round: Round, now: datetime, held: datetime | None = None) -> bool:
+def _take_guard(event_id: int, now: datetime, held: datetime | None = None) -> bool:
     """Set `reschedule_started_at` to `now` if it is free or expired, or, to
     renew it, if it is still `held`."""
     free = (
@@ -382,7 +382,7 @@ def _take_guard(round: Round, now: datetime, held: datetime | None = None) -> bo
         | Q(reschedule_started_at__lte=now - GUARD_EXPIRY)
     )
     return bool(
-        RaceState.objects.filter(event_id=round.event_id)
+        RaceState.objects.filter(event_id=event_id)
         .filter(free)
         .update(reschedule_started_at=now)
     )
@@ -430,46 +430,79 @@ def adjust_round(
     racer_id: int | None = None,
     dry_run: bool = False,
     *,
-    close: int = 0,
-    also: Callable[[RaceState], None] | None = None,
     budget: SearchBudget | None = None,
     clock: Callable[[], datetime] = timezone.now,
 ) -> Rescheduled:
-    """`reschedule`, under its guard, snapshot, recheck and retry (Q15).
-    With `close`, close the lanes of that mask instead of fitting in late
-    racers (#108). `also` runs in the transaction that writes the chart,
-    after the recheck, with the locked `RaceState`; whatever it raises
-    rolls the write back."""
+    """`reschedule`, under its guard, snapshot, recheck and retry (Q15)."""
+    return adjust_rounds(
+        round.event_id,
+        lambda: [round],
+        racer_id,
+        dry_run,
+        budget=budget,
+        clock=clock,
+    )[0]
+
+
+def adjust_rounds(
+    event_id: int,
+    rounds_of: Callable[[], list[Round]],
+    racer_id: int | None = None,
+    dry_run: bool = False,
+    *,
+    close: int = 0,
+    also: Callable[[RaceState, list[Round]], None] | None = None,
+    budget: SearchBudget | None = None,
+    clock: Callable[[], datetime] = timezone.now,
+) -> list[Rescheduled]:
+    """Adjust each round `rounds_of()` names, under one guard, and write
+    every chart in one transaction. `rounds_of` is read again under the
+    lock, with each round's snapshot, and a change in either searches again
+    once (Q15). With `close`, close the lanes of that mask instead of
+    fitting in late racers (#108). `also` runs in the transaction that
+    writes the charts, after the recheck, with the locked `RaceState` and
+    the rounds; whatever it raises rolls every write back."""
     held = clock()
-    if not _take_guard(round, held):
+    if not _take_guard(event_id, held):
         raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
     try:
         for attempt in range(2):
             if attempt:
                 # A second search may run past the first one's guard expiry.
                 renewed = clock()
-                if not _take_guard(round, renewed, held):
+                if not _take_guard(event_id, renewed, held):
                     raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
                 held = renewed
-            snapshot = _snapshot(round, racer_id)
-            adjuster = _adjust(round, snapshot, racer_id, budget, clock, close)
-            result = Rescheduled(adjuster.chart_debug(), adjuster.timing_keys)
+            rounds = rounds_of()
+            work = []
+            for round in rounds:
+                snapshot = _snapshot(round, racer_id)
+                adjuster = _adjust(round, snapshot, racer_id, budget, clock, close)
+                work.append((round, snapshot, adjuster))
+            results = [
+                Rescheduled(adjuster.chart_debug(), adjuster.timing_keys)
+                for _, _, adjuster in work
+            ]
             if dry_run:
-                return result
+                return results
             with transaction.atomic():
-                state = lock_race_state(round.event_id)
-                if _snapshot(round, racer_id) != snapshot:
+                state = lock_race_state(event_id)
+                if [r.pk for r in rounds_of()] != [r.pk for r in rounds] or any(
+                    _snapshot(round, racer_id) != snapshot
+                    for round, snapshot, _ in work
+                ):
                     continue
-                _write(round, state, snapshot, adjuster)
+                for round, snapshot, adjuster in work:
+                    _write(round, state, snapshot, adjuster)
                 if also is not None:
-                    also(state)
-            return result
+                    also(state, rounds)
+            return results
         raise RescheduleFailure(
             Failure.BUSY,
             "The heats or the roster changed while the schedule was adjusted."
             " Try again.",
         )
     finally:
-        RaceState.objects.filter(
-            event_id=round.event_id, reschedule_started_at=held
-        ).update(reschedule_started_at=None)
+        RaceState.objects.filter(event_id=event_id, reschedule_started_at=held).update(
+            reschedule_started_at=None
+        )

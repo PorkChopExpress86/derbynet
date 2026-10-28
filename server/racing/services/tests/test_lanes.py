@@ -4,10 +4,17 @@ from unittest import mock
 
 import pytest
 
-from core.models import RaceSettings
+from core.models import RaceSettings, RaceState
 from racing.engine.scheduling.adjuster import ScheduleAdjuster
 from racing.engine.standings.scoring import Scoring
-from racing.models import HAS_RESULT, HeatLane, LaneClosure, RosterEntry, Round
+from racing.models import (
+    HAS_RESULT,
+    EmptiedHeat,
+    HeatLane,
+    LaneClosure,
+    RosterEntry,
+    Round,
+)
 from racing.services.heats import select_heat
 from racing.services.lanes import (
     Failure,
@@ -16,6 +23,7 @@ from racing.services.lanes import (
     poll_lanes,
     reopen_lanes,
 )
+from racing.services.master import master_index
 from racing.services.reschedule import reschedule
 from racing.services.results import record_timer_result
 from racing.services.schedule import generate_schedule
@@ -444,13 +452,13 @@ def test_the_poll_lists_the_closed_lanes_and_the_scoring_in_force(race):
     close_lanes(event, {3}, scoring=Scoring.FASTEST)
 
     assert poll_lanes(event) == {
-        "closed-lanes": [{"lane": 3, "roundid": round.id, "reopen": True}],
+        "closed-lanes": [{"lane": 3, "roundids": [round.id], "reopen": True}],
         "scoring": 2,
     }
     bears = new_group(replay, "Bears")
     generate_schedule(bears, 1)
     assert poll_lanes(event)["closed-lanes"] == [
-        {"lane": 3, "roundid": round.id, "reopen": False}
+        {"lane": 3, "roundids": [round.id], "reopen": False}
     ]
 
 
@@ -460,7 +468,190 @@ def test_a_reopened_lane_leaves_the_poll(race):
     close_lanes(event, {2, 3})
     reopen_lanes(event, {3})
     assert poll_lanes(event)["closed-lanes"] == [
-        {"lane": 2, "roundid": round.id, "reopen": True}
+        {"lane": 2, "roundids": [round.id], "reopen": True}
     ]
     assert mask(event) == 0b0010
     assert scores(event, round) == averages(round, closed={2, 3})
+
+
+# ----- Every round with a heat left to run (D45) -----------------------------
+
+
+def closed_rounds(event):
+    return set(
+        LaneClosure.objects.filter(event=event).values_list("round_id", flat=True)
+    )
+
+
+def once_in_each_open_lane(round, open_lanes=(1, 2, 4)):
+    lanes = {}
+    for racer, lane in HeatLane.objects.filter(round=round).values_list(
+        "racer_id", "lane"
+    ):
+        if lane in open_lanes:
+            lanes.setdefault(racer, []).append(lane)
+    return all(sorted(seen) == list(open_lanes) for seen in lanes.values())
+
+
+def test_a_round_scheduled_but_not_started_is_rescheduled_on_the_open_lanes(race):
+    replay, wolves = race
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    set_settings(event, scoring=Scoring.DROP_SLOWEST)
+
+    close_lanes(event, {3}, scoring=Scoring.AVERAGE)
+
+    assert 3 not in lanes_used(bears)
+    assert once_in_each_open_lane(bears)
+    assert closed_rounds(event) == {wolves.id, bears.id}
+    assert Round.objects.get(pk=bears.pk).scoring is None
+    run_heats(event, bears, *chart(bears))
+    assert scores(event, bears) == averages(bears)
+
+
+def test_under_the_master_schedule_every_interleaved_round_closes_the_lane():
+    replay, wolves = setup_race(racers=6, lanes=4)
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    set_settings(event, use_master_sched=True)
+    generate_schedule(bears, 1)
+    generate_schedule(wolves, 1)
+    order = sorted({(n, r, h) for n, r, h, _ in master_index(event)})
+    rounds = {wolves.id: wolves, bears.id: bears}
+    for _, r, h in order[:3]:
+        run_heats(event, rounds[r], h)
+    assert {r for _, r, _ in order[:3]} == {wolves.id, bears.id}
+    _, r, h = order[3]
+    make_current(event, rounds[r], h)
+    held = {(r, h) for _, r, h in order[3:5]}
+
+    close_lanes(event, {3})
+
+    assert closed_rounds(event) == {wolves.id, bears.id}
+    for round in (wolves, bears):
+        later = {
+            heat: lanes
+            for heat, lanes in chart(round).items()
+            if (round.id, heat) not in held
+            and not HeatLane.objects.filter(round=round, heat=heat)
+            .filter(HAS_RESULT)
+            .exists()
+        }
+        assert all(3 not in lanes for lanes in later.values()), round
+        assert once_in_each_open_lane(round), round
+    for round in (wolves, bears):
+        assert scores(event, round) == averages(round, closed={3}), round
+
+
+def test_a_round_whose_last_heat_is_a_held_emptied_heat_drops_the_lanes_times():
+    replay, round = setup_race(racers=6, lanes=4)
+    event = replay.event
+    run_heats(event, round, 1, 2, 3, 4, 5)
+    HeatLane.objects.filter(round=round, heat=6).delete()
+    EmptiedHeat.objects.create(event=event, round=round, heat=6)
+    RaceState.objects.filter(event=event).update(current_heat=6)
+
+    close_lanes(event, {3})
+
+    assert closed_rounds(event) == {round.id}
+    assert scores(event, round) == averages(round, closed={3})
+
+
+def test_a_closure_with_only_the_running_and_staged_heats_left_changes_no_heat():
+    replay, round = setup_race(racers=6, lanes=4)
+    event = replay.event
+    run_heats(event, round, 1, 2, 3, 4)
+    make_current(event, round, 5)
+    before = chart(round)
+
+    close_lanes(event, {3})
+
+    assert chart(round) == before
+    assert closed_rounds(event) == {round.id}
+    assert mask(event) == 0b0100
+    run_heats(event, round, 5, 6)
+    assert scores(event, round) == averages(round, closed={3})
+
+
+def test_a_round_scheduled_during_the_closure_is_closed_too(race):
+    """Bears' round is scheduled, on all 4 lanes, after the closure read
+    which rounds to close and before it locks; the recheck under the lock
+    finds it."""
+    replay, wolves = race
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    real = ScheduleAdjuster.close_lanes
+    calls = []
+
+    def schedule_the_bears_first(adjuster, closing):
+        if not calls:
+            generate_schedule(bears, 1)
+        calls.append(closing)
+        real(adjuster, closing)
+
+    with mock.patch.object(ScheduleAdjuster, "close_lanes", schedule_the_bears_first):
+        close_lanes(event, {3})
+
+    assert 3 not in lanes_used(bears)
+    assert closed_rounds(event) == {wolves.id, bears.id}
+
+
+def test_a_car_whose_only_run_to_come_is_on_the_closed_lane_gets_one_new_run():
+    """Car 107 has not raced, and its one run is heat 6 lane 3."""
+    replay, round = setup_race(racers=8, lanes=4)
+    event = replay.event
+    set_settings(event, max_runs_per_car=2)
+    abbreviated(
+        event,
+        round,
+        [
+            [101, 108, 102, 103],
+            [104, 105, 106, 108],
+            [102, 101, 103, 104],
+            [105, 106, None, 101],
+            [103, 102, 104, 105],
+            [106, None, 107, None],
+        ],
+    )
+    run_heats(event, round, 1, 2)
+    make_current(event, round, 3)
+    car = dict(Racer.objects.filter(event=event).values_list("car_number", "id"))
+
+    close_lanes(event, {3})
+
+    lanes = list(
+        HeatLane.objects.filter(round=round, racer_id=car[107]).values_list(
+            "lane", flat=True
+        )
+    )
+    assert len(lanes) == 1
+    assert lanes[0] != 3
+
+
+def test_under_points_a_heat_with_a_closed_lane_scores_the_open_lanes():
+    """On 4 lanes with lane 3 closed, first place is worth 3 points (D37)."""
+    replay, round = setup_race(racers=4, lanes=4)
+    event = replay.event
+    set_settings(event, use_points=True)
+    make_current(event, round, 1)
+    record_timer_result(event, fields("place1=2&place2=3&place3=1&place4=4"))
+    first = HeatLane.objects.get(round=round, heat=1, lane=1).racer_id
+
+    close_lanes(event, {3})
+
+    points = {
+        row.racer.id: row.summary.avg
+        for row in standings_snapshot(event).standings.rows
+        if row.round.id == round.id
+    }
+    assert points[first] == 3
+
+
+def test_reopening_a_lane_the_track_does_not_have_is_refused(race):
+    replay, round = race
+    event = replay.event
+    close_lanes(event, {3})
+    assert failure_of(lambda: reopen_lanes(event, {0})) == Failure.NO_SUCH_LANE
+    assert failure_of(lambda: reopen_lanes(event, {9})) == Failure.NO_SUCH_LANE
+    assert mask(event) == 0b0100
