@@ -22,6 +22,7 @@ from racing.tests.factories import (
     RosterEntryFactory,
     TimerSettingFactory,
 )
+from roster.models import CarRange
 from roster.tests.factories import (
     GroupConstituentFactory,
     GroupConstituentSubgroupFactory,
@@ -60,6 +61,9 @@ def populated_event():
         event=event, group=racer.group, subgroup=racer.subgroup, racer=racer
     )
     AwardPartition.objects.create(event=event, award=award, partition=racer.partition)
+    CarRange.objects.create(
+        event=event, partition=racer.partition, first=100, last=199, sort_order=1
+    )
     VoteFactory(voter__event=event)
     BallotAwardFactory(award__event=event)
     KioskFactory(event=event)

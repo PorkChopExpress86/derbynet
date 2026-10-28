@@ -29,7 +29,7 @@ def test_dump_event_prints_every_event_scoped_models_rows_as_json():
     assert dumped["event"]["slug"] == event.slug
     labels = {model._meta.label_lower for model in event_scoped_models()}
     assert set(dumped["models"]) == labels
-    assert len(labels) == 32
+    assert len(labels) == 33
     for label, rows in dumped["models"].items():
         assert rows, f"{label} has no rows"
         assert all(row["event"] == event.id for row in rows), label

@@ -18,6 +18,7 @@ from roster.models import (
     Partition,
     Subgroup,
 )
+from roster.services import car_numbers
 
 # The class name `record_action_partition_structure()` writes under
 # `one-group`, whatever the group is called now.
@@ -120,7 +121,10 @@ def classes(event) -> list[dict]:
 
 def partitions(event) -> list[dict]:
     """`json_partitions()`: every partition in sort order, with its racer
-    count and its one group and subgroup."""
+    count and its one group and subgroup. A partition with car number ranges
+    also has `carranges` (D48, Django only); the key is left out otherwise so
+    a PHP-shaped reply keeps its shape."""
+    ranges = car_numbers.ranges_by_partition(event.pk)
     rows = (
         Partition.objects.filter(event=event)
         .select_related("subgroup")
@@ -135,6 +139,11 @@ def partitions(event) -> list[dict]:
             "count": p.n,
             "classids": [p.subgroup.group_id],
             "rankids": [p.subgroup_id],
+            **(
+                {"carranges": car_numbers.range_rows(p.pk, ranges)}
+                if p.pk in ranges
+                else {}
+            ),
         }
         for p in rows
     ]
