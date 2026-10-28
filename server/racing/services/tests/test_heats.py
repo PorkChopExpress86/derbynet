@@ -22,6 +22,7 @@ from racing.services.heats import (
 )
 from racing.services.master import master_index
 from racing.services.results import (
+    CURRENT,
     Outcome,
     delete_results,
     record_manual_result,
@@ -175,6 +176,31 @@ def test_every_result_write_sets_completed_and_every_clear_empties_it(race):
     assert not HeatLane.objects.filter(round=round, heat=1, completed__isnull=False)
     delete_results(event)
     assert not HeatLane.objects.filter(event=event, completed__isnull=False)
+
+
+def test_result_delete_of_the_current_heat_reads_it_under_the_lock(race):
+    """`result.delete` with `roundid=current&heat=current` clears the heat
+    that is current when the lock is held, and only that heat."""
+    event, round = race
+    finish(event, "lane1=3.1&lane2=3.2&lane3=3.3&lane4=3.4")
+    finish(event, "lane1=3.5&lane2=3.6&lane3=3.7&lane4=3.8")
+    select_heat(event, round_id=round.id, heat=2)
+
+    assert delete_results(event, CURRENT, CURRENT) is None
+
+    assert all(t is None for t, _ in lanes(round, 2).values())
+    assert all(t is not None for t, _ in lanes(round, 1).values())
+
+
+def test_result_delete_of_the_current_round_with_none_clears_nothing(race):
+    """PHP matches `roundid = -1`, which names no round."""
+    event, round = race
+    finish(event, "lane1=3.1&lane2=3.2&lane3=3.3&lane4=3.4")
+    cancel_running_round(event)
+
+    assert delete_results(event, CURRENT) is None
+
+    assert all(t is not None for t, _ in lanes(round, 1).values())
 
 
 def test_a_partial_timer_result_finishes_the_heat_with_did_not_finish_times(race):

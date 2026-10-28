@@ -12,6 +12,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Final
 
 from django.db import transaction
 from django.utils import timezone
@@ -199,18 +200,40 @@ def record_manual_result(
     return Recorded(outcome, decision.failure)
 
 
+class _Current:
+    def __repr__(self) -> str:
+        return "CURRENT"
+
+
+CURRENT: Final = _Current()
+"""`result.delete`'s `current`: the round or heat that is current once the
+race state is locked."""
+
+
 def delete_results(
     event: Event,
-    round: Round | None = None,
-    heat: int | None = None,
+    round: Round | _Current | None = None,
+    heat: int | _Current | None = None,
     *,
     control_race: bool = True,
     finalists_for: FinalistsFor | None = None,
 ) -> hs.Failure | None:
     """`result.delete`: clear the results of every round, of one round, or
-    of one heat of it. The current heat and racing stay as they are."""
+    of one heat of it. The current heat and racing stay as they are.
+    `CURRENT` names the current round or heat as the lock finds it; with no
+    current round, nothing is cleared, as PHP's `roundid = -1` matches no
+    row."""
     with transaction.atomic():
-        ended = lock_race_state(event.id).ended_round_id
+        state = lock_race_state(event.id)
+        ended = state.ended_round_id
+        if round is CURRENT:
+            round = Round.objects.filter(event=event, pk=state.current_round_id).first()
+            if round is None:
+                return None
+        if heat is CURRENT:
+            heat = state.current_heat
+            if heat is None:
+                return None
         rows = HeatLane.objects.filter(event=event)
         rounds = Round.objects.filter(event=event)
         if round is not None:
