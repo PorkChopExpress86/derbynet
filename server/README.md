@@ -123,6 +123,8 @@ A final with fewer than 2 racers, zero included, gets D28's "The final needs at 
 
 The finalists of a follow-on or aggregate round come from the standings (see below), so `write_roster` and the playlist services take them as input. `racing/engine/groups/aggregates.py` orders the aggregate groups (Q8), computes what each draws from, and finds the aggregates ready for a roster.
 
+`legacy_api/handlers/groups.py` serves `class.add`, `class.edit`, `class.delete`, `class.order`, `query=class.list`, the five `rank.*` actions and the six `partition.*` actions over these services (#30). `roster/services/structure.py` builds the `classes` list (`json_all_classes()`), the `partitions` list that `poll` will serve (#31), and the `partition.*structure` entry for the action log. The services also log `class.*create`, `round.*create`, `rank.*create`, `partition.*create`, `class.*delete` and `rank.*delete` with PHP's keys, in the transaction of the change, so `history.php`'s replay reads new events as it reads imported ones. Every ordering endpoint writes the posted order and renumbers the rows 1 to n in one transaction, where PHP's duplicate cleanups crash or loop (C16). `partition.move` accepts only `classid` or `rankid` as `from_group_field` (S9), and refuses an unknown partition or target with `no-such-partition`, `bad-group` or `bad-from-group`. `class.list` needs a login (D5). `legacy_api/tests/test_groups_parity.py` replays the group scripts' recordings through these endpoints and compares `class.list` with PHP's after every step.
+
 `roster/tests/test_group_scenarios.py` and `racing/tests/test_round_scenarios.py` replay the group and round scripts of the shell suite through these services, using `roster/tests/php_replay.py`, and compare the state with what PHP recorded. PHP rebuilds the groups, with new ids, when a script applies the rule in force, so the replay checks that Django changes nothing and then rebuilds them itself, so later requests find the rows they name.
 
 ## Standings and speed awards
@@ -236,7 +238,7 @@ testing/login-coordinator.sh http://localhost:8080
 testing/login-coordinator.sh http://localhost:8000
 ```
 
-The Django server serves `/action.php` with PHP's dispatch rules and envelope. The login handlers and the database reset and settings slice (#63) are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh`, and `testing/reset-database.sh`, pass against both servers. Every other name answers `unrecognized` until M3 ports it.
+The Django server serves `/action.php` with PHP's dispatch rules and envelope. The login handlers, the database reset and settings slice (#63), and the class, rank and partition endpoints (#30) are ported, so the `user_login_*` and `user_logout` helpers of `testing/common.sh`, and `testing/reset-database.sh`, pass against both servers. Every other name answers `unrecognized` until M3 ports it.
 
 ### Run the shell suites against Django
 

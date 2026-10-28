@@ -26,7 +26,7 @@ from django.db.models.functions import Left, Lower
 
 from awards.models import Award, BallotAward
 from awards.services import reconcile_partition_lists
-from core.models import FullFieldRule, RaceSettings, RaceState
+from core.models import ActionLog, FullFieldRule, RaceSettings, RaceState
 from core.services import lock_race_state
 from racing.engine.heat_state import Cancel
 from racing.models import (
@@ -46,6 +46,7 @@ from roster.models import (
     Racer,
     Subgroup,
 )
+from roster.services.structure import partition_structure
 
 # CLASS_COLUMN_WIDTH and RANK_COLUMN_WIDTH. PHP cuts bytes; this cuts
 # characters, so a multibyte name never ends in half a character.
@@ -174,6 +175,18 @@ def _name_taken(name: str) -> GroupFailure:
     return GroupFailure(Failure.NAME_TAKEN, f"The name {name} is already in use.")
 
 
+def _record(event_id, **request) -> None:
+    """`record_action()` of a synthetic entry, such as `class.*create`, with
+    PHP's parameter names, which `history.php` reads. It is written in the
+    caller's transaction, so a change and its entry commit together."""
+    ActionLog.objects.create(event_id=event_id, request=request)
+
+
+def record_partition_structure(event_id) -> None:
+    """`record_action_partition_structure()`."""
+    ActionLog.objects.create(event_id=event_id, request=partition_structure(event_id))
+
+
 def is_aggregate(group_id) -> bool:
     return (
         GroupConstituent.objects.filter(aggregate_id=group_id).exists()
@@ -272,6 +285,7 @@ def _delete_awards(awards) -> None:
 def _delete_subgroup(subgroup: Subgroup) -> None:
     """`delete_rank()`: the subgroup, its awards and its partitions. The
     caller has checked that no racer is in it."""
+    _record(subgroup.event_id, action="rank.*delete", rankid=subgroup.pk)
     _delete_awards(Award.objects.filter(subgroup=subgroup))
     Partition.objects.filter(subgroup=subgroup).delete()
     subgroup.delete()
@@ -292,7 +306,9 @@ def delete_group_rows(group: Group) -> None:
             current_group=None
         )
         reset_full_field(group.event_id, [group])
+        group_id = group.pk
         group.delete()
+        _record(group.event_id, action="class.*delete", classid=group_id)
 
 
 def _create_partition(event_id, name: str, subgroup: Subgroup) -> Partition:
@@ -301,9 +317,17 @@ def _create_partition(event_id, name: str, subgroup: Subgroup) -> Partition:
         top=Max("sort_order"), n=Count("id")
     )
     sort_order = 1 + (top["top"] if top["top"] is not None else top["n"])
-    return Partition.objects.create(
+    partition = Partition.objects.create(
         event_id=event_id, name=name, subgroup=subgroup, sort_order=sort_order
     )
+    _record(
+        event_id,
+        action="partition.*create",
+        partitionid=partition.pk,
+        name=name,
+        rankid=subgroup.pk,
+    )
+    return partition
 
 
 def _create_group(event_id, name: str, with_first_round: bool = True) -> Group:
@@ -317,8 +341,16 @@ def _create_group(event_id, name: str, with_first_round: bool = True) -> Group:
     if not sort_order:
         sort_order = 1 + top["n"]
     group = Group.objects.create(event_id=event_id, name=name, sort_order=sort_order)
+    _record(event_id, action="class.*create", **{"class": name}, classid=group.pk)
     if with_first_round:
-        Round.objects.get_or_create(event_id=event_id, group=group, number=1)
+        first, _ = Round.objects.get_or_create(event_id=event_id, group=group, number=1)
+        _record(
+            event_id,
+            action="round.*create",
+            roundid=first.pk,
+            classid=group.pk,
+            round=1,
+        )
     return group
 
 
@@ -374,7 +406,18 @@ def find_or_create_subgroup(
                     n += 1
                     candidate = f"{base}-{n}"
                 _create_partition(group.event_id, candidate, subgroup)
+        _record_subgroup_created(subgroup)
         return subgroup
+
+
+def _record_subgroup_created(subgroup: Subgroup) -> None:
+    _record(
+        subgroup.event_id,
+        action="rank.*create",
+        rank=subgroup.name,
+        rankid=subgroup.pk,
+        classid=subgroup.group_id,
+    )
 
 
 def find_or_create_partition(event_id, name: str) -> Partition:
@@ -453,24 +496,30 @@ def _reorder_partitions(event_id) -> None:
         Partition.objects.filter(pk=partition_id).update(sort_order=position)
 
 
-def _make_sort_orders_unique(rows, posted) -> None:
-    """When a post leaves rows sharing a sort order, renumber every row 1,
-    2, ... by sort order. Among rows that share one, the posted rows come
-    first: posting B, C over A=1, B=2, C=3 leaves B=1, A=1, C=2, which
-    becomes B, A, C.
+def _positions(rows: Sequence, positions: Sequence[int] | None) -> Sequence[int]:
+    return range(1, len(rows) + 1) if positions is None else positions
 
-    A post that names only some rows can do this. PHP's cleanup in
-    `class.order` and `partition.order` fails (`class.order` binds a whole
-    row as the id, and `$db->execute_once` does not exist), and the one in
-    `rank.order` bumps every row with a higher id, which can put an unposted
-    row between two posted ones.
+
+def _renumber_densely(rows, posted) -> None:
+    """Renumber every row 1, 2, ... by sort order (C16). Among rows that
+    share one, the posted rows come first: posting B, C over A=1, B=2, C=3
+    leaves B=1, A=1, C=2, which becomes B, A, C, and posted rows that share
+    one keep the posted order. Gaps close too, so the
+    orders are always 1 to n.
+
+    A post that names only some rows can leave rows sharing a sort order.
+    PHP's cleanup in `class.order` and `partition.order` fails (`class.order`
+    binds a whole row as the id, and `$db->execute_once` does not exist), and
+    the one in `rank.order` bumps every row with a higher id, which can put
+    an unposted row between two posted ones.
     """
-    if not rows.values("sort_order").annotate(n=Count("id")).filter(n__gt=1).exists():
-        return
-    posted_ids = {row.pk for row in posted}
-    ordered = sorted(rows, key=lambda r: (r.sort_order, r.pk not in posted_ids, r.pk))
+    rank = {row.pk: n for n, row in enumerate(posted)}
+    ordered = sorted(
+        rows, key=lambda r: (r.sort_order, rank.get(r.pk, len(rank)), r.pk)
+    )
     for position, row in enumerate(ordered, 1):
-        type(row).objects.filter(pk=row.pk).update(sort_order=position)
+        if row.sort_order != position:
+            type(row).objects.filter(pk=row.pk).update(sort_order=position)
 
 
 # ----- Group formation rules --------------------------------------------
@@ -510,6 +559,7 @@ def form_groups_by_rule(event, rule: str) -> None:
         elif rule == Rule.BY_PARTITION:
             _form_by_partition(event.id)
         clean_up_empty_groups_and_subgroups(event.id)
+        record_partition_structure(event.id)
         settings.use_subgroups = rule != Rule.BY_PARTITION
         settings.save(update_fields=["use_subgroups"])
 
@@ -698,6 +748,7 @@ def delete_partition(partition: Partition) -> None:
             GroupConstituent.objects.filter(constituent=group).delete()
             delete_group_rows(group)
         reconcile_partition_lists(event_id)
+        record_partition_structure(event_id)
 
 
 def move_partition(
@@ -743,17 +794,23 @@ def move_partition(
         clean_up_empty_groups_and_subgroups(event_id)
         _reorder_partitions(event_id)
         reconcile_partition_lists(event_id)
+        record_partition_structure(event_id)
 
 
-def order_partitions(event, partitions: Sequence[Partition]) -> None:
-    """`partition.order`: `partitions[i]` gets sort order `i + 1`. Under
+def order_partitions(
+    event, partitions: Sequence[Partition], positions: Sequence[int] | None = None
+) -> None:
+    """`partition.order`: `partitions[i]` gets sort order `positions[i]`, by
+    default `i + 1`, then every partition is renumbered 1 to n. Under
     `by-partition` each group takes its partition's sort order, and under
     `one-group` each subgroup does."""
     with transaction.atomic():
         lock_race_state(event.id)
-        for position, partition in enumerate(partitions, 1):
+        for position, partition in zip(
+            _positions(partitions, positions), partitions, strict=True
+        ):
             Partition.objects.filter(pk=partition.pk).update(sort_order=position)
-        _make_sort_orders_unique(Partition.objects.filter(event=event), partitions)
+        _renumber_densely(Partition.objects.filter(event=event), partitions)
         rule = _rule(event.id)
         if rule == Rule.ONE_GROUP:
             for subgroup in Subgroup.objects.filter(event=event):
@@ -892,15 +949,19 @@ def delete_group(group: Group) -> None:
         reconcile_partition_lists(group.event_id)
 
 
-def order_groups(event, groups: Sequence[Group]) -> None:
-    """`class.order`: `groups[i]` gets sort order `i + 1`, then the
-    partitions are renumbered to match."""
+def order_groups(
+    event, groups: Sequence[Group], positions: Sequence[int] | None = None
+) -> None:
+    """`class.order`: `groups[i]` gets sort order `positions[i]`, by default
+    `i + 1`, every group is renumbered 1 to n, then the partitions are
+    renumbered to match."""
     with transaction.atomic():
         lock_race_state(event.id)
-        for position, group in enumerate(groups, 1):
+        for position, group in zip(_positions(groups, positions), groups, strict=True):
             Group.objects.filter(pk=group.pk).update(sort_order=position)
-        _make_sort_orders_unique(Group.objects.filter(event=event), groups)
+        _renumber_densely(Group.objects.filter(event=event), groups)
         _reorder_partitions(event.id)
+        record_partition_structure(event.id)
 
 
 # ----- Subgroups ----------------------------------------------------------
@@ -919,9 +980,11 @@ def add_subgroup(event, group_id: int, name: str) -> Subgroup:
         if group is None:
             raise GroupFailure(Failure.NOCLASS, f"No class has classid {group_id}")
         n = Subgroup.objects.filter(group=group).count()
-        return Subgroup.objects.create(
+        subgroup = Subgroup.objects.create(
             event=event, group=group, name=name, sort_order=n + 1
         )
+        _record_subgroup_created(subgroup)
+        return subgroup
 
 
 def rename_subgroup(subgroup: Subgroup, name: str, n_trophies=KEEP) -> None:
@@ -995,21 +1058,25 @@ def move_subgroup(subgroup: Subgroup, group: Group | None) -> None:
             entries.update(round=first_round)
         clean_up_empty_groups_and_subgroups(event_id)
         reconcile_partition_lists(event_id)
+        record_partition_structure(event_id)
 
 
-def order_subgroups(event, subgroups: Sequence[Subgroup]) -> None:
-    """`rank.order`: `subgroups[i]` gets sort order `i + 1`, then the
+def order_subgroups(
+    event, subgroups: Sequence[Subgroup], positions: Sequence[int] | None = None
+) -> None:
+    """`rank.order`: `subgroups[i]` gets sort order `positions[i]`, by default
+    `i + 1`, the subgroups of each group are renumbered 1 to n, then the
     partitions are renumbered to match."""
     with transaction.atomic():
         lock_race_state(event.id)
-        for position, subgroup in enumerate(subgroups, 1):
+        for position, subgroup in zip(
+            _positions(subgroups, positions), subgroups, strict=True
+        ):
             Subgroup.objects.filter(pk=subgroup.pk).update(sort_order=position)
         for group_id in (
             Subgroup.objects.filter(event=event)
             .values_list("group_id", flat=True)
             .distinct()
         ):
-            _make_sort_orders_unique(
-                Subgroup.objects.filter(group_id=group_id), subgroups
-            )
+            _renumber_densely(Subgroup.objects.filter(group_id=group_id), subgroups)
         _reorder_partitions(event.id)
