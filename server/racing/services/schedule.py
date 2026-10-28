@@ -162,6 +162,7 @@ def generate_schedule(round: Round, n_times_per_lane: int) -> int:
                 if racer_id is not None
             )
             after_chart_change(round)
+            Round.objects.filter(pk=round.pk).update(chart_mask=inputs.unused_lane_mask)
             # A new chart, which has no result, keeps only the closures of
             # lanes still closed (#108).
             for closure in LaneClosure.objects.filter(round=round):

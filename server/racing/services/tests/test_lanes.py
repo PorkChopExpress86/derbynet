@@ -746,7 +746,10 @@ def test_a_round_regenerated_after_a_reopen_counts_the_reopened_lane(race):
     assert all(base == 4 for base, _ in scores(event, bears).values())
 
 
-def test_a_late_racer_fitted_in_after_a_reopen_can_use_the_lane(race):
+def test_a_late_racer_after_a_reopen_races_on_the_lanes_of_the_chart(race):
+    """The closure moved the Bears' chart off lane 3. After the reopen a
+    late racer is fitted into that chart, so it keeps off lane 3 too; only
+    a new chart uses the lane again (D37)."""
     replay, wolves = race
     event = replay.event
     bears = new_group(replay, "Bears")
@@ -757,10 +760,12 @@ def test_a_late_racer_fitted_in_after_a_reopen_can_use_the_lane(race):
 
     reschedule(bears, late.id)
 
-    assert 3 in set(
-        HeatLane.objects.filter(round=bears, racer=late).values_list("lane", flat=True)
-    )
+    assert lanes_of(bears, late) == {1, 2, 4}
     assert closed_rounds(event) == {wolves.id}
+    generate_schedule(bears, 1)
+    later = late_racer(bears, 251)
+    reschedule(bears, later.id)
+    assert lanes_of(bears, later) == {1, 2, 3, 4}
 
 
 def test_under_points_a_round_scheduled_after_a_closure_scores_its_lanes(race):
@@ -820,8 +825,8 @@ def test_a_round_racing_its_first_heat_keeps_its_closure_after_a_reopen():
 def test_the_poll_after_a_lane_is_opened_on_the_settings_page(race):
     """The Wolves were racing when lane 3 closed and the Bears only
     scheduled. Once the settings page opens lane 3 again, lane 3 is closed
-    only for the Wolves' remaining heats, the Bears' late racer can use it,
-    and once the Wolves finish no lane is closed."""
+    only for the Wolves' remaining heats, a new Bears chart uses it, and
+    once the Wolves finish no lane is closed."""
     replay, wolves = race
     event = replay.event
     bears = new_group(replay, "Bears")
@@ -832,11 +837,8 @@ def test_the_poll_after_a_lane_is_opened_on_the_settings_page(race):
     assert poll_lanes(event)["closed-lanes"] == [
         {"lane": 3, "roundids": [wolves.id], "reopen": True}
     ]
-    late = late_racer(bears, 250)
-    reschedule(bears, late.id)
-    assert 3 in set(
-        HeatLane.objects.filter(round=bears, racer=late).values_list("lane", flat=True)
-    )
+    generate_schedule(bears, 1)
+    assert 3 in lanes_used(bears)
     run_heats(event, wolves, *range(3, 1 + max(chart(wolves))))
     assert poll_lanes(event)["closed-lanes"] == []
 
@@ -844,7 +846,7 @@ def test_the_poll_after_a_lane_is_opened_on_the_settings_page(race):
 def bears_raced_on_a_lane_opened_again(replay, wolves):
     """The Bears were only scheduled when lane 3 closed during the Wolves'
     round. The Wolves finish, the settings page opens lane 3, a late racer
-    is fitted into the Bears on all 4 lanes, and the Bears race."""
+    joins, the Bears are scheduled again on all 4 lanes, and race."""
     event = replay.event
     bears = new_group(replay, "Bears")
     generate_schedule(bears, 1)
@@ -852,7 +854,7 @@ def bears_raced_on_a_lane_opened_again(replay, wolves):
     run_heats(event, wolves, *range(3, 1 + max(chart(wolves))))
     set_settings(event, unused_lane_mask=0)
     late = late_racer(bears, 250)
-    reschedule(bears, late.id)
+    generate_schedule(bears, 1)
     assert lanes_of(bears, late) == {1, 2, 3, 4}
     run_heats(event, bears, *chart(bears))
     assert scores(event, bears)[late.id][0] == 4
@@ -885,3 +887,26 @@ def test_closing_the_lane_again_on_the_settings_page_drops_no_time(race):
 
     assert scores(event, bears) == averages(bears)
     assert scores(event, wolves) == averages(wolves, closed={3})
+
+
+def test_a_round_rescheduled_by_a_closure_keeps_off_the_lane_after_a_reopen(race):
+    """The Bears were only scheduled when lane 3 closed, so the closure moved
+    them onto lanes 1, 2 and 4. They start racing, and lane 3 reopens before
+    the next round is scheduled. A late racer fitted into the Bears races on
+    the lanes the other Bears race on; only later rounds use lane 3 (D37)."""
+    replay, wolves = race
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    close_lanes(event, {3})
+    run_heats(event, wolves, *range(3, 1 + max(chart(wolves))))
+    run_heats(event, bears, 1, 2)
+    reopen_lanes(event, {3})
+    late = late_racer(bears, 250)
+
+    reschedule(bears, late.id)
+
+    assert lanes_of(bears, late) == {1, 2, 4}
+    cubs = new_group(replay, "Cubs", first_car=301)
+    generate_schedule(cubs, 1)
+    assert 3 in lanes_used(cubs)

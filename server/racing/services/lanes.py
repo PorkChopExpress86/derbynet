@@ -26,7 +26,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from django.db import transaction
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
 
 from core.models import Event, RaceSettings, RaceState
@@ -177,6 +177,9 @@ def _record_closure(
         ]
         or [LaneClosure(event_id=event_id, round=None, mask=new, closed_at=now)]
     )
+    for round in rounds:
+        # Its chart is now built without these lanes too.
+        Round.objects.filter(pk=round.pk).update(chart_mask=F("chart_mask").bitor(new))
     settings.unused_lane_mask |= new
     fields = ["unused_lane_mask"]
     if scoring is not None:

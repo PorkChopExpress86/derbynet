@@ -14,6 +14,11 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name="round",
+            name="chart_mask",
+            field=models.PositiveIntegerField(default=0),
+        ),
+        migrations.AddField(
+            model_name="round",
             name="scoring",
             field=models.SmallIntegerField(blank=True, null=True),
         ),

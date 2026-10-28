@@ -160,6 +160,7 @@ class _Snapshot:
     lane_count: int
     unused_lane_mask: int
     closed_mask: int  # the lanes closed in this round, reopened or not (#108)
+    chart_mask: int  # the lanes the chart was built without (#108)
     rows: tuple[tuple[int, int, int, bool], ...]  # heat, lane, racer, has result
     unscheduled: tuple[int, ...]
     departed: tuple[int, ...]
@@ -212,6 +213,7 @@ def _snapshot(round: Round, racer_id: int | None = None) -> _Snapshot:
         lane_count=settings.lane_count,
         unused_lane_mask=settings.unused_lane_mask,
         closed_mask=closed_mask,
+        chart_mask=Round.objects.values_list("chart_mask", flat=True).get(pk=round.pk),
         rows=tuple(
             (heat, lane, racer, done)
             for r, heat, lane, racer, done, _ in rows
@@ -277,8 +279,9 @@ def _adjust(
         chart,
         snapshot.raced(),
         # A lane closed in this round stays closed for the rest of it, even
-        # once it is reopened for later rounds (D37).
-        snapshot.unused_lane_mask | snapshot.closed_mask,
+        # once it is reopened for later rounds, and so does any lane the
+        # chart was built without (D37).
+        snapshot.unused_lane_mask | snapshot.closed_mask | snapshot.chart_mask,
         snapshot.lane_count,
         n_runs,
         budget,

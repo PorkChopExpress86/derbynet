@@ -26,6 +26,12 @@ class Round(EventScoped):
     # closure changes the event's (#108, D36). Django only. Null follows
     # the event setting, as every round does in PHP.
     scoring = models.SmallIntegerField(null=True, blank=True)
+    # The lanes the round's chart was built without, in the
+    # `unused-lane-mask` format: the mask `generate_schedule` used, and the
+    # lanes a closure took it off since. A reschedule keeps off them, so a
+    # lane reopened during the round is used only by charts made after the
+    # reopen (D37, #108). Django only.
+    chart_mask = models.PositiveIntegerField(default=0)
 
     class Meta:
         constraints = [
