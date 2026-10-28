@@ -1678,7 +1678,6 @@ request: POST action.php
 request-body: action=role.login&name=Timer&password=
 status: 200
 content-type: application/json; charset=utf-8
-set-cookie: PHPSESSID=<value>; path=/
 cache-control: no-store, no-cache, must-revalidate
 length: 248
 body:
