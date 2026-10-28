@@ -35,6 +35,7 @@ from racing.services.results import Outcome, record_manual_result
 from racing.services.rounds import (
     FollowOn,
     NewAggregate,
+    make_new_round,
     new_round_roster,
     playlist_finalists,
     round_adjustments,
@@ -608,8 +609,10 @@ def test_a_combined_final_drawn_from_subgroups_takes_only_their_racers(day, draw
 
 def test_a_racer_moved_to_another_group_is_not_entered_in_its_final(day):
     """Review finding 1: the request names the old group, so the new
-    group's final does not take the racer either."""
-    day.race_round_1()
+    group's final does not take the racer either. The racer is allowed
+    before any final exists, so the request is on no round yet."""
+    round_1 = day.start()
+    day.race(round_1)
     day.allowed_late_racer()
     move_to_another_group(day, LATE)
     webelos = day.racer(LATE).group
@@ -689,6 +692,116 @@ def test_an_allow_after_the_final_has_run_waits_for_the_next_round(day):
     assert LATE not in day.roster(final)
     grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2)
     assert day.roster(grand.round) == [101, 102, LATE]
+
+
+def test_a_racer_who_raced_the_final_as_allowed_is_not_entered_again(day):
+    """An allowed request is spent on the first round it puts the racer
+    in, so a combined round built after the final does not take the racer."""
+    final = raced_final(day)
+    day.race(final)
+    grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2)
+    assert day.roster(grand.round) == [101, 102]
+    assert FinalRequest.objects.get().placed_round == final
+
+
+def test_a_rebuild_keeps_the_racer_bound_to_the_round(day):
+    """D27: the rebuild clears the waiting final's roster, and the request
+    still names the final, so the racer comes back."""
+    final = day.race_round_1()
+    day.allowed_late_racer()
+    assert FinalRequest.objects.get().placed_round == final
+    HeatLane.objects.filter(round=day.round_1, racer__car_number=106).update(
+        finish_time=1.9
+    )
+    assert rebuild_waiting_round(day.event, playlist_finalists())
+    assert LATE in day.roster(final)
+    assert FinalRequest.objects.get().placed_round == final
+
+
+@pytest.mark.parametrize("first", ["final", "combined round"])
+def test_a_racer_allowed_before_any_final_joins_the_round_built_first(day, first):
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    day.allowed_late_racer()
+    builds = [
+        lambda: new_round_roster(FollowOn(round_1), top=4).round,
+        lambda: (
+            new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2).round
+        ),
+    ]
+    if first == "combined round":
+        builds.reverse()
+    made_first, made_second = (build() for build in builds)
+    assert LATE in day.roster(made_first)
+    assert LATE not in day.roster(made_second)
+    assert FinalRequest.objects.get().placed_round == made_first
+
+
+def test_an_allow_with_two_rounds_waiting_goes_into_the_one_made_first(day):
+    """D44: both the final and a combined round exist, neither raced."""
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    final = new_round_roster(FollowOn(round_1), top=4).round
+    grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2).round
+    day.allowed_late_racer()
+    assert LATE in day.roster(final)
+    assert LATE not in day.roster(grand)
+
+
+def hand_built_final_with_allowed_racer(day) -> Round:
+    """The final is made empty, the late racer is allowed while its roster
+    is still empty, and the race coordinator fills the roster by hand with
+    `add_to_final`, the allowed racer included. Then the final races."""
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    final = make_new_round(day.group, 2)
+    day.allowed_late_racer()
+    assert FinalRequest.objects.get().placed_round is None
+    for car in (101, 102, 103, 104, LATE):
+        add_to_final(day.racer(car), final)
+    generate_schedule(final, 1)
+    day.race(final)
+    return final
+
+
+def test_add_to_final_places_an_allowed_racer(day):
+    """Review gap 1 on #115: the racer is on the final's roster, so the
+    request is spent on it, and a combined round built after the final has
+    run does not take the racer again."""
+    final = hand_built_final_with_allowed_racer(day)
+    assert FinalRequest.objects.get().placed_round == final
+    grand = new_round_roster(NewAggregate("Grand", groups=[day.group]), top=2)
+    assert day.roster(grand.round) == [101, 102]
+
+
+def test_an_allow_into_an_empty_final_waits_until_the_racer_is_on_a_roster(day):
+    """Review gap 2 on #115. Allow puts nobody on an empty roster, so the
+    request stays unplaced until the roster is written, which then places
+    it. A final built without the racer leaves the request for the next
+    round the group races in (D44)."""
+    round_1 = day.start()
+    day.race(round_1)
+    PlaylistEntry.objects.filter(event=day.event).delete()
+    final = make_new_round(day.group, 2)
+    day.allowed_late_racer()
+    assert FinalRequest.objects.get().placed_round is None
+    made = new_round_roster(FollowOn(round_1), top=4)
+    assert made.round == final
+    assert LATE in day.roster(final)
+    assert FinalRequest.objects.get().placed_round == final
+
+
+def test_declining_unbinds_so_a_new_allow_finds_the_next_round(day):
+    final = day.race_round_1()
+    day.allowed_late_racer()
+    request = decline_final_request(FinalRequest.objects.get())
+    assert request.placed_round is None
+    allow_final_request(request)
+    assert LATE in day.roster(final)
+    assert FinalRequest.objects.get().placed_round == final
 
 
 def test_an_allowed_racer_in_a_finished_final_is_still_not_a_qualifier(day):

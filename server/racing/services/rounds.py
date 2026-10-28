@@ -24,7 +24,7 @@ from core.services import lock_race_state
 from racing.engine.groups.aggregates import Aggregate, ready_aggregates
 from racing.engine.standings import finalists
 from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
-from racing.services.finals import allowed_racers
+from racing.services.finals import allowed_racers, place_allowed_racers
 from racing.services.standings import standings_snapshot
 from roster.models import (
     Group,
@@ -83,13 +83,16 @@ def record_cut(round: Round, top: int, bucketed: bool) -> None:
 
 def write_roster(round: Round, finalists: Iterable[Racer]) -> None:
     """Enter the finalists in the round, in the order given, which is the
-    order the schedule takes them in."""
+    order the schedule takes them in. An allowed racer entered here is
+    placed on the round, so no later round takes the racer again (D32)."""
+    finalists = list(finalists)
     with transaction.atomic():
         lock_race_state(round.event_id)
         RosterEntry.objects.bulk_create(
             RosterEntry(event_id=round.event_id, round=round, racer=racer)
             for racer in finalists
         )
+        place_allowed_racers(round, [racer.pk for racer in finalists])
 
 
 @dataclass(frozen=True)
