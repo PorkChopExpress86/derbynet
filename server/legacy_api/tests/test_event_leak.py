@@ -20,6 +20,7 @@ from core.models import SiteState
 from core.tests.factories import EventFactory
 from legacy_api.registry import REGISTRY, Format
 from racing.models import Round
+from racing.services.polls import POLL_VALUES
 from racing.tests.factories import RosterEntryFactory, RoundFactory
 from roster.models import Group, Racer, Subgroup
 from roster.tests.factories import GroupFactory, RacerFactory, SubgroupFactory
@@ -65,6 +66,25 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     },
     ("action", "partition.order"): {"partitionid_1": "1", "partitionid_2": "2"},
     ("action", "partition.apply-rule"): {"rule": "one-group"},
+    # The ids name rows of the first event, which is not active.
+    ("action", "heat.select"): {"roundid": "1", "now_racing": "1"},
+    ("action", "heat.rerun"): {"heat": "current"},
+    ("action", "heat.reinstate"): {},
+    ("action", "result.write"): {"lane1": "3.1", "lane2": "3.2"},
+    ("action", "result.delete"): {"roundid": "1", "heat": "1"},
+    ("action", "schedule.generate"): {"roundid": "1"},
+    ("action", "schedule.unschedule"): {"roundid": "1"},
+    ("action", "schedule.reschedule"): {"roundid": "1", "racerid": "1"},
+    ("action", "roster.new"): {"roundid": "1", "top": "2"},
+    ("action", "roster.delete"): {"roundid": "1"},
+    ("query", "poll.coordinator"): {"roundid": "1", "heat": "1"},
+    ("query", "poll"): {
+        "values": ",".join(POLL_VALUES),
+        "roundid": "1",
+        "heat": "1",
+        "row-height": "40",
+    },
+    ("query", "poll.results"): {"roundid": "1", "details": "1"},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},
