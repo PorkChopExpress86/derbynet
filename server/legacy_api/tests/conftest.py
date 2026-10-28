@@ -42,14 +42,25 @@ def post(client, body, path="/action.php"):
     return client.post(path, body, content_type="application/x-www-form-urlencoded")
 
 
-@pytest.fixture
-def test_endpoints():
-    """Turn on the test-only endpoints for one test, then off again."""
+def _with_test_endpoints(enabled):
     from django.test import override_settings
 
     from legacy_api.handlers import testing
 
-    with override_settings(ENABLE_TEST_ENDPOINTS=True):
+    with override_settings(ENABLE_TEST_ENDPOINTS=enabled):
         testing.sync()
         yield
+    # Back to the process's own setting, which CI sets to on.
     testing.sync()
+
+
+@pytest.fixture
+def test_endpoints():
+    """Turn on the test-only endpoints for one test."""
+    yield from _with_test_endpoints(True)
+
+
+@pytest.fixture
+def no_test_endpoints():
+    """Turn them off for one test, as a real race runs."""
+    yield from _with_test_endpoints(False)

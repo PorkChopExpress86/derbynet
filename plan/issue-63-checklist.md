@@ -9,7 +9,7 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 - [x] `database.execute`: `schema`, `update-schema`, and `drop-message-queue-table` as a mapping, with `insecure`, `sqlnoscript`, and the `executed` and `details` keys.
 - [x] Remove fake racer images on `schema` (C28).
 - [x] `test.setup` behind `DERBYNET_ENABLE_TEST_ENDPOINTS=1`, with two-argument failures (S24, C17).
-- [ ] `database.check` invariants as service functions with PHP's tags, anonymous only when the test flag is on (S26).
+- [x] `database.check` invariants as service functions with PHP's tags, anonymous only when the test flag is on (S26).
 - [ ] `manage.py create_test_event`.
 - [ ] CI sets `DERBYNET_ENABLE_TEST_ENDPOINTS=1` for the Django shell-suite job, and the developer notes say so.
 - [x] ActionLog rows keep the `settings.write` parameter names.
@@ -20,9 +20,9 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 - [x] `test_settings_list.py`
 - [x] `test_database_execute.py`
 - [x] `test_test_setup.py`
-- [ ] `test_database_check.py`
+- [x] `test_database_check.py`
 - [ ] `testing/reset-database.sh` passes against Django twice in a row, and `DBCHECK=1` passes too.
 
 ## PHP defects (rows of #64)
 
-- [ ] S2 (done), S24 (done), S26, C17 (done), C28 (done)
+- [ ] S2 (done), S24 (done), S26 (done), C17 (done), C28 (done)

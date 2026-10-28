@@ -6,11 +6,9 @@ import os
 from urllib.parse import urlencode
 
 import pytest
-from django.test import override_settings
 
 from accounts.permissions import Perm
 from core.slides import slides_dir
-from legacy_api.handlers import testing
 from legacy_api.registry import REGISTRY
 from legacy_api.tests.conftest import log_in, post
 
@@ -111,12 +109,12 @@ def test_a_caller_without_set_up_cannot_seed_a_slide(
     assert not slides_dir(event).exists()
 
 
-def test_the_handler_is_unregistered_when_the_flag_is_off(client, event):
-    with override_settings(ENABLE_TEST_ENDPOINTS=False):
-        testing.sync()
-        log_in(client, Perm.SET_UP)
+def test_the_handler_is_unregistered_when_the_flag_is_off(
+    client, event, no_test_endpoints
+):
+    log_in(client, Perm.SET_UP)
 
-        body = setup(client, slide="s.png")
+    body = setup(client, slide="s.png")
 
     assert REGISTRY.get("action", "test.setup") is None
     assert body["outcome"]["code"] == "unrecognized"
