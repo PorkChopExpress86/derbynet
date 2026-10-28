@@ -8,13 +8,21 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from django.db import transaction
+from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from racing.engine.heat_state import Advance
 from racing.engine.scheduling.lanes import count_one_bits
 from racing.engine.scheduling.rough import CantFulfill, max_runs_per_lane
 from racing.engine.scheduling.round import TooFewRacers, make_chart
-from racing.models import HAS_RESULT, EmptiedHeat, HeatLane, RosterEntry, Round
+from racing.models import (
+    HAS_RESULT,
+    EmptiedHeat,
+    HeatLane,
+    LaneClosure,
+    RosterEntry,
+    Round,
+)
 from racing.services import heats
 from racing.services.master import reassign_master_heats
 
@@ -154,6 +162,22 @@ def generate_schedule(round: Round, n_times_per_lane: int) -> int:
                 if racer_id is not None
             )
             after_chart_change(round)
+            # A new chart is built on the lanes in force, with no lane closed.
+            Round.objects.filter(pk=round.pk).update(chart_mask=0)
+            # A new chart, which has no result, keeps only the closures of
+            # lanes still closed (#108).
+            for closure in LaneClosure.objects.filter(round=round):
+                closure.mask &= inputs.unused_lane_mask
+                if closure.mask:
+                    closure.save(update_fields=["mask"])
+                else:
+                    closure.delete()
+            # A lane closed before now can no longer be reopened (D36).
+            LaneClosure.objects.filter(
+                event_id=round.event_id,
+                reopened_at__isnull=True,
+                next_round_at__isnull=True,
+            ).exclude(round=round).update(next_round_at=timezone.now())
         return len(chart)
     raise ScheduleFailure(
         Failure.BUSY,

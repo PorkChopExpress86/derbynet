@@ -22,6 +22,16 @@ class Round(EventScoped):
     # of an organic group and for a round made before D43.
     cut_top = models.PositiveSmallIntegerField(null=True, blank=True)
     cut_bucketed = models.BooleanField(default=False)
+    # The legacy `scoring` value this round is scored by, kept once a lane
+    # closure changes the event's (#108, D36). Django only. Null follows
+    # the event setting, as every round does in PHP.
+    scoring = models.SmallIntegerField(null=True, blank=True)
+    # The lanes a closure took the round's current chart off, in the
+    # `unused-lane-mask` format. A reschedule keeps off them, so a lane
+    # reopened during the round is used only by charts made after the
+    # reopen (D37, #108). `generate_schedule` clears it, and with no closure
+    # a reschedule reads the mask in force, as PHP does. Django only.
+    chart_mask = models.PositiveIntegerField(default=0)
 
     class Meta:
         constraints = [
@@ -96,6 +106,37 @@ class EmptiedHeat(EventScoped):
         constraints = [
             models.UniqueConstraint(
                 fields=["event", "round", "heat"], name="emptiedheat_unique_heat"
+            ),
+        ]
+
+
+class LaneClosure(EventScoped):
+    """Lanes the race coordinator closed because they are damaged (#108,
+    D36, D37). Django only. `mask` has the `unused-lane-mask` format: bit 0
+    is lane 1. `round` was racing when the lanes closed: it had a result,
+    or held the running or the staged heat. The standings drop every result
+    of `round` in these lanes, reopened or not (D37). A round only scheduled
+    gets no closure; it is rescheduled on the open lanes and has no time to
+    drop. `round` is null when no round was racing, which drops no time.
+    `next_round_at` is when a later round was first scheduled, after which
+    the lanes can no longer be reopened (`racing.services.lanes`)."""
+
+    round = models.ForeignKey(
+        Round,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="lane_closures",
+    )
+    mask = models.PositiveIntegerField()
+    closed_at = models.DateTimeField(default=timezone.now)
+    next_round_at = models.DateTimeField(null=True, blank=True)
+    reopened_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(mask__gt=0), name="laneclosure_mask_not_empty"
             ),
         ]
 

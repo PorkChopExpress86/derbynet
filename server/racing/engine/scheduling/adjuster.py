@@ -80,12 +80,26 @@ class DeadlineBudget:
         return int(self._clock()) > self._deadline
 
 
-def n_runs_per_lane(chart: Iterable[Heat]) -> int:
+def n_runs_per_lane(chart: Iterable[Heat], lane_mask: int = 0) -> int:
     """PHP's `n_runs_per_lane()`: in the lowest lane that holds a racer, the
     number of heats with a racer there, integer-divided by the number of
-    distinct racers there. Raced heats count."""
+    distinct racers there. Raced heats count.
+
+    A lane in `lane_mask` is skipped. PHP never meets a masked lane that
+    holds a racer, but a lane closed during the round (#108) still holds
+    the cars that raced there before it closed."""
     chart = list(chart)
-    lane = min(lane for heat in chart for lane, r in enumerate(heat) if r is not None)
+    lane = min(
+        (
+            lane
+            for heat in chart
+            for lane, r in enumerate(heat)
+            if r is not None and not lane_mask & (1 << lane)
+        ),
+        default=None,
+    )
+    if lane is None:
+        return 1  # every car is in a closed lane
     racers = [heat[lane] for heat in chart if heat[lane] is not None]
     return len(racers) // len(set(racers))
 
@@ -138,6 +152,9 @@ class ScheduleAdjuster:
         if kept & set(raced):
             raise ValueError("a kept heat cannot be raced")
         self._numbers: list[int | None] = [None] * len(self._chart)
+        # The raced heats' racers, which `close_lanes` reads.
+        self._raced = [list(self._chart[index]) for index in raced]
+        self._departed: set[int] = set()
         # Each kept heat's racers, by its heat number, which never changes.
         self._kept = {index + 1: self._chart[index] for index in kept}
         for index, number in [*raced.items(), *((i, i + 1) for i in kept)]:
@@ -222,6 +239,7 @@ class ScheduleAdjuster:
         """Turn each departed racer's lanes in the unraced heats, the kept
         heats included, into byes."""
         for gone in racer_ids:
+            self._departed.add(gone)
             for heat in [*self._chart, *self._kept.values()]:
                 if heat is not None:
                     for lane in range(self._nlanes):
@@ -280,6 +298,75 @@ class ScheduleAdjuster:
                 self.heats_squeezed_out += 1
                 return True
         return False
+
+    # ----- Closing a lane (#108) ----------------------------------------------
+
+    def close_lanes(self, mask: int) -> None:
+        """Close the lanes in `mask` (bit 0 is lane 1) for the rest of the
+        round (D36). Not in PHP.
+
+        The closed lanes of every unraced heat empty, except in the kept
+        heats, which never change (D34). An unraced heat left with no car is
+        dropped, if it comes after the last kept heat, and heats of byes are
+        squeezed out. In a full chart every racer then still has the round's
+        runs per lane in each open lane. A racer left with no run in an open
+        lane, counting raced and kept heats, as in an abbreviated round
+        whose only run was in a closed lane, gets one run in an open lane
+        (D37): the first bye after the last kept heat, or a heat added at
+        the end. A departed racer gets none. Call `remove_departed` first.
+        """
+        racers = self._racers()
+        self._lane_mask |= mask
+        self._nlanes_usable = self._nlanes - count_one_bits(self._lane_mask)
+        for heat in self._chart:
+            if heat is None:
+                continue
+            for lane in range(self._nlanes):
+                if not self._active(lane) and heat[lane] is not None:
+                    heat[lane] = None
+                    self._modified = True
+        for h in reversed(range(self._squeeze_from, len(self._chart))):
+            heat = self._chart[h]
+            if heat is not None and all(r is None for r in heat):
+                del self._chart[h]
+                del self._numbers[h]
+                self._nheats_unraced -= 1
+                self._modified = True
+        self.squeeze_out_byes()
+        open_runs = {
+            racer
+            for heat in self._heats()
+            for lane, racer in enumerate(heat)
+            if racer is not None and self._active(lane)
+        }
+        for racer in racers:
+            if racer not in open_runs and racer not in self._departed:
+                self._add_one_run(racer)
+
+    def _heats(self) -> list[Heat]:
+        """Every heat of the round: raced, kept and unraced."""
+        heats = [*self._raced, *self._kept.values()]
+        return heats + [heat for heat in self._chart if heat is not None]
+
+    def _racers(self) -> list[int]:
+        """The racers of the round, in the order they first appear."""
+        seen = dict.fromkeys(r for heat in self._heats() for r in heat if r)
+        return list(seen)
+
+    def _add_one_run(self, racer_id: int) -> None:
+        for h in range(self._squeeze_from, len(self._chart)):
+            heat = self._chart[h]
+            if heat is None or racer_id in heat:
+                continue
+            for lane in range(self._nlanes):
+                if self._active(lane) and heat[lane] is None:
+                    heat[lane] = racer_id
+                    self._modified = True
+                    return
+        self._add_heat()
+        lane = next(lane for lane in range(self._nlanes) if self._active(lane))
+        self._chart[-1][lane] = racer_id
+        self._modified = True
 
     # ----- Fitting a late racer in --------------------------------------------
 

@@ -7,6 +7,7 @@ from django.db.models import Exists, OuterRef
 from awards.models import AwardPartition
 from core.models import FullFieldRule, RaceSettings, RaceState
 from racing.engine.standings import oracle
+from racing.engine.standings.closed_lanes import HeatResult, counted_results
 from racing.engine.standings.eligibility import AwardSettings, AwardUnit
 from racing.engine.standings.scoring import Scoring
 from racing.engine.standings.speed_awards import (
@@ -16,7 +17,7 @@ from racing.engine.standings.speed_awards import (
     current_speed_award,
     speed_awards,
 )
-from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
+from racing.models import HAS_RESULT, HeatLane, LaneClosure, RosterEntry, Round
 from roster.models import (
     Group,
     GroupConstituent,
@@ -97,14 +98,20 @@ def _read(event) -> _Inputs:
         .values_list("id", "group_id", "name", "sort_order", "n_trophies")
     )
     lanes = HeatLane.objects.filter(round=OuterRef("pk"))
+    closed = closed_lanes_by_round(event)
+    open_lanes = _open_lane_count(event, closed)
     rounds = tuple(
-        oracle.Round(*row)
+        oracle.Round(
+            *row[:4],
+            scoring=None if row[4] is None else Scoring(row[4]),
+            lane_count=open_lanes.get(row[0]),
+        )
         for row in Round.objects.filter(event=event)
         .annotate(
             finished=Exists(lanes) & ~Exists(lanes.exclude(HAS_RESULT)),
         )
         .order_by("id")
-        .values_list("id", "group_id", "number", "finished")
+        .values_list("id", "group_id", "number", "finished", "scoring")
     )
     racers = tuple(
         oracle.Racer(
@@ -150,13 +157,30 @@ def _read(event) -> _Inputs:
     entered = RosterEntry.objects.filter(
         round=OuterRef("round"), racer=OuterRef("racer")
     )
-    results = tuple(
-        oracle.Result(*row)
-        for row in HeatLane.objects.filter(event=event)
+    rows = (
+        HeatLane.objects.filter(event=event)
         .filter(HAS_RESULT)
-        .filter(Exists(entered))
+        .annotate(entered=Exists(entered))
         .order_by("id")
-        .values_list("round_id", "racer_id", "finish_time", "finish_place")
+        .values_list(
+            "round_id",
+            "heat",
+            "lane",
+            "finish_time",
+            "finish_place",
+            "racer_id",
+            "entered",
+        )
+    )
+    # A closed lane's results still place the other cars of its heat
+    # before they move up, so they are read whether entered or not.
+    results = tuple(
+        oracle.Result(r.round_id, r.key[0], r.finish_time, r.finish_place)
+        for r in counted_results(
+            (HeatResult(*row[:5], key=row[5:]) for row in rows),
+            closed,
+        )
+        if r.key[1]
     )
     return _Inputs(
         event=oracle.Event(
@@ -182,6 +206,35 @@ def _read(event) -> _Inputs:
             one_trophy_per=settings.one_trophy_per,
         ),
     )
+
+
+def _open_lane_count(event, closed: dict[int, int]) -> dict[int, int]:
+    """`{round id: lanes}` that a round's points count (D37): the lanes its
+    chart uses, less the lanes closed in it. With no closure that is
+    `lane-count` less the unused lanes, where PHP counts `lane-count`."""
+    used: dict[int, int] = {}
+    for round_id, lane in (
+        HeatLane.objects.filter(event=event).values_list("round_id", "lane").distinct()
+    ):
+        used[round_id] = used.get(round_id, 0) | (1 << (lane - 1))
+    return {
+        round_id: (mask & ~closed.get(round_id, 0)).bit_count()
+        for round_id, mask in used.items()
+    }
+
+
+def closed_lanes_by_round(event, round_id: int | None = None) -> dict[int, int]:
+    """`{round id: mask}` of the lanes closed in each round, reopened or
+    not, whose results the standings drop and whose remaining heats stay
+    off them (#108, D37). Only a round that was racing has a closure.
+    `event` is an event or its id; `round_id` reads one round."""
+    rows = LaneClosure.objects.filter(event=event, round__isnull=False)
+    if round_id is not None:
+        rows = rows.filter(round_id=round_id)
+    closed: dict[int, int] = {}
+    for round_id, mask in rows.values_list("round_id", "mask"):
+        closed[round_id] = closed.get(round_id, 0) | mask
+    return closed
 
 
 def _partition_lists(event) -> MappingProxyType:
