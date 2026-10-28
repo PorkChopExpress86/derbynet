@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from racing.engine.standings.eligibility import AwardUnit
-from racing.engine.standings.oracle import Standings
+from racing.engine.standings.oracle import Standings, round_key, round_subgroup_key
 
 
 @dataclass(frozen=True)
@@ -164,6 +164,40 @@ def follow_on(
     )
     return from_subgroups(
         standings, subgroup_ids, bucketed=True, limit=limit, for_group=group_id
+    )
+
+
+def from_round(
+    standings: Standings,
+    round_id: int,
+    group_id: int,
+    *,
+    bucketed: bool,
+    limit: int,
+) -> Cut:
+    """The cut `follow_on` takes for the round after `round_id`, read from
+    that round's ladders even once a later round has finished, so the
+    finalist suggestions (D32) compare the final with the standings of the
+    round that fed it, never with the final's own times."""
+    if not bucketed:
+        return from_keys(
+            standings,
+            [round_key(round_id)],
+            [standings.groups[group_id].name],
+            bucketed=False,
+            limit=limit,
+            for_group=group_id,
+        )
+    subgroup_ids = sorted(
+        s.id for s in standings.event.subgroups if s.group_id == group_id
+    )
+    return from_keys(
+        standings,
+        [round_subgroup_key(round_id, s) for s in subgroup_ids],
+        [standings.subgroups[s].name for s in subgroup_ids],
+        bucketed=True,
+        limit=limit,
+        for_group=group_id,
     )
 
 

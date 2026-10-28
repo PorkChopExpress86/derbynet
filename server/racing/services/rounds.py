@@ -24,6 +24,7 @@ from core.services import lock_race_state
 from racing.engine.groups.aggregates import Aggregate, ready_aggregates
 from racing.engine.standings import finalists
 from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
+from racing.services.finals import allowed_racers
 from racing.services.standings import standings_snapshot
 from roster.models import (
     Group,
@@ -71,6 +72,13 @@ def prepare_new_round(group: Group, number: int) -> Round:
             return make_new_round(group, number)
         RosterEntry.objects.filter(round=round).delete()
         return round
+
+
+def record_cut(round: Round, top: int, bucketed: bool) -> None:
+    """Keep the cut the round was built with, for the finalist suggestions
+    (D43)."""
+    round.cut_top, round.cut_bucketed = top, bucketed
+    Round.objects.filter(pk=round.pk).update(cut_top=top, cut_bucketed=bucketed)
 
 
 def write_roster(round: Round, finalists: Iterable[Racer]) -> None:
@@ -153,9 +161,10 @@ def new_round_roster(
 
     `top` is how many racers to take, or with `bucketed` how many from each
     group or subgroup the round draws from; a tie at the cut takes more.
-    Extras are racers the race coordinator allowed in (D32). They follow the
-    qualifiers and never take a qualifier's place, so a rebuild that passes
-    the same extras keeps them. Fails with `no_racers`, and changes nothing,
+    Extras are racers the race coordinator allowed in (D32): `extras`, then
+    the racers `racing.services.finals` allowed into the round. They follow
+    the qualifiers and never take a qualifier's place, so every rebuild
+    keeps the allowed racers. Fails with `no_racers`, and changes nothing,
     when the roster would be empty or a new aggregate draws from nothing.
     """
     if isinstance(source, FollowOn):
@@ -182,11 +191,13 @@ def new_round_roster(
             choose = finalists.for_aggregate
         standings = standings_snapshot(round.event).standings
         cut, qualifiers, added = _choose(
-            choose(standings, group.id, bucketed=bucketed, limit=top), extras
+            choose(standings, group.id, bucketed=bucketed, limit=top),
+            [*extras, *allowed_racers(round)],
         )
         if not qualifiers and not added:
             raise RoundFailure(Failure.NO_RACERS, "No eligible racers found.")
         write_roster(round, qualifiers + added)
+        record_cut(round, top, bucketed)
         return NewRoster(round, cut.finalists, added, cut.concerns)
 
 
@@ -210,7 +221,8 @@ def playlist_finalists(
 ):
     """The playlist's `FinalistsFor`: the racers of a step's round, as
     `activate_playlist_entry()` chooses them, then that round's extras
-    (D32), keyed by the step's group and round number.
+    (D32), keyed by the step's group and round number, then the racers
+    `racing.services.finals` allowed into it.
 
     Round 1 of a group is an aggregate's first round; any later round
     follows on from the group's own standings. The step's `bucket_limit`
@@ -229,7 +241,11 @@ def playlist_finalists(
             limit=entry.bucket_limit,
         )
         cut, qualifiers, added = _choose(
-            cut, extras.get((entry.group_id, entry.round_number), ())
+            cut,
+            [
+                *extras.get((entry.group_id, entry.round_number), ()),
+                *allowed_racers(round),
+            ],
         )
         return Entrants(qualifiers + added, cut.concerns)
 

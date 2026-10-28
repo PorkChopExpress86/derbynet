@@ -31,6 +31,7 @@ from racing.services.rounds import (
     Entrants,
     make_new_round,
     prepare_new_round,
+    record_cut,
     round_is_complete,
     write_roster,
 )
@@ -102,6 +103,7 @@ def _activate(
     round = _round_of(entry) or make_new_round(entry.group, entry.round_number)
     if not round.roster.exists():
         write_roster(round, finalists_for(entry, round).racers)
+        record_cut(round, entry.bucket_limit, entry.bucketed)
     if not HeatLane.objects.filter(round=round).exists():
         # PHP's schedule_one_round writes no chart and reports nothing.
         # `start_waiting_step` reports the failure.

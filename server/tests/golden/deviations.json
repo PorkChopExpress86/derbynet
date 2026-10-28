@@ -70,7 +70,9 @@
         "ordered/8/201/1",
         "ordered/8/202/1",
         "ordered/8/250/1",
-        "ordered/8/400/1"
+        "ordered/8/400/1",
+        "ordered/9/10/1",
+        "ordered/9/17/1"
       ],
       "reason": "No generator table covers these counts; PHP throws a TypeError and Django raises CantFulfill.",
       "expected": "deviations/Q1/out-of-range.json"
@@ -103,6 +105,26 @@
       ],
       "reason": "PHP answers 500 with no body for 201 cars; Django replies cant-fulfill.",
       "expected": "deviations/Q1/more-than-200-cars.http"
+    },
+    {
+      "quirk": "Q1",
+      "fixture": "http/schedule/cant-fulfill-over-a-chart-4-lanes.http",
+      "exchanges": [
+        "005 generate-round-3-too-many-runs",
+        "006 schedule-round-3-after-too-many-runs"
+      ],
+      "reason": "PHP deletes the chart, writes nothing and replies success; Django replies cant-fulfill and keeps the chart, so the poll after shows it.",
+      "expected": "deviations/Q1/cant-fulfill-over-a-chart-4-lanes.http"
+    },
+    {
+      "quirk": "Q1",
+      "fixture": "http/schedule/zero-runs-over-a-chart-4-lanes.http",
+      "exchanges": [
+        "005 generate-round-3-zero-runs",
+        "006 schedule-round-3-after-zero-runs"
+      ],
+      "reason": "PHP deletes the chart, writes nothing and replies success; Django replies cant-fulfill and keeps the chart, so the poll after shows it.",
+      "expected": "deviations/Q1/zero-runs-over-a-chart-4-lanes.http"
     },
     {
       "quirk": "Q4",
@@ -1556,6 +1578,16 @@
       ],
       "reason": "PHP stores a time of --- as text, shows it as 0 and places it first. Django gives the car a did-not-finish time, 9.999 s, so it places last (D42).",
       "expected": "deviations/Q16/partial-and-non-numeric-results.http"
+    },
+    {
+      "quirk": "Q18",
+      "fixture": "http/master-schedule/half-weights.http",
+      "exchanges": [
+        "018 coordinator-after-results-exist",
+        "019 ondeck-after-results-exist"
+      ],
+      "reason": "A refused schedule.generate renumbers the unraced heats and moves the current heat to the first of them in PHP. Django changes nothing (D30).",
+      "expected": "deviations/Q18/half-weights.http"
     },
     {
       "quirk": "Q20",

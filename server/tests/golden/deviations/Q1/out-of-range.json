@@ -65,5 +65,7 @@
 "ordered/8/201/1": {"failure":"cant-fulfill","nheats":0,"heats":[]},
 "ordered/8/202/1": {"failure":"cant-fulfill","nheats":0,"heats":[]},
 "ordered/8/250/1": {"failure":"cant-fulfill","nheats":0,"heats":[]},
-"ordered/8/400/1": {"failure":"cant-fulfill","nheats":0,"heats":[]}
+"ordered/8/400/1": {"failure":"cant-fulfill","nheats":0,"heats":[]},
+"ordered/9/10/1": {"failure":"cant-fulfill","nheats":0,"heats":[]},
+"ordered/9/17/1": {"failure":"cant-fulfill","nheats":0,"heats":[]}
 }
