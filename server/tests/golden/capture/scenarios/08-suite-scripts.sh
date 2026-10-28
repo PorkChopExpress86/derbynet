@@ -74,5 +74,8 @@ record_script suite/aggregate-rounds "$FINALISTS" 0 test-aggregate-rounds.sh
 standings_matrix standings/suite-aggregate-rounds
 record_script suite/aggregate-classes "$FINALISTS" 0 test-aggregate-classes.sh
 standings_matrix standings/suite-aggregate-classes
-record_script suite/aggregate-nonracing "$FINALISTS" 0 test-aggregate-nonracing.sh
+# The script exits before its roster.new, so record its class.add and
+# poll.coordinator exchanges too: the last poll holds the ready-aggregate reply
+# the script checks (#102).
+record_script suite/aggregate-nonracing "$FINALISTS,class.add,poll.coordinator" 0 test-aggregate-nonracing.sh
 standings_matrix standings/suite-aggregate-nonracing
