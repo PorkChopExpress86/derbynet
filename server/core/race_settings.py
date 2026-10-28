@@ -7,6 +7,8 @@ value reads back the way PHP stored it. A key with no single stored value
 """
 
 from django.apps import apps
+from django.core.exceptions import ValidationError
+from django.db import DataError, IntegrityError, transaction
 
 from core.legacy_keys import (
     REGISTRY,
@@ -27,6 +29,16 @@ ROW_MODELS = {
     "core.RaceState": RaceState,
     "racing.TimerStatus": TimerStatus,
     "kiosks.ReplayStatus": ReplayStatus,
+}
+
+
+# SQLite keeps any integer in these columns, and Postgres refuses one past the
+# column. The same range applies on both.
+INTEGER_RANGES = {
+    "SmallIntegerField": (-(2**15), 2**15 - 1),
+    "PositiveSmallIntegerField": (0, 2**15 - 1),
+    "IntegerField": (-(2**31), 2**31 - 1),
+    "PositiveIntegerField": (0, 2**31 - 1),
 }
 
 
@@ -77,7 +89,11 @@ def all_keys(event) -> dict[str, str]:
 
 
 def write(event, key, text: str) -> None:
-    """Store legacy text. Raises `NotWritten` for text the key cannot hold."""
+    """Store legacy text. Raises `NotWritten` for text the key cannot hold.
+
+    Where PHP reads the text back to catch a truncated value, this reads the
+    typed value back, since the text of a typed field is normalized.
+    """
     entry = _entry(key)
     if entry is None:
         raise NotWritten(key)
@@ -86,14 +102,33 @@ def write(event, key, text: str) -> None:
     except LegacyValueError as error:
         raise NotWritten(key) from error
     fields = {entry.fields[0]: value} if len(entry.fields) == 1 else value
-    row = ROW_MODELS[entry.model].for_event(event)
-    for name, field_value in fields.items():
-        field = row._meta.get_field(name)
-        if isinstance(entry.codec, Ref) and field_value is not None:
-            target = apps.get_model(entry.codec.model)
-            if not target.objects.filter(event=event, pk=field_value).exists():
+    try:
+        with transaction.atomic():
+            row = ROW_MODELS[entry.model].for_event(event)
+            for name, field_value in fields.items():
+                _check(event, entry, row._meta.get_field(name), field_value, key)
+                setattr(row, _attname(row, name), field_value)
+            names = [_attname(row, name) for name in fields]
+            row.save(update_fields=names)
+            row.refresh_from_db(fields=names)
+            if any(getattr(row, _attname(row, n)) != v for n, v in fields.items()):
                 raise NotWritten(key)
-        setattr(row, field.attname, field_value)
-    row.save(update_fields=[row._meta.get_field(n).attname for n in fields])
-    if read(event, key) != text:
+    except (IntegrityError, DataError) as error:
+        raise NotWritten(key) from error
+
+
+def _check(event, entry, field, value, key) -> None:
+    if value is None:
+        return
+    if isinstance(entry.codec, Ref):
+        target = apps.get_model(entry.codec.model)
+        if not target.objects.filter(event=event, pk=value).exists():
+            raise NotWritten(key)
+        return
+    low, high = INTEGER_RANGES.get(field.get_internal_type(), (None, None))
+    if low is not None and not low <= value <= high:
         raise NotWritten(key)
+    try:
+        field.run_validators(value)
+    except ValidationError as error:
+        raise NotWritten(key) from error
