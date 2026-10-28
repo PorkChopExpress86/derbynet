@@ -4,4 +4,4 @@ Handlers parse `ctx.args`, call services, and encode the result. They never
 write through the ORM themselves (#17).
 """
 
-from legacy_api.handlers import roles, session, settings  # noqa: F401
+from legacy_api.handlers import database, roles, session, settings  # noqa: F401

@@ -6,8 +6,8 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 
 - [x] `query=settings.list`: requested keys only, empty `db-connection`, no keys for an anonymous caller, `SET_UP` for every key (D5, #15, S2).
 - [x] `settings.write`: declarative table of form key, RaceInfo key, type, and checkbox flag, with every PHP failure code and the read-back check.
-- [ ] `database.execute`: `schema`, `update-schema`, and `drop-message-queue-table` as a mapping, with `insecure`, `sqlnoscript`, and the `executed` and `details` keys.
-- [ ] Remove fake racer images on `schema` (C28).
+- [x] `database.execute`: `schema`, `update-schema`, and `drop-message-queue-table` as a mapping, with `insecure`, `sqlnoscript`, and the `executed` and `details` keys.
+- [x] Remove fake racer images on `schema` (C28).
 - [ ] `test.setup` behind `DERBYNET_ENABLE_TEST_ENDPOINTS=1`, with two-argument failures (S24, C17).
 - [ ] `database.check` invariants as service functions with PHP's tags, anonymous only when the test flag is on (S26).
 - [ ] `manage.py create_test_event`.
@@ -18,11 +18,11 @@ Working list for the legacy API reset and settings slice, on branch `issue-63-re
 
 - [x] `test_settings_write.py`
 - [x] `test_settings_list.py`
-- [ ] `test_database_execute.py`
+- [x] `test_database_execute.py`
 - [ ] `test_test_setup.py`
 - [ ] `test_database_check.py`
 - [ ] `testing/reset-database.sh` passes against Django twice in a row, and `DBCHECK=1` passes too.
 
 ## PHP defects (rows of #64)
 
-- [ ] S2 (done), S24, S26, C17, C28
+- [ ] S2 (done), S24, S26, C17, C28 (done)

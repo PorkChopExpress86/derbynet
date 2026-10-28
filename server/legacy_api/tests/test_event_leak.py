@@ -35,6 +35,7 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "session.write"): {"session_barcode-action": "checkin"},
     ("query", "settings.list"): {},
     ("action", "settings.write"): {"partition-label": "Patrol"},
+    ("action", "database.execute"): {"script": "schema"},
 }
 
 # Response keys that carry a row id, and the model the id belongs to.
