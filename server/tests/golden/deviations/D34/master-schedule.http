@@ -1,0 +1,121 @@
+### 003 racing-after
+request: GET action.php?query=poll.coordinator
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2708
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 3,
+        "number-of-heats": 8,
+        "masterheat": 3,
+        "max_masterheat": 8
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 3,
+            "name": "Racers3 Racer",
+            "carname": "",
+            "carnumber": 103,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 5,
+            "name": "Racers5 Racer",
+            "carname": "",
+            "carnumber": 105,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 3,
+            "racerid": 2,
+            "name": "Racers2 Racer",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 4,
+            "name": "Racers4 Racer",
+            "carname": "",
+            "carnumber": 104,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 6,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Racers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 6,
+                    "ntrophies": -1,
+                    "name": "Racers"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Racers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 6,
+            "passed": 6,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 8,
+            "heats_run": 2,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

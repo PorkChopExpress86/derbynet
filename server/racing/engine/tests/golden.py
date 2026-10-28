@@ -31,6 +31,7 @@ QUIRK_DECISIONS = {
     "Q16": "fix",
     "Q17": "reproduce",
     "Q18": "fix",
+    "Q19": "fix",  # D30
     "Q20": "fix",
     "Q21": "fix",
     "Q22": "fix",
@@ -47,6 +48,12 @@ QUIRK_DECISIONS = {
     # refused, R2 a car number must be a whole number.
     "R1": "fix",
     "R2": "fix",
+    # Proposed in #31, for the owner to confirm: R3 no current heat reads
+    # null, R6 no scheduler debug output, R7 the generate payload shows the
+    # state the request left.
+    "R3": "fix",
+    "R6": "fix",
+    "R7": "fix",
 }
 
 

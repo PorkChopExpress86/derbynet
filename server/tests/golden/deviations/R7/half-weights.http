@@ -1,0 +1,985 @@
+### 002 generate-round-1-two-racers
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4595
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Two",
+        "masterheat": 1,
+        "max_masterheat": 2
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "Two1 Racer",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "Two2 Racer",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Two",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Two"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Three",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Three"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Five",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Five"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 9,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Nine",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Nine"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Two",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Two, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Three",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 3,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Three, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Five",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 5,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Five, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Nine",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 9,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Nine, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 003 generate-round-2-three-racers
+request: POST action.php
+request-body: action=schedule.generate&roundid=2
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4595
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 2
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Two",
+        "masterheat": 1,
+        "max_masterheat": 5
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "Two1 Racer",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "Two2 Racer",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Two",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Two"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Three",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Three"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Five",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Five"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 9,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Nine",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Nine"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Two",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Two, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Three",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Three, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Five",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 5,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Five, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Nine",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 9,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Nine, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 004 generate-round-3-five-racers
+request: POST action.php
+request-body: action=schedule.generate&roundid=3
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4596
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 3
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Two",
+        "masterheat": 1,
+        "max_masterheat": 10
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "Two1 Racer",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "Two2 Racer",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Two",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Two"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Three",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Three"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Five",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Five"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 9,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Nine",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Nine"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Two",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Two, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Three",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Three, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Five",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Five, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Nine",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 9,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Nine, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 005 generate-round-4-nine-racers
+request: POST action.php
+request-body: action=schedule.generate&roundid=4
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4596
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 4
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 2,
+        "class": "Two",
+        "masterheat": 1,
+        "max_masterheat": 19
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 1,
+            "name": "Two1 Racer",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 2,
+            "name": "Two2 Racer",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Two",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Two"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Three",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Three"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Five",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Five"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 9,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Nine",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Nine"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Two",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 0,
+            "name": "Two, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Three",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Three, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Five",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Five, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Nine",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 9,
+            "heats_run": 0,
+            "name": "Nine, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 012 regenerate-round-4-after-a-heat-ran
+request: POST action.php
+request-body: action=schedule.generate&roundid=4
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 4591
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 4
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": true,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 2,
+        "number-of-heats": 2,
+        "class": "Two",
+        "masterheat": 2,
+        "max_masterheat": 19
+    },
+    "racers": [
+        {
+            "lane": 1,
+            "racerid": 2,
+            "name": "Two2 Racer",
+            "carname": "",
+            "carnumber": 102,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 2,
+            "racerid": 1,
+            "name": "Two1 Racer",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 2,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "available",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 2,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Two",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 2,
+                    "ntrophies": -1,
+                    "name": "Two"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Three",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Three"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Five",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Five"
+                }
+            ]
+        },
+        {
+            "classid": 4,
+            "count": 9,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Nine",
+            "subgroups": [
+                {
+                    "rankid": 4,
+                    "count": 9,
+                    "ntrophies": -1,
+                    "name": "Nine"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Two",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 2,
+            "passed": 2,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 2,
+            "heats_run": 1,
+            "name": "Two, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Three",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Three, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Five",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 5,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Five, Round 1"
+        },
+        {
+            "roundid": 4,
+            "classid": 4,
+            "class": "Nine",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 9,
+            "passed": 9,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 9,
+            "heats_run": 0,
+            "name": "Nine, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

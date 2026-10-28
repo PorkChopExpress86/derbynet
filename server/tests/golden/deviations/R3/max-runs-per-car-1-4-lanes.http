@@ -1,0 +1,143 @@
+### 002 generate-round-1
+request: POST action.php
+request-body: action=schedule.generate&roundid=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 3300
+body:
+{
+    "action": {
+        "action": "schedule.generate",
+        "roundid": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": null,
+        "roundid": -1,
+        "round": null,
+        "tbodyid": -1,
+        "heat": null,
+        "number-of-heats": 0,
+        "class": ""
+    },
+    "racers": [],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 20,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Default",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 20,
+                    "ntrophies": -1,
+                    "name": "Default"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 19,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 2",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 19,
+                    "ntrophies": -1,
+                    "name": "Div 2"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 10,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Div 3",
+            "subgroups": [
+                {
+                    "rankid": 3,
+                    "count": 10,
+                    "ntrophies": -1,
+                    "name": "Div 3"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Default",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 20,
+            "passed": 20,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Default, Round 1"
+        },
+        {
+            "roundid": 2,
+            "classid": 2,
+            "class": "Div 2",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 19,
+            "passed": 19,
+            "unscheduled": 19,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 2, Round 1"
+        },
+        {
+            "roundid": 3,
+            "classid": 3,
+            "class": "Div 3",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 10,
+            "passed": 10,
+            "unscheduled": 10,
+            "adjustments": [],
+            "heats_scheduled": 0,
+            "heats_run": 0,
+            "name": "Div 3, Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

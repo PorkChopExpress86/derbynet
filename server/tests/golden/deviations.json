@@ -145,16 +145,6 @@
       "expected": "deviations/Q4/points-rerun-reinstate.http"
     },
     {
-      "quirk": "Q5",
-      "fixture": "http/reschedule/dry-run-while-racing.http",
-      "exchanges": [
-        "002 dry-run-squeezes-a-heat",
-        "003 racing-after"
-      ],
-      "reason": "A dry run that squeezes out a heat of the current round turns racing off in PHP. Django's dry run changes nothing, so racing stays on.",
-      "expected": "deviations/Q5/dry-run-while-racing.http"
-    },
-    {
       "quirk": "Q7",
       "fixture": "http/standings/q7-tie-after-earlier-trophy.http",
       "exchanges": [
@@ -1861,6 +1851,124 @@
       ],
       "reason": "With car-numbering multiplier 0 PHP assigns $partition, not $partitionid, so a PWDwi walk-in falls to Default. Django puts it in the last partition (C14).",
       "expected": "deviations/C14/walk-in-multiplier-0.http"
+    },
+    {
+      "quirk": "R3",
+      "fixture": "http/schedule/two-runs-per-lane-4-lanes.http",
+      "exchanges": [
+        "002 generate-round-1"
+      ],
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "expected": "deviations/R3/two-runs-per-lane-4-lanes.http"
+    },
+    {
+      "quirk": "R3",
+      "fixture": "http/schedule/cant-fulfill-4-lanes.http",
+      "exchanges": [
+        "003 select-round-3-with-no-heats",
+        "005 generate-round-3-at-the-limit"
+      ],
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "expected": "deviations/R3/cant-fulfill-4-lanes.http"
+    },
+    {
+      "quirk": "R3",
+      "fixture": "http/schedule/cant-fulfill-over-a-chart-4-lanes.http",
+      "exchanges": [
+        "002 generate-round-3-at-the-limit"
+      ],
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "expected": "deviations/R3/cant-fulfill-over-a-chart-4-lanes.http"
+    },
+    {
+      "quirk": "R3",
+      "fixture": "http/schedule/zero-runs-over-a-chart-4-lanes.http",
+      "exchanges": [
+        "002 generate-round-3"
+      ],
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "expected": "deviations/R3/zero-runs-over-a-chart-4-lanes.http"
+    },
+    {
+      "quirk": "R3",
+      "fixture": "http/schedule/max-runs-per-car-1-4-lanes.http",
+      "exchanges": [
+        "002 generate-round-1"
+      ],
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "expected": "deviations/R3/max-runs-per-car-1-4-lanes.http"
+    },
+    {
+      "quirk": "R3",
+      "fixture": "http/schedule/unused-lane-mask-33-6-lanes.http",
+      "exchanges": [
+        "002 generate-round-1"
+      ],
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "expected": "deviations/R3/unused-lane-mask-33-6-lanes.http"
+    },
+    {
+      "quirk": "R3",
+      "fixture": "http/schedule/two-lanes.http",
+      "exchanges": [
+        "002 generate-round-1"
+      ],
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "expected": "deviations/R3/two-lanes.http"
+    },
+    {
+      "quirk": "R6",
+      "fixture": "http/schedule/rotation-schedule-4-lanes.http",
+      "exchanges": [
+        "002 generate-round-1",
+        "004 generate-round-2",
+        "006 generate-round-3"
+      ],
+      "reason": "PHP's schedule.generate under rotation-schedule adds its scheduler's debug output, nheats, ncars and heats, and schedule.reschedule with trace adds the adjuster's trace; Django adds neither. These replies also show R3's null classid and heat (#31, for the owner to confirm).",
+      "expected": "deviations/R6/rotation-schedule-4-lanes.http"
+    },
+    {
+      "quirk": "R7",
+      "fixture": "http/master-schedule/half-weights.http",
+      "exchanges": [
+        "002 generate-round-1-two-racers",
+        "003 generate-round-2-three-racers",
+        "004 generate-round-3-five-racers",
+        "005 generate-round-4-nine-racers",
+        "012 regenerate-round-4-after-a-heat-ran"
+      ],
+      "reason": "PHP's schedule.generate appends the coordinator payload before it numbers the master heats and, under the master schedule, moves to the next-up heat. Django numbers and moves in the same transaction as the chart, so its payload shows the state the request left (#31, for the owner to confirm).",
+      "expected": "deviations/R7/half-weights.http"
+    },
+    {
+      "quirk": "Q5",
+      "fixture": "http/reschedule/dry-run-while-racing.http",
+      "exchanges": [
+        "002 dry-run-squeezes-a-heat",
+        "003 racing-after"
+      ],
+      "reason": "PHP turns racing off on a dry run that would squeeze out a heat; Django leaves racing on (Q5). PHP's reply also carries the adjuster's trace, which Django omits (R6).",
+      "expected": "deviations/Q5/dry-run-while-racing.http"
+    },
+    {
+      "quirk": "Q19",
+      "fixture": "http/poll/race-day-polls.http",
+      "exchanges": [
+        "014 04-scheduled-and-racing-heat-1 poll",
+        "021 05-mid-heat poll",
+        "025 06-after-a-result poll"
+      ],
+      "reason": "A playlist round is scheduled through generate_schedule, so its heats get master heat numbers (D30); PHP's playlist leaves them at 0.",
+      "expected": "deviations/Q19/race-day-polls.http"
+    },
+    {
+      "quirk": "D34",
+      "fixture": "http/reschedule/master-schedule.http",
+      "exchanges": [
+        "003 racing-after"
+      ],
+      "reason": "The poll after a late racer joins under the master schedule shows the chart Django made, which keeps the running and staged heats (D34, Q20 on the reschedule before it); PHP's chart changed them.",
+      "expected": "deviations/D34/master-schedule.http"
     }
   ]
 }
