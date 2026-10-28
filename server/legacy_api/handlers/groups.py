@@ -175,7 +175,14 @@ def rank_add(ctx: LegacyContext) -> None:
     ctx.success()
 
 
-@action("rank.edit", permission=Perm.SET_UP)
+@action(
+    "rank.edit",
+    permission=Perm.SET_UP,
+    divergences=(
+        "D49: under the by-partition rule with subgroups off, the group of the"
+        " renamed subgroup is renamed too (C49); PHP leaves the group.",
+    ),
+)
 def rank_edit(ctx: LegacyContext) -> None:
     name = _text(ctx, "name")
     if name is None or "rankid" not in ctx.args:

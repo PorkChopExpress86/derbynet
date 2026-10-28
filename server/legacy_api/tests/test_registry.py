@@ -15,6 +15,7 @@ from legacy_api.registry import (
 from racing.engine.tests.golden import QUIRK_DECISIONS, deviations
 
 DATA = Path(__file__).parent / "data"
+DECISIONS = Path(__file__).resolve().parents[3] / "plan" / "owner-decisions.md"
 HANDLERS = Path(__file__).resolve().parent.parent / "handlers"
 
 
@@ -31,10 +32,19 @@ def test_the_frozen_list_holds_every_php_handler():
     assert ("query", "standings") in endpoints
 
 
+# Endpoints Django adds on purpose (D48). PHP has no such name.
+DJANGO_ONLY = {
+    ("query", "partition.range-list"),
+    ("action", "partition.range-add"),
+    ("action", "partition.range-remove"),
+}
+
+
 def test_every_registered_endpoint_has_a_php_name():
     registered = {(e.kind, e.name) for e in REGISTRY}
 
-    assert registered <= php_endpoints()
+    assert registered - DJANGO_ONLY <= php_endpoints()
+    assert DJANGO_ONLY <= registered
 
 
 @pytest.mark.parametrize(
@@ -104,6 +114,7 @@ def test_every_divergence_names_a_recorded_decision():
     """Each entry reads `<id>: <what>`, and every id is a quirk decision or a
     recorded deviation, so the API docs never cite a row nobody decided."""
     known = set(QUIRK_DECISIONS) | {entry["quirk"] for entry in deviations()}
+    known |= set(re.findall(r"^\| (D\d+) \|", DECISIONS.read_text(), re.MULTILINE))
     unknown = []
     for endpoint in REGISTRY:
         for text in endpoint.divergences:

@@ -388,7 +388,15 @@ def poll_coordinator(ctx: LegacyContext) -> None:
     )
 
 
-@query("poll", permission=Access.ANONYMOUS, divergences=PAYLOAD_DIVERGENCES)
+@query(
+    "poll",
+    permission=Access.ANONYMOUS,
+    divergences=PAYLOAD_DIVERGENCES
+    + (
+        "D48: a partition with car number ranges carries carranges in the"
+        " partitions list; PHP has no such key.",
+    ),
+)
 def poll(ctx: LegacyContext) -> None:
     """`values` lists the keys of `racing.services.polls.POLL_VALUES` to
     answer, in order. The kiosks poll it anonymously (D5)."""
