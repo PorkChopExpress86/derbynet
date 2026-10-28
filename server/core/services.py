@@ -6,7 +6,6 @@ from django.utils.text import slugify
 
 from core.fake_images import remove_fake_images
 from core.models import (
-    ActionLog,
     Event,
     PerEvent,
     RaceSettings,
@@ -118,13 +117,11 @@ def _deletion_order():
     """The event-scoped models to empty, each before the models it points at.
 
     A foreign key is `PROTECT` in nearly every case, so a row cannot go before
-    the rows that refer to it. The per-event rows and the action log are not
-    emptied, and a reference from a per-event row is cleared when it goes.
+    the rows that refer to it. The per-event rows are not emptied: they are put
+    back to their defaults first, which clears their references.
     """
     emptied = [
-        model
-        for model in event_scoped_models()
-        if not issubclass(model, PerEvent) and model is not ActionLog
+        model for model in event_scoped_models() if not issubclass(model, PerEvent)
     ]
     graph = {model: set() for model in emptied}
     for model in emptied:
@@ -165,8 +162,9 @@ def reset_event(event):
     """Empty the event's tables and put its per-event rows back to their
     defaults, as the `schema` script of `database.execute` does (#63).
 
-    The folder, lane count, and websocket settings stay. The action log stays
-    too, as PHP's does. Other events are untouched. The fake racers' images go
+    The folder, lane count, and websocket settings stay. The action log goes,
+    as PHP's `schema` script drops its `ActionHistory` table. Other events are
+    untouched. The fake racers' images go
     from both photo folders, which PHP means to do and skips (C28). Returns the
     number of rows deleted.
     """

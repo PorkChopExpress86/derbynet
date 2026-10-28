@@ -12,13 +12,11 @@ from django.db import DataError, IntegrityError, transaction
 
 from core.legacy_keys import (
     REGISTRY,
-    Dropped,
     LegacyValueError,
     Mapped,
     Ref,
     decode,
     encode,
-    entry_for,
 )
 from core.models import RaceSettings, RaceState
 from kiosks.models import ReplayStatus
@@ -47,12 +45,13 @@ class NotWritten(Exception):
 
 
 def _entry(key):
-    """The `Mapped` entry of a key held in one of the per-event rows, or None."""
-    try:
-        entry = entry_for(key)
-    except KeyError:
-        return None
-    if isinstance(entry, Dropped) or entry.model not in ROW_MODELS or not entry.fields:
+    """The `Mapped` entry of a key held in one of the per-event rows, or None.
+
+    A key matched by a prefix pattern (`tt-lane3`) is one slot of a stored
+    dict, and `replay_queue` is a table, so neither has a single value to read.
+    """
+    entry = REGISTRY.get(key)
+    if not isinstance(entry, Mapped) or entry.model not in ROW_MODELS:
         return None
     return entry
 

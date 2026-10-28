@@ -41,19 +41,20 @@ def test_every_table_is_empty_after_a_reset_except_the_fresh_event_rows():
 
     reset_event(event)
 
-    fresh = counts(EventFactory())
-    assert counts(event) == {**fresh, "core.actionlog": counts(event)["core.actionlog"]}
+    assert counts(event) == counts(EventFactory())
     assert check_invariants(event) == {}
 
 
-def test_the_action_log_survives_a_reset():
+def test_the_action_log_is_emptied_as_php_drops_its_history_table():
     event = populated_event()
-    before = ActionLog.objects.filter(event=event).count()
-    assert before > 0
+    other = populated_event()
+    assert ActionLog.objects.filter(event=event).exists()
+    kept = ActionLog.objects.filter(event=other).count()
 
     reset_event(event)
 
-    assert ActionLog.objects.filter(event=event).count() == before
+    assert not ActionLog.objects.filter(event=event).exists()
+    assert ActionLog.objects.filter(event=other).count() == kept
 
 
 def test_the_preserved_settings_survive_and_the_rest_return_to_defaults():

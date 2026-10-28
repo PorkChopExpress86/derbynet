@@ -71,3 +71,13 @@ def test_set_up_with_no_key_lists_every_setting(client, event):
     assert settings["lane_count"] == 0
     assert settings["balloting"] == "closed"
     assert "token-salt" not in settings
+
+
+@pytest.mark.parametrize("key", ["tt-lane1", "tt-place2", "replay_queue", "tt-"])
+def test_keys_with_no_single_stored_value_read_as_null(client, event, key):
+    log_in(client, Perm.SET_UP)
+
+    response = client.get(f"/action.php?query=settings.list&key={key}")
+
+    body = json.loads(response.content)
+    assert body["settings"] == {"db-connection": "", key: None}

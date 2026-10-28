@@ -40,6 +40,9 @@ jobs:
         image: ${{ matrix.database == 'postgres' && 'postgres:17' || '' }}
         env:
           POSTGRES_PASSWORD: postgres
+          # The shell-suite step connects to this database, not to the
+          # test_derbynet one that pytest creates.
+          POSTGRES_DB: derbynet
         ports:
           - 5432:5432
         options: >-
