@@ -107,11 +107,15 @@ class EmptiedHeat(EventScoped):
 class LaneClosure(EventScoped):
     """Lanes the race coordinator closed because they are damaged (#108,
     D36, D37). Django only. `mask` has the `unused-lane-mask` format: bit 0
-    is lane 1. The standings drop every result of `round` in these lanes,
-    reopened or not. `round` is null for lanes closed between rounds, which
-    drop no time. `next_round_at` is when a later round was first
-    scheduled, after which the lanes can no longer be reopened
-    (`racing.services.lanes`)."""
+    is lane 1. `started` records whether `round` was racing when the lanes
+    closed: it had a result, or held the running or the staged heat. The
+    standings then drop every result of `round` in these lanes, reopened or
+    not (D37). A round only scheduled drops a lane's results only while the
+    lane stays closed for later rounds, so a reopen on the dashboard or on
+    the settings page opens the lane to it again. `round` is null for lanes
+    closed between rounds, which drop no time. `next_round_at` is when a
+    later round was first scheduled, after which the lanes can no longer be
+    reopened (`racing.services.lanes`)."""
 
     round = models.ForeignKey(
         Round,
@@ -121,6 +125,7 @@ class LaneClosure(EventScoped):
         related_name="lane_closures",
     )
     mask = models.PositiveIntegerField()
+    started = models.BooleanField(default=False)
     closed_at = models.DateTimeField(default=timezone.now)
     next_round_at = models.DateTimeField(null=True, blank=True)
     reopened_at = models.DateTimeField(null=True, blank=True)

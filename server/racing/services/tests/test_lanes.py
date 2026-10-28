@@ -797,3 +797,43 @@ def test_a_new_chart_keeps_only_the_closures_of_lanes_still_closed(race):
 
     assert scores(event, bears) == averages(bears)
     assert closed_rounds(event) == {wolves.id}
+
+
+def test_a_round_racing_its_first_heat_keeps_its_closure_after_a_reopen():
+    """Heat 1 is running and heat 2 staged, with no time yet. The round was
+    racing when lane 3 closed, so the reopen leaves its closure, and the
+    lane 3 times of its kept heats stay dropped."""
+    replay, round = setup_race(racers=6, lanes=4)
+    event = replay.event
+    make_current(event, round, 1)
+    close_lanes(event, {3})
+    reopen_lanes(event, {3})
+
+    run_heats(event, round, *chart(round))
+
+    assert closed_rounds(event) == {round.id}
+    assert scores(event, round) == averages(round, closed={3})
+
+
+def test_the_poll_after_a_lane_is_opened_on_the_settings_page(race):
+    """The Wolves were racing when lane 3 closed and the Bears only
+    scheduled. Once the settings page opens lane 3 again, lane 3 is closed
+    only for the Wolves' remaining heats, the Bears' late racer can use it,
+    and once the Wolves finish no lane is closed."""
+    replay, wolves = race
+    event = replay.event
+    bears = new_group(replay, "Bears")
+    generate_schedule(bears, 1)
+    close_lanes(event, {3})
+    set_settings(event, unused_lane_mask=0)
+
+    assert poll_lanes(event)["closed-lanes"] == [
+        {"lane": 3, "roundids": [wolves.id], "reopen": True}
+    ]
+    late = late_racer(bears, 250)
+    reschedule(bears, late.id)
+    assert 3 in set(
+        HeatLane.objects.filter(round=bears, racer=late).values_list("lane", flat=True)
+    )
+    run_heats(event, wolves, *range(3, 1 + max(chart(wolves))))
+    assert poll_lanes(event)["closed-lanes"] == []

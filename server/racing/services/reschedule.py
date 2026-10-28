@@ -35,7 +35,6 @@ from racing.models import (
     HAS_RESULT,
     EmptiedHeat,
     HeatLane,
-    LaneClosure,
     RosterEntry,
     Round,
 )
@@ -43,6 +42,7 @@ from racing.services import heats
 from racing.services.master import held_emptied_heats
 from racing.services.rounds import round_adjustments
 from racing.services.schedule import after_chart_change
+from racing.services.standings import closed_lanes_by_round
 from roster.models import Racer
 
 GUARD_EXPIRY = timedelta(seconds=2 * OVERALL_TIME_LIMIT)
@@ -207,9 +207,7 @@ def _snapshot(round: Round, racer_id: int | None = None) -> _Snapshot:
         sorted((r, heat, n) for _, r, heat, n in held_emptied_heats(round.event))
     )
     pending = round_adjustments(round)
-    closed_mask = 0
-    for mask in LaneClosure.objects.filter(round=round).values_list("mask", flat=True):
-        closed_mask |= mask
+    closed_mask = closed_lanes_by_round(round.event_id, round.id).get(round.id, 0)
     return _Snapshot(
         lane_count=settings.lane_count,
         unused_lane_mask=settings.unused_lane_mask,
@@ -452,7 +450,7 @@ def adjust_rounds(
     dry_run: bool = False,
     *,
     close: int = 0,
-    also: Callable[[RaceState, list[Round]], None] | None = None,
+    also: Callable[[RaceState, dict[Round, bool]], None] | None = None,
     budget: SearchBudget | None = None,
     clock: Callable[[], datetime] = timezone.now,
 ) -> list[Rescheduled]:
@@ -462,7 +460,8 @@ def adjust_rounds(
     once (Q15). With `close`, close the lanes of that mask instead of
     fitting in late racers (#108). `also` runs in the transaction that
     writes the charts, after the recheck, with the locked `RaceState` and
-    the rounds; whatever it raises rolls every write back."""
+    each round mapped to whether it was racing; whatever it raises rolls
+    every write back."""
     held = clock()
     if not _take_guard(event_id, held):
         raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
@@ -507,7 +506,16 @@ def adjust_rounds(
                         round, keep=snapshot.position.pinned(renumbered), advance=False
                     )
                 if also is not None:
-                    also(state, rounds)
+                    # Whether each round was racing: it has a result, or
+                    # holds the running or the staged heat.
+                    also(
+                        state,
+                        {
+                            round: any(done for *_, done in snapshot.rows)
+                            or bool(snapshot.position.kept_in(round))
+                            for round, snapshot, _ in work
+                        },
+                    )
             return results
         raise RescheduleFailure(
             Failure.BUSY,
