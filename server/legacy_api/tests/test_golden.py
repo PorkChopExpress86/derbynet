@@ -27,9 +27,6 @@ def _never_runs(ctx):
 STUBS = {
     "timer-message": dict(kind="action", permission=Perm.TIMER_MESSAGE),
     "kiosk.reload": dict(kind="action", permission=Perm.CONTROL_RACE),
-    "class.edit": dict(
-        kind="action", permission=Perm.SET_UP, failure_code="permission"
-    ),
 }
 
 # Exchanges this ticket does not reproduce, and why.
