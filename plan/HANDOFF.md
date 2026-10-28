@@ -87,17 +87,9 @@ The repo carries the code and the plan. The items below live outside it and must
 
 ### Claude Code configuration (in `~/.claude/`, not in this repo)
 
-- `~/.claude/pstack-models.md` holds the pstack model sheet. Recreate it with `/pstack:setup-pstack`. Current choices:
-  - `feature, refactoring: sonnet`
-  - `strongest judgment: opus`
-  - `how explorer` and `reflect tooling`: `haiku`
-  - `why investigators` and `swarm workers`: `sonnet`
-  - every other role: `opus`
-  - `default effort: high`
-  - `session hook: on`
-- `~/.claude/CLAUDE.md` includes that sheet (`@~/.claude/pstack-models.md`) and a sudo rule. The rule runs every `sudo` command as `SUDO_ASKPASS=$HOME/.local/bin/agy-askpass sudo -A <command>`, so the password goes into a popup and never into chat. The helper scripts are documented in `~/SUDO_ASKPASS_SETUP.md` on the old machine; copy that file too.
+- `~/.claude/CLAUDE.md` holds a root-command rule: run root commands as `agent-sudo <command>`, which asks for approval in a desktop popup so no password goes into chat.
 - Project memory lives in `~/.claude/projects/<project-path>/memory/`. It holds three notes: the git identity and push command, merge approval for each PR, and that a review finding counts as confirmed only once reproduced. All three are restated in this file. Copy the folder, or let them be relearned.
-- The plugins `pstack` (marketplace `michael-denyer/pstack-claude`) and `mattpocock-skills` are enabled in `~/.claude/settings.json`.
+- The plugin `mattpocock-skills` is enabled in `~/.claude/settings.json`.
 - Optional: a notes vault at `/mnt/c/Users/Blake/vault/ClaudeMemory` is referenced from `~/.claude/CLAUDE.md`.
 
 ### Local state that does not need to move
