@@ -51,6 +51,7 @@ class Failure(StrEnum):
     ROUND_SCHEDULED = "round-scheduled"
     BUSY = "busy"
     NLANES = "nlanes"
+    NOCHART = "nochart"
 
 
 class LanesFailure(Exception):
@@ -122,8 +123,8 @@ def close_lanes(
     Raises LanesFailure, with nothing changed: `no-lanes`, `no-such-lane`
     for a lane the track does not have, `already-closed` when every lane
     named is closed or unused already, `too-few-lanes` when fewer than 2
-    would stay open, `no-such-scoring`, and `busy` or `nlanes` from the
-    reschedule.
+    would stay open, `no-such-scoring`, and `busy`, `nlanes` or `nochart`
+    (a heat 0) from the reschedule.
     """
     lanes = set(lanes)
     if scoring is not None and scoring not in {s.value for s in Scoring}:
@@ -147,8 +148,7 @@ def close_lanes(
             clock=clock,
         )
     except RescheduleFailure as failure:
-        code = Failure.NLANES if failure.code == "nlanes" else Failure.BUSY
-        raise LanesFailure(code, failure.description) from None
+        raise LanesFailure(Failure(str(failure.code)), failure.description) from None
 
 
 def _record_closure(
@@ -196,9 +196,9 @@ def reopen_lanes(
     with transaction.atomic():
         lock_race_state(event.id)
         closures = list(
-            LaneClosure.objects.filter(
-                event=event, reopened_at__isnull=True, mask__gt=0
-            ).order_by("id")
+            LaneClosure.objects.filter(event=event, reopened_at__isnull=True).order_by(
+                "id"
+            )
         )
         closing = [c for c in closures if c.mask & mask]
         held = 0
