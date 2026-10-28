@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0003_race_state_intermission"),
-        ("racing", "0003_final_request"),
+        ("racing", "0004_final_request_placed_round"),
     ]
 
     operations = [

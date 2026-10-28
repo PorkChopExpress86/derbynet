@@ -38,7 +38,9 @@ def populated_event():
     scene = Scene.objects.filter(event=event).first()
     HeatLaneFactory(round=round_, racer=racer, lane=1)
     EmptiedHeat.objects.create(event=event, round=round_, heat=2, master_heat=2)
-    FinalRequest.objects.create(event=event, racer=racer, group=round_.group)
+    FinalRequest.objects.create(
+        event=event, racer=racer, group=round_.group, placed_round=round_
+    )
     LaneClosure.objects.create(event=event, round=round_, mask=0b100)
     link = GroupConstituentFactory(aggregate__event=event)
     GroupConstituentSubgroupFactory(aggregate=link.aggregate, subgroup=racer.subgroup)

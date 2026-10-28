@@ -158,6 +158,16 @@ class FinalRequest(EventScoped):
     # When the race coordinator last allowed or declined it. Allowed racers
     # follow the qualifiers in this order.
     decided_at = models.DateTimeField(null=True, blank=True)
+    # The round an allowed request put the racer on. The request is spent
+    # on that round: rebuilds of it take the racer again, and no later round
+    # does. Null until the racer is on a roster, and after a decline.
+    placed_round = models.ForeignKey(
+        Round,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     class Meta:
         constraints = [

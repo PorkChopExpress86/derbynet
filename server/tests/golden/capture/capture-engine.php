@@ -1,5 +1,5 @@
 <?php
-// Captures what the PHP scheduling, master-heat, ordinal and lane-bias code
+// Captures what the PHP scheduling, master-heat, aggregate, ordinal and lane-bias code
 // produces, with no server and no HTTP.  Run from the website/ directory:
 //
 //   php -d serialize_precision=-1 capture-engine.php <outdir> [options]
@@ -784,6 +784,108 @@ function capture_master_heats($outdir) {
 }
 
 // ---------------------------------------------------------------------------
+// topological_sort() and compute_aggregate_constituents_tc() (#102)
+
+const AGGREGATE_RANDOM_CASES = 500;
+
+// One record from aggregate classes [[classid, [constituent classids]], ...],
+// in sort order.  Each element is shaped as aggregate_classes() returns it: an
+// integer classid and the constituents as the strings explode() gives.  PHP 8
+// warns on every comparison that the comparator's by-reference arguments get
+// values; each distinct warning is recorded once.
+function aggregate_record($classes) {
+  $agg = array();
+  foreach ($classes as $c) {
+    $agg[$c[0]] = array('classid' => $c[0], 'class' => "Class $c[0]",
+                        'constituents' => array_map('strval', $c[1]),
+                        'rankids' => array(), 'durable' => 1, 'ntrophies' => -1);
+  }
+  $rec = array('classes' => $classes);
+  list($sorted, , $warnings, $error) = observe(function() use ($agg) {
+    $list = $agg;
+    return topological_sort($list);
+  });
+  $rec['order'] = is_array($sorted) ? array_map(function($c) { return $c['classid']; },
+                                                array_values($sorted)) : null;
+  if ($warnings) { $rec['order_warnings'] = array_values(array_unique($warnings)); }
+  if ($error !== null) { $rec['order_error'] = $error; }
+  list($tc, , $warnings, $error) = observe(function() use ($agg) {
+    $map = $agg;
+    return compute_aggregate_constituents_tc($map);
+  });
+  $closure = array();
+  foreach (is_array($tc) ? $tc : array() as $classid => $c) {
+    $closure[(string) $classid] = array_map('intval', $c['constituents_tc']);
+  }
+  $rec['closure'] = (object) $closure;
+  if ($warnings) { $rec['closure_warnings'] = array_values(array_unique($warnings)); }
+  if ($error !== null) { $rec['closure_error'] = $error; }
+  return $rec;
+}
+
+function aggregate_hand_cases() {
+  return array(
+    // #20 Q8: two unrelated aggregates and an aggregate of the first.  Classes
+    // 10 to 13 are plain classes.
+    'two-unrelated-and-an-aggregate-of-the-first' =>
+      array(array(1, array(10)), array(2, array(11)), array(3, array(1))),
+    'chain-of-3-in-order' => array(array(1, array(10)), array(2, array(1)), array(3, array(2))),
+    'chain-of-3-reversed' => array(array(3, array(2)), array(2, array(1)), array(1, array(10))),
+    'chain-of-4-shuffled' => array(array(2, array(1)), array(4, array(3)), array(1, array(10, 11)),
+                                   array(3, array(2, 12))),
+    'chain-of-3-with-unrelated-between' =>
+      array(array(1, array(10)), array(5, array(11)), array(2, array(1)), array(6, array(12)),
+            array(3, array(2))),
+    'diamond' => array(array(1, array(10)), array(2, array(1)), array(3, array(1)),
+                       array(4, array(2, 3))),
+    'unrelated' => array(array(1, array(10)), array(2, array(11)), array(3, array(12, 13))),
+    'one' => array(array(1, array(10, 11))),
+    'none' => array(),
+  );
+}
+
+// A seeded random aggregate DAG: 2 to 8 aggregates with distinct classids, each
+// drawing from one to three plain classes or aggregates of a lower rank, given
+// in a random sort order.
+function aggregate_random_case($seed) {
+  // A seeded mt_rand() gives the same sequence on every PHP since 7.1.
+  mt_srand($seed, MT_RAND_MT19937);
+  $n = mt_rand(2, 8);
+  $ids = range(1, 20);
+  for ($i = count($ids) - 1; $i > 0; --$i) {
+    $j = mt_rand(0, $i);
+    list($ids[$i], $ids[$j]) = array($ids[$j], $ids[$i]);
+  }
+  $ids = array_slice($ids, 0, $n);   // $ids[$k] has rank $k
+  $classes = array();
+  foreach ($ids as $k => $id) {
+    $from = array();
+    foreach (range(1, mt_rand(1, 3)) as $unused) {
+      $from[] = ($k == 0 || mt_rand(0, 2) == 0) ? 100 + mt_rand(0, 9) : $ids[mt_rand(0, $k - 1)];
+    }
+    $classes[] = array($id, array_values(array_unique($from)));
+  }
+  for ($i = count($classes) - 1; $i > 0; --$i) {
+    $j = mt_rand(0, $i);
+    list($classes[$i], $classes[$j]) = array($classes[$j], $classes[$i]);
+  }
+  return $classes;
+}
+
+function capture_aggregates($outdir) {
+  require_once('inc/aggregate_round.inc');
+  $cases = array();
+  foreach (aggregate_hand_cases() as $name => $classes) {
+    $cases[$name] = aggregate_record($classes);
+  }
+  for ($seed = 1; $seed <= AGGREGATE_RANDOM_CASES; ++$seed) {
+    $cases["seed=$seed"] = aggregate_record(aggregate_random_case($seed));
+  }
+  write_json_lines("$outdir/engine/aggregates.json", $cases);
+  return count($cases);
+}
+
+// ---------------------------------------------------------------------------
 // The sweep runs under the JIT for speed.  Recompute some cases without it and
 // confirm the hashes agree.
 
@@ -864,6 +966,7 @@ function main($argv) {
   $counts['ordinals cases'] = capture_ordinals($outdir);
   list($counts['lane-bias cases'], $counts['critical-f-value cases']) = capture_lane_bias($outdir);
   $counts['master-heat cases'] = capture_master_heats($outdir);
+  $counts['aggregate cases'] = capture_aggregates($outdir);
 
   $lines = array();
   foreach ($counts as $k => $v) {

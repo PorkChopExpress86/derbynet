@@ -113,9 +113,10 @@ def allow_final_request(request: FinalRequest) -> FinalRequest:
     """The race coordinator allows the request, open or declined before.
     The racer goes into the next round the group races in, its final or a
     combined round drawn from it (D44). If that round already has a
-    roster, the racer joins it, after the racers there; with a chart the
-    racer has no heats until Add to schedule fits the racer in. A round made
-    later enters the racer when it is built.
+    roster, the racer joins it, after the racers there, and the request is
+    spent on that round; with a chart the racer has no heats until Add to
+    schedule fits the racer in. A round made later enters the racer when it
+    is built.
 
     Refused with `wrong-group` when the racer has moved to another group
     since the request, and with `not-checked-in` when the racer's check-in
@@ -135,36 +136,41 @@ def allow_final_request(request: FinalRequest) -> FinalRequest:
             )
         if request.state != FinalRequest.State.ALLOWED:
             _decide(request, FinalRequest.State.ALLOWED)
-        final = next_round_of(racer)
+        final = request.placed_round or next_round_of(racer)
         if final is not None and final.roster.exists():
             final.roster.get_or_create(
                 event_id=request.event_id, racer_id=request.racer_id
             )
+            place_allowed_racers(final, [racer.pk])
         return request
 
 
 def decline_final_request(request: FinalRequest) -> FinalRequest:
     """The race coordinator declines the request. A racer allowed before
-    leaves the final's roster, and any unraced heats become byes at the next
-    reschedule, as a departed racer's do (#24)."""
+    leaves the round the request put the racer on, and any unraced heats
+    become byes at the next reschedule, as a departed racer's do (#24). The
+    request no longer names that round, so a later allow looks for the next
+    round again."""
     with transaction.atomic():
         lock_race_state(request.event_id)
         request = FinalRequest.objects.get(pk=request.pk)
         if request.state == FinalRequest.State.DECLINED:
             return request
-        was_allowed = request.state == FinalRequest.State.ALLOWED
+        placed = request.placed_round
         _decide(request, FinalRequest.State.DECLINED)
-        racer = request.racer
-        final = next_round_of(racer)
-        if was_allowed and _applies(request) and final is not None:
-            final.roster.filter(racer_id=racer.pk).delete()
+        if placed is not None:
+            placed.roster.filter(racer_id=request.racer_id).delete()
         return request
 
 
 def _decide(request: FinalRequest, state: FinalRequest.State) -> None:
     request.state = state
     request.decided_at = timezone.now()
-    request.save(update_fields=["state", "decided_at"])
+    fields = ["state", "decided_at"]
+    if state == FinalRequest.State.DECLINED:
+        request.placed_round = None
+        fields.append("placed_round")
+    request.save(update_fields=fields)
 
 
 def next_round_of(racer: Racer) -> Round | None:
@@ -173,7 +179,8 @@ def next_round_of(racer: Racer) -> Round | None:
     group or from the racer's subgroup, whichever was made first. A round
     whose heats have all run is not next, so a racer allowed after the
     final has run goes into a later combined round, or, with none made yet,
-    into the next round built."""
+    into the next round built. Only a request not yet placed on a round
+    reads it."""
     candidates = (
         Round.objects.filter(event_id=racer.event_id)
         .filter(
@@ -194,20 +201,6 @@ def _finished(round: Round) -> bool:
     return lanes.exists() and not lanes.exclude(HAS_RESULT).exists()
 
 
-def _allowed_on(final: Round) -> set[int]:
-    """The final's racers who are there as allowed racers, whether or not
-    the final is still their next round, for they have no result in the
-    round before it."""
-    on_roster = set(final.roster.values_list("racer_id", flat=True))
-    return {
-        r.racer_id
-        for r in FinalRequest.objects.filter(
-            racer_id__in=on_roster, state=FinalRequest.State.ALLOWED
-        ).select_related("racer")
-        if _applies(r) and _racer_of_final(r.racer, final)
-    }
-
-
 def _applies(request: FinalRequest) -> bool:
     """A request still applies while its racer is in the group it named and
     has passed check-in. A reverted check-in departs the racer (D36)."""
@@ -217,8 +210,9 @@ def _applies(request: FinalRequest) -> bool:
 
 def allowed_racers(round: Round) -> tuple[Racer, ...]:
     """The racers allowed into the round, in the order the race coordinator
-    allowed them: those whose request still applies and whose next round
-    it is (D44)."""
+    allowed them, whose request still applies: those the request already
+    put on this round, so every rebuild of it keeps them, and those not yet
+    on any round whose next round this is (D44)."""
     requests = (
         FinalRequest.objects.filter(
             event_id=round.event_id, state=FinalRequest.State.ALLOWED
@@ -229,8 +223,26 @@ def allowed_racers(round: Round) -> tuple[Racer, ...]:
     return tuple(
         r.racer
         for r in requests
-        if _applies(r) and getattr(next_round_of(r.racer), "pk", None) == round.pk
+        if _applies(r)
+        and (
+            r.placed_round_id == round.pk
+            if r.placed_round_id is not None
+            else getattr(next_round_of(r.racer), "pk", None) == round.pk
+        )
     )
+
+
+def place_allowed_racers(round: Round, racer_ids) -> None:
+    """Spend the allowed requests of the racers just written to the round's
+    roster on that round, so no later round takes them again. The roster
+    writers call it under the `RaceState` lock. A request is spent on the
+    first round it puts the racer on."""
+    FinalRequest.objects.filter(
+        event_id=round.event_id,
+        racer_id__in=list(racer_ids),
+        state=FinalRequest.State.ALLOWED,
+        placed_round__isnull=True,
+    ).update(placed_round=round)
 
 
 # ----- suggestions -----
@@ -300,7 +312,7 @@ def finalist_suggestions(
     if not _is_final(final):
         raise FinalsFailure(Failure.NOT_A_FINAL, "The round is not a final.")
     cut = _cut(final, top, bucketed)
-    allowed = _allowed_on(final)
+    allowed = {r.pk for r in allowed_racers(final)}
     roster = [e.racer for e in final.roster.select_related("racer").order_by("id")]
     qualifiers = {r.pk for r in roster} - allowed
     picked = [f.racer_id for f in cut.finalists]
@@ -354,6 +366,8 @@ def add_to_final(racer: Racer, final: Round) -> None:
         if final.roster.filter(racer=racer).exists():
             raise FinalsFailure(Failure.ON_ROSTER, "The racer is already in the final.")
         final.roster.create(event_id=final.event_id, racer=racer)
+        # An allowed racer put on the roster by hand is spent on it too.
+        place_allowed_racers(final, [racer.pk])
 
 
 def remove_from_final(racer: Racer, final: Round) -> None:
@@ -371,10 +385,9 @@ def remove_from_final(racer: Racer, final: Round) -> None:
             raise FinalsFailure(Failure.NOT_ON_ROSTER, "The racer is not in the final.")
         entry.delete()
         for request in FinalRequest.objects.filter(
-            racer_id=racer.pk, state=FinalRequest.State.ALLOWED
-        ).select_related("racer"):
-            if _applies(request) and _racer_of_final(request.racer, final):
-                _decide(request, FinalRequest.State.DECLINED)
+            racer_id=racer.pk, state=FinalRequest.State.ALLOWED, placed_round=final
+        ):
+            _decide(request, FinalRequest.State.DECLINED)
 
 
 # ----- the poll -----
