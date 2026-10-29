@@ -338,3 +338,14 @@ Behind a proxy that ends TLS, the server takes its own scheme from the `X-Forwar
 | `DJANGO_SECRET_KEY` | unset | When unset, the server generates a key into `<DERBYNET_CONFIG_DIR>/secret_key` with mode 0600 on first start, and reuses it after that |
 
 SQLite runs in WAL mode with `synchronous=NORMAL`, `IMMEDIATE` transactions, and a 20 second busy timeout (ADR-05). WAL writes `-wal` and `-shm` files next to the database, so keep `DERBYNET_DATA_DIR` on a writable local disk. A database on a network share can be corrupted. A Postgres `DATABASE_URL` is used as `dj-database-url` parses it, with no extra options.
+
+## Setup, snapshots, preferences and exports (#36)
+
+- `query=stats` needs a login, and gives `race_info` to `SET_UP` only (D16). `racing/services/stats.py` counts.
+- `export-json.php` is `racing.services.workbook.export_all()`: Roster, Results, one Standings sheet per catalog entry, and Awards. It encodes without numeric coercion (`encode_php_json(numeric_check=False)`), so a car name "111" stays text. `racing/tests/test_workbook_parity.py` checks the Standings and speed-award sheets against every PHP capture.
+- `preferences.upload` and `preferences.php` are `roster/services/preferences.py`. The file needs `SET_UP` and leaves out `ballot_password` (S4). An upload is not one transaction: a bad line leaves the lines before it applied, as in PHP.
+- `database.purge` is `racing/services/purge.py`. `purge=schedules` also renumbers master heats, as every chart change does.
+- `result.import` is `racing/services/result_import.py`, one transaction per line.
+- `snapshot.get` writes the event under the legacy table and column names, numbered from 1 (`transfer/snapshot.py`). `snapshot.put` hands the file to the importer, which replaces the active event. A round trip loses `ntrophies`, `note`, `checkin_time` and what the legacy schema has no column for.
+- `setup.nodata` makes or opens an event (`core/setup_event.py`). `file.directory.nodata`, `file.stat` and `file.directory.new.nodata` stay under the data folder.
+- `legacy_api/history_formatter.py` turns the action log into the sentences of `history.php`. `tests/data/history/` holds two PHP events' rows and the text PHP printed for them.
