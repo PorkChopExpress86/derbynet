@@ -44,6 +44,11 @@ COMPETING_WINDOW = 1
 competes with the first."""
 
 SUCCESS = "\n  <success/>\n"
+MAX_LANES = 32767
+"""The largest lane count the settings hold; a timer reporting more is
+ignored."""
+MAX_TEST_MASK = 2**31 - 1
+"""The largest lane mask the timer test's column holds."""
 
 
 # ----- the timer's state -----
@@ -330,7 +335,7 @@ def _hello(msg: _Message) -> None:
         interface = msg.get("interface")
         if msg.has("build"):
             interface += "-" + msg.get("build")
-        msg.row.interface = interface
+        msg.row.interface = _fit(TimerStatus, "interface", interface)
     last = msg.timer.last_contact
     accept = True
     if (
@@ -339,18 +344,18 @@ def _hello(msg: _Message) -> None:
         and int(last.timestamp()) + COMPETING_WINDOW >= int(msg.now.timestamp())
     ):
         agent = msg.row.agent
-        if agent and agent != msg.user_agent:
+        if agent and agent != _fit(TimerStatus, "agent", msg.user_agent):
             accept = False
             msg.out.append(f"<competing>{php_escape(agent)}</competing>\n")
     # The timer that made contact most recently; the others compete with it.
     if accept:
-        msg.row.agent = msg.user_agent
+        msg.row.agent = _fit(TimerStatus, "agent", msg.user_agent)
     msg.out.append(SUCCESS + "    <query/>\n")
 
 
 def _identified(msg: _Message) -> None:
     lanes = php_numeric(msg.get("lane_count")) if msg.has("lane_count") else None
-    if lanes is not None and lanes > 0:
+    if lanes is not None and 0 < lanes <= MAX_LANES:
         # C26: kept for parity. The timer's lane count wins, with no check
         # against the schedules (#50 asks the owner).
         msg.row.reported_lane_count = int(lanes)
@@ -363,10 +368,10 @@ def _identified(msg: _Message) -> None:
         ("options", "options"),
     ):
         if msg.has(key):
-            setattr(msg.row, column, msg.get(key))
+            setattr(msg.row, column, _fit(TimerStatus, column, msg.get(key)))
     for key in ("vid", "pid"):
         if php_truthy(msg.get(key)):
-            setattr(msg.row, key, msg.get(key))
+            setattr(msg.row, key, _fit(TimerStatus, key, msg.get(key)))
     if msg.has("confirmed") and php_equals(0, msg.get("confirmed")):
         msg.timer.state = State.UNCONFIRMED
     else:
@@ -426,7 +431,7 @@ def _heartbeat(msg: _Message) -> None:
     elif timer.unhealthy:
         timer.state = State.CONNECTED
     agent = msg.row.agent
-    if agent and agent != msg.user_agent:
+    if agent and agent != _fit(TimerStatus, "agent", msg.user_agent):
         msg.out.append(f"<competing>{php_escape(agent)}</competing>\n")
 
 
@@ -537,8 +542,14 @@ def heat_ready(current: _Current, settings: RaceSettings, test_mask: int) -> str
 # ----- flags, ports and devices (timer-flags.inc) -----
 
 
+def _fit(model, column: str, text: str) -> str:
+    """`text` cut to the column. PHP stores timer text of any length; a
+    longer value here would abort the whole message."""
+    return text[: model._meta.get_field(column).max_length]
+
+
 def _cut(text: str, column: str) -> str:
-    return text[: TimerSetting._meta.get_field(column).max_length]
+    return _fit(TimerSetting, column, text)
 
 
 def decode_flags(event: Event, fields: Mapping) -> None:
@@ -752,7 +763,7 @@ def set_test_mask(event: Event, mask: int) -> None:
 
     def change(race, row):
         was_testing = _test_end(race, row)
-        row.test_lane_mask = mask
+        row.test_lane_mask = min(max(mask, 0), MAX_TEST_MASK)
         if was_testing:
             _test_start(race, row)
         _test_start(race, row)

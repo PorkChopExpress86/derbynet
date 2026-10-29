@@ -7,7 +7,7 @@ Every message and timer state change goes to the timer audit (D19).
 
 from accounts.permissions import Perm
 from legacy_api.registry import LegacyContext, action, query
-from racing.engine.phpcompat import php_intval, php_numeric, php_truthy
+from racing.engine.phpcompat import php_intval, php_truthy
 from racing.services import polls, timer
 
 
@@ -53,8 +53,7 @@ def remote_start(ctx: LegacyContext) -> None:
 @action("timer.test", permission=Perm.CONTROL_RACE)
 def timer_test(ctx: LegacyContext) -> None:
     if "tt-mask" in ctx.args:
-        mask = php_numeric(_text(ctx, "tt-mask"))
-        timer.set_test_mask(ctx.event, int(mask) if mask is not None else 0)
+        timer.set_test_mask(ctx.event, php_intval(_text(ctx, "tt-mask")))
         ctx.success()
     elif "test-mode" in ctx.args:
         timer.set_test_mode(ctx.event, php_truthy(ctx.args["test-mode"]))

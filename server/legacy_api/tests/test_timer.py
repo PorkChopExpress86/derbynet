@@ -415,3 +415,31 @@ def test_a_timeout_is_audited_as_its_own_change(event, coordinator, jar):
         silent_since + timedelta(seconds=60),
     )
     assert after.detail == {"from": State.NOT_CONNECTED, "to": State.STAGING}
+
+
+# ----- odd input from the timer -----
+
+
+def test_overlong_timer_values_are_cut_to_fit(event, coordinator):
+    jar = Client(headers={"User-Agent": "U" * 300})
+    log_in(jar, Perm.TIMER_MESSAGE, role="Timer")
+    assert "<success/>" in message(jar, "HELLO&interface=" + "i" * 300)
+    body = message(jar, "IDENTIFIED&vid=" + "v" * 30 + "&options=" + "o" * 600)
+    assert "<success/>" in body
+    status = TimerStatus.objects.get(event=event)
+    assert (len(status.agent), len(status.interface)) == (200, 200)
+    assert (len(status.vid), len(status.options)) == (20, 500)
+
+
+@pytest.mark.parametrize("lanes", ["1e400", "70000", "-3", "abc"])
+def test_an_unusable_lane_count_is_ignored(event, coordinator, jar, lanes):
+    ok(coordinator, "action=settings.write&n-lanes=6")
+    assert "<success/>" in message(jar, f"IDENTIFIED&lane_count={lanes}")
+    assert timer_state(coordinator)["lanes"] == 6
+
+
+@pytest.mark.parametrize("mask", ["-1", "99999999999"])
+def test_an_out_of_range_test_mask_still_starts_the_test(event, coordinator, mask):
+    ok(coordinator, f"action=timer.test&tt-mask={mask}")
+    poll = reply(coordinator.get("/action.php?query=poll.timer.test"))
+    assert poll["current-heat"]["roundid"] == -100
