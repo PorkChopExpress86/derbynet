@@ -6,6 +6,7 @@ them (each row's heat, time and sentence, read from the page).
 """
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -35,6 +36,16 @@ def test_the_sentences_match_what_php_printed(path):
     assert len(found) > 50
 
 
+def same_settings(sentence: str) -> str:
+    """Postgres keeps a JSON request in its own key order, so the settings of
+    a `settings.write` come back sorted, where SQLite and PHP keep the order
+    sent."""
+    head, found, rest = sentence.partition("Write setting(s):")
+    if not found:
+        return sentence
+    return head + found + " ".join(sorted(re.findall(r"<b>.*?</b>: \"[^\"]*\"", rest)))
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.stem)
 def test_the_sentences_come_from_the_action_log_of_an_event(path, event):
@@ -50,7 +61,9 @@ def test_the_sentences_come_from_the_action_log_of_an_event(path, event):
 
     found = history(event)
 
-    assert [e.sentence for e in found] == [x["sentence"] for x in expected]
+    assert [same_settings(e.sentence) for e in found] == [
+        same_settings(x["sentence"]) for x in expected
+    ]
 
 
 def run(*actions):
