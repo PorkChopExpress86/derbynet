@@ -36,6 +36,8 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "session.write"): {"session_barcode-action": "checkin"},
     ("query", "settings.list"): {},
     ("query", "stats"): {},
+    ("action", "database.purge"): {"purge": "racers"},
+    ("action", "preferences.upload"): {},
     ("action", "settings.write"): {"partition-label": "Patrol"},
     ("action", "database.execute"): {"script": "schema"},
     ("query", "database.check"): {},

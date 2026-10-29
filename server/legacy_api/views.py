@@ -29,6 +29,7 @@ from legacy_api.registry import (
 from legacy_api.xml import PROLOG, XmlWriter
 from racing.services import timer
 from racing.services import workbook as workbook_service
+from roster.services import preferences as preferences_service
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,7 @@ def dispatch(request):
         session,
         XmlWriter(_masked(post)),
         user_agent=request.headers.get("User-Agent", ""),
+        files=request.FILES,
     )
     if kind == "action":
         echo = _masked(args)
@@ -218,3 +220,22 @@ def export_json(request):
     )
     body = encode_php_json(workbook, numeric_check=False)
     return _response(body, "application/json")
+
+
+def preferences(request):
+    """`preferences.php`: the settings and group structure as a preferences
+    file. PHP serves it to anyone and writes `ballot_password` into it (S4).
+    Django needs a login with `SET_UP`, and leaves the password out."""
+    if not allows(request, Perm.SET_UP):
+        response = HttpResponse(status=302)
+        response["Location"] = "login.php"
+        return response
+    event = _active_event()
+    if event is None:
+        response = HttpResponse(status=302)
+        response["Location"] = "setup.php"
+        return response
+    response = HttpResponse(preferences_service.dump(event), content_type="text/plain")
+    response["Cache-Control"] = "private, max-age=0, must-revalidate"
+    response["Pragma"] = "public"
+    return response

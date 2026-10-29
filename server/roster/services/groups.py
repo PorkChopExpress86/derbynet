@@ -330,6 +330,13 @@ def _create_partition(event_id, name: str, subgroup: Subgroup) -> Partition:
     return partition
 
 
+def create_partition_in_subgroup(subgroup: Subgroup, name: str) -> Partition:
+    """`create_partition_in_existing_rank()`."""
+    with transaction.atomic():
+        lock_race_state(subgroup.event_id)
+        return _create_partition(subgroup.event_id, name.strip(), subgroup)
+
+
 def _create_group(event_id, name: str, with_first_round: bool = True) -> Group:
     """`create_class()`. The caller trims and cuts the name."""
     if _group_name_taken(event_id, name):

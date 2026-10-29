@@ -3,7 +3,7 @@ from django.urls import path
 
 from accounts import views as accounts
 from core import views
-from legacy_api.views import dispatch, export_json, post_timer_log
+from legacy_api.views import dispatch, export_json, post_timer_log, preferences
 
 # A proxy that strips the URL prefix sends `action.php`. A server reached
 # directly, such as runserver, sees the prefix in the path. A root install also
@@ -21,4 +21,6 @@ urlpatterns = [
     path(f"{_legacy_prefix}/post-timer-log.php", post_timer_log),
     path("export-json.php", export_json, name="export-json"),
     path(f"{_legacy_prefix}/export-json.php", export_json),
+    path("preferences.php", preferences, name="preferences"),
+    path(f"{_legacy_prefix}/preferences.php", preferences),
 ]
