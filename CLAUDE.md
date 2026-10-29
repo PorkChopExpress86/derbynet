@@ -24,4 +24,4 @@ Briefing an agent on a ticket: `plan/AGENT-BRIEF.md`. No subagent uses the fable
 
 ## Reviews
 
-A review finding counts as confirmed only after it is reproduced: run the test script, the suite, or the `verify` skill against a real server. Report any finding checked only by reading code as unverified.
+Standards sources for a review: `CONTRIBUTING.md` and `plan/AGENT-BRIEF.md`. A review finding counts as confirmed only after it is reproduced: run the test script, the suite, or the `verify` skill against a real server. Report any finding checked only by reading code as unverified.
