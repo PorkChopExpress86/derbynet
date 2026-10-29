@@ -171,7 +171,8 @@ def test_an_unreadable_file_fails_and_changes_nothing(client, coordinator):
     assert active().pk == coordinator.pk
 
 
-def test_an_unknown_column_and_table_are_ignored_not_run_as_sql(client, coordinator):
+def test_an_unknown_column_or_table_is_refused_and_changes_nothing(client, coordinator):
+    group = GroupFactory(event=coordinator, name="Keep me")
     text = GOLDEN.read_text()
     evil = text.replace(
         '"classid": 1,\n        "class": "Snapshot",',
@@ -188,9 +189,26 @@ def test_an_unknown_column_and_table_are_ignored_not_run_as_sql(client, coordina
 
     reply = put(client, evil.encode()).content.decode()
 
-    assert "<success/>" in reply
+    assert 'code="bad-snapshot"' in reply and "<success/>" not in reply
+    assert "x); drop table core_event; --" in reply
     assert Event.objects.count() == 1
-    assert Group.objects.filter(event=active(), name="Snapshot").exists()
+    assert Group.objects.filter(pk=group.pk).exists()
+    assert not Group.objects.filter(event=active(), name="Snapshot").exists()
+
+
+def test_an_unknown_table_alone_is_refused(client, coordinator):
+    text = GOLDEN.read_text()
+    evil = text.replace(
+        '[\n  {\n    "table": "Classes"',
+        '[\n  {"table": "Evil; DROP TABLE core_event", "rows": [{"a": 1}],'
+        ' "missing": []},\n  {\n    "table": "Classes"',
+        1,
+    )
+    assert evil != text
+
+    reply = put(client, evil.encode()).content.decode()
+
+    assert 'code="bad-snapshot"' in reply and "evil; drop table" in reply
 
 
 def test_a_photo_name_cannot_leave_the_photo_folder(client, coordinator, tmp_path):
@@ -208,8 +226,21 @@ def test_a_photo_name_cannot_leave_the_photo_folder(client, coordinator, tmp_pat
 
     reply = put(client, body.encode()).content.decode()
 
-    assert "<success/>" in reply
+    assert 'code="bad-snapshot"' in reply and "../../escaped.jpg" in reply
+    assert "<success/>" not in reply
     assert not list(Path("/").glob("escaped.jpg"))
     assert not (tmp_path.parent / "escaped.jpg").exists()
-    racer = Racer.objects.filter(event=active()).order_by("pk").first()
-    assert ".." not in racer.headshot
+    assert active().pk == coordinator.pk
+
+
+def test_tables_and_columns_older_php_exports_carried_are_accepted(client, coordinator):
+    text = GOLDEN.read_text()
+    old = text.replace(
+        '[\n  {\n    "table": "Classes"',
+        '[\n  {"table": "Divisions", "rows": [{"divisionid": 1}], "missing": []},\n'
+        '  {\n    "table": "Classes"',
+        1,
+    ).replace('"table": "Playlist"', '"table": "RacingQueue"', 1)
+    assert old != text
+
+    assert "<success/>" in put(client, old.encode()).content.decode()

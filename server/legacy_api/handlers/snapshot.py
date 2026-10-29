@@ -2,9 +2,9 @@
 
 PHP lets anyone download a snapshot (S5), writes the photo files named in an
 uploaded one wherever its basename points (S6), and builds SQL from its table
-and column names (S7). Both need `SET_UP` here, and `put` goes through the
-importer, which knows its own table and column names and keeps a photo inside
-the event's photo folder.
+and column names (S7). Both need `SET_UP` here. `put` refuses a file with a table
+or column outside the export schema, or a photo name that is not a plain file
+name, and changes nothing. Then it goes through the importer.
 
 Other differences, in `DIVERGENCES`: the replaced event gets a new event
 folder, so the folder keys PHP preserves belong to the new event; the file has
@@ -19,8 +19,8 @@ from transfer import snapshot
 
 DIVERGENCES = (
     "S5: needs SET_UP; PHP lets anyone download a snapshot.",
-    "S6: a photo name is kept inside the event's photo folder.",
-    "S7: an unknown table or column in an upload is skipped, never run as SQL.",
+    "S6: a photo name that is not a plain file name refuses the upload.",
+    "S7: an unknown table or column refuses the upload, and none is run as SQL.",
 )
 
 
