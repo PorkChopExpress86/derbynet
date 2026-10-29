@@ -34,7 +34,8 @@ from roster.models import (
     Subgroup,
 )
 from transfer.importer import LATEST_SCHEMA, ImportFailed, import_derbynet
-from transfer.legacy.source import SourceError
+from transfer.legacy.photos import is_valid_name
+from transfer.legacy.source import SourceError, read_source
 
 # The names of the export schema, by the lower case the reader keys tables with.
 _CANONICAL = {
@@ -431,6 +432,39 @@ def get(event: Event, clean: bool = False, photos: bool = False) -> str:
     return "<snapshot><![CDATA[\n[\n" + ",\n".join(entries) + "]\n]]></snapshot>\n"
 
 
+# The columns of the two export tables the Django models do not hold.
+_LOG_COLUMNS = {
+    "Events": (
+        "seq tstamp action racerid classid rankid roundid heat other finishid"
+    ).split(),
+    "EventLaneDetails": (
+        "tresultid finishid lane finishtime finishplace completed"
+    ).split(),
+}
+
+
+def _refusals(event: Event, source) -> list[str]:
+    """What in an upload is not the export schema: a table or column this
+    server never writes, or a photo name that is not a plain file name. A
+    snapshot with any of these is refused whole (S6, S7)."""
+    known = {
+        name.lower(): set(columns)
+        for name, (columns, _rows) in tables(event, False).items()
+    }
+    known |= {name.lower(): set(columns) for name, columns in _LOG_COLUMNS.items()}
+    problems = []
+    for table, rows in source.tables.items():
+        if table not in known:
+            problems.append(f"unknown table {table}")
+            continue
+        for column in sorted({c for row in rows for c in row} - known[table]):
+            problems.append(f"unknown column {column} in {_CANONICAL[table]}")
+    for photo in source.photos:
+        if not is_valid_name(photo.basename):
+            problems.append(f"photo name {photo.basename} is not a file name")
+    return problems
+
+
 class PutFailure(Exception):
     def __init__(self, code: str, description: str):
         super().__init__(description)
@@ -452,13 +486,14 @@ def put(event: Event, content: bytes) -> list[tuple[str, str, int, int]]:
         path = Path(folder) / "snapshot.xml"
         path.write_bytes(content)
         try:
-            from transfer.legacy.source import read_source
-
             source = read_source(path)
         except SourceError as error:
             raise PutFailure("json-parsing", "Failed to parse JSON text.") from error
         if source.kind != "snapshot":
             raise PutFailure("json-parsing", "Failed to parse JSON text.")
+        problems = _refusals(event, source)
+        if problems:
+            raise PutFailure("bad-snapshot", "; ".join(problems))
         try:
             import_derbynet(path, event_name=event.name, replace=True)
         except (ImportFailed, SourceError) as error:
