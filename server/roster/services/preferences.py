@@ -176,11 +176,20 @@ class _Parser:
                 Partition.objects.filter(event=self.event), val
             )
             if partition is not None and re.fullmatch(r"-?\d+", arg):
-                Partition.objects.filter(pk=partition.pk).update(sort_order=int(arg))
+                with transaction.atomic():
+                    lock_race_state(self.event.id)
+                    Partition.objects.filter(pk=partition.pk).update(
+                        sort_order=int(arg)
+                    )
 
     def on_award(self, n, val, arg):
         name = val.strip()
         award_type = AwardType.objects.get(name=DESIGN_GENERAL)
+        with transaction.atomic():
+            lock_race_state(self.event.id)
+            self._create_award(name, award_type)
+
+    def _create_award(self, name, award_type) -> None:
         top = Award.objects.filter(event=self.event).aggregate(top=Max("sort"))["top"]
         award = Award.objects.create(
             event=self.event,
@@ -244,7 +253,9 @@ class _Parser:
             count = int(val)
         except ValueError:
             count = 0
-        type(target).objects.filter(pk=target.pk).update(n_trophies=count)
+        with transaction.atomic():
+            lock_race_state(self.event.id)
+            type(target).objects.filter(pk=target.pk).update(n_trophies=count)
 
     def on_constituentgroup(self, n, val, arg):
         return self.on_constituent(n, val, "GROUP")

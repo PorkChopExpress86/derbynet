@@ -61,23 +61,35 @@ def _results(event: Event, round_id) -> None:
             lanes.update(**clear)
             heats.transition(state, hs.Cancel())
             return
-        _audit(event, Action.PURGE_RESULTS_ONE_ROUND)
         round = _round_of(event, round_id)
+        AuditEvent.objects.create(
+            event=event, action=Action.PURGE_RESULTS_ONE_ROUND, round=round
+        )
         if round is not None:
             lanes.filter(round=round).update(**clear)
             heats.maybe_cancel_running_round(state, round.id)
 
 
 def _schedules(event: Event, round_id) -> None:
-    _audit(event, Action.PURGE_SCHEDULES)
-    if round_id is not None:
-        round = _round_of(event, round_id)
-        if round is not None:
-            schedule.unschedule(round)
-        return
-    for round in Round.objects.filter(event=event).order_by("id"):
-        schedule.unschedule(round)
-    heats.cancel_running_round(event)
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        round = None if round_id is None else _round_of(event, round_id)
+        AuditEvent.objects.create(
+            event=event, action=Action.PURGE_SCHEDULES, round=round
+        )
+        if round_id is not None and round is None:
+            return
+        rounds = [round] if round else list(Round.objects.filter(event=event))
+        for each in rounds:
+            HeatLane.objects.filter(round=each).delete()
+            EmptiedHeat.objects.filter(round=each).delete()
+        # Master heats are renumbered, and the running round cancelled when
+        # its chart goes, as every other chart change does. PHP only deletes
+        # the rows and leaves the master numbers stale.
+        for each in rounds:
+            schedule.after_chart_change(each, cancel_current=True)
+        if round is None:
+            heats.transition(RaceState.objects.get(pk=state.pk), hs.Cancel())
 
 
 def _racers(event: Event) -> None:

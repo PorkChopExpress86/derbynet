@@ -12,8 +12,13 @@ from core import race_settings
 from legacy_api.registry import LegacyContext, query
 from racing.services import stats
 
+DIVERGENCES = (
+    "D16: a login is required, where PHP answers anyone (S3); race_info goes to SET_UP"
+    " only, without the secrets (D16).",
+)
 
-@query("stats", permission=Access.LOGGED_IN)
+
+@query("stats", permission=Access.LOGGED_IN, divergences=DIVERGENCES)
 def stats_query(ctx: LegacyContext) -> None:
     now = timezone.localtime()
     ctx.put(
