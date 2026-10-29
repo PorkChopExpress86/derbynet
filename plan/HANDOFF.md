@@ -58,8 +58,6 @@ The acceptance boxes left open on #29, #30, and #31 are suite criteria that wait
 
 ## Open questions for the owner
 
-- **Which role the timer laptop logs in as** (comment on #50). Spec #15 moves `timer.settings` behind `CONTROL_RACE`, so a Timer-only login loses the browser timer's settings button. #50 lists two fixes.
-- **Raspberry Pi 4 timings** are unmeasured: login cost (#16) and generator table load (#21). The owner runs a regular server (D21), so these are low priority.
 - **The Electron desktop timer** likely sends `Origin: null`, which the Origin check refuses. It is untested. PHP sends no CORS header either. Test it only if the Electron build is ever used.
 
 ## How the work is run
@@ -70,7 +68,7 @@ These are the owner's standing rules. They are also stored as Claude memory file
 - **The PHP server is frozen.** No fixes under `website/` (D12). Defects are fixed only in Django, and #64 tracks them.
 - **One PR per ticket, then an independent review before merge.** The reviewer is a separate agent that the author did not choose. It reproduces findings, or labels them unverified.
 - **Merge a PR when its checks pass on the current head and its review is clean.** The owner gave standing approval on 2026-10-28, so no per-PR ask. Use `plan/bin/pr-wait` and `plan/bin/pr-merge`, which pin the merge to the head that passed. Anything else that is hard to reverse still needs a confirmation.
-- **Owner decisions go in `plan/owner-decisions.md`** (D1 to D46 so far), in the same change that edits the issues they touch.
+- **Owner decisions go in `plan/owner-decisions.md`** (D1 to D56 so far), in the same change that edits the issues they touch.
 - **Edit issue bodies through the lint.** Fetch the body, edit it, run `plan/lint-issues.py --file N=PATH`, then `gh issue edit`. See `plan/README.md`.
 
 ## Setting up a new computer
