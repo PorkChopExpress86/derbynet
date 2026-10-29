@@ -20,6 +20,7 @@ ID_KEYS = {
     "rankid": "rank",
     "roundid": "round",
     "resultid": "result",
+    "awardid": "award",
 }
 # Keys whose value is a list of ids of one kind, or for `schedule` a list of
 # heats of racer ids.
@@ -31,10 +32,27 @@ NO_ROW = 10**9
 _TIMECHECK = re.compile(r'("timecheck": )"[^"]*"')
 _EPOCH = re.compile(r'("last[-_]contact": )[1-9]\d*')
 _SECONDS = re.compile(r"\(\d+ sec\.\)")
+_DURATION = re.compile(r'("duration": )[0-9.eE+-]+')
 _TIMESTAMP = re.compile(r'"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d"')
 _ROUND_IN_TEXT = re.compile(r"roundid (\d+)")
 _ROUND_IN_XML = re.compile(r'(roundid="|roundid )(\d+)')
 _SIGNATURE = re.compile(r"(\d+)-(\d+)")
+# An award key: `award-<awardid>`, or `speed-<place>[-<classid>[-<rankid>]]`.
+_AWARD_KEY = re.compile(r"award-(\d+)|speed-(\w+?)(?:-(\d+)(?:-(\d+))?)?")
+
+
+def award_key(key: str, to_id) -> str:
+    """An award key with its ids passed through `to_id(kind, id)`."""
+    found = _AWARD_KEY.fullmatch(key)
+    if found is None:
+        return key
+    if found[1]:
+        return f"award-{to_id('award', int(found[1]))}"
+    key = f"speed-{found[2]}"
+    for kind, part in (("class", found[3]), ("rank", found[4])):
+        if part:
+            key += f"-{to_id(kind, int(part))}"
+    return key
 
 
 class Ids:
@@ -121,6 +139,8 @@ class Ids:
                     }
                 elif k == "tbodyid" and not value.get("use_master_sched"):
                     out[k] = self.php("round", v)
+                elif k == "key" and isinstance(v, str):
+                    out[k] = award_key(v, self.php)
                 elif k == "chart" and isinstance(v, list) and key is None:
                     out[k] = [
                         None
@@ -147,7 +167,10 @@ FIELD_KINDS = {
     "classid": "class",
     "rankid": "rank",
     "partitionid": "partition",
+    "awardid": "award",
 }
+# Fields `<prefix><n>` whose value names a row.
+VALUE_PREFIX_KINDS = {"awardid_": "award"}
 PREFIX_KINDS = {"classid_": "class", "rankid_": "rank"}
 
 
@@ -156,6 +179,11 @@ def translate(fields, ids: Ids):
     for key, value in fields:
         if key in FIELD_KINDS and value.lstrip("-").isdigit():
             value = str(ids.django(FIELD_KINDS[key], int(value)))
+        for prefix, kind in VALUE_PREFIX_KINDS.items():
+            if key.startswith(prefix) and value.isdigit():
+                value = str(ids.django(kind, int(value)))
+        if key == "key":
+            value = award_key(value, ids.django)
         for prefix, kind in PREFIX_KINDS.items():
             if key.startswith(prefix) and key[len(prefix) :].isdigit():
                 key = prefix + str(ids.django(kind, int(key[len(prefix) :])))
@@ -182,6 +210,7 @@ def mask(body: str) -> str:
     body = _TIMECHECK.sub(r'\1"<timecheck>"', body)
     body = _EPOCH.sub(r'\1"<epoch>"', body)
     body = _SECONDS.sub("(<n> sec.)", body)
+    body = _DURATION.sub(r'\1"<seconds>"', body)
     return _TIMESTAMP.sub('"<timestamp>"', body)
 
 

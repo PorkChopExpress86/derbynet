@@ -86,9 +86,8 @@ class AwardPartition(EventScoped):
     later too, so neither an empty list nor a full one is stored. A row
     names only a partition its unit draws from. Deleting a partition, or
     the unit, deletes its rows, and `awards.services` keeps the rest of
-    that rule. Speed awards read the lists now;
-    `award.winner` reads a judged award's in #33. The legacy API neither
-    reads nor writes them.
+    that rule. Speed awards read the lists, and `award.winner` reads a
+    judged award's. The legacy API never writes them.
     """
 
     group = models.ForeignKey(

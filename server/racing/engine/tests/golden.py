@@ -63,6 +63,15 @@ QUIRK_DECISIONS = {
     "R7": "fix",
     "R8": "fix",
     "R9": "fix",
+    # Proposed in #33, for the owner to confirm: A1 a pack-wide award lists
+    # classid and rankid 0, never null; A2, A4 and A5 refuse a class, a
+    # full-field-calc or an award key PHP would store unchecked; A3
+    # award.present with no parameters answers success, as #33 asks.
+    "A1": "fix",
+    "A2": "fix",
+    "A3": "fix",
+    "A4": "fix",
+    "A5": "fix",
 }
 
 

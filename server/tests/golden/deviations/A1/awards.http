@@ -1,0 +1,815 @@
+### 025 list
+request: GET action.php?query=award.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 6410
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        },
+        {
+            "awardtypeid": 6,
+            "awardtype": "Ad Hoc"
+        }
+    ],
+    "awards": [
+        {
+            "awardid": 2,
+            "awardname": "Lion Paint",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 1,
+            "eligible-classids": [
+                1
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 0,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 6,
+            "awardname": "Exclusively By Scout",
+            "awardtype": "Other",
+            "awardtypeid": 3,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 1,
+            "firstname": "Lion1",
+            "lastname": "Racer",
+            "carnumber": 101,
+            "sort": 0,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 1,
+            "awardname": "Best Paint Job",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 5,
+            "firstname": "Lion3",
+            "lastname": "Racer",
+            "carnumber": 103,
+            "sort": 1,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 3,
+            "awardname": "Tiger Stripes",
+            "awardtype": "Design General",
+            "awardtypeid": 1,
+            "adhoc": false,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 4,
+            "firstname": "Tiger2",
+            "lastname": "Racer",
+            "carnumber": 202,
+            "sort": 9,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 4,
+            "awardname": "Fastest Looking",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 10,
+            "ballot_depth": 2,
+            "votes": []
+        },
+        {
+            "awardid": 5,
+            "awardname": "Most Sparkle",
+            "awardtype": "Ad Hoc",
+            "awardtypeid": 6,
+            "adhoc": true,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 6,
+            "firstname": "Tiger3",
+            "lastname": "Racer",
+            "carnumber": 203,
+            "sort": 999,
+            "ballot_depth": 0,
+            "votes": []
+        }
+    ],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Tigers",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                }
+            ]
+        }
+    ]
+}
+
+### 026 list without ad hoc
+request: GET action.php?query=award.list&adhoc=0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 5755
+body:
+{
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        }
+    ],
+    "awards": [
+        {
+            "awardid": 2,
+            "awardname": "Lion Paint",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 1,
+            "eligible-classids": [
+                1
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 0,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 6,
+            "awardname": "Exclusively By Scout",
+            "awardtype": "Other",
+            "awardtypeid": 3,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 1,
+            "firstname": "Lion1",
+            "lastname": "Racer",
+            "carnumber": 101,
+            "sort": 0,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 1,
+            "awardname": "Best Paint Job",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 5,
+            "firstname": "Lion3",
+            "lastname": "Racer",
+            "carnumber": 103,
+            "sort": 1,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 3,
+            "awardname": "Tiger Stripes",
+            "awardtype": "Design General",
+            "awardtypeid": 1,
+            "adhoc": false,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 4,
+            "firstname": "Tiger2",
+            "lastname": "Racer",
+            "carnumber": 202,
+            "sort": 9,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 4,
+            "awardname": "Fastest Looking",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 10,
+            "ballot_depth": 2,
+            "votes": []
+        }
+    ],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Tigers",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                }
+            ]
+        }
+    ]
+}
+
+### 044 A1 edit new with no class
+request: POST action.php
+request-body: action=award.edit&awardid=new&name=Plain&awardtypeid=4
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 7064
+body:
+{
+    "action": {
+        "action": "award.edit",
+        "awardid": "new",
+        "name": "Plain",
+        "awardtypeid": 4
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "award-types": [
+        {
+            "awardtypeid": 1,
+            "awardtype": "Design General"
+        },
+        {
+            "awardtypeid": 2,
+            "awardtype": "Speed General"
+        },
+        {
+            "awardtypeid": 3,
+            "awardtype": "Other"
+        },
+        {
+            "awardtypeid": 4,
+            "awardtype": "Design Trophy"
+        },
+        {
+            "awardtypeid": 5,
+            "awardtype": "Speed Trophy"
+        }
+    ],
+    "awards": [
+        {
+            "awardid": 4,
+            "awardname": "Fastest Looking",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 1,
+            "ballot_depth": 2,
+            "votes": []
+        },
+        {
+            "awardid": 1,
+            "awardname": "Best Paint Job",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 5,
+            "firstname": "Lion3",
+            "lastname": "Racer",
+            "carnumber": 103,
+            "sort": 2,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 3,
+            "awardname": "Tiger Stripes",
+            "awardtype": "Design General",
+            "awardtypeid": 1,
+            "adhoc": false,
+            "classid": 2,
+            "eligible-classids": [
+                2
+            ],
+            "eligible-rankids": [
+                2
+            ],
+            "rankid": 2,
+            "racerid": 4,
+            "firstname": "Tiger2",
+            "lastname": "Racer",
+            "carnumber": 202,
+            "sort": 9,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 6,
+            "awardname": "Cub Spirit",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 3,
+            "eligible-classids": [
+                1,
+                2
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 10,
+            "ballot_depth": 0,
+            "votes": []
+        },
+        {
+            "awardid": 7,
+            "awardname": "Plain",
+            "awardtype": "Design Trophy",
+            "awardtypeid": 4,
+            "adhoc": false,
+            "classid": 0,
+            "eligible-classids": [
+                1,
+                2,
+                3
+            ],
+            "eligible-rankids": [
+                1,
+                2
+            ],
+            "rankid": 0,
+            "racerid": 0,
+            "firstname": "",
+            "lastname": "",
+            "carnumber": null,
+            "sort": 11,
+            "ballot_depth": 0,
+            "votes": []
+        }
+    ],
+    "speed-awards": [
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1",
+            "place": 1,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2",
+            "place": 2,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3",
+            "place": 3,
+            "category": "supergroup"
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1-3",
+            "place": 1,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-3",
+            "place": 2,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-3",
+            "place": 3,
+            "category": "group",
+            "classid": 3
+        },
+        {
+            "type": "speed-award",
+            "racerid": 1,
+            "key": "speed-1-1",
+            "place": 1,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 5,
+            "key": "speed-2-1",
+            "place": 2,
+            "category": "group",
+            "classid": 1
+        },
+        {
+            "type": "speed-award",
+            "racerid": 2,
+            "key": "speed-1-2",
+            "place": 1,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 4,
+            "key": "speed-2-2",
+            "place": 2,
+            "category": "group",
+            "classid": 2
+        },
+        {
+            "type": "speed-award",
+            "racerid": 6,
+            "key": "speed-3-2",
+            "place": 3,
+            "category": "group",
+            "classid": 2
+        }
+    ],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Lions",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Lions"
+                }
+            ]
+        },
+        {
+            "classid": 2,
+            "count": 3,
+            "nrounds": 1,
+            "ntrophies": -1,
+            "name": "Tigers",
+            "subgroups": [
+                {
+                    "rankid": 2,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Tigers"
+                }
+            ]
+        },
+        {
+            "classid": 3,
+            "count": 0,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Cubs",
+            "subgroups": [],
+            "constituents": [
+                {
+                    "classid": 1,
+                    "name": "Lions"
+                },
+                {
+                    "classid": 2,
+                    "name": "Tigers"
+                }
+            ]
+        }
+    ]
+}
+

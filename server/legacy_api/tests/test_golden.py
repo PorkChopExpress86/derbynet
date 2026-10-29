@@ -13,7 +13,7 @@ import re
 
 import pytest
 
-from accounts.permissions import Access, Perm
+from accounts.permissions import Perm
 from core.tests.factories import EventFactory
 from legacy_api.tests.golden import replay, transcript
 
@@ -76,13 +76,12 @@ def test_the_dispatcher_transcript_holds_the_json_refusals():
     assert {"json-notauthorized", "json-permission-failure"} <= names
 
 
-def test_a_query_that_writes_nothing_is_an_empty_object(client, endpoint):
+def test_a_query_that_writes_nothing_is_an_empty_object(client):
     [ex] = [
         ex
         for ex in transcript("poll/race-day-polls")
         if ex.name == "08-before-awards award.current"
     ]
-    endpoint("query", "award.current", permission=Access.ANONYMOUS)
     EventFactory()
 
     assert_same(replay(client, ex), ex)

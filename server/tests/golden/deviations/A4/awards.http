@@ -1,0 +1,20 @@
+### 047 A4 calc-rule no aggregate
+request: POST action.php
+request-body: action=award.calc-rule&full-field-calc=9999
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 253
+body:
+{
+    "action": {
+        "action": "award.calc-rule",
+        "full-field-calc": 9999
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "not-written",
+        "description": "Value for full-field-calc could not be written."
+    }
+}
+

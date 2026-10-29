@@ -137,6 +137,17 @@
       "expected": "deviations/R1/refusals.http"
     },
     {
+      "quirk": "A1",
+      "fixture": "http/awards/awards.http",
+      "exchanges": [
+        "025 list",
+        "026 list without ad hoc",
+        "044 A1 edit new with no class"
+      ],
+      "reason": "An award stored with no class, one award.edit makes with no class_and_rank or award.xbs makes, lists classid and rankid null in PHP, which the awards editor shows as an unknown class; Django lists 0, as for every other pack-wide award (#33, for the owner to confirm).",
+      "expected": "deviations/A1/awards.http"
+    },
+    {
       "quirk": "R2",
       "fixture": "http/racers/refusals.http",
       "exchanges": [
@@ -144,6 +155,24 @@
       ],
       "reason": "PHP stores a car number such as A12 as text. Django's car number is an integer column, so it refuses one that is not a whole number with invalid-carnumber (#29, for the owner to decide).",
       "expected": "deviations/R2/refusals.http"
+    },
+    {
+      "quirk": "A2",
+      "fixture": "http/awards/awards.http",
+      "exchanges": [
+        "045 A2 edit new in no class"
+      ],
+      "reason": "PHP stores a class_and_rank that names no class of the event; Django refuses it with unknownclass, as award.import does (#33, for the owner to confirm).",
+      "expected": "deviations/A2/awards.http"
+    },
+    {
+      "quirk": "A3",
+      "fixture": "http/awards/awards.http",
+      "exchanges": [
+        "046 A3 present nothing"
+      ],
+      "reason": "award.present with neither key nor reveal never sets an outcome in PHP, which answers in-progress; Django answers success (#33).",
+      "expected": "deviations/A3/awards.http"
     },
     {
       "quirk": "R3",
@@ -228,6 +257,15 @@
       "expected": "deviations/Q4/points-rerun-reinstate.http"
     },
     {
+      "quirk": "A4",
+      "fixture": "http/awards/awards.http",
+      "exchanges": [
+        "047 A4 calc-rule no aggregate"
+      ],
+      "reason": "PHP stores a full-field-calc that names no class; Django refuses it with not-written, as settings.write does (#33, for the owner to confirm).",
+      "expected": "deviations/A4/awards.http"
+    },
+    {
       "quirk": "D5",
       "fixture": "http/racers/refusals.http",
       "exchanges": [
@@ -235,6 +273,15 @@
       ],
       "reason": "PHP lists every racer to anyone. Django's racer.list needs a role that works with racers; the anonymous VIEW_RACE_RESULTS is not enough (D5).",
       "expected": "deviations/D5/refusals.http"
+    },
+    {
+      "quirk": "A5",
+      "fixture": "http/awards/awards.http",
+      "exchanges": [
+        "048 A5 present a long key"
+      ],
+      "reason": "PHP stores an award key of any length; Django refuses one past 100 characters with not-written (#33, for the owner to confirm).",
+      "expected": "deviations/A5/awards.http"
     },
     {
       "quirk": "Q5",
@@ -1744,7 +1791,9 @@
       "exchanges": [
         "014 04-scheduled-and-racing-heat-1 poll",
         "021 05-mid-heat poll",
-        "025 06-after-a-result poll"
+        "025 06-after-a-result poll",
+        "029 07-between-rounds-final-teed-up poll",
+        "034 08-award-presented poll"
       ],
       "reason": "A playlist round is scheduled through generate_schedule, so its heats get master heat numbers (D30); PHP's playlist leaves them at 0.",
       "expected": "deviations/Q19/race-day-polls.http"

@@ -1,0 +1,20 @@
+### 048 A5 present a long key
+request: POST action.php
+request-body: action=award.present&key=award-1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 345
+body:
+{
+    "action": {
+        "action": "award.present",
+        "key": "award-1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "not-written",
+        "description": "Value for current_award_key could not be written."
+    }
+}
+
