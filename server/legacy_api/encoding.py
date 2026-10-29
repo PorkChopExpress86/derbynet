@@ -98,8 +98,8 @@ def _string(s: str) -> str:
     return "".join(out)
 
 
-def _scalar_string(s: str) -> str:
-    number = php_number(s)
+def _scalar_string(s: str, numeric_check: bool = True) -> str:
+    number = php_number(s) if numeric_check else None
     if isinstance(number, int):
         return str(number)
     if isinstance(number, float) and math.isfinite(number):
@@ -107,7 +107,7 @@ def _scalar_string(s: str) -> str:
     return _string(s)
 
 
-def _encode(value, depth: int, out: list[str]) -> None:
+def _encode(value, depth: int, out: list[str], numeric_check: bool = True) -> None:
     match value:
         case None:
             out.append("null")
@@ -120,16 +120,20 @@ def _encode(value, depth: int, out: list[str]) -> None:
                 raise ValueError(f"PHP cannot encode {value} in JSON")
             out.append(php_float(value))
         case str():
-            out.append(_scalar_string(value))
+            out.append(_scalar_string(value, numeric_check))
         case list() | tuple():
-            _container("[", "]", [(None, item) for item in value], depth, out)
+            _container(
+                "[", "]", [(None, item) for item in value], depth, out, numeric_check
+            )
         case dict():
-            _container("{", "}", list(value.items()), depth, out)
+            _container("{", "}", list(value.items()), depth, out, numeric_check)
         case _:
             raise TypeError(f"cannot encode {type(value).__name__} as PHP JSON")
 
 
-def _container(open_, close, items, depth: int, out: list[str]) -> None:
+def _container(
+    open_, close, items, depth: int, out: list[str], numeric_check: bool = True
+) -> None:
     if not items:
         out.append(open_ + close)
         return
@@ -139,14 +143,18 @@ def _container(open_, close, items, depth: int, out: list[str]) -> None:
         out.append(inner)
         if key is not None:
             out.append(_string(str(key)) + ": ")
-        _encode(item, depth + 1, out)
+        _encode(item, depth + 1, out, numeric_check)
         out.append(",\n" if i < len(items) - 1 else "\n")
     out.append("    " * depth + close)
 
 
-def encode_php_json(value) -> bytes:
-    """The response body PHP writes for `value`, trailing newline included."""
+def encode_php_json(value, *, numeric_check: bool = True) -> bytes:
+    """The response body PHP writes for `value`, trailing newline included.
+
+    `action.php` encodes with `JSON_NUMERIC_CHECK`, which turns numeric text
+    into numbers. `export-json.php` does not, so `numeric_check=False` keeps
+    text as text."""
     out: list[str] = []
-    _encode(value, 0, out)
+    _encode(value, 0, out, numeric_check)
     out.append("\n")
     return "".join(out).encode("ascii")

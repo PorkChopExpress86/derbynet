@@ -176,6 +176,21 @@ jobs:
           bash testing/test-master-schedule.sh http://127.0.0.1:8080
           bash testing/test-awards.sh http://127.0.0.1:8080 master
 
+      # The standings suites read their rows from export-json.php (#36).
+      # test-points-racing.sh waits: it reads the Pack sheet while its round is
+      # unfinished, a sheet no server writes, and it fails against PHP too.
+      - name: Run the standings suites against Django
+        working-directory: .
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-den-changes.sh http://127.0.0.1:8080
+          bash testing/test-standing-by-rank.sh http://127.0.0.1:8080
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-den-changes.sh http://127.0.0.1:8080
+          bash testing/test-aggregate-classes.sh http://127.0.0.1:8080
+
       # The real derby-timer.jar, with its simulated timer, races a whole
       # round, as timer/testing/fake-timer runs it (#32, ADR-02).  The runner
       # image ships Java and Ant.

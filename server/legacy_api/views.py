@@ -28,6 +28,7 @@ from legacy_api.registry import (
 )
 from legacy_api.xml import PROLOG, XmlWriter
 from racing.services import timer
+from racing.services import workbook as workbook_service
 
 logger = logging.getLogger(__name__)
 
@@ -197,3 +198,23 @@ def post_timer_log(request):
         else:
             body = f"<success>{written} bytes</success>\n"
     return _response((PROLOG + body).encode(), CONTENT_TYPES[Format.XML])
+
+
+def export_json(request):
+    """`export-json.php`: the workbook of `export_all()` as JSON. PHP sends a
+    caller without `VIEW_RACE_RESULTS` to the login page. It encodes without
+    `JSON_NUMERIC_CHECK`, so text such as a car name "111" stays text."""
+    if not allows(request, Perm.VIEW_RACE_RESULTS):
+        response = HttpResponse(status=302)
+        response["Location"] = "login.php"
+        return response
+    event = _active_event()
+    if event is None:
+        response = HttpResponse(status=302)
+        response["Location"] = "setup.php"
+        return response
+    workbook = workbook_service.export_all(
+        event, show_racer_id="racerid" in request.GET
+    )
+    body = encode_php_json(workbook, numeric_check=False)
+    return _response(body, "application/json")
