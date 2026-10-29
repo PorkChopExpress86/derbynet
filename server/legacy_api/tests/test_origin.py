@@ -99,7 +99,6 @@ def test_a_foreign_login_is_refused(client, event):
 
 
 def test_a_foreign_xml_action_gets_the_xml_refusal(client, event, endpoint):
-    endpoint("action", "timer-message", permission=Perm.TIMER_MESSAGE)
     log_in(client, Perm.TIMER_MESSAGE, role="Timer")
     php = exchange("envelope/dispatcher", "xml-action-timer-message-without-login")
 

@@ -12,7 +12,7 @@ from django.db import DatabaseError, transaction
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from accounts.permissions import allows
+from accounts.permissions import Perm, allows
 from core.models import ActionLog, SiteState
 from legacy_api.encoding import encode_php_json
 from legacy_api.forms import parse_php_form
@@ -27,6 +27,7 @@ from legacy_api.registry import (
     needs_event,
 )
 from legacy_api.xml import PROLOG, XmlWriter
+from racing.services import timer
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,13 @@ def dispatch(request):
     session = request.session
     if not (endpoint and endpoint.session_write):
         session = ReadOnlySession(session, name)
-    ctx = LegacyContext(args, event, session, XmlWriter(_masked(post)))
+    ctx = LegacyContext(
+        args,
+        event,
+        session,
+        XmlWriter(_masked(post)),
+        user_agent=request.headers.get("User-Agent", ""),
+    )
     if kind == "action":
         echo = _masked(args)
         ctx.put("action", echo)
@@ -169,3 +176,24 @@ def dispatch(request):
 
     body = ctx.xml.document() if fmt is Format.XML else encode_php_json(ctx.out)
     return _response(body, CONTENT_TYPES[fmt])
+
+
+@csrf_exempt
+def post_timer_log(request):
+    """`post-timer-log.php`: the timer's log, appended to the file its last
+    HELLO named. PHP takes any upload; Django needs `TIMER_MESSAGE` from the
+    session, which `derby-timer.jar` and the browser timer hold (S22)."""
+    if request.method != "POST":
+        return _response(NOT_A_PAGE, "text/html; charset=UTF-8")
+    event = _active_event()
+    if _foreign_origin(request) or not allows(request, Perm.TIMER_MESSAGE):
+        body = '<failure code="notauthorized">Not authorized</failure>\n'
+    elif event is None:
+        body = "<failure>No event is open</failure>\n"
+    else:
+        written = timer.append_log(event, request.body)
+        if written is None:
+            body = "<failure>Can't open the timer log</failure>\n"
+        else:
+            body = f"<success>{written} bytes</success>\n"
+    return _response((PROLOG + body).encode(), CONTENT_TYPES[Format.XML])

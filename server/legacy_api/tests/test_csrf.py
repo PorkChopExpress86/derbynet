@@ -1,7 +1,6 @@
 import pytest
 from django.test import Client
 
-from accounts.permissions import Perm
 from legacy_api.tests.conftest import post
 from legacy_api.tests.golden import exchange
 
@@ -23,7 +22,6 @@ def test_an_action_posted_without_a_csrf_token_is_answered(csrf_client, event):
 def test_a_timer_message_without_a_token_gets_the_php_response(
     csrf_client, event, endpoint
 ):
-    endpoint("action", "timer-message", permission=Perm.TIMER_MESSAGE)
     php = exchange("envelope/dispatcher", "xml-action-timer-message-without-login")
 
     response = post(csrf_client, "action=timer-message&message=HELLO")

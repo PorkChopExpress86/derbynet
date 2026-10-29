@@ -200,23 +200,29 @@ class LastHeat(Packed):
         return "#".join(parts)
 
 
+# Legacy RoundID while the timer is being tested (TIMER_TEST_ROUNDID).
+TIMER_TEST_ROUND_ID = -100
+
+
 class StagedHeat(Packed):
-    """`roundid#heat` while a heat is staged on the timer, else `""`."""
+    """`roundid#heat` while a heat is staged on the timer, else `""`. A heat
+    of the timer test, `-100#heat`, is a staged heat with no round."""
 
     def decode(self, raw):
         if raw == "":
             return {"staged_round": None, "staged_heat": None}
-        round_id, heat = raw.split("#")
-        return {"staged_round": int(round_id), "staged_heat": int(heat)}
+        round_id, heat = (int(part) for part in raw.split("#"))
+        if round_id == TIMER_TEST_ROUND_ID:
+            return {"staged_round": None, "staged_heat": heat}
+        return {"staged_round": round_id, "staged_heat": heat}
 
     def encode(self, value):
-        if value["staged_round"] is None:
+        if value["staged_heat"] is None:
             return ""
-        return f"{value['staged_round']}#{value['staged_heat']}"
-
-
-# Legacy RoundID while the timer is being tested (TIMER_TEST_ROUNDID).
-TIMER_TEST_ROUND_ID = -100
+        round_id = value["staged_round"]
+        if round_id is None:
+            round_id = TIMER_TEST_ROUND_ID
+        return f"{round_id}#{value['staged_heat']}"
 
 
 class CurrentRound(Packed):

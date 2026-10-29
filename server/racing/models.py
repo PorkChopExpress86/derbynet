@@ -231,7 +231,11 @@ class TimerSetting(EventScoped):
     name = models.CharField(max_length=100)
     value_type = models.CharField(max_length=10, blank=True, default="")
     value = models.CharField(max_length=100, blank=True, default="")
-    description = models.CharField(max_length=500, blank=True, default="")
+    # Null for a flag the timer reported with no description, as PHP's
+    # `timer.settings` reports it.
+    description = models.CharField(  # noqa: DJ001
+        max_length=500, null=True, blank=True, default=""
+    )
     # Null means no change is pending. An empty string is a requested value.
     pending = models.CharField(max_length=100, null=True, blank=True)  # noqa: DJ001
 
@@ -260,6 +264,8 @@ class TimerStatus(PerEvent):
     malfunction_requires_reset = models.BooleanField(default=False)
     malfunction_message = models.CharField(max_length=500, blank=True, default="")
 
+    # Legacy `timer_current`, the heat sent in the last `heat-ready`. A staged
+    # heat with no round is a heat of the timer test.
     staged_round = models.ForeignKey(
         Round, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )

@@ -14,7 +14,7 @@ import logging
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db import DatabaseError, connection, transaction
 
@@ -42,6 +42,9 @@ class Record:
     round_id: int | None = None
     heat: int | None = None
     lanes: tuple[Posted, ...] = ()
+    detail: dict | None = None
+    # When it happened, if not when it is written.
+    at: datetime | None = None
 
 
 def heat_result(
@@ -63,6 +66,25 @@ def reinstated(ref: tuple[int, int]) -> Record:
     """The heat's discarded results come back. Recorded only after a
     discard."""
     return Record(Action.HEAT_RESULT_REINSTATED, *ref)
+
+
+def timer_message(ref: tuple[int, int] | None, detail: dict) -> Record:
+    """A message from the timer, at the heat that was current (D19, #32)."""
+    round_id, heat = ref or (None, None)
+    return Record(Action.TIMER_MESSAGE, round_id, heat, detail=detail)
+
+
+def timer_state_changed(
+    ref: tuple[int, int] | None, was: int, to: int, at: datetime | None = None
+) -> Record:
+    round_id, heat = ref or (None, None)
+    return Record(
+        Action.TIMER_STATE_CHANGED,
+        round_id,
+        heat,
+        detail={"from": was, "to": to},
+        at=at,
+    )
 
 
 def write(event_id: int, records: Iterable[Record]) -> bool:
@@ -148,13 +170,17 @@ def _write(event_id: int, record: Record) -> None:
         for lane, posted in enumerate(record.lanes, start=1)
         if posted.time not in (None, "") and php_numeric(posted.time) is None
     }
+    detail = dict(record.detail or {})
+    if raw:
+        detail["non-numeric"] = raw
     event = AuditEvent.objects.create(
         event_id=event_id,
         action=record.action,
         round_id=record.round_id,
         heat=record.heat,
         result_of=result_of,
-        detail={"non-numeric": raw} if raw else None,
+        detail=detail or None,
+        **({"recorded_at": record.at} if record.at is not None else {}),
     )
     AuditLaneResult.objects.bulk_create(
         AuditLaneResult(

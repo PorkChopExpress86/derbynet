@@ -113,42 +113,57 @@ def record_timer_result(
     did not finish and gets `DID_NOT_FINISH` (D42). The timer writes only the
     current heat, which only the race coordinator selects, so the results
     lock (D32) never refuses it."""
-    fields = list(fields)
-    now = timezone.now()
     with transaction.atomic():
         state = lock_race_state(event.id)
-        settings = RaceSettings.objects.get(event_id=event.id)
-        posted = _posted(fields, settings, mirror=True)
-        ref = (state.current_round_id, state.current_heat)
-        ended = state.ended_round_id
-        results = _merged(state, posted, merge_timer_results)
-        decision = transition(
-            state,
-            hs.TimerResult(
-                all_zero=is_all_zeroes(posted)
-                or (
-                    bool(results) and is_false_start([r.lane for r in results], posted)
-                ),
-                written=tuple((r.lane, _has_result(r)) for r in results),
-                posted_round=_named(fields, "roundid"),
-                posted_heat=_named(fields, "heat"),
-            ),
-            Inputs(results, posted, finalists_for, now),
+        recorded, records = timer_result_locked(
+            state, fields, finalists_for=finalists_for
         )
-        if _outcome(decision) is Outcome.RECORDED:
-            rebuild_waiting_final(event, [ref[0]], ended, finalists_for)
+    audit.write(event.id, records)
+    return recorded
+
+
+def timer_result_locked(
+    state: RaceState,
+    fields: Fields,
+    *,
+    now=None,
+    finalists_for: FinalistsFor | None = None,
+) -> tuple[Recorded, list[audit.Record]]:
+    """`record_timer_result` for a caller that holds the `RaceState` lock
+    on `state`. It returns the audit records for the caller to write after
+    its transaction."""
+    fields = list(fields)
+    now = now or timezone.now()
+    event = state.event
+    settings = RaceSettings.objects.get(event_id=event.id)
+    posted = _posted(fields, settings, mirror=True)
+    ref = (state.current_round_id, state.current_heat)
+    ended = state.ended_round_id
+    results = _merged(state, posted, merge_timer_results)
+    decision = transition(
+        state,
+        hs.TimerResult(
+            all_zero=is_all_zeroes(posted)
+            or (bool(results) and is_false_start([r.lane for r in results], posted)),
+            written=tuple((r.lane, _has_result(r)) for r in results),
+            posted_round=_named(fields, "roundid"),
+            posted_heat=_named(fields, "heat"),
+        ),
+        Inputs(results, posted, finalists_for, now),
+    )
     outcome = _outcome(decision)
+    if outcome is Outcome.RECORDED:
+        rebuild_waiting_final(event, [ref[0]], ended, finalists_for)
+    records = []
     if outcome is Outcome.NOT_RACING:
-        audit.write(
-            event.id,
-            [audit.heat_result(audit.Action.TIMER_RESULT_REFUSED, None, posted)],
+        records.append(
+            audit.heat_result(audit.Action.TIMER_RESULT_REFUSED, None, posted)
         )
     elif outcome is Outcome.RECORDED:
-        audit.write(
-            event.id,
-            [audit.heat_result(audit.Action.HEAT_RESULT_FROM_TIMER, ref, posted)],
+        records.append(
+            audit.heat_result(audit.Action.HEAT_RESULT_FROM_TIMER, ref, posted)
         )
-    return Recorded(outcome, decision.failure)
+    return Recorded(outcome, decision.failure), records
 
 
 def record_manual_result(

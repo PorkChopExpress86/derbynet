@@ -3,8 +3,8 @@ captures (#31), with ids normalized as `php_http` describes.
 
 Each scenario runs the steps of its `capture/scenarios/*.sh` in order:
 the recorded ones are replayed and compared, the unrecorded ones are posted
-through `/action.php` as the scenario posts them. The capture's timer, which
-#32 serves, is driven through `racing.services.results` instead. The
+through `/action.php` as the scenario posts them, the timer's messages
+from a session logged in as the Timer role. The
 exchanges `deviations.json` lists must match their expected Django output
 instead, and must differ from PHP's (D25).
 
@@ -15,13 +15,11 @@ rewrites the #31 entries and their expected transcripts.
 import json
 import os
 from pathlib import Path
-from urllib.parse import parse_qsl
 
 import pytest
 from django.test import Client
-from django.utils import timezone
 
-from core.models import RaceState, SiteState
+from core.models import SiteState
 from legacy_api.tests.php_http import Ids, as_php_body, send
 from racing.engine.tests.golden import (
     DEVIATIONS_FILE,
@@ -30,8 +28,8 @@ from racing.engine.tests.golden import (
     read_transcript,
     transcript_deviations,
 )
-from racing.models import PlaylistEntry, Round, TimerStatus
-from racing.services import playlist, results, rounds
+from racing.models import PlaylistEntry, Round
+from racing.services import playlist, rounds
 from roster.models import Group, Subgroup
 
 pytestmark = pytest.mark.django_db
@@ -74,6 +72,7 @@ class Scenario:
         self.names: list[str] = []
         self.status: dict[tuple[str, str], int] = {}
         self.skipped: set[tuple[str, str]] = set()
+        self._timer_client: Client | None = None
 
     # ----- unrecorded steps -----
 
@@ -119,24 +118,21 @@ class Scenario:
             ):
                 known.setdefault(pk, n)
 
+    @property
+    def timer_client(self) -> Client:
+        """A session logged in as the Timer role, as the capture's timer is."""
+        if self._timer_client is None:
+            self._timer_client = Client()
+            self.post_as(self._timer_client, "action=role.login&name=Timer&password=")
+        return self._timer_client
+
+    def post_as(self, client: Client, body: str) -> bytes:
+        return send(client, "POST action.php", body, self.ids).content
+
     def timer(self, body: str):
-        """A timer message, which #32 serves: a FINISHED is recorded through
-        the service its handler calls, and the timer's state is set as PHP
-        leaves it, so the polls report a connected timer."""
-        fields = dict(parse_qsl(body))
-        event = active_event()
-        message = fields.get("message")
-        if message == "FINISHED":
-            results.record_timer_result(event, parse_qsl(body))
-        state = TimerStatus.State.CONNECTED
-        if message == "STARTED":
-            state = TimerStatus.State.RUNNING
-        elif message in ("HEARTBEAT", "FINISHED"):
-            if RaceState.objects.get(event=event).racing:
-                state = TimerStatus.State.STAGING
-        TimerStatus.objects.filter(event=event).update(
-            state=state, last_contact=timezone.now()
-        )
+        """An unrecorded timer message."""
+        reply = self.post_as(self.timer_client, f"action=timer-message&{body}")
+        assert b"<success/>" in reply, (body, reply)
 
     def coordinator(self) -> dict:
         response = self.client.get("/action.php", {"query": "poll.coordinator"})
@@ -170,13 +166,9 @@ class Scenario:
         while self.names:
             self.skipped.add((self.fixture, self.names.pop(0)))
 
-    def timer_capture(self, label: str, body: str):
-        """A recorded timer message: sent through the stand-in, and left out
-        of the comparison (#32)."""
-        name = self.names.pop(0)
-        assert name.split(" ", 1)[1] == label, (self.fixture, name, label)
-        self.skipped.add((self.fixture, name))
-        self.timer(body)
+    def timer_capture(self, label: str):
+        """A recorded timer message, from the timer's session."""
+        self.capture(label, self.timer_client)
 
     # ----- recorded steps -----
 
@@ -398,19 +390,14 @@ def run_master_schedule(client) -> Scenario:
     s.capture("ondeck-in-master-order")
     s.capture("login-timer", timer)
     s.post_ok("action=heat.select&heat=next-up&now_racing=1")
-    s.timer_capture("heartbeat-first-master-heat", "message=HEARTBEAT")
-    s.timer_capture(
-        "finished-first-master-heat", "message=FINISHED&lane1=3.100&lane2=3.200"
-    )
+    s.timer_capture("heartbeat-first-master-heat")
+    s.timer_capture("finished-first-master-heat")
     s.capture("ondeck-after-one-heat")
     s.capture("regenerate-round-4-after-a-heat-ran")
     s.capture("ondeck-after-regenerating")
     s.post_ok("action=heat.select&roundid=4&heat=9&now_racing=1")
     s.timer("message=STARTED")
-    s.timer_capture(
-        "finished-last-master-heat-out-of-order",
-        "message=FINISHED&lane1=3.300&lane2=3.400",
-    )
+    s.timer_capture("finished-last-master-heat-out-of-order")
     s.capture("coordinator-before-results-exist")
     s.capture("ondeck-before-results-exist")
     s.capture("generate-round-1-results-exist")
@@ -550,19 +537,12 @@ def run_race_day_polls(client) -> Scenario:
         )
     playlist.start_playlist(event, rounds.playlist_finalists())
     polls("04-scheduled-and-racing-heat-1")
-    s.skip("timer-hello")
-    s.timer("message=HELLO")
-    s.skip("timer-identified")
-    s.timer("message=IDENTIFIED")
-    s.skip("timer-heartbeat-staging")
-    s.timer("message=HEARTBEAT")
-    s.skip("timer-started")
-    s.timer("message=STARTED")
+    s.timer_capture("timer-hello")
+    s.timer_capture("timer-identified")
+    s.timer_capture("timer-heartbeat-staging")
+    s.timer_capture("timer-started")
     polls("05-mid-heat")
-    s.timer_capture(
-        "timer-finished",
-        "message=FINISHED&lane1=2.411&lane2=2.522&lane3=2.633&lane4=2.744",
-    )
+    s.timer_capture("timer-finished")
     polls("06-after-a-result")
     s.capture("06-after-a-result poll heat-results")
     return s

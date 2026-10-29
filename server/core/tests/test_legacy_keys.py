@@ -169,6 +169,7 @@ ROUND_TRIPS = [
     (LastHeat(), {"round_id": 4, "heat": 2, "results": [3.125, None, 2.5]}),
     (StagedHeat(), {"staged_round": None, "staged_heat": None}),
     (StagedHeat(), {"staged_round": 7, "staged_heat": 3}),
+    (StagedHeat(), {"staged_round": None, "staged_heat": 2}),
     (CurrentRound(), {"current_round": None, "timer_test": False}),
     (CurrentRound(), {"current_round": None, "timer_test": True}),
     (CurrentRound(), {"current_round": 9, "timer_test": False}),

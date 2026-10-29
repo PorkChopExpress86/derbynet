@@ -27,6 +27,7 @@ from racing.engine.standings.ordinals import ordinal
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round, TimerStatus
 from racing.services import rounds as rounds_service
 from racing.services.heats import LastHeat, engine_state, load_chart
+from racing.services.timer import TimerState, has_remote_start
 from roster.models import Group, GroupConstituentSubgroup, Racer
 from roster.services import car_numbers, structure
 from roster.services.groups import labels
@@ -35,10 +36,6 @@ from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url, render_labe
 FULL_NAME = 0
 FIRST_NAME_LAST_INITIAL = 1
 
-TIMER_TIMEOUT = timedelta(seconds=60)
-"""`TimerState`: a timer that has not reported for longer is not connected."""
-REMOTE_START_TIMEOUT = timedelta(seconds=60)
-"""`has_remote_start()`: a timer offered remote start within the last minute."""
 REPLAY_TIMEOUT = timedelta(seconds=10)
 """`REPLAY_TIMEOUT_LIMIT` in `website/inc/replay.inc`."""
 RESULTS_WINDOW = timedelta(seconds=300)
@@ -235,58 +232,28 @@ def current_racers(
     return racers
 
 
-@dataclass(frozen=True)
-class _Timer:
-    """`new TimerState()`: the stored state with the contact timeout and an
-    expired malfunction applied."""
-
-    row: TimerStatus
-    state: int
-    malfunction: bool
-
-    @property
-    def unhealthy(self) -> bool:
-        State = TimerStatus.State
-        return self.state in (State.NOT_CONNECTED, State.SEARCHING, State.UNHEALTHY)
-
-    @property
-    def troubled(self) -> bool:
-        """`TimerState::troubled()`: unhealthy, or a malfunction in force."""
-        return self.unhealthy or self.malfunction
-
-
-def _timer(event: Event, now: datetime) -> _Timer:
-    timer = TimerStatus.objects.get(event=event)
-    state = timer.state
-    stale = timer.last_contact is None or timer.last_contact + TIMER_TIMEOUT < now
-    if not timer.assume_connected_for_test and stale:
-        state = TimerStatus.State.NOT_CONNECTED
-    malfunction = timer.malfunction_requires_reset or (
-        timer.malfunction_expires_at is not None and timer.malfunction_expires_at > now
-    )
-    return _Timer(timer, state, malfunction)
+def _timer(event: Event, now: datetime) -> TimerState:
+    return TimerState.read(TimerStatus.objects.get(event=event), now)
 
 
 def timer_state(event: Event, now: datetime | None = None) -> dict:
     """`json_timer_state()`, with the contact timeout applied."""
     now = now or timezone.now()
     settings = RaceSettings.objects.get(event=event)
-    timer = _timer(event, now)
+    row = TimerStatus.objects.get(event=event)
+    timer = TimerState.read(row, now)
     message, icon = _timer_status(timer, now)
-    remote = timer.row.remote_start_seen_at
     return {
         "lanes": settings.lane_count,
-        "last-contact": -1
-        if timer.row.assume_connected_for_test
-        else _epoch(timer.row.last_contact),
+        "last-contact": -1 if timer.assume_connected else _epoch(timer.last_contact),
         "state": int(timer.state),
         "icon": icon,
-        "remote-start": remote is not None and remote + REMOTE_START_TIMEOUT >= now,
+        "remote-start": has_remote_start(row, now),
         "message": message,
     }
 
 
-def _timer_status(timer: _Timer, now: datetime) -> tuple[str, str]:
+def _timer_status(timer: TimerState, now: datetime) -> tuple[str, str]:
     """`expand_timer_state_status()` in `website/inc/timer-state-xml.inc`."""
     State = TimerStatus.State
     state = timer.state
@@ -295,12 +262,12 @@ def _timer_status(timer: _Timer, now: datetime) -> tuple[str, str]:
     if state == State.SEARCHING:
         return "Scanning for timer", "img/status/unknown.png"
     if timer.troubled:
-        return timer.row.malfunction_message, "img/status/trouble.png"
+        return timer.malfunction_message, "img/status/trouble.png"
     if state == State.CONNECTED:
         seconds = (
             0
-            if timer.row.assume_connected_for_test
-            else int((now - timer.row.last_contact).total_seconds())
+            if timer.assume_connected
+            else int((now - timer.last_contact).total_seconds())
         )
         return f"CONNECTED ({seconds} sec.)", "img/status/ok.png"
     if state == State.STAGING:
@@ -380,6 +347,17 @@ def heat_results(event: Event, raw_round, raw_heat) -> list[dict]:
             }
         )
     return results
+
+
+def timer_test(event: Event) -> dict:
+    """`timer_test_recorded_results()`: the heat of the stored test results,
+    the test's lane mask, and the results."""
+    row = TimerStatus.objects.get(event=event)
+    return {
+        "heat": row.test_results_heat or 0,
+        "mask": row.test_lane_mask,
+        "results": timer_test_results(event),
+    }
 
 
 def timer_test_results(event: Event) -> list[dict]:
