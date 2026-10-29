@@ -14,7 +14,7 @@ from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in, post
 from racing.models import HeatLane, Round
 from roster.models import Group, Partition, Racer
-from roster.tests.factories import GroupFactory
+from roster.tests.factories import GroupFactory, RacerFactory
 from roster.tests.php_replay import Replay
 
 pytestmark = pytest.mark.django_db
@@ -214,3 +214,53 @@ def test_the_full_field_rule_names_a_group_of_this_event_only(coordinator, event
         == "success"
     )
     assert RaceSettings.objects.get(event=event).full_field_group_id == own.pk
+
+
+# ----- numbers past their columns --------------------------------------------
+
+
+def test_a_ballot_depth_past_its_column_is_kept_at_the_column(coordinator, event):
+    reply = act(
+        coordinator,
+        "award.edit",
+        awardid="new",
+        name="Paint",
+        awardtypeid=DESIGN_TROPHY,
+        ballot_depth=40000,
+    )
+
+    assert outcome(reply) == "success"
+    assert named(reply, "Paint")["ballot_depth"] == 32767
+
+
+def test_a_new_award_after_the_highest_sort_stays_in_its_column(coordinator, event):
+    act(
+        coordinator,
+        "award.edit",
+        awardid="new",
+        name="Last",
+        awardtypeid=DESIGN_TROPHY,
+        sort=2**31 - 1,
+    )
+    reply = act(
+        coordinator, "award.edit", awardid="new", name="Next", awardtypeid=DESIGN_TROPHY
+    )
+
+    assert outcome(reply) == "success"
+    assert named(reply, "Next")["sort"] == 2**31 - 1
+
+
+@pytest.mark.parametrize("car", ["abc", "99999999999", ""])
+def test_an_import_by_a_car_number_that_is_no_number_names_no_racer(
+    coordinator, event, car
+):
+    RacerFactory(group__event=event, car_number=0)
+    reply = act(
+        coordinator,
+        "award.import",
+        awardname="Paint",
+        awardtype="Design Trophy",
+        carnumber=car,
+    )
+
+    assert outcome(reply) == "unknowncarnumber"

@@ -16,8 +16,9 @@ from awards.listing import AD_HOC
 from awards.models import Award, AwardType, BallotAward, Vote
 from awards.services import partition_list
 from core.models import ActionLog, RaceSettings, RaceState
+from core.race_settings import INTEGER_RANGES
 from core.services import lock_race_state
-from racing.engine.phpcompat import php_intval, php_truthy
+from racing.engine.phpcompat import php_intval, php_numeric, php_truthy
 from roster.models import (
     Group,
     GroupConstituent,
@@ -32,6 +33,9 @@ NAME_WIDTH = 75
 # The award type `award.xbs` gives, "Other".
 XBS_AWARD_TYPE = 3
 AD_HOC_SORT = 999
+# The largest values the integer columns hold on every database.
+MAX_SORT = INTEGER_RANGES["IntegerField"][1]
+MAX_BALLOT_DEPTH = INTEGER_RANGES["PositiveSmallIntegerField"][1]
 
 
 class AwardFailure(Exception):
@@ -78,7 +82,7 @@ def _highest_sort(event) -> int | None:
 def _next_sort(event) -> int:
     """`award.edit`'s sort for a new award: one past the highest sort of an
     award that is not ad hoc, or 2 when there is none."""
-    return 1 + (_highest_sort(event) or 1)
+    return min(1 + (_highest_sort(event) or 1), MAX_SORT)
 
 
 def _award_type(award_type_id) -> AwardType:
@@ -93,7 +97,11 @@ def _set_ballot_depth(award: Award, depth: int) -> None:
     votes."""
     BallotAward.objects.filter(award=award).delete()
     if depth > 0:
-        BallotAward.objects.create(event_id=award.event_id, award=award, depth=depth)
+        BallotAward.objects.create(
+            event_id=award.event_id,
+            award=award,
+            depth=min(depth, MAX_BALLOT_DEPTH),
+        )
     else:
         Vote.objects.filter(award=award).delete()
 
@@ -328,10 +336,11 @@ def import_award(event, posted: dict) -> None:
                 event=event, pk=_php_int(posted["racerid"])
             ).first()
         elif "carnumber" in posted:
-            found = list(
-                Racer.objects.filter(
-                    event=event, car_number=_php_int(posted["carnumber"])
-                )[:2]
+            car = _car_number(posted["carnumber"])
+            found = (
+                list(Racer.objects.filter(event=event, car_number=car)[:2])
+                if car is not None
+                else []
             )
             if not found:
                 raise AwardFailure("unknowncarnumber", "Unknown car number")
@@ -362,6 +371,15 @@ def _php_int(value) -> int:
     except TypeError, ValueError:
         return 0
     return number if -(2**31) <= number < 2**31 else 0
+
+
+def _car_number(value) -> int | None:
+    """The car number `carnumber = :carnumber` can match: a whole number
+    the column holds, or None for text that matches no car."""
+    number = php_numeric(value) if isinstance(value, str) else None
+    if number is None or not -MAX_SORT - 1 <= number <= MAX_SORT:
+        return None
+    return int(number) if number == int(number) else None
 
 
 def present(event, *, key: str | None = None, reveal: bool | None = None) -> None:

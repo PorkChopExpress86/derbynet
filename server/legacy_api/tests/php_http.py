@@ -24,7 +24,12 @@ ID_KEYS = {
 }
 # Keys whose value is a list of ids of one kind, or for `schedule` a list of
 # heats of racer ids.
-LIST_KEYS = {"classids": "class", "rankids": "rank"}
+LIST_KEYS = {
+    "classids": "class",
+    "rankids": "rank",
+    "eligible-classids": "class",
+    "eligible-rankids": "rank",
+}
 # Ids the scenarios choose to name no row, and where Django's stand-ins start.
 UNKNOWN_ID = 99
 NO_ROW = 10**9
@@ -171,7 +176,7 @@ FIELD_KINDS = {
 }
 # Fields `<prefix><n>` whose value names a row.
 VALUE_PREFIX_KINDS = {"awardid_": "award"}
-PREFIX_KINDS = {"classid_": "class", "rankid_": "rank"}
+PREFIX_KINDS = {"classid_": "class", "rankid_": "rank", "constituent_": "class"}
 
 
 def translate(fields, ids: Ids):
@@ -184,6 +189,12 @@ def translate(fields, ids: Ids):
                 value = str(ids.django(kind, int(value)))
         if key == "key":
             value = award_key(value, ids.django)
+        if key == "class_and_rank":
+            # `classid[,rankid]`, where 0 is none.
+            value = ",".join(
+                str(ids.django(kind, int(part))) if part.isdigit() else part
+                for kind, part in zip(("class", "rank"), value.split(","), strict=False)
+            )
         for prefix, kind in PREFIX_KINDS.items():
             if key.startswith(prefix) and key[len(prefix) :].isdigit():
                 key = prefix + str(ids.django(kind, int(key[len(prefix) :])))

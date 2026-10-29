@@ -200,8 +200,9 @@ def test_award_current_names_each_speed_award_phps_list_holds(client, event):
     # not eligible for any award.
     assert len(php["speed-awards"]) == 11
     for award in php["speed-awards"]:
+        # post_ok writes the key's ids as Django's, as the reply shows them.
+        s.post_ok(f"action=award.present&key={award['key']}")
         key = award_key(award["key"], s.ids.django)
-        s.post_ok(f"action=award.present&key={key}")
         current = json.loads(
             client.get("/action.php", {"query": "award.current"}).content
         )["current"]

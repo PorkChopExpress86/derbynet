@@ -164,16 +164,12 @@ jobs:
           bash testing/test-aggregate-rounds.sh http://127.0.0.1:8080
           bash testing/test-aggregate-nonracing.sh http://127.0.0.1:8080
 
-      # The award suites (#33) in testing/exercise-one-database.sh order: after
-      # basic racing, then after the master schedule.
-      - name: Run the award suites against Django
+      # The award suite (#33) after the master schedule, in
+      # testing/exercise-one-database.sh order.  `test-awards.sh basic` follows
+      # test-basic-racing.sh, which posts replay.message (#34), so it waits.
+      - name: Run the award suite against Django
         working-directory: .
         run: |
-          bash testing/reset-database.sh http://127.0.0.1:8080
-          bash testing/import-roster.sh http://127.0.0.1:8080
-          bash testing/test-den-changes.sh http://127.0.0.1:8080
-          bash testing/test-basic-racing.sh http://127.0.0.1:8080
-          bash testing/test-awards.sh http://127.0.0.1:8080 basic
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/import-roster.sh http://127.0.0.1:8080
           bash testing/test-den-changes.sh http://127.0.0.1:8080
