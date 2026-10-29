@@ -105,5 +105,5 @@ One race day's data: its racers, rounds, results, awards, and settings. A server
 The folder that holds an event's racer photos, car photos, videos, and logs.
 
 **Snapshot**:
-One file that holds a whole event's data. Restoring a snapshot makes a new event from it and does not change the event that was open.
+One file that holds a whole event's data. Restoring a snapshot replaces the event of the same name with the data in the file.
 _Avoid_: Backup (a snapshot does not carry videos)

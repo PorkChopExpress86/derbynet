@@ -7,9 +7,9 @@ or column outside the export schema, or a photo name that is not a plain file
 name, and changes nothing. Then it goes through the importer.
 
 The file's `Events` and `EventLaneDetails` tables are always empty, because
-Django keeps no timer event log. The reply is built whole, not streamed, and
-the restored event gets a new event folder, so the folder keys PHP preserves
-belong to the new event (#134).
+Django keeps no timer event log. The reply is built whole, not streamed. The
+restored event replaces the open one and gets a new event folder, so the folder
+keys PHP preserves belong to the new event (#134).
 """
 
 from accounts.permissions import Perm
@@ -22,7 +22,7 @@ DIVERGENCES = (
     "S6: a photo name that is not a plain file name refuses the upload.",
     "S7: an unknown table or column refuses the upload, and none is run as SQL.",
     "D57: the reply is built in memory, its Events tables are empty, and a restore"
-    " is a new event with new ids and new folders.",
+    " replaces the open event with a new one, with new ids and new folders.",
 )
 
 

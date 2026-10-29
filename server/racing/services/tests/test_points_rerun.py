@@ -74,11 +74,11 @@ def race():
     return event
 
 
-def heats_and_points(event, cars):
+def heats_and_points(event, expected):
     rows = {
         row.racer.car_number: row for row in standings_snapshot(event).standings.rows
     }
-    return {car: (rows[car].summary.base, rows[car].summary.avg) for car in cars}
+    return {car: (rows[car].summary.base, rows[car].summary.avg) for car in expected}
 
 
 def test_points_after_each_run_of_heat_3(race):
