@@ -25,7 +25,6 @@ def _never_runs(ctx):
 
 
 STUBS = {
-    "timer-message": dict(kind="action", permission=Perm.TIMER_MESSAGE),
     "kiosk.reload": dict(kind="action", permission=Perm.CONTROL_RACE),
 }
 

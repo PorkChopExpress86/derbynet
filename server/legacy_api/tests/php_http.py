@@ -33,6 +33,7 @@ _EPOCH = re.compile(r'("last[-_]contact": )[1-9]\d*')
 _SECONDS = re.compile(r"\(\d+ sec\.\)")
 _TIMESTAMP = re.compile(r'"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d"')
 _ROUND_IN_TEXT = re.compile(r"roundid (\d+)")
+_ROUND_IN_XML = re.compile(r'(roundid="|roundid )(\d+)')
 _SIGNATURE = re.compile(r"(\d+)-(\d+)")
 
 
@@ -200,6 +201,12 @@ def mask_reschedule_timing(django: dict) -> dict:
 
 def as_php_body(response, php_body: bytes, ids: Ids) -> bytes:
     """Django's body with its ids written as PHP's, masked as PHP's is."""
+    if response["Content-Type"].startswith("text/xml"):
+        # A timer reply names rounds only, in attributes and failure text.
+        return _ROUND_IN_XML.sub(
+            lambda m: f"{m[1]}{ids.php('round', int(m[2]))}",
+            response.content.decode(),
+        ).encode()
     django = json.loads(response.content)
     php = json.loads(php_body) if php_body.strip() else None
     if isinstance(php, dict):

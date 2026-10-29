@@ -232,6 +232,9 @@ class LegacyContext:
     session: Mapping
     xml: XmlWriter
     out: dict = field(default_factory=dict)
+    # The client's User-Agent, exactly as sent. Competing timers are told
+    # apart by it, so a proxy must pass it through.
+    user_agent: str = ""
 
     def put(self, key: str, value) -> None:
         self.out[key] = value

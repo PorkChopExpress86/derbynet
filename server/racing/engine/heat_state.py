@@ -190,6 +190,22 @@ class Reinstate:
     pass
 
 
+@dataclass(frozen=True)
+class TimerTestStart:
+    """`timer_test_start`: heat `heat` of the timer test becomes current and
+    racing is on, with no replay command."""
+
+    heat: int
+
+
+@dataclass(frozen=True)
+class TimerTestEnd:
+    """`timer_test_end`: back to the heat `saved` when the test started, or
+    to none, and racing off. Nothing changes outside the timer test."""
+
+    saved: HeatRef | None
+
+
 type Event = (
     RacingOn
     | RacingOff
@@ -200,6 +216,8 @@ type Event = (
     | ManualResult
     | Rerun
     | Reinstate
+    | TimerTestStart
+    | TimerTestEnd
 )
 
 # ----- effects, for the service to carry out in order -----
@@ -721,6 +739,15 @@ TABLE: tuple[Row, ...] = (
         "reinstate",
     ),
     Row(Reinstate, always, (Emit(ClearLastHeat()), OFF), None, "reinstate, none saved"),
+    Row(TimerTestStart, always, (Move(Where.TARGET), *ON), None, "timer test start"),
+    Row(
+        TimerTestEnd,
+        timer_test,
+        (Move(Where.TARGET), SetRacing(False)),
+        None,
+        "timer test end",
+    ),
+    Row(TimerTestEnd, always, (), None, "timer test end, not testing"),
 )
 
 _RACING_ON_EXTRAS: dict[By, tuple[Step, ...]] = {
@@ -820,6 +847,10 @@ class _Run:
         elif isinstance(event, Rerun):
             if event.target is not None and self.chart.has_lanes(event.target):
                 ctx.target = event.target
+        elif isinstance(event, TimerTestStart):
+            ctx.target = (TIMER_TEST_ROUND, event.heat)
+        elif isinstance(event, TimerTestEnd):
+            ctx.target = event.saved or (None, None)
         return ctx
 
     def handle(self, event: Event) -> Failure | None:

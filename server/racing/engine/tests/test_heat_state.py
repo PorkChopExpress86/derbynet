@@ -30,6 +30,8 @@ from racing.engine.heat_state import (
     SendReplay,
     State,
     TimerResult,
+    TimerTestEnd,
+    TimerTestStart,
     TimerToConnected,
     WriteResults,
     WriteTestResults,
@@ -470,7 +472,36 @@ ROW_CASES = {
     "rerun": (RACING_2, Rerun((7, 1)), ROUND),
     "reinstate": (State(7, 2, last_saved=True), Reinstate(), ROUND),
     "reinstate, none saved": (IDLE_2, Reinstate(), ROUND),
+    "timer test start": (RACING_2, TimerTestStart(3), ROUND),
+    "timer test end": (TEST_RACING, TimerTestEnd((7, 2)), ROUND),
+    "timer test end, not testing": (RACING_2, TimerTestEnd((7, 1)), ROUND),
 }
+
+
+def test_timer_test_start_races_its_heat_with_no_replay():
+    state = State(7, 2, racing=True, refused=3)
+    decision = decide(state, TimerTestStart(3), ROUND)
+    assert decision.state == State(TIMER_TEST_ROUND, 3, racing=True)
+    assert decision.effects == (Moved(TIMER_TEST_ROUND, 3),)
+
+
+def test_timer_test_end_goes_back_to_the_saved_heat_with_racing_off():
+    state = State(TIMER_TEST_ROUND, 4, racing=True, refused=1)
+    decision = decide(state, TimerTestEnd((7, 2)), ROUND)
+    assert decision.state == State(7, 2, refused=1)
+    assert decision.effects == (Moved(7, 2),)
+
+
+def test_timer_test_end_with_nothing_saved_leaves_no_current_heat():
+    decision = decide(
+        State(TIMER_TEST_ROUND, 4, racing=True), TimerTestEnd(None), ROUND
+    )
+    assert decision.state == State()
+
+
+def test_timer_test_end_outside_the_test_changes_nothing():
+    decision = decide(RACING_2, TimerTestEnd((7, 1)), ROUND)
+    assert (decision.state, decision.effects) == (RACING_2, ())
 
 
 def test_every_row_has_a_case():
@@ -517,6 +548,9 @@ EVENTS = [
     Rerun((7, 1)),
     Rerun(None),
     Reinstate(),
+    TimerTestStart(2),
+    TimerTestEnd((7, 2)),
+    TimerTestEnd(None),
 ]
 
 

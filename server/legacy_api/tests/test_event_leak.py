@@ -85,6 +85,20 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
         "row-height": "40",
     },
     ("query", "poll.results"): {"roundid": "1", "details": "1"},
+    ("action", "timer-message"): {
+        "message": "FINISHED",
+        "roundid": "1",
+        "heat": "1",
+        "lane1": "3.1",
+    },
+    ("action", "timer.assign-flag"): {"flag": "debug", "value": "true"},
+    ("action", "timer.assign-port"): {"port": "COM1"},
+    ("action", "timer.assign-device"): {"device": "TestTimer"},
+    ("action", "timer.remote-start"): {},
+    ("action", "timer.test"): {"tt-mask": "1"},
+    ("query", "timer.settings"): {},
+    ("query", "timer.log"): {"seek": "0"},
+    ("query", "poll.timer.test"): {},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},
