@@ -1,0 +1,845 @@
+[
+    [
+        "Roster",
+        [
+            [
+                "First Name",
+                "Last Name",
+                "From",
+                "Car Number",
+                "Car Name",
+                "Den",
+                "Excluded?"
+            ],
+            [
+                "Antoine",
+                "Akiyama",
+                null,
+                303,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Angelo",
+                "Alas",
+                null,
+                202,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Adolfo \"Dolf\"",
+                "Asher",
+                null,
+                101,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Arden",
+                "Aziz",
+                null,
+                501,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Barney",
+                "Bainter",
+                null,
+                405,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Byron",
+                "Billy",
+                null,
+                502,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Ben",
+                "Bittinger",
+                null,
+                106,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Bruce",
+                "Boissonneault",
+                null,
+                308,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Blake",
+                "Burling",
+                null,
+                207,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Ca\u00f1umil",
+                "Calero",
+                null,
+                415,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Christoper",
+                "Chauncey",
+                null,
+                212,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Clark",
+                "Chesnutt",
+                null,
+                313,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Carey",
+                "Craney",
+                null,
+                410,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Cletus",
+                "Creager",
+                null,
+                503,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Carroll",
+                "Cybulski",
+                null,
+                111,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Derek",
+                "Dantonio",
+                null,
+                420,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Dexter",
+                "Dawes",
+                null,
+                222,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Denny",
+                "Deering",
+                null,
+                504,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Darrell & Darrell",
+                "Delaughter",
+                null,
+                217,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Darrin",
+                "Denny",
+                null,
+                318,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Danial",
+                "Depaolo",
+                null,
+                116,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Domingo",
+                "Doles",
+                null,
+                323,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Derick",
+                "Dreier",
+                null,
+                121,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Dorian",
+                "Dunkle",
+                null,
+                505,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Edgardo",
+                "Easterwood",
+                null,
+                126,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Elliot",
+                "Eastman",
+                null,
+                227,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Enoch",
+                "Eccles",
+                null,
+                430,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Ethan",
+                "Enye",
+                null,
+                328,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Emory",
+                "Ertel",
+                null,
+                506,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Earnest",
+                "Evangelista",
+                null,
+                425,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Freeman",
+                "Fizer",
+                null,
+                333,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Freddie",
+                "Font",
+                null,
+                232,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Felton",
+                "Fouche",
+                null,
+                131,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Gregg",
+                "Grove",
+                null,
+                507,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Herb",
+                "Halfacre",
+                null,
+                136,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Harley",
+                "Howell",
+                null,
+                435,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Ian",
+                "Ives",
+                null,
+                237,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Juan",
+                "Jacobsen",
+                null,
+                343,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Jed",
+                "Jaquez",
+                null,
+                440,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Jesse",
+                "Jara",
+                null,
+                141,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Julian",
+                "Jarrard",
+                null,
+                445,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Jamison",
+                "Jeffress",
+                null,
+                508,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Josh",
+                "Jose",
+                null,
+                242,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Judson",
+                "Joynt",
+                null,
+                509,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Jackson",
+                "Juliano",
+                null,
+                338,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Kris",
+                "Kaba",
+                null,
+                510,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Kory",
+                "Kilgo",
+                null,
+                348,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Kelvin",
+                "Kinman",
+                null,
+                146,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Kelvin",
+                "Knapp",
+                null,
+                247,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Levi",
+                "Lahr",
+                null,
+                151,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Lanny",
+                "Lavigne",
+                null,
+                450,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Lewis",
+                "Levitsky",
+                null,
+                252,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Lyman",
+                "Liller",
+                null,
+                353,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Marlon",
+                "McGray",
+                null,
+                455,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Mohamed",
+                "McGrew",
+                null,
+                257,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Michal",
+                "Melendrez",
+                null,
+                156,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Markus",
+                "Muncy",
+                null,
+                511,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Norbert",
+                "Nightingale",
+                null,
+                512,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Numbers",
+                "Nish",
+                null,
+                460,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Nelson",
+                "No",
+                null,
+                358,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Owen",
+                "O'Leary",
+                null,
+                161,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Porter",
+                "Papke",
+                null,
+                465,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Pat",
+                "Petrone",
+                null,
+                262,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Pete",
+                "Pinkney",
+                null,
+                363,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Philip",
+                "Prum",
+                null,
+                513,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Renaldo",
+                "Raposo",
+                null,
+                267,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Rodrigo",
+                "Rencher",
+                null,
+                171,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Reuben",
+                "Rockhill",
+                null,
+                368,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Royce",
+                "Rohman",
+                null,
+                272,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Rex",
+                "Rosalez",
+                null,
+                514,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Robbie",
+                "Roush",
+                null,
+                470,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Raymon",
+                "Ruffner",
+                null,
+                166,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Scottie",
+                "Servais",
+                null,
+                373,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Sean",
+                "Strasburg",
+                null,
+                515,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Toby",
+                "Teed",
+                null,
+                176,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Timmy",
+                "Tomei",
+                null,
+                475,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Travis",
+                "Toothaker",
+                null,
+                378,
+                "",
+                "Bears and Fr\u00e8res",
+                0
+            ],
+            [
+                "Tracey",
+                "Trapp",
+                null,
+                277,
+                "",
+                "White's Wolves",
+                0
+            ],
+            [
+                "Vincent",
+                "Vinci",
+                null,
+                516,
+                "",
+                "Webelos (\"Webes\")",
+                0
+            ],
+            [
+                "Weston",
+                "Whigham",
+                null,
+                480,
+                "",
+                "Arrows <<--<<",
+                0
+            ],
+            [
+                "Willard",
+                "Wile",
+                null,
+                181,
+                "",
+                "Lions & Tigers",
+                0
+            ],
+            [
+                "Willard",
+                "Woolfolk",
+                null,
+                282,
+                "",
+                "White's Wolves",
+                0
+            ]
+        ]
+    ],
+    [
+        "Results",
+        [
+            [
+                "Class",
+                "Round",
+                "Heat",
+                "Lane",
+                "FirstName",
+                "LastName",
+                "CarNumber",
+                "CarName",
+                "FinishTime",
+                "Scale MPH",
+                "FinishPlace",
+                "Completed"
+            ]
+        ]
+    ],
+    [
+        "Standings",
+        [
+            [
+                "Standings for Pack"
+            ],
+            [
+                "Averaging all heat times"
+            ],
+            [
+                "Place",
+                "Car Number",
+                "Name",
+                "Den",
+                "In Den",
+                "Heats",
+                "Average",
+                "Best",
+                "Worst"
+            ]
+        ]
+    ],
+    [
+        "Awards",
+        [
+            [
+                "Award Name",
+                "Award Type",
+                "Den",
+                "First Name",
+                "Last Name",
+                "Car Number",
+                "Car Name"
+            ],
+            [
+                "Consolation Prize",
+                "Design Trophy",
+                null,
+                null,
+                null,
+                null,
+                null
+            ],
+            [
+                "Best in Show",
+                "Design Trophy",
+                null,
+                null,
+                null,
+                null,
+                null
+            ],
+            [
+                "Sore Loser",
+                "Design Trophy",
+                null,
+                null,
+                null,
+                null,
+                null
+            ],
+            [
+                "Best Wolf",
+                "Design Trophy",
+                "White's Wolves",
+                null,
+                null,
+                null,
+                null
+            ]
+        ]
+    ]
+]
