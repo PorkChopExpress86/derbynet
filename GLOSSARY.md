@@ -95,3 +95,15 @@ A racer taken off a round's roster, or whose check-in was reverted, whose car le
 
 **Closed lane**:
 A lane the race coordinator takes out of use during a round because it is damaged. It stays closed in the following rounds until the race coordinator reopens it, which is possible only before the next round is scheduled.
+
+## Event data
+
+**Event**:
+One race day's data: its racers, rounds, results, awards, and settings. A server holds many events and serves one at a time.
+
+**Event folder**:
+The folder that holds an event's racer photos, car photos, videos, and logs.
+
+**Snapshot**:
+One file that holds a whole event's data. Restoring a snapshot makes a new event from it and does not change the event that was open.
+_Avoid_: Backup (a snapshot does not carry videos)

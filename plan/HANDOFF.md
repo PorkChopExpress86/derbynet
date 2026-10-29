@@ -68,7 +68,7 @@ These are the owner's standing rules. They are also stored as Claude memory file
 - **The PHP server is frozen.** No fixes under `website/` (D12). Defects are fixed only in Django, and #64 tracks them.
 - **One PR per ticket, then an independent review before merge.** The reviewer is a separate agent that the author did not choose. It reproduces findings, or labels them unverified.
 - **Merge a PR when its checks pass on the current head and its review is clean.** The owner gave standing approval on 2026-10-28, so no per-PR ask. Use `plan/bin/pr-wait` and `plan/bin/pr-merge`, which pin the merge to the head that passed. Anything else that is hard to reverse still needs a confirmation.
-- **Owner decisions go in `plan/owner-decisions.md`** (D1 to D56 so far), in the same change that edits the issues they touch.
+- **Owner decisions go in `plan/owner-decisions.md`** (D1 to D57 so far), in the same change that edits the issues they touch.
 - **Edit issue bodies through the lint.** Fetch the body, edit it, run `plan/lint-issues.py --file N=PATH`, then `gh issue edit`. See `plan/README.md`.
 
 ## Setting up a new computer
