@@ -6,10 +6,10 @@ and column names (S7). Both need `SET_UP` here. `put` refuses a file with a tabl
 or column outside the export schema, or a photo name that is not a plain file
 name, and changes nothing. Then it goes through the importer.
 
-Other differences, in `DIVERGENCES`: the replaced event gets a new event
-folder, so the folder keys PHP preserves belong to the new event; the file has
-no `Events` or `EventLaneDetails` tables because Django keeps no timer event
-log; the reply is built whole, not streamed.
+The file's `Events` and `EventLaneDetails` tables are always empty, because
+Django keeps no timer event log. The reply is built whole, not streamed, and
+the restored event gets a new event folder, so the folder keys PHP preserves
+belong to the new event (#134).
 """
 
 from accounts.permissions import Perm

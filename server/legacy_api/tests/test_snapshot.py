@@ -100,7 +100,10 @@ def test_get_writes_the_wrapper_and_every_table_in_php_order(client, coordinator
         "Votes",
         "Partitions",
         "ConstituentClasses",
+        "Events",
+        "EventLaneDetails",
     ]
+    assert tables["Events"]["rows"] == tables["EventLaneDetails"]["rows"] == []
     assert tables["RegistrationInfo"]["rows"][0]["carnumber"] == 101
     assert tables["RaceChart"]["rows"][0]["finishtime"] == 3.5
     assert tables["Classes"]["missing"] == []
