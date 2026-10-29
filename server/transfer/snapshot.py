@@ -355,6 +355,17 @@ def tables(
                 for antecedent in constituents.get(group.pk, [])
             ],
         ),
+        # PHP's timer event log. Django keeps no such log, so these stay empty.
+        "Events": (
+            (
+                "seq tstamp action racerid classid rankid roundid heat other finishid"
+            ).split(),
+            [],
+        ),
+        "EventLaneDetails": (
+            "tresultid finishid lane finishtime finishplace completed".split(),
+            [],
+        ),
     }
     return out
 
@@ -432,17 +443,6 @@ def get(event: Event, clean: bool = False, photos: bool = False) -> str:
     return "<snapshot><![CDATA[\n[\n" + ",\n".join(entries) + "]\n]]></snapshot>\n"
 
 
-# The columns of the two export tables the Django models do not hold.
-_LOG_COLUMNS = {
-    "Events": (
-        "seq tstamp action racerid classid rankid roundid heat other finishid"
-    ).split(),
-    "EventLaneDetails": (
-        "tresultid finishid lane finishtime finishplace completed"
-    ).split(),
-}
-
-
 # What older PHP exports carried and the importer reads past: the queue before
 # it was called Playlist, and the divisions that classes and ranks replaced.
 _RETIRED_TABLES = {"racingqueue", "divisions", "subdivisions"}
@@ -457,7 +457,6 @@ def _refusals(event: Event, source) -> list[str]:
         name.lower(): set(columns)
         for name, (columns, _rows) in tables(event, False).items()
     }
-    known |= {name.lower(): set(columns) for name, columns in _LOG_COLUMNS.items()}
     problems = []
     for table, rows in source.tables.items():
         if table in _RETIRED_TABLES:
