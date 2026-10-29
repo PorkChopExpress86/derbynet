@@ -32,6 +32,8 @@ EDIT_DIVERGENCES = (
     "A2: a class_and_rank naming no group or subgroup of the event answers"
     " unknownclass or unknownrank, and a subgroup of another group"
     " wrongclass; PHP stores the ids as given.",
+    "A5: a sort or ballot_depth past its column is kept at the column's"
+    " limit; PHP stores the number posted.",
 )
 LIST_DIVERGENCES = (
     "D5: it needs a login; PHP answers anyone. Every page that reads it has one.",
