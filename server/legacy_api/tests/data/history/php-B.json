@@ -1,0 +1,1112 @@
+{
+ "rows": [
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"database.execute\",\"script\":\"update-schema\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"settings.write\",\"photo-dir\":\"/var/lib/derbynet/2026/hist/racers\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"settings.write\",\"car-photo-dir\":\"/var/lib/derbynet/2026/hist/cars\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"settings.write\",\"video-dir\":\"/var/lib/derbynet/2026/hist/videos\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"settings.write\",\"log-dir\":\"/var/lib/derbynet/2026/hist/logs\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.import\",\"firstname\":\"Lucius\",\"lastname\":\"Lemon\",\"carnumber\":\"101\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"class.*create\",\"class\":\"Default\",\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"round.*create\",\"roundid\":1,\"classid\":1,\"round\":1}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"rank.*create\",\"rank\":\"Default\",\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"partition.*create\",\"partitionid\":1,\"name\":\"Default\",\"rankid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.*create\",\"racerid\":1,\"firstname\":\"Lucius\",\"lastname\":\"Lemon\",\"carnumber\":\"101\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.import\",\"firstname\":\"Hubert\",\"lastname\":\"Heffley\",\"carnumber\":\"102\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.*create\",\"racerid\":2,\"firstname\":\"Hubert\",\"lastname\":\"Heffley\",\"carnumber\":\"102\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.import\",\"firstname\":\"Tangela\",\"lastname\":\"Tacey\",\"carnumber\":\"103\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"class.*create\",\"class\":\"Div 2\",\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"round.*create\",\"roundid\":2,\"classid\":2,\"round\":1}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"rank.*create\",\"rank\":\"Div 2\",\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"partition.*create\",\"partitionid\":2,\"name\":\"Div 2\",\"rankid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.*create\",\"racerid\":3,\"firstname\":\"Tangela\",\"lastname\":\"Tacey\",\"carnumber\":\"103\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.import\",\"firstname\":\"Audry\",\"lastname\":\"Appleby\",\"carnumber\":\"104\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.*create\",\"racerid\":4,\"firstname\":\"Audry\",\"lastname\":\"Appleby\",\"carnumber\":\"104\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:49",
+   "{\"action\":\"racer.import\",\"firstname\":\"Kip\",\"lastname\":\"Kennelly\",\"carnumber\":\"105\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"class.*create\",\"class\":\"Div 3\",\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"round.*create\",\"roundid\":3,\"classid\":3,\"round\":1}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"rank.*create\",\"rank\":\"Div 3\",\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"partition.*create\",\"partitionid\":3,\"name\":\"Div 3\",\"rankid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":5,\"firstname\":\"Kip\",\"lastname\":\"Kennelly\",\"carnumber\":\"105\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Charlena\",\"lastname\":\"Callas\",\"carnumber\":\"106\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":6,\"firstname\":\"Charlena\",\"lastname\":\"Callas\",\"carnumber\":\"106\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Sherley\",\"lastname\":\"Summerford\",\"carnumber\":\"107\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":7,\"firstname\":\"Sherley\",\"lastname\":\"Summerford\",\"carnumber\":\"107\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Roland\",\"lastname\":\"Rivero\",\"carnumber\":\"108\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":8,\"firstname\":\"Roland\",\"lastname\":\"Rivero\",\"carnumber\":\"108\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Gerald\",\"lastname\":\"Glennon\",\"carnumber\":\"109\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":9,\"firstname\":\"Gerald\",\"lastname\":\"Glennon\",\"carnumber\":\"109\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Shalanda\",\"lastname\":\"Sanluis\",\"carnumber\":\"110\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":10,\"firstname\":\"Shalanda\",\"lastname\":\"Sanluis\",\"carnumber\":\"110\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Nohemi\",\"lastname\":\"Natale\",\"carnumber\":\"111\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":11,\"firstname\":\"Nohemi\",\"lastname\":\"Natale\",\"carnumber\":\"111\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Lien\",\"lastname\":\"Licht\",\"carnumber\":\"112\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":12,\"firstname\":\"Lien\",\"lastname\":\"Licht\",\"carnumber\":\"112\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Rhett\",\"lastname\":\"Roeder\",\"carnumber\":\"113\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":13,\"firstname\":\"Rhett\",\"lastname\":\"Roeder\",\"carnumber\":\"113\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Ivey\",\"lastname\":\"Ivester\",\"carnumber\":\"114\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":14,\"firstname\":\"Ivey\",\"lastname\":\"Ivester\",\"carnumber\":\"114\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Christy\",\"lastname\":\"Capo\",\"carnumber\":\"115\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.*create\",\"racerid\":15,\"firstname\":\"Christy\",\"lastname\":\"Capo\",\"carnumber\":\"115\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:50",
+   "{\"action\":\"racer.import\",\"firstname\":\"Dara\",\"lastname\":\"Dittmer\",\"carnumber\":\"116\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":16,\"firstname\":\"Dara\",\"lastname\":\"Dittmer\",\"carnumber\":\"116\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Iraida\",\"lastname\":\"Icenhour\",\"carnumber\":\"117\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":17,\"firstname\":\"Iraida\",\"lastname\":\"Icenhour\",\"carnumber\":\"117\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Shirley\",\"lastname\":\"Savidge\",\"carnumber\":\"118\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":18,\"firstname\":\"Shirley\",\"lastname\":\"Savidge\",\"carnumber\":\"118\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Daphine\",\"lastname\":\"Dimas\",\"carnumber\":\"119\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":19,\"firstname\":\"Daphine\",\"lastname\":\"Dimas\",\"carnumber\":\"119\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Bonny\",\"lastname\":\"Barrow\",\"carnumber\":\"120\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":20,\"firstname\":\"Bonny\",\"lastname\":\"Barrow\",\"carnumber\":\"120\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Natisha\",\"lastname\":\"Neifert\",\"carnumber\":\"121\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":21,\"firstname\":\"Natisha\",\"lastname\":\"Neifert\",\"carnumber\":\"121\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Jesse\",\"lastname\":\"John\",\"carnumber\":\"122\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":22,\"firstname\":\"Jesse\",\"lastname\":\"John\",\"carnumber\":\"122\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Lillia\",\"lastname\":\"Lawson\",\"carnumber\":\"123\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":23,\"firstname\":\"Lillia\",\"lastname\":\"Lawson\",\"carnumber\":\"123\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Anh\",\"lastname\":\"Antonio\",\"carnumber\":\"124\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":24,\"firstname\":\"Anh\",\"lastname\":\"Antonio\",\"carnumber\":\"124\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Annalee\",\"lastname\":\"Aguila\",\"carnumber\":\"125\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":25,\"firstname\":\"Annalee\",\"lastname\":\"Aguila\",\"carnumber\":\"125\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Neomi\",\"lastname\":\"Newlin\",\"carnumber\":\"126\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":26,\"firstname\":\"Neomi\",\"lastname\":\"Newlin\",\"carnumber\":\"126\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Lyle\",\"lastname\":\"Lahey\",\"carnumber\":\"127\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":27,\"firstname\":\"Lyle\",\"lastname\":\"Lahey\",\"carnumber\":\"127\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Denny\",\"lastname\":\"Daggett\",\"carnumber\":\"128\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.*create\",\"racerid\":28,\"firstname\":\"Denny\",\"lastname\":\"Daggett\",\"carnumber\":\"128\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:51",
+   "{\"action\":\"racer.import\",\"firstname\":\"Rosemarie\",\"lastname\":\"Robidoux\",\"carnumber\":\"129\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":29,\"firstname\":\"Rosemarie\",\"lastname\":\"Robidoux\",\"carnumber\":\"129\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Margot\",\"lastname\":\"Mckeithan\",\"carnumber\":\"130\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":30,\"firstname\":\"Margot\",\"lastname\":\"Mckeithan\",\"carnumber\":\"130\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Ruthe\",\"lastname\":\"Rooks\",\"carnumber\":\"131\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":31,\"firstname\":\"Ruthe\",\"lastname\":\"Rooks\",\"carnumber\":\"131\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Sherell\",\"lastname\":\"Strode\",\"carnumber\":\"132\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":32,\"firstname\":\"Sherell\",\"lastname\":\"Strode\",\"carnumber\":\"132\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Demetrice\",\"lastname\":\"Denmark\",\"carnumber\":\"133\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":33,\"firstname\":\"Demetrice\",\"lastname\":\"Denmark\",\"carnumber\":\"133\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Lakita\",\"lastname\":\"Lanman\",\"carnumber\":\"134\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":34,\"firstname\":\"Lakita\",\"lastname\":\"Lanman\",\"carnumber\":\"134\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Iva\",\"lastname\":\"Imes\",\"carnumber\":\"135\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":35,\"firstname\":\"Iva\",\"lastname\":\"Imes\",\"carnumber\":\"135\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Kellie\",\"lastname\":\"Kubacki\",\"carnumber\":\"136\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":36,\"firstname\":\"Kellie\",\"lastname\":\"Kubacki\",\"carnumber\":\"136\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Amparo\",\"lastname\":\"Ashbrook\",\"carnumber\":\"137\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":37,\"firstname\":\"Amparo\",\"lastname\":\"Ashbrook\",\"carnumber\":\"137\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Maryetta\",\"lastname\":\"Menchaca\",\"carnumber\":\"138\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":38,\"firstname\":\"Maryetta\",\"lastname\":\"Menchaca\",\"carnumber\":\"138\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Edwardo\",\"lastname\":\"Estabrook\",\"carnumber\":\"139\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":39,\"firstname\":\"Edwardo\",\"lastname\":\"Estabrook\",\"carnumber\":\"139\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Librada\",\"lastname\":\"Labat\",\"carnumber\":\"140\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":40,\"firstname\":\"Librada\",\"lastname\":\"Labat\",\"carnumber\":\"140\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Vita\",\"lastname\":\"Villeda\",\"carnumber\":\"141\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":41,\"firstname\":\"Vita\",\"lastname\":\"Villeda\",\"carnumber\":\"141\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Karrie\",\"lastname\":\"Koski\",\"carnumber\":\"142\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.*create\",\"racerid\":42,\"firstname\":\"Karrie\",\"lastname\":\"Koski\",\"carnumber\":\"142\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:52",
+   "{\"action\":\"racer.import\",\"firstname\":\"Charleen\",\"lastname\":\"Crist\",\"carnumber\":\"143\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.*create\",\"racerid\":43,\"firstname\":\"Charleen\",\"lastname\":\"Crist\",\"carnumber\":\"143\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.import\",\"firstname\":\"Rosenda\",\"lastname\":\"Rossiter\",\"carnumber\":\"144\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.*create\",\"racerid\":44,\"firstname\":\"Rosenda\",\"lastname\":\"Rossiter\",\"carnumber\":\"144\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.import\",\"firstname\":\"Isobel\",\"lastname\":\"Ivester\",\"carnumber\":\"145\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.*create\",\"racerid\":45,\"firstname\":\"Isobel\",\"lastname\":\"Ivester\",\"carnumber\":\"145\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.import\",\"firstname\":\"Nelia\",\"lastname\":\"Nagao\",\"carnumber\":\"146\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.*create\",\"racerid\":46,\"firstname\":\"Nelia\",\"lastname\":\"Nagao\",\"carnumber\":\"146\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.import\",\"firstname\":\"Tuan\",\"lastname\":\"Troxell\",\"carnumber\":\"147\",\"partition\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.*create\",\"racerid\":47,\"firstname\":\"Tuan\",\"lastname\":\"Troxell\",\"carnumber\":\"147\",\"carname\":\"\",\"partitionid\":1,\"rankid\":1,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.import\",\"firstname\":\"Lynelle\",\"lastname\":\"Lipsey\",\"carnumber\":\"148\",\"partition\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.*create\",\"racerid\":48,\"firstname\":\"Lynelle\",\"lastname\":\"Lipsey\",\"carnumber\":\"148\",\"carname\":\"\",\"partitionid\":2,\"rankid\":2,\"classid\":2}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.import\",\"firstname\":\"Melanie\",\"lastname\":\"Meacham\",\"carnumber\":\"149\",\"partition\":\"Div 3\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"racer.*create\",\"racerid\":49,\"firstname\":\"Melanie\",\"lastname\":\"Meacham\",\"carnumber\":\"149\",\"carname\":\"\",\"partitionid\":3,\"rankid\":3,\"classid\":3}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"class.order\",\"classid_1\":\"2\",\"classid_2\":\"1\",\"classid_3\":\"3\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"one-group\"}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"class.*create\",\"class\":\"All Racers\",\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:53",
+   "{\"action\":\"round.*create\",\"roundid\":1,\"classid\":1,\"round\":1}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.*structure\",\"class\":\"All Racers\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":1,\"rankid\":2,\"roundid\":1},{\"partitionid\":3,\"classid\":1,\"rankid\":3,\"roundid\":1}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"rank.order\",\"rankid_1\":\"1\",\"rankid_2\":\"2\",\"rankid_3\":\"3\"}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"by-partition\"}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"custom\"}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"by-partition\"}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.order\",\"partitionid_1\":\"3\",\"partitionid_2\":\"2\",\"partitionid_3\":\"1\"}"
+  ],
+  [
+   "2026-10-29 05:12:54",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"one-group\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"class.*create\",\"class\":\"All Racers\",\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"round.*create\",\"roundid\":1,\"classid\":1,\"round\":1}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.*structure\",\"class\":\"All Racers\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":1,\"rankid\":2,\"roundid\":1},{\"partitionid\":3,\"classid\":1,\"rankid\":3,\"roundid\":1}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.order\",\"partitionid_1\":\"2\",\"partitionid_2\":\"3\",\"partitionid_3\":\"1\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.edit\",\"partitionid\":\"1\",\"name\":\"Div 2\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.edit\",\"partitionid\":\"1\",\"name\":\"Default\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.edit\",\"partitionid\":\"1\",\"name\":\"Div 1\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.add\",\"name\":\"Div 1\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.add\",\"name\":\"New Div\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"rank.*create\",\"rank\":\"New Div\",\"rankid\":4,\"classid\":1}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.*create\",\"partitionid\":4,\"name\":\"New Div\",\"rankid\":4}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"by-partition\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3},{\"partitionid\":4,\"classid\":4,\"rankid\":4,\"roundid\":4}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"custom\"}"
+  ],
+  [
+   "2026-10-29 05:12:55",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3},{\"partitionid\":4,\"classid\":4,\"rankid\":4,\"roundid\":4}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"by-partition\"}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3},{\"partitionid\":4,\"classid\":4,\"rankid\":4,\"roundid\":4}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.add\",\"name\":\"Empty\"}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"class.*create\",\"class\":\"Empty\",\"classid\":5}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"round.*create\",\"roundid\":5,\"classid\":5,\"round\":1}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"rank.*create\",\"rank\":\"Empty\",\"rankid\":5,\"classid\":5}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.*create\",\"partitionid\":5,\"name\":\"Empty\",\"rankid\":5}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"by-partition\"}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3},{\"partitionid\":4,\"classid\":4,\"rankid\":5,\"roundid\":5},{\"partitionid\":5,\"classid\":5,\"rankid\":4,\"roundid\":4}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"by-partition\"}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3},{\"partitionid\":4,\"classid\":4,\"rankid\":5,\"roundid\":5},{\"partitionid\":5,\"classid\":5,\"rankid\":4,\"roundid\":4}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:56",
+   "{\"action\":\"partition.apply-rule\",\"rule\":\"custom\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3},{\"partitionid\":4,\"classid\":4,\"rankid\":5,\"roundid\":5},{\"partitionid\":5,\"classid\":5,\"rankid\":4,\"roundid\":4}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"rank.move\",\"rankid\":\"4\",\"classid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":3,\"rankid\":3,\"roundid\":3},{\"partitionid\":4,\"classid\":4,\"rankid\":5,\"roundid\":5},{\"partitionid\":5,\"classid\":4,\"rankid\":4,\"roundid\":5}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"rank.move\",\"rankid\":\"3\",\"classid\":\"-1\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"class.*create\",\"class\":\"Div 3-1\",\"classid\":5}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"round.*create\",\"roundid\":6,\"classid\":5,\"round\":1}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":3,\"classid\":5,\"rankid\":3,\"roundid\":6},{\"partitionid\":4,\"classid\":4,\"rankid\":5,\"roundid\":5},{\"partitionid\":5,\"classid\":4,\"rankid\":4,\"roundid\":5}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"5\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"10\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"15\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"20\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"25\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"30\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"35\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:57",
+   "{\"action\":\"racer.edit\",\"racerid\":\"40\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:58",
+   "{\"action\":\"racer.edit\",\"racerid\":\"45\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:58",
+   "{\"action\":\"racer.edit\",\"racerid\":\"49\",\"partitionid\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:12:58",
+   "{\"action\":\"partition.delete\",\"partitionid\":\"3\"}"
+  ],
+  [
+   "2026-10-29 05:12:58",
+   "{\"action\":\"partition.*structure\",\"partitions\":[{\"partitionid\":1,\"classid\":1,\"rankid\":1,\"roundid\":1},{\"partitionid\":2,\"classid\":2,\"rankid\":2,\"roundid\":2},{\"partitionid\":4,\"classid\":4,\"rankid\":5,\"roundid\":5},{\"partitionid\":5,\"classid\":4,\"rankid\":4,\"roundid\":5}],\"ranks\":[]}"
+  ],
+  [
+   "2026-10-29 05:13:02",
+   "{\"action\":\"settings.write\",\"unused-lane-mask\":\"0\",\"n-lanes\":\"4\"}"
+  ],
+  [
+   "2026-10-29 05:13:02",
+   "{\"action\":\"racer.pass\",\"racer\":\"1\",\"value\":\"1\"}"
+  ],
+  [
+   "2026-10-29 05:13:02",
+   "{\"action\":\"racer.pass\",\"racer\":\"\",\"value\":\"1\"}"
+  ]
+ ],
+ "expected": [
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Update Database Schema"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Write setting(s): <b>photo-dir</b>: \"/var/lib/derbynet/2026/hist/racers\""
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Write setting(s): <b>car-photo-dir</b>: \"/var/lib/derbynet/2026/hist/cars\""
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Write setting(s): <b>video-dir</b>: \"/var/lib/derbynet/2026/hist/videos\""
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Write setting(s): <b>log-dir</b>: \"/var/lib/derbynet/2026/hist/logs\""
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Import racer <b>Lucius Lemon</b>, 101, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Import racer <b>Hubert Heffley</b>, 102, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Import racer <b>Tangela Tacey</b>, 103, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Import racer <b>Audry Appleby</b>, 104, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:49",
+   "sentence": "Import racer <b>Kip Kennelly</b>, 105, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Charlena Callas</b>, 106, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Sherley Summerford</b>, 107, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Roland Rivero</b>, 108, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Gerald Glennon</b>, 109, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Shalanda Sanluis</b>, 110, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Nohemi Natale</b>, 111, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Lien Licht</b>, 112, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Rhett Roeder</b>, 113, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Ivey Ivester</b>, 114, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Christy Capo</b>, 115, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:50",
+   "sentence": "Import racer <b>Dara Dittmer</b>, 116, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Iraida Icenhour</b>, 117, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Shirley Savidge</b>, 118, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Daphine Dimas</b>, 119, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Bonny Barrow</b>, 120, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Natisha Neifert</b>, 121, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Jesse John</b>, 122, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Lillia Lawson</b>, 123, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Anh Antonio</b>, 124, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Annalee Aguila</b>, 125, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Neomi Newlin</b>, 126, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Lyle Lahey</b>, 127, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Denny Daggett</b>, 128, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:51",
+   "sentence": "Import racer <b>Rosemarie Robidoux</b>, 129, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Margot Mckeithan</b>, 130, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Ruthe Rooks</b>, 131, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Sherell Strode</b>, 132, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Demetrice Denmark</b>, 133, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Lakita Lanman</b>, 134, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Iva Imes</b>, 135, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Kellie Kubacki</b>, 136, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Amparo Ashbrook</b>, 137, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Maryetta Menchaca</b>, 138, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Edwardo Estabrook</b>, 139, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Librada Labat</b>, 140, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Vita Villeda</b>, 141, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Karrie Koski</b>, 142, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:52",
+   "sentence": "Import racer <b>Charleen Crist</b>, 143, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Import racer <b>Rosenda Rossiter</b>, 144, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Import racer <b>Isobel Ivester</b>, 145, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Import racer <b>Nelia Nagao</b>, 146, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Import racer <b>Tuan Troxell</b>, 147, Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Import racer <b>Lynelle Lipsey</b>, 148, Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Import racer <b>Melanie Meacham</b>, 149, Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Re-order racing groups"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:53",
+   "sentence": "Racing groups: Race as one big group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:54",
+   "sentence": "Re-order subgroups"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:54",
+   "sentence": "Racing groups: Race each den as a group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:54",
+   "sentence": "Racing groups: Custom racing groups."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:54",
+   "sentence": "Racing groups: Race each den as a group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:54",
+   "sentence": "Racing groups: Race as one big group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:55",
+   "sentence": "[DID IT] Rename den Default to Div 2"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:55",
+   "sentence": "[DID IT] Rename den Default to Default"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:55",
+   "sentence": "[DID IT] Rename den Default to Div 1"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:55",
+   "sentence": "Add den Div 1"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:55",
+   "sentence": "Add den New Div"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:55",
+   "sentence": "Racing groups: Race each den as a group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:55",
+   "sentence": "Racing groups: Custom racing groups."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:56",
+   "sentence": "Racing groups: Race each den as a group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:56",
+   "sentence": "Add den Empty"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:56",
+   "sentence": "Racing groups: Race each den as a group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:56",
+   "sentence": "Racing groups: Race each den as a group."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:56",
+   "sentence": "Racing groups: Custom racing groups."
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:57",
+   "sentence": "Move den  into racing group "
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:57",
+   "sentence": "Move den  into its own racing group"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:12:58",
+   "sentence": "[DID IT] Delete partition Div 3"
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:13:02",
+   "sentence": "Write setting(s): <b>unused-lane-mask</b>: \"0\" <b>n-lanes</b>: \"4\""
+  },
+  {
+   "heat": "",
+   "received": "2026-10-29 05:13:02",
+   "sentence": "Check in  <b>Lucius Lemon</b>, 101, "
+  }
+ ]
+}
