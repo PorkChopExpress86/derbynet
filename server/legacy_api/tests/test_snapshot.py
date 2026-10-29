@@ -231,3 +231,16 @@ def test_a_photo_name_cannot_leave_the_photo_folder(client, coordinator, tmp_pat
     assert not list(Path("/").glob("escaped.jpg"))
     assert not (tmp_path.parent / "escaped.jpg").exists()
     assert active().pk == coordinator.pk
+
+
+def test_tables_and_columns_older_php_exports_carried_are_accepted(client, coordinator):
+    text = GOLDEN.read_text()
+    old = text.replace(
+        '[\n  {\n    "table": "Classes"',
+        '[\n  {"table": "Divisions", "rows": [{"divisionid": 1}], "missing": []},\n'
+        '  {\n    "table": "Classes"',
+        1,
+    ).replace('"table": "Playlist"', '"table": "RacingQueue"', 1)
+    assert old != text
+
+    assert "<success/>" in put(client, old.encode()).content.decode()

@@ -443,6 +443,12 @@ _LOG_COLUMNS = {
 }
 
 
+# What older PHP exports carried and the importer reads past: the queue before
+# it was called Playlist, and the divisions that classes and ranks replaced.
+_RETIRED_TABLES = {"racingqueue", "divisions", "subdivisions"}
+_RETIRED_COLUMNS = {"registrationinfo": {"divisionid", "subdivisionid", "superdiv"}}
+
+
 def _refusals(event: Event, source) -> list[str]:
     """What in an upload is not the export schema: a table or column this
     server never writes, or a photo name that is not a plain file name. A
@@ -454,10 +460,13 @@ def _refusals(event: Event, source) -> list[str]:
     known |= {name.lower(): set(columns) for name, columns in _LOG_COLUMNS.items()}
     problems = []
     for table, rows in source.tables.items():
+        if table in _RETIRED_TABLES:
+            continue
         if table not in known:
             problems.append(f"unknown table {table}")
             continue
-        for column in sorted({c for row in rows for c in row} - known[table]):
+        allowed = known[table] | _RETIRED_COLUMNS.get(table, set())
+        for column in sorted({c for row in rows for c in row} - allowed):
             problems.append(f"unknown column {column} in {_CANONICAL[table]}")
     for photo in source.photos:
         if not is_valid_name(photo.basename):
