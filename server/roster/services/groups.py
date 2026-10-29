@@ -988,7 +988,8 @@ def add_subgroup(event, group_id: int, name: str) -> Subgroup:
 
 
 def rename_subgroup(subgroup: Subgroup, name: str, n_trophies=KEEP) -> None:
-    """`rank.edit`: rename the subgroup and its partitions.
+    """`rank.edit`: rename the subgroup and its partitions, and under
+    `by-partition` its group too (D49, C49: PHP leaves the group).
 
     For a subgroup with partitions, a name another partition holds, ignoring
     case, is `name-taken`, and so is any name when it has more than one,
@@ -1003,8 +1004,29 @@ def rename_subgroup(subgroup: Subgroup, name: str, n_trophies=KEEP) -> None:
         others = Partition.objects.filter(event_id=subgroup.event_id).exclude(
             subgroup=subgroup
         )
-        if n > 1 or (n == 1 and _partition_named(others, name)):
+        # The group follows only when it is this partition's own: the group
+        # of a subgroup with a partition and no sibling subgroup. Any other
+        # group holds names of more than one row, so it keeps its name.
+        # The legacy `use-subgroups` setting turns the subgroups on without
+        # changing the rule field, so by-partition holds only with it off.
+        settings = RaceSettings.objects.get(event_id=subgroup.event_id)
+        renames_group = (
+            n == 1
+            and settings.group_formation_rule == Rule.BY_PARTITION
+            and not settings.use_subgroups
+            and Subgroup.objects.filter(group_id=subgroup.group_id).count() == 1
+        )
+        if (
+            n > 1
+            or (n == 1 and _partition_named(others, name))
+            or (
+                renames_group
+                and _group_name_taken(subgroup.event_id, name, exclude=subgroup.group)
+            )
+        ):
             raise _name_taken(name)
+        if renames_group:
+            Group.objects.filter(pk=subgroup.group_id).update(name=name)
         Subgroup.objects.filter(pk=subgroup.pk).update(name=name)
         partitions.update(name=name)
         if n_trophies is not KEEP:

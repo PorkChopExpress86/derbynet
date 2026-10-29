@@ -35,6 +35,13 @@ READ_RACERS = (
 )
 
 
+RANGE_DIVERGENCES = (
+    "D48: a partition with car number ranges answers range-full with its"
+    " partitionid when every range is taken, and warns about a number outside"
+    " the ranges; PHP has neither.",
+)
+
+
 def _text(ctx: LegacyContext, name: str, default: str = "") -> str:
     value = ctx.args.get(name)
     return value if isinstance(value, str) else default
@@ -52,10 +59,13 @@ def _refuse(ctx: LegacyContext) -> None:
 
 
 def _fail(ctx: LegacyContext, failure: RacerFailure) -> None:
+    if failure.partition_id is not None:
+        # The check-in page asks for another range of this partition.
+        ctx.put("partitionid", failure.partition_id)
     ctx.failure(failure.code, failure.description)
 
 
-@action("racer.add", permission=Perm.REGISTER_NEW_RACER)
+@action("racer.add", permission=Perm.REGISTER_NEW_RACER, divergences=RANGE_DIVERGENCES)
 def racer_add(ctx: LegacyContext) -> None:
     # PHP reads an undefined $partitionid, so with no valid partitionid the
     # racer lands in the Default partition (C15).
@@ -92,7 +102,7 @@ def _place(ctx: LegacyContext, name: str, model):
     return ctx.resolve(model, posted) or racers.MISSING, posted
 
 
-@action("racer.edit", permission=Perm.EDIT_RACER)
+@action("racer.edit", permission=Perm.EDIT_RACER, divergences=RANGE_DIVERGENCES)
 def racer_edit(ctx: LegacyContext) -> None:
     posted = _optional(ctx, "racer")
     if posted is None:

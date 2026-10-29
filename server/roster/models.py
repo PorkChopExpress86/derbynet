@@ -148,6 +148,32 @@ class Partition(EventScoped):
         return name.casefold()
 
 
+class CarRange(EventScoped):
+    """A span of car numbers the race coordinator gives a partition (D48).
+
+    A partition holds an ordered list of them. One with none uses the
+    `car-numbering` setting. Django only: PHP has no such table.
+    """
+
+    partition = models.ForeignKey(
+        Partition, on_delete=models.CASCADE, related_name="car_ranges"
+    )
+    first = models.IntegerField()
+    last = models.IntegerField()
+    sort_order = models.IntegerField()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(last__gte=models.F("first")),
+                name="car_range_last_not_below_first",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.first} to {self.last}"
+
+
 class Racer(EventScoped):
     """Legacy `RegistrationInfo`.
 

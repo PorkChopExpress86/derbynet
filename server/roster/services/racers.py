@@ -57,13 +57,16 @@ class Failure(StrEnum):
     INVALID_CAR_NUMBER = "invalid-carnumber"
     # Django only: PHP stores a null car number when a partition is full.
     NO_CAR_NUMBER = "no-carnumber"
+    # Django only: every car number range of the partition is taken (D48).
+    RANGE_FULL = "range-full"
 
 
 class RacerFailure(Exception):
-    def __init__(self, code: Failure, description: str):
+    def __init__(self, code: Failure, description: str, partition_id=None):
         super().__init__(f"{code}: {description}")
         self.code = code
         self.description = description
+        self.partition_id = partition_id
 
 
 def _record(event_id, request: dict) -> None:
@@ -121,6 +124,12 @@ def insert_new_racer(
             )
         if car_number is None or (isinstance(car_number, str) and car_number == ""):
             car_number = car_numbers.next_car_number_for_partition(partition)
+            if car_number is None and car_numbers.has_ranges(partition):
+                raise RacerFailure(
+                    Failure.RANGE_FULL,
+                    f"Every car number range of {partition.name} is taken.",
+                    partition_id=partition.pk,
+                )
             if car_number is None:
                 # PHP stores a null car number; the column here has none.
                 raise RacerFailure(
@@ -134,6 +143,8 @@ def insert_new_racer(
             number = car_number
         if Racer.objects.filter(event=event, car_number=number).exists():
             warnings.append(f"Duplicate car number {car_number}")
+        if outside := car_numbers.outside_warning(partition, number):
+            warnings.append(outside)
         subgroup = partition.subgroup
         racer = Racer.objects.create(
             event=event,
@@ -312,6 +323,12 @@ def edit_racer(racer: Racer, edit: Edit) -> EditResult:
             ):
                 # PHP interpolates an unset key, so the number is missing.
                 result.warning = ["Duplicate car number "]
+            if racer.partition_id and (
+                outside := car_numbers.outside_warning(
+                    racer.partition, racer.car_number
+                )
+            ):
+                result.warning = (result.warning or []) + [outside]
         if edit.exclude is not None:
             racer.exclude = edit.exclude
         racer.save()

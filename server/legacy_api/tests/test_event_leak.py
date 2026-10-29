@@ -59,6 +59,9 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "partition.add"): {"name": "Walk-ins"},
     ("action", "partition.edit"): {"partitionid": "1", "name": "Renamed"},
     ("action", "partition.delete"): {"partitionid": "1"},
+    ("action", "partition.range-add"): {"partitionid": "1", "first": "1", "last": "9"},
+    ("action", "partition.range-remove"): {"rangeid": "1"},
+    ("query", "partition.range-list"): {},
     ("action", "partition.move"): {
         "div_id": "1",
         "group_field": "classid",

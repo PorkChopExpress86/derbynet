@@ -177,8 +177,11 @@ if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
         "transaction_mode": "IMMEDIATE",
         "timeout": 20,
     }
-    # An in-memory test database cannot use WAL, so tests use a file.
-    DATABASES["default"]["TEST"] = {"NAME": str(DATA_DIR / "test-derbynet.sqlite3")}
+    # An in-memory test database cannot use WAL, so tests use a file. The pid
+    # keeps runs in parallel worktrees, and agents, off each other's file.
+    DATABASES["default"]["TEST"] = {
+        "NAME": str(DATA_DIR / f"test-derbynet-{os.getpid()}.sqlite3")
+    }
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = _time_zone()

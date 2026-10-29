@@ -15,7 +15,9 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 - A service that changes roster, inspection, lane, or result data takes `core.services.lock_race_state(event_id)` first inside `transaction.atomic()`. A handler never reads race state before a service call and acts on it after.
 - A record that must survive a refusal is written after the atomic block, because the rollback removes it.
 - Every endpoint needs a `LEAK_REQUESTS` entry in `server/legacy_api/tests/test_event_leak.py`.
-- A deliberate difference from PHP goes in `server/tests/golden/deviations.json` (D25), and in the endpoint's `divergences` in the registry.
+- A deliberate difference from PHP goes in the endpoint's `divergences` in the registry, citing a quirk id or an owner decision (`D48`). A difference that a recorded golden fixture shows also goes in `server/tests/golden/deviations.json` (D25).
+- A new Django-only endpoint is added to `DJANGO_ONLY` in `server/legacy_api/tests/test_registry.py`. A new event-scoped model needs a row in `server/core/tests/populated.py`. Run `pytest core/tests legacy_api/tests/test_registry.py legacy_api/tests/test_event_leak.py` before the full suite, because these fail only there otherwise.
+- Replay suites hold PHP's state after each script step: `roster/tests/test_group_scenarios.py`, `legacy_api/tests/test_groups_parity.py`, `racing/tests/test_round_scenarios.py`, `racing/tests/test_finalists.py`. Run them before changing a behavior they cover. A fix they break needs a narrower condition or a recorded deviation, never an edited expectation.
 
 ## Evidence
 
