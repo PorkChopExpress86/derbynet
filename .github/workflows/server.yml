@@ -199,6 +199,12 @@ jobs:
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/test-subgroup-ntrophies.sh http://127.0.0.1:8080
 
+      - name: Run the result import suite against Django
+        working-directory: .
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/test-import-results.sh http://127.0.0.1:8080
+
       # The real derby-timer.jar, with its simulated timer, races a whole
       # round, as timer/testing/fake-timer runs it (#32, ADR-02).  The runner
       # image ships Java and Ant.
