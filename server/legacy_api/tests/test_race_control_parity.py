@@ -545,12 +545,29 @@ def run_race_day_polls(client) -> Scenario:
     s.timer_capture("timer-finished")
     polls("06-after-a-result")
     s.capture("06-after-a-result poll heat-results")
+    # The rest of the day: Scouts round 1, the Scouts final the playlist tees
+    # up, the Outlaws' two rounds, then the awards (#33).
+    s.race_round()
+    s.capture("07-between-rounds-final-teed-up poll.coordinator")
+    s.skip("07-between-rounds-final-teed-up poll.kiosk")  # #34
+    s.capture("07-between-rounds-final-teed-up poll")
+    for salt in (7, 3, 5):
+        s.post_ok("action=heat.select&now_racing=1")
+        s.race_round(salt=salt)
+    s.capture("08-before-awards award.current")
+    s.capture("present-speed-1")
+    s.capture("08-award-presented poll.coordinator")
+    s.skip("08-award-presented poll.kiosk")  # #34
+    s.capture("08-award-presented poll")
+    s.capture("08-award-presented award.current")
+    s.capture("reveal-award")
+    s.capture("08-award-revealed award.current")
+    s.capture("08-award-revealed award.list")
     return s
 
 
 def test_the_race_day_polls_match_php(client, event):
     s = run_race_day_polls(client)
-    s.skip_rest()  # the rest of the day needs #32, #33 and #34
     _dump(s)
     assert s.mismatches() == []
 
@@ -693,6 +710,8 @@ DEVIATIONS = {
                 "014 04-scheduled-and-racing-heat-1 poll",
                 "021 05-mid-heat poll",
                 "025 06-after-a-result poll",
+                "029 07-between-rounds-final-teed-up poll",
+                "034 08-award-presented poll",
             ]
         },
         None,
@@ -742,9 +761,10 @@ def _exchange_text(name, php, body: bytes) -> bytes:
     return "\n".join(lines).encode() + b"\n" + body + b"\n"
 
 
-def test_every_listed_deviation_is_a_reply_these_scenarios_make():
-    for quirk, (_, scenario, fixtures, _) in DEVIATIONS.items():
-        assert scenario in SCENARIOS, quirk
+def assert_listed(listed_deviations: dict, scenarios: dict) -> None:
+    """Every entry of `listed_deviations` is in deviations.json as written."""
+    for quirk, (_, scenario, fixtures, _) in listed_deviations.items():
+        assert scenario in scenarios, quirk
         listed = {
             (e["fixture"], tuple(e["exchanges"]))
             for e in deviations()
@@ -754,13 +774,12 @@ def test_every_listed_deviation_is_a_reply_these_scenarios_make():
             assert (fixture, tuple(names)) in listed, (quirk, fixture)
 
 
-@pytest.mark.skipif(
-    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the #31 entries"
-)
-def test_write_race_control_deviations(event):
-    runs = {name: run(Client()) for name, run in SCENARIOS.items()}
+def write_deviations(listed_deviations: dict, scenarios: dict) -> None:
+    """Run the scenarios and write each entry's Django exchanges, replacing
+    the entries with the same expected files in deviations.json."""
+    runs = {name: run(Client()) for name, run in scenarios.items()}
     written = []
-    for quirk, (reason, scenario, fixtures, filename) in DEVIATIONS.items():
+    for quirk, (reason, scenario, fixtures, filename) in listed_deviations.items():
         run = runs[scenario]
         for fixture, names in fixtures.items():
             php = run.transcripts[fixture]
@@ -785,3 +804,14 @@ def test_write_race_control_deviations(event):
     # By quirk number, as `tools/reschedule_deviations.py --check` expects.
     listing["deviations"] = sorted(kept + written, key=lambda e: int(e["quirk"][1:]))
     DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2) + "\n")
+
+
+def test_every_listed_deviation_is_a_reply_these_scenarios_make():
+    assert_listed(DEVIATIONS, SCENARIOS)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the #31 entries"
+)
+def test_write_race_control_deviations(event):
+    write_deviations(DEVIATIONS, SCENARIOS)

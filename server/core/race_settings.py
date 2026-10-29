@@ -119,8 +119,14 @@ def write(event, key, text: str) -> None:
 def _check(event, entry, field, value, key) -> None:
     if value is None:
         return
-    if isinstance(entry.codec, Ref):
-        target = apps.get_model(entry.codec.model)
+    if isinstance(entry.codec, Ref) or field.is_relation:
+        # A row of this event only, also for an id packed with other fields
+        # (`full-field-calc`).
+        target = (
+            apps.get_model(entry.codec.model)
+            if isinstance(entry.codec, Ref)
+            else field.related_model
+        )
         if not target.objects.filter(event=event, pk=value).exists():
             raise NotWritten(key)
         return

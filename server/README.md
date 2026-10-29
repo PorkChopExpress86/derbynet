@@ -112,7 +112,7 @@ uv run python tools/reschedule_deviations.py --check   # exits 1 if they are out
 - `schedule.generate` fails in PHP's order: `nlanes`, `results-exist`, `too-few-racers`, then `cant-fulfill`. A `roundid` that names no round still gets the lane check first (`schedule.refuse_missing_round`). PHP's `trace` field adds a `trace` key to the reply; Django drops it (R6).
 - Fixes and differences from PHP are recorded on each endpoint's `divergences` in the registry, for the parity gate (#37): `roster.new` needs `CONTROL_RACE` (S17) and fails with `invalid-roundid` (C24), `result.delete` has no `sql` key (C23), and the R3 and R5 to R9 differences #31 proposes for the owner to confirm.
 
-`legacy_api/tests/test_race_control_parity.py` replays `capture/scenarios/04-schedules.sh`, `05-master-schedule.sh`, `11-reschedule-quirks.sh`, `16-poll-results.sh` and the polls of `06-race-day.sh` up to the first result through these endpoints, with ids mapped by first appearance (`legacy_api/tests/php_http.py`). The capture's timer messages go through `timer-message` from a Timer login, and its playlist steps (#34) through the services. `WRITE_DEVIATIONS=1 uv run pytest legacy_api/tests/test_race_control_parity.py` rewrites its deviation entries. `legacy_api/tests/test_race_control_concurrency.py` posts two `schedule.reschedule` calls, and `heat.select` with `result.write`, at once on real transactions.
+`legacy_api/tests/test_race_control_parity.py` replays `capture/scenarios/04-schedules.sh`, `05-master-schedule.sh`, `11-reschedule-quirks.sh`, `16-poll-results.sh` and the polls and awards of `06-race-day.sh` through these endpoints, with ids mapped by first appearance (`legacy_api/tests/php_http.py`). The capture's timer messages go through `timer-message` from a Timer login, and its playlist steps (#34) through the services. `WRITE_DEVIATIONS=1 uv run pytest legacy_api/tests/test_race_control_parity.py` rewrites its deviation entries. `legacy_api/tests/test_race_control_concurrency.py` posts two `schedule.reschedule` calls, and `heat.select` with `result.write`, at once on real transactions.
 
 ## Closed lanes
 
@@ -165,7 +165,7 @@ The finalists of a follow-on or aggregate round come from the standings (see bel
 Award eligibility follows owner decisions D33, D34 and D35:
 
 - A racer has two award settings. `Racer.exclude` is "not eligible for any award", and `Racer.not_eligible_for_speed_awards` is new. The legacy API reads and writes `exclude` only.
-- Every award unit lists the partitions its awards can go to: the pack, each group (aggregates included), each subgroup, and later each judged award (#33). `awards.models.AwardPartition` stores a list only where it is narrowed, and `awards/services.py` reads and sets them. No stored list means every partition, those added later too; a narrowed list keeps exactly its partitions; deleting a partition deletes it from every list, and a list left empty goes back to all partitions. The legacy API neither reads nor writes the lists.
+- Every award unit lists the partitions its awards can go to: the pack, each group (aggregates included), each subgroup, and later each judged award (#33). `awards.models.AwardPartition` stores a list only where it is narrowed, and `awards/services.py` reads and sets them. No stored list means every partition, those added later too; a narrowed list keeps exactly its partitions; deleting a partition deletes it from every list, and a list left empty goes back to all partitions. The legacy API never writes the lists, and only `award.winner` reads them.
 - A racer who cannot win a ladder's speed awards keeps the standings rows, marked in `Row.not_eligible` with the reason, and takes no place and adds no `T` mark there. Every other place, ladder, speed award and finalist is then what PHP gives with that racer removed. A racer whose partition a unit's list leaves out is marked only in the ladder that unit's awards read, and keeps every other place. The `full-field-calc` group's award ladder is the pack's.
 - A cut skips any racer who cannot win the speed awards of the group the new round is for, and takes the next racer. It reads that group's list, never the pack's. `racing/engine/standings/eligibility.py` holds the one rule the ladders, the awards and the cut share.
 
@@ -176,6 +176,17 @@ export DATABASE_URL=sqlite:////tmp/standings-timing.sqlite3
 uv run python manage.py migrate -v 0
 uv run python -m tools.time_standings
 ```
+
+## Awards, judging and presentation
+
+`legacy_api/handlers/awards.py` serves `award.edit`, `award.delete`, `award.order`, `award.adhoc`, `award.winner`, `award.import`, `award.present`, `award.calc-rule`, `award.xbs`, `query=award.current` and `query=award.list` (#33). The writes are in `awards/editing.py`, which takes the `RaceState` lock first and fails with `AwardFailure` and PHP's code, and the replies in `awards/listing.py`, which builds `json_out_awards()` and `award.current`.
+
+- `award.winner` keeps PHP's checks for every judged award: `ineligible` for a racer not eligible for any award (`exclude`), then `wrong-class` and `wrong-subgroup`, an aggregate checked through its groups and its own subgroups. A racer who is not eligible for speed awards can still win a judged award (D33). A racer whose partition the award's partition list leaves out is `ineligible` too (D35).
+- `query=award.current` answers anonymously, for the award kiosk (D5), and resolves a `speed-` key through `racing.services.standings.current_award`. It caches nothing, as the standings section above explains. `query=award.list` needs a login.
+- The ballot endpoints (`ballot.open`, `query=ballot.get`, `vote.cast`, `query=ballot.results`) are deferred to #54 (D7), listed in `legacy_api.registry.DEFERRED` for the coverage check of #37. `award.edit` still takes `ballot_depth`.
+- Differences from PHP, for the owner to confirm, are A1 to A5 in `deviations.json`: a pack-wide award lists `classid` and `rankid` 0, never PHP's null (A1); a `class_and_rank`, `full-field-calc` or award key PHP would store unchecked is refused (A2, A4, A5); and `award.present` with no parameters answers success (A3).
+
+`legacy_api/tests/test_awards_parity.py` replays `capture/scenarios/17-awards.sh` through these endpoints, and `WRITE_DEVIATIONS=1` rewrites its entries.
 
 ## Standings differential test against PHP
 

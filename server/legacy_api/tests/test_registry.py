@@ -5,6 +5,7 @@ import pytest
 
 from accounts.permissions import Access, Perm
 from legacy_api.registry import (
+    DEFERRED,
     REGISTRY,
     Endpoint,
     Format,
@@ -127,3 +128,10 @@ def test_every_divergence_names_a_recorded_decision():
             ]
 
     assert unknown == []
+
+
+def test_every_deferred_endpoint_is_a_php_handler_django_does_not_serve():
+    ajax = Path(__file__).resolve().parents[3] / "website" / "ajax"
+    for deferred in DEFERRED:
+        assert (ajax / f"{deferred.kind}.{deferred.name}.inc").is_file(), deferred
+        assert REGISTRY.get(deferred.kind, deferred.name) is None, deferred

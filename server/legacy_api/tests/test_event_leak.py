@@ -102,6 +102,27 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("query", "timer.settings"): {},
     ("query", "timer.log"): {"seek": "0"},
     ("query", "poll.timer.test"): {},
+    ("action", "award.edit"): {
+        "awardid": "new",
+        "name": "Paint",
+        "awardtypeid": "4",
+        "class_and_rank": "1,1",
+    },
+    ("action", "award.delete"): {"awardid": "1"},
+    ("action", "award.order"): {"awardid_1": "1"},
+    ("action", "award.adhoc"): {"racerid": "1", "awardname": "Shiny"},
+    ("action", "award.winner"): {"awardid": "1", "racerid": "1"},
+    ("action", "award.import"): {
+        "awardname": "Paint",
+        "awardtype": "Design Trophy",
+        "classname": "Cubs",
+        "carnumber": "101",
+    },
+    ("action", "award.present"): {"key": "award-1", "reveal": "1"},
+    ("action", "award.calc-rule"): {"full-field-calc": "0"},
+    ("action", "award.xbs"): {"racer": "1", "value": "1"},
+    ("query", "award.current"): {},
+    ("query", "award.list"): {},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},

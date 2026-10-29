@@ -1,0 +1,23 @@
+### 045 A2 edit new in no class
+request: POST action.php
+request-body: action=award.edit&awardid=new&name=Ghost&awardtypeid=4&class_and_rank=9999,0
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 300
+body:
+{
+    "action": {
+        "action": "award.edit",
+        "awardid": "new",
+        "name": "Ghost",
+        "awardtypeid": 4,
+        "class_and_rank": "9999,0"
+    },
+    "outcome": {
+        "summary": "failure",
+        "code": "unknownclass",
+        "description": "Unrecognized class"
+    }
+}
+

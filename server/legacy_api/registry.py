@@ -119,6 +119,29 @@ class Registry:
 REGISTRY = Registry()
 
 
+@dataclass(frozen=True)
+class Deferred:
+    """A PHP endpoint Django does not serve yet, and the backlog ticket that
+    ports it. The coverage check of #37 counts it as accounted for."""
+
+    kind: Kind
+    name: str
+    ticket: str
+    reason: str
+
+
+_BALLOTING = "Balloting moved to the backlog (D7)."
+
+# Every PHP endpoint deferred to a backlog ticket. A name here is never
+# registered, so the dispatcher answers it as it answers any unknown name.
+DEFERRED: tuple[Deferred, ...] = (
+    Deferred("action", "ballot.open", "#54", _BALLOTING),
+    Deferred("query", "ballot.get", "#54", _BALLOTING),
+    Deferred("action", "vote.cast", "#54", _BALLOTING),
+    Deferred("query", "ballot.results", "#54", _BALLOTING),
+)
+
+
 def action(
     name: str,
     *,

@@ -1,0 +1,19 @@
+### 046 A3 present nothing
+request: POST action.php
+request-body: action=award.present
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 167
+body:
+{
+    "action": {
+        "action": "award.present"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+

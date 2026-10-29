@@ -120,8 +120,8 @@ jobs:
       # them: import-roster.sh, test-den-changes.sh (#30), then
       # test-basic-checkins.sh, which test-basic-racing.sh starts with.  They
       # run from the repository root, where testing/common.sh keeps its
-      # scratch files.  test-racer-query.sh needs test-basic-racing.sh, which
-      # needs timer-message (#32), and test-awards.sh (#33) first.
+      # scratch files.  test-racer-query.sh needs test-basic-racing.sh and
+      # test-awards.sh (#33), and later suites that #34 and #36 serve, first.
       - name: Run the racer and check-in suites against Django
         working-directory: .
         run: |
@@ -152,8 +152,8 @@ jobs:
           bash testing/test-unused-lanes.sh http://127.0.0.1:8080
 
       # The suites that race heats through timer-message (#32) with run_heat
-      # and need no endpoint of another ticket.  The others read awards (#33),
-      # replay (#34) or export-json.php (#36), so they wait for those tickets.
+      # and need no endpoint of another ticket.  The others read replay (#34)
+      # or export-json.php (#36), so they wait for those tickets.
       - name: Run the timer-message suites against Django
         working-directory: .
         run: |
@@ -163,6 +163,18 @@ jobs:
           bash testing/test-master-schedule.sh http://127.0.0.1:8080
           bash testing/test-aggregate-rounds.sh http://127.0.0.1:8080
           bash testing/test-aggregate-nonracing.sh http://127.0.0.1:8080
+
+      # The award suite (#33) after the master schedule, in
+      # testing/exercise-one-database.sh order.  `test-awards.sh basic` follows
+      # test-basic-racing.sh, which posts replay.message (#34), so it waits.
+      - name: Run the award suite against Django
+        working-directory: .
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-den-changes.sh http://127.0.0.1:8080
+          bash testing/test-master-schedule.sh http://127.0.0.1:8080
+          bash testing/test-awards.sh http://127.0.0.1:8080 master
 
       # The real derby-timer.jar, with its simulated timer, races a whole
       # round, as timer/testing/fake-timer runs it (#32, ADR-02).  The runner
