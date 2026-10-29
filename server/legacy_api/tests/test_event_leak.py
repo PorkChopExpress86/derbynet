@@ -38,6 +38,8 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("query", "stats"): {},
     ("action", "database.purge"): {"purge": "racers"},
     ("action", "preferences.upload"): {},
+    ("query", "snapshot.get"): {},
+    ("action", "snapshot.put"): {},
     ("action", "result.import"): {
         "class": "Tiger",
         "round": "1",

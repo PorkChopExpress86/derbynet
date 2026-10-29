@@ -205,6 +205,13 @@ jobs:
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/test-import-results.sh http://127.0.0.1:8080
 
+      # snapshot.get, then snapshot.put as nobody (refused) and as the
+      # coordinator, the way testing/exercise-one-database.sh ends.
+      - name: Round-trip a snapshot against Django
+        working-directory: .
+        run: |
+          bash testing/snapshot-round-trip.sh http://127.0.0.1:8080
+
       # The real derby-timer.jar, with its simulated timer, races a whole
       # round, as timer/testing/fake-timer runs it (#32, ADR-02).  The runner
       # image ships Java and Ant.
