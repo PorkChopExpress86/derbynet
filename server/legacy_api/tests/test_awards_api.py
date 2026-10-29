@@ -264,3 +264,16 @@ def test_an_import_by_a_car_number_that_is_no_number_names_no_racer(
     )
 
     assert outcome(reply) == "unknowncarnumber"
+
+
+def test_an_anonymous_kiosk_reads_the_current_award_but_may_not_present(
+    client, event
+):
+    """kiosk.php grants PRESENT_AWARDS to every visitor; Django does not.
+    The award kiosk only reads `award.current` anonymously (D5)."""
+    reply = act(client, "award.present", key="speed-1")
+
+    assert outcome(reply) == "notauthorized"
+    current = client.get("/action.php", {"query": "award.current"})
+    # A query answers a refusal with an outcome, and an answer without one.
+    assert "outcome" not in json.loads(current.content)
