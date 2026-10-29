@@ -29,17 +29,25 @@ while args:
     else:
         sys.exit(__doc__)
 
-out = subprocess.run([GH, 'issue', 'list', '--repo', repo, '--label', 'django-migration', '--state', 'all',
-                      '--limit', '500', '--json', 'number,state,body,labels'],
-                     capture_output=True, text=True, check=True).stdout
+def gh(*argv):
+    """The output of a gh call. A failed call (rate limit, no network, not
+    logged in) exits with gh's own message, since the lint cannot run without
+    the live issues; running it again is the usual fix."""
+    done = subprocess.run([GH, *argv], capture_output=True, text=True)
+    if done.returncode:
+        sys.exit(f"gh {' '.join(argv[:2])} failed, so the lint did not run:\n{done.stderr.strip()}")
+    return done.stdout
+
+
+out = gh('issue', 'list', '--repo', repo, '--label', 'django-migration', '--state', 'all',
+         '--limit', '500', '--json', 'number,state,body,labels')
 issues = {i['number']: i for i in json.loads(out)}
 for n, body in drafts.items():
     issues[n]['body'] = body
 
 
 def numbers(kind):
-    out = subprocess.run([GH, kind, 'list', '--repo', repo, '--state', 'all', '--limit', '1000', '--json', 'number'],
-                         capture_output=True, text=True, check=True).stdout
+    out = gh(kind, 'list', '--repo', repo, '--state', 'all', '--limit', '1000', '--json', 'number')
     return {i['number'] for i in json.loads(out)}
 
 

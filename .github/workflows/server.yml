@@ -215,6 +215,14 @@ jobs:
         run: |
           bash testing/snapshot-round-trip.sh http://127.0.0.1:8080
 
+      # A suite that writes into its working directory leaves a file a later
+      # `git add -A` commits.  Write to $TMPDIR instead.
+      - name: Check the shell suites left the checkout clean
+        working-directory: .
+        run: |
+          status="$(git status --porcelain)"
+          [ -z "$status" ] || { echo "$status"; exit 1; }
+
       # The real derby-timer.jar, with its simulated timer, races a whole
       # round, as timer/testing/fake-timer runs it (#32, ADR-02).  The runner
       # image ships Java and Ant.

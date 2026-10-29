@@ -78,7 +78,10 @@ class Endpoint:
     get_writes: bool = False
     # Each intentional difference from PHP's reply, as `<id>: <what>`, where
     # the id is a #64 row, an owner decision or a quirk of #20. The parity
-    # gate (#37) allows exactly these.
+    # gate (#37) allows exactly these. The guard in tests/test_registry.py accepts
+    # an id from QUIRK_DECISIONS (racing/engine/tests/golden.py), a quirk in
+    # deviations.json, or a `D<n>` row of plan/owner-decisions.md, so add the
+    # decision before citing it.
     divergences: tuple[str, ...] = ()
 
     def __post_init__(self):
