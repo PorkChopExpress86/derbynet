@@ -258,6 +258,8 @@ class LegacyContext:
     # The client's User-Agent, exactly as sent. Competing timers are told
     # apart by it, so a proxy must pass it through.
     user_agent: str = ""
+    # The uploaded files of a multipart POST, by field name.
+    files: Mapping = field(default_factory=dict)
 
     def put(self, key: str, value) -> None:
         self.out[key] = value

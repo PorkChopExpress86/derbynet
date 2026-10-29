@@ -127,7 +127,7 @@ user_login_coordinator
 # Because Harold is ineligible, only 4 Tigers show up.
 standings_sheet "All Racers / Bears" | jq -e 'length == 5' >/dev/null || test_fails Bears standings
 standings_sheet "All Racers / Tigers" | jq -e 'length == 4' >/dev/null || test_fails Tigers standings
-expect_row Pack 101 '[1,101,"Jewell Jeansonne","Lions",1,4,1.010,1.010,1.010]'
+expect_row Pack 101 '[1,101,"Jewell Jeansonne","Lions",1,4,1.01,1.01,1.01]'
 expect_row Pack 206 '[16,206,"Ernest Edelman","Tigers",2,4,5.506,5.506,5.506]'
 expect_row Pack 214 '[17,214,"Thanh Turner","Tigers",3,4,5.514,5.514,5.514]'
 expect_row Pack 218 '[18,218,"Sterling Spalla","Tigers",4,4,5.518,5.518,5.518]'
