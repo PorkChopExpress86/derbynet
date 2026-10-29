@@ -81,7 +81,7 @@ EOF
 
 
 # TODO
-curl_getj "action.php?query=poll.coordinator" > poll-coordinator.json
+curl_getj "action.php?query=poll.coordinator" > "${TMPDIR:-/tmp}/poll-coordinator.json"
 
 # curl_getj "action.php?query=poll&values=awards,classes,partitions,race-structure,rounds"
 

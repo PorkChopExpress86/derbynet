@@ -15,7 +15,10 @@ The PHP server under `website/` is frozen: fix every defect in the Django port (
 ## Running things
 
 - Builds and tests run in containers through `testing/docker/run-suite.sh`; the host has no PHP, Java, or Ant. Run it from a regular clone, not a git worktree.
+- To see what PHP does with one script, from a worktree too: `testing/docker/php-scratch.sh` (usage in `testing/README.md`).
+- Tests that pass on SQLite can fail on Postgres, which CI also runs. Check with `server/tools/pytest-postgres.sh`.
 - Give each concurrent run its own `DERBYNET_TEST_PREFIX`, and remove that prefix's containers, images, and volumes afterwards.
+- Run `python3 -I plan/lint-issues.py --file N=PATH` on a plan issue body before every `gh issue edit` (steps in `plan/README.md`).
 - Wait for and merge PRs with `plan/bin/pr-wait` and `plan/bin/pr-merge`, which pin the merge to the head SHA that passed.
 
 ## Delegating

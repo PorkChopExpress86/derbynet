@@ -50,4 +50,3 @@ adapter-webrtc/
 
 # Django dev data: the SQLite database, secret_key, and event folders
 server/var/
-/poll-coordinator.json

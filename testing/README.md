@@ -41,6 +41,17 @@ the images, container, and volume.
 Run from a regular checkout, not a `git worktree`: the containers can't see the
 repository's git directory, and the build needs it.
 
+To see what PHP does with one script, from a regular checkout or a worktree,
+build the images once with `run-suite.sh harness assets server` and then run
+
+    testing/docker/php-scratch.sh test-points-racing.sh
+
+It starts a throwaway PHP server, creates the event, runs the script against
+it, and removes the server. Pass `--no-event` for a script that sets the event
+up itself, such as `exercise-one-database.sh`. A fresh PHP server has no event,
+so a script that logs in first fails with `parse error: Invalid numeric literal`
+until `setup.nodata` has created one.
+
 A server database can't be reused: setup (`ez-new=testdb`) fails with
 `already_exists` the second time, so each run needs a fresh data volume.  The
 script always makes one.
