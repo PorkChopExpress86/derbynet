@@ -8,6 +8,8 @@
 #
 # Run it from anywhere; it runs `uv run pytest` in server/.  The container
 # listens on a free port of localhost and takes its name from this process.
+# The image, credentials and database name are the ones the `server` job in
+# .github/workflows/server.yml uses; change them together.
 
 set -e -E -o pipefail
 

@@ -21,7 +21,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 
 ## Evidence
 
-- A claim counts once a test or a real server run reproduces it. That covers a sentence in `GLOSSARY.md`, `plan/owner-decisions.md` or a docstring that says what the server does. Name the test or the code that shows it. D57 first said a restore left the open event alone, and the importer replaces it.
+- A claim counts once a test or a real server run reproduces it. That covers a sentence in `GLOSSARY.md`, `plan/owner-decisions.md` or a docstring that says what the server does. Name the test or the code that shows it.
 - Run the shell suites in `testing/` against a live Django server the way `.github/workflows/server.yml` does. Add a suite to that workflow once it passes on SQLite and Postgres with no stand-in.
 - Run the full server suite once at the end, in the background, and read its exit code before pushing.
 - Golden captures from PHP need a regular clone, not a worktree. Ask the lead to run `server/tests/golden/capture.sh`, narrowed with `GOLDEN_SCENARIOS`.

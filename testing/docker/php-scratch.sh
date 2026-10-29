@@ -34,7 +34,7 @@ if [ "$1" = "--no-event" ]; then
   CREATE_EVENT=
   shift
 fi
-[ $# -gt 0 ] || { sed -n '3,21p' "$0" >&2; exit 2; }
+[ $# -gt 0 ] || { sed -n '2,/^[^#]/{/^#/p}' "$0" >&2; exit 2; }
 
 for image in "$HARNESS_IMAGE" "$SERVER_IMAGE"; do
   docker image inspect "$image" >/dev/null 2>&1 || {
