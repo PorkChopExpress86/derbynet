@@ -52,6 +52,11 @@ QUIRK_DECISIONS = {
     "C23": "fix",
     "C24": "fix",
     "S17": "fix",
+    # Rows of #64 that the #36 snapshot and setup endpoints fix.
+    "S5": "fix",
+    "S6": "fix",
+    "S7": "fix",
+    "S25": "fix",
     # Proposed in #31, for the owner to confirm: R3 no current heat reads
     # null, R5 result.write fails in JSON, not XML, R6 no scheduler debug
     # output, R7 the generate payload shows the state the request left, R8

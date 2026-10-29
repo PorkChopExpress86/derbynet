@@ -38,6 +38,12 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("query", "stats"): {},
     ("action", "database.purge"): {"purge": "racers"},
     ("action", "preferences.upload"): {},
+    ("query", "snapshot.get"): {},
+    ("query", "file.directory.nodata"): {"path": "/"},
+    ("query", "file.stat"): {"path": "/"},
+    ("action", "setup.nodata"): {},
+    ("action", "file.directory.new.nodata"): {"directory": "/nonexistent/x"},
+    ("action", "snapshot.put"): {},
     ("action", "result.import"): {
         "class": "Tiger",
         "round": "1",
