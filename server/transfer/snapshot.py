@@ -264,10 +264,6 @@ def tables(
                 )
             ],
         ),
-        "Scenes": (
-            ["sceneid", "name", "sortorder"],
-            [[n, s.name, s.sort_order] for n, s in enumerate(scenes, 1)],
-        ),
         "SceneKiosk": (
             ["scenekioskid", "sceneid", "kiosk_name", "page"],
             [
@@ -281,6 +277,10 @@ def tables(
                     SceneKiosk.objects.filter(**mine).order_by("pk"), 1
                 )
             ],
+        ),
+        "Scenes": (
+            ["sceneid", "name", "sortorder"],
+            [[n, s.name, s.sort_order] for n, s in enumerate(scenes, 1)],
         ),
         "Playlist": (
             [
@@ -438,11 +438,16 @@ class PutFailure(Exception):
         self.description = description
 
 
-def put(event: Event, content: bytes) -> list[tuple[str, int]]:
-    """Replace `event` with the snapshot `content`. Returns each table of the
-    file and the number of rows it held. The old event's rows go in the same
+def put(event: Event, content: bytes) -> list[tuple[str, str, int, int]]:
+    """Replace `event` with the snapshot `content`. Returns, for each table of
+    the file, its name, its id column, the rows the event held before, and the
+    rows the file brought. The old event's rows go in the same
     transaction that brings the new ones, so a snapshot that fails changes
     nothing."""
+    before = {
+        name: (columns[0], len(rows))
+        for name, (columns, rows) in tables(event, False).items()
+    }
     with tempfile.TemporaryDirectory(prefix="derbynet-snapshot-") as folder:
         path = Path(folder) / "snapshot.xml"
         path.write_bytes(content)
@@ -459,6 +464,9 @@ def put(event: Event, content: bytes) -> list[tuple[str, int]]:
         except (ImportFailed, SourceError) as error:
             raise PutFailure("import-failed", str(error)) from error
         return [
-            (_CANONICAL.get(name, name), len(rows))
-            for name, rows in source.tables.items()
+            (table, *before.get(table, ("", 0)), len(rows))
+            for table, rows in (
+                (_CANONICAL.get(name, name), rows)
+                for name, rows in source.tables.items()
+            )
         ]

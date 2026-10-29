@@ -82,7 +82,25 @@ def test_get_writes_the_wrapper_and_every_table_in_php_order(client, coordinator
         b'<?xml version="1.0" encoding="UTF-8"?>\n<snapshot><![CDATA[\n['
     )
     tables = tables_of(response.content)
-    assert list(tables)[:3] == ["Classes", "Ranks", "RegistrationInfo"]
+    assert list(tables) == [
+        "Classes",
+        "Ranks",
+        "RegistrationInfo",
+        "Rounds",
+        "AwardTypes",
+        "Awards",
+        "Roster",
+        "RaceChart",
+        "RaceInfo",
+        "SceneKiosk",
+        "Scenes",
+        "Playlist",
+        "BallotAwards",
+        "Voters",
+        "Votes",
+        "Partitions",
+        "ConstituentClasses",
+    ]
     assert tables["RegistrationInfo"]["rows"][0]["carnumber"] == 101
     assert tables["RaceChart"]["rows"][0]["finishtime"] == 3.5
     assert tables["Classes"]["missing"] == []
@@ -114,7 +132,7 @@ def test_a_php_snapshot_loads_with_its_row_counts(client, coordinator):
     assert Group.objects.filter(event=event, durable=False).count() <= len(
         sent["Classes"]["rows"]
     )
-    assert re.search(r'<table name="Classes" rows-before="0"', reply)
+    assert re.search(r'<table name="Classes" rows-before="0" idcolumn="classid"', reply)
     assert Event.objects.count() == 1
 
 

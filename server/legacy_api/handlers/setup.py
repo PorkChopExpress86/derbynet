@@ -13,6 +13,10 @@ from accounts.permissions import Perm, log_in
 from core import setup_details, setup_event
 from legacy_api.registry import LegacyContext, action, query
 
+S25 = (
+    "S25: needs SET_UP and stays under the data folder; PHP serves any path to anyone."
+)
+
 
 def _text(ctx: LegacyContext, key: str) -> str | None:
     value = ctx.args.get(key)
@@ -48,7 +52,7 @@ def setup_nodata(ctx: LegacyContext) -> None:
         log_in(ctx.session, role)
 
 
-@query("file.directory.nodata", permission=Perm.SET_UP)
+@query("file.directory.nodata", permission=Perm.SET_UP, divergences=(S25,))
 def file_directory(ctx: LegacyContext) -> None:
     path = _text(ctx, "path")
     if path is None:
@@ -62,7 +66,7 @@ def file_directory(ctx: LegacyContext) -> None:
         ctx.failure(*failures[0])
 
 
-@query("file.stat", permission=Perm.SET_UP)
+@query("file.stat", permission=Perm.SET_UP, divergences=(S25,))
 def file_stat(ctx: LegacyContext) -> None:
     path = _text(ctx, "path")
     if path is None:
@@ -75,7 +79,7 @@ def file_stat(ctx: LegacyContext) -> None:
         ctx.put("stat", found)
 
 
-@action("file.directory.new.nodata", permission=Perm.SET_UP)
+@action("file.directory.new.nodata", permission=Perm.SET_UP, divergences=(S25,))
 def file_directory_new(ctx: LegacyContext) -> None:
     directory = _text(ctx, "directory") or ""
     if setup_event.make_folder(directory):
