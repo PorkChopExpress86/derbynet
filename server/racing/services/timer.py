@@ -592,10 +592,7 @@ def _send_assignments(event: Event) -> list[str]:
         .values_list("kind", "name", "pending")
     ):
         if kind == Kind.FLAG:
-            out.append(
-                f'<assign-flag flag="{name}"'
-                f' value="{php_escape(pending)}"/>\n'
-            )
+            out.append(f'<assign-flag flag="{name}" value="{php_escape(pending)}"/>\n')
         elif kind == Kind.PORTS:
             port = f' port="{php_escape(pending)}"' if pending != "" else ""
             out.append(f"<assign-port{port}/>\n")
