@@ -176,9 +176,10 @@ jobs:
           bash testing/test-master-schedule.sh http://127.0.0.1:8080
           bash testing/test-awards.sh http://127.0.0.1:8080 master
 
-      # The standings suites read their rows from export-json.php (#36).
-      # test-points-racing.sh waits: it reads the Pack sheet while its round is
-      # unfinished, a sheet no server writes, and it fails against PHP too.
+      # The standings suites read their rows from export-json.php (#36). The
+      # points racing suite checks the points in the middle of a round only in
+      # test_points_rerun.py, since no server writes a sheet for a round that
+      # is not finished.
       - name: Run the standings suites against Django
         working-directory: .
         run: |
@@ -190,6 +191,8 @@ jobs:
           bash testing/import-roster.sh http://127.0.0.1:8080
           bash testing/test-den-changes.sh http://127.0.0.1:8080
           bash testing/test-aggregate-classes.sh http://127.0.0.1:8080
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/test-points-racing.sh http://127.0.0.1:8080
 
       # test-preferences.sh waits for #34: it sets `racing_scene = 4`, and the
       # scenes of a reset database have new ids (the rest of it passes).
