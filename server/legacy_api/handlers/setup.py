@@ -18,12 +18,15 @@ S25 = (
 )
 
 
+D57 = "D57: a new event's folders are events/<slug>, not <year>/<name>."
+
+
 def _text(ctx: LegacyContext, key: str) -> str | None:
     value = ctx.args.get(key)
     return value if isinstance(value, str) else None
 
 
-@action("setup.nodata", permission=Perm.SET_UP, session_write=True)
+@action("setup.nodata", permission=Perm.SET_UP, session_write=True, divergences=(D57,))
 def setup_nodata(ctx: LegacyContext) -> None:
     if settings.LOCK_SETTINGS:
         ctx.failure("locked", "Settings are locked and cannot be changed.")

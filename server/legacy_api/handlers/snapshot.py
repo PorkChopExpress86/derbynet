@@ -21,6 +21,8 @@ DIVERGENCES = (
     "S5: needs SET_UP; PHP lets anyone download a snapshot.",
     "S6: a photo name that is not a plain file name refuses the upload.",
     "S7: an unknown table or column refuses the upload, and none is run as SQL.",
+    "D57: the reply is built in memory, its Events tables are empty, and a restore"
+    " is a new event with new ids and new folders.",
 )
 
 
