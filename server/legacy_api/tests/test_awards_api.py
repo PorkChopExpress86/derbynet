@@ -5,6 +5,7 @@ import json
 from urllib.parse import urlencode
 
 import pytest
+from django.test import Client
 from django.utils import timezone
 
 from awards.models import Award
@@ -264,3 +265,21 @@ def test_an_import_by_a_car_number_that_is_no_number_names_no_racer(
     )
 
     assert outcome(reply) == "unknowncarnumber"
+
+
+def test_an_anonymous_kiosk_reads_the_current_award_but_may_not_present(
+    coordinator, event
+):
+    """kiosk.php grants PRESENT_AWARDS to every visitor; Django does not.
+    The award kiosk only reads `award.current` anonymously (D5)."""
+    winning = RacerFactory(group__event=event)
+    awardid = judged(coordinator)
+    act(coordinator, "award.winner", awardid=awardid, racerid=winning.pk)
+    assert presented(coordinator, f"award-{awardid}")
+    kiosk = Client()
+
+    reply = act(kiosk, "award.present", key="speed-1")
+
+    assert outcome(reply) == "notauthorized"
+    current = json.loads(kiosk.get("/action.php", {"query": "award.current"}).content)
+    assert current["current"]["key"] == f"award-{awardid}"
