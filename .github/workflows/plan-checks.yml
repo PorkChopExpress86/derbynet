@@ -24,9 +24,12 @@ permissions:
   issues: read
   pull-requests: read
 
+# A pull request's newer push supersedes its older run.  Other events each get
+# their own group and are never cancelled, so an issue event can't cancel the
+# run checking a push to master.
 concurrency:
-  group: plan-checks-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: plan-checks-${{ github.event.pull_request.number || format('{0}-{1}', github.event_name, github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   plan-checks:
@@ -46,11 +49,11 @@ jobs:
 
       - name: Decide whether to lint the issues
         id: scope
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+        # A pull request checks out its merge commit, whose first parent is the
+        # base it merged onto.
         run: |
           if [ "$GITHUB_EVENT_NAME" != pull_request ] ||
-             ! git diff --quiet "$BASE" HEAD -- plan/; then
+             ! git diff --quiet HEAD^1 HEAD -- plan/; then
             echo lint=true >> "$GITHUB_OUTPUT"
           else
             echo "No change under plan/; the issue lint runs on master and on issue events."
