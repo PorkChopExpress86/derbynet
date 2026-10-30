@@ -7,7 +7,7 @@ The PHP server under `website/` is frozen: fix every defect in the Django port (
 ## Where things are
 
 - Plan: GitHub issues labeled `django-migration`, roadmap #2. Owner decisions and plan tooling: `plan/README.md`.
-- Where the work stands, what is next, and new-machine setup: `plan/HANDOFF.md`.
+- Where to find the plan's state, how the work is run, and new-machine setup: `plan/HANDOFF.md`.
 - Architecture decisions: `server/docs/adr/README.md`.
 - PHP test suite, and how to run it in Docker: `testing/README.md`.
 - Golden fixtures captured from PHP: `server/tests/golden/README.md`.

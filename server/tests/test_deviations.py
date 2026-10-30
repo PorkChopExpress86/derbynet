@@ -188,7 +188,7 @@ def test_every_generate_that_php_lets_empty_a_round_is_under_q1():
 
 DECISIONS_FILE = SERVER_DIR.parent / "plan" / "owner-decisions.md"
 GOLDEN_PY = SERVER_DIR / "racing" / "engine" / "tests" / "golden.py"
-ACCEPTED = re.compile(r"[Aa]ccepted in (D\d+(?:(?:, and |, | and )D\d+)*)")
+ACCEPTED = re.compile(r"[Aa]ccepted (?:in|by) (D\d+(?:(?:,? and |,? or |, )D\d+)*)")
 FOR_THE_OWNER = "for the owner to"
 
 
@@ -253,7 +253,8 @@ def test_the_comment_reader_finds_each_block_and_inline_comment():
 
 def test_an_accepted_in_decision_mentions_the_quirk():
     """A reason or comment that says a quirk was accepted in Dnn names a
-    decision whose row in plan/owner-decisions.md mentions that quirk."""
+    decision whose row in plan/owner-decisions.md mentions that quirk, and
+    every decision it cites mentions one of its quirks."""
     rows = decision_rows()
     wrong = []
     for where, ids, text in attributions():
@@ -262,6 +263,9 @@ def test_an_accepted_in_decision_mentions_the_quirk():
             for quirk in ids:
                 if not any(mentions(rows.get(d, ""), quirk) for d in decisions):
                     wrong.append(f"{where}: {quirk} is not in {', '.join(decisions)}")
+            for d in decisions:
+                if not any(mentions(rows.get(d, ""), quirk) for quirk in ids):
+                    wrong.append(f"{where}: {d} mentions none of {', '.join(ids)}")
     assert wrong == []
 
 

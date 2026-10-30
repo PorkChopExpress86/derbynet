@@ -4,7 +4,7 @@ The plan lives in GitHub issues on PorkChopExpress86/derbynet, labeled `django-m
 
 | File | Purpose |
 | --- | --- |
-| `HANDOFF.md` | Where the migration stands, what comes next, how the work is run, and new-machine setup |
+| `HANDOFF.md` | Where to find the plan's state, how the work is run, open questions, and new-machine setup |
 | `owner-decisions.md` | Every owner decision, with the issues and ADRs that record it |
 | `lint-issues.py` | Checks every plan issue body: style, section order, cited paths, `#N` references, and forward-only dependencies with no cycles. Checks that issue state matches the code: no open ticket or spec that a merged PR closes, no `ready-for-agent` with an open dependency, no `blocked` with every dependency closed |
 | `bin/pr-wait` | Waits for every check on a PR's current head and prints one line per check |

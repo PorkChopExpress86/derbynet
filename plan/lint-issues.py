@@ -213,11 +213,12 @@ def git(*argv):
 
 def merged_closers():
     """{issue: [merged PRs that close it]}, from each PR's closingIssuesReferences
-    and the Closes/Fixes/Resolves #N lines of its body. A PR GitHub shows as closed
+    and the Closes/Fixes/Resolves #N lines of its body. Only PRs into master count.
+    A PR GitHub shows as closed
     counts as merged when its head commit is on origin/master, as when the lead
     merges it by hand."""
     out = gh('pr', 'list', '--repo', repo, '--state', 'all', '--limit', '1000',
-             '--json', 'number,state,headRefOid,closingIssuesReferences,body')
+             '--json', 'number,state,baseRefName,headRefOid,closingIssuesReferences,body')
     have_master = git('rev-parse', '--verify', '--quiet', 'origin/master^{commit}')
     if not have_master:
         notes_out.append('origin/master is not fetched, so a PR GitHub shows as closed '
@@ -225,6 +226,8 @@ def merged_closers():
     owner, name = repo.split('/')
     closers = {}
     for pr in json.loads(out):
+        if pr['baseRefName'] != 'master':
+            continue
         merged = pr['state'] == 'MERGED' or (
             pr['state'] == 'CLOSED' and have_master
             and git('merge-base', '--is-ancestor', pr['headRefOid'], 'origin/master'))

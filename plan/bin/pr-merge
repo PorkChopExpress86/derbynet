@@ -23,6 +23,8 @@ fi
 "$GH" pr merge "$PR" --repo "$REPO" --match-head-commit "$head" "$@"
 "$GH" pr view "$PR" --repo "$REPO" --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"'
 
+# With --auto the PR merges later, so there is nothing to check yet.
+case " $* " in *" --auto "*) exit 0 ;; esac
 closes=$("$GH" pr view "$PR" --repo "$REPO" --json closingIssuesReferences \
            --jq '.closingIssuesReferences[].number')
 [ -n "$closes" ] || exit 0

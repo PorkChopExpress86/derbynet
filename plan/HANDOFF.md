@@ -7,8 +7,8 @@ Written on 2026-10-24, before the owner moved to a new computer, and trimmed on 
 GitHub holds the live state, so this file copies none of it.
 
 - The roadmap #2 lists the milestones M0 to M6 and their epics.
-- `gh issue list --repo PorkChopExpress86/derbynet --label django-migration --state open` lists what is left. A ticket labeled `ready-for-agent` has every dependency closed, which `plan/lint-issues.py` checks.
-- `git log origin/master --grep '#N'` lists what has landed for ticket N, and `server/legacy_api/registry.py` lists every legacy endpoint Django serves.
+- `gh issue list --repo PorkChopExpress86/derbynet --label django-migration --state open` lists what is left. A ticket labeled `ready-for-agent` has every dependency closed or marked `## Still open`, which `plan/lint-issues.py` checks.
+- `git log origin/master --grep '#N\b'` lists what has landed for ticket N, and `server/legacy_api/registry.py` lists every legacy endpoint Django serves.
 - #64 tracks the PHP defects, and epic #3 stays open until its last row is fixed.
 
 The shell suites in `testing/` run against Django one by one as their endpoints land. A suite goes into `.github/workflows/server.yml` once it passes on SQLite and Postgres with no stand-in.
