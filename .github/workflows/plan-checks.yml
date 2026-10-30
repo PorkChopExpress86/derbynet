@@ -28,6 +28,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The lint counts a PR GitHub shows as closed as merged when its head
+          # commit is on origin/master, so it needs the history.
+          fetch-depth: 0
 
       - name: Check the paths the ADRs cite
         run: bash server/docs/adr/check-paths.sh
