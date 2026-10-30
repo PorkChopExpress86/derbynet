@@ -44,10 +44,9 @@ QUIRK_DECISIONS = {
     "D5": "fix",
     "D34": "fix",
     "S23": "fix",
-    # Accepted in D51 (#29): R1 an unknown racer id is refused.
+    # Accepted in D51 and D60 (#29): R1 an unknown racer id is refused, R2 a
+    # car number must be a whole number.
     "R1": "fix",
-    # Proposed in #29, for the owner to decide: R2 a car number must be a
-    # whole number.
     "R2": "fix",
     # Rows of #64 that a #31 endpoint fixes.
     "C23": "fix",
