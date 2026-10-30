@@ -6,6 +6,7 @@ transcripts once their handlers exist (#31)."""
 import importlib
 import importlib.util
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from urllib.parse import parse_qsl
@@ -181,3 +182,99 @@ def test_every_generate_that_php_lets_empty_a_round_is_under_q1():
         "005 generate-round-3-zero-runs",
     ) in needed
     assert sorted(needed - q1) == []
+
+
+# ----- Decision attributions match plan/owner-decisions.md --------------------
+
+DECISIONS_FILE = SERVER_DIR.parent / "plan" / "owner-decisions.md"
+GOLDEN_PY = SERVER_DIR / "racing" / "engine" / "tests" / "golden.py"
+ACCEPTED = re.compile(r"[Aa]ccepted in (D\d+(?:(?:, and |, | and )D\d+)*)")
+FOR_THE_OWNER = "for the owner to"
+
+
+def decision_rows() -> dict[str, str]:
+    """`{decision id: its Decision column}` from the decision log's table."""
+    rows = {}
+    for line in DECISIONS_FILE.read_text().splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split(" | ")]
+        if len(cells) == 4 and re.fullmatch(r"D\d+", cells[0]):
+            rows[cells[0]] = cells[2]
+    return rows
+
+
+def quirk_decision_comments() -> list[tuple[list[str], str]]:
+    """`(ids, comment)` for each comment in QUIRK_DECISIONS: a comment block
+    covers the keys below it up to the next comment, an inline comment its key."""
+    source = GOLDEN_PY.read_text()
+    start = source.index("QUIRK_DECISIONS = {")
+    body = source[start : source.index("\n}\n", start)]
+    blocks, comment, ids = [], [], []
+    for line in body.splitlines()[1:]:
+        line = line.strip()
+        key = re.match(r'"(\w+)": "\w+",(?:\s*#\s*(.*))?$', line)
+        if line.startswith("#"):
+            if ids:
+                blocks.append((ids, " ".join(comment)))
+                comment, ids = [], []
+            comment.append(line.lstrip("# "))
+        elif key:
+            ids.append(key[1])
+            if key[2]:
+                blocks.append(([key[1]], key[2]))
+    if ids:
+        blocks.append((ids, " ".join(comment)))
+    return [(ids, text) for ids, text in blocks if text]
+
+
+def attributions() -> list[tuple[str, list[str], str]]:
+    """`(where, ids, text)` for every deviation reason and decision comment."""
+    found = [
+        (f"deviations.json {e['quirk']} {e['fixture']}", [e["quirk"]], e["reason"])
+        for e in deviations()
+    ]
+    found += [
+        (f"golden.py QUIRK_DECISIONS {ids}", ids, text)
+        for ids, text in quirk_decision_comments()
+    ]
+    return found
+
+
+def mentions(row: str, quirk: str) -> bool:
+    return re.search(rf"\b{re.escape(quirk)}\b", row) is not None
+
+
+def test_the_comment_reader_finds_each_block_and_inline_comment():
+    comments = quirk_decision_comments()
+    assert [ids for ids, text in comments if "Accepted in D58 (#34)" in text] == [
+        ["R10", "R11", "R12"]
+    ]
+    assert (["Q19"], "D30") in comments
+
+
+def test_an_accepted_in_decision_mentions_the_quirk():
+    """A reason or comment that says a quirk was accepted in Dnn names a
+    decision whose row in plan/owner-decisions.md mentions that quirk."""
+    rows = decision_rows()
+    wrong = []
+    for where, ids, text in attributions():
+        for cited in ACCEPTED.findall(text):
+            decisions = re.findall(r"D\d+", cited)
+            for quirk in ids:
+                if not any(mentions(rows.get(d, ""), quirk) for d in decisions):
+                    wrong.append(f"{where}: {quirk} is not in {', '.join(decisions)}")
+    assert wrong == []
+
+
+def test_no_decided_quirk_waits_for_the_owner():
+    """A reason or comment still waiting "for the owner to" decide names no
+    quirk that a decision in plan/owner-decisions.md already mentions."""
+    rows = decision_rows()
+    wrong = [
+        f"{where}: {quirk} is in {decision}"
+        for where, ids, text in attributions()
+        if FOR_THE_OWNER in text
+        for quirk in ids
+        for decision, row in rows.items()
+        if mentions(row, quirk)
+    ]
+    assert wrong == []
