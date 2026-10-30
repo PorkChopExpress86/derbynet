@@ -43,9 +43,10 @@ adapter-webrtc/
 *.iml
 .DS_Store
 
-# Claude Code: agent worktrees, verification evidence, Playwright MCP snapshots
+# Claude Code: agent worktrees, verification evidence, personal settings, Playwright MCP snapshots
 .claude/worktrees/
 .claude/verify-evidence/
+.claude/settings.local.json
 .playwright-mcp/
 
 # Django dev data: the SQLite database, secret_key, and event folders
