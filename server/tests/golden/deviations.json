@@ -153,7 +153,7 @@
       "exchanges": [
         "005 import text car number"
       ],
-      "reason": "PHP stores a car number such as A12 as text. Django's car number is an integer column, so it refuses one that is not a whole number with invalid-carnumber (#29, accepted in D51).",
+      "reason": "PHP stores a car number such as A12 as text. Django's car number is an integer column, so it refuses one that is not a whole number with invalid-carnumber (#29, for the owner to decide).",
       "expected": "deviations/R2/refusals.http"
     },
     {
