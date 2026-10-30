@@ -10,7 +10,8 @@ Reads every issue labeled django-migration, then checks each body for:
 - forward-only ## Dependencies, with no cycles across the plan
 - open kind:ticket and kind:spec issues that a merged PR closes, unless a
   "## Still open" section names what is left
-- ready-for-agent on an open ticket with an open dependency
+- ready-for-agent on an open ticket with an open dependency that has no
+  "## Still open" section
 - blocked on an open ticket whose dependencies are all closed, unless a
   "## Waiting on" section names what it waits on
 
@@ -254,11 +255,15 @@ for n, issue in sorted(issues.items()):
                         f'"## {STILL_OPEN}" section that names what is left')
     if k != 'ticket':
         continue
-    open_deps = [d for d in deps.get(n, []) if issues[d]['state'] == 'OPEN']
+    # A dependency whose work has merged and that stays open only for the boxes its
+    # "Still open" section names no longer holds back the tickets after it.
+    open_deps = [d for d in deps.get(n, [])
+                 if issues[d]['state'] == 'OPEN' and not has_section(issues[d], STILL_OPEN)]
     if 'ready-for-agent' in labels and open_deps:
         findings.append(f'#{n}: ready-for-agent, but depends on open '
                         + ', '.join(f'#{d}' for d in open_deps))
-    if 'blocked' in labels and not open_deps and not has_section(issue, WAITING_ON):
+    if ('blocked' in labels and not open_deps
+            and not has_section(issue, WAITING_ON) and not has_section(issue, STILL_OPEN)):
         findings.append(f'#{n}: blocked, but every dependency is closed; drop the label, or add a '
                         f'"## {WAITING_ON}" section that names what it waits on')
 

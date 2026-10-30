@@ -24,7 +24,7 @@ The lint reads every other issue live, so a reference or dependency is checked a
 
 The lint counts a PR as merged when GitHub says so, or when GitHub shows it closed and its head commit is on `origin/master`, as when a PR is merged by hand. A PR closes an issue through GitHub's closing references or a `Closes #N`, `Fixes #N` or `Resolves #N` in its body. Two sections, placed anywhere in a body, tell the lint that a state is meant:
 
-- `## Still open` keeps an issue open after a merged PR closes it. Write what is left under it, such as the acceptance boxes still to tick.
+- `## Still open` keeps an issue open after its work has merged. Write what is left under it, such as the acceptance boxes still to tick. A ticket that depends on it counts the dependency as done.
 - `## Waiting on` keeps `blocked` on a ticket whose dependencies are all closed. Write what it waits on under it, such as an owner decision.
 
 ## Ship a PR
