@@ -1,15 +1,22 @@
 name: plan-checks
 
 # Checks the Django migration's planning records: the paths the ADRs cite, and
-# every django-migration issue body (plan/lint-issues.py).  Issue edits trigger
-# it too, because an issue body can go stale with no code change.
+# every django-migration issue body (plan/lint-issues.py).
+#
+# The issue lint reads live GitHub state, not the checkout, so a pull request
+# runs it only when it changes plan/; otherwise one stale issue would fail every
+# open pull request.  Issue events, pushes to master and a daily run catch the
+# drift instead: a merged pull request that closes, or fails to close, an issue
+# shows up as a push and a `closed` event.
 
 on:
   push:
     branches: [master]
   pull_request:
   issues:
-    types: [opened, edited, labeled]
+    types: [opened, edited, labeled, unlabeled, closed, reopened]
+  schedule:
+    - cron: "17 6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -17,9 +24,12 @@ permissions:
   issues: read
   pull-requests: read
 
+# A pull request's newer push supersedes its older run.  Other events each get
+# their own group and are never cancelled, so an issue event can't cancel the
+# run checking a push to master.
 concurrency:
-  group: plan-checks-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: plan-checks-${{ github.event.pull_request.number || format('{0}-{1}', github.event_name, github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   plan-checks:
@@ -34,9 +44,23 @@ jobs:
           fetch-depth: 0
 
       - name: Check the paths the ADRs cite
+        if: github.event_name != 'issues'
         run: bash server/docs/adr/check-paths.sh
 
+      - name: Decide whether to lint the issues
+        id: scope
+        # A pull request checks out its merge commit, whose first parent is the
+        # base it merged onto.
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] ||
+             ! git diff --quiet HEAD^1 HEAD -- plan/; then
+            echo lint=true >> "$GITHUB_OUTPUT"
+          else
+            echo "No change under plan/; the issue lint runs on master and on issue events."
+          fi
+
       - name: Lint the plan's issue bodies
+        if: steps.scope.outputs.lint == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -I plan/lint-issues.py --repo "${{ github.repository }}"
