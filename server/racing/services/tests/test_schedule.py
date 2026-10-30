@@ -7,10 +7,10 @@ import pytest
 from core.models import RaceSettings
 from racing.engine.scheduling.round import make_chart
 from racing.engine.tests.golden import (
-    DEVIATIONS_FILE,
     GOLDEN_DIR,
     read_transcript,
     transcript_deviations,
+    write_deviation_entries,
 )
 from racing.models import HeatLane, PlaylistEntry, Round
 from racing.services import schedule
@@ -458,13 +458,15 @@ def test_a_request_php_lets_delete_the_chart_keeps_it(name):
     assert json.loads(php[after]["body"])["schedule"] == []
 
 
+DEVIATION_CLAIM = {("Q1", f"http/schedule/{name}.http") for name in OVER_A_CHART}
+
+
 def write_over_a_chart_deviations():
     """Each generate keeps PHP's header and `action`, with Django's failure as
     its outcome. Each poll after takes the body of the poll before, the chart
     `test_a_request_php_lets_delete_the_chart_keeps_it` checks Django keeps."""
-    listing = json.loads(DEVIATIONS_FILE.read_text())
     fixtures = {f"http/schedule/{name}.http": name for name in OVER_A_CHART}
-    entries = [e for e in listing["deviations"] if e["fixture"] not in fixtures]
+    entries = []
     for fixture, name in fixtures.items():
         _, _, before, generate, after = OVER_A_CHART[name]
         _, failure = replay_over_a_chart(name)
@@ -499,8 +501,7 @@ def write_over_a_chart_deviations():
                 "expected": expected,
             }
         )
-    listing["deviations"] = sorted(entries, key=lambda e: int(e["quirk"][1:]))
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+    write_deviation_entries(DEVIATION_CLAIM, entries)
 
 
 @pytest.mark.skipif(

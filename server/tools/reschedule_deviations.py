@@ -32,9 +32,11 @@ sys.path.insert(0, str(SERVER_DIR))
 from racing.engine.tests.golden import (  # noqa: E402
     DEVIATIONS_FILE,
     GOLDEN_DIR,
+    deviations_text,
     read_transcript,
 )
 from racing.engine.tests.reschedule_replay import (  # noqa: E402
+    QUIRK_FIXTURES,
     SUITE_FIXTURE,
     engine,
     php_changed_a_kept_heat,
@@ -119,13 +121,10 @@ def expected_files() -> tuple[dict[Path, str], list[dict]]:
     return written, entries
 
 
-def merged_deviations(entries: list[dict]) -> str:
-    current = json.loads(DEVIATIONS_FILE.read_text())
-    ours = {"Q20", "Q21", "Q25"}
-    kept = [e for e in current["deviations"] if e["quirk"] not in ours]
-    # By quirk number, as the lane-bias and speed-award writers order them.
-    merged = sorted(kept + entries, key=lambda e: int(e["quirk"][1:]))
-    return json.dumps({**current, "deviations": merged}, indent=2) + "\n"
+def DEVIATION_CLAIM(quirk: str, fixture: str) -> bool:  # noqa: N802
+    """Each quirk of REASONS in each reschedule transcript: which ones differ
+    is known only once the replay runs."""
+    return quirk in REASONS and fixture in (SUITE_FIXTURE, *QUIRK_FIXTURES)
 
 
 def main() -> int:
@@ -133,7 +132,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     files, entries = expected_files()
-    files[DEVIATIONS_FILE] = merged_deviations(entries)
+    files[DEVIATIONS_FILE] = deviations_text(DEVIATION_CLAIM, entries)
     stale = [
         path
         for path, text in files.items()

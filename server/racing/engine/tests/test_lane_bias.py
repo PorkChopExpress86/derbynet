@@ -31,7 +31,12 @@ from racing.engine.standings.lane_bias import (
     lane_bias_analysis,
 )
 
-from .golden import DEVIATIONS_FILE, GOLDEN_DIR, canonical, engine_deviations
+from .golden import (
+    GOLDEN_DIR,
+    canonical,
+    engine_deviations,
+    write_deviation_entries,
+)
 
 LANE_BIAS = "engine/lane-bias.json"
 CRITICAL_F_VALUE = "engine/critical-f-value.json"
@@ -215,13 +220,10 @@ def test_one_used_lane_has_no_result():
     assert lane_bias_analysis([[3.0, 3.1, 3.2, 3.3], [], [9.9]]) is None
 
 
+DEVIATION_CLAIM = set(REASON)
+
+
 def write_lane_bias_deviations():
-    listing = json.loads(DEVIATIONS_FILE.read_text())
-    others = [
-        entry
-        for entry in listing["deviations"]
-        if not (entry["quirk"] in ("Q9", "Q24") and entry["fixture"] in DJANGO_RECORD)
-    ]
     entries = []
     for (quirk, fixture), reason in REASON.items():
         differing = {}
@@ -246,8 +248,7 @@ def write_lane_bias_deviations():
             }
         )
         print(f"{quirk} {fixture}: {len(differing)} cases, written to {expected}")
-    listing["deviations"] = sorted(others + entries, key=lambda e: int(e["quirk"][1:]))
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2) + "\n")
+    write_deviation_entries(DEVIATION_CLAIM, entries)
 
 
 if __name__ == "__main__":

@@ -23,10 +23,10 @@ import re
 import pytest
 
 from racing.engine.tests.golden import (
-    DEVIATIONS_FILE,
     GOLDEN_DIR,
     read_transcript,
     transcript_deviations,
+    write_deviation_entries,
 )
 
 TIMER = "http/timer/partial-and-non-numeric-results.http"
@@ -180,12 +180,12 @@ def test_the_services_give_the_deviation(computed, fixture, name):
     assert json.loads(deviation["body"]) != json.loads(php(fixture)[name]["body"])
 
 
+DEVIATION_CLAIM = set(DEVIATIONS)
+
+
 def write_deviations():
     computed = django_replay()
-    listing = json.loads(DEVIATIONS_FILE.read_text())
-    entries = [
-        e for e in listing["deviations"] if (e["quirk"], e["fixture"]) not in DEVIATIONS
-    ]
+    entries = []
     for (quirk, fixture), (names, reason) in DEVIATIONS.items():
         raw = (GOLDEN_DIR / fixture).read_bytes()
         out = b""
@@ -210,8 +210,7 @@ def write_deviations():
             }
         )
         print(f"{quirk} {fixture}: written to {expected}")
-    listing["deviations"] = sorted(entries, key=lambda e: int(e["quirk"][1:]))
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+    write_deviation_entries(DEVIATION_CLAIM, entries)
 
 
 @pytest.mark.skipif(

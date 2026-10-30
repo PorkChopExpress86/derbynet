@@ -21,7 +21,12 @@ from racing.engine.groups.aggregates import (
     topological_order,
 )
 
-from .golden import DEVIATIONS_FILE, GOLDEN_DIR, engine_deviations, read_cases
+from .golden import (
+    GOLDEN_DIR,
+    engine_deviations,
+    read_cases,
+    write_deviation_entries,
+)
 
 FIXTURE = "engine/aggregates.json"
 EXPECTED = "deviations/Q8/aggregates.json"
@@ -93,6 +98,9 @@ def test_the_fixture_holds_the_cases_the_ticket_names():
         assert "order_error" not in case and "closure_error" not in case
 
 
+DEVIATION_CLAIM = {("Q8", FIXTURE)}
+
+
 def write_q8_deviation():
     differ = {
         case_id: django_record(case)
@@ -105,19 +113,14 @@ def write_q8_deviation():
     ]
     (GOLDEN_DIR / EXPECTED).parent.mkdir(parents=True, exist_ok=True)
     (GOLDEN_DIR / EXPECTED).write_text("{\n" + ",\n".join(lines) + "\n}\n")
-    listing = json.loads(DEVIATIONS_FILE.read_text())
-    entries = [e for e in listing["deviations"] if e["fixture"] != FIXTURE]
-    entries.append(
-        {
-            "quirk": "Q8",
-            "fixture": FIXTURE,
-            "cases": list(differ),
-            "reason": REASON,
-            "expected": EXPECTED,
-        }
-    )
-    listing["deviations"] = sorted(entries, key=lambda e: int(e["quirk"][1:]))
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+    entry = {
+        "quirk": "Q8",
+        "fixture": FIXTURE,
+        "cases": list(differ),
+        "reason": REASON,
+        "expected": EXPECTED,
+    }
+    write_deviation_entries(DEVIATION_CLAIM, [entry])
     print(f"Q8: {len(differ)} of {len(CASES)} cases written to {EXPECTED}")
 
 

@@ -23,11 +23,10 @@ from django.test import Client
 
 from legacy_api.encoding import encode_php_json
 from racing.engine.tests.golden import (
-    DEVIATIONS_FILE,
     GOLDEN_DIR,
-    deviations,
     read_transcript,
     transcript_deviations,
+    write_deviation_entries,
 )
 
 pytestmark = pytest.mark.django_db
@@ -355,6 +354,9 @@ DEVIATIONS = {
 }
 
 
+DEVIATION_CLAIM = {(quirk, entry[0]) for quirk, entry in DEVIATIONS.items()}
+
+
 def _exchange_text(name, php, body: bytes) -> bytes:
     lines = [f"### {name}"]
     for key in ("request", "request-body", "status", "content-type", "cache-control"):
@@ -368,8 +370,7 @@ def _exchange_text(name, php, body: bytes) -> bytes:
     not os.environ.get("WRITE_DEVIATIONS"), reason="writes the #29 entries"
 )
 def test_write_racer_deviations(event):
-    listing = json.loads(DEVIATIONS_FILE.read_text())
-    entries = [e for e in deviations() if e["quirk"] not in DEVIATIONS]
+    entries = []
     for quirk, (fixture, names, reason, expected, runner) in DEVIATIONS.items():
         run = runner(Client())
         path = GOLDEN_DIR / expected
@@ -386,5 +387,4 @@ def test_write_racer_deviations(event):
                 "expected": expected,
             }
         )
-    listing["deviations"] = entries
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+    write_deviation_entries(DEVIATION_CLAIM, entries)

@@ -6,6 +6,7 @@ record decisions", for the deviation rules.
 
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 GOLDEN_DIR = Path(__file__).resolve().parents[3] / "tests" / "golden"
@@ -167,6 +168,58 @@ def read_transcript(path: Path) -> dict[str, dict]:
 
 def deviations() -> list[dict]:
     return json.loads(DEVIATIONS_FILE.read_text())["deviations"]
+
+
+Claim = set[tuple[str, str]] | Callable[[str, str], bool]
+"""The `deviations.json` entries one writer owns, by (quirk, fixture): a set
+of pairs, or a test of a pair for a writer whose pairs depend on its run."""
+
+# Entries recorded by hand, which no writer rewrites.
+HAND_RECORDED: Claim = {
+    ("Q1", "engine/out-of-range.json"),
+    ("Q1", "http/schedule/cant-fulfill-4-lanes.http"),
+    ("Q1", "http/schedule/seven-lanes.http"),
+    ("Q1", "http/schedule/more-than-200-cars.http"),
+    ("Q4", "http/suite/basic-racing.http"),
+}
+
+
+def claims(claim: Claim, entry: dict) -> bool:
+    pair = (entry["quirk"], entry["fixture"])
+    return pair in claim if isinstance(claim, set) else claim(*pair)
+
+
+def deviations_text(claim: Claim, entries: list[dict]) -> str:
+    """`deviations.json` with the entries `claim` owns replaced by `entries`.
+
+    An entry written again keeps its place and one no longer written goes, so
+    the writers can run in any order and leave the same bytes. A new entry goes
+    after the last entry whose quirk number is not above its own."""
+    listing = json.loads(DEVIATIONS_FILE.read_text())
+    new = {(e["quirk"], e["fixture"]): e for e in entries}
+    assert len(new) == len(entries), "two entries for one (quirk, fixture)"
+    foreign = [key for key, e in new.items() if not claims(claim, e)]
+    assert not foreign, f"entries outside the writer's claim: {foreign}"
+    kept = []
+    for entry in listing["deviations"]:
+        if not claims(claim, entry):
+            kept.append(entry)
+        elif (key := (entry["quirk"], entry["fixture"])) in new:
+            kept.append(new.pop(key))
+    for entry in new.values():
+        number = int(entry["quirk"][1:])
+        at = max(
+            (i + 1 for i, e in enumerate(kept) if int(e["quirk"][1:]) <= number),
+            default=0,
+        )
+        kept.insert(at, entry)
+    listing["deviations"] = kept
+    return json.dumps(listing, indent=2, ensure_ascii=False) + "\n"
+
+
+def write_deviation_entries(claim: Claim, entries: list[dict]) -> None:
+    """Write `deviations_text(claim, entries)` to `deviations.json`."""
+    DEVIATIONS_FILE.write_text(deviations_text(claim, entries))
 
 
 def engine_deviations(fixture: str) -> dict[str, dict]:

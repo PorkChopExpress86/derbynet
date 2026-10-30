@@ -20,6 +20,7 @@ from legacy_api.tests.test_race_control_parity import (
     Scenario,
     _dump,
     assert_listed,
+    listed_claim,
     write_deviations,
 )
 from roster.models import Racer
@@ -182,6 +183,9 @@ DEVIATIONS = {
 
 def test_every_listed_deviation_is_a_reply_the_scenario_makes():
     assert_listed(DEVIATIONS, SCENARIOS)
+
+
+DEVIATION_CLAIM = listed_claim(DEVIATIONS)
 
 
 @pytest.mark.skipif(
