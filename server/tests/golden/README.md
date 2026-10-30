@@ -208,7 +208,7 @@ A ticket that needs a case this tool lacks adds it here: a `capture` line in a s
 
 | Key | Value |
 |---|---|
-| `quirk` | The decision the difference follows, with Fix in `QUIRK_DECISIONS` (`racing/engine/tests/golden.py`): a quirk id from #20 such as `Q1`, a row of #64 such as `C14`, an owner decision such as `D34`, or `R1` and `R2`, which #29 proposes for the owner to confirm |
+| `quirk` | The decision the difference follows, with Fix in `QUIRK_DECISIONS` (`racing/engine/tests/golden.py`): a quirk id from #20 such as `Q1`, a row of #64 such as `C14`, an owner decision such as `D34`, or `R1` and `R2` from #29, of which D51 accepted R1 and R2 waits for the owner |
 | `fixture` | The fixture path, relative to this directory |
 | `cases` or `exchanges` | Engine case ids, or transcript exchange names as their `###` line gives them |
 | `reason` | One line |

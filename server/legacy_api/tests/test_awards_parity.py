@@ -135,8 +135,8 @@ DEVIATIONS = {
         "An award stored with no class, one award.edit makes with no"
         " class_and_rank or award.xbs makes, lists classid and rankid null in"
         " PHP, which the awards editor shows as an unknown class; Django lists"
-        " 0, as for every other pack-wide award (#33, for the owner to"
-        " confirm).",
+        " 0, as for every other pack-wide award (#33, accepted"
+        " in D58).",
         "awards",
         {
             AWARDS: [
@@ -149,8 +149,8 @@ DEVIATIONS = {
     ),
     "A2": (
         "PHP stores a class_and_rank that names no class of the event; Django"
-        " refuses it with unknownclass, as award.import does (#33, for the"
-        " owner to confirm).",
+        " refuses it with unknownclass, as award.import does (#33, accepted"
+        " in D58).",
         "awards",
         {AWARDS: ["045 A2 edit new in no class"]},
         None,
@@ -164,15 +164,15 @@ DEVIATIONS = {
     ),
     "A4": (
         "PHP stores a full-field-calc that names no class; Django refuses it"
-        " with not-written, as settings.write does (#33, for the owner to"
-        " confirm).",
+        " with not-written, as settings.write does (#33, accepted"
+        " in D58).",
         "awards",
         {AWARDS: ["047 A4 calc-rule no aggregate"]},
         None,
     ),
     "A5": (
         "PHP stores an award key of any length; Django refuses one past 100"
-        " characters with not-written (#33, for the owner to confirm).",
+        " characters with not-written (#33, accepted in D58).",
         "awards",
         {AWARDS: ["048 A5 present a long key"]},
         None,

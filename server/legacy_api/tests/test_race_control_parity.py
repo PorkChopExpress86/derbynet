@@ -635,7 +635,7 @@ DEVIATIONS = {
         "With no current heat after a round stops being current, PHP reports"
         " classid -1 and heat -1, the values set_current_heat(-1, -1) wrote;"
         " Django reports null for both, as before any heat was selected"
-        " (#31, for the owner to confirm).",
+        " (#31, accepted in D51).",
         "schedules",
         {
             SCHEDULE.format("two-runs-per-lane-4-lanes"): ["002 generate-round-1"],
@@ -658,8 +658,8 @@ DEVIATIONS = {
         " debug output, nheats, ncars and heats, schedule.generate with trace"
         " adds a `trace` key, and schedule.reschedule with trace adds the"
         " adjuster's trace; Django adds none of them. These replies"
-        " also show R3's null classid and heat (#31, for the owner to"
-        " confirm).",
+        " also show R3's null classid and heat (#31, accepted"
+        " in D51).",
         "schedules",
         {
             SCHEDULE.format("rotation-schedule-4-lanes"): [
@@ -675,7 +675,7 @@ DEVIATIONS = {
         " numbers the master heats and, under the master schedule, moves to"
         " the next-up heat. Django numbers and moves in the same transaction"
         " as the chart, so its payload shows the state the request left"
-        " (#31, for the owner to confirm).",
+        " (#31, accepted in D51).",
         "master-schedule",
         {
             "http/master-schedule/half-weights.http": [
@@ -726,7 +726,7 @@ DEVIATIONS = {
     ),
     "R8": (
         "PHP's query.poll.results.inc writes a space before its JSON; Django's"
-        " body starts at `{` (#31, for the owner to confirm).",
+        " body starts at `{` (#31, accepted in D51).",
         "poll-results",
         {
             "http/poll/poll-results.http": [
@@ -744,7 +744,7 @@ DEVIATIONS = {
         "With details, PHP's poll.results rows repeat every column under its"
         ' position, "0" to "7", as PDO\'s default fetch mode returns them;'
         " Django gives each column once, by name. The reply also shows R8's"
-        " missing leading space (#31, for the owner to confirm).",
+        " missing leading space (#31, accepted in D51).",
         "poll-results",
         {"http/poll/poll-results.http": ["004 after-two-heats-details"]},
         None,

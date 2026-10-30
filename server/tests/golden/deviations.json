@@ -133,7 +133,7 @@
         "001 edit unknown racer",
         "002 pass unknown racer"
       ],
-      "reason": "PHP answers success for a racer id that names no racer, and changes nothing. Django answers racer.edit with noracer and racer.pass with notunique (#29, for the owner to confirm).",
+      "reason": "PHP answers success for a racer id that names no racer, and changes nothing. Django answers racer.edit with noracer and racer.pass with notunique (#29, accepted in D51).",
       "expected": "deviations/R1/refusals.http"
     },
     {
@@ -144,7 +144,7 @@
         "026 list without ad hoc",
         "044 A1 edit new with no class"
       ],
-      "reason": "An award stored with no class, one award.edit makes with no class_and_rank or award.xbs makes, lists classid and rankid null in PHP, which the awards editor shows as an unknown class; Django lists 0, as for every other pack-wide award (#33, for the owner to confirm).",
+      "reason": "An award stored with no class, one award.edit makes with no class_and_rank or award.xbs makes, lists classid and rankid null in PHP, which the awards editor shows as an unknown class; Django lists 0, as for every other pack-wide award (#33, accepted in D58).",
       "expected": "deviations/A1/awards.http"
     },
     {
@@ -162,7 +162,7 @@
       "exchanges": [
         "045 A2 edit new in no class"
       ],
-      "reason": "PHP stores a class_and_rank that names no class of the event; Django refuses it with unknownclass, as award.import does (#33, for the owner to confirm).",
+      "reason": "PHP stores a class_and_rank that names no class of the event; Django refuses it with unknownclass, as award.import does (#33, accepted in D58).",
       "expected": "deviations/A2/awards.http"
     },
     {
@@ -180,7 +180,7 @@
       "exchanges": [
         "002 generate-round-1"
       ],
-      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, accepted in D51).",
       "expected": "deviations/R3/two-runs-per-lane-4-lanes.http"
     },
     {
@@ -190,7 +190,7 @@
         "003 select-round-3-with-no-heats",
         "005 generate-round-3-at-the-limit"
       ],
-      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, accepted in D51).",
       "expected": "deviations/R3/cant-fulfill-4-lanes.http"
     },
     {
@@ -199,7 +199,7 @@
       "exchanges": [
         "002 generate-round-3-at-the-limit"
       ],
-      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, accepted in D51).",
       "expected": "deviations/R3/cant-fulfill-over-a-chart-4-lanes.http"
     },
     {
@@ -208,7 +208,7 @@
       "exchanges": [
         "002 generate-round-3"
       ],
-      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, accepted in D51).",
       "expected": "deviations/R3/zero-runs-over-a-chart-4-lanes.http"
     },
     {
@@ -217,7 +217,7 @@
       "exchanges": [
         "002 generate-round-1"
       ],
-      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, accepted in D51).",
       "expected": "deviations/R3/max-runs-per-car-1-4-lanes.http"
     },
     {
@@ -226,7 +226,7 @@
       "exchanges": [
         "002 generate-round-1"
       ],
-      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, accepted in D51).",
       "expected": "deviations/R3/unused-lane-mask-33-6-lanes.http"
     },
     {
@@ -235,7 +235,7 @@
       "exchanges": [
         "002 generate-round-1"
       ],
-      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, for the owner to confirm).",
+      "reason": "With no current heat after a round stops being current, PHP reports classid -1 and heat -1, the values set_current_heat(-1, -1) wrote; Django reports null for both, as before any heat was selected (#31, accepted in D51).",
       "expected": "deviations/R3/two-lanes.http"
     },
     {
@@ -262,7 +262,7 @@
       "exchanges": [
         "047 A4 calc-rule no aggregate"
       ],
-      "reason": "PHP stores a full-field-calc that names no class; Django refuses it with not-written, as settings.write does (#33, for the owner to confirm).",
+      "reason": "PHP stores a full-field-calc that names no class; Django refuses it with not-written, as settings.write does (#33, accepted in D58).",
       "expected": "deviations/A4/awards.http"
     },
     {
@@ -280,7 +280,7 @@
       "exchanges": [
         "048 A5 present a long key"
       ],
-      "reason": "PHP stores an award key of any length; Django refuses one past 100 characters with not-written (#33, for the owner to confirm).",
+      "reason": "PHP stores an award key of any length; Django refuses one past 100 characters with not-written (#33, accepted in D58).",
       "expected": "deviations/A5/awards.http"
     },
     {
@@ -301,7 +301,7 @@
         "004 generate-round-2",
         "006 generate-round-3"
       ],
-      "reason": "PHP's schedule.generate under rotation-schedule adds its scheduler's debug output, nheats, ncars and heats, schedule.generate with trace adds a `trace` key, and schedule.reschedule with trace adds the adjuster's trace; Django adds none of them. These replies also show R3's null classid and heat (#31, for the owner to confirm).",
+      "reason": "PHP's schedule.generate under rotation-schedule adds its scheduler's debug output, nheats, ncars and heats, schedule.generate with trace adds a `trace` key, and schedule.reschedule with trace adds the adjuster's trace; Django adds none of them. These replies also show R3's null classid and heat (#31, accepted in D51).",
       "expected": "deviations/R6/rotation-schedule-4-lanes.http"
     },
     {
@@ -324,7 +324,7 @@
         "005 generate-round-4-nine-racers",
         "012 regenerate-round-4-after-a-heat-ran"
       ],
-      "reason": "PHP's schedule.generate appends the coordinator payload before it numbers the master heats and, under the master schedule, moves to the next-up heat. Django numbers and moves in the same transaction as the chart, so its payload shows the state the request left (#31, for the owner to confirm).",
+      "reason": "PHP's schedule.generate appends the coordinator payload before it numbers the master heats and, under the master schedule, moves to the next-up heat. Django numbers and moves in the same transaction as the chart, so its payload shows the state the request left (#31, accepted in D51).",
       "expected": "deviations/R7/half-weights.http"
     },
     {
@@ -619,7 +619,7 @@
         "006 named-round",
         "007 under-points"
       ],
-      "reason": "PHP's query.poll.results.inc writes a space before its JSON; Django's body starts at `{` (#31, for the owner to confirm).",
+      "reason": "PHP's query.poll.results.inc writes a space before its JSON; Django's body starts at `{` (#31, accepted in D51).",
       "expected": "deviations/R8/poll-results.http"
     },
     {
@@ -1743,7 +1743,7 @@
       "exchanges": [
         "004 after-two-heats-details"
       ],
-      "reason": "With details, PHP's poll.results rows repeat every column under its position, \"0\" to \"7\", as PDO's default fetch mode returns them; Django gives each column once, by name. The reply also shows R8's missing leading space (#31, for the owner to confirm).",
+      "reason": "With details, PHP's poll.results rows repeat every column under its position, \"0\" to \"7\", as PDO's default fetch mode returns them; Django gives each column once, by name. The reply also shows R8's missing leading space (#31, accepted in D51).",
       "expected": "deviations/R9/poll-results.http"
     },
     {

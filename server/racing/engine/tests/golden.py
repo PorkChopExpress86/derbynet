@@ -44,9 +44,10 @@ QUIRK_DECISIONS = {
     "D5": "fix",
     "D34": "fix",
     "S23": "fix",
-    # Proposed in #29, for the owner to confirm: R1 an unknown racer id is
-    # refused, R2 a car number must be a whole number.
+    # Accepted in D51 (#29): R1 an unknown racer id is refused.
     "R1": "fix",
+    # Proposed in #29, for the owner to decide: R2 a car number must be a
+    # whole number.
     "R2": "fix",
     # Rows of #64 that a #31 endpoint fixes.
     "C23": "fix",
@@ -65,7 +66,7 @@ QUIRK_DECISIONS = {
     "D16": "fix",
     "S18": "fix",
     "S27": "fix",
-    # Proposed in #31, for the owner to confirm: R3 no current heat reads
+    # Accepted in D51 (#31): R3 no current heat reads
     # null, R5 result.write fails in JSON, not XML, R6 no scheduler debug
     # output, R7 the generate payload shows the state the request left, R8
     # poll.results starts with no leading space, R9 poll.results with
@@ -76,7 +77,7 @@ QUIRK_DECISIONS = {
     "R7": "fix",
     "R8": "fix",
     "R9": "fix",
-    # Proposed in #33, for the owner to confirm: A1 a pack-wide award lists
+    # Accepted in D58 (#33): A1 a pack-wide award lists
     # classid and rankid 0, never null; A2, A4 and A5 refuse a class, a
     # full-field-calc or an award key PHP would store unchecked; A3
     # award.present with no parameters answers success, as #33 asks.
@@ -85,7 +86,7 @@ QUIRK_DECISIONS = {
     "A3": "fix",
     "A4": "fix",
     "A5": "fix",
-    # Proposed in #34, for the owner to confirm: R10 deleting a scene clears
+    # Accepted in D58 (#34): R10 deleting a scene clears
     # what names it, R11 a step of another event's class fails no_classid,
     # R12 a scene id or name of no scene of the event changes nothing.
     "R10": "fix",

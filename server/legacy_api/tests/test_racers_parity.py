@@ -313,7 +313,7 @@ DEVIATIONS = {
         ["001 edit unknown racer", "002 pass unknown racer"],
         "PHP answers success for a racer id that names no racer, and changes"
         " nothing. Django answers racer.edit with noracer and racer.pass with"
-        " notunique (#29, for the owner to confirm).",
+        " notunique (#29, accepted in D51).",
         "deviations/R1/refusals.http",
         run_refusals,
     ),
