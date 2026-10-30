@@ -102,7 +102,14 @@ def scene_add(ctx: LegacyContext) -> None:
     ctx.success()
 
 
-@action("scene.delete", permission=Perm.SET_UP)
+@action(
+    "scene.delete",
+    permission=Perm.SET_UP,
+    divergences=(
+        "R10: the playlist step, racing scene and race state that named the"
+        " scene name none; PHP leaves them naming a deleted scene.",
+    ),
+)
 def scene_delete(ctx: LegacyContext) -> None:
     """A playlist step, the racing scene or the current scene that named the
     scene name none afterwards; PHP leaves them naming a deleted scene."""
@@ -110,7 +117,11 @@ def scene_delete(ctx: LegacyContext) -> None:
     ctx.success()
 
 
-@action("scene.setkiosk", permission=Perm.SET_UP)
+@action(
+    "scene.setkiosk",
+    permission=Perm.SET_UP,
+    divergences=("R12: a scene id of no scene of the event changes nothing.",),
+)
 def scene_setkiosk(ctx: LegacyContext) -> None:
     """`page` with optional `params` sets the page kiosks named `kiosk_name`
     show in the scene; no page takes the name out. A scene of another event,
@@ -125,7 +136,12 @@ def scene_setkiosk(ctx: LegacyContext) -> None:
     ctx.success()
 
 
-@action("scene.apply", permission=Perm.CONTROL_RACE, divergences=DASHBOARD_DIVERGENCES)
+@action(
+    "scene.apply",
+    permission=Perm.CONTROL_RACE,
+    divergences=DASHBOARD_DIVERGENCES
+    + ("R12: an id or name of no scene of the event leaves no scene current.",),
+)
 def scene_apply(ctx: LegacyContext) -> None:
     """`sceneid`, or `name`. A negative id, or an id or name that names no
     scene of the event, leaves no scene current."""

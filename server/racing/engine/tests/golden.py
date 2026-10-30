@@ -85,6 +85,12 @@ QUIRK_DECISIONS = {
     "A3": "fix",
     "A4": "fix",
     "A5": "fix",
+    # Proposed in #34, for the owner to confirm: R10 deleting a scene clears
+    # what names it, R11 a step of another event's class fails no_classid,
+    # R12 a scene id or name of no scene of the event changes nothing.
+    "R10": "fix",
+    "R11": "fix",
+    "R12": "fix",
 }
 
 

@@ -34,7 +34,11 @@ def _fields(ctx: LegacyContext) -> playlist.StepFields:
     )
 
 
-@action("playlist.add", permission=Perm.SET_UP)
+@action(
+    "playlist.add",
+    permission=Perm.SET_UP,
+    divergences=("R11: a class of another event fails with no_classid.",),
+)
 def playlist_add(ctx: LegacyContext) -> None:
     """`classid` and `round` name the step's round; `top` and `bucketed` its
     cut, `n_times_per_lane` its runs, and `sceneid_at_finish` or
