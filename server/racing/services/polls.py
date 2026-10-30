@@ -5,8 +5,9 @@ Ported from `website/ajax/query.poll.coordinator.inc`, `query.poll.inc`,
 `query.poll.results.inc` and the `website/inc/json-*.inc` builders they call.
 Each function returns PHP's JSON shape as plain data; the legacy handlers
 encode it, and the new dashboard (#41) reads the same coordinator payload.
-Nothing here writes. PHP's `TimerState` writes `NOT CONNECTED` back when it
-reads a timer that has timed out; here the poll only reports it.
+Only `poll_coordinator` writes, when a finished playlist step's scene comes
+due (#34). PHP's `TimerState` writes `NOT CONNECTED` back when it reads a
+timer that has timed out; here the poll only reports it.
 """
 
 from collections.abc import Callable, Mapping
@@ -27,6 +28,7 @@ from racing.engine.standings.ordinals import ordinal
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round, TimerStatus
 from racing.services import rounds as rounds_service
 from racing.services.heats import LastHeat, engine_state, load_chart
+from racing.services.playlist import apply_due_scene
 from racing.services.timer import TimerState, has_remote_start
 from roster.models import Group, GroupConstituentSubgroup, Racer
 from roster.services import car_numbers, structure
@@ -482,6 +484,14 @@ def ready_aggregates(event: Event) -> list[dict]:
         {"classid": g.id, "by-subgroup": g.id in by_subgroup, "class": g.name}
         for g in rounds_service.ready_aggregate_groups(event)
     ]
+
+
+def poll_coordinator(event: Event, shown_round=None, shown_heat=None) -> dict:
+    """`query=poll.coordinator`: first show a finished playlist step's scene
+    once it is due (#34), so the scene changes 10 s after the round ends
+    even when no kiosk polls, then the coordinator payload."""
+    apply_due_scene(event, timezone.now())
+    return coordinator(event, shown_round, shown_heat)
 
 
 def coordinator(event: Event, shown_round=None, shown_heat=None) -> dict:

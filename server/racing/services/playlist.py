@@ -15,14 +15,17 @@ the standings (#26), so each call takes a `FinalistsFor`.
 """
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
+from kiosks.models import Scene
 from kiosks.services import apply_scene
 from racing.engine import heat_state as hs
 from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, Round
@@ -36,7 +39,7 @@ from racing.services.rounds import (
     write_roster,
 )
 from racing.services.schedule import ScheduleFailure, generate_schedule, unschedule
-from roster.models import GroupConstituent
+from roster.models import Group, GroupConstituent
 
 FinalistsFor = Callable[[PlaylistEntry, Round], Entrants]
 """The racers of a step's round, in roster order, when it has no roster
@@ -328,6 +331,95 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
         _activate(state, entry, finalists_for, select)
         state.save()
         return True
+
+
+# ----- editing the playlist (#34) ----------------------------------------------
+
+
+@dataclass(frozen=True)
+class StepFields:
+    """What `playlist.add` and `playlist.edit` set on a step. Zero runs per
+    lane, PHP's -1, means the step never schedules its round."""
+
+    bucket_limit: int = 0
+    bucketed: bool = False
+    n_times_per_lane: int = 0
+    scene_at_finish: Scene | None = None
+    continue_racing: bool = False
+
+
+def add_step(
+    event, group, round_number: int, fields: StepFields, waits: bool = False
+) -> PlaylistEntry:
+    """`playlist.add`: a step after the others. A step from the legacy API
+    does not wait for the operator, as PHP has no gate (D12)."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        last = PlaylistEntry.objects.filter(event=event).aggregate(last=Max("seq"))
+        return PlaylistEntry.objects.create(
+            event=event,
+            seq=(last["last"] or 0) + 1,
+            group=group,
+            round_number=round_number,
+            waits_for_operator=waits,
+            **vars(fields),
+        )
+
+
+def queue_entry(step: PlaylistEntry) -> dict:
+    """The `queue-entry` of `playlist.add`'s reply. PHP's -1 stands for no
+    runs per lane and no scene. The round name leads with the class when the
+    event has more than one (`use_groups()`)."""
+    name = step.group.name
+    round_name = f"Round {step.round_number}"
+    if Group.objects.filter(event_id=step.event_id).count() > 1:
+        round_name = f"{name}, {round_name}"
+    return {
+        "queueid": step.pk,
+        "seq": step.seq,
+        "classid": step.group_id,
+        "round": step.round_number,
+        "bucket_limit": step.bucket_limit,
+        "bucketed": int(step.bucketed),
+        "n_times_per_lane": step.n_times_per_lane or -1,
+        "sceneid_at_finish": step.scene_at_finish_id or -1,
+        "continue_racing": int(step.continue_racing),
+        "class": name,
+        "roundname": round_name,
+    }
+
+
+def edit_step(step: PlaylistEntry | None, fields: StepFields) -> None:
+    if step is None:
+        return
+    with transaction.atomic():
+        lock_race_state(step.event_id)
+        PlaylistEntry.objects.filter(pk=step.pk).update(**vars(fields))
+
+
+def delete_step(step: PlaylistEntry | None) -> None:
+    """A step the intermission waits on cannot go: the intermission closes
+    first, as `skip_waiting_step` would, since the race state names it."""
+    if step is None:
+        return
+    with transaction.atomic():
+        state = lock_race_state(step.event_id)
+        if state.waiting_entry_id == step.pk:
+            state.waiting_entry = None
+            state.ended_round = None
+            state.save(update_fields=["waiting_entry", "ended_round"])
+        step.delete()
+
+
+def order_steps(event, seqs: dict[PlaylistEntry, int]) -> None:
+    """`playlist.order`: each step to its new position. Moved through
+    negative positions first, as positions are unique."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        for step, seq in seqs.items():
+            PlaylistEntry.objects.filter(pk=step.pk).update(seq=-seq)
+        for step, seq in seqs.items():
+            PlaylistEntry.objects.filter(pk=step.pk).update(seq=seq)
 
 
 def apply_due_scene(event, now: datetime) -> bool:

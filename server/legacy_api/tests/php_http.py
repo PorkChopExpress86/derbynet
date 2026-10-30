@@ -21,6 +21,8 @@ ID_KEYS = {
     "roundid": "round",
     "resultid": "result",
     "awardid": "award",
+    "sceneid_at_finish": "scene",
+    "queueid": "queue",
 }
 # Keys whose value is a list of ids of one kind, or for `schedule` a list of
 # heats of racer ids.
@@ -174,6 +176,8 @@ FIELD_KINDS = {
     "rankid": "rank",
     "partitionid": "partition",
     "awardid": "award",
+    "sceneid_at_finish": "scene",
+    "queueid": "queue",
 }
 # Fields `<prefix><n>` whose value names a row.
 VALUE_PREFIX_KINDS = {"awardid_": "award"}

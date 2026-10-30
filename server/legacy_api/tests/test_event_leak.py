@@ -153,6 +153,11 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "scene.delete"): {"sceneid": "1"},
     ("action", "scene.setkiosk"): {"sceneid": "1", "kiosk_name": "Main"},
     ("action", "scene.apply"): {"sceneid": "1"},
+    ("action", "playlist.add"): {"classid": "1", "round": "1"},
+    ("action", "playlist.edit"): {"queueid": "1", "top": "2"},
+    ("action", "playlist.delete"): {"queueid": "1"},
+    ("action", "playlist.order"): {"queueid_1": "1"},
+    ("action", "playlist.start"): {},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},
