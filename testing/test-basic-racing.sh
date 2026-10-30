@@ -183,6 +183,9 @@ run_heat $ROUND 2  425:2.4600 415:3.6349 445:2.3152 435:2.6711
 run_heat $ROUND 3  435:3.8841 425:2.8243 415:2.7381 445:3.9018
 run_heat $ROUND 4  445:2.7886 435:3.5121 425:3.8979 415:2.0171  x
 
+# award.list needs a login with a password (D5), which Timer is not.
+user_login_coordinator
+
 # We changed class 2 (White's Wolves) to have 4 trophies, not the default 3
 curl_getj "action.php?query=award.list" | \
     jq -e --argjson white $(classid_of White) '.["speed-awards"] | map(select(.classid == $white)) | length == 4' > /dev/null || test_fails
@@ -194,8 +197,6 @@ curl_getj "action.php?query=award.list" | \
     jq -e --argjson webelos $(classid_of Webelos) '.["speed-awards"] | map(select(.classid == $webelos)) | length == 3' > /dev/null || test_fails
 curl_getj "action.php?query=award.list" | \
     jq -e --argjson arrows $(classid_of Arrows) '.["speed-awards"] | map(select(.classid == $arrows)) | length == 3' > /dev/null || test_fails
-
-user_login_coordinator
 
 curl_postj action.php "action=award.present&key=speed-1" | check_jsuccess
 curl_getj "action.php?query=award.current" | expect_one Elliot

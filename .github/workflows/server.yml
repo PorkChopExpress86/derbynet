@@ -152,9 +152,8 @@ jobs:
           bash testing/test-unused-lanes.sh http://127.0.0.1:8080
 
       # The suites that race heats through timer-message (#32) with run_heat
-      # and need no endpoint of another ticket.  test-basic-racing.sh waits:
-      # it reads award.list as the Timer role, which award.list refuses (#33),
-      # and history.php (#49).
+      # and need no endpoint of another ticket.  test-basic-racing.sh waits
+      # for history.php (#49).
       - name: Run the timer-message suites against Django
         working-directory: .
         run: |
