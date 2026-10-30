@@ -114,7 +114,15 @@ def test_relative_parts_reads_windows_and_posix_paths(path, directory, parts):
 
 
 def test_kiosk_page_splits_reload_and_params():
-    assert kiosk_page('!kiosks/x.kiosk#{"a":1}') == ("kiosks/x.kiosk", {"a": 1}, True)
-    assert kiosk_page(None) == ("", {}, False)
-    with pytest.raises(BadValue):
-        kiosk_page("kiosks/x.kiosk#{confetti:false}")
+    assert kiosk_page('!kiosks/x.kiosk#{"a":1}') == ("kiosks/x.kiosk", '{"a":1}', True)
+    assert kiosk_page(None) == ("", "", False)
+
+
+def test_kiosk_params_stay_the_text_php_stored():
+    """PHP never parses the parameters: `testing/test-scenes.sh` stores
+    `{confetti:false}` and the kiosk capture `title=Final Standings`."""
+    assert kiosk_page("kiosks/x.kiosk#{confetti:false}") == (
+        "kiosks/x.kiosk",
+        "{confetti:false}",
+        False,
+    )

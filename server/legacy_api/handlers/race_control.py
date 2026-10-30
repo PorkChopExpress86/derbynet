@@ -375,6 +375,7 @@ def roster_delete(ctx: LegacyContext) -> None:
 @query(
     "poll.coordinator",
     permission=Access.ANONYMOUS,
+    get_writes=True,
     divergences=PAYLOAD_DIVERGENCES,
 )
 def poll_coordinator(ctx: LegacyContext) -> None:
@@ -382,9 +383,11 @@ def poll_coordinator(ctx: LegacyContext) -> None:
     `heat-results`. Anonymous, as in PHP and as #31 says, where #17's table
     asks for a login: `run_heat` in `testing/common.sh` polls it as the Timer
     role, whose empty password counts as no login, and `query=poll` already
-    shows the kiosks the same racers."""
+    shows the kiosks the same racers. It writes when a finished playlist
+    step's scene comes due (#34), which PHP shows only at a kiosk's poll."""
     _put_all(
-        ctx, polls.coordinator(ctx.event, _text(ctx, "roundid"), _text(ctx, "heat"))
+        ctx,
+        polls.poll_coordinator(ctx.event, _text(ctx, "roundid"), _text(ctx, "heat")),
     )
 
 

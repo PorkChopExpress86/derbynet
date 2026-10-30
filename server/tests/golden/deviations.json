@@ -1786,6 +1786,15 @@
       "expected": "deviations/Q18/half-weights.http"
     },
     {
+      "quirk": "C18",
+      "fixture": "http/kiosks/pages.http",
+      "exchanges": [
+        "035 reload"
+      ],
+      "reason": "action.kiosk.reload.inc never calls json_success(), so PHP's reply stays in-progress; Django answers success (C18).",
+      "expected": "deviations/C18/reload.http"
+    },
+    {
       "quirk": "Q19",
       "fixture": "http/poll/race-day-polls.http",
       "exchanges": [
@@ -1797,6 +1806,41 @@
       ],
       "reason": "A playlist round is scheduled through generate_schedule, so its heats get master heat numbers (D30); PHP's playlist leaves them at 0.",
       "expected": "deviations/Q19/race-day-polls.http"
+    },
+    {
+      "quirk": "C20",
+      "fixture": "http/kiosks/poll-kiosk.http",
+      "exchanges": [
+        "022 poll-kiosk-all-after-twenty-addresses"
+      ],
+      "reason": "all_kiosks() reads $row['params'], a key that does not exist, so PHP lists every kiosk's parameters as null; Django lists each kiosk's own, \"{}\" when it has none (C20).",
+      "expected": "deviations/C20/poll-kiosk.http"
+    },
+    {
+      "quirk": "C20",
+      "fixture": "http/kiosks/pages.http",
+      "exchanges": [
+        "001 assign-award-presentations",
+        "003 assign-derbynet",
+        "005 assign-flag",
+        "007 assign-identify",
+        "009 assign-now-racing-columnar-reversed",
+        "011 assign-now-racing-columnar",
+        "013 assign-now-racing",
+        "015 assign-ondeck",
+        "017 assign-please-check-in",
+        "019 assign-qrcode",
+        "021 assign-results-by-racer",
+        "023 assign-scale-MPH",
+        "025 assign-slideshow",
+        "027 assign-standings",
+        "029 assign-welcome",
+        "031 assign-with-parameters",
+        "033 assign-name",
+        "037 poll-kiosk-all"
+      ],
+      "reason": "all_kiosks() reads $row['params'], a key that does not exist, so PHP lists every kiosk's parameters as null; Django lists each kiosk's own, \"{}\" when it has none (C20).",
+      "expected": "deviations/C20/pages.http"
     },
     {
       "quirk": "Q20",

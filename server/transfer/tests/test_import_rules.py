@@ -421,7 +421,7 @@ def test_kiosk_pages_split_into_page_params_and_reload(tmp_path):
     report, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"))
     kiosks = {k.address: k for k in Kiosk.objects.filter(event=_event(report))}
     assert kiosks["fixture-kiosk-1"].page == "kiosks/please-check-in.kiosk"
-    assert kiosks["fixture-kiosk-1"].params == {"classids": [1, 2]}
+    assert kiosks["fixture-kiosk-1"].params == '{"classids":[1,2]}'
     assert kiosks["fixture-kiosk-1"].name == "Main"
     assert kiosks["fixture-kiosk-3"].page == "kiosks/standings.kiosk"
     assert kiosks["fixture-kiosk-3"].reload_requested

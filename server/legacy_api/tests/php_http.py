@@ -21,6 +21,8 @@ ID_KEYS = {
     "roundid": "round",
     "resultid": "result",
     "awardid": "award",
+    "sceneid_at_finish": "scene",
+    "queueid": "queue",
 }
 # Keys whose value is a list of ids of one kind, or for `schedule` a list of
 # heats of racer ids.
@@ -38,6 +40,7 @@ _TIMECHECK = re.compile(r'("timecheck": )"[^"]*"')
 _EPOCH = re.compile(r'("last[-_]contact": )[1-9]\d*')
 _SECONDS = re.compile(r"\(\d+ sec\.\)")
 _DURATION = re.compile(r'("duration": )[0-9.eE+-]+')
+_AGE = re.compile(r'("age": )\d+')
 _TIMESTAMP = re.compile(r'"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d"')
 _ROUND_IN_TEXT = re.compile(r"roundid (\d+)")
 _ROUND_IN_XML = re.compile(r'(roundid="|roundid )(\d+)')
@@ -173,6 +176,8 @@ FIELD_KINDS = {
     "rankid": "rank",
     "partitionid": "partition",
     "awardid": "award",
+    "sceneid_at_finish": "scene",
+    "queueid": "queue",
 }
 # Fields `<prefix><n>` whose value names a row.
 VALUE_PREFIX_KINDS = {"awardid_": "award"}
@@ -221,6 +226,7 @@ def mask(body: str) -> str:
     body = _TIMECHECK.sub(r'\1"<timecheck>"', body)
     body = _EPOCH.sub(r'\1"<epoch>"', body)
     body = _SECONDS.sub("(<n> sec.)", body)
+    body = _AGE.sub(r'\1"<seconds>"', body)
     body = _DURATION.sub(r'\1"<seconds>"', body)
     return _TIMESTAMP.sub('"<timestamp>"', body)
 

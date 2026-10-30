@@ -13,7 +13,6 @@ import re
 
 import pytest
 
-from accounts.permissions import Perm
 from core.tests.factories import EventFactory
 from legacy_api.tests.golden import replay, transcript
 
@@ -24,9 +23,7 @@ def _never_runs(ctx):
     raise AssertionError("an anonymous request reached a refusing stub")
 
 
-STUBS = {
-    "kiosk.reload": dict(kind="action", permission=Perm.CONTROL_RACE),
-}
+STUBS: dict[str, dict] = {}
 
 # Exchanges this ticket does not reproduce, and why.
 NOT_COMPARED = {

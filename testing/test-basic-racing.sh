@@ -41,6 +41,9 @@ curl_post action.php "action=timer-message&message=IDENTIFIED&nlanes=4" | check_
 
 run_heat $(roundid_of Lions 1) 1 101:3.3294 121:3.4179 141:3.8182 111:2.2401
 
+# The replay station logs in as a role that holds CONTROL_RACE (owner decision
+# D16), so poll as the coordinator, not as the timer run_heat left us as.
+user_login_coordinator
 curl_postj action.php "action=replay.message" | \
     jq -e '.replay == ["CANCEL", "START Lions & Tigers_Round1_Heat01",
                        "RACE_STARTS 4000 2 50",
@@ -48,6 +51,7 @@ curl_postj action.php "action=replay.message" | \
                        "CANCEL",
                        "START Lions & Tigers_Round1_Heat02"]' \
        >/dev/null || test_fails
+user_login_timer
 
 ROUND=$(roundid_of Lions 1)
 run_heat $ROUND 2 111:3.7554 131:2.6205 101:2.3800 121:3.2347

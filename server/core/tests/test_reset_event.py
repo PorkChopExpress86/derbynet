@@ -88,6 +88,27 @@ def test_the_six_legacy_scenes_come_back():
     assert names == ["Welcome", "Opening", "Check-In", "Racing", "Awards", "Wrap-Up"]
 
 
+def test_the_legacy_scenes_keep_their_ids_across_a_reset():
+    """PHP's schema script recreates the scenes as ids 1 to 6, and the shell
+    suites name them by id (`test-scenes.sh`, `test-playlist.sh`,
+    `test-preferences.sh`). A reset puts the six back in the rows the event
+    started with, so a fresh database keeps 1 to 6 however often it is reset."""
+    event = populated_event()
+    first = list(
+        Scene.objects.filter(event=event).order_by("sort_order").values_list("pk")
+    )
+    Scene.objects.create(event=event, name="Extra", sort_order=7)
+    Scene.objects.filter(pk=first[1][0]).update(name="Renamed", sort_order=9)
+
+    reset_event(event)
+    reset_event(event)
+
+    after = list(
+        Scene.objects.filter(event=event).order_by("sort_order").values_list("pk")
+    )
+    assert after == first
+
+
 def test_another_event_is_untouched():
     event, other = populated_event(), populated_event()
     before = counts(other)

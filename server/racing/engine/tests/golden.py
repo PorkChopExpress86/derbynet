@@ -57,6 +57,14 @@ QUIRK_DECISIONS = {
     "S6": "fix",
     "S7": "fix",
     "S25": "fix",
+    # Rows of #64 and owner decisions that the #34 kiosk, scene, playlist,
+    # message and replay endpoints fix.
+    "C18": "fix",
+    "C19": "fix",
+    "C20": "fix",
+    "D16": "fix",
+    "S18": "fix",
+    "S27": "fix",
     # Proposed in #31, for the owner to confirm: R3 no current heat reads
     # null, R5 result.write fails in JSON, not XML, R6 no scheduler debug
     # output, R7 the generate payload shows the state the request left, R8
@@ -77,6 +85,12 @@ QUIRK_DECISIONS = {
     "A3": "fix",
     "A4": "fix",
     "A5": "fix",
+    # Proposed in #34, for the owner to confirm: R10 deleting a scene clears
+    # what names it, R11 a step of another event's class fails no_classid,
+    # R12 a scene id or name of no scene of the event changes nothing.
+    "R10": "fix",
+    "R11": "fix",
+    "R12": "fix",
 }
 
 
