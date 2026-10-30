@@ -130,6 +130,27 @@ def test_order_and_delete(coordinator, event):
     assert [(s.pk, s.seq) for s in steps] == [(ids[2], 1), (ids[1], 3)]
 
 
+def test_a_stale_order_onto_a_taken_position_moves_the_other_step_after(
+    coordinator, event
+):
+    """A tab that missed a delete and an add can name a position another
+    step holds. PHP stores both at that position; Django keeps positions
+    unique, so the step it does not move goes after the others."""
+    den = GroupFactory(event=event)
+    ids = [
+        act(coordinator, "playlist.add", classid=den.pk, round=n)["queue-entry"][
+            "queueid"
+        ]
+        for n in (1, 2, 3)
+    ]
+
+    reply = act(coordinator, "playlist.order", queueid_1=ids[2])
+
+    assert reply["outcome"]["summary"] == "success"
+    steps = PlaylistEntry.objects.filter(event=event).order_by("seq")
+    assert [s.pk for s in steps] == [ids[2], ids[1], ids[0]]
+
+
 def test_the_race_crew_cannot_edit_the_playlist(client, event):
     log_in(client, Perm.CONTROL_RACE)
     den = GroupFactory(event=event)

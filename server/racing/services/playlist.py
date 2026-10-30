@@ -413,11 +413,19 @@ def delete_step(step: PlaylistEntry | None) -> None:
 
 def order_steps(event, seqs: dict[PlaylistEntry, int]) -> None:
     """`playlist.order`: each step to its new position. Moved through
-    negative positions first, as positions are unique."""
+    negative positions first, as positions are unique. A step left out
+    that holds one of the new positions, as a stale tab's order can name,
+    goes after every other step, where PHP would store both at one
+    position."""
     with transaction.atomic():
         lock_race_state(event.id)
         for step, seq in seqs.items():
             PlaylistEntry.objects.filter(pk=step.pk).update(seq=-seq)
+        steps = PlaylistEntry.objects.filter(event=event)
+        last = max([*seqs.values(), steps.aggregate(last=Max("seq"))["last"] or 0])
+        taken = steps.filter(seq__in=seqs.values()).order_by("seq")
+        for after, step in enumerate(taken, start=last + 1):
+            PlaylistEntry.objects.filter(pk=step.pk).update(seq=after)
         for step, seq in seqs.items():
             PlaylistEntry.objects.filter(pk=step.pk).update(seq=seq)
 
