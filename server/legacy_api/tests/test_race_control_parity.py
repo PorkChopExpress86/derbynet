@@ -22,11 +22,11 @@ from django.test import Client
 from core.models import SiteState
 from legacy_api.tests.php_http import Ids, as_php_body, send
 from racing.engine.tests.golden import (
-    DEVIATIONS_FILE,
     GOLDEN_DIR,
     deviations,
     read_transcript,
     transcript_deviations,
+    write_deviation_entries,
 )
 from racing.models import PlaylistEntry, Round
 from racing.services import playlist, rounds
@@ -776,7 +776,7 @@ def assert_listed(listed_deviations: dict, scenarios: dict) -> None:
 
 def write_deviations(listed_deviations: dict, scenarios: dict) -> None:
     """Run the scenarios and write each entry's Django exchanges, replacing
-    the entries with the same expected files in deviations.json."""
+    the entries with the same (quirk, fixture) in deviations.json."""
     runs = {name: run(Client()) for name, run in scenarios.items()}
     written = []
     for quirk, (reason, scenario, fixtures, filename) in listed_deviations.items():
@@ -798,12 +798,19 @@ def write_deviations(listed_deviations: dict, scenarios: dict) -> None:
                     "expected": expected,
                 }
             )
-    paths = {e["expected"] for e in written}
-    listing = json.loads(DEVIATIONS_FILE.read_text())
-    kept = [e for e in listing["deviations"] if e["expected"] not in paths]
-    # By quirk number, as `tools/reschedule_deviations.py --check` expects.
-    listing["deviations"] = sorted(kept + written, key=lambda e: int(e["quirk"][1:]))
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2) + "\n")
+    write_deviation_entries(listed_claim(listed_deviations), written)
+
+
+def listed_claim(listed_deviations: dict) -> set[tuple[str, str]]:
+    """The (quirk, fixture) pairs `write_deviations` writes for these entries."""
+    return {
+        (quirk, fixture)
+        for quirk, (_, _, fixtures, _) in listed_deviations.items()
+        for fixture in fixtures
+    }
+
+
+DEVIATION_CLAIM = listed_claim(DEVIATIONS)
 
 
 def test_every_listed_deviation_is_a_reply_these_scenarios_make():

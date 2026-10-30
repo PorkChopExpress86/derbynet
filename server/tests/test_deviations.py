@@ -3,15 +3,20 @@ decisions"). Whether Django's output equals each expected item is checked by
 the parity test of each fixture: the engine parity tests now, the legacy API
 transcripts once their handlers exist (#31)."""
 
+import importlib
+import importlib.util
 import json
 from collections import Counter
+from pathlib import Path
 from urllib.parse import parse_qsl
 
 import pytest
 
 from racing.engine.tests.golden import (
     GOLDEN_DIR,
+    HAND_RECORDED,
     QUIRK_DECISIONS,
+    claims,
     deviations,
     read_cases,
     read_transcript,
@@ -59,6 +64,51 @@ def test_transcript_entries_match_fixture_exchanges_and_expected_files():
             for key in ("request", "request-body"):
                 assert expected[name].get(key) == php[name].get(key), (name, key)
             assert expected[name] != php[name], f"{name} does not differ from PHP"
+
+
+SERVER_DIR = Path(__file__).resolve().parents[1]
+
+# Every writer of deviations.json, by the module that declares its
+# DEVIATION_CLAIM, the (quirk, fixture) pairs it rewrites and keeps no others.
+WRITERS = [
+    "legacy_api.tests.test_racers_parity",
+    "legacy_api.tests.test_race_control_parity",
+    "legacy_api.tests.test_awards_parity",
+    "legacy_api.tests.test_kiosks_parity",
+    "racing.services.tests.test_heat_state_parity",
+    "racing.services.tests.test_master",
+    "racing.services.tests.test_schedule",
+    "racing.engine.tests.test_aggregates_parity",
+    "racing.engine.tests.test_lane_bias",
+    "racing.engine.tests.test_speed_awards_parity",
+    "tools/reschedule_deviations.py",
+]
+
+
+def writer_claim(writer):
+    if writer.endswith(".py"):
+        spec = importlib.util.spec_from_file_location(
+            Path(writer).stem, SERVER_DIR / writer
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    else:
+        module = importlib.import_module(writer)
+    return module.DEVIATION_CLAIM
+
+
+def test_every_entry_has_exactly_one_writer():
+    """A writer replaces only the entries it claims, so an entry claimed by
+    two writers is deleted or rewritten by whichever runs last, and one
+    claimed by none is never rewritten."""
+    owners = {writer: writer_claim(writer) for writer in WRITERS}
+    owners["by hand (golden.HAND_RECORDED)"] = HAND_RECORDED
+    wrong = {}
+    for entry in deviations():
+        claimed_by = [name for name, claim in owners.items() if claims(claim, entry)]
+        if len(claimed_by) != 1:
+            wrong[entry["quirk"], entry["fixture"]] = claimed_by
+    assert wrong == {}
 
 
 def test_the_transcript_reader_checks_lengths(tmp_path):

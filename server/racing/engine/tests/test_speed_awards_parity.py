@@ -42,7 +42,11 @@ from racing.engine.standings.speed_awards import (
     speed_awards,
 )
 
-from .golden import DEVIATIONS_FILE, GOLDEN_DIR, read_transcript
+from .golden import (
+    GOLDEN_DIR,
+    read_transcript,
+    write_deviation_entries,
+)
 from .standings_fixtures import (
     EXPORT,
     STANDINGS,
@@ -378,6 +382,12 @@ def raw_headers(path) -> dict[str, bytes]:
     return headers
 
 
+def DEVIATION_CLAIM(quirk: str, fixture: str) -> bool:  # noqa: N802
+    """Each quirk of REASONS in each standings transcript: which exchanges
+    differ is known only once the writer runs."""
+    return quirk in REASONS and fixture.startswith("http/standings/")
+
+
 def write_standings_deviations():
     """Every standings transcript exchange where Django differs, listed
     under its quirk, with Django's exchanges under `deviations/<quirk>/`."""
@@ -400,18 +410,13 @@ def write_standings_deviations():
                 [*names, name],
                 out + head + b"\nbody:\n" + django + b"\n",
             )
-    listing = json.loads(DEVIATIONS_FILE.read_text())
-    kept = [
-        e
-        for e in listing["deviations"]
-        if not e["fixture"].startswith("http/standings/")
-    ]
+    entries = []
     for (stem, quirk), (names, out) in sorted(written.items()):
         expected = f"deviations/{quirk}/{stem}.http"
         path = GOLDEN_DIR / expected
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(out)
-        kept.append(
+        entries.append(
             {
                 "quirk": quirk,
                 "fixture": f"http/standings/{stem}.http",
@@ -421,8 +426,7 @@ def write_standings_deviations():
             }
         )
         print(f"{quirk} {stem}: {len(names)} exchanges, written to {expected}")
-    listing["deviations"] = sorted(kept, key=lambda e: int(e["quirk"][1:]))
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2) + "\n")
+    write_deviation_entries(DEVIATION_CLAIM, entries)
 
 
 if __name__ == "__main__":

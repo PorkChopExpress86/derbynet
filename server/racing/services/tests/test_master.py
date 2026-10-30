@@ -11,11 +11,11 @@ from core.models import RaceSettings
 from core.tests.factories import EventFactory
 from racing.engine.scheduling.master import master_target
 from racing.engine.tests.golden import (
-    DEVIATIONS_FILE,
     GOLDEN_DIR,
     read_cases,
     read_transcript,
     transcript_deviations,
+    write_deviation_entries,
 )
 from racing.models import HAS_RESULT, HeatLane
 from racing.services import master
@@ -181,6 +181,9 @@ def test_a_refused_generate_renumbers_nothing():
     assert php_after[0] != before[0] and php_after[1] != before[1]
 
 
+DEVIATION_CLAIM = {("Q18", HALF_WEIGHTS)}
+
+
 def write_q18_deviation():
     """Each Q18 exchange keeps PHP's header and takes the body of the poll
     before the refused request, which `test_a_refused_generate_renumbers_nothing`
@@ -196,19 +199,14 @@ def write_q18_deviation():
         out += header.encode() + b"\nbody:\n" + data + b"\n"
     (GOLDEN_DIR / Q18_EXPECTED).parent.mkdir(parents=True, exist_ok=True)
     (GOLDEN_DIR / Q18_EXPECTED).write_bytes(out)
-    listing = json.loads(DEVIATIONS_FILE.read_text())
-    entries = [e for e in listing["deviations"] if e["quirk"] != "Q18"]
-    entries.append(
-        {
-            "quirk": "Q18",
-            "fixture": HALF_WEIGHTS,
-            "exchanges": list(Q18_EXCHANGES),
-            "reason": Q18_REASON,
-            "expected": Q18_EXPECTED,
-        }
-    )
-    listing["deviations"] = sorted(entries, key=lambda e: int(e["quirk"][1:]))
-    DEVIATIONS_FILE.write_text(json.dumps(listing, indent=2, ensure_ascii=False) + "\n")
+    entry = {
+        "quirk": "Q18",
+        "fixture": HALF_WEIGHTS,
+        "exchanges": list(Q18_EXCHANGES),
+        "reason": Q18_REASON,
+        "expected": Q18_EXPECTED,
+    }
+    write_deviation_entries(DEVIATION_CLAIM, [entry])
 
 
 @pytest.mark.skipif(
