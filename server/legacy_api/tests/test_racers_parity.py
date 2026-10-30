@@ -322,7 +322,7 @@ DEVIATIONS = {
         ["005 import text car number"],
         "PHP stores a car number such as A12 as text. Django's car number is an"
         " integer column, so it refuses one that is not a whole number with"
-        " invalid-carnumber (#29, for the owner to decide).",
+        " invalid-carnumber (#29, accepted in D60).",
         "deviations/R2/refusals.http",
         run_refusals,
     ),
