@@ -7,12 +7,13 @@ handlers encode them. A kiosk is found by its address within the event.
 
 from datetime import datetime, timedelta
 
-from django.db import transaction
+from django.db import models, transaction
 
-from core.models import RaceState
+from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
 from kiosks.madlib import madlib
-from kiosks.models import Kiosk, SceneKiosk
+from kiosks.models import Kiosk, Scene, SceneKiosk
+from racing.models import PlaylistEntry
 
 IDENTIFY = "kiosks/identify.kiosk"
 NO_PARAMS = "{}"
@@ -168,3 +169,121 @@ def assign(
 def request_reload(event, address: str) -> None:
     """`mark_kiosk_for_reload()`: the kiosk reloads at its next poll."""
     Kiosk.objects.filter(event=event, address=address).update(reload_requested=True)
+
+
+# ----- scenes ------------------------------------------------------------------
+
+
+class DuplicateSceneName(Exception):
+    pass
+
+
+def _main_first(name: str) -> str:
+    """PHP's `CASE kiosk_name WHEN 'Main' THEN '' ELSE kiosk_name END`."""
+    return "" if name == "Main" else name
+
+
+def _scene_kiosk(row: SceneKiosk) -> dict:
+    return {
+        "kiosk_name": row.kiosk_name,
+        "page": row.page,
+        "parameters": row.params or NO_PARAMS,
+    }
+
+
+def all_scenes(event) -> list[dict]:
+    """`all_scenes()`: every scene, those with no kiosk too, its kiosks with
+    Main first. Sorted here, so Postgres collation plays no part."""
+    rows = list(SceneKiosk.objects.filter(event=event))
+    out = []
+    for scene in Scene.objects.filter(event=event).order_by("sort_order", "pk"):
+        kiosks = sorted(
+            (r for r in rows if r.scene_id == scene.pk),
+            key=lambda r: _main_first(r.kiosk_name),
+        )
+        out.append(
+            {
+                "sceneid": scene.pk,
+                "name": scene.name,
+                "kiosks": [_scene_kiosk(r) for r in kiosks],
+            }
+        )
+    return out
+
+
+def scene_list(event) -> list[dict]:
+    """`query=scene.list`: only scenes with a kiosk, as its INNER JOIN, and
+    their kiosks in plain name order."""
+    out = []
+    for scene in all_scenes(event):
+        kiosks = sorted(scene["kiosks"], key=lambda k: k["kiosk_name"])
+        if kiosks:
+            out.append({"name": scene["name"], "kiosks": kiosks})
+    return out
+
+
+def add_scene(event, name: str) -> Scene:
+    """`scene.add`: a new scene after the others. Raises
+    `DuplicateSceneName` when the event has one by that name."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        scenes = Scene.objects.filter(event=event)
+        if scenes.filter(name=name).exists():
+            raise DuplicateSceneName(name)
+        last = scenes.aggregate(last=models.Max("sort_order"))["last"] or 0
+        return Scene.objects.create(event=event, name=name, sort_order=last + 1)
+
+
+def delete_scene(event, scene: Scene | None) -> None:
+    """`scene.delete`, its kiosk pages with it. A playlist step, the racing
+    scene and the race state that name it name no scene afterwards."""
+    if scene is None:
+        return
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        PlaylistEntry.objects.filter(event=event, scene_at_finish=scene).update(
+            scene_at_finish=None
+        )
+        RaceSettings.objects.filter(event=event, racing_scene=scene).update(
+            racing_scene=None
+        )
+        for field in ("current_scene", "playlist_scene"):
+            if getattr(state, f"{field}_id") == scene.pk:
+                setattr(state, field, None)
+                state.save(update_fields=[field])
+        scene.delete()
+
+
+def set_scene_kiosk(
+    scene: Scene | None, kiosk_name: str, page: str, params: str | None
+) -> None:
+    """`scene.setkiosk`: the page kiosks named `kiosk_name` show in the scene.
+    No page takes the name out of the scene."""
+    if scene is None:
+        return
+    rows = SceneKiosk.objects.filter(scene=scene, kiosk_name=kiosk_name)
+    if not page:
+        rows.delete()
+        return
+    SceneKiosk.objects.update_or_create(
+        event_id=scene.event_id,
+        scene=scene,
+        kiosk_name=kiosk_name,
+        defaults={"page": page, "params": params or ""},
+    )
+
+
+def scene_named(event, name: str | None) -> Scene | None:
+    return Scene.objects.filter(event=event, name=name).first()
+
+
+def choose_scene(event, scene: Scene | None) -> None:
+    """`scene.apply`. None, for a negative or unknown id, means no scene is
+    current, and no kiosk changes."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        if scene is None:
+            state.current_scene = None
+        else:
+            apply_scene(state, scene.pk)
+        state.save(update_fields=["current_scene"])

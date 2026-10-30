@@ -66,11 +66,19 @@ def _create_event_rows(event, folders):
     _create_legacy_scenes(event)
 
 
-def _create_legacy_scenes(event):
+def _create_legacy_scenes(event, reuse=()):
+    """The six legacy scenes, in the `Scene` rows of `reuse` first, so a reset
+    keeps the ids the event started with."""
+    reuse = list(reuse)
     for sort_order, (scene_name, *pages) in enumerate(LEGACY_SCENES, start=1):
-        scene = Scene.objects.create(
-            event=event, name=scene_name, sort_order=sort_order
-        )
+        if reuse:
+            scene = reuse.pop(0)
+            scene.name, scene.sort_order = scene_name, sort_order
+            scene.save()
+        else:
+            scene = Scene.objects.create(
+                event=event, name=scene_name, sort_order=sort_order
+            )
         SceneKiosk.objects.bulk_create(
             SceneKiosk(event=event, scene=scene, kiosk_name=kiosk_name, page=page)
             for kiosk_name, page in zip(KIOSK_NAMES, pages, strict=True)
@@ -181,11 +189,17 @@ def _reset_rows(event):
     lock_race_state(event.pk)
     # The per-event rows refer to other rows, so they are cleared first.
     _reset_to_defaults(event, keep=SCHEMA_KEPT_SETTINGS)
+    # PHP's schema script recreates the scenes as ids 1 to 6, and the shell
+    # suites name them by id, so the event's first six scene rows stay.
+    kept = list(Scene.objects.filter(event=event).order_by("pk")[: len(LEGACY_SCENES)])
     deleted = 0
     for model in _deletion_order():
         _clear_self_references(model, event)
-        deleted += model.objects.filter(event=event).delete()[0]
-    _create_legacy_scenes(event)
+        rows = model.objects.filter(event=event)
+        if model is Scene:
+            rows = rows.exclude(pk__in=[scene.pk for scene in kept])
+        deleted += rows.delete()[0]
+    _create_legacy_scenes(event, reuse=kept)
     return deleted
 
 
