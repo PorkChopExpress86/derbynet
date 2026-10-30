@@ -152,8 +152,9 @@ jobs:
           bash testing/test-unused-lanes.sh http://127.0.0.1:8080
 
       # The suites that race heats through timer-message (#32) with run_heat
-      # and need no endpoint of another ticket.  The others read replay (#34)
-      # or export-json.php (#36), so they wait for those tickets.
+      # and need no endpoint of another ticket.  test-basic-racing.sh waits:
+      # it reads award.list as the Timer role, which award.list refuses (#33),
+      # and history.php (#49).
       - name: Run the timer-message suites against Django
         working-directory: .
         run: |
@@ -166,7 +167,7 @@ jobs:
 
       # The award suite (#33) after the master schedule, in
       # testing/exercise-one-database.sh order.  `test-awards.sh basic` follows
-      # test-basic-racing.sh, which posts replay.message (#34), so it waits.
+      # test-basic-racing.sh, which reads history.php (#49), so it waits.
       - name: Run the award suite against Django
         working-directory: .
         run: |
@@ -194,13 +195,25 @@ jobs:
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/test-points-racing.sh http://127.0.0.1:8080
 
-      # test-preferences.sh waits for #34: it sets `racing_scene = 4`, and the
-      # scenes of a reset database have new ids (the rest of it passes).
       - name: Run the subgroup trophy suite against Django
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/test-subgroup-ntrophies.sh http://127.0.0.1:8080
+
+      # The scene, playlist, message relay and preferences suites (#34), in
+      # testing/exercise-one-database.sh order.  test-scenes.sh runs there
+      # after test-basic-racing.sh, which waits for history.php (#49); it needs
+      # only the scenes of a reset database, which keep the ids 1 to 6 that it
+      # and test-playlist.sh and test-preferences.sh name.
+      - name: Run the scene, playlist and messaging suites against Django
+        working-directory: .
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/test-scenes.sh http://127.0.0.1:8080
+          bash testing/test-playlist.sh http://127.0.0.1:8080
+          bash testing/test-messaging.sh http://127.0.0.1:8080
+          bash testing/test-preferences.sh http://127.0.0.1:8080
 
       - name: Run the result import suite against Django
         working-directory: .
