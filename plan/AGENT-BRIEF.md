@@ -5,6 +5,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## Rules for every agent
 
 - Never use the fable model, and never spawn a subagent on it. Use opus for the hardest work.
+- Before building, list what `origin/master` already has for the ticket: its commits (`git log origin/master --grep '#N'`), its endpoints in `server/legacy_api/registry.py`, and the handlers and services that exist. Build what the list lacks, and put the list in the final report.
 - Work in its own git worktree, on a branch named `issue-<n>-<slug>`. Check `git branch --show-current` before any pull or merge in the main clone, because other sessions use it.
 - Commit with `git -c user.name=PorkChopExpress86 -c user.email=<owner email> commit`, and end each message with the `Co-Authored-By` line the session gives. Push the branch, and leave the PR and the merge to the lead.
 - Edit no issue body and no owner decision. Put proposed ticks in the final report.

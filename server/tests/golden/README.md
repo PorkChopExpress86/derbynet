@@ -6,7 +6,7 @@ Do not edit a fixture by hand. Regenerate them all with one command.
 
 ## Regenerate
 
-You need `docker` and `bash`, and a regular git clone (not a `git worktree`, because the server image build reads the git directory).
+You need `docker` and `bash`, and a regular git clone (not a `git worktree`, because the server image build reads the git directory). A fresh `git clone` into a scratch directory counts as a regular clone, and a full `--http-only` run takes about 10 minutes.
 
     server/tests/golden/capture.sh
 

@@ -1,60 +1,26 @@
 # Handoff: state of the Django migration
 
-Written on 2026-10-24, before the owner moved to a new computer, and brought up to date on 2026-10-28. It records what is done, what comes next, how the work is run, and the setup that lives outside this repo. Everything else lives in GitHub issues (labeled `django-migration`, roadmap #2), in `plan/owner-decisions.md`, and in the ADRs in `server/docs/adr/`.
+Written on 2026-10-24, before the owner moved to a new computer, and trimmed on 2026-10-30 to what GitHub cannot say: how the work is run, the open questions, and the setup that lives outside this repo. The plan itself lives in GitHub issues, in `plan/owner-decisions.md`, and in the ADRs in `server/docs/adr/`.
 
 ## Where the work stands
 
-| Milestone | State |
-| --- | --- |
-| M0 Parity harness and decisions | Done. Epic #3 stays open only for #64, the PHP defect tracker, which closes as Django fixes each row. |
-| M1 Django skeleton | Done and closed (#10). Exit met: Django imports a real past-event database (#14) and answers `role.login` byte for byte like PHP (#16). |
-| M2 Racing engine | Done and closed (#19). Spec #20 and tickets #21 to #27 are merged, with the follow-on work for lane closure (#108), allowed racers (#110), and finalist suggestions. |
-| M3 Legacy API parity | In progress (#28). #63, #29, #30, and #31 are merged. #32 to #36, #107, and the parity gate #37 are open. |
-| M4 to M6 | Not started. |
+GitHub holds the live state, so this file copies none of it.
 
-Master is at `e0455614` (#120). Every ticket merged through a PR that passed CI and an independent review.
+- The roadmap #2 lists the milestones M0 to M6 and their epics.
+- `gh issue list --repo PorkChopExpress86/derbynet --label django-migration --state open` lists what is left. A ticket labeled `ready-for-agent` has every dependency closed, which `plan/lint-issues.py` checks.
+- `git log origin/master --grep '#N'` lists what has landed for ticket N, and `server/legacy_api/registry.py` lists every legacy endpoint Django serves.
+- #64 tracks the PHP defects, and epic #3 stays open until its last row is fixed.
 
-### What the Django server has today (`server/`)
-
-- Project scaffold, env-driven settings, SQLite in WAL mode by default, Postgres through `DATABASE_URL` (#11, PR #85).
-- No Django users or admin. Roles live in the session (D22, ADR-16, PR #86).
-- Domain models for every event-scoped table, the legacy RaceInfo key registry, `check_invariants()` with a `cross-event` check, `new_event()`, and `manage.py dump_event` (#13, PR #87).
-- The `/action.php` dispatcher with PHP-compatible JSON and XML encoders, handler registry, permission checks, and ActionLog (#18, PR #88).
-- `manage.py import_derbynet` for old DerbyNet SQLite files (schema 1 to 10) and snapshots, crash-safe, never touching the source (#14, PR #89, hardened in #91 / PR #92).
-- Role logins, permissions, `/mcheckin.php` tokens, hardened `session.write`, the Origin check, and `manage.py import_roles` (#16, PR #90).
-- The PHP schedule generator tables as a generated Python module, checked against PHP (#21, PR #94).
-- The racing engine: schedules, master schedule, rescheduling, rounds and rosters, group formation, standings and speed awards, the heat state machine, and lane closure (#22 to #27, #108, #110).
-- Legacy `/action.php` endpoints so far: the database reset, settings, and test endpoints (#63); racers, check-in, and roster import (#29); classes, ranks, and partitions (#30); schedule, heat, result, round, and the racing polls (#31). `server/README.md` lists them.
-- `deviations.json` lists every approved difference from PHP, and the endpoint registry carries the same list in its `divergences` field for the parity gate (#37).
+The shell suites in `testing/` run against Django one by one as their endpoints land. A suite goes into `.github/workflows/server.yml` once it passes on SQLite and Postgres with no stand-in.
 
 ### Test and CI tooling
 
 - `testing/` is the PHP shell suite, now backend-agnostic, with no literal IDs, and run twice in CI with shifted IDs (#5, #6).
 - `server/tests/golden/` holds fixtures captured from PHP, checked in CI by the `golden-fixtures` workflow (#7). `deviations.json` (D25) lists approved differences.
 - `.github/workflows/`: `php-suite`, `golden-fixtures`, `server` (SQLite and Postgres 17), and `plan-checks` (ADR path check plus the issue lint).
-- `plan/lint-issues.py` lints every plan issue body live from GitHub.
+- `plan/lint-issues.py` lints every plan issue body live from GitHub, and checks issue state against merged PRs and dependencies.
 - `plan/bin/pr-wait` and `plan/bin/pr-merge` wait for checks and merge only the head that passed.
 - `.claude/skills/verify/` is a project skill that launches an isolated DerbyNet on port 8090 and drives it with the Playwright MCP.
-
-## What comes next
-
-### M3, in dependency order
-
-The shell suites in `testing/` run against Django one by one as their endpoints land. A suite goes into `.github/workflows/server.yml` once it passes on SQLite and Postgres with no stand-in.
-
-1. **#32 timer-message XML protocol** and **#33 awards, judging, balloting**. They are independent. Most suites run heats through `timer-message`, so #32 unlocks the most suite boxes on #29, #30, and #31.
-2. **#36 settings, setup, snapshot, preferences, history** and **#34 kiosks, scenes, playlist, replay**. #36 adds `export-json.php` and `preferences.upload`, which several suites read.
-3. **#35 photos, video, slides** (with #73 and #74).
-4. **#107** updates `testing/test-reschedule.sh` for D34, and #5 decides whether its PHP-chart step is marked known-failing.
-5. **#37 parity gate**: the full suite against Django in CI, with hardware clients unchanged.
-
-The acceptance boxes left open on #29, #30, and #31 are suite criteria that wait for the tickets above.
-
-### After M3
-
-- M4 manager UI (#38) starts with spec #39 and #40.
-- M5 displays and replay (#51) starts with the kiosk framework spike #71. Kiosk push is required (D21, ADR-15).
-- M6 packaging and cutover (#57).
 
 ## Open questions for the owner
 
@@ -68,7 +34,7 @@ These are the owner's standing rules. They are also stored as Claude memory file
 - **The PHP server is frozen.** No fixes under `website/` (D12). Defects are fixed only in Django, and #64 tracks them.
 - **One PR per ticket, then an independent review before merge.** The reviewer is a separate agent that the author did not choose. It reproduces findings, or labels them unverified.
 - **Merge a PR when its checks pass on the current head and its review is clean.** The owner gave standing approval on 2026-10-28, so no per-PR ask. Use `plan/bin/pr-wait` and `plan/bin/pr-merge`, which pin the merge to the head that passed. Anything else that is hard to reverse still needs a confirmation.
-- **Owner decisions go in `plan/owner-decisions.md`** (D1 to D57 so far), in the same change that edits the issues they touch.
+- **Owner decisions go in `plan/owner-decisions.md`** in the same change that edits the issues they touch.
 - **Edit issue bodies through the lint.** Fetch the body, edit it, run `plan/lint-issues.py --file N=PATH`, then `gh issue edit`. See `plan/README.md`.
 
 ## Setting up a new computer
