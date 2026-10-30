@@ -158,6 +158,11 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "playlist.delete"): {"queueid": "1"},
     ("action", "playlist.order"): {"queueid_1": "1"},
     ("action", "playlist.start"): {},
+    ("action", "message.send"): {"message[recipient]": "AA", "message[k]": "v"},
+    ("action", "message.retrieve"): {"recipient": "AA"},
+    ("action", "replay.message"): {"status": "0"},
+    ("action", "replay.test"): {},
+    ("action", "replay.trigger"): {},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},

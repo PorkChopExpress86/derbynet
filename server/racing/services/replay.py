@@ -7,6 +7,7 @@ a rollback drops them with the race-state change that sent them.
 
 from datetime import datetime, timedelta
 
+from django.db import transaction
 from django.utils import timezone
 
 from core.models import RaceSettings
@@ -33,6 +34,39 @@ def send(event_id: int, command: str, now: datetime | None = None) -> bool:
         return False
     ReplayCommand.objects.create(event_id=event_id, command=command)
     return True
+
+
+def poll(event_id: int, reported: str, now: datetime) -> list[str]:
+    """`replay.message`: the replay client polls, 4 times a second. It is
+    connected from now on and reports its status; it gets the queued
+    commands, each exactly once, with `HELLO` first when it was not
+    connected. Under the `ReplayStatus` lock, so two polls drain the queue
+    one after the other."""
+    with transaction.atomic():
+        status = ReplayStatus.objects.select_for_update().get(event_id=event_id)
+        was_connected = connected(event_id, now)
+        status.state = ReplayStatus.State.CONNECTED
+        status.reported = reported
+        status.last_contact = now
+        status.save(update_fields=["state", "reported", "last_contact"])
+        queued = list(
+            ReplayCommand.objects.filter(event_id=event_id)
+            .order_by("pk")
+            .values_list("pk", "command")
+        )
+        ReplayCommand.objects.filter(pk__in=[pk for pk, _ in queued]).delete()
+    commands = [command for _, command in queued]
+    return commands if was_connected else ["HELLO", *commands]
+
+
+def trigger(event_id: int) -> None:
+    """`replay.trigger`: play the last few seconds back now."""
+    send(event_id, replay(RaceSettings.objects.get(event_id=event_id)))
+
+
+def send_test(event_id: int) -> None:
+    """`replay.test`."""
+    send(event_id, test(RaceSettings.objects.get(event_id=event_id)))
 
 
 def start(group_name: str, round_number: int, heat: int) -> str:
