@@ -1,6 +1,5 @@
 """Conversions from legacy column values, which SQLite does not type-check."""
 
-import json
 from datetime import UTC, datetime
 
 
@@ -106,20 +105,13 @@ def kiosk_page(raw):
     """Split a legacy kiosk page into `(page, params, reload_requested)`.
 
     PHP marks a pending reload with a leading `!` (`mark_kiosk_for_reload()`)
-    and appends parameters after `#` (`parse_kiosk_params()`). Raises
-    `BadValue` when the parameters are not a JSON object.
+    and appends parameters after `#` (`parse_kiosk_params()`). The parameters
+    stay the text PHP stored, which PHP never parses: `testing/test-scenes.sh`
+    stores `{confetti:false}`.
     """
     page = text(raw)
     reload = page.startswith("!")
     if reload:
         page = page[1:]
     page, _, params = page.partition("#")
-    if not params:
-        return page, {}, reload
-    try:
-        decoded = json.loads(params)
-    except json.JSONDecodeError:
-        raise BadValue(f"parameters {params!r} are not JSON") from None
-    if not isinstance(decoded, dict):
-        raise BadValue(f"parameters {params!r} are not a JSON object")
-    return page, decoded, reload
+    return page, params, reload

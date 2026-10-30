@@ -1,0 +1,20 @@
+### 035 reload
+request: POST action.php
+request-body: action=kiosk.reload&address=192.168.1.10
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 201
+body:
+{
+    "action": {
+        "action": "kiosk.reload",
+        "address": "192.168.1.10"
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    }
+}
+

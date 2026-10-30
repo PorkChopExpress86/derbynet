@@ -144,6 +144,10 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "award.xbs"): {"racer": "1", "value": "1"},
     ("query", "award.current"): {},
     ("query", "award.list"): {},
+    ("query", "poll.kiosk"): {"address": "K1"},
+    ("query", "poll.kiosk.all"): {},
+    ("action", "kiosk.assign"): {"address": "K1", "page": "kiosks/flag.kiosk"},
+    ("action", "kiosk.reload"): {"address": "K1"},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},

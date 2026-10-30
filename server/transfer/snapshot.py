@@ -272,7 +272,7 @@ def tables(
                     n,
                     ids(Scene, k.scene_id),
                     k.kiosk_name,
-                    k.page + (f"#{_json(k.params)}" if k.params else ""),
+                    k.page + (f"#{k.params}" if k.params else ""),
                 ]
                 for n, k in enumerate(
                     SceneKiosk.objects.filter(**mine).order_by("pk"), 1

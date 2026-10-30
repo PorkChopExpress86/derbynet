@@ -68,7 +68,7 @@ def test_migrate_and_new_event_seed_the_legacy_award_types_and_scenes_exactly():
         EXPECTED_SCENE_KIOSKS
     )
     assert scene_kiosks.count() == len(EXPECTED_SCENE_KIOSKS)
-    assert all(sk.params == {} for sk in scene_kiosks)
+    assert all(sk.params == "" for sk in scene_kiosks)
 
 
 def test_a_new_award_type_after_the_seed_gets_a_fresh_id():

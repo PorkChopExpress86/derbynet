@@ -57,6 +57,14 @@ QUIRK_DECISIONS = {
     "S6": "fix",
     "S7": "fix",
     "S25": "fix",
+    # Rows of #64 and owner decisions that the #34 kiosk, scene, playlist,
+    # message and replay endpoints fix.
+    "C18": "fix",
+    "C19": "fix",
+    "C20": "fix",
+    "D16": "fix",
+    "S18": "fix",
+    "S27": "fix",
     # Proposed in #31, for the owner to confirm: R3 no current heat reads
     # null, R5 result.write fails in JSON, not XML, R6 no scheduler debug
     # output, R7 the generate payload shows the state the request left, R8

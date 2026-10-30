@@ -334,7 +334,11 @@ def apply_due_scene(event, now: datetime) -> bool:
     """`maybe_apply_playlist_scene()`: show the finished step's scene once
     its due time has passed. The kiosk poll (#34) and a periodic check call
     it, so the scene changes even with no kiosk polling. Returns whether it
-    applied the scene."""
+    applied the scene. The polls call it every few seconds, so the lock is
+    taken only when a scene is due."""
+    due = RaceState.objects.filter(event=event, playlist_scene_at__lt=now)
+    if not due.exists():
+        return False
     with transaction.atomic():
         state = lock_race_state(event.id)
         if state.playlist_scene_at is None or not state.playlist_scene_at < now:

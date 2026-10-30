@@ -4,12 +4,16 @@ from core.models import EventScoped, PerEvent
 
 
 class Kiosk(EventScoped):
-    """Legacy `Kiosks`. The legacy `page` packs `!` + path + `#` + JSON params."""
+    """Legacy `Kiosks`. The legacy `page` packs `!` + path + `#` + params.
+
+    `params` is the text after `#`, exactly as the client sent it: PHP never
+    parses it, and `testing/test-scenes.sh` stores `{confetti:false}`. Empty
+    means none, which the legacy API shows as `"{}"`."""
 
     address = models.CharField(max_length=50)
     name = models.CharField(max_length=200, blank=True, default="")
     page = models.CharField(max_length=200, blank=True, default="")
-    params = models.JSONField(default=dict, blank=True)
+    params = models.TextField(blank=True, default="")
     reload_requested = models.BooleanField(default=False)
     last_contact = models.DateTimeField(null=True, blank=True)
 
@@ -35,7 +39,7 @@ class SceneKiosk(EventScoped):
     scene = models.ForeignKey(Scene, on_delete=models.CASCADE, related_name="kiosks")
     kiosk_name = models.CharField(max_length=200)
     page = models.CharField(max_length=200)
-    params = models.JSONField(default=dict, blank=True)
+    params = models.TextField(blank=True, default="")
 
     class Meta:
         constraints = [

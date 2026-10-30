@@ -431,13 +431,7 @@ def _scene(row, ctx):
 
 
 def _page(ctx, table, legacy_id, raw):
-    try:
-        page, params, reload = values.kiosk_page(raw)
-    except BadValue as error:
-        page, params, reload = values.kiosk_page(values.text(raw).partition("#")[0])
-        ctx.report.add(
-            Kind.CHANGED_VALUE, table, legacy_id, f"page {raw!r}: {error}; dropped"
-        )
+    page, params, reload = values.kiosk_page(raw)
     if page.startswith("local/"):
         ctx.report.add(
             Kind.LOCAL_KIOSK_PAGE,
