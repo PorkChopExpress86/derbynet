@@ -1,0 +1,87 @@
+/* SPIKE #71: the look both candidates share, so the comparison is about how
+   each one animates, not how it is styled.  A 1920x1080 TV, read from across
+   a gym.  Candidate-specific animation rules live with each candidate. */
+
+:root {
+  --bg: #0b1020;
+  --panel: #151c33;
+  --panel-2: #1d2645;
+  --ink: #f4f6ff;
+  --muted: #9aa4c7;
+  --gold: #f5c542;
+  --silver: #cfd6e6;
+  --bronze: #d58b4f;
+  --accent: #4fa3ff;
+  --row-h: 150px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 600 32px/1.2 system-ui, "Segoe UI", Roboto, "DejaVu Sans", sans-serif;
+  overflow: hidden;
+}
+
+.kiosk { height: 100vh; padding: 48px 72px; display: flex; flex-direction: column; gap: 32px; }
+.kiosk h1 { margin: 0; font-size: 64px; letter-spacing: .01em; }
+.kiosk h1 small { color: var(--muted); font-size: 40px; margin-left: 24px; font-weight: 500; }
+.badge-candidate { position: fixed; right: 24px; bottom: 16px; color: var(--muted); font-size: 20px; }
+.badge-paused { position: fixed; left: 24px; bottom: 16px; color: var(--gold); font-size: 24px; }
+
+/* ----- now racing ----- */
+.board { display: flex; flex-direction: column; gap: 24px; }
+.lanes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 20px; }
+.lane {
+  height: var(--row-h);
+  display: grid;
+  grid-template-columns: 190px 180px 1fr 260px 160px;
+  align-items: center;
+  gap: 24px;
+  padding: 0 32px;
+  background: var(--panel);
+  border-radius: 20px;
+  font-size: 56px;
+}
+.lane .lane-no { font-size: 40px; color: var(--muted); }
+.lane .car { color: var(--accent); }
+.lane .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lane .time { text-align: right; font-variant-numeric: tabular-nums; }
+.lane .place {
+  justify-self: center;
+  width: 120px; height: 120px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 64px; background: var(--panel-2);
+}
+.lane .place:empty { background: transparent; }
+.lane.p1 .place { background: var(--gold); color: #000; }
+.lane.p2 .place { background: var(--silver); color: #000; }
+.lane.p3 .place { background: var(--bronze); color: #000; }
+
+/* ----- standings ----- */
+.standings { display: flex; flex-direction: column; gap: 10px; }
+.srow, .shead {
+  display: grid;
+  grid-template-columns: 140px 160px 1fr 140px 200px;
+  gap: 24px; align-items: center;
+  padding: 0 32px; height: 62px; font-size: 36px;
+}
+.shead { color: var(--muted); font-size: 26px; height: 40px; }
+.srow { background: var(--panel); border-radius: 12px; }
+.srow .avg, .srow .heats, .shead .avg, .shead .heats { text-align: right; font-variant-numeric: tabular-nums; }
+.srow.p1 { background: linear-gradient(90deg, #5a4610, var(--panel) 60%); }
+.srow.p2 { background: linear-gradient(90deg, #404756, var(--panel) 60%); }
+.srow.p3 { background: linear-gradient(90deg, #4e3220, var(--panel) 60%); }
+
+/* ----- intermission leaders ----- */
+.leaders { display: grid; grid-template-rows: auto 1fr; gap: 32px; height: 100%; }
+.leaders .podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; align-items: end; }
+.leaders .step { background: var(--panel); border-radius: 24px; padding: 32px; text-align: center; }
+.leaders .step .pl { font-size: 96px; }
+.leaders .step .nm { font-size: 48px; }
+.leaders .step .av { color: var(--muted); font-size: 32px; }
+.leaders .step.p1 { order: 2; min-height: 520px; border-top: 12px solid var(--gold); }
+.leaders .step.p2 { order: 1; min-height: 440px; border-top: 12px solid var(--silver); }
+.leaders .step.p3 { order: 3; min-height: 380px; border-top: 12px solid var(--bronze); }

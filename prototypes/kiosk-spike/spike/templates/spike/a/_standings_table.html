@@ -1,0 +1,13 @@
+{# Every row is rendered; Alpine shows the bottom `revealed` of them. Each #}
+{# row's view-transition-name lets the browser glide it when one appears. #}
+<h1>{{ entry.name|default:"Standings" }}<small>Standings</small></h1>
+<div class="standings">
+  <div class="shead"><span>Place</span><span>Car</span><span>Name</span><span class="heats">Heats</span><span class="avg">Average</span></div>
+  {% for row in rows %}
+  <div class="srow p{{ row.place }}" x-cloak :hidden="!shows({{ forloop.revcounter }})"
+       style="view-transition-name: r{{ row.id }}">
+    <span>{{ row.place }}</span><span>{{ row.carnumber }}</span><span>{{ row.name }}</span>
+    <span class="heats">{{ row.heats }}</span><span class="avg">{{ row.avg }}</span>
+  </div>
+  {% endfor %}
+</div>

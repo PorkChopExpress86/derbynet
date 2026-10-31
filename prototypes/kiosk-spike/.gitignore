@@ -1,0 +1,5 @@
+var/
+svelte/node_modules/
+traces/
+*.log
+__pycache__/

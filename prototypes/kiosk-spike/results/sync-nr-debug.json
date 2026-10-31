@@ -1,0 +1,72 @@
+[
+ {
+  "candidate": "a",
+  "page": "now-racing",
+  "mode": "poll",
+  "skew_ms": {
+   "n": 5,
+   "mean": 12,
+   "median": 14,
+   "max": 16
+  },
+  "latency_ms": {
+   "n": 10,
+   "mean": 257,
+   "median": 271,
+   "max": 490
+  },
+  "requests_per_tv": [
+   135,
+   129
+  ],
+  "poll_phase_gap_ms": [
+   8,
+   null,
+   1,
+   9,
+   16
+  ],
+  "samples": [
+   5,
+   14,
+   14,
+   16,
+   12
+  ]
+ },
+ {
+  "candidate": "b",
+  "page": "now-racing",
+  "mode": "poll",
+  "skew_ms": {
+   "n": 5,
+   "mean": 102,
+   "median": 14,
+   "max": 466
+  },
+  "latency_ms": {
+   "n": 10,
+   "mean": 280,
+   "median": 354,
+   "max": 521
+  },
+  "requests_per_tv": [
+   134,
+   130
+  ],
+  "poll_phase_gap_ms": [
+   null,
+   24,
+   4,
+   12,
+   15
+  ],
+  "samples": [
+   466,
+   15,
+   7,
+   14,
+   10
+  ]
+ }
+]

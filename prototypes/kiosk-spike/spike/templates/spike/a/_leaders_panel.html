@@ -1,0 +1,14 @@
+<section class="leaders"
+         hx-get="/spike/a/leaders/panel?i={{ next }}{% if not vt %}&vt=0{% endif %}" hx-trigger="load delay:6s, resume"
+         hx-target="#panel" hx-swap="{% if vt %}innerHTML transition:true{% else %}innerHTML swap:450ms{% endif %}">
+  <h1>{{ panel.name }}<small>Leaders so far</small></h1>
+  <div class="podium">
+    {% for row in panel.rows %}
+    <div class="step p{{ row.place }}" style="--p: {{ row.place }}">
+      <div class="pl">{{ row.place }}</div>
+      <div class="nm">{{ row.name }}</div>
+      <div class="av">#{{ row.carnumber }} &middot; {{ row.avg }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>

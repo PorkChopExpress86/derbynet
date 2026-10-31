@@ -1,0 +1,16 @@
+/* SPIKE #71, candidate A: every animation is CSS.  Keyframes on new nodes,
+   and the View Transitions API for a new heat, a revealed standings row and
+   the next leaders panel.  ?vt=0 (.no-vt) does the same motion without the
+   View Transitions API. */
+
+[x-cloak] { display: none !important; }
+
+/* Only the named parts take part in a view transition, not a snapshot of
+   the whole page cross-fading over itself.  Without this line the standings
+   reveal dropped 56% of its frames here, against 12% with it. */
+:root { view-transition-name: none; }
+
+::view-transition-old(board) { animation: 450ms ease-in both slide-out; }
+::view-transition-new(board) { animation: 550ms ease-out both slide-in; }
+@keyframes slide-out { to { transform: translateX(-120%); opacity: 0; } }
+@keyframes slide-in { from { transform: translateX(120%); opacity: 0; } }

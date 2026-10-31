@@ -1,0 +1,158 @@
+[
+ {
+  "candidate": "a",
+  "page": "now-racing",
+  "renders_in_frame": true,
+  "paused_animations": 9,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 0,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 4466,
+  "marks_after_resume": [
+   "resumed",
+   "lineup",
+   "results"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "a0",
+  "page": "now-racing",
+  "renders_in_frame": true,
+  "paused_animations": 9,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 0,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 4807,
+  "marks_after_resume": [
+   "resumed",
+   "lineup",
+   "results"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "b",
+  "page": "now-racing",
+  "renders_in_frame": true,
+  "paused_animations": 9,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 0,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 4359,
+  "marks_after_resume": [
+   "resumed",
+   "lineup",
+   "results"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "a",
+  "page": "standings",
+  "renders_in_frame": true,
+  "paused_animations": 6,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 1,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 1853,
+  "marks_after_resume": [
+   "resumed",
+   "reveal"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "a0",
+  "page": "standings",
+  "renders_in_frame": true,
+  "paused_animations": 2,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 1,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 1816,
+  "marks_after_resume": [
+   "resumed",
+   "reveal"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "b",
+  "page": "standings",
+  "renders_in_frame": true,
+  "paused_animations": 2,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 1,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 7,
+  "marks_after_resume": [
+   "resumed",
+   "reveal"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "a",
+  "page": "leaders",
+  "renders_in_frame": true,
+  "paused_animations": 6,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 0,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 109,
+  "marks_after_resume": [
+   "resumed",
+   "panel"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "a0",
+  "page": "leaders",
+  "renders_in_frame": true,
+  "paused_animations": 4,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 0,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 487,
+  "marks_after_resume": [
+   "resumed",
+   "panel"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ },
+ {
+  "candidate": "b",
+  "page": "leaders",
+  "renders_in_frame": true,
+  "paused_animations": 4,
+  "running_while_paused": 0,
+  "animation_clock_moved_ms": 0,
+  "requests_while_paused": 0,
+  "marks_while_paused": [],
+  "resume_to_next_step_ms": 35,
+  "marks_after_resume": [
+   "resumed",
+   "panel"
+  ],
+  "paused_left_after_resume": 0,
+  "pass": true
+ }
+]

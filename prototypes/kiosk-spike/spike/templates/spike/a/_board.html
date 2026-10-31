@@ -1,0 +1,22 @@
+{# A new heat swaps inside a view transition (the view sets HX-Reswap);   #}
+{# results appear by place from CSS alone, because their nodes are new.   #}
+<section class="board" data-board data-roundid="{{ board.roundid|default_if_none:'' }}"
+         data-heat="{{ board.heat|default_if_none:'' }}" data-nresults="{{ board.nresults }}"
+         {% if new_heat %}data-new-heat{% endif %}>
+  <h1>{{ board.class|default:"Waiting for racing" }}{% if board.heat %}<small>Round {{ board.round }} &middot; Heat {{ board.heat }} of {{ board.nheats }}</small>{% endif %}</h1>
+  <ol class="lanes">
+    {% for l in board.lanes %}
+    <li class="lane{% if l.place %} p{{ l.place }}{% endif %}">
+      <span class="lane-no">Lane {{ l.lane }}</span>
+      <span class="car">{{ l.carnumber }}</span>
+      <span class="name">{{ l.name }}</span>
+      {% if l.place %}
+      <span class="time result" style="--p: {{ l.place }}">{{ l.time }}</span>
+      <span class="place result" style="--p: {{ l.place }}">{{ l.place }}</span>
+      {% else %}
+      <span class="time"></span><span class="place"></span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>

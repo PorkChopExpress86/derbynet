@@ -1,0 +1,33 @@
+[
+ {
+  "candidate": "b",
+  "page": "now-racing",
+  "mode": "poll",
+  "skew_ms": {
+   "n": 3,
+   "mean": 257,
+   "median": 261,
+   "max": 272
+  },
+  "latency_ms": {
+   "n": 6,
+   "mean": 347,
+   "median": 463,
+   "max": 500
+  },
+  "requests_per_tv": [
+   57,
+   51
+  ],
+  "poll_phase_gap_ms": [
+   266,
+   266,
+   239
+  ],
+  "samples": [
+   272,
+   261,
+   238
+  ]
+ }
+]

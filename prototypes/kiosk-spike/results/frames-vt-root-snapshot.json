@@ -1,0 +1,39 @@
+[
+ {
+  "candidate": "a",
+  "page": "standings",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 7.8,
+   "frames": 140,
+   "fps": 17.8,
+   "missed_vsyncs": 331,
+   "missed_pct": 70.3,
+   "long_frames": 126,
+   "p50_ms": 50.1,
+   "p95_ms": 83.4,
+   "max_ms": 133.4
+  },
+  "trace": {
+   "animating": {
+    "presented": 180,
+    "partial": 128,
+    "dropped": 397,
+    "dropped_pct": 56.3
+   },
+   "all": {
+    "presented": 201,
+    "partial": 128,
+    "dropped": 399,
+    "dropped_pct": 54.8
+   },
+   "states": {
+    "PRESENTED_ALL": 201,
+    "NO_UPDATE_DESIRED": 1436,
+    "DROPPED": 399,
+    "PRESENTED_PARTIAL": 128
+   }
+  },
+  "marks": 13
+ }
+]

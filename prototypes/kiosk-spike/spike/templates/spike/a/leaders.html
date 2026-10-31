@@ -1,0 +1,12 @@
+{% extends "spike/a/base.html" %}
+{% block title %}Leaders{% endblock %}
+{% block assets %}{% load static %}<link rel="stylesheet" href="{% static 'spike/a/leaders.css' %}"><script src="{% static 'spike/a/leaders.js' %}"></script>{% endblock %}
+{% block body %}
+{# The intermission screen (D12): each class's top three in turn. Each panel #}
+{# asks for the next one 6 s after it loads, swapped in a view transition.  #}
+<main class="kiosk" x-data="leaders">
+  <div id="panel" hx-get="/spike/a/leaders/panel?i=0{% if not vt %}&vt=0{% endif %}" hx-trigger="load"
+       hx-swap="{% if vt %}innerHTML transition:true{% else %}innerHTML swap:450ms{% endif %}" style="height: 100%"></div>
+  <div class="badge-paused" x-show="paused">paused for replay</div>
+</main>
+{% endblock %}

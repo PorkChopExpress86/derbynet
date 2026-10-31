@@ -1,0 +1,664 @@
+[
+ {
+  "candidate": "a",
+  "page": "now-racing",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 10.3,
+   "frames": 592,
+   "fps": 57.4,
+   "missed_vsyncs": 27,
+   "missed_pct": 4.4,
+   "long_frames": 24,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 50.1
+  },
+  "trace": {
+   "animating": {
+    "presented": 598,
+    "partial": 116,
+    "dropped": 30,
+    "dropped_pct": 4
+   },
+   "all": {
+    "presented": 621,
+    "partial": 116,
+    "dropped": 32,
+    "dropped_pct": 4.2
+   },
+   "states": {
+    "NO_UPDATE_DESIRED": 877,
+    "PRESENTED_ALL": 621,
+    "DROPPED": 32,
+    "PRESENTED_PARTIAL": 116
+   }
+  },
+  "marks": 5
+ },
+ {
+  "candidate": "a0",
+  "page": "now-racing",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 13.7,
+   "frames": 818,
+   "fps": 59.9,
+   "missed_vsyncs": 2,
+   "missed_pct": 0.2,
+   "long_frames": 1,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 50
+  },
+  "trace": {
+   "animating": {
+    "presented": 822,
+    "partial": 52,
+    "dropped": 4,
+    "dropped_pct": 0.5
+   },
+   "all": {
+    "presented": 851,
+    "partial": 52,
+    "dropped": 6,
+    "dropped_pct": 0.7
+   },
+   "states": {
+    "PRESENTED_ALL": 851,
+    "NO_UPDATE_DESIRED": 675,
+    "DROPPED": 6,
+    "PRESENTED_PARTIAL": 52
+   }
+  },
+  "marks": 6
+ },
+ {
+  "candidate": "b",
+  "page": "now-racing",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 9.4,
+   "frames": 567,
+   "fps": 60,
+   "missed_vsyncs": 0,
+   "missed_pct": 0,
+   "long_frames": 0,
+   "p50_ms": 16.7,
+   "p95_ms": 16.7,
+   "max_ms": 16.8
+  },
+  "trace": {
+   "animating": {
+    "presented": 571,
+    "partial": 0,
+    "dropped": 4,
+    "dropped_pct": 0.7
+   },
+   "all": {
+    "presented": 592,
+    "partial": 0,
+    "dropped": 9,
+    "dropped_pct": 1.5
+   },
+   "states": {
+    "PRESENTED_ALL": 592,
+    "DROPPED": 9,
+    "NO_UPDATE_DESIRED": 912
+   }
+  },
+  "marks": 5
+ },
+ {
+  "candidate": "a",
+  "page": "standings",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 7.1,
+   "frames": 376,
+   "fps": 53.1,
+   "missed_vsyncs": 49,
+   "missed_pct": 11.5,
+   "long_frames": 40,
+   "p50_ms": 16.7,
+   "p95_ms": 33.4,
+   "max_ms": 50.1
+  },
+  "trace": {
+   "animating": {
+    "presented": 415,
+    "partial": 279,
+    "dropped": 59,
+    "dropped_pct": 7.8
+   },
+   "all": {
+    "presented": 439,
+    "partial": 279,
+    "dropped": 62,
+    "dropped_pct": 7.9
+   },
+   "states": {
+    "PRESENTED_ALL": 439,
+    "DROPPED": 62,
+    "NO_UPDATE_DESIRED": 1546,
+    "PRESENTED_PARTIAL": 279
+   }
+  },
+  "marks": 13
+ },
+ {
+  "candidate": "a0",
+  "page": "standings",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 6.9,
+   "frames": 412,
+   "fps": 60,
+   "missed_vsyncs": 0,
+   "missed_pct": 0,
+   "long_frames": 0,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 16.8
+  },
+  "trace": {
+   "animating": {
+    "presented": 413,
+    "partial": 0,
+    "dropped": 0,
+    "dropped_pct": 0
+   },
+   "all": {
+    "presented": 441,
+    "partial": 0,
+    "dropped": 3,
+    "dropped_pct": 0.7
+   },
+   "states": {
+    "PRESENTED_ALL": 441,
+    "NO_UPDATE_DESIRED": 1584,
+    "DROPPED": 3
+   }
+  },
+  "marks": 13
+ },
+ {
+  "candidate": "b",
+  "page": "standings",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 6.8,
+   "frames": 411,
+   "fps": 60,
+   "missed_vsyncs": 0,
+   "missed_pct": 0,
+   "long_frames": 0,
+   "p50_ms": 16.7,
+   "p95_ms": 16.7,
+   "max_ms": 16.8
+  },
+  "trace": {
+   "animating": {
+    "presented": 413,
+    "partial": 0,
+    "dropped": 2,
+    "dropped_pct": 0.5
+   },
+   "all": {
+    "presented": 434,
+    "partial": 0,
+    "dropped": 4,
+    "dropped_pct": 0.9
+   },
+   "states": {
+    "PRESENTED_ALL": 434,
+    "NO_UPDATE_DESIRED": 1574,
+    "DROPPED": 4
+   }
+  },
+  "marks": 13
+ },
+ {
+  "candidate": "a",
+  "page": "leaders",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 7.9,
+   "frames": 429,
+   "fps": 54,
+   "missed_vsyncs": 48,
+   "missed_pct": 10.1,
+   "long_frames": 45,
+   "p50_ms": 16.7,
+   "p95_ms": 33.3,
+   "max_ms": 50.1
+  },
+  "trace": {
+   "animating": {
+    "presented": 389,
+    "partial": 15,
+    "dropped": 49,
+    "dropped_pct": 10.8
+   },
+   "all": {
+    "presented": 408,
+    "partial": 15,
+    "dropped": 51,
+    "dropped_pct": 10.8
+   },
+   "states": {
+    "PRESENTED_ALL": 408,
+    "DROPPED": 51,
+    "NO_UPDATE_DESIRED": 772,
+    "PRESENTED_PARTIAL": 15
+   }
+  },
+  "marks": 4
+ },
+ {
+  "candidate": "a0",
+  "page": "leaders",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 7.5,
+   "frames": 440,
+   "fps": 58.8,
+   "missed_vsyncs": 9,
+   "missed_pct": 2,
+   "long_frames": 3,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 116.6
+  },
+  "trace": {
+   "animating": {
+    "presented": 385,
+    "partial": 9,
+    "dropped": 10,
+    "dropped_pct": 2.5
+   },
+   "all": {
+    "presented": 413,
+    "partial": 9,
+    "dropped": 12,
+    "dropped_pct": 2.8
+   },
+   "states": {
+    "PRESENTED_ALL": 413,
+    "NO_UPDATE_DESIRED": 819,
+    "DROPPED": 12,
+    "PRESENTED_PARTIAL": 9
+   }
+  },
+  "marks": 4
+ },
+ {
+  "candidate": "b",
+  "page": "leaders",
+  "cpu_throttle": 1,
+  "raf": {
+   "animated_s": 8,
+   "frames": 483,
+   "fps": 60,
+   "missed_vsyncs": 0,
+   "missed_pct": 0,
+   "long_frames": 0,
+   "p50_ms": 16.7,
+   "p95_ms": 16.7,
+   "max_ms": 16.8
+  },
+  "trace": {
+   "animating": {
+    "presented": 400,
+    "partial": 0,
+    "dropped": 3,
+    "dropped_pct": 0.7
+   },
+   "all": {
+    "presented": 429,
+    "partial": 0,
+    "dropped": 5,
+    "dropped_pct": 1.2
+   },
+   "states": {
+    "PRESENTED_ALL": 429,
+    "DROPPED": 5,
+    "NO_UPDATE_DESIRED": 807
+   }
+  },
+  "marks": 4
+ },
+ {
+  "candidate": "a",
+  "page": "now-racing",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 13.2,
+   "frames": 767,
+   "fps": 58,
+   "missed_vsyncs": 26,
+   "missed_pct": 3.3,
+   "long_frames": 21,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 83.3
+  },
+  "trace": {
+   "animating": {
+    "presented": 773,
+    "partial": 108,
+    "dropped": 29,
+    "dropped_pct": 3.2
+   },
+   "all": {
+    "presented": 801,
+    "partial": 109,
+    "dropped": 33,
+    "dropped_pct": 3.5
+   },
+   "states": {
+    "PRESENTED_ALL": 801,
+    "NO_UPDATE_DESIRED": 706,
+    "DROPPED": 33,
+    "PRESENTED_PARTIAL": 109
+   }
+  },
+  "marks": 6
+ },
+ {
+  "candidate": "a0",
+  "page": "now-racing",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 11.2,
+   "frames": 668,
+   "fps": 59.7,
+   "missed_vsyncs": 3,
+   "missed_pct": 0.4,
+   "long_frames": 1,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 66.8
+  },
+  "trace": {
+   "animating": {
+    "presented": 670,
+    "partial": 198,
+    "dropped": 10,
+    "dropped_pct": 1.1
+   },
+   "all": {
+    "presented": 698,
+    "partial": 198,
+    "dropped": 11,
+    "dropped_pct": 1.2
+   },
+   "states": {
+    "PRESENTED_ALL": 698,
+    "NO_UPDATE_DESIRED": 834,
+    "DROPPED": 11,
+    "PRESENTED_PARTIAL": 198
+   }
+  },
+  "marks": 5
+ },
+ {
+  "candidate": "b",
+  "page": "now-racing",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 12.6,
+   "frames": 757,
+   "fps": 59.9,
+   "missed_vsyncs": 1,
+   "missed_pct": 0.1,
+   "long_frames": 1,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 33.5
+  },
+  "trace": {
+   "animating": {
+    "presented": 761,
+    "partial": 229,
+    "dropped": 15,
+    "dropped_pct": 1.5
+   },
+   "all": {
+    "presented": 792,
+    "partial": 229,
+    "dropped": 16,
+    "dropped_pct": 1.5
+   },
+   "states": {
+    "PRESENTED_ALL": 792,
+    "NO_UPDATE_DESIRED": 739,
+    "DROPPED": 16,
+    "PRESENTED_PARTIAL": 229
+   }
+  },
+  "marks": 6
+ },
+ {
+  "candidate": "a",
+  "page": "standings",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 7.5,
+   "frames": 376,
+   "fps": 49.9,
+   "missed_vsyncs": 76,
+   "missed_pct": 16.8,
+   "long_frames": 52,
+   "p50_ms": 16.7,
+   "p95_ms": 33.4,
+   "max_ms": 66.7
+  },
+  "trace": {
+   "animating": {
+    "presented": 425,
+    "partial": 332,
+    "dropped": 92,
+    "dropped_pct": 10.8
+   },
+   "all": {
+    "presented": 465,
+    "partial": 333,
+    "dropped": 97,
+    "dropped_pct": 10.8
+   },
+   "states": {
+    "PRESENTED_ALL": 465,
+    "DROPPED": 97,
+    "NO_UPDATE_DESIRED": 1525,
+    "PRESENTED_PARTIAL": 333
+   }
+  },
+  "marks": 13
+ },
+ {
+  "candidate": "a0",
+  "page": "standings",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 6.9,
+   "frames": 415,
+   "fps": 60,
+   "missed_vsyncs": 0,
+   "missed_pct": 0,
+   "long_frames": 0,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 16.8
+  },
+  "trace": {
+   "animating": {
+    "presented": 420,
+    "partial": 5,
+    "dropped": 6,
+    "dropped_pct": 1.4
+   },
+   "all": {
+    "presented": 446,
+    "partial": 5,
+    "dropped": 11,
+    "dropped_pct": 2.4
+   },
+   "states": {
+    "PRESENTED_ALL": 446,
+    "NO_UPDATE_DESIRED": 1576,
+    "DROPPED": 11,
+    "PRESENTED_PARTIAL": 5
+   }
+  },
+  "marks": 13
+ },
+ {
+  "candidate": "b",
+  "page": "standings",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 7.1,
+   "frames": 427,
+   "fps": 60,
+   "missed_vsyncs": 0,
+   "missed_pct": 0,
+   "long_frames": 0,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 16.8
+  },
+  "trace": {
+   "animating": {
+    "presented": 431,
+    "partial": 13,
+    "dropped": 21,
+    "dropped_pct": 4.5
+   },
+   "all": {
+    "presented": 456,
+    "partial": 13,
+    "dropped": 23,
+    "dropped_pct": 4.7
+   },
+   "states": {
+    "PRESENTED_ALL": 456,
+    "DROPPED": 23,
+    "NO_UPDATE_DESIRED": 1580,
+    "PRESENTED_PARTIAL": 13
+   }
+  },
+  "marks": 13
+ },
+ {
+  "candidate": "a",
+  "page": "leaders",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 8.1,
+   "frames": 426,
+   "fps": 52.8,
+   "missed_vsyncs": 58,
+   "missed_pct": 12,
+   "long_frames": 45,
+   "p50_ms": 16.7,
+   "p95_ms": 33.3,
+   "max_ms": 100
+  },
+  "trace": {
+   "animating": {
+    "presented": 386,
+    "partial": 37,
+    "dropped": 61,
+    "dropped_pct": 12.6
+   },
+   "all": {
+    "presented": 412,
+    "partial": 37,
+    "dropped": 66,
+    "dropped_pct": 12.8
+   },
+   "states": {
+    "PRESENTED_ALL": 412,
+    "NO_UPDATE_DESIRED": 780,
+    "DROPPED": 66,
+    "PRESENTED_PARTIAL": 37
+   }
+  },
+  "marks": 4
+ },
+ {
+  "candidate": "a0",
+  "page": "leaders",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 7.5,
+   "frames": 448,
+   "fps": 59.7,
+   "missed_vsyncs": 2,
+   "missed_pct": 0.4,
+   "long_frames": 2,
+   "p50_ms": 16.7,
+   "p95_ms": 16.8,
+   "max_ms": 33.3
+  },
+  "trace": {
+   "animating": {
+    "presented": 392,
+    "partial": 27,
+    "dropped": 9,
+    "dropped_pct": 2.1
+   },
+   "all": {
+    "presented": 418,
+    "partial": 27,
+    "dropped": 12,
+    "dropped_pct": 2.6
+   },
+   "states": {
+    "PRESENTED_ALL": 418,
+    "NO_UPDATE_DESIRED": 823,
+    "DROPPED": 12,
+    "PRESENTED_PARTIAL": 27
+   }
+  },
+  "marks": 4
+ },
+ {
+  "candidate": "b",
+  "page": "leaders",
+  "cpu_throttle": 4,
+  "raf": {
+   "animated_s": 8.1,
+   "frames": 484,
+   "fps": 59.9,
+   "missed_vsyncs": 1,
+   "missed_pct": 0.2,
+   "long_frames": 1,
+   "p50_ms": 16.7,
+   "p95_ms": 16.7,
+   "max_ms": 33.4
+  },
+  "trace": {
+   "animating": {
+    "presented": 402,
+    "partial": 52,
+    "dropped": 8,
+    "dropped_pct": 1.7
+   },
+   "all": {
+    "presented": 427,
+    "partial": 52,
+    "dropped": 9,
+    "dropped_pct": 1.8
+   },
+   "states": {
+    "PRESENTED_ALL": 427,
+    "NO_UPDATE_DESIRED": 807,
+    "DROPPED": 9,
+    "PRESENTED_PARTIAL": 52
+   }
+  },
+  "marks": 4
+ }
+]

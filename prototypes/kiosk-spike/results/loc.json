@@ -1,0 +1,66 @@
+{
+ "loc": {
+  "A now-racing": {
+   "front_end": 92,
+   "python": 87,
+   "total": 179
+  },
+  "A standings": {
+   "front_end": 78,
+   "python": 56,
+   "total": 134
+  },
+  "A leaders": {
+   "front_end": 50,
+   "python": 41,
+   "total": 91
+  },
+  "A shared": {
+   "front_end": 52,
+   "python": 0,
+   "total": 52
+  },
+  "B now-racing": {
+   "front_end": 103,
+   "python": 0,
+   "total": 103
+  },
+  "B standings": {
+   "front_end": 77,
+   "python": 36,
+   "total": 113
+  },
+  "B leaders": {
+   "front_end": 64,
+   "python": 26,
+   "total": 90
+  },
+  "B shared": {
+   "front_end": 32,
+   "python": 3,
+   "total": 35
+  },
+  "both shared": {
+   "front_end": 98,
+   "python": 3,
+   "total": 101
+  },
+  "both push (#56)": {
+   "front_end": 0,
+   "python": 25,
+   "total": 25
+  }
+ },
+ "shipped": {
+  "A vendor (htmx, Alpine.js, htmx sse)": {
+   "bytes": 110926,
+   "gzip": 37862,
+   "files": 3
+  },
+  "B dist (built JS + CSS)": {
+   "bytes": 50824,
+   "gzip": 20921,
+   "files": 7
+  }
+ }
+}

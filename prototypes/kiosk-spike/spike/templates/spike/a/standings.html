@@ -1,0 +1,15 @@
+{% extends "spike/a/base.html" %}
+{% block title %}Standings{% endblock %}
+{% block assets %}{% load static %}<link rel="stylesheet" href="{% static 'spike/a/standings.css' %}"><script src="{% static 'spike/a/standings.js' %}"></script>{% endblock %}
+{% block body %}
+{# poll.kiosk every 5 s (kiosk-poller.js's contract); the answer carries the #}
+{# kiosk's parameters as an HX-Trigger event. With ?push=1 a server-sent     #}
+{# "change" event polls at once.                                             #}
+<main class="kiosk" x-data="standings" @kiosk-params.window="apply($event.detail)"
+      {% if push %}hx-ext="sse" sse-connect="/spike/events"{% endif %}>
+  <div hx-get="/spike/a/kiosk-poll?address={{ address|urlencode }}"
+       hx-trigger="load, every 5s{% if push %}, sse:change{% endif %}" hx-swap="none"></div>
+  <div id="table"></div>
+  <div class="badge-paused" x-show="paused">paused for replay</div>
+</main>
+{% endblock %}

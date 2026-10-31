@@ -1,0 +1,20 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>{% block title %}Kiosk{% endblock %} (A)</title>
+<link rel="stylesheet" href="{% static 'spike/kiosk.css' %}">
+<link rel="stylesheet" href="{% static 'spike/a/common.css' %}">
+<script src="{% static 'spike/spike-common.js' %}"></script>
+<script src="{% static 'spike/vendor/htmx-2.0.11.min.js' %}"></script>
+{% if push %}<script src="{% static 'spike/vendor/htmx-ext-sse-2.2.4.min.js' %}"></script>{% endif %}
+<script src="{% static 'spike/a/common.js' %}"></script>
+{% block assets %}{% endblock %}
+<script defer src="{% static 'spike/vendor/alpinejs-3.17.4.min.js' %}"></script>
+</head>
+<body>
+{% block body %}{% endblock %}
+<div class="badge-candidate">A: htmx + Alpine.js</div>
+</body>
+</html>

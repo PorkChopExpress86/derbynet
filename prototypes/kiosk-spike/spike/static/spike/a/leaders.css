@@ -1,0 +1,8 @@
+/* SPIKE #71, candidate A: the intermission leaders.  The panel slides in
+   (a view transition, or with ?vt=0 htmx's swap delay), then the podium
+   steps rise in turn. */
+.leaders { view-transition-name: board; }
+.leaders .step { animation: rise 700ms cubic-bezier(.2, .9, .3, 1.2) both; animation-delay: calc(400ms + (4 - var(--p)) * 300ms); }
+@keyframes rise { from { transform: translateY(200px); opacity: 0; } }
+.no-vt .leaders { view-transition-name: none; animation: 550ms ease-out both slide-in; }
+.no-vt #panel.htmx-swapping > .leaders { animation: 450ms ease-in both slide-out; }

@@ -1,0 +1,20 @@
+/* SPIKE #71, candidate A: now racing. */
+
+/* Results land by place, 1st first, 400 ms apart. */
+.lane .result {
+  animation: land 600ms cubic-bezier(.2, .9, .3, 1.3) both;
+  animation-delay: calc((var(--p) - 1) * 400ms);
+}
+.lane .time.result { animation-name: fade-up; }
+.lane.p1 { animation: glow 1200ms ease-in-out 1800ms 2 alternate both; }
+@keyframes land { from { transform: translateX(400px) scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes glow { to { box-shadow: 0 0 0 6px var(--gold), 0 0 60px var(--gold); } }
+
+/* A new lineup slides in from the right: a view transition, or with ?vt=0
+   the old board slides out during htmx's swap delay (.htmx-swapping) and
+   the new one slides in as it is inserted. */
+.board { view-transition-name: board; }
+.no-vt .board { view-transition-name: none; }
+.no-vt #board.htmx-swapping > .board { animation: 450ms ease-in both slide-out; }
+.no-vt .board[data-new-heat] { animation: 550ms ease-out both slide-in; }

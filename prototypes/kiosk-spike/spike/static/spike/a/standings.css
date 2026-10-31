@@ -1,0 +1,11 @@
+/* SPIKE #71, candidate A: the standings reveal.  The revealed row drops in;
+   the rows below glide, because the browser animates each named row's group
+   from its old box to its new one.  (?vt=0: flip() in common.js.) */
+::view-transition-group(*) { animation-duration: 500ms; }
+::view-transition-new(*):only-child { animation: 500ms ease-out both row-in; }
+@keyframes row-in { from { transform: translateY(-40px) scaleY(.4); opacity: 0; } }
+
+/* Rows are hidden with a bound `hidden` attribute, not x-show: Alpine's
+   x-show shows an element one animation frame late, after the view
+   transition or flip() has already measured the new layout. */
+.srow[hidden] { display: none; }

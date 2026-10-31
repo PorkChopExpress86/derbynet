@@ -1,0 +1,18 @@
+{% extends "spike/a/base.html" %}
+{% block title %}Now Racing{% endblock %}
+{% block assets %}{% load static %}<link rel="stylesheet" href="{% static 'spike/a/now-racing.css' %}"><script src="{% static 'spike/a/now-racing.js' %}"></script>{% endblock %}
+{% block body %}
+{# htmx fetches the board 500 ms after each response (now-racing-poller.js's #}
+{# contract); the server answers 204 when nothing changed. With ?push=1 a   #}
+{# server-sent "change" event fetches it at once and the chain slows to 5 s. #}
+<main class="kiosk" x-data="nowRacing({{ push|yesno:'5000,500' }})"
+      {% if push %}hx-ext="sse" sse-connect="/spike/events"{% endif %}>
+  <div id="board" x-ref="board"
+       hx-get="/spike/a/now-racing/board"
+       hx-trigger="load, next-poll{% if push %}, sse:change{% endif %}"
+       hx-vals="js:{...boardState()}"
+       hx-sync="this:queue last">
+  </div>
+  <div class="badge-paused" x-show="paused">paused for replay</div>
+</main>
+{% endblock %}

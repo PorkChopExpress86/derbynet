@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Kiosk spike #71</title>
+<style>body{font:18px system-ui;margin:40px;background:#fff;color:#111}a{display:block;margin:6px 0}</style></head>
+<body>
+<h1>Kiosk front-end spike (#71)</h1>
+<h2>A: Django templates + htmx + Alpine.js</h2>
+<a href="/spike/a/now-racing/">Now racing</a>
+<a href="/spike/a/standings/?address=spike-a">Standings reveal</a>
+<a href="/spike/a/leaders/">Intermission leaders</a>
+<a href="/spike/a/now-racing/?push=1">Now racing, push (SSE)</a>
+<h2>B: Svelte (static bundle)</h2>
+<a href="/spike/b/now-racing.html">Now racing</a>
+<a href="/spike/b/standings.html?address=spike-b">Standings reveal</a>
+<a href="/spike/b/leaders.html">Intermission leaders</a>
+<a href="/spike/b/now-racing.html?push=1">Now racing, push (SSE)</a>
+<h2>Replay frame</h2>
+<a href="/spike/replay-harness?src=/spike/a/now-racing/">A now racing inside the replay iframe</a>
+<a href="/spike/replay-harness?src=/spike/b/now-racing.html">B now racing inside the replay iframe</a>
+</body>
+</html>

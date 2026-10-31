@@ -1,0 +1,242 @@
+[
+ {
+  "candidate": "a",
+  "page": "now-racing",
+  "mode": "poll",
+  "skew_ms": {
+   "n": 5,
+   "mean": 10,
+   "median": 9,
+   "max": 19
+  },
+  "latency_ms": {
+   "n": 10,
+   "mean": 266,
+   "median": 213,
+   "max": 523
+  },
+  "requests_per_tv": [
+   131,
+   129
+  ],
+  "samples": [
+   11,
+   3,
+   9,
+   6,
+   19
+  ]
+ },
+ {
+  "candidate": "a",
+  "page": "standings",
+  "mode": "poll",
+  "skew_ms": {
+   "n": 13,
+   "mean": 2401,
+   "median": 2401,
+   "max": 2406
+  },
+  "latency_ms": {
+   "n": 26,
+   "mean": 1955,
+   "median": 2499,
+   "max": 3984
+  },
+  "samples": [
+   2406,
+   2405,
+   2405,
+   2402,
+   2397,
+   2397,
+   2401,
+   2401,
+   2398,
+   2400,
+   2401,
+   2398,
+   2401
+  ]
+ },
+ {
+  "candidate": "b",
+  "page": "now-racing",
+  "mode": "poll",
+  "skew_ms": {
+   "n": 5,
+   "mean": 32,
+   "median": 29,
+   "max": 63
+  },
+  "latency_ms": {
+   "n": 10,
+   "mean": 459,
+   "median": 456,
+   "max": 502
+  },
+  "requests_per_tv": [
+   134,
+   132
+  ],
+  "samples": [
+   63,
+   40,
+   29,
+   25,
+   3
+  ]
+ },
+ {
+  "candidate": "b",
+  "page": "standings",
+  "mode": "poll",
+  "skew_ms": {
+   "n": 13,
+   "mean": 139,
+   "median": 138,
+   "max": 148
+  },
+  "latency_ms": {
+   "n": 26,
+   "mean": 3372,
+   "median": 3388,
+   "max": 3982
+  },
+  "samples": [
+   141,
+   140,
+   138,
+   138,
+   136,
+   136,
+   137,
+   141,
+   133,
+   138,
+   148,
+   140,
+   138
+  ]
+ },
+ {
+  "candidate": "a",
+  "page": "now-racing",
+  "mode": "push",
+  "skew_ms": {
+   "n": 5,
+   "mean": 8,
+   "median": 11,
+   "max": 12
+  },
+  "latency_ms": {
+   "n": 10,
+   "mean": 61,
+   "median": 58,
+   "max": 76
+  },
+  "requests_per_tv": [
+   21,
+   20
+  ],
+  "samples": [
+   4,
+   12,
+   11,
+   12,
+   0
+  ]
+ },
+ {
+  "candidate": "a",
+  "page": "standings",
+  "mode": "push",
+  "skew_ms": {
+   "n": 13,
+   "mean": 8,
+   "median": 4,
+   "max": 51
+  },
+  "latency_ms": {
+   "n": 26,
+   "mean": 41,
+   "median": 44,
+   "max": 61
+  },
+  "samples": [
+   3,
+   3,
+   4,
+   2,
+   2,
+   8,
+   8,
+   51,
+   1,
+   4,
+   8,
+   6,
+   3
+  ]
+ },
+ {
+  "candidate": "b",
+  "page": "now-racing",
+  "mode": "push",
+  "skew_ms": {
+   "n": 5,
+   "mean": 9,
+   "median": 10,
+   "max": 19
+  },
+  "latency_ms": {
+   "n": 10,
+   "mean": 43,
+   "median": 43,
+   "max": 58
+  },
+  "requests_per_tv": [
+   21,
+   20
+  ],
+  "samples": [
+   12,
+   19,
+   5,
+   10,
+   1
+  ]
+ },
+ {
+  "candidate": "b",
+  "page": "standings",
+  "mode": "push",
+  "skew_ms": {
+   "n": 13,
+   "mean": 8,
+   "median": 5,
+   "max": 51
+  },
+  "latency_ms": {
+   "n": 26,
+   "mean": 36,
+   "median": 37,
+   "max": 64
+  },
+  "samples": [
+   7,
+   5,
+   4,
+   2,
+   5,
+   3,
+   51,
+   6,
+   5,
+   6,
+   2,
+   6,
+   2
+  ]
+ }
+]

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Replay harness</title>
+<style>
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+#interior { border: 0; width: 100%; height: 100%; }
+#playback { position: absolute; inset: 0; display: none; background: #000; color: #fff;
+            font: 80px system-ui; align-items: center; justify-content: center; }
+</style></head>
+<body>
+{# The part of website/replay.php the kiosk sees: it frames the kiosk page  #}
+{# in #interior and posts 'replay-started' / 'replay-ended' into it, with   #}
+{# target origin '*', around showing a replay over it.                      #}
+<iframe id="interior" src="{{ src }}"></iframe>
+<div id="playback">REPLAY</div>
+<script>
+function announce_to_interior(msg) {
+  document.querySelector("#interior").contentWindow.postMessage(msg, '*');
+}
+function start_replay() {
+  document.getElementById('playback').style.display = 'flex';
+  announce_to_interior('replay-started');
+}
+function end_replay() {
+  document.getElementById('playback').style.display = 'none';
+  announce_to_interior('replay-ended');
+}
+</script>
+</body>
+</html>

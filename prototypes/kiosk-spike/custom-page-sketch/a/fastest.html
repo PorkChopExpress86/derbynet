@@ -1,0 +1,29 @@
+{% extends "kiosks/base.html" %}
+{# SKETCH (not wired): an owner-built "fastest five" page in candidate A.    #}
+{# The owner writes this one template; the kiosk app registers every file   #}
+{# under templates/kiosks/custom/ as a page, and gives it `standings` and   #}
+{# `fastest` from the same services the built-in pages use. Edit, reload    #}
+{# the browser: no build step. Animations are plain CSS classes the base    #}
+{# stylesheet ships (enter-up, stagger) or the page's own <style>.          #}
+{% block title %}Fastest five{% endblock %}
+{% block body %}
+<main class="kiosk"
+      hx-get="{% url 'kiosks:custom' 'fastest' %}" hx-trigger="every 5s, kiosk:changed from:body"
+      hx-select="main" hx-swap="outerHTML transition:true">
+  <h1>Fastest five today</h1>
+  <ol class="standings">
+    {% for run in fastest|slice:":5" %}
+    <li class="srow enter-up" style="--i: {{ forloop.counter0 }}; view-transition-name: run-{{ run.resultid }}">
+      <span>{{ forloop.counter }}</span>
+      <span>#{{ run.carnumber }}</span>
+      <span>{{ run.name }}</span>
+      <span class="avg">{{ run.time }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</main>
+<style>
+  .enter-up { animation: enter-up 500ms ease-out both; animation-delay: calc(var(--i) * 150ms); }
+  @keyframes enter-up { from { transform: translateY(40px); opacity: 0; } }
+</style>
+{% endblock %}
