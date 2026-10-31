@@ -79,6 +79,20 @@ def test_every_ladder_matches_php(fixture):
     assert compared == len(fixture.named(STANDINGS))
 
 
+def test_every_ladder_comes_in_phps_order(fixture):
+    """The ladders come in the order PHP adds them, which `query=standings`
+    prints. A deviated exchange has no PHP order to keep."""
+    wrong = {}
+    for name in fixture.named(STANDINGS):
+        if name in fixture.deviated:
+            continue
+        php = list(body(fixture.expected(name))["standings"])
+        django = list(Standings(fixture.event(name)).ladders)
+        if php != django:
+            wrong[name] = (django, php)
+    assert wrong == {}
+
+
 @pytest.mark.parametrize("stem", EXPORTING)
 def test_every_export_sheet_matches_php(stem):
     fixture = Fixture(stem)

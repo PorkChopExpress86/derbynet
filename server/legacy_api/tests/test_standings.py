@@ -10,25 +10,45 @@ engine's ladders are compared with every standings transcript in
 """
 
 import json
+import os
+import re
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
+from awards.models import AwardPartition
 from core.models import RaceSettings, SiteState
 from core.tests.factories import EventFactory
-from legacy_api.tests.test_race_control_parity import Scenario, _dump, active_event
+from legacy_api.encoding import encode_php_json
+from legacy_api.tests.test_race_control_parity import (
+    Scenario,
+    _dump,
+    _exchange_text,
+    active_event,
+)
 from legacy_api.tests.test_snapshot import GOLDEN as Q13_SNAPSHOT
 from legacy_api.tests.test_snapshot import put
-from racing.models import HeatLane, RosterEntry, Round
+from racing.engine.tests.golden import (
+    GOLDEN_DIR,
+    read_transcript,
+    transcript_deviations,
+    write_deviation_entries,
+)
+from racing.models import HeatLane, LaneClosure, RosterEntry, Round
 from roster.models import Racer, Subgroup
 from roster.tests.factories import (
     GroupConstituentFactory,
     GroupFactory,
+    PartitionFactory,
     RacerFactory,
     SubgroupFactory,
 )
 
 pytestmark = pytest.mark.django_db
+
+WRITE_SQL = re.compile(r"\s*(INSERT|UPDATE|DELETE|REPLACE)\b", re.IGNORECASE)
 
 
 def standings(client):
@@ -133,6 +153,104 @@ def test_only_the_active_events_racers_are_listed(client, event):
     assert listed == set(Racer.objects.filter(event=event).values_list("pk", flat=True))
 
 
+def test_a_standings_read_writes_nothing(client, event):
+    """PHP's standings.inc writes scoring=1 on every read while the legacy
+    drop-slowest key is set (Q13, #64 C11). Django's read sends no write."""
+    group = GroupFactory(event=event)
+    round_ = Round.objects.create(event=event, group=group, number=1)
+    race(round_, dict.fromkeys(checked_in(group, 2), 3.0))
+    before = client.get("/action.php", {"query": "settings.list"}).content
+
+    with CaptureQueriesContext(connection) as queries:
+        standings(client)
+
+    writes = [q["sql"] for q in queries if WRITE_SQL.match(q["sql"])]
+    assert writes == []
+    assert len(queries) > 0
+    assert client.get("/action.php", {"query": "settings.list"}).content == before
+
+
+# ----- The divergences `query=standings` records --------------------------------
+
+
+def run(round_, heat, lane, racer, time=None, place=None):
+    """One result, with the racer on the round's roster."""
+    RosterEntry.objects.get_or_create(event=round_.event, round=round_, racer=racer)
+    HeatLane.objects.create(
+        event=round_.event,
+        round=round_,
+        heat=heat,
+        lane=lane,
+        racer=racer,
+        finish_time=time,
+        finish_place=place,
+        completed=timezone.now(),
+    )
+
+
+def test_q23_a_racer_with_only_a_place_under_time_scoring_takes_no_place(client, event):
+    """PHP throws a TypeError or files the racer under rung -1 (Q23)."""
+    group = GroupFactory(event=event)
+    round_ = Round.objects.create(event=event, group=group, number=1)
+    timed, placed = checked_in(group, 2)
+    run(round_, 1, 1, timed, time=3.0, place=1)
+    run(round_, 1, 2, placed, place=2)
+
+    _, ladders = standings(client)
+
+    assert ladders[f"st-r{round_.pk}"] == [[timed.pk]]
+
+
+def test_d33_a_racer_not_eligible_for_speed_awards_takes_no_place(client, event):
+    """PHP has no such setting, and places every racer not excluded."""
+    group = GroupFactory(event=event)
+    round_ = Round.objects.create(event=event, group=group, number=1)
+    fast, ineligible, slow = checked_in(group, 3)
+    Racer.objects.filter(pk=ineligible.pk).update(not_eligible_for_speed_awards=True)
+    race(round_, {fast: 3.0, ineligible: 3.1, slow: 3.2})
+
+    _, ladders = standings(client)
+
+    assert ladders[f"st-r{round_.pk}"] == [[fast.pk], [slow.pk]]
+
+
+def test_d35_a_racer_outside_a_narrowed_partition_list_takes_no_place(client, event):
+    """PHP has no partition lists, and places every racer not excluded."""
+    group = GroupFactory(event=event)
+    subgroup = SubgroupFactory(group=group)
+    listed, other = (
+        PartitionFactory(subgroup=subgroup),
+        PartitionFactory(subgroup=subgroup),
+    )
+    AwardPartition.objects.create(event=event, group=group, partition=listed)
+    round_ = Round.objects.create(event=event, group=group, number=1)
+    outsider = RacerFactory(
+        group=group, subgroup=subgroup, partition=other, passed_inspection=True
+    )
+    member = RacerFactory(
+        group=group, subgroup=subgroup, partition=listed, passed_inspection=True
+    )
+    race(round_, {outsider: 3.0, member: 3.1})
+
+    _, ladders = standings(client)
+
+    assert ladders[f"st-r{round_.pk}"] == [[member.pk]]
+
+
+def test_d37_a_closed_lanes_results_are_dropped(client, event):
+    """PHP has no lane closures, and would place the lane-2 car first."""
+    group = GroupFactory(event=event)
+    round_ = Round.objects.create(event=event, group=group, number=1)
+    open_lane, closed_lane = checked_in(group, 2)
+    run(round_, 1, 1, open_lane, time=3.0, place=2)
+    run(round_, 1, 2, closed_lane, time=2.9, place=1)
+    LaneClosure.objects.create(event=event, round=round_, mask=0b10)
+
+    _, ladders = standings(client)
+
+    assert ladders[f"st-r{round_.pk}"] == [[open_lane.pk]]
+
+
 # ----- capture/scenarios/12-standings-quirks.sh --------------------------------
 
 
@@ -213,10 +331,42 @@ def run_standings_quirks(client) -> Scenario:
         racer = Racer.objects.get(event=event, car_number=car)
         s.ids.to_php["racer"][racer.pk] = php_id
     s.ids.to_php["round"][Round.objects.get(event=event).pk] = 1
-    s.skip("settings.list after the snapshot")
+    s.q13_settings = {}
+    settings_scoring(s, AFTER_SNAPSHOT)
     s.capture("standings after the snapshot")
-    s.skip_rest()
+    settings_scoring(s, AFTER_STANDINGS)
     return s
+
+
+# The two settings.list exchanges around Q13's second standings read, which
+# show whether the read wrote `scoring`. The rest of Django's settings.list
+# differs from PHP's throughout (it lists every setting, and the folders
+# and ids of this run), so only the settings Q13 touches are compared.
+Q13_FIXTURE = "http/standings/q13-drop-slowest.http"
+AFTER_SNAPSHOT = "003 settings.list after the snapshot"
+AFTER_STANDINGS = "005 settings.list after standings"
+Q13_KEYS = ("scoring", "drop-slowest")
+Q13_REASON = (
+    "Django converts the legacy drop-slowest key to scoring=1 when it imports"
+    " the snapshot, and reading the standings writes nothing; PHP lists no"
+    " scoring until query=standings includes standings.inc, which writes"
+    " scoring=1 (#64 C11). Only the settings Q13 touches are recorded."
+)
+DEVIATION_CLAIM = {("Q13", Q13_FIXTURE)}
+
+
+def q13_body(body: bytes) -> bytes:
+    """A settings.list body cut down to the settings Q13 touches."""
+    settings = json.loads(body)["settings"]
+    kept = {k: settings[k] for k in Q13_KEYS if k in settings}
+    return encode_php_json({"settings": kept})
+
+
+def settings_scoring(s: Scenario, name: str):
+    """A recorded settings.list, kept as `q13_body` instead of compared whole."""
+    s.skip(name.split(" ", 1)[1])
+    response = s.client.get("/action.php", {"query": "settings.list"})
+    s.q13_settings[name] = q13_body(response.content)
 
 
 def test_the_standings_quirk_scenarios_match_php(client, event):
@@ -226,3 +376,47 @@ def test_the_standings_quirk_scenarios_match_php(client, event):
     assert s.mismatches() == []
     compared = [name for got in s.got.values() for name in got if "standings" in name]
     assert len(compared) == 3
+
+
+def test_q13_reading_the_standings_writes_no_scoring(client, event):
+    """PHP's settings gain scoring=1 between 003 and 005, because its second
+    standings read wrote it. Django's hold the scoring=1 its snapshot import
+    converted (`transfer.legacy.raceinfo`) on both sides of the read, as
+    the Q13 entry of deviations.json records for 003."""
+    s = run_standings_quirks(client)
+    php = read_transcript(GOLDEN_DIR / Q13_FIXTURE)
+    django = s.q13_settings
+
+    assert json.loads(php[AFTER_SNAPSHOT]["body"])["settings"].get("scoring") is None
+    assert json.loads(php[AFTER_STANDINGS]["body"])["settings"]["scoring"] == 1
+    assert django[AFTER_SNAPSHOT] == django[AFTER_STANDINGS]
+    # Django converts drop-slowest on import and does not list it.
+    assert json.loads(django[AFTER_STANDINGS]) == {"settings": {"scoring": 1}}
+    [(quirk, expected)] = transcript_deviations(Q13_FIXTURE).values()
+    assert quirk == "Q13"
+    assert expected["body"] == django[AFTER_SNAPSHOT]
+    assert expected["body"] != q13_body(php[AFTER_SNAPSHOT]["body"])
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the #37 Q13 entry"
+)
+def test_write_standings_deviations(client, event):
+    s = run_standings_quirks(client)
+    php = read_transcript(GOLDEN_DIR / Q13_FIXTURE)
+    expected = "deviations/Q13/q13-drop-slowest.http"
+    path = GOLDEN_DIR / expected
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(
+        _exchange_text(
+            AFTER_SNAPSHOT, php[AFTER_SNAPSHOT], s.q13_settings[AFTER_SNAPSHOT]
+        )
+    )
+    entry = {
+        "quirk": "Q13",
+        "fixture": Q13_FIXTURE,
+        "exchanges": [AFTER_SNAPSHOT],
+        "reason": Q13_REASON,
+        "expected": expected,
+    }
+    write_deviation_entries(DEVIATION_CLAIM, [entry])

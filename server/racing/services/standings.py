@@ -55,7 +55,9 @@ def standings_snapshot(event) -> Snapshot:
 
 def all_standings(event) -> dict[str, oracle.Ladder]:
     """`StandingsOracle::all_standings`: every ladder of the event, keyed as
-    `website/inc/standings.inc` keys them, in the order PHP adds them."""
+    `website/inc/standings.inc` keys them, in the order PHP adds them
+    (`test_every_ladder_comes_in_phps_order` in `racing/engine/tests/
+    test_standings_parity.py`)."""
     return dict(standings_snapshot(event).standings.ladders)
 
 
