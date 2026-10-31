@@ -95,11 +95,7 @@ def resolve(event, barcode: str) -> Resolved:
         case WalkIn(car_number):
             racer, created = racers.find_or_create_walk_in(event, car_number)
             return Resolved(racer, created)
-        # A car number past the 32-bit column names no car; a lookup with it
-        # would raise on both engines.
-        case CarNumber(text) if (
-            _INTEGER.fullmatch(text) and -(2**31) <= int(text) < 2**31
-        ):
+        case CarNumber(text) if _INTEGER.fullmatch(text):
             found = list(racers_of_event.filter(car_number=int(text))[:2])
             return Resolved(found[0] if len(found) == 1 else None)
     return Resolved(None)

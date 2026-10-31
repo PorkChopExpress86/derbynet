@@ -87,10 +87,11 @@ def test_a_rotation_during_a_render_leaves_no_stale_render(
 def test_a_delete_during_a_render_leaves_no_orphan(crew, folders, event, monkeypatch):
     upload(crew, "p.jpg", image_bytes((480, 320)))
     repo = photos.repository(event, "head")
+    # After the photo is decoded, so the render no longer needs the file.
     started = interrupt(
         monkeypatch,
-        "_open_upright",
-        lambda path, rotation=0.0: True,
+        "_encode",
+        lambda image, fmt, target: True,
         lambda: photos.delete_photo(event, repo, "p.jpg"),
     )
 
