@@ -392,3 +392,46 @@ def test_a_deleted_photo_leaves_no_render_and_no_racer(crew, act, folders, event
     assert list(folders.car.rglob("p.jpg")) == []
     assert Racer.objects.get(pk=racer.pk).car_photo == ""
     assert crew.get("/photo.php/car/file/original/p.jpg/1").status_code == 404
+
+
+def pattern(orientation: int) -> bytes:
+    """`testing/data/carphotos/make-pattern-o6.py`'s picture, stored turned
+    so that EXIF `orientation` turns it upright, as a camera stores it."""
+    upright = Image.new("RGB", (480, 320))
+    for x, y, color in [
+        (0, 0, (220, 30, 30)),
+        (240, 0, (30, 200, 30)),
+        (0, 160, (30, 30, 220)),
+        (240, 160, (245, 245, 245)),
+    ]:
+        upright.paste(color, (x, y, x + 240, y + 160))
+    undo = {
+        3: Image.Transpose.ROTATE_180,
+        6: Image.Transpose.ROTATE_90,
+        8: Image.Transpose.ROTATE_270,
+    }
+    exif = Image.Exif()
+    exif[0x0112] = orientation
+    stream = io.BytesIO()
+    upright.transpose(undo[orientation]).save(
+        stream, "JPEG", quality=95, exif=exif.tobytes()
+    )
+    return stream.getvalue()
+
+
+@pytest.mark.parametrize("orientation", [3, 6, 8])
+def test_every_turned_tag_renders_upright(crew, folders, orientation):
+    """The render checks #35 runs against Django only, since PHP draws photos
+    with tags 3, 6 and 8 turned (#73)."""
+    stored = pattern(orientation)
+    upload(crew, f"o{orientation}.jpg", stored, repo="car")
+
+    _, original = get(crew, f"car/file/original/o{orientation}.jpg/1")
+    _, thumb = get(crew, f"car/file/200x200/o{orientation}.jpg/1")
+    _, work = get(crew, f"car/file/work/o{orientation}.jpg/1")
+
+    assert original == stored
+    assert shape(original)[1] == orientation
+    assert quarters(original) == "RGBW"
+    assert (shape(thumb), quarters(thumb)) == (((200, 133), None), "RGBW")
+    assert (shape(work), quarters(work)) == (((600, 400), None), "RGBW")

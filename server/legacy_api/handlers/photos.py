@@ -27,8 +27,8 @@ UPLOAD_DIVERGENCES = (
     "P3: the file is decoded to check it is a JPEG, PNG or GIF, its name must end"
     " in .jpg, .jpeg, .jpe, .png or .gif, and its size is capped; PHP trusts the"
     " client's MIME type.",
-    "P4: autocrop runs OpenCV, reports a miss as No face detected for autocrop.,"
-    " and runs the DERBYNET_FACEDETECT hook with no shell (#74).",
+    "P4: autocrop runs OpenCV and warns of a miss, where PHP's detector returns a"
+    " box of zeros (#74), and runs the DERBYNET_FACEDETECT hook with no shell.",
 )
 REPO_DIVERGENCE = ("P5: an unknown repo fails with unknown-repo; PHP fails fatally.",)
 
