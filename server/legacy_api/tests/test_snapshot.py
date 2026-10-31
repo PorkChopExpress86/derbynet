@@ -10,6 +10,7 @@ import pytest
 
 from accounts.permissions import Perm
 from core.models import Event, RaceSettings, SiteState
+from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in
 from racing.models import HeatLane, RosterEntry, Round
 from racing.tests.factories import HeatLaneFactory, RoundFactory
@@ -269,10 +270,11 @@ def folder_settings(event):
 
 
 def with_photos(event):
-    """Two racers of `event` with a headshot and a car photo on disk, and empty
-    video and log folders. Returns `{path: bytes}` of the photos."""
+    """Two racers of `event` with a headshot and a car photo on disk, and
+    video and log folders with no files. Returns `{path: bytes}` of the
+    photos."""
     for directory in folder_settings(event).values():
-        Path(directory).mkdir(parents=True)
+        Path(directory).mkdir(parents=True, exist_ok=True)
     row = RaceSettings.for_event(event)
     group = GroupFactory(event=event)
     RoundFactory(event=event, group=group, number=1)
@@ -303,70 +305,192 @@ def photos_resolve(event):
         assert (Path(row.car_photo_directory) / racer.car_photo).is_file()
 
 
-def staging_folders(events_root):
-    return [p.name for p in events_root.rglob("*") if folders.MARK in p.name]
+def leftovers(events_root):
+    """Import and removal folders under `events_root`."""
+    return sorted(
+        p.name
+        for p in events_root.rglob("*")
+        if folders.MARK in p.name or p.name.startswith(folders.REMOVING)
+    )
 
 
+def set_folder(event, **paths):
+    RaceSettings.objects.filter(event=event).update(
+        **{field: str(path) for field, path in paths.items()}
+    )
+
+
+def _usual(event, tmp_path):
+    return {}
+
+
+def _elsewhere(event, tmp_path):
+    """The headshots are in a folder outside `events/`, with a file of the
+    crew's own."""
+    elsewhere = tmp_path / "usb" / "racers"
+    elsewhere.mkdir(parents=True)
+    (elsewhere / "crew.jpg").write_bytes(b"the crew's own file")
+    set_folder(event, photo_directory=elsewhere)
+    return {elsewhere / "crew.jpg": b"the crew's own file"}
+
+
+def _symlink(event, tmp_path):
+    """`events/<slug>/racers` is a symlink to a folder on another disk."""
+    target = tmp_path / "usb" / "racers"
+    target.mkdir(parents=True)
+    (target / "crew.jpg").write_bytes(b"the crew's own file")
+    link = Path(RaceSettings.for_event(event).photo_directory)
+    link.parent.mkdir(parents=True)
+    link.symlink_to(target)
+    return {target / "crew.jpg": b"the crew's own file"}
+
+
+def _shared(event, tmp_path):
+    """Another event points at the same headshot folder, and has a file in
+    it."""
+    other = EventFactory()
+    shared = Path(RaceSettings.for_event(event).photo_directory)
+    shared.mkdir(parents=True)
+    (shared / "other.jpg").write_bytes(b"the other event's file")
+    set_folder(other, photo_directory=shared)
+    return {shared / "other.jpg": b"the other event's file"}
+
+
+def _moved_data_dir(event, tmp_path):
+    """The event's folders are under a `DATA_DIR` the server no longer
+    uses."""
+    old = tmp_path / "old-data" / "events" / event.slug
+    set_folder(event, **{field: old / sub for field, sub in FOLDERS.items()})
+    return {}
+
+
+# How the event's folders are laid out before the restore. Each returns the
+# files of others that the restore must leave as they are.
+LAYOUTS = {
+    "usual": _usual,
+    "elsewhere": _elsewhere,
+    "symlink": _symlink,
+    "shared": _shared,
+    "moved-data-dir": _moved_data_dir,
+}
+
+
+def set_up(event, layout, tmp_path):
+    """`event` in `layout`, with photos, and an empty subfolder in its videos
+    folder. Returns the folder settings, the photos, the files of others,
+    and the snapshot with photos."""
+    others = LAYOUTS[layout](event, tmp_path)
+    saved = with_photos(event)
+    before = folder_settings(event)
+    # A file would make the restore refuse; a subfolder shows whether the
+    # videos folder is kept.
+    (Path(before["video_directory"]) / "heat-1").mkdir()
+    return before, saved, others
+
+
+def assert_restored(event, before, saved, others, events_root):
+    assert folder_settings(event) == before
+    for path, content in {**saved, **others}.items():
+        assert path.read_bytes() == content
+    photos_resolve(event)
+    assert (Path(before["video_directory"]) / "heat-1").is_dir()
+    assert leftovers(events_root) == []
+    for directory in before.values():
+        assert not [p for p in Path(directory).rglob("*") if folders.PLACING in p.name]
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
 def test_a_restore_keeps_the_folder_paths_and_brings_the_photos_back(
-    events_root, client, coordinator
+    client, coordinator, events_root, tmp_path, layout
 ):
-    saved = with_photos(coordinator)
-    before = folder_settings(coordinator)
+    before, saved, others = set_up(coordinator, layout, tmp_path)
     snapshot = get(client, "&photos").content
     for path in saved:
         path.write_bytes(b"changed after the snapshot")
+    # A file the snapshot does not have.
+    stale = Path(before["car_photo_directory"]) / "stale.jpg"
+    stale.write_bytes(b"not in the snapshot")
 
     assert "<success/>" in put(client, snapshot).content.decode()
 
     event = active()
     assert event.pk != coordinator.pk
-    assert folder_settings(event) == before
-    for path, content in saved.items():
-        assert path.read_bytes() == content
-    photos_resolve(event)
-    assert all(Path(d).is_dir() for d in before.values())
-    assert staging_folders(events_root) == []
-    assert sorted(p.name for p in events_root.iterdir()) == [coordinator.slug]
+    assert_restored(event, before, saved, others, events_root)
+    # A swapped folder holds only the snapshot's files; one kept in place,
+    # here the car photos under the old DATA_DIR, keeps the others too.
+    assert stale.exists() == (layout == "moved-data-dir")
+    if layout == "symlink":
+        assert Path(before["photo_directory"]).is_symlink()
+    if layout == "shared":
+        (other,) = Event.objects.exclude(pk=event.pk)
+        assert folder_settings(other)["photo_directory"] == before["photo_directory"]
+
+
+def test_a_restore_over_an_event_with_videos_is_refused(
+    client, coordinator, events_root, tmp_path
+):
+    before, saved, others = set_up(coordinator, "usual", tmp_path)
+    video = Path(before["video_directory"]) / "heat-1.mkv"
+    video.write_bytes(b"a recording")
+    snapshot = get(client, "&photos").content
+
+    reply = put(client, snapshot).content.decode()
+
+    assert 'code="import-failed"' in reply and "--discard-videos" in reply
+    assert active().pk == coordinator.pk
+    assert video.read_bytes() == b"a recording"
+    assert folder_settings(coordinator) == before
+    assert leftovers(events_root) == []
 
 
 class Killed(BaseException):
     """Stands for a process killed at one step: nothing catches it."""
 
 
-def kill_before(owner, name, monkeypatch):
-    def die(*args, **kwargs):
-        raise Killed
+# The steps of a restore after its import's commit, each as when to kill
+# (before or after the call), and the function.
+KILL_POINTS = {
+    "committed": ("before", ImportFolder, "finish"),
+    "linked": ("after", folders, "_link_copy"),
+    "set-aside": ("after", folders, "_set_aside"),
+    "moved-in": ("after", folders, "_move_in"),
+    "file-linked": ("after", folders, "_link_or_copy"),
+    "placed-file": ("after", folders, "_place_file"),
+    "between-folders": ("after", folders, "_keep_one"),
+    "repointed": ("after", folders, "_repoint"),
+}
 
-    monkeypatch.setattr(owner, name, die)
 
-
-def kill_after(owner, name, monkeypatch):
+def kill_at(point, monkeypatch):
+    when, owner, name = KILL_POINTS[point]
     real = getattr(owner, name)
 
     def wrapped(*args, **kwargs):
-        real(*args, **kwargs)
+        if when == "after":
+            real(*args, **kwargs)
         raise Killed
 
     monkeypatch.setattr(owner, name, wrapped)
 
 
-# Each point lies after the import's commit and before its folder switch is
-# complete.
-KILL_POINTS = {
-    "committed": lambda m: kill_before(ImportFolder, "finish", m),
-    "linked": lambda m: kill_after(folders, "_link_copy", m),
-    "set-aside": lambda m: kill_after(folders, "_set_aside", m),
-    "moved-in": lambda m: kill_after(folders, "_move_in", m),
-    "repointed": lambda m: kill_after(folders, "_repoint", m),
-}
-
-
-@pytest.mark.parametrize("point", KILL_POINTS)
+@pytest.mark.parametrize(
+    "layout, point",
+    [
+        *(("usual", point) for point in KILL_POINTS if point != "placed-file"),
+        # In a folder kept in place, the first file is linked to its
+        # temporary name and not yet renamed.
+        ("elsewhere", "file-linked"),
+        ("elsewhere", "placed-file"),
+        ("elsewhere", "between-folders"),
+        ("elsewhere", "repointed"),
+        ("symlink", "placed-file"),
+        ("shared", "placed-file"),
+    ],
+)
 def test_a_restore_killed_before_its_folder_switch_leaves_folders_that_exist(
-    events_root, client, coordinator, monkeypatch, point
+    client, coordinator, events_root, tmp_path, monkeypatch, layout, point
 ):
-    saved = with_photos(coordinator)
-    before = folder_settings(coordinator)
+    before, saved, others = set_up(coordinator, layout, tmp_path)
     snapshot = get(client, "&photos").content
     for path in saved:
         path.write_bytes(b"changed after the snapshot")
@@ -380,14 +504,14 @@ def test_a_restore_killed_before_its_folder_switch_leaves_folders_that_exist(
 
     with monkeypatch.context() as patched:
         patched.setattr(ImportFolder, "__init__", init)
-        KILL_POINTS[point](patched)
+        kill_at(point, patched)
         with pytest.raises(Killed):
             put(client, snapshot)
     # A killed process lets go of its lock.
     (killed,) = started
     os.close(killed._lock)
 
-    (event,) = Event.objects.all()
+    event = active()
     assert event.pk != coordinator.pk
     assert all(Path(d).is_dir() for d in folder_settings(event).values())
     photos_resolve(event)
@@ -395,38 +519,4 @@ def test_a_restore_killed_before_its_folder_switch_leaves_folders_that_exist(
     # The next import, or restore, finishes the switch first.
     recover(events_root)
 
-    assert folder_settings(event) == before
-    for path, content in saved.items():
-        assert path.read_bytes() == content
-    photos_resolve(event)
-    assert staging_folders(events_root) == []
-    assert sorted(p.name for p in events_root.iterdir()) == [coordinator.slug]
-
-
-def test_a_folder_outside_the_events_folder_is_left_alone_by_a_restore(
-    client, coordinator, events_root, tmp_path
-):
-    elsewhere = tmp_path / "usb" / "racers"
-    RaceSettings.objects.filter(event=coordinator).update(
-        photo_directory=str(elsewhere)
-    )
-    saved = with_photos(coordinator)
-    (elsewhere / "not-a-racer.jpg").write_bytes(b"the crew's own file")
-    before = folder_settings(coordinator)
-    snapshot = get(client, "&photos").content
-
-    assert "<success/>" in put(client, snapshot).content.decode()
-
-    event = active()
-    after = folder_settings(event)
-    assert {f: d for f, d in after.items() if f != "photo_directory"} == {
-        f: d for f, d in before.items() if f != "photo_directory"
-    }
-    # The headshots stay in the import folder, which keeps only them.
-    staging = Path(after["photo_directory"])
-    assert staging.parent.parent == events_root and staging.name == "racers"
-    assert [p.name for p in staging.parent.iterdir()] == ["racers"]
-    photos_resolve(event)
-    assert sorted(p.name for p in elsewhere.iterdir()) == sorted(
-        ["not-a-racer.jpg", *(p.name for p in saved if p.parent == elsewhere)]
-    )
+    assert_restored(event, before, saved, others, events_root)

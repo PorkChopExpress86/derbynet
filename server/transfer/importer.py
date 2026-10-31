@@ -124,7 +124,7 @@ def import_derbynet(
                     + ", ".join(sorted(report.invariants)),
                     report,
                 )
-            folder.note_replaced(replaced, keep=keep_folders)
+            folder.note_replaced(event, replaced, keep=keep_folders)
     except OSError as error:
         folder.discard()
         raise ImportFailed(f"cannot write the photos: {error}", report) from None
