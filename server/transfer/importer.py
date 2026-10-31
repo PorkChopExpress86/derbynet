@@ -49,6 +49,7 @@ def import_derbynet(
     accept_violations=False,
     time_zone=None,
     discard_videos=False,
+    keep_folders=False,
 ):
     """Import the legacy database at `path` and return the `Report`.
 
@@ -56,7 +57,9 @@ def import_derbynet(
     `SourceError` for an unreadable file, and `ImportFailed` when the event
     name is taken or the imported rows violate an invariant. A replaced
     event's videos and logs cannot be recovered from the source, so
-    `replace` refuses to remove any unless `discard_videos` is set.
+    `replace` refuses to remove any unless `discard_videos` is set. With
+    `keep_folders`, the new event takes the replaced event's folder paths,
+    which then hold the new event's files (`legacy.folders`).
     """
     path = Path(path)
     time_zone = time_zone or settings.TIME_ZONE
@@ -121,7 +124,7 @@ def import_derbynet(
                     + ", ".join(sorted(report.invariants)),
                     report,
                 )
-            folder.note_replaced(replaced)
+            folder.note_replaced(replaced, keep=keep_folders)
     except OSError as error:
         folder.discard()
         raise ImportFailed(f"cannot write the photos: {error}", report) from None
@@ -186,7 +189,7 @@ def _recordings_to_discard(name, replace, discard_videos, report):
 def _create_event(name, replace, report):
     """A new event named `name`, replacing the existing one if asked to.
 
-    Also returns the replaced event's directories.
+    Also returns the replaced event's directories, by `FOLDERS` field.
     """
     existing = list(Event.objects.select_for_update().filter(name=name))
     if existing and not replace:
@@ -196,10 +199,10 @@ def _create_event(name, replace, report):
     if len(existing) > 1:
         raise ImportFailed(f"{len(existing)} events are named {name!r}", report)
     old = existing[0] if existing else None
-    replaced = []
+    replaced = {}
     if old is not None:
         old_settings = RaceSettings.for_event(old)
-        replaced = [getattr(old_settings, field) for field in FOLDERS]
+        replaced = {field: getattr(old_settings, field) for field in FOLDERS}
         # Frees the slug, so the new event gets the old one's folder name.
         Event.objects.filter(pk=old.pk).update(slug=f"{old.slug}-replaced-{old.pk}")
         delete_event_rows(old)

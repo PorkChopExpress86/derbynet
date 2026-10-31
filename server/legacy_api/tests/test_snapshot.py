@@ -2,18 +2,21 @@
 
 import io
 import json
+import os
 import re
 from pathlib import Path
 
 import pytest
 
 from accounts.permissions import Perm
-from core.models import Event, SiteState
+from core.models import Event, RaceSettings, SiteState
 from legacy_api.tests.conftest import log_in
 from racing.models import HeatLane, RosterEntry, Round
 from racing.tests.factories import HeatLaneFactory, RoundFactory
 from roster.models import Group, Racer
-from roster.tests.factories import GroupFactory
+from roster.tests.factories import GroupFactory, RacerFactory
+from transfer.legacy import folders
+from transfer.legacy.folders import FOLDERS, ImportFolder, recover
 
 pytestmark = pytest.mark.django_db
 
@@ -21,6 +24,14 @@ GOLDEN = (
     Path(__file__).resolve().parents[2]
     / "tests/golden/http/standings/q13-drop-slowest.snapshot.xml"
 )
+
+
+@pytest.fixture(autouse=True)
+def events_root(settings, tmp_path):
+    """Each test's event folders go under its own temporary directory. Autouse,
+    so the folders of the `event` fixture are there too."""
+    settings.DATA_DIR = tmp_path / "data"
+    return settings.DATA_DIR / "events"
 
 
 @pytest.fixture
@@ -247,3 +258,175 @@ def test_tables_and_columns_older_php_exports_carried_are_accepted(client, coord
     assert old != text
 
     assert "<success/>" in put(client, old.encode()).content.decode()
+
+
+# #134: a restore keeps the event's four folder settings.
+
+
+def folder_settings(event):
+    row = RaceSettings.for_event(event)
+    return {field: getattr(row, field) for field in FOLDERS}
+
+
+def with_photos(event):
+    """Two racers of `event` with a headshot and a car photo on disk, and empty
+    video and log folders. Returns `{path: bytes}` of the photos."""
+    for directory in folder_settings(event).values():
+        Path(directory).mkdir(parents=True)
+    row = RaceSettings.for_event(event)
+    group = GroupFactory(event=event)
+    RoundFactory(event=event, group=group, number=1)
+    files = {}
+    for n in (1, 2):
+        RacerFactory(
+            group=group,
+            car_number=100 + n,
+            headshot=f"head-{n}.jpg",
+            car_photo=f"car-{n}.jpg",
+        )
+        for directory, name in (
+            (row.photo_directory, f"head-{n}.jpg"),
+            (row.car_photo_directory, f"car-{n}.jpg"),
+        ):
+            path = Path(directory) / name
+            path.write_bytes(f"{name} as saved".encode())
+            files[path] = path.read_bytes()
+    return files
+
+
+def photos_resolve(event):
+    row = RaceSettings.for_event(event)
+    racers = Racer.objects.filter(event=event)
+    assert racers.count() == 2
+    for racer in racers:
+        assert (Path(row.photo_directory) / racer.headshot).is_file()
+        assert (Path(row.car_photo_directory) / racer.car_photo).is_file()
+
+
+def staging_folders(events_root):
+    return [p.name for p in events_root.rglob("*") if folders.MARK in p.name]
+
+
+def test_a_restore_keeps_the_folder_paths_and_brings_the_photos_back(
+    events_root, client, coordinator
+):
+    saved = with_photos(coordinator)
+    before = folder_settings(coordinator)
+    snapshot = get(client, "&photos").content
+    for path in saved:
+        path.write_bytes(b"changed after the snapshot")
+
+    assert "<success/>" in put(client, snapshot).content.decode()
+
+    event = active()
+    assert event.pk != coordinator.pk
+    assert folder_settings(event) == before
+    for path, content in saved.items():
+        assert path.read_bytes() == content
+    photos_resolve(event)
+    assert all(Path(d).is_dir() for d in before.values())
+    assert staging_folders(events_root) == []
+    assert sorted(p.name for p in events_root.iterdir()) == [coordinator.slug]
+
+
+class Killed(BaseException):
+    """Stands for a process killed at one step: nothing catches it."""
+
+
+def kill_before(owner, name, monkeypatch):
+    def die(*args, **kwargs):
+        raise Killed
+
+    monkeypatch.setattr(owner, name, die)
+
+
+def kill_after(owner, name, monkeypatch):
+    real = getattr(owner, name)
+
+    def wrapped(*args, **kwargs):
+        real(*args, **kwargs)
+        raise Killed
+
+    monkeypatch.setattr(owner, name, wrapped)
+
+
+# Each point lies after the import's commit and before its folder switch is
+# complete.
+KILL_POINTS = {
+    "committed": lambda m: kill_before(ImportFolder, "finish", m),
+    "linked": lambda m: kill_after(folders, "_link_copy", m),
+    "set-aside": lambda m: kill_after(folders, "_set_aside", m),
+    "moved-in": lambda m: kill_after(folders, "_move_in", m),
+    "repointed": lambda m: kill_after(folders, "_repoint", m),
+}
+
+
+@pytest.mark.parametrize("point", KILL_POINTS)
+def test_a_restore_killed_before_its_folder_switch_leaves_folders_that_exist(
+    events_root, client, coordinator, monkeypatch, point
+):
+    saved = with_photos(coordinator)
+    before = folder_settings(coordinator)
+    snapshot = get(client, "&photos").content
+    for path in saved:
+        path.write_bytes(b"changed after the snapshot")
+
+    started = []
+    real_init = ImportFolder.__init__
+
+    def init(self, *args, **kwargs):
+        real_init(self, *args, **kwargs)
+        started.append(self)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(ImportFolder, "__init__", init)
+        KILL_POINTS[point](patched)
+        with pytest.raises(Killed):
+            put(client, snapshot)
+    # A killed process lets go of its lock.
+    (killed,) = started
+    os.close(killed._lock)
+
+    (event,) = Event.objects.all()
+    assert event.pk != coordinator.pk
+    assert all(Path(d).is_dir() for d in folder_settings(event).values())
+    photos_resolve(event)
+
+    # The next import, or restore, finishes the switch first.
+    recover(events_root)
+
+    assert folder_settings(event) == before
+    for path, content in saved.items():
+        assert path.read_bytes() == content
+    photos_resolve(event)
+    assert staging_folders(events_root) == []
+    assert sorted(p.name for p in events_root.iterdir()) == [coordinator.slug]
+
+
+def test_a_folder_outside_the_events_folder_is_left_alone_by_a_restore(
+    client, coordinator, events_root, tmp_path
+):
+    elsewhere = tmp_path / "usb" / "racers"
+    RaceSettings.objects.filter(event=coordinator).update(
+        photo_directory=str(elsewhere)
+    )
+    saved = with_photos(coordinator)
+    (elsewhere / "not-a-racer.jpg").write_bytes(b"the crew's own file")
+    before = folder_settings(coordinator)
+    snapshot = get(client, "&photos").content
+
+    assert "<success/>" in put(client, snapshot).content.decode()
+
+    event = active()
+    after = folder_settings(event)
+    assert {f: d for f, d in after.items() if f != "photo_directory"} == {
+        f: d for f, d in before.items() if f != "photo_directory"
+    }
+    # The headshots stay in the import folder, which keeps only them.
+    staging = Path(after["photo_directory"])
+    assert staging.parent.parent == events_root and staging.name == "racers"
+    assert [p.name for p in staging.parent.iterdir()] == ["racers"]
+    photos_resolve(event)
+    assert sorted(p.name for p in elsewhere.iterdir()) == sorted(
+        ["not-a-racer.jpg", *(p.name for p in saved if p.parent == elsewhere)]
+    )
