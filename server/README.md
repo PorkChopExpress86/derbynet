@@ -188,6 +188,18 @@ uv run python -m tools.time_standings
 
 `legacy_api/tests/test_awards_parity.py` replays `capture/scenarios/17-awards.sh` through these endpoints, and `WRITE_DEVIATIONS=1` rewrites its entries.
 
+## Photos, slides and replay video (#35)
+
+`media/photos.py` ports `PhotoRepository` and `PhotoRender`. `photo.php`, `image.php` and `slide.php` answer at the root and under `/derbynet/`, to anyone, with PHP's cache headers. `media/tests/` holds the tests, and the photo and slide shell suites run against Django in CI with `DERBYNET_BACKEND=django`.
+
+- The upload is stored byte for byte, so `original`, `cropped` and a racer's photo serve it unchanged until the photo is cropped or turned (#8). Every decode applies the EXIF orientation first, so renders, crops, autocrop and rotation see the photo upright, and renders carry no orientation tag (#73). A crop box is in the upright frame of the `work` render. `photo.rotate` stores the turn in `media.PhotoRotation`, keyed by folder and file name, and a turned original is served from `0-rotated`.
+- Renders are made on first request under a per-file lock, in PHP's folders (`0-cropped`, `0-work`, `<W>x<H>`), with PHP's truncated sizes. Only the sizes in `photos.ALLOWED_BOXES` are made. Any other size gets the largest allowed render that fits inside it, so a client can't create folders.
+- A racer with no photo, or whose file is missing, gets `media/data/1x1.png` (PHP's `website/img/1x1.png`) with status 200. `photo.php/info/...` answers 404 (S8).
+- `photo.upload` decodes the file with Pillow and takes JPEG, PNG and GIF under a matching image extension, up to `DERBYNET_PHOTO_UPLOAD_MAX_MB`. `filename-change` names the stored file (C27). Autocrop finds the face with OpenCV's `haarcascade_frontalface_alt2`, or runs `DERBYNET_FACEDETECT` with no shell, and keeps PHP's crop math. A miss warns `No face detected for autocrop.` (#74). `media/tests/test_faces.py` holds OpenCV to PHP's miss count over `testing/data/headshots`.
+- `photo.crop` needs `ASSIGN_RACER_IMAGE` (S19). `video.upload` needs `CONTROL_RACE` (D16), takes `.mkv` and `.webm` only, and is capped by `DERBYNET_VIDEO_UPLOAD_MAX_MB` (S20). `query=slide.next` takes `classids` as integers only (S10).
+- `image.php` and `slide.php` look in the event's `imagery` or `slides` folder, then the same folder under `DERBYNET_CONFIG_DIR`, then the image set the `images-dir` setting names, from `media/image_sets` (copied from `website/Images`).
+- A file is written before the transaction that names it, and removed only after the transaction that stops naming it commits. P1 to P7 in `racing/engine/tests/golden.py` list the other differences from PHP, which wait for an owner decision.
+
 ## Standings differential test against PHP
 
 `tools/standings_differential/` runs the real PHP standings, finalists and speed-award code and the Django engine in `racing/engine/standings/` on the same seeded random events, and compares every result row, ladder, catalog entry, class and rank key, finalist cut, speed award and `award.current` answer. It needs Docker and a local image with `php84` and the website at `/var/www/html`. From this directory, run:
@@ -335,6 +347,9 @@ Behind a proxy that ends TLS, the server takes its own scheme from the `X-Forwar
 | `DERBYNET_CSRF_TRUSTED_ORIGINS` | empty | Comma-separated extra origins for the new UI behind a proxy |
 | `DERBYNET_LOCK_SETTINGS` | `0` | Sets `LOCK_SETTINGS`. `settings.write` then refuses the photo, car photo, and video folders, as PHP's `settings.lock` file did for a hosted install |
 | `DERBYNET_ENABLE_TEST_ENDPOINTS` | `0` | Registers `test.setup` and lets anyone call `database.check`. Only the shell suites set it |
+| `DERBYNET_PHOTO_UPLOAD_MAX_MB` | `30` | The largest photo `photo.upload` takes, in MB. The photo stand posts `MAX_FILE_SIZE=30000000` |
+| `DERBYNET_VIDEO_UPLOAD_MAX_MB` | `100` | The largest replay clip `video.upload` takes, in MB |
+| `DERBYNET_FACEDETECT` | unset | An executable autocrop runs on the photo's path instead of OpenCV. Its last line of output is `x y width height` |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server generates a key into `<DERBYNET_CONFIG_DIR>/secret_key` with mode 0600 on first start, and reuses it after that |
 
 SQLite runs in WAL mode with `synchronous=NORMAL`, `IMMEDIATE` transactions, and a 20 second busy timeout (ADR-05). WAL writes `-wal` and `-shm` files next to the database, so keep `DERBYNET_DATA_DIR` on a writable local disk. A database on a network share can be corrupted. A Postgres `DATABASE_URL` is used as `dj-database-url` parses it, with no extra options.

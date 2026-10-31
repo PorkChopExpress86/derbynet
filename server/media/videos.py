@@ -15,7 +15,7 @@ from media.photos import (
     UNSAFE_NAME_CHARACTERS,
     Refused,
     check_upload_size,
-    is_valid_name,
+    is_upload_name,
     move_failure,
     store_upload,
 )
@@ -31,7 +31,7 @@ def upload_video(event, upload, max_file_size=None) -> str:
         raise Refused("not-configured", "No video upload directory configured.")
     name = UNSAFE_NAME_CHARACTERS.sub("_", (upload.name or "").rsplit("/", 1)[-1])
     extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-    if not is_valid_name(name) or extension not in VIDEO_EXTENSIONS:
+    if not is_upload_name(name) or extension not in VIDEO_EXTENSIONS:
         raise Refused(
             "upload_video_type",
             f"Unacceptable file type: {name} (a replay video ends in .mkv or .webm)",

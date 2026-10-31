@@ -4,6 +4,7 @@ and `query=slide.next`. The work is in `media.photos`, `media.videos` and
 `media.slides`.
 """
 
+import math
 import re
 
 from accounts.permissions import Access, Perm
@@ -132,7 +133,7 @@ def photo_crop(ctx: LegacyContext) -> None:
     if repo is None:
         return
     values = [php_numeric(_text(ctx, name) or "") for name in CROP_FIELDS]
-    if any(value is None for value in values):
+    if any(value is None or not math.isfinite(value) for value in values):
         ctx.failure("crop", "The crop needs " + ", ".join(CROP_FIELDS) + ".")
         return
     try:
@@ -162,7 +163,7 @@ def photo_rotate(ctx: LegacyContext) -> None:
     if repo is None:
         return
     degrees = php_numeric(_text(ctx, "rotation") or "")
-    if degrees is None:
+    if degrees is None or not math.isfinite(degrees):
         ctx.failure("rotation", "The rotation must be a number of degrees.")
         return
     try:

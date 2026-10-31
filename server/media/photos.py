@@ -185,6 +185,12 @@ def is_valid_name(name) -> bool:
     )
 
 
+def is_upload_name(name: str) -> bool:
+    """A name an upload may take: a valid name that is not hidden, which also
+    keeps it apart from the temporary files written here."""
+    return is_valid_name(name) and not name.startswith(".")
+
+
 @dataclass(frozen=True)
 class Repository:
     name: str
@@ -676,7 +682,7 @@ def upload_photo(
     decoded_format(upload)
     name = sanitized_name(upload.name or "")
     extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-    if not is_valid_name(name) or extension not in sum(EXTENSIONS.values(), ()):
+    if not is_upload_name(name) or extension not in sum(EXTENSIONS.values(), ()):
         raise Refused(
             "upload_image_type",
             f"Unacceptable file name: {name} (a photo's name ends in .jpg, .jpeg,"
@@ -818,8 +824,10 @@ def crop_photo(event, repo: Repository, name: str, box: CropBox) -> None:
         Racer.objects.filter(event=event, **{repo.field: name}).update(
             **{repo.field: f"{CROPPED_FOLDER}/{name}"}
         )
-        stale = _dependents(repo, name, keep=CROPPED_FOLDER)
-        transaction.on_commit(lambda: _unlink_all(stale))
+        # Listed at the commit, so a render made meanwhile goes too.
+        transaction.on_commit(
+            lambda: _unlink_all(_dependents(repo, name, keep=CROPPED_FOLDER))
+        )
 
 
 def rotate_photo(event, repo: Repository, name: str, degrees: float) -> None:
@@ -846,10 +854,9 @@ def rotate_photo(event, repo: Repository, name: str, degrees: float) -> None:
         Racer.objects.filter(
             event=event, **{repo.field: f"{CROPPED_FOLDER}/{name}"}
         ).update(**{repo.field: name})
-        stale = _dependents(repo, name, keep=None)
 
         def tidy():
-            _unlink_all(stale)
+            _unlink_all(_dependents(repo, name, keep=None))
             # The upload's bytes stay, so its time changes instead, and with
             # it every cache breaker that names the photo.
             try:

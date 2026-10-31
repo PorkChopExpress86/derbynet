@@ -214,6 +214,31 @@ jobs:
           bash testing/test-messaging.sh http://127.0.0.1:8080
           bash testing/test-preferences.sh http://127.0.0.1:8080
 
+      # The photo and slideshow suites (#35), in testing/exercise-one-database.sh
+      # order. photo-setup.sh uploads the photos the others assign, and
+      # test-photo-assignments.sh takes the master car numbers, since
+      # test-basic-racing.sh waits for history.php (#49).  DERBYNET_BACKEND
+      # makes test-photo-manipulations.sh expect upright EXIF renders (#73).
+      - name: Run the photo and slide suites against Django
+        working-directory: .
+        env:
+          DERBYNET_BACKEND: django
+        run: |
+          command -v identify >/dev/null && command -v convert >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends imagemagick
+          }
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-den-changes.sh http://127.0.0.1:8080
+          bash testing/photo-setup.sh http://127.0.0.1:8080
+          bash testing/test-photo-upload.sh http://127.0.0.1:8080
+          bash testing/test-photo-manipulations.sh http://127.0.0.1:8080
+          bash testing/test-photo-assignments.sh http://127.0.0.1:8080 master
+          bash testing/test-slide-next.sh http://127.0.0.1:8080
+          bash testing/test-photo-manipulations.sh http://127.0.0.1:8080
+          bash testing/test-photo-upload.sh http://127.0.0.1:8080
+
       - name: Run the result import suite against Django
         working-directory: .
         run: |
