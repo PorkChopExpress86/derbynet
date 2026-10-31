@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from accounts.permissions import Access, Perm
+from legacy_api.handlers.testing import MANAGED
 from legacy_api.registry import (
     DEFERRED,
     REGISTRY,
@@ -19,6 +20,8 @@ from racing.engine.tests.golden import QUIRK_DECISIONS, deviations
 DATA = Path(__file__).parent / "data"
 DECISIONS = Path(__file__).resolve().parents[3] / "plan" / "owner-decisions.md"
 HANDLERS = Path(__file__).resolve().parent.parent / "handlers"
+AJAX = Path(__file__).resolve().parents[3] / "website" / "ajax"
+AJAX_FILE = re.compile(r"(action|query)\.(.+)\.inc")
 
 
 def php_endpoints():
@@ -32,6 +35,60 @@ def test_the_frozen_list_holds_every_php_handler():
     assert len(endpoints) == 108
     assert sum(kind == "action" for kind, _ in endpoints) == 83
     assert ("query", "standings") in endpoints
+
+
+def ajax_endpoints():
+    """Every PHP handler, as `website/ajax/<kind>.<name>.inc` names it today."""
+    return {
+        (found[1], found[2])
+        for path in AJAX.iterdir()
+        if (found := AJAX_FILE.fullmatch(path.name))
+    }
+
+
+def unaccounted(php, registry=REGISTRY, deferred=DEFERRED, managed=MANAGED):
+    """The PHP endpoints Django neither serves, defers to a backlog ticket, nor
+    manages for the shell suites. A test-managed endpoint counts whether or not
+    `DERBYNET_ENABLE_TEST_ENDPOINTS` registered it in this run."""
+    accounted = {(e.kind, e.name) for e in registry}
+    accounted |= {(d.kind, d.name) for d in deferred}
+    accounted |= set(managed)
+    return sorted(set(php) - accounted)
+
+
+COVERAGE_FIX = (
+    "Django has no handler and no registry entry for these PHP endpoints in"
+    " website/ajax/: {missing}. Port each one with @action or @query in"
+    " server/legacy_api/handlers/, or, if a backlog ticket ports it later, add a"
+    " Deferred(kind, name, ticket, reason) to DEFERRED in"
+    " server/legacy_api/registry.py."
+)
+
+
+def test_every_php_handler_is_served_deferred_or_test_managed():
+    """The #37 coverage check, read from `website/ajax/` itself."""
+    missing = unaccounted(ajax_endpoints())
+
+    if missing:
+        names = ", ".join(f"{kind} {name}" for kind, name in missing)
+        pytest.fail(COVERAGE_FIX.format(missing=names), pytrace=False)
+
+
+def test_the_coverage_check_names_an_endpoint_nobody_accounts_for():
+    registry = Registry()
+    registry.register(Endpoint("query", "poll", print, Access.ANONYMOUS))
+    php = {("query", "poll"), ("action", "ballot.open"), ("action", "test.setup")}
+    php |= {("query", "standings"), ("action", "racer.pass")}
+
+    missing = unaccounted(php, registry=registry)
+
+    assert missing == [("action", "racer.pass"), ("query", "standings")]
+
+
+def test_the_frozen_list_is_what_website_ajax_holds():
+    """`php_endpoints.txt` keeps the PHP names for when #62 deletes
+    `website/`; until then it must agree with the directory."""
+    assert ajax_endpoints() == php_endpoints()
 
 
 # Endpoints Django adds on purpose (D48). PHP has no such name.

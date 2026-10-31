@@ -144,6 +144,7 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "award.xbs"): {"racer": "1", "value": "1"},
     ("query", "award.current"): {},
     ("query", "award.list"): {},
+    ("query", "standings"): {},
     ("query", "poll.kiosk"): {"address": "K1"},
     ("query", "poll.kiosk.all"): {},
     ("action", "kiosk.assign"): {"address": "K1", "page": "kiosks/flag.kiosk"},
