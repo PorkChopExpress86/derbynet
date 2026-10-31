@@ -145,6 +145,16 @@ DEFERRED: tuple[Deferred, ...] = (
 )
 
 
+# The legacy pages outside `/action.php` that differ from PHP on purpose, by
+# path, in the form of `Endpoint.divergences`.
+ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
+    "photo.php/info": (
+        "S8: removed, and answers 404; PHP serves the file any setting names, or a"
+        " path from the URL.",
+    ),
+}
+
+
 def action(
     name: str,
     *,

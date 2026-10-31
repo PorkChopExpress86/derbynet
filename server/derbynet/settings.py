@@ -192,3 +192,30 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+def _env_megabytes(name, default):
+    value = os.environ.get(name) or str(default)
+    try:
+        megabytes = int(value)
+    except ValueError:
+        megabytes = 0
+    if megabytes <= 0:
+        raise ImproperlyConfigured(
+            f"{name} must be a whole number of MB, not {value!r}"
+        )
+    return megabytes * 1_000_000
+
+
+# Uploads (#35). Django streams a file larger than FILE_UPLOAD_MAX_MEMORY_SIZE
+# to a temporary file, so these caps bound an upload, not memory. nginx is the
+# outer limit. The photo stand posts MAX_FILE_SIZE=30000000, and phone photos
+# run 4 to 12 MB. A replay clip is at most 10 s (D18).
+PHOTO_UPLOAD_MAX_BYTES = _env_megabytes("DERBYNET_PHOTO_UPLOAD_MAX_MB", 30)
+VIDEO_UPLOAD_MAX_BYTES = _env_megabytes("DERBYNET_VIDEO_UPLOAD_MAX_MB", 100)
+# The form fields of an upload, which never count the file itself.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10_000_000
+
+# PHP's DERBYNET_FACEDETECT autocrop hook: an executable that takes an image
+# path and prints `x y width height`. Unset, OpenCV finds the face.
+FACE_DETECT_COMMAND = os.environ.get("DERBYNET_FACEDETECT", "")

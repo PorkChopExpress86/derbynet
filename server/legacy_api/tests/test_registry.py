@@ -7,6 +7,7 @@ from accounts.permissions import Access, Perm
 from legacy_api.registry import (
     DEFERRED,
     REGISTRY,
+    ROUTE_DIVERGENCES,
     Endpoint,
     Format,
     Registry,
@@ -117,15 +118,13 @@ def test_every_divergence_names_a_recorded_decision():
     known = set(QUIRK_DECISIONS) | {entry["quirk"] for entry in deviations()}
     known |= set(re.findall(r"^\| (D\d+) \|", DECISIONS.read_text(), re.MULTILINE))
     unknown = []
-    for endpoint in REGISTRY:
-        for text in endpoint.divergences:
+    listed = [(f"{e.kind} {e.name}", e.divergences) for e in REGISTRY]
+    listed += list(ROUTE_DIVERGENCES.items())
+    for where, divergences in listed:
+        for text in divergences:
             found = DIVERGENCE.match(text)
             ids = found["ids"].split(", ") if found else [text]
-            unknown += [
-                f"{endpoint.kind} {endpoint.name}: {id}"
-                for id in ids
-                if id not in known
-            ]
+            unknown += [f"{where}: {id}" for id in ids if id not in known]
 
     assert unknown == []
 
