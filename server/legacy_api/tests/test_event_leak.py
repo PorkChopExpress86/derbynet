@@ -163,6 +163,21 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("action", "replay.message"): {"status": "0"},
     ("action", "replay.test"): {},
     ("action", "replay.trigger"): {},
+    ("action", "photo.upload"): {"repo": "head", "racerid": "1"},
+    ("action", "photo.assign"): {"repo": "head", "racer": "1", "photo": ""},
+    ("action", "photo.crop"): {
+        "image_name": "x.jpg",
+        "left": "0",
+        "top": "0",
+        "right": "10",
+        "bottom": "10",
+        "original_width": "20",
+        "original_height": "20",
+    },
+    ("action", "photo.rotate"): {"image_name": "x.jpg", "rotation": "90"},
+    ("action", "photo.delete"): {"repo": "car", "photo": "x.jpg"},
+    ("action", "video.upload"): {},
+    ("query", "slide.next"): {"mode": "racer", "racerid": "0", "classids": "1"},
     # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS, so it is listed here
     # for a run that sets it.
     ("action", "test.setup"): {"slide": "s.png"},

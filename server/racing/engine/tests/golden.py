@@ -92,6 +92,26 @@ QUIRK_DECISIONS = {
     "R10": "fix",
     "R11": "fix",
     "R12": "fix",
+    # Rows of #64 that the #35 photo, video and slide endpoints fix.
+    "C17": "fix",
+    "C27": "fix",
+    "S8": "fix",
+    "S10": "fix",
+    "S19": "fix",
+    "S20": "fix",
+    # Accepted in D61 (#35): P1 renders apply the EXIF orientation and keep
+    # the upload (#8, #73), P2 render sizes are allowlisted, P3 an upload is
+    # decoded and its name and size checked, P4 autocrop runs OpenCV and
+    # reports a miss (#74), P5 an unknown repo fails, P6 a bad crop or rotate
+    # fails instead of a PHP fatal error, P7 an empty photo column counts as
+    # no photo in slide.next.
+    "P1": "fix",
+    "P2": "fix",
+    "P3": "fix",
+    "P4": "fix",
+    "P5": "fix",
+    "P6": "fix",
+    "P7": "fix",
 }
 
 
