@@ -238,3 +238,21 @@ def test_a_refused_replace_runs_before_recover_and_leaves_dead_folders(
 
     assert pending.is_dir()
     assert removing.is_dir()
+
+
+@pytest.mark.django_db
+def test_recover_reads_the_list_note_an_older_import_wrote(tmp_path, data_dir):
+    events = data_dir / "events"
+    report, _ = run_import(
+        legacy_folder(tmp_path, "v10"), "--event", "Pack", report_dir=tmp_path
+    )
+    live = event_folder(Event.objects.get(pk=report["event"]["id"]))
+    old = events / "pack-old"
+    (old / "racers").mkdir(parents=True)
+    (live / ".replaced").write_text('["pack-old/racers"]')
+
+    removed = recover(events)
+
+    assert removed == [old / "racers"]
+    assert [p.name for p in events.iterdir()] == [live.name]
+    assert not (live / ".replaced").exists()

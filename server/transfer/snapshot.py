@@ -6,6 +6,8 @@ writes the event's rows under the legacy table and column names, numbering
 each table from 1, so an old DerbyNet can read the file. `put` hands an
 uploaded file to the importer (#14), which reads only column names it
 knows and never builds SQL from the file, and replaces the active event.
+The new event keeps the old one's four folder settings, and its files move
+to those folders (#134, `transfer.legacy.folders`).
 
 A snapshot omits `ntrophies`, `note` and `checkin_time`, as PHP's does.
 Round trips lose them, and everything Django keeps that the legacy schema
@@ -503,7 +505,9 @@ def put(event: Event, content: bytes) -> list[tuple[str, str, int, int]]:
         if problems:
             raise PutFailure("bad-snapshot", "; ".join(problems))
         try:
-            import_derbynet(path, event_name=event.name, replace=True)
+            import_derbynet(
+                path, event_name=event.name, replace=True, keep_folders=True
+            )
         except (ImportFailed, SourceError) as error:
             raise PutFailure("import-failed", str(error)) from error
         return [
