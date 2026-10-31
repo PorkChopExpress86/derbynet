@@ -348,6 +348,7 @@ Behind a proxy that ends TLS, the server takes its own scheme from the `X-Forwar
 | `DERBYNET_LOCK_SETTINGS` | `0` | Sets `LOCK_SETTINGS`. `settings.write` then refuses the photo, car photo, and video folders, as PHP's `settings.lock` file did for a hosted install |
 | `DERBYNET_ENABLE_TEST_ENDPOINTS` | `0` | Registers `test.setup` and lets anyone call `database.check`. Only the shell suites set it |
 | `DERBYNET_PHOTO_UPLOAD_MAX_MB` | `30` | The largest photo `photo.upload` takes, in MB. The photo stand posts `MAX_FILE_SIZE=30000000` |
+| `DERBYNET_PHOTO_MAX_MEGAPIXELS` | `50` | The largest photo, in megapixels, that is decoded. `photo.upload` refuses a larger one, and renders of one answer 404 |
 | `DERBYNET_VIDEO_UPLOAD_MAX_MB` | `100` | The largest replay clip `video.upload` takes, in MB |
 | `DERBYNET_FACEDETECT` | unset | An executable autocrop runs on the photo's path instead of OpenCV. Its last line of output is `x y width height` |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server generates a key into `<DERBYNET_CONFIG_DIR>/secret_key` with mode 0600 on first start, and reuses it after that |

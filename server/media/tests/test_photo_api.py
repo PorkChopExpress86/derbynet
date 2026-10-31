@@ -1,8 +1,9 @@
 """`photo.upload`, `photo.assign` and `photo.crop` on the wire (#35)."""
 
 import io
-import os
 import random
+import subprocess
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -208,10 +209,15 @@ def test_autocrop_reports_a_miss_and_leaves_the_photo_uncropped(client, folders,
     assert racer.headshot == "no-photo.jpg"
 
 
-def test_the_face_detect_hook_runs_with_no_shell(client, folders, settings, tmp_path):
-    """PHP runs `DERBYNET_FACEDETECT '<path>'` through a shell. Django passes
-    the path as one argument, so a quote in it does no harm."""
-    quoted = tmp_path / "o'brien; touch pwned"
+def test_the_face_detect_hook_runs_with_no_shell(
+    client, folders, settings, tmp_path, monkeypatch
+):
+    """PHP runs `DERBYNET_FACEDETECT '<path>'` through a shell. A folder name
+    with a quote in it then runs a command; Django passes the path as one
+    argument, so it runs nothing."""
+    mark = tmp_path / "pwned"
+    monkeypatch.setenv("PWNED_MARK", str(mark))
+    quoted = tmp_path / """x'; touch "$PWNED_MARK"; echo '"""
     quoted.mkdir()
     from core.models import RaceSettings
 
@@ -223,6 +229,11 @@ def test_the_face_detect_hook_runs_with_no_shell(client, folders, settings, tmp_
         "echo debug\necho 40 40 80 80\n"
     )
     hook.chmod(0o755)
+    # The payload works under PHP's call: exec("<hook> '<path>'").
+    php_call = f"{hook} '{quoted / 'p.jpg'}'"
+    subprocess.run(["sh", "-c", php_call], check=False, capture_output=True)
+    assert mark.exists()
+    mark.unlink()
     settings.FACE_DETECT_COMMAND = str(hook)
     log_in(client, PHOTO_ROLE)
 
@@ -230,13 +241,11 @@ def test_the_face_detect_hook_runs_with_no_shell(client, folders, settings, tmp_
 
     count, path = seen.read_text().splitlines()
     assert (count, path) == ("1", str(quoted / "p.jpg"))
+    assert not mark.exists()
     assert reply["cropped"] is True
     with Image.open(quoted / "0-cropped" / "p.jpg") as crop:
         # x 40 w 80 widened 10% to 88 from 36; height 4/3 of that, from 21.
         assert crop.size == (88, 117)
-    # A shell would have run `touch pwned` in the server's folder.
-    assert not os.path.exists("pwned")
-    assert not (tmp_path / "pwned").exists()
 
 
 def test_photo_assign_gives_the_crop_and_takes_the_photo_away(client, folders, event):
@@ -355,21 +364,38 @@ def test_rotate_and_delete_need_assign_racer_image(client, folders):
 
 
 def test_photo_delete_succeeds_when_a_file_cannot_be_removed(
-    client, folders, django_capture_on_commit_callbacks
+    client, folders, monkeypatch, django_capture_on_commit_callbacks
 ):
     """C17: PHP's error path calls json_failure() with one argument, a fatal
-    error on PHP 8. Django skips what it can't remove."""
+    error on PHP 8. Django skips a file it can't remove and removes the rest.
+    A folder that happens to have the photo's name is searched, not removed."""
     log_in(client, CREW)
     upload(client, "p.jpg", image_bytes())
-    stuck = folders.head / "200x200"
-    stuck.mkdir()
-    (stuck / "p.jpg").mkdir()  # a folder by the photo's name can't be unlinked
+    client.get("/photo.php/head/file/200x200/p.jpg/1")
+    client.get("/photo.php/head/file/work/p.jpg/1")
+    stuck = folders.head / "200x200" / "p.jpg"
+    odd = folders.head / "other" / "p.jpg"
+    odd.mkdir(parents=True)
+    (odd / "p.jpg").write_bytes(b"inside")
+    refused, real_unlink = [], Path.unlink
 
+    def unlink(self, *args, **kwargs):
+        if self == stuck:
+            refused.append(self)
+            raise PermissionError(13, "Permission denied", str(self))
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
     with django_capture_on_commit_callbacks(execute=True):
         reply = post(client, action="photo.delete", photo="p.jpg")
 
     assert reply["outcome"]["code"] == "success"
+    assert refused == [stuck]
+    assert stuck.is_file()
     assert not (folders.head / "p.jpg").exists()
+    assert not (folders.head / "0-work" / "p.jpg").exists()
+    assert odd.is_dir()
+    assert not (odd / "p.jpg").exists()
 
 
 def test_an_unknown_repository_fails(client, folders):

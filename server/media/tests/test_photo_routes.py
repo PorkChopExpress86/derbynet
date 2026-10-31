@@ -224,7 +224,8 @@ def test_a_size_on_the_allowlist_is_used_as_asked(crew, folders):
     assert (folders.head / "400x400" / "p.jpg").is_file()
 
 
-@pytest.mark.django_db(transaction=True)
+# serialized_rollback restores the seeded rows after the flush.
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
 def test_ten_first_requests_make_one_render(folders, monkeypatch):
     """Concurrent first requests for one render wait on its lock: one file is
     written once, and every response has its bytes."""

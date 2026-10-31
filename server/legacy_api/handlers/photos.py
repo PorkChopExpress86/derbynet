@@ -5,7 +5,6 @@ and `query=slide.next`. The work is in `media.photos`, `media.videos` and
 """
 
 import math
-import re
 
 from accounts.permissions import Access, Perm
 from core.slides import is_acceptable_name
@@ -213,7 +212,6 @@ def video_upload(ctx: LegacyContext) -> None:
 
 
 _NO_RACER_AFTER = 2**63 - 1
-_INTEGER = re.compile(r"[+-]?[0-9]+")
 
 
 @query(
@@ -235,12 +233,13 @@ def slide_next(ctx: LegacyContext) -> None:
             ctx.failure("classids", "classids must be class ids separated by commas.")
             return
     subdir = _text(ctx, "subdir") or ""
-    racer_id = (_text(ctx, "racerid") or "0").strip()
+    racer_id = photos.bounded_int((_text(ctx, "racerid") or "0").strip())
     request = slides.SlideRequest(
         mode=_text(ctx, "mode") or "title",
         subdir=subdir if is_acceptable_name(subdir) else "",
-        # SQLite compares a text id that is no number above every racer id.
-        racer_id=int(racer_id) if _INTEGER.fullmatch(racer_id) else _NO_RACER_AFTER,
+        # SQLite compares a text id that is no number, or one past the id column,
+        # above every racer id.
+        racer_id=_NO_RACER_AFTER if racer_id is None else racer_id,
         file=_text(ctx, "file") or "",
         class_ids=class_ids,
     )

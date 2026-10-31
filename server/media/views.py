@@ -5,7 +5,6 @@ serves them to kiosks (D5), with PHP's cache headers.
 from the URL (S8). Nothing builds those URLs, and Django answers them 404.
 """
 
-import re
 import time
 from pathlib import Path
 from urllib.parse import unquote_plus
@@ -21,7 +20,6 @@ PHOTO_MAX_AGE = 86400
 IMAGE_MAX_AGE = 120
 # `website/img/1x1.png`, for a racer with no photo.
 TRANSPARENT_PIXEL = Path(__file__).parent / "data" / "1x1.png"
-_RACER_ID = re.compile(r"\s*[+-]?[0-9]+\s*")
 
 
 def _active_event():
@@ -77,9 +75,10 @@ def photo(request, rest: str):
             return _not_found("No such render")
     path = ""
     # SQLite reads PHP's text id as a number, so `065` is racer 65.
-    if _RACER_ID.fullmatch(parts[3]):
+    racer_id = photos.bounded_int(parts[3])
+    if racer_id is not None:
         path = (
-            Racer.objects.filter(event=event, pk=int(parts[3]))
+            Racer.objects.filter(event=event, pk=racer_id)
             .values_list(repo.field, flat=True)
             .first()
         ) or ""

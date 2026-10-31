@@ -194,27 +194,29 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-def _env_megabytes(name, default):
+def _env_millions(name, default, unit="MB"):
     value = os.environ.get(name) or str(default)
     try:
-        megabytes = int(value)
+        millions = int(value)
     except ValueError:
-        megabytes = 0
-    if megabytes <= 0:
+        millions = 0
+    if millions <= 0:
         raise ImproperlyConfigured(
-            f"{name} must be a whole number of MB, not {value!r}"
+            f"{name} must be a whole number of {unit}, not {value!r}"
         )
-    return megabytes * 1_000_000
+    return millions * 1_000_000
 
 
 # Uploads (#35). Django streams a file larger than FILE_UPLOAD_MAX_MEMORY_SIZE
 # to a temporary file, so these caps bound an upload, not memory. nginx is the
 # outer limit. The photo stand posts MAX_FILE_SIZE=30000000, and phone photos
 # run 4 to 12 MB. A replay clip is at most 10 s (D18).
-PHOTO_UPLOAD_MAX_BYTES = _env_megabytes("DERBYNET_PHOTO_UPLOAD_MAX_MB", 30)
-VIDEO_UPLOAD_MAX_BYTES = _env_megabytes("DERBYNET_VIDEO_UPLOAD_MAX_MB", 100)
-# The form fields of an upload, which never count the file itself.
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10_000_000
+PHOTO_UPLOAD_MAX_BYTES = _env_millions("DERBYNET_PHOTO_UPLOAD_MAX_MB", 30)
+VIDEO_UPLOAD_MAX_BYTES = _env_millions("DERBYNET_VIDEO_UPLOAD_MAX_MB", 100)
+# The largest photo that is decoded, by its header, so a small file of huge
+# dimensions can't take the server's memory. 50 MP holds the 48 and 50 MP
+# phone cameras (8064x6048, 8160x6120).
+PHOTO_MAX_PIXELS = _env_millions("DERBYNET_PHOTO_MAX_MEGAPIXELS", 50, "megapixels")
 
 # PHP's DERBYNET_FACEDETECT autocrop hook: an executable that takes an image
 # path and prints `x y width height`. Unset, OpenCV finds the face.

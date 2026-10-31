@@ -32,6 +32,7 @@ import math
 import os
 import re
 import secrets
+import threading
 import time
 import zlib
 from collections.abc import Callable
@@ -191,6 +192,19 @@ def is_upload_name(name: str) -> bool:
     return is_valid_name(name) and not name.startswith(".")
 
 
+_INTEGER_TEXT = re.compile(r"\s*[+-]?[0-9]+\s*")
+
+
+def bounded_int(text, bits: int = 64) -> int | None:
+    """An integer posted as text, or None when it isn't one or doesn't fit a
+    signed column of `bits`: a bigint id, or a 32-bit car number. Past the
+    column, SQLite raises OverflowError and Postgres a DataError."""
+    if not isinstance(text, str) or not _INTEGER_TEXT.fullmatch(text):
+        return None
+    value = int(text)
+    return value if -(2 ** (bits - 1)) <= value < 2 ** (bits - 1) else None
+
+
 @dataclass(frozen=True)
 class Repository:
     name: str
@@ -232,6 +246,19 @@ def rotation_of(repo: Repository, name: str) -> float:
     return row.degrees if row else 0.0
 
 
+class TooManyPixels(ValueError):
+    """A photo past `PHOTO_MAX_PIXELS`, which is never decoded."""
+
+
+def _check_pixels(image: Image.Image) -> None:
+    width, height = image.size
+    if width * height > django_settings.PHOTO_MAX_PIXELS:
+        raise TooManyPixels(
+            f"The photo is {width}x{height} pixels, past the limit of"
+            f" {django_settings.PHOTO_MAX_PIXELS // 1_000_000} megapixels."
+        )
+
+
 # ----- Decoding and encoding -----------------------------------------------------
 
 
@@ -241,8 +268,10 @@ def _is_svg(path: Path) -> bool:
 
 def _open_upright(path: Path, rotation: float = 0.0) -> tuple[Image.Image, str]:
     """The decoded image, turned by its orientation tag and then by
-    `rotation`, and its format."""
+    `rotation`, and its format. Raises `TooManyPixels` before decoding a photo
+    past the limit."""
     with Image.open(path) as opened:
+        _check_pixels(opened)
         fmt = opened.format
         image = ImageOps.exif_transpose(opened)
     if rotation:
@@ -253,6 +282,7 @@ def _open_upright(path: Path, rotation: float = 0.0) -> tuple[Image.Image, str]:
 def _upright_size(path: Path, rotation: float = 0.0) -> tuple[int, int]:
     """The size `_open_upright()` gives, from the header alone."""
     with Image.open(path) as opened:
+        _check_pixels(opened)
         width, height = opened.size
         if opened.getexif().get(0x0112) in (5, 6, 7, 8):
             width, height = height, width
@@ -296,34 +326,69 @@ def _encode(image: Image.Image, fmt: str, target) -> None:
         image.save(target, "GIF")
 
 
+@contextmanager
+def _photo_lock(repo: Repository, name: str):
+    """An exclusive lock on one photo, across threads and processes.
+
+    Everything that reads a photo's state to make a file from it holds this,
+    and so does everything that changes the state: a render reads the crop
+    and the rotation, then writes, under the lock, and `photo.crop`,
+    `photo.rotate` and `photo.delete` hold it until their transaction has
+    committed and the stale renders are gone. No render made from the old
+    state can outlive the change.
+
+    The locks are a fixed set of files in the data folder, picked by the
+    photo's folder and name, so no lock file is left in a photo folder. A
+    thread that holds a stripe takes it again freely.
+    """
+    stripe = zlib.crc32(os.fsencode(os.path.join(repo.key, name))) % LOCK_STRIPES
+    held = _held_stripes.__dict__.setdefault("stripes", set())
+    if stripe in held:
+        yield
+        return
+    folder = django_settings.DATA_DIR / "locks"
+    folder.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(folder / f"photo-{stripe:02d}.lock", os.O_RDWR | os.O_CREAT)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        held.add(stripe)
+        yield
+    finally:
+        held.discard(stripe)
+        os.close(descriptor)
+
+
+def _after_commit(work: Callable[[], None]) -> None:
+    """Run `work` once the changes are committed. Called after the service's
+    own atomic block, so with no outer transaction it runs now, still under
+    the photo's lock."""
+    if transaction.get_connection().in_atomic_block:
+        transaction.on_commit(work)
+    else:
+        work()
+
+
 # ----- Writing files -------------------------------------------------------------
 
 LOCK_STRIPES = 64
-
-
-@contextmanager
-def _file_lock(target: Path):
-    """An exclusive lock for one file, across threads and processes.
-
-    The locks are a fixed set of files in the data folder, picked by the
-    target's path, so no lock file is left in a photo folder.
-    """
-    folder = django_settings.DATA_DIR / "locks"
-    folder.mkdir(parents=True, exist_ok=True)
-    stripe = zlib.crc32(os.fsencode(target)) % LOCK_STRIPES
-    descriptor = os.open(folder / f"render-{stripe:02d}.lock", os.O_RDWR | os.O_CREAT)
-    try:
-        fcntl.flock(descriptor, fcntl.LOCK_EX)
-        yield
-    finally:
-        os.close(descriptor)
+# What a broken, unknown or oversized image file raises when it is read.
+UNREADABLE = (
+    OSError,
+    UnidentifiedImageError,
+    ValueError,
+    SyntaxError,
+    Image.DecompressionBombError,
+)
+_held_stripes = threading.local()
 
 
 def _write_atomically(target: Path, write: Callable) -> None:
     """Write through a temporary file in the same folder and move it into
-    place, so a reader sees the old file or the whole new one. The new file
-    gets the service user's umask, where PHP made folders world-writable."""
-    temporary = target.with_name(f".{target.name}.{secrets.token_hex(6)}.tmp")
+    place, so a reader sees the old file or the whole new one. The temporary
+    name is short, so a name as long as a racer's column allows still fits.
+    The new file gets the service user's umask, where PHP made folders
+    world-writable."""
+    temporary = target.with_name(f".{secrets.token_hex(6)}.tmp")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
     try:
         with os.fdopen(descriptor, "wb") as stream:
@@ -335,16 +400,15 @@ def _write_atomically(target: Path, write: Callable) -> None:
 
 
 def _make(target: Path, build: Callable[[], tuple[Image.Image, str]]) -> Path | None:
-    """`target`, made by `build()` under the file's lock unless it exists."""
+    """`target`, made by `build()` unless it exists. The caller holds the
+    photo's lock."""
     if target.is_file():
         return target
     try:
         target.parent.mkdir(exist_ok=True)
-        with _file_lock(target):
-            if not target.is_file():
-                image, fmt = build()
-                _write_atomically(target, lambda stream: _encode(image, fmt, stream))
-    except OSError, UnidentifiedImageError, ValueError, Image.DecompressionBombError:
+        image, fmt = build()
+        _write_atomically(target, lambda stream: _encode(image, fmt, stream))
+    except UNREADABLE:
         return None
     return target
 
@@ -364,14 +428,28 @@ def find_or_make(repo: Repository, label: Label, name: str) -> Path | None:
     made if it is missing, or None when there is no such photo."""
     if repo.directory is None or not is_valid_name(name):
         return None
-    original = repo.file(name)
     cropped = repo.file(name, CROPPED_FOLDER)
     if label.name == CROPPED and cropped.is_file():
         return cropped
     if label.name in (ORIGINAL, CROPPED):
         return _original(repo, name)
+    # A render already made for a fixed size is served without the lock.
+    fixed = WORK_FOLDER if label.name == WORK else None
+    if label.requested is not None:
+        box = _ALLOWED_FOLDERS.get("x".join(f"{n:g}" for n in label.requested))
+        fixed = box.folder if box else None
+    if fixed and repo.file(name, fixed).is_file():
+        return repo.file(name, fixed)
+    with _photo_lock(repo, name):
+        return _render(repo, label, name)
+
+
+def _render(repo: Repository, label: Label, name: str) -> Path | None:
+    """Read the photo's state and make the render, under the photo's lock."""
+    original = repo.file(name)
+    cropped = repo.file(name, CROPPED_FOLDER)
     if label.name == WORK:
-        source, rotation, box, folder = original, None, WORK_BOX, WORK_FOLDER
+        source, rotation, box = original, None, WORK_BOX
     else:
         # A sized render starts from the crop, which already holds the turn.
         source, rotation = (cropped, 0.0) if cropped.is_file() else (original, None)
@@ -382,10 +460,11 @@ def find_or_make(repo: Repository, label: Label, name: str) -> Path | None:
         return source
     if rotation is None:
         rotation = rotation_of(repo, name)
+    folder = WORK_FOLDER
     if box is None:
         try:
             box = nearest_box(label.requested, _upright_size(source, rotation))
-        except OSError, UnidentifiedImageError, Image.DecompressionBombError:
+        except UNREADABLE:
             return None
         folder = box.folder
 
@@ -401,12 +480,18 @@ def _original(repo: Repository, name: str) -> Path | None:
     original = repo.file(name)
     if not original.is_file():
         return None
-    rotation = rotation_of(repo, name)
-    if not rotation or _is_svg(original):
+    if _is_svg(original) or not rotation_of(repo, name):
         return original
-    return _make(
-        repo.file(name, ROTATED_FOLDER), lambda: _open_upright(original, rotation)
-    )
+    rotated = repo.file(name, ROTATED_FOLDER)
+    if rotated.is_file():
+        return rotated
+    with _photo_lock(repo, name):
+        rotation = rotation_of(repo, name)
+        if not original.is_file():
+            return None
+        if not rotation:
+            return original
+        return _make(rotated, lambda: _open_upright(original, rotation))
 
 
 def racer_photo(repo: Repository, path: str, label: Label | None) -> Path | None:
@@ -510,27 +595,29 @@ def sanitized_name(posted: str) -> str:
     return name
 
 
-def suffixed_name(name: str, attempt: int) -> str:
-    """PHP's `_1`, `_2` before the extension."""
+def suffixed_name(name: str, attempt: int, separator: str = "_") -> str:
+    """PHP's `_1`, `_2` before the extension, or `-1` for a video. The stem
+    gives way so the name still fits a racer's column."""
     stem, dot, extension = name.rpartition(".")
-    return f"{stem}_{attempt}.{extension}" if dot else f"{name}_{attempt}"
+    if not dot:
+        stem, extension = name, ""
+    suffix = f"{separator}{attempt}" + (f".{extension}" if dot else "")
+    return stem[: MAX_NAME_LENGTH - len(suffix)] + suffix
 
 
 def decoded_format(upload) -> str:
     """The upload's format, decoded by Pillow rather than taken from the
-    client's MIME type. Raises `Refused` for anything GD could not read."""
+    client's MIME type. Raises `Refused` for anything GD could not read, and
+    for a photo past `PHOTO_MAX_PIXELS`, before decoding it."""
     try:
         upload.seek(0)
         with Image.open(upload) as image:
             fmt = image.format
+            _check_pixels(image)
             image.load()
-    except (
-        OSError,
-        UnidentifiedImageError,
-        ValueError,
-        SyntaxError,
-        Image.DecompressionBombError,
-    ):
+    except TooManyPixels as error:
+        raise Refused("upload_image_size", str(error)) from None
+    except UNREADABLE:
         fmt = None
     finally:
         upload.seek(0)
@@ -567,15 +654,12 @@ def store_upload(folder: Path, name: str, upload, separator="_") -> str:
     keeps two uploads of one name apart."""
     attempt = 0
     while True:
-        target = name if attempt == 0 else _suffixed(name, attempt, separator)
+        target = name if attempt == 0 else suffixed_name(name, attempt, separator)
         try:
             descriptor = os.open(
                 folder / target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666
             )
-        except FileExistsError:
-            attempt += 1
-            continue
-        except IsADirectoryError:
+        except FileExistsError, IsADirectoryError:
             attempt += 1
             continue
         try:
@@ -586,13 +670,6 @@ def store_upload(folder: Path, name: str, upload, separator="_") -> str:
             (folder / target).unlink(missing_ok=True)
             raise
         return target
-
-
-def _suffixed(name: str, attempt: int, separator: str) -> str:
-    if separator == "_":
-        return suffixed_name(name, attempt)
-    stem, dot, extension = name.rpartition(".")
-    return f"{stem}-{attempt}.{extension}" if dot else f"{name}-{attempt}"
 
 
 def move_failure(folder: Path, what: str) -> Refused:
@@ -622,7 +699,8 @@ def widen_and_clip(
 
 def autocrop(repo: Repository, name: str, result: UploadResult) -> bool:
     """Crop a fresh upload to the face, widened 10% and made 4:3 tall, as
-    PHP does. Returns whether it cropped; a miss or an error is a warning."""
+    PHP does. Returns whether it cropped; a miss or an error is a warning.
+    The caller holds the photo's lock."""
     original = repo.file(name)
     try:
         image, fmt = _open_upright(original)
@@ -640,8 +718,7 @@ def autocrop(repo: Repository, name: str, result: UploadResult) -> bool:
         target = repo.file(name, CROPPED_FOLDER)
         target.parent.mkdir(exist_ok=True)
         crop = image.crop((x, y, x + w, y + h))
-        with _file_lock(target):
-            _write_atomically(target, lambda stream: _encode(crop, fmt, stream))
+        _write_atomically(target, lambda stream: _encode(crop, fmt, stream))
     except Exception as error:  # PHP turns any exception into the warning.
         result.warning = str(error)
         return False
@@ -659,7 +736,7 @@ def _find_face(original: Path, image: Image.Image, fmt: str):
         return faces.detect_with_hook(command, str(original))
     # The hook reads the file, so it gets an upright copy when the stored
     # pixels are turned, and its box lands in the frame the crop uses.
-    temporary = original.with_name(f".{original.name}.{secrets.token_hex(6)}.upright")
+    temporary = original.with_name(f".{secrets.token_hex(6)}.upright{original.suffix}")
     try:
         with temporary.open("wb") as stream:
             _encode(image, fmt, stream)
@@ -698,8 +775,13 @@ def upload_photo(
     result = UploadResult()
     if target != name:
         result.filename_change = target  # PHP echoes an undefined variable (C27).
-    if autocrop_requested:
-        autocrop(repo, target, result)
+    with _photo_lock(repo, target):
+        # A file of this name that went away some other way may have left a
+        # rotation and renders behind; they don't belong to the new photo.
+        PhotoRotation.objects.filter(directory=repo.key, name=target).delete()
+        _unlink_all(_dependents(repo, target, keep=None))
+        if autocrop_requested:
+            autocrop(repo, target, result)
 
     path = f"{CROPPED_FOLDER}/{target}" if result.cropped else target
     success = True
@@ -731,9 +813,10 @@ def _assign_upload(event, repo, path, selector, result: UploadResult) -> bool:
                     result.failure = ("noracer", "No such racer.")
                     return False
             case ByCarNumber(text):
+                car = bounded_int(text, bits=32)
                 racer = None
-                if re.fullmatch(r"[+-]?[0-9]+", text.strip()):
-                    racer = racers.filter(car_number=int(text)).order_by("pk").first()
+                if car is not None:
+                    racer = racers.filter(car_number=car).order_by("pk").first()
                 if racer is None:
                     result.failure = ("no-such-car", f"No car numbered {text} found.")
                     return False
@@ -748,10 +831,8 @@ def _assign_upload(event, repo, path, selector, result: UploadResult) -> bool:
 
 
 def _by_id(racers, text) -> Racer | None:
-    try:
-        return racers.filter(pk=int(str(text).strip())).first()
-    except ValueError:
-        return None
+    pk = bounded_int(str(text))
+    return None if pk is None else racers.filter(pk=pk).first()
 
 
 def _set_photo(event, repo: Repository, racer: Racer, path: str) -> None:
@@ -797,37 +878,43 @@ class CropBox:
 def crop_photo(event, repo: Repository, name: str, box: CropBox) -> None:
     """`photo.crop`: cut the box, given in pixels of an image of
     `original_width` x `original_height` that shows the upright, turned
-    photo, out of the original."""
+    photo, out of the original. The box is clipped to the photo, where GD
+    fills the part outside it with black, so a crop is never larger than the
+    photo."""
     original = repo.file(name) if repo.directory and is_valid_name(name) else None
     if original is None or not original.is_file():
         raise Refused("nosuchfile", f"Image {name} not found.")
     if box.original_width <= 0 or box.original_height <= 0:
         raise Refused("crop", "The crop needs the image's width and height.")
-    try:
-        image, fmt = _open_upright(original, rotation_of(repo, name))
-    except OSError, UnidentifiedImageError, Image.DecompressionBombError:
-        raise Refused("nosuchfile", f"Image {name} can't be read.") from None
-    # GD's imagecopy() truncates the float coordinates.
-    x = int(box.left * image.width / box.original_width)
-    y = int(box.top * image.height / box.original_height)
-    width = int((box.right - box.left) * image.width / box.original_width)
-    height = int((box.bottom - box.top) * image.height / box.original_height)
-    if width <= 0 or height <= 0:
-        raise Refused("crop", "The crop is empty.")
-    target = repo.file(name, CROPPED_FOLDER)
-    target.parent.mkdir(exist_ok=True)
-    crop = _workable(image).crop((x, y, x + width, y + height))
-    with _file_lock(target):
+    # The lock is held until the racers point at the crop and the old renders
+    # are gone, so a rotation can't remove the crop in between, and a render
+    # can't be made from the old crop afterwards.
+    with _photo_lock(repo, name):
+        try:
+            image, fmt = _open_upright(original, rotation_of(repo, name))
+        except TooManyPixels as error:
+            raise Refused("crop", str(error)) from None
+        except OSError, UnidentifiedImageError, ValueError:
+            raise Refused("nosuchfile", f"Image {name} can't be read.") from None
+        # GD's imagecopy() truncates the float coordinates.
+        x = int(box.left * image.width / box.original_width)
+        y = int(box.top * image.height / box.original_height)
+        width = int((box.right - box.left) * image.width / box.original_width)
+        height = int((box.bottom - box.top) * image.height / box.original_height)
+        left, top = max(0, x), max(0, y)
+        right, bottom = min(image.width, x + width), min(image.height, y + height)
+        if right <= left or bottom <= top:
+            raise Refused("crop", "The crop is empty.")
+        target = repo.file(name, CROPPED_FOLDER)
+        target.parent.mkdir(exist_ok=True)
+        crop = _workable(image).crop((left, top, right, bottom))
         _write_atomically(target, lambda stream: _encode(crop, fmt, stream))
-    with transaction.atomic():
-        lock_race_state(event.id)
-        Racer.objects.filter(event=event, **{repo.field: name}).update(
-            **{repo.field: f"{CROPPED_FOLDER}/{name}"}
-        )
-        # Listed at the commit, so a render made meanwhile goes too.
-        transaction.on_commit(
-            lambda: _unlink_all(_dependents(repo, name, keep=CROPPED_FOLDER))
-        )
+        with transaction.atomic():
+            lock_race_state(event.id)
+            Racer.objects.filter(event=event, **{repo.field: name}).update(
+                **{repo.field: f"{CROPPED_FOLDER}/{name}"}
+            )
+        _after_commit(lambda: _unlink_all(_dependents(repo, name, keep=CROPPED_FOLDER)))
 
 
 def rotate_photo(event, repo: Repository, name: str, degrees: float) -> None:
@@ -837,23 +924,26 @@ def rotate_photo(event, repo: Repository, name: str, degrees: float) -> None:
     original = repo.file(name) if repo.directory and is_valid_name(name) else None
     if original is None or not original.is_file():
         raise Refused("nosuchfile", f"Image {name} not found.")
-    with transaction.atomic():
-        lock_race_state(event.id)
-        row = (
-            PhotoRotation.objects.select_for_update()
-            .filter(directory=repo.key, name=name)
-            .first()
-        )
-        total = ((row.degrees if row else 0.0) + degrees) % 360
-        if total == 0:
-            PhotoRotation.objects.filter(directory=repo.key, name=name).delete()
-        elif row:
-            PhotoRotation.objects.filter(pk=row.pk).update(degrees=total)
-        else:
-            PhotoRotation.objects.create(directory=repo.key, name=name, degrees=total)
-        Racer.objects.filter(
-            event=event, **{repo.field: f"{CROPPED_FOLDER}/{name}"}
-        ).update(**{repo.field: name})
+    with _photo_lock(repo, name):
+        with transaction.atomic():
+            lock_race_state(event.id)
+            row = (
+                PhotoRotation.objects.select_for_update()
+                .filter(directory=repo.key, name=name)
+                .first()
+            )
+            total = ((row.degrees if row else 0.0) + degrees) % 360
+            if total == 0:
+                PhotoRotation.objects.filter(directory=repo.key, name=name).delete()
+            elif row:
+                PhotoRotation.objects.filter(pk=row.pk).update(degrees=total)
+            else:
+                PhotoRotation.objects.create(
+                    directory=repo.key, name=name, degrees=total
+                )
+            Racer.objects.filter(
+                event=event, **{repo.field: f"{CROPPED_FOLDER}/{name}"}
+            ).update(**{repo.field: name})
 
         def tidy():
             _unlink_all(_dependents(repo, name, keep=None))
@@ -864,35 +954,41 @@ def rotate_photo(event, repo: Repository, name: str, degrees: float) -> None:
             except OSError:
                 pass
 
-        transaction.on_commit(tidy)
+        _after_commit(tidy)
 
 
 def delete_photo(event, repo: Repository, name) -> None:
     """`photo.delete`: forget the photo and remove it from every folder of the
-    repository, after the racers that showed it lose it."""
+    repository, after the racers that showed it lose it. The photo's lock is
+    held throughout, so no render made meanwhile is left behind."""
     if repo.directory is None or not is_valid_name(name):
         return
-    with transaction.atomic():
-        lock_race_state(event.id)
-        Racer.objects.filter(
-            event=event, **{f"{repo.field}__in": [name, f"{CROPPED_FOLDER}/{name}"]}
-        ).update(**{repo.field: ""})
-        PhotoRotation.objects.filter(directory=repo.key, name=name).delete()
+    with _photo_lock(repo, name):
+        with transaction.atomic():
+            lock_race_state(event.id)
+            Racer.objects.filter(
+                event=event,
+                **{f"{repo.field}__in": [name, f"{CROPPED_FOLDER}/{name}"]},
+            ).update(**{repo.field: ""})
+            PhotoRotation.objects.filter(directory=repo.key, name=name).delete()
         directory = repo.directory
-        transaction.on_commit(lambda: _delete_everywhere(directory, name))
+        _after_commit(lambda: _delete_everywhere(directory, name))
 
 
 def _delete_everywhere(directory: Path, name: str) -> None:
-    """`delete_photo_recursively()`, which follows no linked folder."""
+    """`delete_photo_recursively()`: unlink every file called `name` in the
+    folder and the folders under it. A folder of that name is searched, not
+    removed, and no linked folder is followed. A file that can't be removed
+    is skipped, where PHP's error path fails fatally (C17)."""
     try:
         entries = list(os.scandir(directory))
     except OSError:
         return
     for entry in entries:
-        if entry.name == name and not entry.is_dir(follow_symlinks=False):
-            _unlink_all([Path(entry.path)])
-        elif entry.is_dir(follow_symlinks=False):
+        if entry.is_dir(follow_symlinks=False):
             _delete_everywhere(Path(entry.path), name)
+        elif entry.name == name:
+            _unlink_all([Path(entry.path)])
 
 
 def cache_breaker() -> int:

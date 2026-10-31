@@ -8,7 +8,6 @@ are copied from `website/Images` into `media/image_sets`.
 """
 
 import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
@@ -18,6 +17,7 @@ from django.conf import settings as django_settings
 from core.models import RaceSettings
 from core.services import event_dir
 from core.slides import is_acceptable_name
+from media.photos import bounded_int
 from racing.services.polls import mangled_name
 from roster.models import Racer
 from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url
@@ -134,16 +134,13 @@ class BadClassIds(ValueError):
     pass
 
 
-_CLASS_ID = re.compile(r"\s*[+-]?[0-9]+\s*")
-
-
 def parse_class_ids(text) -> list[int]:
-    """`classids` as a comma-separated list of integers. PHP pastes the text
-    into its SQL (S10), so anything else is refused."""
-    parts = text.split(",") if isinstance(text, str) else [None]
-    if not all(isinstance(p, str) and _CLASS_ID.fullmatch(p) for p in parts):
+    """`classids` as a comma-separated list of integers that fit an id. PHP
+    pastes the text into its SQL (S10), so anything else is refused."""
+    ids = [bounded_int(p) for p in text.split(",")] if isinstance(text, str) else []
+    if not ids or None in ids:
         raise BadClassIds(text)
-    return [int(p) for p in parts]
+    return ids
 
 
 @dataclass(frozen=True)
