@@ -1,0 +1,11 @@
+<header data-chrome class="sticky top-0 z-20 flex h-14 items-center gap-1 border-b border-line bg-surface pl-4 pr-1">
+  <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">{{ title }}</h1>
+  {% if appbar_racing %}
+  <div class="flex items-center">
+    <span id="appbar-racing-label" class="text-sm font-medium">Racing</span>
+    {% include "switch.html" with labelledby="appbar-racing-label" checked=True %}
+  </div>
+  {% endif %}
+  <span class="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink-muted"><span class="sr-only">Signed in as </span>{{ role }}</span>
+  <a href="#logout" class="grid size-11 place-items-center rounded-full text-ink-muted hover:bg-surface-2" aria-label="Log out">{% include "icon.html" with name="logout" %}</a>
+</header>

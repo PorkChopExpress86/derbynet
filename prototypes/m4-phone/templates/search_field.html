@@ -1,0 +1,7 @@
+{# Persistent search field. A USB or Bluetooth scanner types into it and ends with Enter. #}
+<label for="find" class="{{ label_class|default:'sr-only' }}">Find a racer by name or car number</label>
+<div class="relative{% if label_class %} mt-2{% endif %}">
+  <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-ink-muted">{% include "icon.html" with name="search" cls="size-5" %}</span>
+  <input id="find" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Name or car number"
+    class="{{ input_class|default:'h-12' }} w-full rounded-xl border border-field bg-surface pl-11 pr-3 text-base placeholder:text-ink-muted">
+</div>

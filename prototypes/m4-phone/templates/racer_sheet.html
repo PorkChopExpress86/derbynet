@@ -1,0 +1,28 @@
+{% include "sheet_top.html" with name="racer" title="Racer" title_x="'#' + $store.ui.racer.car + ' ' + $store.ui.racer.first + ' ' + $store.ui.racer.last" %}
+  <div class="flex items-center gap-4">
+    <span aria-hidden="true" class="grid size-20 shrink-0 place-items-center rounded-2xl bg-surface-2 text-2xl font-semibold text-ink-muted" x-text="$store.ui.racer.first.charAt(0) + $store.ui.racer.last.charAt(0)"></span>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm" :class="$store.ui.racer.photo ? 'text-ink-muted' : 'text-warn font-medium'" x-text="$store.ui.racer.photo ? 'Photo on file' : 'No photo yet'"></p>
+      <button type="button" class="mt-1 flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-semibold">{% include "icon.html" with name="photos" cls="size-5" %}Take photo</button>
+    </div>
+  </div>
+  <div class="mt-4 flex items-center justify-between rounded-xl border border-line px-4 py-1">
+    <span id="sheet-pass-label" class="font-medium">Passed inspection</span>
+    <button type="button" role="switch" aria-labelledby="sheet-pass-label" :aria-checked="$store.ui.racer.passed.toString()" aria-checked="false" @click="$store.ui.racer.passed = !$store.ui.racer.passed" class="group grid h-11 w-16 shrink-0 place-items-center rounded-full">
+      <span class="relative block h-7 w-12 rounded-full bg-switch-off group-aria-checked:bg-ok"><span class="absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow group-aria-checked:translate-x-5 motion-safe:transition-transform"></span></span>
+    </button>
+  </div>
+  <div class="mt-4 grid grid-cols-2 gap-3">
+    <div><label for="f-first" class="text-sm font-medium">First name</label><input id="f-first" :value="$store.ui.racer.first" autocomplete="off" class="mt-1 h-12 w-full rounded-lg border border-field bg-surface px-3 text-base"></div>
+    <div><label for="f-last" class="text-sm font-medium">Last name</label><input id="f-last" :value="$store.ui.racer.last" autocomplete="off" class="mt-1 h-12 w-full rounded-lg border border-field bg-surface px-3 text-base"></div>
+    <div><label for="f-car" class="text-sm font-medium">Car number</label><input id="f-car" inputmode="numeric" :value="$store.ui.racer.car" class="mt-1 h-12 w-full rounded-lg border border-field bg-surface px-3 font-mono text-base"></div>
+    <div><label for="f-den" class="text-sm font-medium">Den</label>
+      <select id="f-den" x-effect="$el.value = $store.ui.racer.partition" class="mt-1 h-12 w-full rounded-lg border border-field bg-surface px-3 text-base">
+        <option>Tigers</option><option>Wolves</option><option>Bears</option>
+      </select></div>
+  </div>
+  <div class="mt-5 grid grid-cols-2 gap-2">
+    <button type="button" @click="$store.ui.close()" class="min-h-12 rounded-xl border border-line font-semibold">Cancel</button>
+    <button type="button" class="min-h-12 rounded-xl bg-accent font-semibold text-accent-ink">Save</button>
+  </div>
+{% include "sheet_bottom.html" %}

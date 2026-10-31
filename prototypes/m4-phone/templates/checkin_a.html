@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{# Option A: one card list with a pass switch on each card, under a sticky filter bar. #}
+{% block main %}
+<div data-chrome class="sticky top-14 z-10 border-b border-line bg-surface px-3 pb-2 pt-3" x-data="{ den: 'All' }">
+  {% include "search_field.html" %}
+  <div role="group" aria-label="Den" class="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-surface-2 p-1">
+    {% for d in dens %}<button type="button" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}" :aria-pressed="(den === '{{ d }}').toString()" @click="den = '{{ d }}'" class="min-h-11 rounded-lg text-sm font-semibold text-ink-muted aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow">{{ d }}</button>{% endfor %}
+  </div>
+  <p class="mt-2 text-sm text-ink-muted"><span class="font-semibold text-ink">{{ passed }}</span> of {{ total }} passed</p>
+</div>
+<ul id="roster" aria-label="Racers" hx-get="poll/roster?sig=r31" hx-trigger="every 10s [!Alpine.store('ui').editing()]" hx-swap="outerHTML" class="divide-y divide-line border-b border-line">
+  {% for r in racers %}{% include "racer_row.html" with show_partition=True %}{% endfor %}
+</ul>
+{% endblock %}
+{% block sheets %}{% include "racer_sheet.html" %}{% endblock %}

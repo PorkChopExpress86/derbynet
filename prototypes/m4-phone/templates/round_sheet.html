@@ -1,0 +1,14 @@
+{% include "sheet_top.html" with name="round" title="Wolves · Round 1" %}
+  <p class="text-sm text-ink-muted">10 racers · 5 of 11 heats run · racing now</p>
+  <ul class="mt-3 divide-y divide-line rounded-xl border border-line">
+    <li><button type="button" class="flex min-h-12 w-full items-center justify-between px-4 text-left">Show heats and results{% include "icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</button></li>
+    <li><button type="button" class="flex min-h-12 w-full items-center justify-between px-4 text-left">Make this the current round{% include "icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</button></li>
+    <li><button type="button" class="flex min-h-12 w-full items-center justify-between px-4 text-left">Add a late racer to the schedule{% include "icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</button></li>
+    <li><button type="button" class="flex min-h-12 w-full items-center justify-between px-4 text-left">Print heat sheet{% include "icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</button></li>
+  </ul>
+  <h3 class="mt-5 text-sm font-semibold text-ink-muted">Cannot be undone</h3>
+  <div class="mt-1 grid gap-2">
+    <button type="button" class="min-h-12 rounded-lg border border-danger px-4 font-semibold text-danger">Unschedule 6 heats not yet run</button>
+    <button type="button" class="min-h-12 rounded-lg bg-danger px-4 font-semibold text-white dark:text-black">Delete round and 5 heat results</button>
+  </div>
+{% include "sheet_bottom.html" %}

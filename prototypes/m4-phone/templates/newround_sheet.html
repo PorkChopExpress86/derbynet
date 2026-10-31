@@ -1,0 +1,37 @@
+{% include "sheet_top.html" with name="newround" title="New round" %}
+  <ol class="flex gap-2 text-xs font-semibold" aria-label="Steps">
+    <li class="flex-1 border-t-4 border-accent pt-1" aria-current="step">1. Racers</li>
+    <li class="flex-1 border-t-4 border-line pt-1 text-ink-muted">2. Heats</li>
+    <li class="flex-1 border-t-4 border-line pt-1 text-ink-muted">3. Review</li>
+  </ol>
+  <fieldset class="mt-4">
+    <legend class="text-base font-semibold">Who races?</legend>
+    <div class="mt-2 grid gap-2">
+      <label class="flex min-h-14 items-center gap-3 rounded-xl border border-line px-4 has-checked:border-2 has-checked:border-accent has-checked:bg-accent-soft/40">
+        <input type="radio" name="kind" value="top" checked class="size-5 accent-[var(--color-accent)]">
+        <span><span class="block font-medium">Top finishers from each den</span><span class="block text-sm text-ink-muted">Tigers, Wolves, Bears</span></span>
+      </label>
+      <label class="flex min-h-14 items-center gap-3 rounded-xl border border-line px-4 has-checked:border-2 has-checked:border-accent has-checked:bg-accent-soft/40">
+        <input type="radio" name="kind" value="overall" class="size-5 accent-[var(--color-accent)]">
+        <span class="font-medium">Top finishers overall</span>
+      </label>
+      <label class="flex min-h-14 items-center gap-3 rounded-xl border border-line px-4 has-checked:border-2 has-checked:border-accent has-checked:bg-accent-soft/40">
+        <input type="radio" name="kind" value="all" class="size-5 accent-[var(--color-accent)]">
+        <span class="font-medium">Every racer in one den</span>
+      </label>
+    </div>
+  </fieldset>
+  <div class="mt-4 flex items-center justify-between gap-3" x-data="{ n: 3 }">
+    <label for="per-den" class="font-medium">Racers per den</label>
+    <div class="flex items-center rounded-xl border border-field">
+      <button type="button" aria-label="Fewer racers" @click="n = Math.max(1, n - 1)" class="grid size-12 place-items-center">{% include "icon.html" with name="minus" cls="size-5" %}</button>
+      <input id="per-den" type="number" inputmode="numeric" min="1" max="10" x-model.number="n" value="3" class="h-12 w-12 border-x border-field bg-transparent text-center text-base font-semibold">
+      <button type="button" aria-label="More racers" @click="n = Math.min(10, n + 1)" class="grid size-12 place-items-center">{% include "icon.html" with name="plus" cls="size-5" %}</button>
+    </div>
+  </div>
+  <p class="mt-2 text-sm text-ink-muted">Wolves round 1 is still racing. Its top 3 are picked when it finishes.</p>
+  <div class="mt-5 grid grid-cols-2 gap-2">
+    <button type="button" @click="$store.ui.close()" class="min-h-12 rounded-xl border border-line font-semibold">Cancel</button>
+    <button type="button" class="min-h-12 rounded-xl bg-accent font-semibold text-accent-ink">Next</button>
+  </div>
+{% include "sheet_bottom.html" %}

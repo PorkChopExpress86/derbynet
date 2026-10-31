@@ -1,0 +1,10 @@
+<li class="flex min-h-11 items-center gap-3 py-1">
+  {% include "lane_badge.html" with n=lane.lane %}
+  {% if lane.racer %}
+  <span class="w-10 shrink-0 font-mono font-semibold tabular-nums">{{ lane.racer.car }}</span>
+  <span class="min-w-0 flex-1 truncate">{{ lane.racer.name }}</span>
+  {% if show_result and lane.time %}<span class="font-mono text-sm tabular-nums text-ink-muted">{{ lane.time }}</span>{% endif %}
+  {% else %}
+  <span class="min-w-0 flex-1 italic text-ink-muted">Empty lane</span>
+  {% endif %}
+</li>

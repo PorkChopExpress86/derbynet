@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{# Option A: one column, sticky current-heat card, round cards below. #}
+{% block main %}
+<div data-chrome class="sticky top-14 z-10 bg-bg px-3 pb-2 pt-3">
+  {% include "heat_card.html" with heat_card_class="rounded-xl border border-line bg-surface p-4 shadow-sm" racing_inline=True pills=True %}
+</div>
+<div class="space-y-3 px-3 pt-1">
+  {% include "last_results.html" %}
+  <h2 class="pt-2 text-base font-semibold">Rounds</h2>
+  <ul class="space-y-3">{% for r in rounds %}{% include "round_card.html" %}{% endfor %}</ul>
+  <button type="button" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-field font-semibold">{% include "icon.html" with name="plus" cls="size-5" %}New round</button>
+</div>
+{% endblock %}
+{% block sheets %}{% include "round_sheet.html" %}{% endblock %}

@@ -1,0 +1,758 @@
+[
+  {
+    "layout": "dashboard-a",
+    "scheme": "light",
+    "sheet": "round",
+    "layoutMetric": {
+      "chromePx": 487,
+      "contentPx": 357,
+      "racerRowsVisible": 0
+    },
+    "default": {
+      "file": "screenshots/dashboard-a-light-default.png",
+      "targets": {
+        "count": 14,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/dashboard-a-light-sheet.png",
+      "targets": {
+        "count": 7,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "dashboard-a",
+    "scheme": "dark",
+    "sheet": "round",
+    "layoutMetric": {
+      "chromePx": 487,
+      "contentPx": 357,
+      "racerRowsVisible": 0
+    },
+    "default": {
+      "file": "screenshots/dashboard-a-dark-default.png",
+      "targets": {
+        "count": 14,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/dashboard-a-dark-sheet.png",
+      "targets": {
+        "count": 7,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "dashboard-b",
+    "scheme": "light",
+    "sheet": "newround",
+    "layoutMetric": {
+      "chromePx": 190,
+      "contentPx": 654,
+      "racerRowsVisible": 0
+    },
+    "default": {
+      "file": "screenshots/dashboard-b-light-default.png",
+      "targets": {
+        "count": 12,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/dashboard-b-light-sheet.png",
+      "targets": {
+        "count": 9,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "dashboard-b",
+    "scheme": "dark",
+    "sheet": "newround",
+    "layoutMetric": {
+      "chromePx": 190,
+      "contentPx": 654,
+      "racerRowsVisible": 0
+    },
+    "default": {
+      "file": "screenshots/dashboard-b-dark-default.png",
+      "targets": {
+        "count": 12,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/dashboard-b-dark-sheet.png",
+      "targets": {
+        "count": 9,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "dashboard-c",
+    "scheme": "light",
+    "sheet": "heat",
+    "layoutMetric": {
+      "chromePx": 276,
+      "contentPx": 568,
+      "racerRowsVisible": 0
+    },
+    "default": {
+      "file": "screenshots/dashboard-c-light-default.png",
+      "targets": {
+        "count": 14,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/dashboard-c-light-sheet.png",
+      "targets": {
+        "count": 6,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "dashboard-c",
+    "scheme": "dark",
+    "sheet": "heat",
+    "layoutMetric": {
+      "chromePx": 276,
+      "contentPx": 568,
+      "racerRowsVisible": 0
+    },
+    "default": {
+      "file": "screenshots/dashboard-c-dark-default.png",
+      "targets": {
+        "count": 14,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/dashboard-c-dark-sheet.png",
+      "targets": {
+        "count": 6,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "checkin-a",
+    "scheme": "light",
+    "sheet": "racer",
+    "layoutMetric": {
+      "chromePx": 278,
+      "contentPx": 566,
+      "racerRowsVisible": 9
+    },
+    "default": {
+      "file": "screenshots/checkin-a-light-default.png",
+      "targets": {
+        "count": 90,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/checkin-a-light-sheet.png",
+      "targets": {
+        "count": 9,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "checkin-a",
+    "scheme": "dark",
+    "sheet": "racer",
+    "layoutMetric": {
+      "chromePx": 278,
+      "contentPx": 566,
+      "racerRowsVisible": 9
+    },
+    "default": {
+      "file": "screenshots/checkin-a-dark-default.png",
+      "targets": {
+        "count": 90,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/checkin-a-dark-sheet.png",
+      "targets": {
+        "count": 9,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "checkin-b",
+    "scheme": "light",
+    "sheet": "found",
+    "layoutMetric": {
+      "chromePx": 121,
+      "contentPx": 723,
+      "racerRowsVisible": 4
+    },
+    "default": {
+      "file": "screenshots/checkin-b-light-default.png",
+      "targets": {
+        "count": 22,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/checkin-b-light-sheet.png",
+      "targets": {
+        "count": 5,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "checkin-b",
+    "scheme": "dark",
+    "sheet": "found",
+    "layoutMetric": {
+      "chromePx": 121,
+      "contentPx": 723,
+      "racerRowsVisible": 4
+    },
+    "default": {
+      "file": "screenshots/checkin-b-dark-default.png",
+      "targets": {
+        "count": 22,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/checkin-b-dark-sheet.png",
+      "targets": {
+        "count": 5,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "checkin-c",
+    "scheme": "light",
+    "sheet": "racer",
+    "layoutMetric": {
+      "chromePx": 186,
+      "contentPx": 658,
+      "racerRowsVisible": 10
+    },
+    "default": {
+      "file": "screenshots/checkin-c-light-default.png",
+      "targets": {
+        "count": 86,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/checkin-c-light-sheet.png",
+      "targets": {
+        "count": 9,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "layout": "checkin-c",
+    "scheme": "dark",
+    "sheet": "racer",
+    "layoutMetric": {
+      "chromePx": 186,
+      "contentPx": 658,
+      "racerRowsVisible": 10
+    },
+    "default": {
+      "file": "screenshots/checkin-c-dark-default.png",
+      "targets": {
+        "count": 86,
+        "smallest": {
+          "tag": "a",
+          "role": "",
+          "name": "Log out",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    "focusInSheet": true,
+    "sheetState": {
+      "file": "screenshots/checkin-c-dark-sheet.png",
+      "targets": {
+        "count": 9,
+        "smallest": {
+          "tag": "button",
+          "role": "",
+          "name": "Close",
+          "w": 44,
+          "h": 44
+        },
+        "under44": [],
+        "under24": 0
+      },
+      "axe": {
+        "version": "4.10.3",
+        "violations": [],
+        "incomplete": [
+          {
+            "id": "skip-link",
+            "impact": "moderate",
+            "nodes": 1,
+            "wcag": false,
+            "help": "The skip-link target should exist and be focusable",
+            "targets": [
+              ".focus\\:not-sr-only"
+            ]
+          }
+        ]
+      }
+    },
+    "errors": []
+  }
+]

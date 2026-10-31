@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>{{ title }} · prototype {{ option }}</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js"></script>
+  <script defer src="vendor/alpinejs-3.14.8.min.js"></script>
+  <script src="vendor/htmx-2.0.4.min.js"></script>
+</head>
+<body class="min-h-dvh bg-bg text-ink antialiased" hx-headers='{"X-CSRFToken": "prototype-token"}' x-data @keydown.escape.window="$store.ui.close()">
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-surface focus:p-3">Skip to content</a>
+  <div id="page" x-effect="$el.inert = $store.ui.modal()">
+    {% include "appbar.html" %}
+    <main id="main" class="{% block main_pad %}pb-[calc(5rem+env(safe-area-inset-bottom))]{% endblock %}">
+      {% block main %}{% endblock %}
+    </main>
+    {% block docked %}{% endblock %}
+    {% include "bottomnav.html" %}
+  </div>
+  {% block sheets %}{% endblock %}
+  {% include "more_sheet.html" %}
+</body>
+</html>

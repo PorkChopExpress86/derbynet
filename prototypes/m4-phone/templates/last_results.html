@@ -1,0 +1,13 @@
+<section aria-labelledby="last-title" class="rounded-xl border border-line bg-surface p-4">
+  <h2 id="last-title" class="text-base font-semibold">Last heat <span class="font-normal text-ink-muted">· Heat {{ last_heat.heat }}</span></h2>
+  <ol class="mt-1">
+    {% for lane in last_results %}
+    <li class="flex min-h-9 items-center gap-3">
+      <span class="w-5 text-sm font-semibold text-ink-muted">{{ lane.place }}</span>
+      {% include "lane_badge.html" with n=lane.lane cls="size-6 rounded text-xs" %}
+      <span class="min-w-0 flex-1 truncate">{{ lane.racer.car }} {{ lane.racer.name }}</span>
+      <span class="font-mono text-sm tabular-nums">{{ lane.time }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</section>

@@ -1,0 +1,13 @@
+<div x-cloak x-show="$store.ui.sheet === '{{ name }}'" class="fixed inset-0 z-40">
+  <div class="absolute inset-0 bg-black/50" aria-hidden="true" @click="$store.ui.close()"></div>
+  <section role="dialog" aria-modal="true" aria-labelledby="sheet-{{ name }}-title" data-sheet="{{ name }}"
+    x-effect="if ($store.ui.sheet === '{{ name }}') $nextTick(() => $el.querySelector('[data-autofocus]').focus())"
+    class="absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-2xl bg-surface pb-[env(safe-area-inset-bottom)] shadow-2xl">
+    <div class="sticky top-0 z-10 bg-surface px-4 pt-3">
+      <div aria-hidden="true" class="mx-auto mb-1 h-1.5 w-10 rounded-full bg-line"></div>
+      <div class="flex items-center gap-2">
+        <h2 id="sheet-{{ name }}-title" class="min-w-0 flex-1 truncate text-lg font-semibold"{% if title_x %} x-text="{{ title_x }}"{% endif %}>{{ title }}</h2>
+        <button type="button" data-autofocus aria-label="Close" @click="$store.ui.close()" class="-mr-2 grid size-11 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "icon.html" with name="close" %}</button>
+      </div>
+    </div>
+    <div class="px-4 pb-6 pt-2">

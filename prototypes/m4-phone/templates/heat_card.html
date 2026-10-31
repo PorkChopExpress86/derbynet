@@ -1,0 +1,17 @@
+{# The polled section. The server answers 204 while the state signature matches, so htmx swaps nothing. #}
+<section id="heat-card" aria-labelledby="heat-card-title" hx-get="poll/heat?sig=w1-h6-on" hx-trigger="every 2s [!Alpine.store('ui').editing()]" hx-swap="outerHTML"
+  class="{{ heat_card_class }}">
+  <h2 id="heat-card-title" class="sr-only">Current heat</h2>
+  {% include "heat_header.html" with heat=heat %}
+  <ul class="mt-1">
+    {% for lane in heat.lanes %}{% include "lane_row.html" %}{% endfor %}
+  </ul>
+  {% if racing_switch %}
+  <div class="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2">
+    <span id="racing-label" class="font-medium">Racing</span>
+    {% include "switch.html" with labelledby="racing-label" checked=True %}
+  </div>
+  {% endif %}
+  <div class="mt-2">{% include "heat_controls.html" %}</div>
+  {% if pills %}<div class="mt-3">{% include "status_pills.html" %}</div>{% endif %}
+</section>

@@ -1,0 +1,10 @@
+<li class="flex items-center gap-2 bg-surface py-1.5 pl-3 pr-1">
+  <button type="button" aria-haspopup="dialog" @click="$store.ui.racer = {{ r.json }}; $store.ui.open('{{ sheet|default:'racer' }}', $event)"{% if r.car == 206 %} data-open-racer{% endif %} class="flex min-h-12 min-w-0 flex-1 items-center gap-3 text-left">
+    <span aria-hidden="true" class="grid size-11 shrink-0 place-items-center rounded-full bg-surface-2 text-sm font-semibold text-ink-muted">{{ r.initials }}</span>
+    <span class="min-w-0">
+      <span class="block truncate font-medium">{{ r.name }}</span>
+      <span class="block truncate text-sm text-ink-muted"><span class="font-mono">#{{ r.car }}</span>{% if show_partition %} · {{ r.partition }}{% endif %}{% if not r.photo %} · <span class="text-warn">No photo</span>{% endif %}</span>
+    </span>
+  </button>
+  {% include "switch.html" with label=r.pass_label checked=r.passed %}
+</li>

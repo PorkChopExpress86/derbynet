@@ -1,0 +1,10 @@
+<div class="flex items-center gap-1">
+  <div class="min-w-0 flex-1">
+    <p class="text-base font-semibold">Heat {{ heat.heat }} <span class="font-normal text-ink-muted">of 11</span></p>
+    <p class="text-sm text-ink-muted">Wolves · Round 1</p>
+  </div>
+  {% if racing_inline %}
+  <span id="racing-label" class="text-sm font-medium">Racing</span>
+  {% include "switch.html" with labelledby="racing-label" checked=True %}
+  {% endif %}
+</div>

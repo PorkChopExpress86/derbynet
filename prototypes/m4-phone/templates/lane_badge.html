@@ -1,0 +1,2 @@
+{# Lane badge. Class names are spelled out so the Tailwind scanner finds them. #}
+<span class="grid shrink-0 place-items-center font-bold {{ cls|default:'size-8 rounded-md text-sm' }} {% if n == 1 %}bg-lane-1 text-white{% elif n == 2 %}bg-lane-2 text-white{% elif n == 3 %}bg-lane-3 text-white{% else %}bg-lane-4 text-black{% endif %}"><span class="sr-only">Lane </span>{{ n }}</span>

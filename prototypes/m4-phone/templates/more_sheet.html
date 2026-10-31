@@ -1,0 +1,8 @@
+{% include "sheet_top.html" with name="more" title="More" %}
+  {% for section, entries in more %}
+  <h3 class="mt-3 text-sm font-semibold text-ink-muted">{{ section }}</h3>
+  <ul class="mt-1 divide-y divide-line rounded-xl border border-line">
+    {% for e in entries %}<li><a href="#{{ e|slugify }}" class="flex min-h-12 items-center justify-between px-4">{{ e }}{% include "icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</a></li>{% endfor %}
+  </ul>
+  {% endfor %}
+{% include "sheet_bottom.html" %}
