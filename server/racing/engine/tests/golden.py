@@ -99,13 +99,12 @@ QUIRK_DECISIONS = {
     "S10": "fix",
     "S19": "fix",
     "S20": "fix",
-    # Differences #35's issue body and triage specify, proposed for an owner
-    # decision row: P1 renders apply the EXIF orientation and keep the upload
-    # (#8, #73), P2 render sizes are allowlisted, P3 an upload is decoded and
-    # its name and size checked, P4 autocrop runs OpenCV and reports a miss
-    # (#74), P5 an unknown repo fails, P6 a bad crop or rotate fails instead
-    # of a PHP fatal error, P7 an empty photo column counts as no photo in
-    # slide.next.
+    # Accepted in D61 (#35): P1 renders apply the EXIF orientation and keep
+    # the upload (#8, #73), P2 render sizes are allowlisted, P3 an upload is
+    # decoded and its name and size checked, P4 autocrop runs OpenCV and
+    # reports a miss (#74), P5 an unknown repo fails, P6 a bad crop or rotate
+    # fails instead of a PHP fatal error, P7 an empty photo column counts as
+    # no photo in slide.next.
     "P1": "fix",
     "P2": "fix",
     "P3": "fix",
