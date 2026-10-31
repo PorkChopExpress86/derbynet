@@ -28,6 +28,7 @@ after the transaction that stops referring to it commits.
 """
 
 import fcntl
+import logging
 import math
 import os
 import re
@@ -54,6 +55,8 @@ from racing.models import AuditEvent
 from roster.models import Racer
 from roster.services import barcode
 from roster.services.racers import HEADSHOTS, photo_url
+
+logger = logging.getLogger(__name__)
 
 ORIGINAL = "original"
 CROPPED = "cropped"
@@ -246,12 +249,19 @@ def rotation_of(repo: Repository, name: str) -> float:
     return row.degrees if row else 0.0
 
 
+class PhotoLockError(OSError):
+    """The data folder's photo lock can't be opened. It is logged; a render
+    then answers 404 and an action fails as a server error."""
+
+
 class TooManyPixels(ValueError):
     """A photo past `PHOTO_MAX_PIXELS`, which is never decoded."""
 
 
-def _check_pixels(image: Image.Image) -> None:
-    width, height = image.size
+def _check_pixels(image: Image.Image, rotation: float = 0.0) -> None:
+    """Refuse a photo past the limit, by its header, and by its size after a
+    rotation that isn't a right angle, which widens the canvas."""
+    width, height = _turned_size(*image.size, rotation)
     if width * height > django_settings.PHOTO_MAX_PIXELS:
         raise TooManyPixels(
             f"The photo is {width}x{height} pixels, past the limit of"
@@ -266,12 +276,25 @@ def _is_svg(path: Path) -> bool:
     return path.suffix.lower() in (".svg", ".svgz")
 
 
+def _turned_size(width: int, height: int, rotation: float) -> tuple[int, int]:
+    """The canvas `_rotate()` makes: an expanded box for any angle."""
+    if rotation % 180 == 90:
+        return height, width
+    if rotation % 90:
+        turn = math.radians(rotation % 360)
+        return (
+            math.ceil(abs(width * math.cos(turn)) + abs(height * math.sin(turn))),
+            math.ceil(abs(width * math.sin(turn)) + abs(height * math.cos(turn))),
+        )
+    return width, height
+
+
 def _open_upright(path: Path, rotation: float = 0.0) -> tuple[Image.Image, str]:
     """The decoded image, turned by its orientation tag and then by
     `rotation`, and its format. Raises `TooManyPixels` before decoding a photo
-    past the limit."""
+    that is past the limit, as stored or once turned."""
     with Image.open(path) as opened:
-        _check_pixels(opened)
+        _check_pixels(opened, rotation)
         fmt = opened.format
         image = ImageOps.exif_transpose(opened)
     if rotation:
@@ -282,19 +305,11 @@ def _open_upright(path: Path, rotation: float = 0.0) -> tuple[Image.Image, str]:
 def _upright_size(path: Path, rotation: float = 0.0) -> tuple[int, int]:
     """The size `_open_upright()` gives, from the header alone."""
     with Image.open(path) as opened:
-        _check_pixels(opened)
+        _check_pixels(opened, rotation)
         width, height = opened.size
         if opened.getexif().get(0x0112) in (5, 6, 7, 8):
             width, height = height, width
-    turn = math.radians(rotation % 360)
-    if rotation % 180 == 90:
-        return height, width
-    if rotation % 90:
-        return (
-            math.ceil(abs(width * math.cos(turn)) + abs(height * math.sin(turn))),
-            math.ceil(abs(width * math.sin(turn)) + abs(height * math.cos(turn))),
-        )
-    return width, height
+    return _turned_size(width, height, rotation)
 
 
 def _workable(image: Image.Image) -> Image.Image:
@@ -346,9 +361,13 @@ def _photo_lock(repo: Repository, name: str):
     if stripe in held:
         yield
         return
-    folder = django_settings.DATA_DIR / "locks"
-    folder.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(folder / f"photo-{stripe:02d}.lock", os.O_RDWR | os.O_CREAT)
+    lock_file = django_settings.DATA_DIR / "locks" / f"photo-{stripe:02d}.lock"
+    try:
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(lock_file, os.O_RDWR | os.O_CREAT)
+    except OSError as error:
+        logger.exception("can't open the photo lock %s", lock_file)
+        raise PhotoLockError(lock_file) from error
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX)
         held.add(stripe)
@@ -440,8 +459,11 @@ def find_or_make(repo: Repository, label: Label, name: str) -> Path | None:
         fixed = box.folder if box else None
     if fixed and repo.file(name, fixed).is_file():
         return repo.file(name, fixed)
-    with _photo_lock(repo, name):
-        return _render(repo, label, name)
+    try:
+        with _photo_lock(repo, name):
+            return _render(repo, label, name)
+    except PhotoLockError:
+        return None
 
 
 def _render(repo: Repository, label: Label, name: str) -> Path | None:
@@ -485,13 +507,16 @@ def _original(repo: Repository, name: str) -> Path | None:
     rotated = repo.file(name, ROTATED_FOLDER)
     if rotated.is_file():
         return rotated
-    with _photo_lock(repo, name):
-        rotation = rotation_of(repo, name)
-        if not original.is_file():
-            return None
-        if not rotation:
-            return original
-        return _make(rotated, lambda: _open_upright(original, rotation))
+    try:
+        with _photo_lock(repo, name):
+            rotation = rotation_of(repo, name)
+            if not original.is_file():
+                return None
+            if not rotation:
+                return original
+            return _make(rotated, lambda: _open_upright(original, rotation))
+    except PhotoLockError:
+        return None
 
 
 def racer_photo(repo: Repository, path: str, label: Label | None) -> Path | None:
@@ -775,6 +800,8 @@ def upload_photo(
     result = UploadResult()
     if target != name:
         result.filename_change = target  # PHP echoes an undefined variable (C27).
+    # Held until the racer's row commits, so a rotation or delete can't take
+    # the crop or the photo away before the racer points at it.
     with _photo_lock(repo, target):
         # A file of this name that went away some other way may have left a
         # rotation and renders behind; they don't belong to the new photo.
@@ -783,19 +810,19 @@ def upload_photo(
         if autocrop_requested:
             autocrop(repo, target, result)
 
-    path = f"{CROPPED_FOLDER}/{target}" if result.cropped else target
-    success = True
-    match selector:
-        case ByBarcode("PWDuploadtest"):
-            # The photo stand's test: upload, delete, and report success.
-            _unlink_all([repo.file(target), repo.file(target, CROPPED_FOLDER)])
-        case ByBarcode("PWDuploadonly") | None:
-            pass
-        case _:
-            success = _assign_upload(event, repo, path, selector, result)
-    if success:
-        result.uploaded = target
-        result.thumbnail = repo.url(_stored_path(repo, target), RENDER_THUMBNAIL)
+        path = f"{CROPPED_FOLDER}/{target}" if result.cropped else target
+        success = True
+        match selector:
+            case ByBarcode("PWDuploadtest"):
+                # The photo stand's test: upload, delete, and report success.
+                _unlink_all([repo.file(target), repo.file(target, CROPPED_FOLDER)])
+            case ByBarcode("PWDuploadonly") | None:
+                pass
+            case _:
+                success = _assign_upload(event, repo, path, selector, result)
+        if success:
+            result.uploaded = target
+            result.thumbnail = repo.url(_stored_path(repo, target), RENDER_THUMBNAIL)
     return result
 
 
@@ -852,11 +879,18 @@ def _set_photo(event, repo: Repository, racer: Racer, path: str) -> None:
 def assign_photo(event, repo: Repository, racer_id, photo) -> None:
     """`photo.assign`: give the racer the photo, by its crop when it has one,
     or take the racer's photo away when `photo` is empty."""
-    path = ""
-    if photo:
+    if not photo:
+        _assign_path(event, repo, racer_id, "")
+        return
+    # Held from the crop check until the racer's row commits, so a rotation
+    # or delete can't take the crop or the photo away in between.
+    with _photo_lock(repo, photo):
         if find_or_make(repo, Label(CROPPED), photo) is None:
             raise Refused("nosuchfile", f"Image {photo} not found.")
-        path = _stored_path(repo, photo)
+        _assign_path(event, repo, racer_id, _stored_path(repo, photo))
+
+
+def _assign_path(event, repo: Repository, racer_id, path: str) -> None:
     with transaction.atomic():
         lock_race_state(event.id)
         racer = _by_id(Racer.objects.filter(event=event), racer_id)

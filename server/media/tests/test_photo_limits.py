@@ -3,6 +3,7 @@ pixel counts, crop size, name length, out-of-range integers, and leftovers
 of a file that went away."""
 
 import os
+import shutil
 import struct
 import zlib
 
@@ -218,3 +219,40 @@ def test_photo_assign_with_a_racer_id_past_the_column_fails(crew, folders):
     ).json()
 
     assert reply["outcome"]["code"] == "noracer"
+
+
+def test_a_turn_that_widens_a_photo_past_the_limit_is_not_decoded(
+    crew, folders, settings, django_capture_on_commit_callbacks
+):
+    """A rotation that isn't a right angle widens the canvas: a 1000x1000
+    photo turned 45 degrees is 1415x1415, past a 1 MP limit it fits."""
+    settings.PHOTO_MAX_PIXELS = 1_000_000
+    upload(crew, "p.jpg", image_bytes((1000, 1000)))
+    assert crew.get("/photo.php/head/file/200x200/p.jpg/1").status_code == 200
+    with django_capture_on_commit_callbacks(execute=True):
+        crew.post(
+            "/action.php",
+            {"action": "photo.rotate", "image_name": "p.jpg", "rotation": "45"},
+        )
+
+    render = crew.get("/photo.php/head/file/200x200/p.jpg/2")
+    original = crew.get("/photo.php/head/file/original/p.jpg/2")
+    cropped = crew.post("/action.php", CROP).json()
+
+    assert render.status_code == original.status_code == 404
+    assert cropped["outcome"]["code"] == "crop"
+    assert not (folders.head / "0-rotated" / "p.jpg").exists()
+
+
+def test_a_lock_that_cannot_be_opened_is_logged_and_a_render_is_404(
+    crew, folders, settings, caplog
+):
+    upload(crew, "p.jpg", image_bytes())
+    # The upload took the lock; now a file stands where the lock folder was.
+    shutil.rmtree(settings.DATA_DIR / "locks")
+    (settings.DATA_DIR / "locks").write_text("not a folder")
+
+    response = crew.get("/photo.php/head/file/200x200/p.jpg/1")
+
+    assert response.status_code == 404
+    assert "can't open the photo lock" in caplog.text
