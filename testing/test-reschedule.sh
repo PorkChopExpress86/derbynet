@@ -628,17 +628,23 @@ curl_postj action.php "action=racer.import&firstname=F-other&lastname=L-other&ca
 curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$(jq .racerid testing/debug.curl)" | check_jfailure
 jq -e '.outcome.code == "notonroster"' testing/debug.curl >/dev/null || test_fails
 
-# late_chart_is <lanes> <carnumber>: the chart of the reschedule just made,
-# by car number, with the latecomer's car as L, is the one Django gives for a
-# latecomer in the stress loop on <lanes> lanes.  None of the latecomers is
-# checked in, so each reschedule drops the one before, and every latecomer
-# gets the same lanes.  On 4 lanes this is the chart of Q20's exchanges 039 to
-# 044, the first six latecomers; on 6 lanes, a real Django run's, the same for
-# all six latecomers of the default run.
+# late_chart_by_car <carnumber>: the chart of the reschedule just made, by
+# car number, with the latecomer's car as L.
+late_chart_by_car() {
+    jq -c --argjson cars "$(racer_carnumbers)" --arg late "$1" '.chart
+        | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end)
+                                                  | map(if . == $late then "L" else . end) | join(" ") else . end)' \
+        testing/debug.curl
+}
+
+# late_chart_is <carnumber>: on 4 lanes, the chart Django gives a latecomer in
+# the stress loop.  None of the latecomers is checked in, so each reschedule
+# drops the one before, and every latecomer gets the same lanes.  This is the
+# chart of Q20's exchanges 039 to 044, the first six latecomers.  Their
+# searches end well inside the 10 s deadline, so the chart does not depend on
+# the machine.
 late_chart_is() {
-    local WANT
-    case $1 in
-        4) WANT='[null,
+    late_chart_by_car $1 | jq -e '. == [null,
                   "207 217 232 161",
                   "212 222 237 267",
                   "217 227 141 272",
@@ -656,32 +662,35 @@ late_chart_is() {
                   "272 282 L 242",
                   "277 202 217 247",
                   "282 207 222 252",
-                  "141 242 212 202"]' ;;
-        6) WANT='[null,
-                  "232 141 247 161 202 242",
-                  "257 267 277 207 232 272",
-                  "207 L 227 141 161 222",
-                  "L 242 252 267 207 247",
-                  "161 272 282 L 237 277",
-                  "212 222 232 242 L 227",
-                  "141 247 257 272 212 252",
-                  "267 277 L 217 141 282",
-                  "217 227 237 247 272 232",
-                  "242 252 161 277 217 257",
-                  "272 282 207 222 242 202",
-                  "222 232 141 252 277 237",
-                  "247 257 267 282 222 161",
-                  "277 202 212 227 247 207",
-                  "227 237 242 257 282 141",
-                  "252 161 272 202 227 267",
-                  "282 207 217 232 252 212",
-                  "237 217 202 212 267 L"]' ;;
-    esac
-    jq -e --argjson cars "$(racer_carnumbers)" --arg late "$2" --argjson want "$WANT" '.chart
-        | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end)
-                                                  | map(if . == $late then "L" else . end) | join(" ") else . end)
-        == $want' testing/debug.curl >/dev/null || \
-        test_fails Chart for latecomer car $2 on $1 lanes
+                  "141 242 212 202"]' >/dev/null || \
+        test_fails Chart for latecomer car $1 on 4 lanes
+}
+
+# late_chart_6 <carnumber>: on 6 lanes, the first latecomer's search runs into
+# its 10 s deadline and returns the best chart it found by then, which depends
+# on how fast the machine is (PHP's too: golden/README.md omits that exchange,
+# 045, for this reason).  So for the first latecomer check what any such chart
+# holds: heat 1 has run, the running heat 2 and the staged heat 3 are as
+# generated (D34), and in every lane each car of the round, the latecomer
+# included, races exactly once, counting heat 1 ($HEAT1_6, by lane).  Each
+# later latecomer takes the lanes of the one before, so its chart is the one
+# before with the new car as L.
+late_chart_6() {
+    local GOT
+    GOT=$(late_chart_by_car $1)
+    echo "$GOT" | jq -e --argjson prev "${PREV6:-null}" --argjson heat1 "$HEAT1_6" '
+        ($prev != null and . == $prev) or
+        ($prev == null and
+             .[0] == null and
+             .[1] == "232 141 247 161 202 242" and
+             .[2] == "257 267 277 207 232 272" and
+             ([.[1:][] | split(" ")] as $heats
+              | ([$heats[][], $heat1[]] | map(select(. != "-")) | unique) as $all
+              | ($all | length) == 19 and ($all | index("L")) != null and
+                all(range(6); . as $lane
+                    | [$heats[][$lane], $heat1[$lane]] | map(select(. != "-")) | sort == $all)))' >/dev/null || \
+        test_fails Chart for latecomer car $1 on 6 lanes
+    PREV6=$GOT
 }
 fi
 
@@ -698,7 +707,7 @@ do
     START=$(date +%s)
     if [ "$DERBYNET_BACKEND" = django ] ; then
     curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jsuccess
-    late_chart_is 4 $CARNO
+    late_chart_is $CARNO
     else
     curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jsuccess
     fi
@@ -717,6 +726,12 @@ curl_postj action.php "action=database.purge&purge=schedules&roundid=$(roundid_o
 curl_postj action.php "action=settings.write&unused-lane-mask=0&n-lanes=6" | check_jsuccess
 curl_postj action.php "action=schedule.generate&roundid=$(roundid_of White 1)" | check_jsuccess
 curl_postj action.php "action=heat.select&roundid=$(roundid_of White 1)&now_racing=1" | check_jsuccess
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Heat 1's cars by lane, "-" for an empty lane, for late_chart_6.
+HEAT1_6=$(curl_getj "action.php?query=poll.coordinator" | \
+    jq -c '[range(1; 7) as $lane | (.racers | map(select(.lane == $lane))[0].carnumber // "-" | tostring)]')
+PREV6=
+fi
 run_heat $(roundid_of White 1)  1  1.0 2.0 3.0 4.0 5.0 6.0 x
 
 
@@ -733,7 +748,7 @@ do
     START=$(date +%s)
     if [ "$DERBYNET_BACKEND" = django ] ; then
     curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jsuccess
-    late_chart_is 6 $CARNO
+    late_chart_6 $CARNO
     else
     curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jsuccess
     fi
