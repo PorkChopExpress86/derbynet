@@ -1,5 +1,10 @@
 #! /bin/bash
 
+# With DERBYNET_BACKEND=django, the checks expect what the Django server does
+# where it differs from PHP on purpose: fitting a racer in never changes the
+# running heat or the staged heat (D34, quirk Q20), and a racer who is not on
+# the round's roster is refused with notonroster (D39, quirk Q25).  Unset, the
+# script checks PHP as it always has.
 
 
 BASE_URL=$1
@@ -47,35 +52,76 @@ run_heat $(roundid_of Arrows 1)  1  405:4.050 435:4.350 425:4.250 415:4.150
 # Add latecomer 80 (car 480)
 curl_postj action.php "action=racer.pass&racer=$(racerid_of 480)&value=1" | check_jsuccess
 curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of Arrows 1)&trace=1" | check_jsuccess
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Heat 2 is running and heat 3 is staged, so Django keeps both and fits car
+# 480 into heat 4 and added heats (D34, Q20).
+jq -e --argjson cars "$(racer_carnumbers)" '.chart
+        | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end) | join(" ") else . end)
+        == [null,
+            "415 405 435 425",
+            "425 415 405 435",
+            "480 425 415 405",
+            "435 480 - -",
+            "- - 480 -",
+            "- - - 480"]' testing/debug.curl > /dev/null || test_fails
+else
 jq -e --argjson cars "$(racer_carnumbers)" '.chart
         | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end) | join(" ") else . end)
         | .[1] == "480 405 435 425" and
                 .[2] == "425 415 480 435" and
                 .[3] == "435 480 415 405" and
                 .[4] == "415 425 405 480"' testing/debug.curl > /dev/null || test_fails
+fi
 
 # Oops, it wasn't actually latecomer 80
 curl_postj action.php "action=racer.pass&racer=$(racerid_of 480)&value=0" | check_jsuccess
 curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of Arrows 1)&trace=1" | check_jsuccess
 # So now there are byes in the schedule
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Car 480's lanes go empty, and the added heats stay, empty (D34, Q20).
+jq -e --argjson cars "$(racer_carnumbers)" '.chart
+        | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end) | join(" ") else . end)
+        == [null,
+            "415 405 435 425",
+            "425 415 405 435",
+            "- 425 415 405",
+            "435 - - -",
+            "- - - -",
+            "- - - -"]' testing/debug.curl > /dev/null || test_fails
+else
 jq -e --argjson cars "$(racer_carnumbers)" '.chart
         | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end) | join(" ") else . end)
         | .[1] == "- 405 435 425" and
                 .[2] == "425 415 - 435" and
                 .[3] == "435 - 415 405" and
                 .[4] == "415 425 405 -"' testing/debug.curl > /dev/null || test_fails
+fi
 
 # Oh, latecomer 80 really HAS arrived
 curl_postj action.php "action=racer.pass&racer=$(racerid_of 480)&value=1" | check_jsuccess
 curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of Arrows 1)&trace=1" | check_jsuccess
 
 # So put them back in the schedule
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Heats 2 and 3 stay as they are again, and car 480 goes into heats 4 to 7
+# (D34, Q20).
+jq -e --argjson cars "$(racer_carnumbers)" '.chart
+        | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end) | join(" ") else . end)
+        == [null,
+            "415 405 435 425",
+            "425 415 405 435",
+            "- 480 415 405",
+            "480 - - -",
+            "435 - 480 -",
+            "- 425 - 480"]' testing/debug.curl > /dev/null || test_fails
+else
 jq -e --argjson cars "$(racer_carnumbers)" '.chart
         | map(if type == "string" then split(" ") | map(if . == "-" then . else ($cars[.] | tostring) end) | join(" ") else . end)
         | .[1] == "480 405 435 425" and
                 .[2] == "425 415 480 435" and
                 .[3] == "435 480 415 405" and
                 .[4] == "415 425 405 480"' testing/debug.curl > /dev/null || test_fails
+fi
 
 RESET_SOURCE=reschedule-2 "`dirname $0`/reset-database.sh" "$BASE_URL"
 "`dirname $0`/import-roster.sh" "$BASE_URL"
@@ -308,6 +354,19 @@ curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson lions_r1 $(roundid_of Lions 1) ".rounds | map(select(.roundid == \$lions_r1))[0] |
            .heats_scheduled == 17 and (.adjustments | length) == 0" \
        >/dev/null || test_fails
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Django leaves car 262's lanes empty and squeezes out no heat, so the round
+# keeps its 18 heats and racing stays on (D34, Q20; Q5: only a squeezed-out
+# heat stops racing).
+curl_getj "action.php?query=poll.coordinator" | \
+    jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
+           .heats_scheduled == 18 and (.adjustments | length) == 0" \
+       >/dev/null || test_fails
+
+curl_getj "action.php?query=poll.coordinator" | \
+    jq -e --argjson white_r1 $(roundid_of White 1) '.["current-heat"] | .roundid == $white_r1 and .heat == 7 and .now_racing == true' \
+       >/dev/null || test_fails
+else
 curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
            .heats_scheduled == 17 and (.adjustments | length) == 0" \
@@ -316,6 +375,7 @@ curl_getj "action.php?query=poll.coordinator" | \
 curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson white_r1 $(roundid_of White 1) '.["current-heat"] | .roundid == $white_r1 and .heat == 7 and .now_racing == false' \
        >/dev/null || test_fails
+fi
 
 # The last raced heat at this point is heat 5, rather than heat 6,
 # so the correct next heat would be heat 6.
@@ -328,36 +388,92 @@ curl_getj "action.php?query=poll.coordinator" | \
            .heats_scheduled == 17 and (.adjustments |
                   length == 1 and .[0] .why == "'"'"departed"'"'")" \
        >/dev/null || test_fails
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Still the 18 heats Django kept above.
+curl_getj "action.php?query=poll.coordinator" | \
+    jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
+           .heats_scheduled == 18 and (.adjustments |
+                  length == 1 and .[0] .why == "'"'"unscheduled"'"'")" \
+       >/dev/null || test_fails
+else
 curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
            .heats_scheduled == 17 and (.adjustments |
                   length == 1 and .[0] .why == "'"'"unscheduled"'"'")" \
        >/dev/null || test_fails
+fi
 
 curl_postj action.php "action=schedule.reschedule&trace=1&roundid=$(roundid_of Lions 1)" | check_jsuccess
 curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson lions_r1 $(roundid_of Lions 1) ".rounds | map(select(.roundid == \$lions_r1))[0] |
            .heats_scheduled == 17 and (.adjustments | length) == 0" \
        >/dev/null || test_fails
+if [ "$DERBYNET_BACKEND" = django ] ; then
+curl_getj "action.php?query=poll.coordinator" | \
+    jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
+           .heats_scheduled == 18 and (.adjustments |
+                  length == 1 and .[0] .why == "'"'"unscheduled"'"'")" \
+       >/dev/null || test_fails
+else
 curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
            .heats_scheduled == 17 and (.adjustments |
                   length == 1 and .[0] .why == "'"'"unscheduled"'"'")" \
        >/dev/null || test_fails
+fi
 
 curl_postj action.php "action=schedule.reschedule&trace=1&roundid=$(roundid_of White 1)" | check_jsuccess
 curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson lions_r1 $(roundid_of Lions 1) ".rounds | map(select(.roundid == \$lions_r1))[0] |
            .heats_scheduled == 17 and (.adjustments | length) == 0" \
        >/dev/null || test_fails
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Heat 7 is running and heat 8 staged, so Django fits car 141 into heats 1
+# to 3 and adds a heat 19 (D34, Q20).
+curl_getj "action.php?query=poll.coordinator" | \
+    jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
+           .heats_scheduled == 19 and (.adjustments | length) == 0" \
+       >/dev/null || test_fails
+else
 curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson white_r1 $(roundid_of White 1) ".rounds | map(select(.roundid == \$white_r1))[0] |
            .heats_scheduled == 18 and (.adjustments | length) == 0" \
        >/dev/null || test_fails
+fi
 
 curl_postj action.php "action=heat.select&roundid=$(roundid_of White 1)&heat=1" | check_jsuccess
 curl_postj action.php "action=heat.select&now_racing=1" | check_jsuccess
 
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Django's 19 heats, from the chart of the reschedule above.  Heat 6 ran
+# before the moves and keeps its number (D34), so racing stops after heat 5
+# and goes on from heat 7.  Each car gets the times it gets on PHP, so the
+# standings below are the same.
+ROUND=$(roundid_of White 1)
+run_heat $ROUND 1  141:2.685 - 212:2.522 227:3.274
+run_heat $ROUND 2  207:1.724 - 141:3.484 232:1.239
+run_heat $ROUND 3  237:2.203 - 161:2.066 141:1.791
+run_heat $ROUND 4  242:3.397 - 252:3.462 161:1.462
+run_heat $ROUND 5  247:1.374 - 257:1.455 272:3.399 x
+
+curl_postj action.php "action=heat.select&roundid=$(roundid_of White 1)&heat=7" | check_jsuccess
+curl_postj action.php "action=heat.select&now_racing=1" | check_jsuccess
+
+ROUND=$(roundid_of White 1)
+run_heat $ROUND 7  252:1.033 - -         277:3.656
+run_heat $ROUND 8  212:1.905 - 222:1.269 237:2.036
+run_heat $ROUND 9  217:1.037 - 227:3.209 242:3.259
+run_heat $ROUND 10 257:2.728 - 267:2.500 282:1.043
+run_heat $ROUND 11 -         - 272:1.116 202:3.460
+run_heat $ROUND 12 222:3.141 - 232:2.654 247:3.970
+run_heat $ROUND 13 267:2.015 - 277:2.638 207:3.607
+run_heat $ROUND 14 227:2.474 - 237:3.020 252:2.505
+run_heat $ROUND 15 232:3.771 - 242:1.665 257:1.105
+run_heat $ROUND 16 272:2.702 - 282:3.953 212:2.385
+run_heat $ROUND 17 277:1.756 - 202:2.212 217:3.306
+run_heat $ROUND 18 202:3.423 - 247:1.878 267:3.701
+run_heat $ROUND 19 161:3.028 - 217:1.825 -         x
+else
 ROUND=$(roundid_of White 1)
 run_heat $ROUND 1  141:2.685 - 217:1.037  232:1.239
 run_heat $ROUND 2  237:2.203 - 161:2.066  141:3.484
@@ -381,6 +497,7 @@ run_heat $ROUND 15 272:2.702 - 282:3.953  212:2.385
 run_heat $ROUND 16 277:1.756 - 202:2.212  217:1.825
 run_heat $ROUND 17 202:3.423 - 247:1.878  267:3.701
 run_heat $ROUND 18 207:3.607 - 257:1.105  227:2.474 x
+fi
 
 curl_postj action.php "action=heat.select&roundid=$(roundid_of Lions 1)&heat=1" | check_jsuccess
 curl_postj action.php "action=heat.select&now_racing=1" | check_jsuccess
@@ -411,6 +528,15 @@ run_heat $ROUND 17 101:2.581 - 146:1.692 116:3.143 x
 # Car 141's lone heat in the first round of Lions & Tigers would make it fastest
 # in the round if it were counted in standings.  This is to confirm it's not.
 # A round's standings are under the key "st-r" and the round's ID.
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Django does not serve query=standings, so read the same places from the
+# standings sheets export-json.php serves, one per den; each den races only
+# its first round here.
+expect_places "Lions & Tigers" Place 146 1 151 2 106 3
+expect_places "White's Wolves" Place 257 1 222 2 217 3
+[ -z "$(standings_row "Lions & Tigers" 141)" ] || \
+    test_fails Car 141 should have no row in the Lions standings
+else
 curl_getj "action.php?query=standings" | \
     jq -e --arg lions "st-r$(roundid_of Lions 1)" --arg white "st-r$(roundid_of White 1)" \
           --argjson car146 $(racerid_of 146) --argjson car151 $(racerid_of 151) \
@@ -423,6 +549,7 @@ curl_getj "action.php?query=standings" | \
                         .[$white][1][0] == $car222 and
                         .[$white][2][0] == $car217' \
         >/dev/null || test_fails
+fi
 
 echo ============= 4 lanes 17 racers roundid 2 ======================
 
@@ -438,7 +565,13 @@ do
     run_heat $(roundid_of White 1)  $i  1.0 2.0 3.0 4.0 x
 
     echo 17 racers 4 lanes $i heats run add racer 6
+    if [ "$DERBYNET_BACKEND" = django ] ; then
+    # Car 106 is a Lion, not on this round's roster (D39, Q25).
+    curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$(racerid_of 106)&dry-run=1" | check_jfailure
+    jq -e '.outcome.code == "notonroster"' testing/debug.curl >/dev/null || test_fails
+    else
     curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$(racerid_of 106)&dry-run=1" | check_jsuccess
+    fi
     jq .chart testing/debug.curl
 done
 
@@ -467,7 +600,14 @@ do
     RACERID=$(jq .racerid testing/debug.curl)
 
     START=$(date +%s)
+    if [ "$DERBYNET_BACKEND" = django ] ; then
+    # partition=2 names a new partition, not White's, so the latecomer is not
+    # on this round's roster (D39, Q25).
+    curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jfailure
+    jq -e '.outcome.code == "notonroster"' testing/debug.curl >/dev/null || test_fails
+    else
     curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jsuccess
+    fi
     END=$(date +%s)
 
     jq .chart testing/debug.curl
@@ -492,7 +632,14 @@ do
     RACERID=$(jq .racerid testing/debug.curl)
 
     START=$(date +%s)
+    if [ "$DERBYNET_BACKEND" = django ] ; then
+    # partition=2 names a new partition, not White's, so the latecomer is not
+    # on this round's roster (D39, Q25).
+    curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jfailure
+    jq -e '.outcome.code == "notonroster"' testing/debug.curl >/dev/null || test_fails
+    else
     curl_postj action.php "action=schedule.reschedule&roundid=$(roundid_of White 1)&racerid=$RACERID" | check_jsuccess
+    fi
     END=$(date +%s)
 
     jq .chart testing/debug.curl

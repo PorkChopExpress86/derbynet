@@ -164,6 +164,17 @@ jobs:
           bash testing/test-aggregate-rounds.sh http://127.0.0.1:8080
           bash testing/test-aggregate-nonracing.sh http://127.0.0.1:8080
 
+      # The reschedule suite (#107).  With DERBYNET_BACKEND=django it expects
+      # Django's charts where D34 and D39 differ from PHP (quirks Q20 and Q25),
+      # and reads its standings from export-json.php.  It resets the database
+      # itself.
+      - name: Run the reschedule suite against Django
+        working-directory: .
+        env:
+          DERBYNET_BACKEND: django
+        run: |
+          bash testing/test-reschedule.sh http://127.0.0.1:8080
+
       # The award suite (#33) after the master schedule, in
       # testing/exercise-one-database.sh order.  `test-awards.sh basic` follows
       # test-basic-racing.sh, which reads history.php (#49), so it waits.

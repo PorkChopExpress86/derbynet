@@ -108,6 +108,15 @@ orientation 6 come out.  The PHP server ignores the tag (#73) and won't be
 fixed, so by default the script expects PHP's sideways renders.  With
 `DERBYNET_BACKEND=django` it expects upright ones.
 
+`test-reschedule.sh` checks PHP's charts by default.  With
+`DERBYNET_BACKEND=django` it expects the charts and car numbers of Django,
+which keeps the running and staged heats (D34, Q20), and the `notonroster`
+refusals of a racer who is not on the round's roster (D39, Q25): the 17
+previews that fit a Lions racer into White's Wolves, and the latecomers of the
+stress loops, whom `partition=2` puts in a new partition.  It reads its
+standings from `export-json.php`, since Django does not serve
+`query=standings`.
+
 ## Test photos
 
 `data/carphotos/pattern-o6.jpg` stands in for a phone photo taken in portrait:
