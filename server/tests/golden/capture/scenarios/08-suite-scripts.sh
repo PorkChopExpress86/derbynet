@@ -7,7 +7,8 @@
 #                            scripts that pick top finishers, for issue #26
 #   state per step           classes, ranks, partitions, rounds and roster
 #                            membership by name after each step of the group
-#                            scripts, for issue #25
+#                            scripts, for issue #25, and for
+#                            test-racing-groups.sh the poll replies, for #30
 #   replay commands          the replay.message exchanges, for issues #27 and #34
 #   playlist race state      test-playlist.sh's poll.coordinator and poll.kiosk
 #                            exchanges, for issue #27
@@ -59,7 +60,8 @@ standings_matrix standings/suite-playlist
 # ----- Racing groups and partitions (ex1) -----
 reset_database
 record_script suite/partitions "" 1 test-partitions.sh
-record_script suite/racing-groups "" 1 test-racing-groups.sh
+# The poll replies after each step too, for #30's wire-level diff.
+RECORD_POLLS=classes,partitions,race-structure record_script suite/racing-groups "" 1 test-racing-groups.sh
 record_script suite/single-group-operation "" 1 setup-single-group-operation.sh
 
 # ----- Master schedule (ex2) -----
