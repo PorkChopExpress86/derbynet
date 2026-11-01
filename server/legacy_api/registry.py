@@ -9,7 +9,6 @@ handlers write `$json_out` or echo XML: the last outcome wins.
 import logging
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
-from enum import StrEnum
 from typing import Literal
 
 from django.conf import settings
@@ -17,17 +16,13 @@ from django.db.models import Model
 
 from accounts.permissions import Requirement
 from core.models import Event
+from legacy_api.formats import Format, format_of
 from legacy_api.xml import XmlWriter
 
 logger = logging.getLogger(__name__)
 
 Kind = Literal["action", "query"]
 FailureCode = Literal["notauthorized", "permission"]
-
-
-class Format(StrEnum):
-    JSON = "json"
-    XML = "xml"
 
 
 # The description PHP gives with each refusal code, in JSON. The XML refusal
@@ -42,13 +37,6 @@ REFUSALS: dict[FailureCode, str] = {
 UNLOGGED_ACTIONS = frozenset(
     {"role.login", "vote.cast", "replay.message", "message.send", "message.retrieve"}
 )
-
-
-def format_of(name: str) -> Format:
-    """PHP's rule. `login` and `roles` are in XML for older derby-timer.jar."""
-    if name in ("timer-message", "login", "roles") or "snapshot" in name:
-        return Format.XML
-    return Format.JSON
 
 
 def needs_event(name: str) -> bool:
