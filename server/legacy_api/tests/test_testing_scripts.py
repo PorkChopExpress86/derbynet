@@ -2,8 +2,9 @@
 
 The dev and demo scripts there run against PHP and Django but gate nothing, so
 they rotted unnoticed: `simulate-replay.sh` posted `register-replay`,
-`demo-multi.sh` posted `select-heat`, and `polling-loop.sh` ran a `query.sh`
-that was never there. These read the scripts instead of running them.
+`demo-multi.sh` posted `select-heat`, `polling-loop.sh` ran a `query.sh` that
+was never there, and `testing/query` called a `curl_get` that `common.sh` no
+longer defined. These read the scripts instead of running them.
 """
 
 import re
@@ -18,7 +19,17 @@ from legacy_api.registry import DEFERRED, REGISTRY
 from legacy_api.tests.test_registry import php_endpoints
 
 TESTING = Path(__file__).resolve().parents[3] / "testing"
-SCRIPTS = sorted(TESTING.glob("*.sh"))
+# The `.sh` scripts, and the helpers with no suffix such as `queryj`.
+SCRIPTS = sorted(
+    path
+    for path in TESTING.iterdir()
+    if path.is_file()
+    and (
+        path.suffix == ".sh"
+        or (not path.suffix and path.read_bytes().startswith(b"#!"))
+    )
+)
+COMMON = TESTING / "common.sh"
 # `action=role.login` in a curl argument, `-F action=snapshot.put` in a form.
 # A name made of a shell variable is not checked.
 ENDPOINT = re.compile(r"\b(action|query)=([A-Za-z0-9._-]+)")
@@ -26,6 +37,9 @@ ENDPOINT = re.compile(r"\b(action|query)=([A-Za-z0-9._-]+)")
 CALLED = re.compile(
     r"""(?:`dirname \$0`|\$\(dirname "?\$0"?\))/([A-Za-z0-9._-]+\.sh)"""
 )
+# A curl helper from common.sh, as called or as defined there.
+CURL_HELPER = re.compile(r"\bcurl_[a-z_]+\b")
+DEFINED = re.compile(r"^\s*(?:function\s+)?(curl_[a-z_]+)\s*(?:\(\))?\s*\{?\s*$")
 
 
 def code_lines(path: Path) -> list[str]:
@@ -81,6 +95,27 @@ def test_every_script_a_script_runs_is_there(script):
     }
 
     assert {name for name in called if not (TESTING / name).is_file()} == set()
+
+
+def curl_helpers_defined() -> set[str]:
+    return {found[1] for line in code_lines(COMMON) if (found := DEFINED.match(line))}
+
+
+def test_the_scan_covers_the_helpers_with_no_suffix():
+    assert {"queryj", "actionj"} <= {path.name for path in SCRIPTS}
+
+
+def test_a_definition_in_common_sh_is_found():
+    assert {"curl_getj", "curl_postj", "curl_get_xml"} <= curl_helpers_defined()
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda path: path.name)
+def test_every_curl_helper_a_script_calls_is_defined_in_common_sh(script):
+    called = {
+        found[0] for line in code_lines(script) for found in CURL_HELPER.finditer(line)
+    }
+
+    assert called - curl_helpers_defined() == set(), "common.sh has no such function"
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")

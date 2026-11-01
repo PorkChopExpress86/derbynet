@@ -9,7 +9,7 @@ if [ "$BASE_URL" = "" ]; then
 fi
 
 if [ "$2" = "" ]; then
-    echo "Usage: <URL root> \"action=xyz&param1=...\""
+    echo "Usage: <URL root> \"action=timer-message&message=HELLO\"  (prints the reply, JSON or XML)"
     exit
 fi
 
