@@ -4,6 +4,9 @@ BASE_URL=$1
 set -e -E -o pipefail
 source `dirname $0`/common.sh
 
+# Each racer and the round are named by car number and looked up, because the
+# Django server never reuses an id after a reset.
+
 user_login_coordinator
 
 RESET_SOURCE=single-group `dirname $0`/reset-database.sh "$BASE_URL"
@@ -24,24 +27,25 @@ curl_postj action.php "action=racer.import&firstname=Clark&lastname=Chesnutt&car
 curl_postj action.php "action=racer.import&firstname=Cletus&lastname=Creager&carnumber=514" | check_jsuccess
 
 
-curl_postj action.php "action=racer.pass&racer=1&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=2&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=3&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=4&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=5&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=6&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=7&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=8&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=9&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=10&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=11&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=12&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=13&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=14&value=1" | check_jsuccess
-#curl_postj action.php "action=racer.pass&racer=15&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 101)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 202)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 303)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 504)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 405)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 106)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 207)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 308)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 509)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 410)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 111)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 212)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 313)&value=1" | check_jsuccess
+curl_postj action.php "action=racer.pass&racer=$(racerid_of 514)&value=1" | check_jsuccess
 
 curl_postj action.php "action=settings.write&unused-lane-mask=0&n-lanes=4" | check_jsuccess
 
-curl_postj action.php "action=schedule.generate&roundid=1" | check_jsuccess
+# The one round there is
+ROUND=$(lookup_get "action.php?query=poll&values=rounds" | jq '.rounds[0].roundid')
+curl_postj action.php "action=schedule.generate&roundid=$ROUND" | check_jsuccess
 
-curl_postj action.php "action=heat.select&roundid=1&now_racing=1" | check_jsuccess
+curl_postj action.php "action=heat.select&roundid=$ROUND&now_racing=1" | check_jsuccess

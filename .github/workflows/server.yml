@@ -272,6 +272,24 @@ jobs:
           ant -noinput -buildfile timer/build.xml
           bash testing/race-with-derby-timer.sh http://127.0.0.1:8080
 
+      # The dev and demo scripts of testing/ that end on their own (#37).  They
+      # gate nothing, so they rotted unnoticed (#64 C44, C45).  setup-basic.sh
+      # starts a new event, so this step comes after every other suite.
+      # demo.sh, demo-multi.sh and polling-loop.sh run until stopped, so they
+      # stay out; legacy_api/tests/test_testing_scripts.py checks the
+      # endpoints and scripts they name.
+      - name: Run the dev scripts against Django
+        working-directory: .
+        run: |
+          bash testing/setup-basic.sh http://127.0.0.1:8080
+          bash testing/setup-single-group-operation.sh http://127.0.0.1:8080
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/checkin-all.sh http://127.0.0.1:8080
+          bash testing/simulate-replay.sh http://127.0.0.1:8080 3
+          echo 'testing/post-timer-log.sh in CI' \
+            | bash testing/post-timer-log.sh http://127.0.0.1:8080 | grep '<success>'
+
       # A suite that writes into its working directory leaves a file a later
       # `git add -A` commits.  Write to $TMPDIR instead, rather than adding the
       # file to .gitignore (poll-coordinator.json was one).  This covers the suites

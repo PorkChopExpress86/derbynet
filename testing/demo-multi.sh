@@ -1,5 +1,9 @@
 #! /bin/bash
 
+# A multi-kiosk demo that runs until stopped, against the PHP or the Django
+# server.  Each pass resets the database, so it asks for every id by name: the
+# Django server never reuses an id, so the second pass gets new ones.
+
 BASE_URL=$1
 set -e -E -o pipefail
 source `dirname $0`/common.sh
@@ -23,10 +27,11 @@ while true ; do
   curl_postj action.php "action=database.execute&script=update-schema" | check_jsuccess
 
   # Because the kiosks haven't registered themselves (again) since the database
-  # got reset.  We don't want to use the cookies file because we don't want the
+  # got reset.  A kiosk's first poll.kiosk registers its address, on either
+  # server.  We don't want to use the cookies file because we don't want the
   # same session.
-  curl --location -s "$BASE_URL/kiosk.php?id=$MAIN" > /dev/null
-  curl --location -s "$BASE_URL/kiosk.php?id=$AUX" > /dev/null
+  curl --location -s "$BASE_URL/action.php?query=poll.kiosk&address=$MAIN" > /dev/null
+  curl --location -s "$BASE_URL/action.php?query=poll.kiosk&address=$AUX" > /dev/null
 
   curl_postj action.php "action=kiosk.assign&address=$MAIN&page=kiosks/slideshow.kiosk" | check_jsuccess
   curl_postj action.php "action=kiosk.assign&address=$AUX&page=kiosks/welcome.kiosk" | check_jsuccess
@@ -37,12 +42,17 @@ while true ; do
 
   `dirname $0`/import-roster.sh "$BASE_URL"
   `dirname $0`/photo-setup.sh "$BASE_URL"
-  curl_postj action.php "action=class.edit&classid=1&name=Tigers" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=2&name=Wolves" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=3&name=Bears" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=4&name=Webelos%20I" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=5&name=Webelos%20II" | check_jsuccess
-  curl_postj action.php "action=class.order&classid_1=1&classid_2=2&classid_3=3&classid_4=4&classid_5=5" | check_jsuccess
+  TIGERS=$(classid_of Lions)
+  WOLVES=$(classid_of White)
+  BEARS=$(classid_of Bears)
+  WEBELOS_I=$(classid_of Webelos)
+  WEBELOS_II=$(classid_of Arrows)
+  curl_postj action.php "action=class.edit&classid=$TIGERS&name=Tigers" | check_jsuccess
+  curl_postj action.php "action=class.edit&classid=$WOLVES&name=Wolves" | check_jsuccess
+  curl_postj action.php "action=class.edit&classid=$BEARS&name=Bears" | check_jsuccess
+  curl_postj action.php "action=class.edit&classid=$WEBELOS_I&name=Webelos%20I" | check_jsuccess
+  curl_postj action.php "action=class.edit&classid=$WEBELOS_II&name=Webelos%20II" | check_jsuccess
+  curl_postj action.php "action=class.order&classid_1=$TIGERS&classid_2=$WOLVES&classid_3=$BEARS&classid_4=$WEBELOS_I&classid_5=$WEBELOS_II" | check_jsuccess
   `dirname $0`/test-photo-assignments.sh "$BASE_URL"
   curl_postj action.php "action=settings.write&n-lanes=4" | check_jsuccess
 
@@ -58,14 +68,11 @@ while true ; do
   user_login_coordinator
 
   # Schedule Round 1
-  curl_postj action.php "action=schedule.generate&roundid=1" | check_jsuccess
-  # curl_postj action.php "action=schedule.generate&roundid=2" | check_jsuccess
-  # curl_postj action.php "action=schedule.generate&roundid=3" | check_jsuccess
-  # curl_postj action.php "action=schedule.generate&roundid=4" | check_jsuccess
-  # curl_postj action.php "action=schedule.generate&roundid=5" | check_jsuccess
+  TIGERS_1=$(roundid_of Tigers 1)
+  curl_postj action.php "action=schedule.generate&roundid=$TIGERS_1" | check_jsuccess
 
-  # Start racing
-  curl_post action.php "action=select-heat&now_racing=1&roundid=1" | check_success
+  # Start racing.  No server has a select-heat action; heat.select is the one.
+  curl_postj action.php "action=heat.select&now_racing=1&roundid=$TIGERS_1" | check_jsuccess
 
   curl_postj action.php "action=settings.write&show-car-photos-on-deck=1&show-car-photos-on-deck-checkbox=1" | check_jsuccess
   curl_postj action.php "action=kiosk.assign&address=$ONDECK&page=kiosks/ondeck.kiosk" | check_jsuccess
@@ -130,20 +137,16 @@ while true ; do
   curl_post action.php "action=timer-message&message=FINISHED&lane1=2.6295&lane2=3.1224&lane3=2.8310&lane4=2.7356" | check_success
   # sleep 3s
 
-  # TODO Not ready for prime time
-  # curl_postj action.php "action=kiosk.assign&address=$MAIN&page=kiosks/standings.kiosk" | check_jsuccess
-  # curl_post action.php "action=standings.select&roundid=1&expose=all" | check_success
-
   user_login_coordinator
   ########## Awards Presentations ##############
   sleep 15s
   curl_postj action.php "action=kiosk.assign&address=$AUX&page=kiosks/award-presentations.kiosk" | check_jsuccess
   sleep 6s
-  curl_postj action.php "action=award.present&key=speed-2-1&reveal=0" | check_jsuccess
+  curl_postj action.php "action=award.present&key=speed-2-$TIGERS&reveal=0" | check_jsuccess
   sleep 3s
   curl_postj action.php "action=award.present&reveal=1" | check_jsuccess
   sleep 12s
-  curl_postj action.php "action=award.present&key=speed-1-1&reveal=0" | check_jsuccess
+  curl_postj action.php "action=award.present&key=speed-1-$TIGERS&reveal=0" | check_jsuccess
   sleep 3s
   curl_postj action.php "action=award.present&reveal=1" | check_jsuccess
   sleep 12s

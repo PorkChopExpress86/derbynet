@@ -32,11 +32,12 @@ ALLOWLIST=check-no-literal-ids.allowlist
 if [ $# -gt 0 ]; then
     FILES="$@"
 else
-    # exercise-one-database.sh, the scripts it runs, and the helpers they call.
-    # The demo scripts (demo*.sh, checkin-all.sh, setup-*.sh) feed a demo
-    # server and gate nothing, so they're not checked.
+    # exercise-one-database.sh, the scripts it runs, and the helpers they call,
+    # and the demo scripts (demo*.sh, checkin-all.sh, setup-*.sh), which must
+    # run against Django too, where an id is never reused (#37).
     FILES=$(ls exercise-one-database.sh reset-database.sh shift-ids.sh test-*.sh \
-               import-roster.sh run-scout-heats.sh photo-setup.sh)
+               import-roster.sh run-scout-heats.sh photo-setup.sh \
+               demo*.sh checkin-all.sh setup-*.sh)
 fi
 
 IDNAME='(racer|racerid|roundid|classid|rankid|partitionid|awardid|resultid)'
