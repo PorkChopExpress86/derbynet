@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62), and said the kiosks are laptops, not Raspberry Pis (D63). The last paragraph of the Decision names it. It fills in the choice the decision left to #71, and the decision itself is unchanged.
+Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62), and the last paragraph of the Decision names that framework. The same day the owner said the kiosks are laptops, not Raspberry Pis (D63). It fills in the choice the decision left to #71, and the decision itself is unchanged.
 
 ## Context
 
@@ -22,7 +22,7 @@ The legacy page strings and the `poll.kiosk` contract stay (ADR-02), so an exist
 
 ## Evidence
 
-Kiosks are large screens. `extras/scripts/kiosk.sh` opens them in fullscreen Chromium on Raspberry Pi units. The owner's kiosks are laptops running a browser full screen (D63). The seeded Wrap-Up scene in `website/sql/sqlite/scene-tables.inc` names `local/kiosks/feedback.kiosk`, which does not exist.
+Kiosks are large screens. `extras/scripts/kiosk.sh` opens them in fullscreen Chromium on Raspberry Pi units. The owner's kiosks are laptops running a browser (D63). The seeded Wrap-Up scene in `website/sql/sqlite/scene-tables.inc` names `local/kiosks/feedback.kiosk`, which does not exist.
 
 The spike's results are in the [#71 results comment](https://github.com/PorkChopExpress86/derbynet/issues/71#issuecomment-6538487054). It built now racing, the standings reveal, and the intermission leaders screen in both candidates at 1920x1080, on a 4-vCPU cloud container with no GPU, where Chromium rendered in software. The ranking holds there, and the numbers are not those of a kiosk laptop.
 
