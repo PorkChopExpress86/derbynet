@@ -14,9 +14,10 @@ name: parity
 # same curl, jq and xmllint.
 #
 # The gate can't pass until the tickets in WAITING (server/tools/parity_gate.py)
-# land, so it runs nightly, on demand, on a pull request that changes the gate
-# itself, and on a push to a branch named parity-check/<anything>, which runs it
-# on any commit without a pull request.
+# land, so it runs nightly, on demand, and on a push to a branch named
+# parity-check/<anything>.  It does not run on pull requests: a red gate would
+# stop plan/bin/pr-merge, which merges only when every check passed.  To try a
+# change to the gate, push its commit to parity-check/<name> as well.
 
 on:
   schedule:
@@ -24,18 +25,9 @@ on:
   workflow_dispatch:
   push:
     branches: ['parity-check/**']
-  pull_request:
-    paths:
-      - testing/exercise-one-database.sh
-      - testing/steps.sh
-      - testing/docker/**
-      - server/tools/parity_gate.py
-      - server/tools/parity-django.sh
-      - server/tools/transcript_diff.py
-      - .github/workflows/parity.yml
 
 concurrency:
-  group: parity-${{ github.event.pull_request.number || github.ref }}
+  group: parity-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

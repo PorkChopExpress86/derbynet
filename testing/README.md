@@ -178,8 +178,10 @@ the two legs: the steps that wait on another ticket are in its `WAITING`, and
 the reply paths a recorded divergence changes are in `PARITY_PATHS` in
 `server/legacy_api/registry.py`.
 
-The gate runs nightly, on demand, on a pull request that changes it, and on a
-push to a branch named `parity-check/<anything>`.  To run it locally, from a
+The gate runs nightly, on demand, and on a push to a branch named
+`parity-check/<anything>`.  It does not run on pull requests, because it can't
+pass yet and `plan/bin/pr-merge` merges only when every check passed, so push a
+change to the gate to `parity-check/<name>` too.  To run it locally, from a
 regular checkout with the images built (`run-suite.sh harness assets`):
 
     DERBYNET_PARITY_DIR=/tmp/leg-php testing/docker/run-suite.sh server timeout parity
