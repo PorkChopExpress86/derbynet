@@ -39,6 +39,11 @@ LIST_DIVERGENCES = (
     "D5: it needs a login; PHP answers anyone. Every page that reads it has one.",
     "A1: an award stored with no class lists classid 0 and rankid 0; PHP lists null.",
 )
+# The actions that answer with the award list, as award.list does.
+REPLY_DIVERGENCES = (
+    "A1: an award stored with no class lists classid 0 and rankid 0 in the"
+    " reply's award list; PHP lists null.",
+)
 CALC_RULE_DIVERGENCES = (
     "A4: a full-field-calc that names no group of the event answers"
     " not-written; PHP stores it.",
@@ -123,7 +128,7 @@ def award_edit(ctx: LegacyContext) -> None:
     _put_awards(ctx, include_ad_hoc=False)
 
 
-@action("award.delete", permission=Perm.EDIT_AWARDS)
+@action("award.delete", permission=Perm.EDIT_AWARDS, divergences=REPLY_DIVERGENCES)
 def award_delete(ctx: LegacyContext) -> None:
     award = ctx.resolve(Award, ctx.args.get("awardid"))
     try:
@@ -135,7 +140,7 @@ def award_delete(ctx: LegacyContext) -> None:
     _put_awards(ctx, include_ad_hoc=False)
 
 
-@action("award.order", permission=Perm.EDIT_AWARDS)
+@action("award.order", permission=Perm.EDIT_AWARDS, divergences=REPLY_DIVERGENCES)
 def award_order(ctx: LegacyContext) -> None:
     placed = []
     for key, raw_id in ctx.args.items():
@@ -150,7 +155,7 @@ def award_order(ctx: LegacyContext) -> None:
     _put_awards(ctx, include_ad_hoc=False)
 
 
-@action("award.adhoc", permission=Perm.JUDGING)
+@action("award.adhoc", permission=Perm.JUDGING, divergences=REPLY_DIVERGENCES)
 def award_adhoc(ctx: LegacyContext) -> None:
     racer = ctx.resolve(Racer, ctx.args.get("racerid"))
     editing.set_ad_hoc_award(ctx.event, racer, _text(ctx, "awardname") or "")
@@ -158,7 +163,7 @@ def award_adhoc(ctx: LegacyContext) -> None:
     _put_awards(ctx, include_ad_hoc=True)
 
 
-@action("award.winner", permission=Perm.JUDGING)
+@action("award.winner", permission=Perm.JUDGING, divergences=REPLY_DIVERGENCES)
 def award_winner(ctx: LegacyContext) -> None:
     award = ctx.resolve(Award, ctx.args.get("awardid"))
     racer = None

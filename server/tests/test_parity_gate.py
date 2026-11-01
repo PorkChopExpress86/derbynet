@@ -487,3 +487,22 @@ def test_every_parity_path_cites_a_divergence_of_its_endpoint(allowed):
 
     assert REGISTRY.get(kind, name) is not None, allowed.endpoint
     assert divergence_text(allowed.endpoint, allowed.divergence), allowed
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "action award.edit",
+        "action award.delete",
+        "action award.order",
+        "action award.adhoc",
+        "action award.winner",
+        "query award.list",
+    ],
+)
+def test_a1_allows_class_and_rank_0_in_every_reply_that_lists_the_awards(endpoint):
+    for key in ("classid", "rankid"):
+        path = f"$.awards[3].{key}"
+        assert allowed_by(endpoint, path, None, 0).startswith("A1: ")
+        assert allowed_by(endpoint, path, None, 2) is None
+        assert allowed_by(endpoint, path, 1, 0) is None

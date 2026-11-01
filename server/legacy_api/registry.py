@@ -234,7 +234,14 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
     ),
     *(
         ParityPath(endpoint, f"$.awards[*].{key}", "A1", php=None, django=0)
-        for endpoint in ("action award.edit", "query award.list")
+        for endpoint in (
+            "action award.edit",
+            "action award.delete",
+            "action award.order",
+            "action award.adhoc",
+            "action award.winner",
+            "query award.list",
+        )
         for key in ("classid", "rankid")
     ),
     *(
