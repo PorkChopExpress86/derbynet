@@ -346,6 +346,39 @@ def test_pages_are_not_compared():
     assert report.skipped == 1
 
 
+CLASS_ADD = """
+    post action.php action=class.add&rankid_{rank}=1&name=Agg
+
+    {{"outcome": {{"summary": "success"}},
+      "action": {{"action": "class.add", "rankid_{rank}": "1", "name": "Agg"}}}}
+
+    post action.php action=award.edit&class_and_rank=1,{rank}
+
+    {{"outcome": {{"summary": "success"}},
+      "action": {{"action": "award.edit", "class_and_rank": "1,{rank}"}}}}
+    """
+
+
+def test_ids_in_an_echoed_request_are_numbered_as_in_the_request():
+    report = differences(CLASS_ADD.format(rank=8), CLASS_ADD.format(rank=9))
+
+    assert report.ok, report.render()
+
+
+def test_a_long_value_is_cut_in_the_report():
+    a = run("""
+        action.php?query=racer.list
+
+        {"text": "short"}
+        """)
+    b = a.replace("short", "x" * 1000)
+
+    rendered = differences(a, b).render()
+
+    assert "... (1002 characters)" in rendered
+    assert "x" * 400 not in rendered
+
+
 def test_an_allowed_difference_passes_and_is_listed():
     a = IMPORT_AND_LIST.format(**FIRST)
     b = IMPORT_AND_LIST.format(**dict(SHIFTED, bob_name="Robert"))

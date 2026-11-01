@@ -52,6 +52,10 @@ PAGES=(
 )
 
 for PAGE in "${PAGES[@]}" ; do
+    # The Django server drops the printables (#55), so it has no print.php.
+    if [ "$DERBYNET_BACKEND" = django ] && [ "$PAGE" = print.php ] ; then
+        continue
+    fi
     curl_page "$PAGE" > /dev/null
 done
 

@@ -70,15 +70,25 @@ What is normalized, on both runs alike:
   missing. Also `unrec-<time>`.
 - Session ids: the value of `PHPSESSID=`, `sessionid=` and `csrftoken=`.
 - The port of a kiosk address `<ip>+<port>` (PHP's REMOTE_PORT).
+- A kiosk address the script made with `mktemp kiosk1-XXXXXX`
+  (`testing/test-scenes.sh`): the six random characters.
+- An event's folder inside the data folder, before `racers`, `cars`,
+  `videos`, `logs`, `imagery` or `slides`: PHP's `<year>/<name>` and
+  Django's `events/<slug>` (owner decision D57) are both `<event-folder>`.
+  The data folder in front is compared, so the gate runs both servers on
+  `/var/lib/derbynet`. The reset scripts post these paths back, so without
+  this every reset would part the runs.
 - File arguments of `snapshot.put` and `photo-upload`, by base name, since
   each run's copy of `testing/` sits in its own directory.
 
 `GOLDEN_RULES` says where each rule of the golden capture's
 `capture/normalize.mjs` is handled here; a test keeps the two lists equal.
 
-First-appearance numbering works only if both servers create rows in the
-same order. Where they legitimately differ, record a divergence (#37) rather
-than loosening this.
+Ids are numbered afresh after each database reset (`database.execute`
+with `script=schema`), since PHP then hands out ids from 1 again and an id
+from before the reset names another row. First-appearance numbering works
+only if both servers create rows in the same order. Where they
+legitimately differ, record a divergence (#37) rather than loosening this.
 
 Allowed differences: `diff(..., allow=f)` calls `f(difference)` for each one,
 and a non-empty string it returns is the reason the difference is allowed. An
@@ -157,15 +167,20 @@ _REQUEST_BREAKER = re.compile(_PHOTO_PREFIX + r"\d+$")
 _UNREC = re.compile(r"unrec-\d+")
 _SESSION = re.compile(r"\b(PHPSESSID|sessionid|csrftoken)=[^;&\s\"]+")
 _ADDRESS = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\+\d+\b")
+_MKTEMP_KIOSK = re.compile(r"\b(kiosk\d+-)[A-Za-z0-9]{6}\b")
+_EVENT_FOLDER = re.compile(
+    r"/(?:\d{4}|events)/[^/\s\"<>]+(?=/(?:racers|cars|videos|logs|imagery|slides)\b)"
+)
 _ROUND_IN_TEXT = re.compile(r"(roundid )(\d+)")
 _BARCODE = re.compile(r"(PWDid)(\d+)")
 _WHO = re.compile(r"([cdr])(\d+)")
 _WHO_KINDS = {"c": "class", "r": "rank", "d": "partition"}
 _PLAIN_KEY = re.compile(r"[A-Za-z_][\w-]*")
-# class.order and rank.order post `classid_<position>=<classid>`; class.add
-# posts `rankid_<rankid>=1`, the form php_http's PREFIX_KINDS reads.
-_ORDER_ACTIONS = frozenset({"class.order", "rank.order"})
-_ORDER_FIELD = re.compile(r"(class|rank)id_\d+")
+# class.order, rank.order and partition.order post
+# `classid_<position>=<classid>`; class.add posts `rankid_<rankid>=1`, the
+# form php_http's PREFIX_KINDS reads.
+_ORDER_ACTIONS = frozenset({"class.order", "rank.order", "partition.order"})
+_ORDER_FIELD = re.compile(r"(class|rank|partition)id_\d+")
 
 
 @dataclass(frozen=True)
@@ -308,6 +323,8 @@ class Run:
         text = _REPLY_BREAKER.sub(r"\1<breaker>", text)
         text = _UNREC.sub("unrec-<time>", text)
         text = _SESSION.sub(r"\1=<value>", text)
+        text = _EVENT_FOLDER.sub("/<event-folder>", text)
+        text = _MKTEMP_KIOSK.sub(r"\1<mktemp>", text)
         return _ADDRESS.sub(r"\1+<port>", text)
 
     def who(self, value):
@@ -315,6 +332,25 @@ class Run:
         if found is None:
             return value
         return f"{found[1]}{self.ids.number(_WHO_KINDS[found[1]], int(found[2]))}"
+
+    def echoed(self, fields: dict) -> dict:
+        """The request fields a reply echoes under `action`, with their ids
+        renumbered as the request's are: a text field as `fields` reads it,
+        so a `rankid_<id>` key and a `class_and_rank` value are renumbered
+        too."""
+        action = fields.get("action")
+        out = {}
+        for key, value in fields.items():
+            # PHP echoes a number field as a number: `"classid_1": 2`.
+            number = isinstance(value, int) and not isinstance(value, bool)
+            if (isinstance(value, str) or number) and key not in FIELD_KINDS:
+                [_, (key, text)] = self._ids_in([("action", action), (key, str(value))])
+                value = int(text) if number and text.lstrip("-").isdigit() else text
+                value = self.who(value) if key == "who" else value
+            else:
+                value = self.map_echoed_field(action, key, value)
+            out[key] = value
+        return out
 
     def map_echoed_field(self, action, key: str, value):
         """A field of the request as the reply echoes it under `action`."""
@@ -481,10 +517,7 @@ def read_body(text: str, request: Request, run: Run) -> Body:
 def _json(value, endpoint: str, run: Run):
     echo = None
     if isinstance(value, dict) and isinstance(value.get("action"), dict):
-        action = value["action"].get("action")
-        echo = {
-            k: run.map_echoed_field(action, k, v) for k, v in value["action"].items()
-        }
+        echo = run.echoed(value["action"])
         value = {k: v for k, v in value.items() if k != "action"}
     value = rewrite_ids(value, run.ids)
     if echo is not None:
@@ -575,15 +608,20 @@ class Report:
     def ok(self) -> bool:
         return not self.differences and self.diverged is None
 
-    def render(self, labels: tuple[str, str] = ("a", "b")) -> str:
+    def render(self, labels: tuple[str, str] = ("a", "b"), limit=None) -> str:
+        """`limit` caps the differences and the allowed ones listed, each."""
         a, b = labels
         out = []
-        for found in self.differences + self.allowed:
+        shown = self.differences[:limit] + self.allowed[:limit]
+        for found in shown:
             note = f"  allowed: {found.allowed_by}" if found.allowed_by else ""
             out.append(f"#{found.index} {found.endpoint}  {found.request}")
             out.append(
                 f"    {found.path}: {a}={_show(found.a)} {b}={_show(found.b)}{note}"
             )
+        unlisted = len(self.differences) + len(self.allowed) - len(shown)
+        if unlisted:
+            out.append(f"... and {unlisted} more")
         if self.diverged is not None:
             out.append(f"#{self.diverged.index} the runs diverge:")
             out.append(f"    {a}: {self.diverged.a}")
@@ -597,10 +635,17 @@ class Report:
         return "\n".join(out)
 
 
+# A value longer than this, such as a whole page, is cut in a report.
+SHOW_LIMIT = 300
+
+
 def _show(value) -> str:
     if value is MISSING:
         return str(MISSING)
-    return json.dumps(value, ensure_ascii=False)
+    text = json.dumps(value, ensure_ascii=False)
+    if len(text) > SHOW_LIMIT:
+        return f"{text[:SHOW_LIMIT]}... ({len(text)} characters)"
+    return text
 
 
 def _key_path(key) -> str:
@@ -733,7 +778,18 @@ def diff(
                 report.allowed.append(difference)
             else:
                 report.differences.append(difference)
+        if _resets_database(req_a):
+            run_a.ids, run_b.ids = FirstAppearance(), FirstAppearance()
     return report
+
+
+def _resets_database(request: Request) -> bool:
+    """`database.execute&script=schema`, which `testing/reset-database.sh`
+    posts: every row is gone, and PHP hands out its ids from 1 again."""
+    return (
+        request.endpoint == "action database.execute"
+        and ("script", "schema") in request.key[-1]
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -7,6 +7,7 @@ handlers write `$json_out` or echo XML: the last outcome wins.
 """
 
 import logging
+import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
@@ -147,6 +148,118 @@ class Removed:
 # or deferred, and the dispatcher answers it as any unknown name. No PHP
 # handler is dropped today.
 REMOVED: tuple[Removed, ...] = ()
+
+
+ANY = object()  # A ParityPath value that matches any value.
+
+
+@dataclass(frozen=True)
+class ParityPath:
+    """Where in an endpoint's reply the parity gate (#37) lets Django differ
+    from PHP, under one of the endpoint's `divergences`.
+
+    `endpoint` is `action <name>` or `query <name>`. `path` is a reply path as
+    `tools/transcript_diff.py` prints it (`$.current-heat.classid`,
+    `/action-response/heat-ready/@heat`), where `*` stands for any run of
+    characters and `[*]` for any list index. `php` and `django` are the
+    values the divergence gives each server there, after the differ's
+    normalizing (`MISSING` from the differ for a key one lacks), or `ANY`.
+    `divergence` is the id that starts one of the endpoint's `divergences`
+    (`R3`); the guard in legacy_api/tests/test_registry.py checks it does."""
+
+    endpoint: str
+    path: str
+    divergence: str
+    php: object = ANY
+    django: object = ANY
+
+    def covers(self, endpoint: str, path: str, php=ANY, django=ANY) -> bool:
+        return (
+            endpoint == self.endpoint
+            and _path_pattern(self.path).fullmatch(path) is not None
+            and _matches(self.php, php)
+            and _matches(self.django, django)
+        )
+
+
+def _matches(expected, value) -> bool:
+    if expected is ANY or value is ANY:
+        return True
+    # 0 == False and 1 == True in Python; JSON tells them apart.
+    return type(expected) is type(value) and expected == value
+
+
+def _path_pattern(pattern: str) -> re.Pattern:
+    parts = re.split(r"(\[\*\]|\*)", pattern)
+    wild = {"[*]": r"\[\d+\]", "*": ".*"}
+    return re.compile("".join(wild.get(part, re.escape(part)) for part in parts))
+
+
+# Every reply that carries the coordinator payload's `current-heat` (R3).
+_CURRENT_HEAT = (
+    "action heat.select",
+    "action heat.rerun",
+    "action heat.reinstate",
+    "action result.write",
+    "action result.delete",
+    "action schedule.generate",
+    "action schedule.unschedule",
+    "action schedule.reschedule",
+    "action roster.new",
+    "action roster.delete",
+    "query poll.coordinator",
+    "query poll",
+    "query poll.results",
+)
+_KIOSK_LISTS = ("query poll.kiosk.all", "action kiosk.assign", "action scene.apply")
+
+# Each reply path a recorded divergence changes, as the parity gate saw it,
+# with the values the divergence names. Add one only for a difference that an
+# existing divergence of that endpoint already explains; any other difference
+# fails the gate.
+PARITY_PATHS: tuple[ParityPath, ...] = (
+    *(
+        ParityPath(endpoint, f"$.current-heat.{key}", "R3", php=-1, django=None)
+        for endpoint in _CURRENT_HEAT
+        for key in ("classid", "heat")
+    ),
+    # PHP repeats each column under its position; MISSING is the differ's.
+    ParityPath("query poll.results", '$.results[*]["*"]', "R9"),
+    *(
+        ParityPath(endpoint, f"$.awards[*].{key}", "A1", php=None, django=0)
+        for endpoint in ("action award.edit", "query award.list")
+        for key in ("classid", "rankid")
+    ),
+    *(
+        ParityPath(endpoint, "$.current-scene", "C19", php="")
+        for endpoint in _KIOSK_LISTS
+    ),
+    *(
+        ParityPath(endpoint, "$.kiosks[*].parameters", "C20", php=None)
+        for endpoint in _KIOSK_LISTS
+    ),
+)
+
+
+def divergence_text(endpoint: str, divergence: str) -> str | None:
+    """The endpoint's divergence entry whose ids include `divergence`."""
+    kind, _, name = endpoint.partition(" ")
+    found = REGISTRY.get(kind, name)
+    for text in found.divergences if found else ():
+        ids = text.split(": ", 1)[0].split(", ")
+        if divergence in ids:
+            return text
+    return None
+
+
+def allowed_by(endpoint: str, path: str, php=ANY, django=ANY) -> str | None:
+    """The divergence that lets Django's reply differ from PHP's at `path`,
+    where PHP gave `php` and Django `django`, or None. The parity gate fails
+    on a difference this doesn't allow."""
+    for allowed in PARITY_PATHS:
+        if allowed.covers(endpoint, path, php, django):
+            return divergence_text(endpoint, allowed.divergence)
+    return None
 
 
 # The legacy pages outside `/action.php` that differ from PHP on purpose, by

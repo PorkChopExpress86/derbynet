@@ -36,6 +36,12 @@ prepare_for_setup() {
     # TODO Summarize success or failure here
 }
 
+# A new database named testdb, set up as a first-time user does.
+ez_setup() {
+    prepare_for_setup
+    curl_postj action.php "action=setup.nodata&ez-new=testdb" > /dev/null
+}
+
 function user_login_coordinator() {
     user_login RaceCoordinator
 }
@@ -47,133 +53,159 @@ puppeteer_test() {
     node "`dirname $0`/puppeteer/$1" "$BASE_URL"
 }
 
+# The snapshot round trip at the end of run_tests, as steps.
+snapshot_get() {
+    # test-balloting.sh deleted the cookie jar, and a snapshot is for the coordinator
+    user_login_coordinator
+    echo Taking snapshot in $SNAPSHOT
+    curl_get_xml "action.php?query=snapshot.get" > $SNAPSHOT
+}
+
+snapshot_put_as_nobody() {
+    user_logout
+    curl_put_snapshot $SNAPSHOT | check_failure
+}
+
+snapshot_put() {
+    user_login_coordinator
+    curl_put_snapshot $SNAPSHOT | check_success
+}
+
+source `dirname $0`/steps.sh
+
 run_tests() {
 ############################## Basic Racing ##############################
-    RESET_SOURCE=ex0 `dirname $0`/reset-database.sh "$BASE_URL"
-    `dirname $0`/import-roster.sh "$BASE_URL"
-    `dirname $0`/test-den-changes.sh "$BASE_URL"
+    RESET_SOURCE=ex0 step reset-database.sh
+    step import-roster.sh
+    step test-den-changes.sh
 
-    `dirname $0`/photo-setup.sh "$BASE_URL"
-    `dirname $0`/test-photo-upload.sh "$BASE_URL"
+    step photo-setup.sh
+    step test-photo-upload.sh
 
-    `dirname $0`/test-each-role.sh "$BASE_URL"
-    `dirname $0`/test-permissions.sh $BASE_URL
+    step test-each-role.sh
+    step test-permissions.sh
 
-    `dirname $0`/test-basic-racing.sh "$BASE_URL"
+    step test-basic-racing.sh
 
-    puppeteer_test all-pages-test.js
-    puppeteer_test coordinator-test.js
-    puppeteer_test ondeck-columns-test.js
+    step puppeteer_test all-pages-test.js
+    step puppeteer_test coordinator-test.js
+    step puppeteer_test ondeck-columns-test.js
 
-    `dirname $0`/test-awards.sh "$BASE_URL" basic
-    `dirname $0`/test-new-rounds.sh "$BASE_URL"
+    step test-awards.sh basic
+    step test-new-rounds.sh
 
-    `dirname $0`/test-each-role.sh "$BASE_URL"
-    `dirname $0`/test-scenes.sh "$BASE_URL"
+    step test-each-role.sh
+    step test-scenes.sh
 
-    `dirname $0`/test-photo-manipulations.sh "$BASE_URL"
-    `dirname $0`/test-photo-assignments.sh "$BASE_URL" basic
-    `dirname $0`/test-slide-next.sh "$BASE_URL"
+    step test-photo-manipulations.sh
+    step test-photo-assignments.sh basic
+    step test-slide-next.sh
 
-    `dirname $0`/test-racer-query.sh "$BASE_URL"
-
-    # Resets database
-    `dirname $0`/test-car-numbers.sh "$BASE_URL"
-    # Resets database
-    `dirname $0`/test-extended-scheduling.sh "$BASE_URL"
+    step test-racer-query.sh
 
     # Resets database
-    `dirname $0`/test-reschedule.sh "$BASE_URL"
+    step --resets test-car-numbers.sh
     # Resets database
-    `dirname $0`/test-rotation-schedule.sh "$BASE_URL"
+    step --resets test-extended-scheduling.sh
+
+    # Resets database
+    step --resets test-reschedule.sh
+    # Resets database
+    step --resets test-rotation-schedule.sh
 
 ############################## Standings by Rank ##############################
     # Resets database
-    `dirname $0`/test-standing-by-rank.sh "$BASE_URL"
-    `dirname $0`/test-each-role.sh "$BASE_URL"
+    step --resets test-standing-by-rank.sh
+    step test-each-role.sh
     # Resets database
-    `dirname $0`/test-subgroup-ntrophies.sh "$BASE_URL"
+    step --resets test-subgroup-ntrophies.sh
 
 ############################## Points Racing ##############################
     # Resets database
-    `dirname $0`/test-points-racing.sh "$BASE_URL"
+    step --resets test-points-racing.sh
 
 ############################## Rounds Playlist ##############################
     # Resets database
-    `dirname $0`/test-playlist.sh "$BASE_URL"
+    step --resets test-playlist.sh
 
 ############################## One-Run-Per-Car Racing ##############################
-    `dirname $0`/test-model-a-club.sh "$BASE_URL"
+    step test-model-a-club.sh
 
     # Resets database
-    `dirname $0`/test-messaging.sh "$BASE_URL"
+    step --resets test-messaging.sh
 
 ############################## Racing Groups and Partitions ##############################
     # checkin-empty-test.js reads the partition's ID from the page (#div-1), and
     # the Puppeteer tests are outside the shifted-ID run, so this reset doesn't shift
-    DERBYNET_SHIFT_IDS= RESET_SOURCE=ex1 `dirname $0`/reset-database.sh "$BASE_URL"
-    puppeteer_test checkin-empty-test.js
+    DERBYNET_SHIFT_IDS= RESET_SOURCE=ex1 step reset-database.sh
+    step puppeteer_test checkin-empty-test.js
 
     # Resets database
-    `dirname $0`/test-partitions.sh "$BASE_URL"
-    `dirname $0`/test-racing-groups.sh "$BASE_URL"
+    step --resets test-partitions.sh
+    step test-racing-groups.sh
     # Resets database
-    `dirname $0`/test-preferences.sh "$BASE_URL"
+    step --resets test-preferences.sh
 
 ############################## Master Schedule ##############################
-    RESET_SOURCE=ex2 `dirname $0`/reset-database.sh "$BASE_URL"
-    `dirname $0`/import-roster.sh "$BASE_URL"
-    `dirname $0`/test-den-changes.sh "$BASE_URL"
-    `dirname $0`/test-master-schedule.sh "$BASE_URL"
+    RESET_SOURCE=ex2 step reset-database.sh
+    step import-roster.sh
+    step test-den-changes.sh
+    step test-master-schedule.sh
 
-    `dirname $0`/test-awards.sh "$BASE_URL" master
-    `dirname $0`/test-new-rounds.sh "$BASE_URL"
-    `dirname $0`/test-each-role.sh "$BASE_URL"
-    `dirname $0`/test-photo-manipulations.sh "$BASE_URL"
-    `dirname $0`/test-photo-assignments.sh "$BASE_URL" master
-    `dirname $0`/test-photo-upload.sh "$BASE_URL"
-    `dirname $0`/test-each-role.sh "$BASE_URL"
+    step test-awards.sh master
+    step test-new-rounds.sh
+    step test-each-role.sh
+    step test-photo-manipulations.sh
+    step test-photo-assignments.sh master
+    step test-photo-upload.sh
+    step test-each-role.sh
 
     # Resets database
-    `dirname $0`/test-aggregate-rounds.sh "$BASE_URL"
+    step --resets test-aggregate-rounds.sh
     # Resets database
-    `dirname $0`/test-aggregate-classes.sh "$BASE_URL"
+    step --resets test-aggregate-classes.sh
     # Resets database
-    `dirname $0`/test-aggregate-nonracing.sh "$BASE_URL"
+    step --resets test-aggregate-nonracing.sh
 
 ############################## Snapshot Export and Import ##############################
-    RESET_SOURCE=ex3 `dirname $0`/reset-database.sh "$BASE_URL"
-    `dirname $0`/import-roster.sh "$BASE_URL"
-    `dirname $0`/test-den-changes.sh "$BASE_URL"
-    `dirname $0`/test-unused-lanes.sh "$BASE_URL"
+    RESET_SOURCE=ex3 step reset-database.sh
+    step import-roster.sh
+    step test-den-changes.sh
+    step test-unused-lanes.sh
+
+    # Resets database.  Balloting moved to the backlog (#54, D7), and the Django
+    # server doesn't serve it yet.
+    if [ "$DERBYNET_BACKEND" = django ] ; then
+        skip_step test-balloting.sh "balloting is deferred to #54 (D7)"
+    else
+        step --resets test-balloting.sh
+    fi
+
+    if [ -n "$PARITY_DIR" ] ; then
+        # A fixed name, so that both legs of the parity gate post the same file name
+        SNAPSHOT=$PARITY_DIR/derby-snapshot.xml
+    else
+        SNAPSHOT=$(mktemp /tmp/derby-snapshot.xml.XXXXX)
+    fi
+    step snapshot_get
 
     # Resets database
-    `dirname $0`/test-balloting.sh "$BASE_URL"
+    step --resets test-import-results.sh
+    step test-each-role.sh
 
-    # test-balloting.sh deleted the cookie jar, and a snapshot is for the coordinator
-    user_login_coordinator
-
-    SNAPSHOT=$(mktemp /tmp/derby-snapshot.xml.XXXXX)
-    echo Taking snapshot in $SNAPSHOT
-    curl_get_xml "action.php?query=snapshot.get" > $SNAPSHOT
-
-    # Resets database
-    `dirname $0`/test-import-results.sh "$BASE_URL"
-    `dirname $0`/test-each-role.sh "$BASE_URL"
-
-    user_logout
-    curl_put_snapshot $SNAPSHOT | check_failure
+    step snapshot_put_as_nobody
 
     if [ "x$SKIP_PUT_SNAPSHOT" == "x" ]; then
-        user_login_coordinator
-        curl_put_snapshot $SNAPSHOT | check_success
+        step snapshot_put
     else
         tput setaf 2  # green text
         echo Skipping snapshot put
         tput setaf 0  # black text
     fi
 
-    rm $SNAPSHOT
+    rm -f $SNAPSHOT
+
+    steps_done
 
     tput setaf 2  # green text
     echo "<<<<<<<<<<<<<<<<<<<<<<<< Test run complete >>>>>>>>>>>>>>>>>>>>>>>>"
@@ -185,8 +217,7 @@ rm `dirname $0`/*.curl 2>&1 || true
 if [ "$DBTYPE" == "none" ] ; then
     run_tests
 elif [ "$DBTYPE" == "ez" ] ; then
-    prepare_for_setup
-    curl_postj action.php "action=setup.nodata&ez-new=testdb" > /dev/null
+    step ez_setup
     run_tests
 elif [ "$DBTYPE" == "sqlite" ] ; then
     DBPATH=${1:-/Library/WebServer/Documents/xsite/local/trial.sqlite}
