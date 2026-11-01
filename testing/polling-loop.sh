@@ -6,6 +6,10 @@
 # with HTTP status 200.
 #
 # Usage: polling-loop.sh <base url>
+#
+# It doesn't source common.sh: it's a load loop that needs no login, and
+# common.sh's helpers log every request to output.curl, which a load run
+# doesn't want.
 
 BASE_URL=$1
 if [ -z "$BASE_URL" ] ; then

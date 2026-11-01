@@ -38,18 +38,8 @@ while true ; do
   `dirname $0`/checkin-all.sh "$BASE_URL"
   sleep 15s
 
-  TIGERS=$(classid_of Lions)
-  WOLVES=$(classid_of White)
-  BEARS=$(classid_of Bears)
-  WEBELOS_I=$(classid_of Webelos)
-  WEBELOS_II=$(classid_of Arrows)
-  curl_postj action.php "action=class.edit&classid=$TIGERS&name=Tigers" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$WOLVES&name=Wolves" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$BEARS&name=Bears" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$WEBELOS_I&name=Webelos%20I" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$WEBELOS_II&name=Webelos%20II" | check_jsuccess
-
-  curl_postj action.php "action=class.order&classid_1=$TIGERS&classid_2=$WOLVES&classid_3=$BEARS&classid_4=$WEBELOS_I&classid_5=$WEBELOS_II" | check_jsuccess
+  # Sets LIONS, the classid of the class renamed Tigers, and the others
+  rename_demo_classes
 
   # Start the timer
   user_login_timer
@@ -58,15 +48,15 @@ while true ; do
 
   user_login_coordinator
   # Schedule Round 1
-  TIGERS_1=$(roundid_of Tigers 1)
-  curl_postj action.php "action=schedule.generate&roundid=$TIGERS_1" | check_jsuccess
+  LIONS_1=$(roundid_of Tigers 1)
+  curl_postj action.php "action=schedule.generate&roundid=$LIONS_1" | check_jsuccess
   curl_postj action.php "action=schedule.generate&roundid=$(roundid_of Wolves 1)" | check_jsuccess
 
   ########## On Deck ##############
   curl_postj action.php "action=kiosk.assign&all=kiosks/ondeck.kiosk" | check_jsuccess
 
   # Start racing
-  curl_postj action.php "action=heat.select&now_racing=1&roundid=$TIGERS_1" | check_jsuccess
+  curl_postj action.php "action=heat.select&now_racing=1&roundid=$LIONS_1" | check_jsuccess
 
   user_login_timer
   sleep 1s
@@ -156,7 +146,7 @@ while true ; do
   user_login_coordinator
   curl_postj action.php "action=kiosk.assign&all=kiosks/award-presentations.kiosk" | check_jsuccess
   sleep 6s
-  curl_postj action.php "action=award.present&key=speed-1-$TIGERS" | check_jsuccess
+  curl_postj action.php "action=award.present&key=speed-1-$LIONS" | check_jsuccess
   sleep 15s
 
   ########## DerbyNet ##############

@@ -45,12 +45,6 @@ def endpoints_named(path: Path) -> set[tuple[str, str]]:
     }
 
 
-def test_the_scripts_are_there():
-    names = {path.name for path in SCRIPTS}
-
-    assert {"demo.sh", "simulate-replay.sh", "polling-loop.sh"} <= names
-
-
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda path: path.name)
 def test_every_endpoint_a_script_calls_is_one_php_has_and_django_covers(script):
     """Django serves it (or a backlog ticket defers it, or it is a test

@@ -20,14 +20,15 @@ set -e -E -o pipefail
 NOANNOUNCE=1
 source `dirname $0`/common.sh
 
-# Its own files, not the shared cookies.curl and debug.curl
-JAR=$(mktemp)
+# Its own cookie jar and scratch files, not the shared cookies.curl, debug.curl
+# and output.curl, which another script may be using.  Four polls a second
+# would also swamp output.curl.
+COOKIES_CURL=$(mktemp)
 DEBUG_CURL=$(mktemp)
-trap 'rm -f $JAR $DEBUG_CURL' EXIT
+OUTPUT_CURL=/dev/null
+trap 'rm -f $COOKIES_CURL $DEBUG_CURL' EXIT
 
-PASSWORD=$(sed -n -e "s/^RaceCoordinator://p" "${PASSWORDS_FILE:-`dirname $0`/default.passwords}")
-curl -s -c $JAR -b $JAR -d "action=role.login&name=RaceCoordinator&password=$PASSWORD" \
-     $BASE_URL/action.php | check_jsuccess
+user_login_coordinator
 
 if [ -n "$2" ] ; then
     END=$(( $(date +%s) + $2 ))
@@ -35,10 +36,9 @@ fi
 
 echo Polling replay.message as the replay station
 while [ -z "$END" ] || [ "$(date +%s)" -lt "$END" ] ; do
-    curl -s -c $JAR -b $JAR -d "action=replay.message&status=0&finished-replay=0" \
-         $BASE_URL/action.php > $DEBUG_CURL
+    curl_postj action.php "action=replay.message&status=0&finished-replay=0" > /dev/null
     jq -e '.outcome.summary == "success"' $DEBUG_CURL > /dev/null || test_fails replay.message failed
     jq -r --arg t "$(date +%T)" '.replay[] | "\($t) \(.)"' $DEBUG_CURL
     # replay.php polls every 250 ms
-    timeout 0.25 tail -f /dev/null || true
+    sleep 0.25
 done

@@ -42,17 +42,8 @@ while true ; do
 
   `dirname $0`/import-roster.sh "$BASE_URL"
   `dirname $0`/photo-setup.sh "$BASE_URL"
-  TIGERS=$(classid_of Lions)
-  WOLVES=$(classid_of White)
-  BEARS=$(classid_of Bears)
-  WEBELOS_I=$(classid_of Webelos)
-  WEBELOS_II=$(classid_of Arrows)
-  curl_postj action.php "action=class.edit&classid=$TIGERS&name=Tigers" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$WOLVES&name=Wolves" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$BEARS&name=Bears" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$WEBELOS_I&name=Webelos%20I" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=$WEBELOS_II&name=Webelos%20II" | check_jsuccess
-  curl_postj action.php "action=class.order&classid_1=$TIGERS&classid_2=$WOLVES&classid_3=$BEARS&classid_4=$WEBELOS_I&classid_5=$WEBELOS_II" | check_jsuccess
+  # Sets LIONS, the classid of the class renamed Tigers, and the others
+  rename_demo_classes
   `dirname $0`/test-photo-assignments.sh "$BASE_URL"
   curl_postj action.php "action=settings.write&n-lanes=4" | check_jsuccess
 
@@ -68,11 +59,11 @@ while true ; do
   user_login_coordinator
 
   # Schedule Round 1
-  TIGERS_1=$(roundid_of Tigers 1)
-  curl_postj action.php "action=schedule.generate&roundid=$TIGERS_1" | check_jsuccess
+  LIONS_1=$(roundid_of Tigers 1)
+  curl_postj action.php "action=schedule.generate&roundid=$LIONS_1" | check_jsuccess
 
   # Start racing.  No server has a select-heat action; heat.select is the one.
-  curl_postj action.php "action=heat.select&now_racing=1&roundid=$TIGERS_1" | check_jsuccess
+  curl_postj action.php "action=heat.select&now_racing=1&roundid=$LIONS_1" | check_jsuccess
 
   curl_postj action.php "action=settings.write&show-car-photos-on-deck=1&show-car-photos-on-deck-checkbox=1" | check_jsuccess
   curl_postj action.php "action=kiosk.assign&address=$ONDECK&page=kiosks/ondeck.kiosk" | check_jsuccess
@@ -142,11 +133,11 @@ while true ; do
   sleep 15s
   curl_postj action.php "action=kiosk.assign&address=$AUX&page=kiosks/award-presentations.kiosk" | check_jsuccess
   sleep 6s
-  curl_postj action.php "action=award.present&key=speed-2-$TIGERS&reveal=0" | check_jsuccess
+  curl_postj action.php "action=award.present&key=speed-2-$LIONS&reveal=0" | check_jsuccess
   sleep 3s
   curl_postj action.php "action=award.present&reveal=1" | check_jsuccess
   sleep 12s
-  curl_postj action.php "action=award.present&key=speed-1-$TIGERS&reveal=0" | check_jsuccess
+  curl_postj action.php "action=award.present&key=speed-1-$LIONS&reveal=0" | check_jsuccess
   sleep 3s
   curl_postj action.php "action=award.present&reveal=1" | check_jsuccess
   sleep 12s
