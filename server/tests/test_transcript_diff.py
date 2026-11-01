@@ -449,6 +449,22 @@ def test_the_event_folder_and_mktemp_kiosk_names_are_masked():
     assert found.path == "$.settings.photo-directory"
 
 
+def test_two_events_folders_still_differ():
+    template = """
+        post action.php action=settings.write&photo-dir=/var/lib/derbynet/{}/racers
+
+        {{"outcome": {{"summary": "success"}}}}
+        """
+
+    same = differences(template.format("2026/testdb"), template.format("events/testdb"))
+    other = differences(
+        template.format("2026/testdb"), template.format("events/another-event")
+    )
+
+    assert same.ok
+    assert other.diverged is not None
+
+
 def test_a_long_value_is_cut_in_the_report():
     a = run("""
         action.php?query=racer.list

@@ -105,8 +105,8 @@ run_tests() {
 
     # Resets database
     step --resets test-car-numbers.sh
-    # Resets database
-    step --resets test-extended-scheduling.sh
+    # Doesn't reset the database, so it can't be retried on its own
+    step test-extended-scheduling.sh
 
     # Resets database
     step --resets test-reschedule.sh

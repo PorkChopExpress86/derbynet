@@ -8,6 +8,7 @@ from datetime import datetime
 
 import pytest
 
+from legacy_api.missing import MISSING
 from legacy_api.registry import (
     PARITY_PATHS,
     REGISTRY,
@@ -49,6 +50,7 @@ def judge(php, django, **kwargs):
     kwargs.setdefault("waiting", {})
     kwargs.setdefault("step_divergences", {})
     kwargs.setdefault("after_skip", {})
+    kwargs.setdefault("skips", {})
     kwargs.setdefault("allow", lambda difference: None)
     return gate.judge(php, django, NOW, **kwargs)
 
@@ -92,7 +94,7 @@ def test_a_waiting_step_may_fail_and_stop_early(tmp_path):
     php = leg(tmp_path, "php", [("test-a.sh", "pass", 1, poll() + poll(), "")])
     django = leg(tmp_path, "django", [("test-a.sh", "fail", 1, poll(), "")])
 
-    [result] = judge(php, django, waiting={"test-a.sh": "#49"})
+    [result] = judge(php, django, waiting={"test-a.sh": gate.Waiting("#49")})
     [unlisted] = judge(php, django)
 
     assert not result.failed
@@ -104,7 +106,7 @@ def test_a_waiting_step_still_fails_on_a_reply_that_differs(tmp_path):
     php = leg(tmp_path, "php", [("test-a.sh", "pass", 1, poll(), "")])
     django = leg(tmp_path, "django", [("test-a.sh", "fail", 1, poll(heat="2"), "")])
 
-    [result] = judge(php, django, waiting={"test-a.sh": "#49"})
+    [result] = judge(php, django, waiting={"test-a.sh": gate.Waiting("#49")})
 
     assert result.problems == ["1 differences from PHP"]
 
@@ -114,7 +116,7 @@ def test_a_waiting_step_whose_requests_part_fails(tmp_path):
     other = "\naction.php?query=poll.kiosk\n\n{}\n"
     django = leg(tmp_path, "django", [("test-a.sh", "fail", 1, other, "")])
 
-    [result] = judge(php, django, waiting={"test-a.sh": "#49"})
+    [result] = judge(php, django, waiting={"test-a.sh": gate.Waiting("#49")})
 
     assert result.problems == ["the requests part from PHP's"]
 
@@ -123,7 +125,7 @@ def test_a_waiting_step_that_passes_fails_the_gate(tmp_path):
     php = leg(tmp_path, "php", [("test-a.sh", "pass", 1, poll(), "")])
     django = leg(tmp_path, "django", [("test-a.sh", "pass", 1, poll(), "")])
 
-    [result] = judge(php, django, waiting={"test-a.sh": "#49"})
+    [result] = judge(php, django, waiting={"test-a.sh": gate.Waiting("#49")})
 
     assert result.failed
     assert "remove it from WAITING" in result.problems[0]
@@ -133,7 +135,7 @@ def test_a_waiting_entry_no_leg_ran_fails_the_gate(tmp_path):
     php = leg(tmp_path, "php", [])
     django = leg(tmp_path, "django", [])
 
-    [result] = judge(php, django, waiting={"test-gone.sh": "#49"})
+    [result] = judge(php, django, waiting={"test-gone.sh": gate.Waiting("#49")})
 
     assert result.failed
 
@@ -142,7 +144,7 @@ def test_a_skip_is_reported_and_not_compared(tmp_path):
     php = leg(tmp_path, "php", [("test-balloting.sh", "pass", 1, poll(), "")])
     django = leg(tmp_path, "django", [("test-balloting.sh", "skip", 0, None, "#54")])
 
-    [result] = judge(php, django)
+    [result] = judge(php, django, skips={"test-balloting.sh": "#54"})
 
     assert not result.failed
     assert result.report is None
@@ -234,8 +236,8 @@ def test_main_reports_a_leg_with_no_steps(tmp_path, capsys):
 
 
 def test_main_writes_the_summary_and_exits_on_the_verdict(tmp_path):
-    leg(tmp_path, "php", [("test-a.sh", "pass", 1, poll(), "")])
-    leg(tmp_path, "django", [("test-a.sh", "pass", 1, poll(heat="2"), "")])
+    leg(tmp_path, "php", [("test-balloting.sh", "pass", 1, poll(), "")])
+    leg(tmp_path, "django", [("test-balloting.sh", "pass", 1, poll(heat="2"), "")])
     summary = tmp_path / "summary.md"
 
     status = gate.main(
@@ -246,7 +248,200 @@ def test_main_writes_the_summary_and_exits_on_the_verdict(tmp_path):
     assert "$.current-heat.heat: php=1 django=2" in summary.read_text()
 
 
+# Found in the review of PR #159
+
+
+RACERS = (
+    "\naction.php?query=racer.list\n\n"
+    '{"racers": [{"racerid": 11, "firstname": "Adam"},'
+    ' {"racerid": 12, "firstname": "Bea"}]}\n'
+)
+
+
+def names_racer(racerid):
+    return f'\n{POLL}\n\n{{"current-heat": {{"racerid": {racerid}}}}}\n'
+
+
+def test_ids_keep_their_numbers_from_one_step_to_the_next(tmp_path):
+    php = leg(
+        tmp_path,
+        "php",
+        [("a.sh", "pass", 1, RACERS, ""), ("b.sh", "pass", 1, names_racer(11), "")],
+    )
+    django = leg(
+        tmp_path,
+        "django",
+        [("a.sh", "pass", 1, RACERS, ""), ("b.sh", "pass", 1, names_racer(12), "")],
+    )
+
+    first, second = judge(php, django)
+
+    assert not first.failed
+    assert second.problems == ["1 differences from PHP"]
+    assert second.report.differences[0].path == "$.current-heat.racerid"
+
+
+def test_a_reset_numbers_ids_afresh_for_the_next_steps(tmp_path):
+    reset = (
+        "\npost action.php action=database.execute&script=schema\n\n"
+        '{"outcome": {"summary": "success"}}\n'
+    )
+    # After the reset PHP reuses id 11 for a new racer; Django hands out 13.
+    php = leg(
+        tmp_path,
+        "php",
+        [
+            ("a.sh", "pass", 1, RACERS, ""),
+            ("reset.sh", "pass", 1, reset, ""),
+            ("b.sh", "pass", 1, names_racer(11), ""),
+        ],
+    )
+    django = leg(
+        tmp_path,
+        "django",
+        [
+            ("a.sh", "pass", 1, RACERS, ""),
+            ("reset.sh", "pass", 1, reset, ""),
+            ("b.sh", "pass", 1, names_racer(13), ""),
+        ],
+    )
+
+    assert not any(r.failed for r in judge(php, django))
+
+
+def test_ids_a_skipped_step_shows_carry_on_in_the_leg_that_ran_it(tmp_path):
+    php = leg(
+        tmp_path,
+        "php",
+        [
+            ("test-balloting.sh", "pass", 1, RACERS, ""),
+            ("b.sh", "pass", 1, names_racer(12), ""),
+        ],
+    )
+    django = leg(
+        tmp_path,
+        "django",
+        [
+            ("test-balloting.sh", "skip", 0, None, "#54"),
+            ("b.sh", "pass", 1, names_racer(12), ""),
+        ],
+    )
+
+    _, after = judge(php, django, skips={"test-balloting.sh": "#54"})
+
+    # PHP's 12 is its second racer; Django's is its first.
+    assert after.problems == ["1 differences from PHP"]
+
+
+def test_only_a_listed_django_skip_passes(tmp_path):
+    php = leg(tmp_path, "php", [("test-basic-racing.sh", "pass", 1, RACERS, "")])
+    skipped = leg(
+        tmp_path, "django", [("test-basic-racing.sh", "skip", 0, None, "whatever")]
+    )
+
+    [unlisted] = judge(php, skipped)
+    [listed] = judge(php, skipped, skips={"test-basic-racing.sh": "#49"})
+
+    assert unlisted.problems == ["skipped on Django, and SKIPS doesn't list it"]
+    assert not listed.failed
+
+
+def test_a_php_skip_fails_and_django_is_still_judged(tmp_path):
+    php = leg(tmp_path, "php", [("test-basic-racing.sh", "skip", 0, None, "x")])
+    django = leg(tmp_path, "django", [("test-basic-racing.sh", "fail", 1, RACERS, "")])
+
+    [result] = judge(php, django, skips={"test-basic-racing.sh": "#49"})
+
+    assert "skipped on PHP, which skips nothing" in result.problems
+
+
+def test_a_listed_skip_that_django_ran_fails(tmp_path):
+    php = leg(tmp_path, "php", [("test-balloting.sh", "pass", 1, RACERS, "")])
+    django = leg(tmp_path, "django", [("test-balloting.sh", "pass", 1, RACERS, "")])
+
+    [result] = judge(php, django, skips={"test-balloting.sh": "#54"})
+
+    assert result.problems == ["SKIPS lists it but Django ran it: remove it from SKIPS"]
+
+
+def test_a_step_divergence_that_no_longer_parts_fails(tmp_path):
+    php = leg(tmp_path, "php", [("test-reschedule.sh", "pass", 1, RACERS, "")])
+    django = leg(tmp_path, "django", [("test-reschedule.sh", "pass", 1, RACERS, "")])
+
+    [result] = judge(php, django, step_divergences={"test-reschedule.sh": "D34"})
+
+    assert "remove it from STEP_DIVERGENCES" in result.problems[0]
+
+
+HISTORY_RUN = (
+    "\nracer.php\n\n<html/>\n"
+    '\naction.php?query=racer.list\n\n{"racers": []}\n'
+    "\nhistory.php\n\n<html/>\n"
+    "\nhistory.php?again\n\n<html/>\n"
+)
+
+
+def test_a_waiting_step_may_stop_only_after_its_request(tmp_path):
+    php = leg(tmp_path, "php", [("test-basic-racing.sh", "pass", 1, HISTORY_RUN, "")])
+    early = HISTORY_RUN.split("\naction.php")[0]
+    at_history = HISTORY_RUN.split("\nhistory.php?again")[0]
+    stops_early = leg(
+        tmp_path, "early", [("test-basic-racing.sh", "fail", 1, early, "")]
+    )
+    stops_after = leg(
+        tmp_path, "after", [("test-basic-racing.sh", "fail", 1, at_history, "")]
+    )
+    waits = {"test-basic-racing.sh": gate.Waiting("#49", "history.php")}
+
+    [before] = judge(php, stops_early, waiting=waits)
+    [after] = judge(php, stops_after, waiting=waits)
+
+    assert before.problems == ["stops before it sends history.php, which it waits on"]
+    assert not after.failed
+
+
+def complete(tmp_path, name, count):
+    (tmp_path / name / "complete").write_text(f"{count}\n")
+
+
+def test_main_fails_a_leg_that_was_cut_short(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "WAITING", {})
+    monkeypatch.setattr(gate, "SKIPS", {})
+    leg(tmp_path, "php", [("test-a.sh", "pass", 1, poll(), "")])
+    leg(tmp_path, "django", [("test-a.sh", "pass", 1, poll(), "")])
+    args = [str(tmp_path / "php"), str(tmp_path / "django")]
+
+    complete(tmp_path, "php", 1)
+    no_file = gate.main(args)
+    complete(tmp_path, "django", 2)
+    wrong_count = gate.main(args)
+    complete(tmp_path, "django", 1)
+    whole = gate.main(args)
+
+    assert (no_file, wrong_count, whole) == (1, 1, 0)
+
+
 # The registry side: PARITY_PATHS
+
+
+def test_r9_allows_only_the_positional_columns_django_lacks():
+    found = "query poll.results"
+
+    assert allowed_by(found, '$.results[0]["3"]', 5, MISSING).startswith("R9: ")
+    assert allowed_by(found, '$.results[0]["3"]', 5, 9) is None
+    assert allowed_by(found, '$.results[0]["3"]', MISSING, 9) is None
+    assert allowed_by(found, '$.results[0]["8"]', 5, MISSING) is None
+    assert allowed_by(found, '$.results[0]["car number"]', "1", MISSING) is None
+
+
+def test_c19_and_c20_allow_only_the_type_django_gives():
+    kiosks = "query poll.kiosk.all"
+
+    assert allowed_by(kiosks, "$.current-scene", "", 7).startswith("C19: ")
+    assert allowed_by(kiosks, "$.current-scene", "", None) is None
+    assert allowed_by(kiosks, "$.current-scene", "", "7") is None
+    assert allowed_by(kiosks, "$.kiosks[0].parameters", None, "{}").startswith("C20")
+    assert allowed_by(kiosks, "$.kiosks[0].parameters", None, 3) is None
 
 
 def test_a_parity_path_matches_any_index_and_any_run():

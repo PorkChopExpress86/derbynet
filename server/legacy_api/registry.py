@@ -18,6 +18,7 @@ from django.db.models import Model
 from accounts.permissions import Requirement
 from core.models import Event
 from legacy_api.formats import Format, format_of
+from legacy_api.missing import MISSING
 from legacy_api.xml import XmlWriter
 
 logger = logging.getLogger(__name__)
@@ -163,7 +164,8 @@ class ParityPath:
     `/action-response/heat-ready/@heat`), where `*` stands for any run of
     characters and `[*]` for any list index. `php` and `django` are the
     values the divergence gives each server there, after the differ's
-    normalizing (`MISSING` from the differ for a key one lacks), or `ANY`.
+    normalizing: a value, `MISSING` (`legacy_api.missing`) for a key one
+    reply lacks, a type such as `int` for any value of it, or `ANY`.
     `divergence` is the id that starts one of the endpoint's `divergences`
     (`R3`); the guard in legacy_api/tests/test_registry.py checks it does."""
 
@@ -186,6 +188,8 @@ def _matches(expected, value) -> bool:
     if expected is ANY or value is ANY:
         return True
     # 0 == False and 1 == True in Python; JSON tells them apart.
+    if isinstance(expected, type):
+        return type(value) is expected
     return type(expected) is type(value) and expected == value
 
 
@@ -223,19 +227,24 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
         for endpoint in _CURRENT_HEAT
         for key in ("classid", "heat")
     ),
-    # PHP repeats each column under its position; MISSING is the differ's.
-    ParityPath("query poll.results", '$.results[*]["*"]', "R9"),
+    # PHP repeats each of the eight columns under its position, "0" to "7".
+    *(
+        ParityPath("query poll.results", f'$.results[*]["{n}"]', "R9", django=MISSING)
+        for n in range(8)
+    ),
     *(
         ParityPath(endpoint, f"$.awards[*].{key}", "A1", php=None, django=0)
         for endpoint in ("action award.edit", "query award.list")
         for key in ("classid", "rankid")
     ),
     *(
-        ParityPath(endpoint, "$.current-scene", "C19", php="")
+        # The scene applied last, by id.
+        ParityPath(endpoint, "$.current-scene", "C19", php="", django=int)
         for endpoint in _KIOSK_LISTS
     ),
     *(
-        ParityPath(endpoint, "$.kiosks[*].parameters", "C20", php=None)
+        # The kiosk's own parameters, as the JSON text it stores.
+        ParityPath(endpoint, "$.kiosks[*].parameters", "C20", php=None, django=str)
         for endpoint in _KIOSK_LISTS
     ),
 )

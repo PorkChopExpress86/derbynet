@@ -74,7 +74,9 @@ What is normalized, on both runs alike:
   (`testing/test-scenes.sh`): the six random characters.
 - An event's folder inside the data folder, before `racers`, `cars`,
   `videos`, `logs`, `imagery` or `slides`: PHP's `<year>/<name>` and
-  Django's `events/<slug>` (owner decision D57) are both `<event-folder>`.
+  Django's `events/<slug>` (owner decision D57) are both
+  `<event:<slug>>`, with PHP's name slugified as Django slugs a new event's
+  name, so two events' folders still differ.
   The data folder in front is compared, so the gate runs both servers on
   `/var/lib/derbynet`. The reset scripts post these paths back, so without
   this every reset would part the runs.
@@ -109,7 +111,10 @@ from enum import StrEnum
 from pathlib import PurePosixPath
 from urllib.parse import parse_qsl
 
+from django.utils.text import slugify
+
 from legacy_api.formats import Format, format_of
+from legacy_api.missing import MISSING, _Missing
 from legacy_api.tests.php_http import (
     FIELD_KINDS,
     ID_KEYS,
@@ -117,18 +122,6 @@ from legacy_api.tests.php_http import (
     rewrite_ids,
     translate,
 )
-
-
-class _Missing:
-    """No value: a key, an element or an exchange one run lacks."""
-
-    def __repr__(self):
-        return "(missing)"
-
-    __str__ = __repr__
-
-
-MISSING = _Missing()
 
 # Where each rule of server/tests/golden/capture/normalize.mjs is handled.
 GOLDEN_RULES = {
@@ -169,8 +162,14 @@ _SESSION = re.compile(r"\b(PHPSESSID|sessionid|csrftoken)=[^;&\s\"]+")
 _ADDRESS = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\+\d+\b")
 _MKTEMP_KIOSK = re.compile(r"\b(kiosk\d+-)[A-Za-z0-9]{6}\b")
 _EVENT_FOLDER = re.compile(
-    r"/(?:\d{4}|events)/[^/\s\"<>]+(?=/(?:racers|cars|videos|logs|imagery|slides)\b)"
+    r"/(?:\d{4}|events)/([^/\s\"<>]+)(?=/(?:racers|cars|videos|logs|imagery|slides)\b)"
 )
+
+
+def _event_folder(found: re.Match) -> str:
+    return f"/<event:{slugify(found[1])}>"
+
+
 _ROUND_IN_TEXT = re.compile(r"(roundid )(\d+)")
 _BARCODE = re.compile(r"(PWDid)(\d+)")
 _WHO = re.compile(r"([cdr])(\d+)")
@@ -323,7 +322,7 @@ class Run:
         text = _REPLY_BREAKER.sub(r"\1<breaker>", text)
         text = _UNREC.sub("unrec-<time>", text)
         text = _SESSION.sub(r"\1=<value>", text)
-        text = _EVENT_FOLDER.sub("/<event-folder>", text)
+        text = _EVENT_FOLDER.sub(_event_folder, text)
         text = _MKTEMP_KIOSK.sub(r"\1<mktemp>", text)
         return _ADDRESS.sub(r"\1+<port>", text)
 
@@ -735,18 +734,39 @@ def diff_bodies(a: Body, b: Body, endpoint: str) -> list[Found]:
     return out
 
 
+def new_runs(now: datetime | None = None) -> tuple[Run, Run]:
+    """The two runs' normalizing state, to pass to `diff` for each part of
+    the runs in turn, so that ids keep their numbers from part to part."""
+    now = now or datetime.now()
+    return Run(FirstAppearance(), now), Run(FirstAppearance(), now)
+
+
+def absorb(exchanges: Sequence[Exchange], run: Run) -> None:
+    """Number the ids in exchanges only one run compared, so that the run's
+    numbering goes on as if they had been compared."""
+    for exchange in exchanges:
+        request = parse_request(exchange.request, run)
+        if request.comparison is not Comparison.SKIPPED:
+            read_body(exchange.body, request, run)
+        if _resets_database(request):
+            run.ids = FirstAppearance()
+
+
 def diff(
     a_text: str,
     b_text: str,
     allow: Allow | None = None,
     now: datetime | None = None,
+    runs: tuple[Run, Run] | None = None,
 ) -> Report:
     """Compare two `output.curl` runs exchange by exchange. `now` is when
-    they ran, for telling volatile timestamps from fixed dates."""
-    now = now or datetime.now()
+    they ran, for telling volatile timestamps from fixed dates. `runs`, from
+    `new_runs`, carries the id numbering over from an earlier part of the
+    same two runs; it is updated in place, past any divergence too."""
+    run_a, run_b = runs or new_runs(now)
     report = Report()
-    run_a, run_b = Run(FirstAppearance(), now), Run(FirstAppearance(), now)
-    for _, ex_a, ex_b in _pairs(parse(a_text), parse(b_text)):
+    exchanges_a, exchanges_b = parse(a_text), parse(b_text)
+    for i, ex_a, ex_b in _pairs(exchanges_a, exchanges_b):
         if ex_a is MISSING or ex_b is MISSING:
             index = (ex_b if ex_a is MISSING else ex_a).index
             report.diverged = Divergence(
@@ -754,11 +774,17 @@ def diff(
                 MISSING if ex_a is MISSING else ex_a.request,
                 MISSING if ex_b is MISSING else ex_b.request,
             )
+            absorb(exchanges_a[i:], run_a)
+            absorb(exchanges_b[i:], run_b)
             break
         req_a = parse_request(ex_a.request, run_a)
         req_b = parse_request(ex_b.request, run_b)
         if req_a != req_b:
             report.diverged = Divergence(ex_a.index, ex_a.request, ex_b.request)
+            # Numbering is by first appearance, so the requests numbered
+            # already number the same again.
+            absorb(exchanges_a[i:], run_a)
+            absorb(exchanges_b[i:], run_b)
             break
         if req_a.comparison is Comparison.SKIPPED:
             report.skipped += 1

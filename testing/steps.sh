@@ -27,6 +27,8 @@
 #   transcript is the second attempt's.  Another step can't be retried on its
 #   own, because it carries on from the state the steps before it left.
 # - The run goes on after a failed step.
+# - At the end, steps_done writes the number of steps to $PARITY_DIR/complete;
+#   a leg without it was cut short.
 
 STEP_NUMBER=0
 STEP_LABELS=
@@ -121,9 +123,11 @@ skip_step() {
     fi
 }
 
-# Print each step's outcome, in a parity gate leg.
+# Print each step's outcome, in a parity gate leg, and write
+# $PARITY_DIR/complete, which tells the gate the leg ran to the end.
 steps_done() {
     if [ -n "$PARITY_DIR" ] ; then
+        echo "$STEP_NUMBER" > "$PARITY_DIR/complete"
         echo
         echo "Steps (see $PARITY_DIR/steps.tsv):"
         cut -f 1-4,6 "$PARITY_DIR/steps.tsv"

@@ -174,9 +174,11 @@ the runs step by step (#37).  With `PARITY_DIR` set, each step of
 `exercise-one-database.sh` (`steps.sh`) saves its slice of `output.curl` and
 its outcome there, retries once a failed step that resets the database itself,
 and the run goes on past a failure.  `server/tools/parity_gate.py` then judges
-the two legs: the steps that wait on another ticket are in its `WAITING`, and
-the reply paths a recorded divergence changes are in `PARITY_PATHS` in
-`server/legacy_api/registry.py`.
+the two legs: the steps that wait on another ticket are in its `WAITING`, the
+steps the Django leg skips in its `SKIPS`, and the reply paths a recorded
+divergence changes are in `PARITY_PATHS` in `server/legacy_api/registry.py`.
+A leg that ends writes `complete` next to `steps.tsv`; the gate fails a leg
+without it.
 
 The gate runs nightly, on demand, and on a push to a branch named
 `parity-check/<anything>`.  It does not run on pull requests, because it can't
