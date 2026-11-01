@@ -131,11 +131,11 @@ def test_a_change_after_the_final_has_raced_keeps_its_roster(intermission):
 
 def test_a_change_to_another_round_keeps_the_final(intermission):
     event, round1, final, entry, finalists_for = intermission
-    before = list(HeatLane.objects.filter(round=final).values_list("id", flat=True))
+    before = sorted(HeatLane.objects.filter(round=final).values_list("id", flat=True))
     delete_results(event, final)
-    assert list(HeatLane.objects.filter(round=final).values_list("id", flat=True)) == (
-        before
-    )
+    assert sorted(
+        HeatLane.objects.filter(round=final).values_list("id", flat=True)
+    ) == (before)
 
 
 def test_a_change_that_keeps_the_finalists_keeps_the_final_chart(intermission):
