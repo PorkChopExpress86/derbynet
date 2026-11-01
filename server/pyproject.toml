@@ -19,6 +19,11 @@ dev = [
     "pytest-django>=4.11",
     "ruff>=0.14",
 ]
+# The WSGI server tools/load-run.sh serves Django with (ADR-08), until M6
+# settles the production image. `uv run --group serve` installs it.
+serve = [
+    "gunicorn>=26.2,<27",
+]
 
 [tool.uv]
 package = false

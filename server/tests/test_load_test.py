@@ -61,6 +61,67 @@ def test_every_keeps_its_grid_and_skips_a_tick_missed_while_busy():
     assert lt.Every(0.25).rate == pytest.approx(4.0)
 
 
+def test_interval_fires_on_its_grid_while_a_request_is_in_flight():
+    # kiosk-poller.js: a bare setInterval, so a slow poll.kiosk does not
+    # hold back the next one. Each tick is handed to `spawn`, which runs it
+    # on a thread of its own; the grid never waits for it.
+    clock = FakeClock()
+    actor = CountingActor(clock, latency=7.0)
+    spawned = []
+
+    def spawn(tick):
+        spawned.append(clock())
+
+    lt.run_actor(
+        actor,
+        lt.Interval(5.0),
+        first_at=0.0,
+        clock=clock,
+        wait=clock.wait,
+        deadline=20.0,
+        spawn=spawn,
+    )
+    assert spawned == [0.0, 5.0, 10.0, 15.0]
+    assert lt.Interval(5.0).rate == pytest.approx(0.2)
+    assert str(lt.Interval(5.0)) == "every 5 s, overlapping"
+
+
+def test_an_actor_with_a_message_due_fires_before_its_pacer_says():
+    # derby-timer.jar sends a queued STARTED or FINISHED at once, cutting
+    # its 0.5 s heartbeat wait short.
+    clock = FakeClock()
+
+    class Due(CountingActor):
+        def due_at(self):
+            return 0.2 if len(self.ticks) == 1 else None
+
+    actor = Due(clock, 0.0)
+    lt.run_actor(
+        actor, lt.After(0.5), first_at=0.0, clock=clock, wait=clock.wait, deadline=1.3
+    )
+    assert actor.ticks == pytest.approx([0.0, 0.2, 0.7, 1.2])
+
+
+def test_run_actor_reports_how_late_each_tick_started():
+    clock = FakeClock()
+
+    def late_wait(seconds):
+        clock.now += seconds + 0.03  # an overloaded client wakes late
+        return False
+
+    lags = []
+    lt.run_actor(
+        CountingActor(clock, 0.0),
+        lt.Every(1.0),
+        first_at=1.0,
+        clock=clock,
+        wait=late_wait,
+        deadline=3.0,
+        lag=lags.append,
+    )
+    assert lags == pytest.approx([0.03, 0.03])
+
+
 def test_after_waits_its_delay_from_the_response():
     # setTimeout chained from the response, as now-racing-poller.js,
     # kiosk-dashboard.js and derby-timer.jar's heartbeat do.
@@ -152,6 +213,37 @@ def test_timer_says_hello_identifies_then_heartbeats():
     }
 
 
+def test_timer_answers_the_servers_query_with_its_flags():
+    # HttpTask.decodeResponse queues Message.Flags on <query/>; HELLO's
+    # reply carries one.
+    sim = lt.TimerSim(lanes=4, rng=random.Random(1))
+    label, _ = sim.next_message(0.0)
+    sim.on_response(label, SUCCESS.replace("<success/>", "<success/><query/>"), 0.1)
+    assert sim.due_at() == 0.0  # at once
+    label, params = sim.next_message(0.1)
+    assert label == "timer-message FLAGS"
+    assert params["flag-ignore-place"] == "bool:false"
+    assert params["flag-reset-after-start"] == "int:10"
+    assert params["desc-ignore-place"]
+    assert "ports" in params
+    assert any(key.startswith("device-") for key in params)
+    sim.on_response(label, SUCCESS, 0.2)
+    assert sim.next_message(0.2)[1]["message"] == "IDENTIFIED"
+
+
+def test_timer_says_when_its_next_event_is_due():
+    sim = lt.TimerSim(lanes=4, rng=random.Random(6), stage_seconds=1.0)
+    assert sim.due_at() == 0.0  # HELLO
+    sim.on_response("timer-message IDENTIFIED", SUCCESS, 0.0)
+    assert sim.due_at() is None  # heartbeats only
+    sim.on_response("timer-message HEARTBEAT", ready(1, 1, 0b1111), 2.0)
+    assert sim.due_at() == pytest.approx(3.0)  # STARTED
+    label, _ = sim.next_message(3.0)
+    sim.on_response(label, SUCCESS, 3.0)
+    slowest = max(float(t) for t in sim.race_times.values())
+    assert sim.due_at() == pytest.approx(3.0 + slowest)  # FINISHED
+
+
 def test_timer_races_the_heat_it_is_given():
     sim = lt.TimerSim(lanes=4, rng=random.Random(2), stage_seconds=1.0)
     sim.on_response(*sim.next_message(0.0)[:1], SUCCESS, 0.0)
@@ -175,7 +267,7 @@ def test_timer_races_the_heat_it_is_given():
     # The FINISHED reply carries the next heat-ready.
     sim.on_response(label, ready(7, 4, 0b1111), 10.1)
     assert sim.finished_ok == 1
-    assert sim.staged == (7, 4, 0b1111)
+    assert sim.staged == lt.Staged(roundid=7, heat=4, lane_mask=0b1111)
 
 
 def test_timer_finished_waits_for_the_slowest_lane():
@@ -211,8 +303,56 @@ def test_timer_reports_how_long_it_has_waited_for_a_heat():
     sim.on_response("timer-message HELLO", SUCCESS, 0.0)
     sim.on_response("timer-message IDENTIFIED", SUCCESS, 1.0)
     assert sim.idle_seconds(4.0) == pytest.approx(3.0)
-    sim.on_response("timer-message HEARTBEAT", ready(1, 1, 1), 4.0)
+    sim.restart_idle(5.0)
+    assert sim.idle_seconds(6.0) == pytest.approx(1.0)
+    sim.on_response("timer-message HEARTBEAT", ready(1, 1, 1), 7.0)
     assert sim.idle_seconds(9.0) == 0.0
+
+
+# ----- the pollers -----------------------------------------------------------------
+
+
+class RecordingSession:
+    """Records each request and answers with `reply`."""
+
+    def __init__(self, reply: str = "{}"):
+        self.reply, self.sent = reply, []
+
+    def request(self, label, method, params):
+        self.sent.append(params)
+        return 200, self.reply
+
+
+def test_coordinator_starts_at_round_0_heat_0_then_follows_the_heat():
+    # coordinator-poll.js: g_current_heat starts as {roundid: 0, heat: 0}.
+    session = RecordingSession('{"current-heat": {"roundid": 3, "heat": 2}}')
+    poller = lt.CoordinatorPoller(session)
+    poller.tick()
+    poller.tick()
+    assert (session.sent[0]["roundid"], session.sent[0]["heat"]) == (0, 0)
+    assert (session.sent[1]["roundid"], session.sent[1]["heat"]) == (3, 2)
+
+
+def test_now_racing_sends_the_row_height_of_a_1080p_tv():
+    # now-racing.js: (window height - top of the first photo cell) / rows,
+    # less the cell's bottom border.
+    assert lt.default_row_height(lanes=4) == 238
+    assert lt.default_row_height(lanes=6) == 156
+    session = RecordingSession('{"current-heat": {"roundid": 1, "heat": 4}}')
+    poller = lt.NowRacingPoller(session, row_height=238)
+    poller.tick()
+    poller.tick()
+    assert session.sent[0]["row-height"] == 238
+    assert (session.sent[0]["roundid"], session.sent[0]["heat"]) == (0, 0)
+    assert (session.sent[1]["roundid"], session.sent[1]["heat"]) == (1, 4)
+
+
+def test_current_heat_reads_the_heat_from_a_poll_reply():
+    reply = '{"current-heat": {"roundid": 2, "heat": 5}}'
+    assert lt.current_heat(200, reply) == (2, 5)
+    assert lt.current_heat(500, reply) is None
+    assert lt.current_heat(200, "not json") is None
+    assert lt.current_heat(200, "{}") is None
 
 
 # ----- responses, statistics and the report ---------------------------------------
@@ -238,7 +378,9 @@ def test_timer_reports_how_long_it_has_waited_for_a_heat():
     ],
 )
 def test_classify(status, body, kind):
-    assert lt.classify(status, body) == kind
+    found = lt.classify(status, body)
+    assert found == kind
+    assert found is None or isinstance(found, lt.ErrorKind)
 
 
 def test_percentile_is_nearest_rank():
@@ -257,15 +399,15 @@ def make_stats() -> lt.Stats:
     for ms in range(1, 101):
         stats.record("poll", ms / 1000, None)
     stats.record("poll.kiosk", 0.004, None)
-    stats.record("poll.kiosk", 0.006, "5xx")
-    stats.record("poll.kiosk", 0.008, "locked")
+    stats.record("poll.kiosk", 0.006, lt.ErrorKind.SERVER)
+    stats.record("poll.kiosk", 0.008, lt.ErrorKind.LOCKED)
     stats.record("setup role.login", 0.5, None)
     return stats
 
 
 CLIENTS = [
-    lt.ClientType("kiosk content", 2, lt.After(0.5), ("poll",)),
-    lt.ClientType("kiosk", 2, lt.Every(5.0), ("poll.kiosk",)),
+    lt.ClientType("kiosk content", 2, lt.After(0.5), "poll"),
+    lt.ClientType("kiosk", 2, lt.Interval(5.0), "poll.kiosk"),
 ]
 
 
@@ -327,6 +469,28 @@ def test_verdict_names_each_failed_check():
     assert "setup" not in text
 
 
+def test_thresholds_judge_only_the_polls_and_timer_with_enough_samples():
+    stats = lt.Stats()
+    for _ in range(30):
+        stats.record("timer-message HEARTBEAT", 0.5, None)
+        stats.record("setup racer.import", 0.5, None)
+    stats.record("timer-message HELLO", 0.5, None)
+    for _ in range(lt.MIN_SAMPLES - 1):
+        stats.record("poll.kiosk.all", 0.5, None)
+    report = lt.summarize(stats, elapsed=10.0, clients=CLIENTS)
+    failures = lt.verdict(report, max_p95_ms=300, max_p99_ms=None)
+    assert failures == ["timer-message HEARTBEAT p95 500.0 ms > 300 ms"]
+    assert set(lt.THRESHOLD_ENDPOINTS) == {
+        "poll",
+        "poll.kiosk",
+        "poll.coordinator",
+        "poll.kiosk.all",
+        "replay.message",
+        "timer-message HEARTBEAT",
+        "timer-message FINISHED",
+    }
+
+
 def test_verdict_passes_a_clean_run():
     stats = lt.Stats()
     stats.record("poll", 0.01, None)
@@ -353,6 +517,72 @@ def test_markdown_holds_the_tables_the_owner_pastes():
     assert "| kiosk content | 2 | after 0.5 s |" in text
     assert "FAIL" in text and "5xx" in text
     assert "12.5" in text
+
+
+def clean_report() -> dict:
+    stats = lt.Stats()
+    stats.record("poll", 0.01, None)
+    report = lt.summarize(stats, elapsed=1.0, clients=CLIENTS)
+    for rate in report["rates"]:
+        rate.update(achieved_pct=99.0, lag_p95_ms=2.0)
+    report["server"] = {
+        "cpu_mean_pct": 30.0,
+        "cpu_max_pct": 50.0,
+        "rss_start_mb": 300.0,
+        "rss_end_mb": 310.0,
+        "host_cpu_mean_pct": 20.0,
+        "host_cpu_max_pct": 40.0,
+    }
+    return report
+
+
+def test_limits_name_a_busy_host_cpu():
+    report = clean_report()
+    report["server"]["host_cpu_mean_pct"] = 82.0
+    assert any("CPU" in line for line in lt.likely_limits(report))
+
+
+def test_limits_name_server_memory_growth():
+    report = clean_report()
+    report["server"]["rss_end_mb"] = 420.0
+    limits = lt.likely_limits(report)
+    assert any("memory" in line and "300" in line for line in limits)
+
+
+def test_limits_name_the_sqlite_write_lock():
+    report = clean_report()
+    report["totals"]["locked"] = 3
+    assert any("database is locked" in line for line in lt.likely_limits(report))
+
+
+def test_limits_name_client_side_lag():
+    report = clean_report()
+    report["rates"][0]["lag_p95_ms"] = 250.0
+    assert any("load script" in line for line in lt.likely_limits(report))
+    report["rates"][0].update(lag_p95_ms=2.0, achieved_pct=70.0)
+    assert any("load script" in line for line in lt.likely_limits(report))
+
+
+def test_limits_say_when_nothing_stood_out():
+    assert lt.likely_limits(clean_report()) == [lt.NOTHING_STOOD_OUT]
+    report = clean_report()
+    del report["server"]
+    assert "--pid" in lt.likely_limits(report)[0]
+
+
+def test_markdown_names_the_likely_limit_and_labels_the_restarts():
+    report = clean_report()
+    report["timer"] = {
+        "finished_sent": 3,
+        "finished_ok": 3,
+        "finished_recorded": 3,
+        "passes": 2,
+    }
+    report["failures"] = ["poll p95 400.0 ms > 300 ms"]
+    report["limits"] = ["CPU: the host's cores were busy"]
+    text = lt.render_markdown(report)
+    assert "Likely limit" in text and "the host's cores were busy" in text
+    assert "load a race day doesn't have" in text
 
 
 def test_report_lists_the_clients_endpoints_before_the_scripts_own():
@@ -414,6 +644,15 @@ def test_director_leaves_racing_alone_while_a_heat_is_on():
     assert director.passes == 0
 
 
+def test_director_logs_in_on_its_own_session():
+    session = RecordingSession('{"outcome": {"summary": "success"}}')
+    director = lt.Director(session, loop=False)
+    director.login("RaceCoordinator", "doyourbest")
+    assert session.sent == [
+        {"action": "role.login", "name": "RaceCoordinator", "password": "doyourbest"}
+    ]
+
+
 def test_director_never_purges_an_event_it_did_not_set_up():
     session = FakeSession(heats_run=[7, 9, 9])
     director = lt.Director(session, loop=False)
@@ -462,11 +701,30 @@ def test_cpu_percent_between_two_samples():
 
 class Stub(BaseHTTPRequestHandler):
     """Answers every client: XML to the timer, JSON to the rest, a 500 to
-    `query=<fail>` and a slow reply to `query=<slow>`."""
+    `query=<fail>`, and a reply `slow[name]` seconds late to a query or
+    action. It counts the most requests of each name in flight at once."""
 
     fail = ""
-    slow = ""
+    slow: dict = {}
     seen: list = []
+    in_flight: dict = {}
+    most_in_flight: dict = {}
+    lock = threading.Lock()
+
+    def track(self, name: str, delta: int) -> None:
+        with Stub.lock:
+            Stub.in_flight[name] = Stub.in_flight.get(name, 0) + delta
+            Stub.most_in_flight[name] = max(
+                Stub.most_in_flight.get(name, 0), Stub.in_flight[name]
+            )
+
+    def answer(self, name: str, status: int, body: str, kind: str) -> None:
+        self.track(name, 1)
+        try:
+            time.sleep(Stub.slow.get(name, 0))
+            self.reply(status, body, kind)
+        finally:
+            self.track(name, -1)
 
     def log_message(self, *args):
         pass
@@ -483,25 +741,25 @@ class Stub(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query).get("query", [""])[0]
         Stub.seen.append(query)
         if query == Stub.fail:
-            self.reply(500, "Server Error (500)", "text/html")
+            self.answer(query, 500, "Server Error (500)", "text/html")
         else:
-            if query == Stub.slow:
-                time.sleep(0.05)
-            self.reply(200, "{}")
+            self.answer(query, 200, "{}", "application/json")
 
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
         action = parse_qs(body).get("action", [""])[0]
         Stub.seen.append(action)
         if action == "timer-message":
-            self.reply(200, SUCCESS, "text/xml")
+            self.answer(action, 200, SUCCESS, "text/xml")
         else:
-            self.reply(200, '{"outcome": {"summary": "success"}}')
+            success = '{"outcome": {"summary": "success"}}'
+            self.answer(action, 200, success, "application/json")
 
 
 @pytest.fixture
 def stub():
-    Stub.fail, Stub.slow, Stub.seen = "", "", []
+    Stub.fail, Stub.slow, Stub.seen = "", {}, []
+    Stub.in_flight, Stub.most_in_flight = {}, {}
     server = ThreadingHTTPServer(("127.0.0.1", 0), Stub)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -552,12 +810,24 @@ def test_command_fails_on_a_5xx(stub):
 
 
 def test_command_fails_when_p95_crosses_the_threshold(stub):
-    Stub.slow = "poll.coordinator"
+    Stub.slow = {"replay.message": 0.05}
     result = run_command(
-        "--url", stub, "--duration", "3", "--kiosks", "1", "--max-p95-ms", "20"
+        "--url", stub, "--duration", "6", "--kiosks", "1", "--max-p95-ms", "20"
     )
     assert result.returncode == 1
-    assert "poll.coordinator p95" in result.stdout
+    assert "replay.message p95" in result.stdout
+    assert "Likely limit" in result.stdout
+
+
+def test_command_overlaps_kiosk_polls_but_not_guarded_ones(stub):
+    # A poll.kiosk slower than its 5 s interval overlaps the next one, as a
+    # browser's bare setInterval does; replay.message, guarded in replay.php,
+    # never has two in flight.
+    Stub.slow = {"poll.kiosk": 5.5, "replay.message": 0.4}
+    result = run_command("--url", stub, "--duration", "11", "--kiosks", "1")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert Stub.most_in_flight["poll.kiosk"] >= 2
+    assert Stub.most_in_flight["replay.message"] == 1
 
 
 def test_command_stops_cleanly_on_sigint(stub):

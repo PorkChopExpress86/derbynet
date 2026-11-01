@@ -2,61 +2,27 @@
 
     uv run python -m tools.load_test --url http://127.0.0.1:8000 --setup --duration 300
 
-It plays the clients of a race day at the rates and with the requests the
-real ones send, each in a thread of its own with its own session:
+It plays a race day's clients, 10 kiosks, one timer, the coordinator page,
+the replay station and the kiosk dashboard, each at its real rate with its
+real requests and login, and prints a markdown report. The section
+"Race-day load test (#37)" of `server/README.md` describes each client, the
+setup and the restarts, the report, the thresholds, the exit status, and the
+limiting-resource heuristic. It is the one place they are described; keep it
+in step with this module.
 
-- 10 kiosks (`--kiosks`). Each polls `query=poll.kiosk&address=<id>` every
-  5 s (`website/js/kiosk-poller.js`) and, as a now-racing kiosk, chains a
-  `query=poll` 500 ms after each response (`website/js/now-racing-poller.js`,
-  with the `values`, `roundid`, `heat` and `row-height` of
-  `website/js/now-racing.js`). Kiosks do not log in.
-- One timer, as `derby-timer.jar` talks (`timer/src/.../HttpTask.java`,
-  `Message.java`): it logs in as `Timer`, sends `HELLO` and `IDENTIFIED`,
-  then a `timer-message` 500 ms after each response. That is a `HEARTBEAT`
-  unless a heat is due: on `<heat-ready>` it waits `--stage-seconds`, sends
-  `STARTED`, and once the slowest car is in sends `FINISHED` with the
-  heat's `roundid`, `heat` and a time from 2.5 to 4 s for each lane of the
-  lane mask.
-- The coordinator page, logged in as `RaceCoordinator`: `query=poll.coordinator`
-  with the heat it shows, every 2 s, skipping a tick while one is in flight
-  (`website/js/coordinator-poll.js`).
-- The replay station, logged in as `RaceCoordinator` (D16): POST
-  `action=replay.message&status=0&finished-replay=0` every 250 ms, skipping a
-  tick while one is in flight (`website/replay.php`).
-- The kiosk dashboard, logged in as `RaceCoordinator` (it needs
-  PRESENT_AWARDS): `query=poll.kiosk.all`, chained 2 s after each response
-  (`website/js/kiosk-dashboard.js`).
-
-`--setup` first resets the event's database (`database.execute`, as
-`testing/reset-database.sh` does), imports `--racers` racers in four groups,
-checks them in, schedules every round on the master schedule with
-`--lanes` lanes, points every kiosk at the now-racing page and starts
-racing. When the timer then runs out of heats, the results are purged and
-racing starts again from the first heat, so the timer races full heats for
-the whole run. Without `--setup` the event is used as it is and nothing is
-purged; racing stops when its schedule does.
-
-At the end it checks the server recorded every `FINISHED` it accepted (the
-`heats_run` of `poll.coordinator`'s rounds), and prints a markdown report:
-per endpoint the request, error and 5xx counts and the p50, p95, p99 and
-maximum latency; each client's rate against its target; and, with `--pid`,
-the CPU and memory of that process and its children, read from `/proc`.
-`--json` writes the report as JSON too.
-
-It exits 1 on any error (a 5xx, another HTTP error, a failed connection or
-a `failure` outcome), any `database is locked`, a `FINISHED` that was refused
-or not recorded, or a latency over `--max-p95-ms` or `--max-p99-ms`; 2 when
-setup fails. SIGINT or SIGTERM stops it early and still prints the report.
-
-The rates are those the clients use: a chained client waits its delay after
-each response, so it polls a little slower than its nominal rate, and the
-report shows the rate it could reach given the mean latency as "expected".
+The pieces, top to bottom: pacing (`Interval`, `Every`, `After`,
+`run_actor`), response kinds and statistics, the report (`summarize`,
+`verdict`, `likely_limits`, `render_markdown`), the `/proc` sampler, the HTTP
+session, the clients, the timer (`TimerSim`), the director that sets the
+event up and restarts it, and the run itself (`client_types`, `run`, `main`).
 """
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import datetime
+import enum
 import http.client
 import json
 import math
@@ -70,17 +36,38 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import urlencode, urlsplit
 
 # ----- pacing ------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
+class Interval:
+    """A bare `setInterval(period)`, as `kiosk-poller.js` uses: a request
+    goes every period even while the last one is still in flight."""
+
+    period: float
+
+    @property
+    def rate(self) -> float:
+        return 1.0 / self.period
+
+    def next(self, scheduled: float, done: float) -> float:
+        return scheduled + self.period
+
+    def __str__(self) -> str:
+        return f"every {self.period:g} s, overlapping"
+
+
+@dataclass(frozen=True)
 class Every:
-    """`setInterval(period)` guarded against a second request in flight: the
-    next request goes at the first tick of the grid after the response."""
+    """`setInterval(period)` guarded against a second request in flight, as
+    `coordinator-poll.js` and `replay.php` are: the next request goes at the
+    first tick of the grid after the response."""
 
     period: float
 
@@ -113,45 +100,82 @@ class After:
         return f"after {self.delay:g} s"
 
 
+Pacer = Interval | Every | After
+
+
+def _tick(actor) -> None:
+    try:
+        actor.tick()
+    except Exception as error:  # one bad reply must not end a client
+        print(f"{type(actor).__name__}: {error!r}", file=sys.stderr)
+
+
 def run_actor(
     actor,
-    pacer: Every | After,
+    pacer: Pacer,
     first_at: float,
     clock: Callable[[], float],
     wait: Callable[[float], bool],
     deadline: float,
+    spawn: Callable[[Callable[[], None]], object] | None = None,
+    lag: Callable[[float], None] | None = None,
 ) -> None:
     """Call `actor.tick()` at `first_at`, then as `pacer` says, until
-    `deadline` or until `wait` reports a stop. A tick that raises is logged
-    and the actor goes on, as a page's next poll would."""
+    `deadline` or until `wait` reports a stop.
+
+    With an `Interval`, each tick goes to `spawn`, which runs it on another
+    thread, so the grid never waits for a response. An actor with a
+    `due_at()` that returns a time fires then if that is sooner than the
+    pacer's next tick, as `derby-timer.jar` sends a queued message at once.
+    `lag` gets how late each tick started. A tick that raises is logged and
+    the actor goes on, as a page's next poll would."""
+    due_at = getattr(actor, "due_at", None)
     scheduled = first_at
     while scheduled < deadline:
         if wait(max(0.0, scheduled - clock())):
             return
-        try:
-            actor.tick()
-        except Exception as error:  # one bad reply must not end a client
-            print(f"{type(actor).__name__}: {error!r}", file=sys.stderr)
-        scheduled = pacer.next(scheduled, clock())
+        if lag is not None:
+            lag(max(0.0, clock() - scheduled))
+        if isinstance(pacer, Interval) and spawn is not None:
+            spawn(lambda: _tick(actor))
+            scheduled = pacer.next(scheduled, clock())
+            continue
+        _tick(actor)
+        done = clock()
+        scheduled = pacer.next(scheduled, done)
+        due = due_at() if due_at is not None else None
+        if due is not None:
+            scheduled = min(scheduled, max(done, due))
 
 
 # ----- responses and statistics ------------------------------------------------
 
+
+class ErrorKind(enum.StrEnum):
+    """What went wrong with a response."""
+
+    TRANSPORT = "transport"  # no response: refused, reset, timed out
+    LOCKED = "locked"  # "database is locked" anywhere in the body
+    SERVER = "5xx"
+    HTTP = "http"  # another 4xx
+    FAILURE = "failure"  # a `failure` outcome, JSON or XML
+
+
 _FAILURE_JSON = re.compile(r'"summary"\s*:\s*"failure"')
 
 
-def classify(status: int | None, body: str) -> str | None:
+def classify(status: int | None, body: str) -> ErrorKind | None:
     """The kind of error a response is, or None for a good one."""
     if status is None:
-        return "transport"
+        return ErrorKind.TRANSPORT
     if "database is locked" in body.lower():
-        return "locked"
+        return ErrorKind.LOCKED
     if status >= 500:
-        return "5xx"
+        return ErrorKind.SERVER
     if status >= 400:
-        return "http"
+        return ErrorKind.HTTP
     if _FAILURE_JSON.search(body) or "<failure" in body:
-        return "failure"
+        return ErrorKind.FAILURE
     return None
 
 
@@ -175,57 +199,68 @@ class _Endpoint:
 
 
 class Stats:
-    """Every request's latency and outcome, by endpoint label. Labels that
-    start with `setup ` or `director ` are the script's own requests."""
+    """Every request's latency and outcome, by endpoint label, and how late
+    each client's ticks started, by client. Labels that start with `setup `
+    or `director ` are the script's own requests."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._endpoints: dict[str, _Endpoint] = {}
+        self._lags: dict[str, list[float]] = {}
 
     def record(
-        self, endpoint: str, latency: float, kind: str | None, status: int | None = None
+        self,
+        endpoint: str,
+        latency: float,
+        kind: ErrorKind | None,
+        status: int | None = None,
     ) -> None:
         with self._lock:
             row = self._endpoints.setdefault(endpoint, _Endpoint())
             row.latencies.append(latency)
             if kind is not None:
                 row.errors += 1
-            if kind == "5xx" or (status is not None and status >= 500):
+            if kind is ErrorKind.SERVER or (status is not None and status >= 500):
                 row.server_errors += 1
-            if kind == "locked":
+            if kind is ErrorKind.LOCKED:
                 row.locked += 1
-            if kind == "transport":
+            if kind is ErrorKind.TRANSPORT:
                 row.transport_errors += 1
 
-    def snapshot(self) -> dict[str, _Endpoint]:
+    def record_lag(self, client: str, seconds: float) -> None:
         with self._lock:
-            return {
-                name: _Endpoint(list(row.latencies), *_counts(row))
+            self._lags.setdefault(client, []).append(seconds)
+
+    def snapshot(self) -> tuple[dict[str, _Endpoint], dict[str, list[float]]]:
+        with self._lock:
+            endpoints = {
+                name: dataclasses.replace(row, latencies=list(row.latencies))
                 for name, row in self._endpoints.items()
             }
-
-
-def _counts(row: _Endpoint) -> tuple[int, int, int, int]:
-    return row.errors, row.server_errors, row.locked, row.transport_errors
+            return endpoints, {name: list(v) for name, v in self._lags.items()}
 
 
 @dataclass(frozen=True)
 class ClientType:
-    """A kind of client, how many run, how they pace, and the endpoint labels
-    their requests go under (a label matches itself and `<label> <more>`)."""
+    """A kind of client: how many run, how they pace, the endpoint label
+    their requests go under (it matches itself and `<label> <more>`), the
+    role they log in as, the browser whose session they share (instance i
+    of each type with the same browser shares one session), and the range
+    their first request falls in, in seconds after the start."""
 
     name: str
     instances: int
-    pacer: Every | After
-    endpoints: tuple[str, ...]
+    pacer: Pacer
+    endpoint: str
+    role: str | None = None
+    browser: str | None = None
+    start: tuple[float, float] = (0.0, 0.0)
 
     def owns(self, endpoint: str) -> bool:
-        return any(
-            endpoint == e or endpoint.startswith(e + " ") for e in self.endpoints
-        )
+        return endpoint == self.endpoint or endpoint.startswith(self.endpoint + " ")
 
 
-def _own(endpoint: str) -> bool:
+def _is_script_request(endpoint: str) -> bool:
     return endpoint.startswith(("setup ", "director "))
 
 
@@ -238,9 +273,9 @@ def summarize(stats: Stats, elapsed: float, clients: Iterable[ClientType]) -> di
     totals = dict.fromkeys(
         ("requests", "errors", "server_errors", "locked", "transport_errors"), 0
     )
-    snapshot = stats.snapshot()
+    snapshot, lags = stats.snapshot()
     # The clients' endpoints first, in the order they were first seen.
-    for name, row in sorted(snapshot.items(), key=lambda item: _own(item[0])):
+    for name, row in sorted(snapshot.items(), key=lambda i: _is_script_request(i[0])):
         entry = {
             "requests": len(row.latencies),
             "errors": row.errors,
@@ -271,6 +306,7 @@ def summarize(stats: Stats, elapsed: float, clients: Iterable[ClientType]) -> di
         else:
             expected = target
         achieved = len(latencies) / elapsed if elapsed else 0.0
+        client_lags = lags.get(client.name, [])
         rates.append(
             {
                 "client": client.name,
@@ -282,6 +318,8 @@ def summarize(stats: Stats, elapsed: float, clients: Iterable[ClientType]) -> di
                 "achieved_pct": round(100 * achieved / expected, 1)
                 if expected
                 else None,
+                "lag_p95_ms": _ms(percentile(client_lags, 95)),
+                "lag_max_ms": _ms(max(client_lags, default=None)),
             }
         )
     return {
@@ -290,6 +328,22 @@ def summarize(stats: Stats, elapsed: float, clients: Iterable[ClientType]) -> di
         "totals": totals,
         "rates": rates,
     }
+
+
+THRESHOLD_ENDPOINTS = (
+    "poll",
+    "poll.kiosk",
+    "poll.coordinator",
+    "poll.kiosk.all",
+    "replay.message",
+    "timer-message HEARTBEAT",
+    "timer-message FINISHED",
+)
+"""The endpoints `--max-p95-ms` and `--max-p99-ms` judge: the race-day polls
+of #37's acceptance criterion and the timer's heartbeat and FINISHED."""
+
+MIN_SAMPLES = 20
+"""Fewer requests than this make no percentile worth judging."""
 
 
 def verdict(
@@ -322,12 +376,62 @@ def verdict(
     if timer.get("required") and not timer.get("finished_ok"):
         failures.append("the timer finished no heat")
     for name, row in report["endpoints"].items():
-        if _own(name):
+        if name not in THRESHOLD_ENDPOINTS or row["requests"] < MIN_SAMPLES:
             continue
         for key, limit in (("p95_ms", max_p95_ms), ("p99_ms", max_p99_ms)):
             if limit is not None and row[key] is not None and row[key] > limit:
                 failures.append(f"{name} {key[:3]} {row[key]:.1f} ms > {limit:g} ms")
     return failures
+
+
+NOTHING_STOOD_OUT = (
+    "no sampled resource stood out (CPU, memory, SQLite's write lock, the load"
+    " script's own lag); read the server log and the per-endpoint latency"
+)
+
+
+def likely_limits(report: dict) -> list[str]:
+    """The resources that probably limited a failed run, from the samples.
+    The rules, documented in `server/README.md`, are deliberately simple."""
+    limits = []
+    server = report.get("server") or {}
+    locked = report["totals"]["locked"]
+    if locked:
+        limits.append(
+            f"SQLite's write lock: {locked} `database is locked` errors; writers"
+            " waited longer than the busy timeout"
+        )
+    host_mean = server.get("host_cpu_mean_pct")
+    host_max = server.get("host_cpu_max_pct")
+    if (host_mean is not None and host_mean >= 75) or (
+        host_max is not None and host_max >= 95
+    ):
+        limits.append(
+            f"CPU: the host's cores were busy, mean {host_mean}%, highest 1 s"
+            f" {host_max}%; the server took {server.get('cpu_mean_pct')}% of one"
+            " core on average"
+        )
+    start, end = server.get("rss_start_mb"), server.get("rss_end_mb")
+    if start is not None and end is not None and end - start >= max(50.0, start / 4):
+        limits.append(f"memory: the server's RSS grew from {start} to {end} MB")
+    for rate in report.get("rates", []):
+        lag = rate.get("lag_p95_ms")
+        achieved = rate.get("achieved_pct")
+        if (lag is not None and lag > 100) or (achieved is not None and achieved < 90):
+            limits.append(
+                f"the load script: {rate['client']} started its requests p95"
+                f" {lag} ms late and reached {achieved}% of its expected rate; it"
+                " may be short of CPU itself, so the server may be better than"
+                " these numbers"
+            )
+    if limits:
+        return limits
+    if not server:
+        return [
+            "unknown: run with --pid to sample the server's CPU and memory; "
+            + NOTHING_STOOD_OUT
+        ]
+    return [NOTHING_STOOD_OUT]
 
 
 def _cell(value) -> str:
@@ -338,6 +442,20 @@ def _cell(value) -> str:
     return str(value)
 
 
+SERVER_LABELS = {
+    "pid": "PID (with its children)",
+    "processes": "Processes",
+    "cpu_mean_pct": "CPU, mean % of one core",
+    "cpu_max_pct": "CPU, highest 1 s % of one core",
+    "rss_start_mb": "RSS at start, MB",
+    "rss_max_mb": "RSS peak, MB",
+    "rss_end_mb": "RSS at end, MB",
+    "host_cpu_mean_pct": "Host CPU, mean % of all cores",
+    "host_cpu_max_pct": "Host CPU, highest 1 s % of all cores",
+    "error": "Error",
+}
+
+
 def render_markdown(report: dict) -> str:
     lines = ["# DerbyNet load report", ""]
     environment = report.get("environment") or {}
@@ -346,22 +464,33 @@ def render_markdown(report: dict) -> str:
         lines += [f"| {key} | {value} |" for key, value in environment.items()]
         lines.append("")
     failures = report.get("failures", [])
-    lines.append("## Verdict")
-    lines.append("")
+    lines += ["## Verdict", ""]
     if failures:
-        lines.append("**FAIL**")
-        lines.append("")
+        lines += ["**FAIL**", ""]
         lines += [f"- {failure}" for failure in failures]
+        lines += ["", "Likely limit:", ""]
+        lines += [f"- {limit}" for limit in report.get("limits", [])]
     else:
         lines.append("**PASS**: no errors, no 5xx, no `database is locked`,")
         lines.append("every FINISHED recorded, and every threshold met.")
     totals = report["totals"]
+    thresholds = report.get("thresholds") or {}
     lines += [
         "",
         f"{totals['requests']} requests in {report['elapsed_s']} s:"
         f" {totals['errors']} errors, {totals['server_errors']} 5xx,"
         f" {totals['locked']} `database is locked`,"
         f" {totals['transport_errors']} failed connections.",
+    ]
+    if any(value is not None for value in thresholds.values()):
+        lines += [
+            "",
+            f"Thresholds: p95 {_cell(thresholds.get('max_p95_ms'))} ms and p99"
+            f" {_cell(thresholds.get('max_p99_ms'))} ms, on"
+            f" {', '.join(THRESHOLD_ENDPOINTS)}, each with at least"
+            f" {MIN_SAMPLES} requests.",
+        ]
+    lines += [
         "",
         "## Endpoints",
         "",
@@ -372,19 +501,9 @@ def render_markdown(report: dict) -> str:
         "| Endpoint | Requests | Errors | 5xx | p50 | p95 | p99 | max |",
         "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
+    columns = ("requests", "errors", "server_errors", "p50_ms", "p95_ms", "p99_ms")
     for name, row in report["endpoints"].items():
-        cells = [name] + [
-            _cell(row[key])
-            for key in (
-                "requests",
-                "errors",
-                "server_errors",
-                "p50_ms",
-                "p95_ms",
-                "p99_ms",
-                "max_ms",
-            )
-        ]
+        cells = [name] + [_cell(row[key]) for key in (*columns, "max_ms")]
         lines.append("| " + " | ".join(cells) + " |")
     lines += [
         "",
@@ -392,50 +511,43 @@ def render_markdown(report: dict) -> str:
         "",
         "Requests per second for all instances together. A client paced"
         " *after* each response can reach only `expected`, its delay plus the"
-        " mean latency apart.",
+        " mean latency apart. Lag is how late the load script started a"
+        " request after it was due.",
         "",
         "| Client | Instances | Pacing | Target/s | Expected/s | Achieved/s"
-        " | % of expected |",
-        "|---|---:|---|---:|---:|---:|---:|",
+        " | % of expected | Lag p95 ms |",
+        "|---|---:|---|---:|---:|---:|---:|---:|",
     ]
     for rate in report["rates"]:
         lines.append(
             f"| {rate['client']} | {rate['instances']} | {rate['pacing']} |"
             f" {rate['target_per_s']:.2f} | {rate['expected_per_s']:.2f} |"
             f" {rate['achieved_per_s']:.2f} | {_cell(rate['achieved_pct'])} |"
+            f" {_cell(rate.get('lag_p95_ms'))} |"
         )
     timer = report.get("timer")
     if timer:
-        lines += ["", "## Timer", ""]
-        lines.append(f"- FINISHED sent: {timer.get('finished_sent')}")
-        lines.append(f"- FINISHED accepted: {timer.get('finished_ok')}")
         recorded = timer.get("finished_recorded")
-        lines.append(
+        lines += [
+            "",
+            "## Timer",
+            "",
+            f"- FINISHED sent: {timer.get('finished_sent')}",
+            f"- FINISHED accepted: {timer.get('finished_ok')}",
             "- Heats recorded by the server: "
-            + ("not checked" if recorded is None else str(recorded))
-        )
+            + ("not checked" if recorded is None else str(recorded)),
+        ]
         if "passes" in timer:
             lines.append(
-                f"- Restarts of the schedule after its last heat: {timer['passes']}"
+                f"- Restarts of the schedule: {timer['passes']}. Each purges the"
+                " results and races the schedule again, load a race day doesn't"
+                " have, so the timer races heats for the whole run."
             )
     server = report.get("server")
     if server:
-        lines += ["", "## Server process", ""]
-        labels = {
-            "pid": "PID (with its children)",
-            "processes": "Processes",
-            "cpu_mean_pct": "CPU, mean % of one core",
-            "cpu_max_pct": "CPU, highest 1 s % of one core",
-            "rss_start_mb": "RSS at start, MB",
-            "rss_max_mb": "RSS peak, MB",
-            "rss_end_mb": "RSS at end, MB",
-            "host_cpu_mean_pct": "Host CPU, mean % of all cores",
-            "host_cpu_max_pct": "Host CPU, highest 1 s % of all cores",
-            "error": "Error",
-        }
-        lines += ["| | |", "|---|---:|"]
+        lines += ["", "## Server process", "", "| | |", "|---|---:|"]
         lines += [
-            f"| {labels.get(key, key)} | {_cell(value)} |"
+            f"| {SERVER_LABELS.get(key, key)} | {_cell(value)} |"
             for key, value in server.items()
         ]
     return "\n".join(lines) + "\n"
@@ -446,6 +558,9 @@ def render_markdown(report: dict) -> str:
 
 @dataclass(frozen=True)
 class ProcUsage:
+    """The CPU seconds used and resident bytes held by a process tree, and
+    how many processes it has, at one moment."""
+
     cpu_seconds: float
     rss_bytes: int
     processes: int
@@ -492,9 +607,9 @@ def read_proc_tree(
 
 
 def cpu_percent(before: ProcUsage, after: ProcUsage, seconds: float) -> float:
-    return (
-        100 * (after.cpu_seconds - before.cpu_seconds) / seconds if seconds > 0 else 0.0
-    )
+    if seconds <= 0:
+        return 0.0
+    return 100 * (after.cpu_seconds - before.cpu_seconds) / seconds
 
 
 def _host_cpu() -> tuple[float, float] | None:
@@ -557,9 +672,8 @@ class ProcSampler(threading.Thread):
             ]
             span = self.host[-1][1] - self.host[0][1]
             if span > 0 and host_steps:
-                out["host_cpu_mean_pct"] = round(
-                    100 * (self.host[-1][0] - self.host[0][0]) / span, 1
-                )
+                busy = self.host[-1][0] - self.host[0][0]
+                out["host_cpu_mean_pct"] = round(100 * busy / span, 1)
                 out["host_cpu_max_pct"] = round(max(host_steps), 1)
         return out
 
@@ -567,68 +681,58 @@ class ProcSampler(threading.Thread):
 # ----- HTTP --------------------------------------------------------------------
 
 
-class Cookies:
-    """A cookie jar several connections of one browser share."""
+class SetupError(Exception):
+    """A login or a setup step failed, so the run cannot measure anything."""
 
-    def __init__(self) -> None:
+
+class HttpSession:
+    """One browser's session with `action.php`: a cookie jar and a pool of
+    keep-alive connections, so requests that overlap each get a connection
+    of their own, as a browser opens one. Each request is recorded in
+    `stats`. It is safe to use from several threads."""
+
+    def __init__(self, base_url: str, stats: Stats, timeout: float = 30.0):
+        parts = urlsplit(base_url)
+        if parts.scheme != "http":
+            raise SetupError(f"only http:// URLs are supported, not {base_url}")
+        self.host = parts.hostname or "127.0.0.1"
+        self.port = parts.port or 80
+        self.path = parts.path.rstrip("/") + "/action.php"
+        self.stats, self.timeout = stats, timeout
         self._lock = threading.Lock()
-        self._values: dict[str, str] = {}
+        self._idle: list[http.client.HTTPConnection] = []
+        self._cookies: dict[str, str] = {}
 
-    def header(self) -> str:
+    def _take(self) -> tuple[http.client.HTTPConnection, bool]:
         with self._lock:
-            return "; ".join(f"{k}={v}" for k, v in self._values.items())
+            if self._idle:
+                return self._idle.pop(), True
+        return http.client.HTTPConnection(
+            self.host, self.port, timeout=self.timeout
+        ), False
 
-    def update(self, set_cookies: Iterable[str]) -> None:
+    def _give(self, connection: http.client.HTTPConnection) -> None:
+        with self._lock:
+            self._idle.append(connection)
+
+    def _cookie_header(self) -> str:
+        with self._lock:
+            return "; ".join(f"{k}={v}" for k, v in self._cookies.items())
+
+    def _keep_cookies(self, set_cookies: Iterable[str]) -> None:
         with self._lock:
             for line in set_cookies:
                 name, _, rest = line.partition("=")
                 value = rest.split(";", 1)[0]
                 expired = "max-age=0" in line.lower().replace(" ", "")
                 if value and not expired:
-                    self._values[name.strip()] = value
+                    self._cookies[name.strip()] = value
                 else:
-                    self._values.pop(name.strip(), None)
-
-
-class HttpSession:
-    """One keep-alive connection to `action.php`, as one page's polls use,
-    recording each request in `stats`."""
-
-    def __init__(
-        self,
-        base_url: str,
-        stats: Stats,
-        cookies: Cookies | None = None,
-        timeout: float = 30.0,
-    ):
-        parts = urlsplit(base_url)
-        self.host = parts.hostname or "127.0.0.1"
-        self.port = parts.port or (443 if parts.scheme == "https" else 80)
-        self.https = parts.scheme == "https"
-        self.path = parts.path.rstrip("/") + "/action.php"
-        self.stats, self.timeout = stats, timeout
-        self.cookies = cookies or Cookies()
-        self._conn: http.client.HTTPConnection | None = None
-
-    def _connection(self) -> tuple[http.client.HTTPConnection, bool]:
-        if self._conn is None:
-            kind = (
-                http.client.HTTPSConnection
-                if self.https
-                else http.client.HTTPConnection
-            )
-            self._conn = kind(self.host, self.port, timeout=self.timeout)
-            return self._conn, False
-        return self._conn, True
-
-    def close(self) -> None:
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
+                    self._cookies.pop(name.strip(), None)
 
     def _send(self, method: str, params: dict) -> tuple[int, str]:
         headers = {"Accept": "*/*", "X-Requested-With": "XMLHttpRequest"}
-        cookie = self.cookies.header()
+        cookie = self._cookie_header()
         if cookie:
             headers["Cookie"] = cookie
         url, body = self.path, None
@@ -638,10 +742,10 @@ class HttpSession:
             body = urlencode(params)
             headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
         for attempt in (1, 2):
-            conn, reused = self._connection()
+            connection, reused = self._take()
             try:
-                conn.request(method, url, body=body, headers=headers)
-                response = conn.getresponse()
+                connection.request(method, url, body=body, headers=headers)
+                response = connection.getresponse()
                 data = response.read()
             except (
                 http.client.RemoteDisconnected,
@@ -650,13 +754,18 @@ class HttpSession:
             ):
                 # The server closed an idle keep-alive connection; a browser
                 # retries such a request on a new one.
-                self.close()
+                connection.close()
                 if reused and attempt == 1:
                     continue
                 raise
+            except BaseException:
+                connection.close()
+                raise
             if response.will_close:
-                self.close()
-            self.cookies.update(response.headers.get_all("Set-Cookie") or [])
+                connection.close()
+            else:
+                self._give(connection)
+            self._keep_cookies(response.headers.get_all("Set-Cookie") or [])
             return response.status, data.decode("utf-8", "replace")
         raise AssertionError("unreachable")
 
@@ -665,24 +774,21 @@ class HttpSession:
         try:
             status, text = self._send(method, params)
         except (OSError, http.client.HTTPException) as error:
-            self.close()
             status, text = None, repr(error)
         latency = time.perf_counter() - started
         self.stats.record(label, latency, classify(status, text), status)
         return status, text
 
-    def login(self, role: str, password: str) -> None:
-        status, text = self.request(
-            "setup role.login",
-            "POST",
-            {"action": "role.login", "name": role, "password": password},
-        )
-        if status != 200 or classify(status, text) is not None:
-            raise SetupError(f"could not log in as {role}: {status} {text[:200]}")
 
-
-class SetupError(Exception):
-    pass
+def login(session, role: str, password: str) -> None:
+    """`role.login` on `session`, as each page and `derby-timer.jar` does."""
+    status, text = session.request(
+        "setup role.login",
+        "POST",
+        {"action": "role.login", "name": role, "password": password},
+    )
+    if status != 200 or classify(status, text) is not None:
+        raise SetupError(f"could not log in as {role}: {status} {text[:200]}")
 
 
 def _json(text: str) -> dict:
@@ -693,11 +799,34 @@ def _json(text: str) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def current_heat(status: int | None, text: str) -> tuple[int, int] | None:
+    """The `roundid` and `heat` of a poll reply's `current-heat`, or None."""
+    current = _json(text).get("current-heat") if status == 200 else None
+    if not isinstance(current, dict) or "roundid" not in current:
+        return None
+    return current["roundid"], current.get("heat", 0)
+
+
 # ----- the clients -------------------------------------------------------------
 
 NOW_RACING_VALUES = (
     "current-heat,heat-results,precision,racers,timer-trouble,current-reschedule"
 )
+
+TV_HEIGHT = 1080
+"""A 1080p TV, the screen the now-racing kiosk usually fills."""
+TV_PHOTO_TOP = 100
+"""Pixels above the first photo cell: the banner and the table header."""
+TV_PHOTO_BORDER = 7
+"""The photo cell's bottom border (`css/now-racing.css`)."""
+
+
+def default_row_height(lanes: int) -> int:
+    """`now-racing.js`'s `g_row_height` on a 1080p TV: the height below the
+    first photo cell split over the lanes, less the cell's bottom border.
+    The banner height and border are approximations; `--row-height` sets
+    another value."""
+    return (TV_HEIGHT - TV_PHOTO_TOP) // lanes - TV_PHOTO_BORDER
 
 
 class KioskPoller:
@@ -716,43 +845,39 @@ class NowRacingPoller:
     """`now-racing-poller.js` with `now-racing.js`'s request: `poll` for
     the lineup it shows, which starts at round 0, heat 0."""
 
+    def __init__(self, session: HttpSession, row_height: int):
+        self.session, self.row_height = session, row_height
+        self.roundid, self.heat = 0, 0
+
+    def tick(self) -> None:
+        params = {
+            "query": "poll",
+            "values": NOW_RACING_VALUES,
+            "roundid": self.roundid,
+            "heat": self.heat,
+            "row-height": self.row_height,
+        }
+        heat = current_heat(*self.session.request("poll", "GET", params))
+        if heat is not None:
+            self.roundid, self.heat = heat
+
+
+class CoordinatorPoller:
+    """`coordinator-poll.js`: `poll.coordinator` for the heat it shows,
+    which starts at round 0, heat 0."""
+
     def __init__(self, session: HttpSession):
         self.session, self.roundid, self.heat = session, 0, 0
 
     def tick(self) -> None:
-        status, text = self.session.request(
-            "poll",
-            "GET",
-            {
-                "query": "poll",
-                "values": NOW_RACING_VALUES,
-                "roundid": self.roundid,
-                "heat": self.heat,
-                "row-height": 0,
-            },
-        )
-        current = _json(text).get("current-heat") if status == 200 else None
-        if isinstance(current, dict):
-            self.roundid = current.get("roundid", self.roundid)
-            self.heat = current.get("heat", self.heat)
-
-
-class CoordinatorPoller:
-    """`coordinator-poll.js`: `poll.coordinator` for the heat it shows."""
-
-    def __init__(self, session: HttpSession):
-        self.session, self.roundid, self.heat = session, "", ""
-
-    def tick(self) -> None:
-        status, text = self.session.request(
-            "poll.coordinator",
-            "GET",
-            {"query": "poll.coordinator", "roundid": self.roundid, "heat": self.heat},
-        )
-        current = _json(text).get("current-heat") if status == 200 else None
-        if isinstance(current, dict):
-            self.roundid = current.get("roundid", self.roundid)
-            self.heat = current.get("heat", self.heat)
+        params = {
+            "query": "poll.coordinator",
+            "roundid": self.roundid,
+            "heat": self.heat,
+        }
+        heat = current_heat(*self.session.request("poll.coordinator", "GET", params))
+        if heat is not None:
+            self.roundid, self.heat = heat
 
 
 class ReplayPoller:
@@ -779,15 +904,56 @@ class DashboardPoller:
         self.session.request("poll.kiosk.all", "GET", {"query": "poll.kiosk.all"})
 
 
+# ----- the timer ---------------------------------------------------------------
+
 _HEAT_READY = re.compile(r"<heat-ready\b([^>]*)>")
 _ATTRIBUTE = re.compile(r'([\w-]+)="([^"]*)"')
+
+
+class Phase(enum.Enum):
+    """Where the timer is in `derby-timer.jar`'s handshake."""
+
+    HELLO = enum.auto()  # say HELLO
+    IDENTIFY = enum.auto()  # say IDENTIFIED
+    CONNECTED = enum.auto()
+
+
+class Staged(NamedTuple):
+    """The heat a `<heat-ready>` gave the timer."""
+
+    roundid: int
+    heat: int
+    lane_mask: int
+
+
+TIMER_FLAGS = {
+    # Settable flags of timer/src/org/jeffpiazza/derby/Flag.java, as
+    # Message.Flags writes them: name, type, value, description.
+    "t": ("bool", "false", "Trace non-heartbeat messages sent"),
+    "th": ("bool", "false", "Trace heartbeat messages sent"),
+    "r": ("bool", "false", "Trace responses to traced messages"),
+    "ignore-place": ("bool", "false", "Discard any place indications from timer"),
+    "pace": ("int", "0", "Seconds between simulated heats"),
+    "reset-after-start": (
+        "int",
+        "10",
+        "Reset timer <nsec> seconds after heat start, default 10.  Set 0 for never.",
+    ),
+    "delay-reset-after-race": ("long", "10", "Delay reset after race"),
+}
+TIMER_DEVICES = {
+    "FastTrackDevice": "FastTrack K, P or Q series",
+    "ChampDevice": "Champ Timer (BestTrack)",
+    "SmartLineDevice": "Micro Wizard SmartLine",
+}
 
 
 class TimerSim:
     """`derby-timer.jar` with a simulated timer, one message at a time.
 
-    `next_message(now)` is the message to send at `now` and
-    `on_response(label, body, now)` reads the server's reply."""
+    `next_message(now)` is the message to send at `now`,
+    `on_response(label, body, now)` reads the server's reply, and `due_at()`
+    says when the next message other than a heartbeat is due."""
 
     def __init__(
         self,
@@ -799,8 +965,9 @@ class TimerSim:
     ):
         self.lanes, self.rng, self.stage_seconds = lanes, rng, stage_seconds
         self.fastest, self.slowest = fastest, slowest
-        self.phase = 0  # 0: say HELLO, 1: say IDENTIFIED, 2: connected
-        self.staged: tuple[int, int, int] | None = None  # roundid, heat, lane mask
+        self.phase = Phase.HELLO
+        self.queue: list[str] = []  # messages queued by the server, e.g. FLAGS
+        self.staged: Staged | None = None
         self.staged_at = 0.0
         self.started_at: float | None = None
         self.race_times: dict[int, str] = {}
@@ -815,10 +982,40 @@ class TimerSim:
             **params,
         }
 
+    def _flags(self) -> tuple[str, dict]:
+        params = {}
+        for name, (kind, value, description) in TIMER_FLAGS.items():
+            params[f"flag-{name}"] = f"{kind}:{value}"
+            params[f"desc-{name}"] = description
+        params["ports"] = ""
+        params.update({f"device-{name}": text for name, text in TIMER_DEVICES.items()})
+        return self._message("FLAGS", **params)
+
+    def _finish_time(self) -> float:
+        assert self.started_at is not None
+        return self.started_at + max(
+            (float(t) for t in self.race_times.values()), default=0.0
+        )
+
+    def due_at(self) -> float | None:
+        """When the next message other than a heartbeat is due: 0 for one
+        that goes at once, None when only heartbeats are due."""
+        if self.queue or self.phase is not Phase.CONNECTED:
+            return 0.0
+        if self.staged is None:
+            return None
+        if self.started_at is None:
+            return self.staged_at + self.stage_seconds
+        return self._finish_time()
+
     def next_message(self, now: float) -> tuple[str, dict]:
-        if self.phase == 0:
+        if self.queue:
+            name = self.queue.pop(0)
+            if name == "FLAGS":
+                return self._flags()
+        if self.phase is Phase.HELLO:
             return self._message("HELLO", interface="jar", build="load-test")
-        if self.phase == 1:
+        if self.phase is Phase.IDENTIFY:
             return self._message(
                 "IDENTIFIED",
                 interface="jar",
@@ -830,50 +1027,53 @@ class TimerSim:
         if self.staged is not None and self.started_at is None:
             if now >= self.staged_at + self.stage_seconds:
                 self.started_at = now
-                _, _, mask = self.staged
                 self.race_times = {
                     lane: f"{self.rng.uniform(self.fastest, self.slowest):.4f}"
                     for lane in range(1, self.lanes + 1)
-                    if mask & (1 << (lane - 1))
+                    if self.staged.lane_mask & (1 << (lane - 1))
                 }
                 return self._message("STARTED")
-        elif self.staged is not None and self.started_at is not None:
-            slowest = max((float(t) for t in self.race_times.values()), default=0.0)
-            if now >= self.started_at + slowest:
-                roundid, heat, _ = self.staged
-                self.finished_sent += 1
-                lanes = {f"lane{lane}": time for lane, time in self.race_times.items()}
-                return self._message(
-                    "FINISHED", roundid=str(roundid), heat=str(heat), **lanes
-                )
+        elif self.staged is not None and now >= self._finish_time():
+            self.finished_sent += 1
+            lanes = {f"lane{lane}": t for lane, t in self.race_times.items()}
+            return self._message(
+                "FINISHED",
+                roundid=str(self.staged.roundid),
+                heat=str(self.staged.heat),
+                **lanes,
+            )
         return self._message("HEARTBEAT", confirmed="1")
 
     def _unstage(self, now: float) -> None:
         self.staged, self.started_at, self.race_times = None, None, {}
+        self.restart_idle(now)
+
+    def restart_idle(self, now: float) -> None:
+        """Start counting the time without a heat afresh from `now`."""
         self.idle_since = now
 
     def on_response(self, label: str, body: str, now: float) -> None:
         ok = "<success" in body and "<failure" not in body
         message = label.removeprefix("timer-message ")
-        if message == "HELLO" and ok:
-            self.phase = max(self.phase, 1)
+        if message == "HELLO" and ok and self.phase is Phase.HELLO:
+            self.phase = Phase.IDENTIFY
         elif message == "IDENTIFIED" and ok:
-            self.phase = 2
-            self.idle_since = now
+            self.phase = Phase.CONNECTED
+            self.restart_idle(now)
         elif message == "FINISHED":
             if ok:
                 self.finished_ok += 1
             self._unstage(now)
+        if "<query" in body and "FLAGS" not in self.queue:
+            self.queue.append("FLAGS")
         if "<abort" in body:
             self._unstage(now)
         match = _HEAT_READY.search(body)
         if match and self.started_at is None:
             attrs = dict(_ATTRIBUTE.findall(match.group(1)))
             try:
-                self.staged = (
-                    int(attrs["roundid"]),
-                    int(attrs["heat"]),
-                    int(attrs["lane-mask"]),
+                self.staged = Staged(
+                    int(attrs["roundid"]), int(attrs["heat"]), int(attrs["lane-mask"])
                 )
             except KeyError, ValueError:
                 return
@@ -888,6 +1088,10 @@ class TimerSim:
 
 
 class TimerClient:
+    """The timer's actor: sends `TimerSim`'s messages, and asks the director
+    to restart racing once the timer has waited `rearm_after` seconds
+    without a heat."""
+
     def __init__(
         self,
         session: HttpSession,
@@ -899,21 +1103,27 @@ class TimerClient:
         self.session, self.sim, self.clock = session, sim, clock
         self.director, self.rearm_after = director, rearm_after
 
+    def due_at(self) -> float | None:
+        return self.sim.due_at()
+
     def tick(self) -> None:
         label, params = self.sim.next_message(self.clock())
         status, text = self.session.request(label, "POST", params)
         self.sim.on_response(label, text if status == 200 else "", self.clock())
-        if (
-            self.director is not None
-            and self.sim.idle_seconds(self.clock()) > self.rearm_after
-        ):
+        idle = self.sim.idle_seconds(self.clock())
+        if self.director is not None and idle > self.rearm_after:
             self.director.rearm()
-            self.sim.idle_since = self.clock()
+            self.sim.restart_idle(self.clock())
 
 
 # ----- setup and the race director ---------------------------------------------
 
 GROUPS = ("Lions", "Tigers", "Wolves", "Bears")
+
+
+def _heats_run(poll_coordinator: dict) -> int:
+    rounds = poll_coordinator.get("rounds") or []
+    return sum(r.get("heats_run", 0) for r in rounds if isinstance(r, dict))
 
 
 class Director:
@@ -926,7 +1136,10 @@ class Director:
         self.baseline = 0  # heats run before this pass's first FINISHED
         self.passes = 0
         self.first_roundid: int | None = None
-        self.checked = True
+        self.heats_known = True
+
+    def login(self, role: str, password: str) -> None:
+        login(self.session, role, password)
 
     def _post(self, label: str, **params) -> dict:
         status, text = self.session.request(label, "POST", params)
@@ -943,17 +1156,16 @@ class Director:
     def setup(
         self, racers: int, groups: int, lanes: int, kiosk_addresses: list[str]
     ) -> None:
-        names = (
+        group_names = (
             GROUPS[:groups]
             if groups <= len(GROUPS)
             else [f"Group {n}" for n in range(1, groups + 1)]
         )
-        post = self._post
-        post("setup database.execute", action="database.execute", script="schema")
-        post(
+        self._post("setup database.execute", action="database.execute", script="schema")
+        self._post(
             "setup database.execute", action="database.execute", script="update-schema"
         )
-        post(
+        self._post(
             "setup settings.write",
             action="settings.write",
             **{
@@ -961,35 +1173,37 @@ class Director:
                 "unused-lane-mask": 0,
                 "use-master-sched-checkbox": 1,
                 "use-master-sched": 1,
+                # The default, as demo.sh sets it: now-racing shows head shots.
+                "photos-on-now-racing": "head",
             },
         )
         for i in range(racers):
-            group = names[i % len(names)]
-            post(
+            group = group_names[i % len(group_names)]
+            self._post(
                 "setup racer.import",
                 action="racer.import",
                 firstname=f"Racer{i + 1}",
                 lastname=group,
                 partition=group,
-                carnumber=100 * (i % len(names) + 1) + i // len(names) + 1,
+                carnumber=100 * (i % len(group_names) + 1) + i // len(group_names) + 1,
             )
-        post(
+        self._post(
             "setup racer.bulk", action="racer.bulk", who="all", what="checkin", value=1
         )
-        rounds = self._get("setup poll", query="poll", values="rounds").get(
-            "rounds", []
-        )
+        rounds = self._get("setup poll", query="poll", values="rounds").get("rounds")
+        if not rounds:
+            raise SetupError("setup made no rounds")
         for entry in rounds:
-            post(
+            self._post(
                 "setup schedule.generate",
                 action="schedule.generate",
                 roundid=entry["roundid"],
             )
         for address in kiosk_addresses:
             self._get("setup poll.kiosk", query="poll.kiosk", address=address)
-        post("setup kiosk.assign", action="kiosk.assign", all="kiosks/now-racing.kiosk")
-        if not rounds:
-            raise SetupError("setup made no rounds")
+        self._post(
+            "setup kiosk.assign", action="kiosk.assign", all="kiosks/now-racing.kiosk"
+        )
         self.first_roundid = rounds[0]["roundid"]
         self._start_racing("setup heat.select")
 
@@ -1002,29 +1216,26 @@ class Director:
             now_racing=1,
         )
 
-    def heats_run(self) -> int:
-        rounds = self._get("director poll.coordinator", query="poll.coordinator").get(
-            "rounds"
-        )
-        return sum(r.get("heats_run", 0) for r in rounds or [] if isinstance(r, dict))
+    def _coordinator_poll(self) -> dict:
+        return self._get("director poll.coordinator", query="poll.coordinator")
 
     def start(self) -> None:
         try:
-            self.baseline = self.heats_run()
+            self.baseline = _heats_run(self._coordinator_poll())
         except SetupError as error:
             print(f"cannot count the heats run: {error}", file=sys.stderr)
-            self.checked = False
+            self.heats_known = False
 
     def rearm(self) -> None:
-        """After the schedule's last heat: purge the results and race it again."""
+        """After the schedule's last heat: purge the results and race it
+        again. Only an event the script set up is purged."""
         if not self.loop or self.first_roundid is None:
             return
         try:
-            state = self._get("director poll.coordinator", query="poll.coordinator")
+            state = self._coordinator_poll()
             if (state.get("current-heat") or {}).get("now_racing"):
                 return
-            run = sum(r.get("heats_run", 0) for r in state.get("rounds") or [])
-            self.recorded += run - self.baseline
+            self.recorded += _heats_run(state) - self.baseline
             self._post(
                 "director database.purge", action="database.purge", purge="results"
             )
@@ -1035,10 +1246,10 @@ class Director:
             print(f"could not restart racing: {error}", file=sys.stderr)
 
     def finished_recorded(self) -> int | None:
-        if not self.checked:
+        if not self.heats_known:
             return None
         try:
-            return self.recorded + self.heats_run() - self.baseline
+            return self.recorded + _heats_run(self._coordinator_poll()) - self.baseline
         except SetupError:
             return None
 
@@ -1062,20 +1273,16 @@ def environment(args: argparse.Namespace, elapsed: float) -> dict:
         django_version = "not installed with the client"
     memory = first("/proc/meminfo", r"^MemTotal:\s*(\d+)")
     cpu = first("/proc/cpuinfo", r"^(?:model name|Model)\s*:\s*(.+)$")
-    machine = platform.machine()
+    machine_parts = (
+        socket.gethostname(),
+        cpu,
+        f"{os.cpu_count()} cores",
+        f"{int(memory) // 1024} MB RAM" if memory else None,
+        platform.machine(),
+    )
     return {
         "Date": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "Machine": ", ".join(
-            part
-            for part in (
-                socket.gethostname(),
-                cpu,
-                f"{os.cpu_count()} cores",
-                f"{int(memory) // 1024} MB RAM" if memory else None,
-                machine,
-            )
-            if part
-        ),
+        "Machine": ", ".join(part for part in machine_parts if part),
         "OS": first("/etc/os-release", r"^PRETTY_NAME=(.+)$") or platform.platform(),
         "Kernel": platform.release(),
         "Python": platform.python_version(),
@@ -1093,43 +1300,59 @@ def environment(args: argparse.Namespace, elapsed: float) -> dict:
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m tools.load_test",
-        description="Simulate race-day polling against a DerbyNet server (#37).",
+        description="Simulate race-day polling against a DerbyNet server (#37)."
+        ' server/README.md, "Race-day load test", describes it.',
     )
-    parser.add_argument(
-        "--url", default="http://127.0.0.1:8000", help="the server's base URL"
-    )
-    parser.add_argument("--duration", type=float, default=60, help="seconds to run")
-    parser.add_argument("--kiosks", type=int, default=10)
-    parser.add_argument(
-        "--setup", action="store_true", help="reset the event and race it"
-    )
-    parser.add_argument("--racers", type=int, default=40, help="racers --setup imports")
-    parser.add_argument("--groups", type=int, default=4, help="groups --setup makes")
-    parser.add_argument("--lanes", type=int, default=4)
-    parser.add_argument("--stage-seconds", type=float, default=1.0)
-    parser.add_argument("--pid", type=int, help="the server process to sample")
-    parser.add_argument("--json", type=Path, help="also write the report here as JSON")
-    parser.add_argument("--markdown", type=Path, help="also write the markdown here")
-    parser.add_argument("--max-p95-ms", type=float)
-    parser.add_argument("--max-p99-ms", type=float)
-    parser.add_argument("--coordinator-password", default="doyourbest")
-    parser.add_argument("--timer-password", default="")
-    parser.add_argument("--seed", type=int, default=37)
-    parser.add_argument(
-        "--server", default="", help="how the server runs, for the report"
-    )
-    parser.add_argument("--note", default="", help="a line for the report")
+    add = parser.add_argument
+    add("--url", default="http://127.0.0.1:8000", help="the server's base URL")
+    add("--duration", type=float, default=60, help="seconds to run")
+    add("--kiosks", type=int, default=10)
+    add("--setup", action="store_true", help="reset the event and race it")
+    add("--racers", type=int, default=40, help="racers --setup imports")
+    add("--groups", type=int, default=4, help="groups --setup makes")
+    add("--lanes", type=int, default=4)
+    add("--row-height", type=int, help="now-racing's row-height; default 1080p TV")
+    add("--stage-seconds", type=float, default=1.0)
+    add("--pid", type=int, help="the server process to sample")
+    add("--json", type=Path, help="also write the report here as JSON")
+    add("--markdown", type=Path, help="also write the markdown here")
+    add("--max-p95-ms", type=float)
+    add("--max-p99-ms", type=float)
+    add("--coordinator-password", default="doyourbest")
+    add("--timer-password", default="")
+    add("--seed", type=int, default=37)
+    add("--server", default="", help="how the server runs, for the report")
+    add("--note", default="", help="a line for the report")
     return parser.parse_args(argv)
 
 
 def client_types(kiosks: int) -> list[ClientType]:
+    """Every client of the run, each rate defined here once."""
     return [
-        ClientType("kiosk poll.kiosk", kiosks, Every(5.0), ("poll.kiosk",)),
-        ClientType("kiosk now-racing poll", kiosks, After(0.5), ("poll",)),
-        ClientType("timer", 1, After(0.5), ("timer-message",)),
-        ClientType("coordinator", 1, Every(2.0), ("poll.coordinator",)),
-        ClientType("replay", 1, Every(0.25), ("replay.message",)),
-        ClientType("kiosk dashboard", 1, After(2.0), ("poll.kiosk.all",)),
+        ClientType(
+            "kiosk poll.kiosk",
+            kiosks,
+            Interval(5.0),
+            "poll.kiosk",
+            browser="kiosk",
+            start=(0.0, 5.0),
+        ),
+        ClientType(
+            "kiosk now-racing poll",
+            kiosks,
+            After(0.5),
+            "poll",
+            browser="kiosk",
+            start=(1.0, 1.5),
+        ),
+        ClientType("timer", 1, After(0.5), "timer-message", role="Timer"),
+        ClientType(
+            "coordinator", 1, Every(2.0), "poll.coordinator", role="RaceCoordinator"
+        ),
+        ClientType("replay", 1, Every(0.25), "replay.message", role="RaceCoordinator"),
+        ClientType(
+            "kiosk dashboard", 1, After(2.0), "poll.kiosk.all", role="RaceCoordinator"
+        ),
     ]
 
 
@@ -1137,54 +1360,69 @@ def run(args: argparse.Namespace, stop: threading.Event) -> dict:
     stats = Stats()
     rng = random.Random(args.seed)
     clock = time.monotonic
+    passwords = {
+        "RaceCoordinator": args.coordinator_password,
+        "Timer": args.timer_password,
+    }
     addresses = [f"load-kiosk-{n:02d}" for n in range(1, args.kiosks + 1)]
+    row_height = args.row_height or default_row_height(args.lanes)
 
-    def session(cookies: Cookies | None = None) -> HttpSession:
-        return HttpSession(args.url, stats, cookies)
-
-    director = Director(session(), loop=args.setup)
-    director.session.login("RaceCoordinator", args.coordinator_password)
+    director = Director(HttpSession(args.url, stats), loop=args.setup)
+    director.login("RaceCoordinator", args.coordinator_password)
     if args.setup:
         director.setup(args.racers, args.groups, args.lanes, addresses)
     director.start()
 
-    actors: list[tuple[object, Every | After, float]] = []
-    for address in addresses:
-        jar = Cookies()  # one browser: its two pollers share the session
-        actors.append(
-            (KioskPoller(session(jar), address), Every(5.0), rng.uniform(0, 5))
-        )
-        actors.append(
-            (NowRacingPoller(session(jar)), After(0.5), 1.0 + rng.uniform(0, 0.5))
-        )
-    for kind, pacer in (
-        (CoordinatorPoller, Every(2.0)),
-        (ReplayPoller, Every(0.25)),
-        (DashboardPoller, After(2.0)),
-    ):
-        s = session()
-        s.login("RaceCoordinator", args.coordinator_password)
-        actors.append((kind(s), pacer, 0.0))
-    timer_session = session()
-    timer_session.login("Timer", args.timer_password)
     sim = TimerSim(
         args.lanes, random.Random(args.seed + 1), stage_seconds=args.stage_seconds
     )
-    actors.append((TimerClient(timer_session, sim, clock, director), After(0.5), 0.0))
+    builders: dict[str, Callable[[HttpSession, int], object]] = {
+        "poll.kiosk": lambda session, i: KioskPoller(session, addresses[i]),
+        "poll": lambda session, i: NowRacingPoller(session, row_height),
+        "timer-message": lambda session, i: TimerClient(session, sim, clock, director),
+        "poll.coordinator": lambda session, i: CoordinatorPoller(session),
+        "replay.message": lambda session, i: ReplayPoller(session),
+        "poll.kiosk.all": lambda session, i: DashboardPoller(session),
+    }
+    browsers: dict[tuple[str, int], HttpSession] = {}
+    actors = []
+    clients = client_types(args.kiosks)
+    for client in clients:
+        for i in range(client.instances):
+            if client.browser is not None and (client.browser, i) in browsers:
+                session = browsers[(client.browser, i)]
+            else:
+                session = HttpSession(args.url, stats)
+                if client.role is not None:
+                    login(session, client.role, passwords[client.role])
+                if client.browser is not None:
+                    browsers[(client.browser, i)] = session
+            actor = builders[client.endpoint](session, i)
+            actors.append((client, actor, rng.uniform(*client.start)))
 
     sampler = ProcSampler(args.pid, stop) if args.pid else None
     if sampler:
         sampler.start()
+    # Threads for the overlapping requests of Interval clients.
+    pool = ThreadPoolExecutor(
+        max_workers=4 * args.kiosks + 4, thread_name_prefix="tick"
+    )
     start = clock()
     deadline = start + args.duration
     threads = [
         threading.Thread(
             target=run_actor,
-            args=(actor, pacer, start + offset, clock, stop.wait, deadline),
+            args=(actor, client.pacer, start + offset, clock, stop.wait, deadline),
+            kwargs={
+                "spawn": pool.submit,
+                "lag": lambda seconds, name=client.name: stats.record_lag(
+                    name, seconds
+                ),
+            },
             daemon=True,
             name=type(actor).__name__,
         )
-        for actor, pacer, offset in actors
+        for client, actor, offset in actors
     ]
     for thread in threads:
         thread.start()
@@ -1194,8 +1432,9 @@ def run(args: argparse.Namespace, stop: threading.Event) -> dict:
     stop.set()
     for thread in threads:
         thread.join(timeout=35)
+    pool.shutdown(wait=True, cancel_futures=True)
 
-    report = summarize(stats, elapsed, client_types(args.kiosks))
+    report = summarize(stats, elapsed, clients)
     report["timer"] = {
         "finished_sent": sim.finished_sent,
         "finished_ok": sim.finished_ok,
@@ -1228,6 +1467,8 @@ def main(argv: list[str] | None = None) -> int:
         "max_p99_ms": args.max_p99_ms,
     }
     report["failures"] = verdict(report, args.max_p95_ms, args.max_p99_ms)
+    if report["failures"]:
+        report["limits"] = likely_limits(report)
     text = render_markdown(report)
     print(text)
     if args.markdown:

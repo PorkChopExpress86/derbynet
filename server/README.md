@@ -308,35 +308,65 @@ DBCHECK=1 ../testing/reset-database.sh http://127.0.0.1:8000
 
 ## Race-day load test (#37)
 
-`tools/load_test.py` plays a race day's clients against a server, each at its real rate with its real requests and login:
+`tools/load_test.py` plays a race day's clients against a server. Each client sends its real request at its real rate, with its real login. This section is the one description of the script, and its docstring and `tools/load-run.sh` point here.
 
 | Client | Request | Pacing | Login |
 |---|---|---|---|
-| 10 kiosks (`--kiosks`) | `query=poll.kiosk&address=…` | every 5 s | none |
-| the same kiosks, showing now-racing | `query=poll` with `now-racing.js`'s `values`, `roundid`, `heat`, `row-height` | 0.5 s after each response | none |
-| one timer | `action=timer-message`: `HELLO`, `IDENTIFIED`, then `HEARTBEAT`, `STARTED` and `FINISHED` | 0.5 s after each response | `Timer` |
-| coordinator page | `query=poll.coordinator` | every 2 s, skipping a tick while one is in flight | `RaceCoordinator` |
+| 10 kiosks (`--kiosks`) | `query=poll.kiosk&address=load-kiosk-NN` | every 5 s, even while the last one is in flight (`kiosk-poller.js` uses a bare `setInterval`) | none |
+| the same kiosks, showing now-racing | `query=poll` with `now-racing.js`'s `values`, the `roundid` and `heat` of the lineup shown (0 and 0 at first), and `row-height` | 0.5 s after each response | none |
+| one timer | `action=timer-message`, as `derby-timer.jar` sends it | 0.5 s after each response, and a queued message at once | `Timer` |
+| coordinator page | `query=poll.coordinator` with the heat it shows (0 and 0 at first) | every 2 s, skipping a tick while one is in flight | `RaceCoordinator` |
 | replay station | `action=replay.message&status=0&finished-replay=0` | every 0.25 s, skipping a tick while one is in flight | `RaceCoordinator` |
 | kiosk dashboard | `query=poll.kiosk.all` | 2 s after each response | `RaceCoordinator` |
 
-The timer races full heats, as `derby-timer.jar` does. On each `<heat-ready>` it waits `--stage-seconds` (1 s by default), sends `STARTED`, and sends `FINISHED` with a time from 2.5 to 4 s for each lane of the lane mask once the slowest car is in. With `--setup` the script first resets the event's database, imports `--racers` racers (40) in `--groups` groups (4), checks them in, schedules every round on the master schedule, and starts racing. When the schedule runs out, it purges the results and starts again from the first heat. Without `--setup` it uses the event as it is and never purges it.
+Each kiosk is one browser: its two pollers share a session, and a request that overlaps another gets a connection of its own. The kiosks poll anonymously. The dashboard needs `PRESENT_AWARDS` and replay needs `CONTROL_RACE` (D16). `tests/test_load_test_live.py` checks both. `row-height` is what `now-racing.js` computes on a 1080p TV: 1080 px less about 100 px of banner and header, split over the lanes, less the photo cell's 7 px border. That is 238 for 4 lanes, and `--row-height` sets another value. A row height of 0 would let the server skip the photo work.
+
+The timer talks as `derby-timer.jar` does (`HttpTask.java`, `Message.java`). It sends `HELLO`, answers the reply's `<query/>` with `FLAGS`, and sends `IDENTIFIED`. After that it sends a `HEARTBEAT` 0.5 s after each response. On `<heat-ready>` it waits `--stage-seconds` (1 s), then sends `STARTED` at once. When the slowest car is in, it sends `FINISHED` at once, with the heat's `roundid` and `heat` and a time from 2.5 to 4 s for each lane of the lane mask. So the timer sends a little more than 2 messages a second.
+
+With `--setup`, the script first resets the event's database. It imports `--racers` racers (40) in `--groups` groups (4), checks them in, and schedules every round on the master schedule with `--lanes` lanes (4). It shows head shots on now-racing, points every kiosk at the now-racing page, and starts racing. When the schedule runs out, the script purges the results and races the schedule again from the first heat, so the timer races heats for the whole run. Those restarts are load a race day doesn't have, and the report counts them. Without `--setup`, the script uses the event as it is and never purges it.
 
 ```sh
 uv run python -m tools.load_test --url http://127.0.0.1:8000 --setup --duration 300 \
     --pid <server pid> --max-p95-ms 300 --max-p99-ms 1000 --json report.json
 ```
 
-It prints a markdown report. Per endpoint, the report gives the requests, errors, 5xx responses, and p50, p95, p99 and maximum latency. It gives each client's achieved rate against its target. With `--pid`, it gives the CPU and memory of that process and its children, read from `/proc`. The report also checks that the server recorded every `FINISHED` it accepted, from the `heats_run` of `poll.coordinator`. The script exits 1 on any of these: an error (a 5xx, another HTTP error, a failed connection, or a `failure` outcome), a `database is locked`, a refused or unrecorded `FINISHED`, or a latency over `--max-p95-ms` or `--max-p99-ms`. It exits 2 when setup fails. Ctrl-C stops it early and still prints the report. It uses only the standard library.
+The report is markdown, and `--json` and `--markdown` also write it to files. It gives:
+
+- the machine, OS, Python and Django versions, and the run length;
+- per endpoint, the requests, errors, 5xx responses, and p50, p95, p99 and maximum latency;
+- each client's achieved rate against its target, and how late the script started its requests (lag);
+- the `FINISHED` messages the timer sent and the server accepted, and the heats the server recorded (the `heats_run` of `poll.coordinator`);
+- with `--pid`, the CPU and memory of that process and its children, and the host's CPU, read from `/proc`. `--pid` needs the script on the server's machine.
+
+The script exits 1 on any of these:
+
+- an error: a 5xx, another HTTP error, a failed connection, or a `failure` outcome;
+- a `database is locked`;
+- a refused or unrecorded `FINISHED`, or, with `--setup`, no heat finished;
+- a p95 over `--max-p95-ms` or a p99 over `--max-p99-ms`, on `poll`, `poll.kiosk`, `poll.coordinator`, `poll.kiosk.all`, `replay.message`, or the timer's `HEARTBEAT` and `FINISHED`, counted only for an endpoint with at least 20 requests.
+
+It exits 2 when setup fails. Ctrl-C stops it early and still prints the report. It uses only the standard library.
+
+When a check fails, the report names the likely limiting resource from the samples, with these rules:
+
+| Rule | Named limit |
+|---|---|
+| any `database is locked` | SQLite's write lock |
+| host CPU mean 75% or more, or a 1 s peak of 95% or more | CPU |
+| server RSS grew by at least 50 MB and a quarter of its starting size | memory |
+| a client's p95 lag over 100 ms, or under 90% of its expected rate | the load script itself, short of CPU |
+
+When no rule matches, the report says nothing stood out. Without `--pid` it also asks for one.
 
 ### The race-day run on a Raspberry Pi
 
-`tools/load-run.sh` serves Django as production will (ADR-08), then runs the load script against it. It uses gunicorn with sync workers, a fresh SQLite database in WAL mode under `var/`, and `DEBUG` off. On the Pi, from `server/` after `uv sync`, run:
+`tools/load-run.sh` serves Django as production will (ADR-08), then runs the load script against it. It uses a fresh SQLite database under `var/` and refuses to run unless SQLite is in WAL mode. It serves the database with gunicorn from the `serve` dependency group, which `uv.lock` pins, with `DEBUG` off. It starts 4 sync workers. That count is a stand-in until M6 settles the production config, and `DERBYNET_LOAD_WORKERS` changes it. On the Pi, after `uv sync`, run:
 
 ```sh
-tools/load-run.sh 30
+server/tools/load-run.sh 30
 ```
 
-It runs for 30 minutes, at the #37 thresholds of p95 300 ms and p99 1 s. It writes `var/load-report-<time>/load-report.md`, ready to paste into #37, with `load-report.json` and gunicorn's log next to it. `DERBYNET_LOAD_WORKERS` sets the number of gunicorn workers (4), and a second argument sets the report folder. gunicorn comes from `uv run --with gunicorn`, so the first run needs to reach PyPI. The load script runs on the Pi beside the server, as the report notes. Its share of the CPU is in the host CPU row and not in the server's.
+It runs for 30 minutes at the #37 thresholds, p95 300 ms and p99 1 s. It writes `server/var/load-report-<time>/load-report.md`, ready to paste into #37, with `load-report.json` and gunicorn's log next to it. A second argument sets the report folder. The first run downloads gunicorn. The load script runs on the Pi beside the server, as the report notes, so its CPU counts in the host CPU row.
 
 ## Legacy handlers
 
