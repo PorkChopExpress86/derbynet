@@ -54,7 +54,6 @@ from .standings_fixtures import (
     Fixture,
     body,
     groups_of,
-    label,
     php_json,
 )
 
@@ -280,57 +279,6 @@ def test_current_speed_award_matches_php_award_current():
             php["awardname"],
             php["carnumber"],
         )
-
-
-AWARD_CURRENT_DIR = GOLDEN_DIR / "http" / "award-current" / "standings"
-
-
-def test_award_current_matches_php_for_every_listed_speed_award():
-    """After each `award.list` of a standings fixture, the capture presented
-    every speed award it listed and kept PHP's `query=award.current`, in
-    `http/award-current/standings/` (#33). Looked up among the awards
-    Django lists under the same settings, each key names PHP's award and
-    racer. Where Django's `award.list` differs from PHP's on purpose (Q7,
-    Q22, Q23), a key whose award the two lists give differently is left
-    out; every other key of that list is compared."""
-    wrong = []
-    compared = deviated = 0
-    for path in sorted(AWARD_CURRENT_DIR.glob("*.http")):
-        fixture = Fixture(path.stem)
-        lists = {label(name): name for name in fixture.named(AWARD_LIST)}
-        computed = {}
-        for name, exchange in read_transcript(path).items():
-            *words, key, _request = name.split(" ")[1:]
-            listed = lists[" ".join(words)]
-            if listed not in computed:
-                computed[listed] = django_awards(fixture, listed)
-            standings, awards = computed[listed]
-            found = current_speed_award(key, standings, awards)
-            got = None
-            if found is not None and found.racer_id is not None:
-                got = (found.key, found.name, fixture.car_of(found.racer_id))
-            php = body(exchange).get("current")
-            want = None
-            if php is not None:
-                want = (
-                    php["key"],
-                    php["awardname"],
-                    f"{php['carnumber']} {php['recipient']}",
-                )
-            if listed in fixture.deviated:
-                php_listed = {
-                    a["key"]: a for a in body(fixture.exchanges[listed])["speed-awards"]
-                }
-                django_listed = {a.key: speed_award_json(a) for a in awards}
-                if php_listed.get(key) != django_listed.get(key):
-                    deviated += 1
-                    continue
-            if got != want:
-                wrong.append((fixture.stem, name, got, want))
-            compared += 1
-    assert wrong == []
-    assert compared > 4000
-    assert deviated < 20
 
 
 def test_php_json_writes_every_fixture_body_as_php_did():

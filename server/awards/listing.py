@@ -196,6 +196,32 @@ class UnrecognizedKey(Exception):
     """A `current_award_key` that names neither an award nor a speed award."""
 
 
+def presented(
+    key: str,
+    name: str,
+    reveal: bool,
+    racer,
+    subgroup: str,
+    *,
+    name_style: int,
+    use_subgroups: bool,
+) -> dict:
+    """The fields of `query=award.current` that name the award and its racer,
+    in PHP's order. `racer` has `first_name`, `last_name`, `car_number` and
+    `car_name`, as a `Racer` row and an engine racer both do."""
+    shown = {
+        "key": key,
+        "awardname": name,
+        "reveal": reveal,
+        "carnumber": racer.car_number,
+        "carname": racer.car_name,
+        "recipient": mangled_name(racer.first_name, racer.last_name, name_style),
+    }
+    if use_subgroups:
+        shown["subgroup"] = subgroup
+    return shown
+
+
 def current(event, started: float) -> dict | None:
     """`query=award.current`: the award being presented, or None when no
     award, or no winner, goes with the key. `started` is the request's
@@ -224,18 +250,15 @@ def current(event, started: float) -> dict | None:
         raise UnrecognizedKey(key)
 
     settings = RaceSettings.objects.get(event=event)
-    shown = {
-        "key": key,
-        "awardname": name,
-        "reveal": state.reveal_current_award,
-        "carnumber": racer.car_number,
-        "carname": racer.car_name,
-        "recipient": mangled_name(
-            racer.first_name, racer.last_name, settings.name_style
-        ),
-    }
-    if settings.use_subgroups:
-        shown["subgroup"] = racer.subgroup.name
+    shown = presented(
+        key,
+        name,
+        state.reveal_current_award,
+        racer,
+        racer.subgroup.name,
+        name_style=settings.name_style,
+        use_subgroups=settings.use_subgroups,
+    )
     if racer.headshot:
         shown["headphoto"] = photo_url(
             HEADSHOTS, settings.photo_directory, racer.headshot, RENDER_CROPPED

@@ -266,9 +266,10 @@ capture_award_list() {
 # These captures take long enough for PHP to time a timer out (60 s with no
 # contact), and how long depends on the machine, which the scripts after them
 # would see.  So a timer that was connected before them sends a heartbeat at
-# once and every 15 s while they run, as derby-timer.jar does.  With racing
-# off, PHP answers the first one by aborting a staged heat, so the timer is
-# CONNECTED afterwards on any machine.
+# once and every 15 s while they run, as derby-timer.jar does.  PHP aborts a
+# staged heat when timer_current names another heat than the running one, as
+# it does after a script finishes its heats, and with racing off it stages
+# nothing new, so the timer is CONNECTED afterwards on any machine.
 TIMER_ALIVE=0
 TIMER_HEARTBEAT_AT=0
 note_timer_state() {
@@ -283,7 +284,7 @@ keep_timer_alive() {
   [ "$TIMER_ALIVE" = 1 ] && [ $((SECONDS - TIMER_HEARTBEAT_AT)) -ge 15 ] || return 0
   local session="$COOKIES_CURL"
   use_session timer
-  curl_post action.php "action=timer-message&message=HEARTBEAT" >/dev/null
+  curl_post action.php "action=timer-message&message=HEARTBEAT" | check_success
   COOKIES_CURL="$session"
   TIMER_HEARTBEAT_AT=$SECONDS
 }
