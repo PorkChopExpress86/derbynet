@@ -6,7 +6,8 @@ name: parity
 # testing/.  server/tools/parity_gate.py then compares each step's transcript
 # with PHP's, after the registry's allowlist (PARITY_PATHS in
 # server/legacy_api/registry.py), and fails on a failed step or any other
-# difference.
+# difference.  Each Django leg also replays the golden fixtures of #7 and
+# races a round with derby-timer.jar (#32), as server.yml does.
 #
 # The Django server runs as in server.yml, with runserver and the test
 # endpoints on; there is no Django image yet (#58).  Both legs run the suite
@@ -137,6 +138,45 @@ jobs:
           name: leg-django-${{ matrix.database }}
           path: ${{ runner.temp }}/leg/suite/steps
           if-no-files-found: error
+
+      # The PHP golden fixtures of #7 (engine outputs, timer transcripts, poll
+      # payloads), replayed against Django on this leg's database engine:
+      # every test the root conftest.py marks `golden`.
+      - name: Replay the golden fixtures against Django
+        if: ${{ !cancelled() }}
+        working-directory: server
+        run: uv run pytest -rs -m 'golden and not full'
+
+      # The real derby-timer.jar, with its simulated timer, races a whole round
+      # (#32, ADR-02), as server.yml runs it.  The runner image ships Java and
+      # Ant.  The suite's server has stopped, so this starts another on the
+      # same data folder; race-with-derby-timer.sh starts from an empty
+      # database.
+      - name: Race a round with derby-timer.jar against Django
+        if: ${{ !cancelled() }}
+        env:
+          DERBYNET_ENABLE_TEST_ENDPOINTS: '1'
+          DERBYNET_DATA_DIR: /var/lib/derbynet
+          DERBYNET_CONFIG_DIR: ${{ runner.temp }}/leg/config
+        run: |
+          command -v xmllint >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends libxml2-utils
+          }
+          ant -noinput -buildfile timer/build.xml
+          (cd server && uv run python manage.py runserver 127.0.0.1:8080 --noreload \
+            > "$RUNNER_TEMP/timer-server.log" 2>&1 &)
+          for _ in $(seq 60); do
+            curl -sf -o /dev/null http://127.0.0.1:8080/health/ && break
+            sleep 1
+          done
+          bash testing/race-with-derby-timer.sh http://127.0.0.1:8080
+
+      - name: Show the derby-timer.jar and server logs
+        if: failure()
+        run: |
+          cat testing/derby-timer.log || true
+          cat "$RUNNER_TEMP/timer-server.log" || true
 
   gate:
     name: gate (django, ${{ matrix.database }})

@@ -6,11 +6,14 @@ record decisions", for the deviation rules.
 
 import hashlib
 import json
+import sys
 from collections.abc import Callable
 from pathlib import Path
+from types import ModuleType
 
 GOLDEN_DIR = Path(__file__).resolve().parents[3] / "tests" / "golden"
 DEVIATIONS_FILE = GOLDEN_DIR / "deviations.json"
+SERVER_DIR = GOLDEN_DIR.parents[1]
 
 # The decisions of #20, "Quirk decisions". Only a Fix may have a deviation.
 QUIRK_DECISIONS = {
@@ -262,3 +265,37 @@ def transcript_deviations(fixture: str) -> dict[str, tuple[str, dict]]:
             for name in entry["exchanges"]:
                 expected[name] = (entry["quirk"], exchanges[name])
     return expected
+
+
+def reads_golden_fixtures(module: ModuleType) -> bool:
+    """Whether a module holds a path under GOLDEN_DIR, or uses a module of
+    this server that does. The root conftest marks the tests of such a module
+    `golden`, so `pytest -m golden` replays the fixtures (#37)."""
+    return _reads_golden(module, set())
+
+
+def _reads_golden(module: ModuleType, seen: set[str]) -> bool:
+    seen.add(module.__name__)
+    for value in vars(module).values():
+        if isinstance(value, Path) and value.resolve().is_relative_to(GOLDEN_DIR):
+            return True
+        used = value if isinstance(value, ModuleType) else None
+        if used is None:
+            used = sys.modules.get(getattr(value, "__module__", None) or "")
+        if (
+            used is not None
+            and used.__name__ not in seen
+            and _is_ours(used)
+            and _reads_golden(used, seen)
+        ):
+            return True
+    return False
+
+
+def _is_ours(module: ModuleType) -> bool:
+    path = getattr(module, "__file__", None)
+    return (
+        path is not None
+        and Path(path).resolve().is_relative_to(SERVER_DIR)
+        and ".venv" not in Path(path).parts
+    )
