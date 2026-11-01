@@ -102,8 +102,8 @@ database reset (`shift-ids.sh`), so that nothing created in the suite gets its
 usual ID.
 
 `test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
-With `DERBYNET_BACKEND=django`, `test-visit-each-page.sh` leaves out `print.php`,
-since the Django server drops the printables (#55), and
+With `DERBYNET_BACKEND=django`, `test-visit-each-page.sh` expects `print.php` to
+answer 404, since the Django server drops the printables (#55), and
 `exercise-one-database.sh` skips `test-balloting.sh` (#54).
 
 `test-photo-manipulations.sh` checks how the renders of a photo with EXIF

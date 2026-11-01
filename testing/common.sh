@@ -83,6 +83,22 @@ function curl_page() {
 	cat $DEBUG_CURL
 }
 
+# Fetch a page a server doesn't have, and check it answers 404.  It is recorded
+# as curl_page records a page, so the parity gate's transcripts stay in step.
+function curl_page_missing() {
+	echo ' ' ' ' ' ' $1 >&2
+	echo    >> $OUTPUT_CURL
+	echo $1 >> $OUTPUT_CURL
+	echo    >> $OUTPUT_CURL
+	local STATUS
+	STATUS=$(curl --location -s -o $DEBUG_CURL -w '%{http_code}' \
+                  -b $COOKIES_CURL -c $COOKIES_CURL $BASE_URL/$1)
+	cat $DEBUG_CURL >> $OUTPUT_CURL
+	if [ "$STATUS" != 404 ] ; then
+		test_fails $1 answered with HTTP status $STATUS, not 404
+	fi
+}
+
 # The visible text of an HTML page on stdin: scripts, styles and tags are gone,
 # common entities are decoded, and runs of whitespace are one space.
 function page_text() {
