@@ -21,7 +21,7 @@ uv run ruff format --check
 uv run python manage.py makemigrations --check --dry-run
 ```
 
-The `server` GitHub Actions workflow runs these four commands on Python 3.14, once on SQLite and once on Postgres. To run the tests on Postgres locally, run `tools/pytest-postgres.sh`, which starts a throwaway Postgres 17 container, passes its arguments to `uv run pytest`, and removes the container. Or set `DATABASE_URL` yourself, for example `DATABASE_URL=postgres://postgres:postgres@localhost:5432/derbynet uv run pytest`.
+The `server` GitHub Actions workflow runs these four commands on Python 3.14, once on SQLite and once on Postgres, with pytest spread over one worker per core (`uv run pytest -n auto`, pytest-xdist). A test's parametrize ids must come out the same in every worker, so build them from values with a fixed `repr`, never from a bare `object()`. `git config core.hooksPath .githooks` runs the three lint commands, and the other `--check` tools, before each push that changes `server/`. To run the tests on Postgres locally, run `tools/pytest-postgres.sh`, which starts a throwaway Postgres 17 container, passes its arguments to `uv run pytest`, and removes the container. Or set `DATABASE_URL` yourself, for example `DATABASE_URL=postgres://postgres:postgres@localhost:5432/derbynet uv run pytest`.
 
 Model tests build their data with the factory_boy factories in `<app>/tests/factories.py`. `EventFactory` creates an event through `core.services.new_event()`, so each event comes with its settings, state rows, and the six legacy scenes.
 

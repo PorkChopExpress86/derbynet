@@ -2,6 +2,11 @@ name: server
 
 # Lints and tests the Django server in server/ on Python 3.14, once on SQLite
 # and once on Postgres (owner decision D1).  See server/README.md.
+#
+# The work is split into jobs that run at once, so a pull request waits only
+# for the slowest: lint, pytest, the legacy API tests with the test endpoints
+# on, and the shell suites of testing/ in three groups of about the same
+# length.  Each shell group starts its own Django server.
 
 on:
   push:
@@ -21,38 +26,15 @@ concurrency:
   group: server-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+defaults:
+  run:
+    working-directory: server
+
 jobs:
-  server:
-    name: server (${{ matrix.database }})
+  # The checks that need no database server, run once.
+  lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - database: sqlite
-            url: ''
-          - database: postgres
-            url: postgres://postgres:postgres@localhost:5432/derbynet
-    services:
-      postgres:
-        # An empty image skips the service on the SQLite run.
-        image: ${{ matrix.database == 'postgres' && 'postgres:17' || '' }}
-        env:
-          POSTGRES_PASSWORD: postgres
-          # The shell-suite step connects to this database, not to the
-          # test_derbynet one that pytest creates.
-          POSTGRES_DB: derbynet
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
-          --health-retries 15
-    env:
-      DATABASE_URL: ${{ matrix.url }}
-    defaults:
-      run:
-        working-directory: server
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -78,19 +60,90 @@ jobs:
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
 
+  pytest:
+    name: pytest (${{ matrix.database }}${{ matrix.endpoints && ', test endpoints' || '' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+        endpoints: [false, true]
+    services:
+      postgres:
+        # An empty image skips the service on the SQLite run.
+        image: ${{ matrix.database == 'postgres' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: derbynet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgres://postgres:postgres@localhost:5432/derbynet' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # One pytest-xdist worker per core of the runner.
       - name: Test
-        run: uv run pytest -v -rs
+        if: ${{ !matrix.endpoints }}
+        run: uv run pytest -v -rs -n auto
 
       - name: Test the legacy API with the test endpoints on
+        if: ${{ matrix.endpoints }}
         env:
           DERBYNET_ENABLE_TEST_ENDPOINTS: '1'
-        run: uv run pytest -v -rs legacy_api
+        run: uv run pytest -v -rs -n auto legacy_api
 
-      # testing/reset-database.sh runs before every phase of the shell suites,
-      # so it is the first thing that must pass against Django (#63).  The test
-      # endpoints are on, as the suites need (test.setup, anonymous
-      # database.check).
-      - name: Run testing/reset-database.sh against Django
+  # The shell suites of testing/ against a running Django server.  The groups
+  # keep testing/exercise-one-database.sh order within each group.  Every step
+  # starts from reset-database.sh except the last three of group 3, which read
+  # what the step before them left, so they stay together in that order.
+  shell:
+    name: shell (${{ matrix.database }}, group ${{ matrix.group }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+        group: [1, 2, 3]
+    services:
+      postgres:
+        # An empty image skips the service on the SQLite run.
+        image: ${{ matrix.database == 'postgres' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          # The shell suites connect to this database, not to the
+          # test_derbynet one that pytest creates.
+          POSTGRES_DB: derbynet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgres://postgres:postgres@localhost:5432/derbynet' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Start the Django server
         env:
           DERBYNET_ENABLE_TEST_ENDPOINTS: '1'
           DERBYNET_DATA_DIR: ${{ runner.temp }}/data
@@ -109,7 +162,15 @@ jobs:
             curl -sf 'http://127.0.0.1:8080/action.php?query=role.list' >/dev/null && break
             sleep 1
           done
-          cd ../testing
+
+      # testing/reset-database.sh runs before every phase of the shell suites,
+      # so it is the first thing that must pass against Django (#63).  The test
+      # endpoints are on, as the suites need (test.setup, anonymous
+      # database.check).
+      - name: Run testing/reset-database.sh against Django
+        if: matrix.group == 1
+        working-directory: testing
+        run: |
           # Twice in a row, then with database.check before every POST.
           bash reset-database.sh http://127.0.0.1:8080
           bash reset-database.sh http://127.0.0.1:8080
@@ -123,6 +184,7 @@ jobs:
       # scratch files.  test-racer-query.sh needs test-basic-racing.sh and
       # test-awards.sh (#33), and later suites that #34 and #36 serve, first.
       - name: Run the racer and check-in suites against Django
+        if: matrix.group == 1
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -136,6 +198,7 @@ jobs:
       # The race-control and poll suites of #31 that need no endpoint of
       # another ticket, in testing/exercise-one-database.sh order.
       - name: Run the race-control suites against Django
+        if: matrix.group == 1
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -155,6 +218,7 @@ jobs:
       # and need no endpoint of another ticket.  test-basic-racing.sh waits
       # for history.php (#49).
       - name: Run the timer-message suites against Django
+        if: matrix.group == 1
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -169,6 +233,7 @@ jobs:
       # and reads its standings from export-json.php.  It resets the database
       # itself.
       - name: Run the reschedule suite against Django
+        if: matrix.group == 2
         working-directory: .
         env:
           DERBYNET_BACKEND: django
@@ -179,6 +244,7 @@ jobs:
       # testing/exercise-one-database.sh order.  `test-awards.sh basic` follows
       # test-basic-racing.sh, which reads history.php (#49), so it waits.
       - name: Run the award suite against Django
+        if: matrix.group == 2
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -192,6 +258,7 @@ jobs:
       # test_points_rerun.py, since no server writes a sheet for a round that
       # is not finished.
       - name: Run the standings suites against Django
+        if: matrix.group == 2
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -206,6 +273,7 @@ jobs:
           bash testing/test-points-racing.sh http://127.0.0.1:8080
 
       - name: Run the subgroup trophy suite against Django
+        if: matrix.group == 2
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -217,6 +285,7 @@ jobs:
       # only the scenes of a reset database, which keep the ids 1 to 6 that it
       # and test-playlist.sh and test-preferences.sh name.
       - name: Run the scene, playlist and messaging suites against Django
+        if: matrix.group == 1
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -231,6 +300,7 @@ jobs:
       # test-basic-racing.sh waits for history.php (#49).  DERBYNET_BACKEND
       # makes test-photo-manipulations.sh expect upright EXIF renders (#73).
       - name: Run the photo and slide suites against Django
+        if: matrix.group == 3
         working-directory: .
         env:
           DERBYNET_BACKEND: django
@@ -251,6 +321,7 @@ jobs:
           bash testing/test-photo-upload.sh http://127.0.0.1:8080
 
       - name: Run the result import suite against Django
+        if: matrix.group == 3
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
@@ -259,6 +330,7 @@ jobs:
       # snapshot.get, then snapshot.put as nobody (refused) and as the
       # coordinator, the way testing/exercise-one-database.sh ends.
       - name: Round-trip a snapshot against Django
+        if: matrix.group == 3
         working-directory: .
         run: |
           bash testing/snapshot-round-trip.sh http://127.0.0.1:8080
@@ -267,6 +339,7 @@ jobs:
       # round, as timer/testing/fake-timer runs it (#32, ADR-02).  The runner
       # image ships Java and Ant.
       - name: Race a round with derby-timer.jar against Django
+        if: matrix.group == 3
         working-directory: .
         run: |
           ant -noinput -buildfile timer/build.xml
@@ -279,6 +352,7 @@ jobs:
       # stay out; legacy_api/tests/test_testing_scripts.py checks the
       # endpoints and scripts they name.
       - name: Run the dev scripts against Django
+        if: matrix.group == 3
         working-directory: .
         run: |
           bash testing/setup-basic.sh http://127.0.0.1:8080
