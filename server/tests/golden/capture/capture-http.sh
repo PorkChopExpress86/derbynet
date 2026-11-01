@@ -280,13 +280,15 @@ wait_for_replay_timeout() {
 # record_script <tag> <record-list> <steps 0|1> <script> [args...]
 # Runs one script from testing/ through the recording proxy, starting with no
 # replay client connected.  The script gets BASE_URL=http://localhost:8081/<tag>.
+# With steps on, RECORD_POLLS=<values> also records query=poll&values=<values>
+# at each step, into http/<tag>.polls.http.
 record_script() {
   local name="$1" record="$2" steps="$3" script="$4"
   shift 4
   local tag="${name//\//__}"   # the proxy's tag is one path segment; __ stands for /
   wait_for_replay_timeout
   echo "  recording $name: $script $*" >&2
-  curl -sf "http://127.0.0.1:$RECORDER_PORT/__control/begin?tag=$tag&record=$record&steps=$steps" >/dev/null
+  curl -sf "http://127.0.0.1:$RECORDER_PORT/__control/begin?tag=$tag&record=$record&steps=$steps&polls=${RECORD_POLLS:-}" >/dev/null
   local status=0
   "$ROOT/testing/$script" "http://localhost:$RECORDER_PORT/$tag" "$@" >"$RAW/.script.log" 2>&1 || status=$?
   curl -sf "http://127.0.0.1:$RECORDER_PORT/__control/end?tag=$tag" >/dev/null

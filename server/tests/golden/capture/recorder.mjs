@@ -7,12 +7,14 @@
 // and, while a recording is active for <tag>, writes down what the capture
 // asks for.  Control requests start and end a recording:
 //
-//   GET /__control/begin?tag=T&record=a,b&steps=1   start recording tag T
+//   GET /__control/begin?tag=T&record=a,b&steps=1&polls=v   start recording tag T
 //   GET /__control/end?tag=T                        write <rawdir>/T.http
 //
 //   record=  comma-separated action or query names to record in full ("*" for all)
 //   steps=1  after each request that changes the roster, classes, ranks,
 //            partitions, rounds or schedule, record a snapshot of that state
+//   polls=   with steps=1, also record query=poll&values=<polls> at each step,
+//            as PHP sent it, into <rawdir>/T.polls.http, one exchange per step
 //
 // Snapshots are taken with the proxy's own coordinator session, so they never
 // disturb the test's login.  They are keyed by names (car number, class, rank,
@@ -30,7 +32,7 @@ const COORDINATOR = { name: 'RaceCoordinator', password: 'doyourbest' };
 // Requests that never change the structure steps snapshots describe.
 const NOT_STRUCTURAL = /^(timer-message|role\.login|replay[.-]|heat\.|result\.write|kiosk\.|scene\.|photo\.|award\.|message\.|vote\.|video\.|snapshot\.get|login$|roles$)/;
 
-const recordings = new Map();   // tag -> { record, steps, exchanges, snap, stepNo }
+const recordings = new Map();   // tag -> { record, steps, polls, exchanges, pollExchanges, snap, stepNo }
 let snapshotCookie = '';
 let queue = Promise.resolve();
 
@@ -113,6 +115,19 @@ async function readState() {
   };
 }
 
+// The poll reply for the step just recorded.  readState() has logged the
+// snapshot session in.
+async function recordPoll(rec, step) {
+  if (!rec.polls) return;
+  const query = `query=poll&values=${rec.polls}`;
+  const res = await snapshotGet(query);
+  rec.pollExchanges.push({
+    name: `${step} poll`, request: `GET action.php?${query}`,
+    status: res.status, contentType: res.headers['content-type'], cacheControl: res.headers['cache-control'],
+    body: res.body,
+  });
+}
+
 function diffState(prev, next) {
   const change = {};
   for (const k of ['classes', 'partitions', 'rounds']) {
@@ -154,7 +169,8 @@ async function handle(req, res) {
       const rec = {
         record: (url.searchParams.get('record') ?? '').split(',').filter(Boolean),
         steps: url.searchParams.get('steps') === '1',
-        exchanges: [], snap: null, stepNo: 0, seq: 0,
+        polls: url.searchParams.get('polls') ?? '',
+        exchanges: [], pollExchanges: [], snap: null, stepNo: 0, seq: 0,
       };
       recordings.set(tag, rec);
       if (rec.steps) {
@@ -163,12 +179,14 @@ async function handle(req, res) {
           name: 'step-0 initial state', request: 'SNAPSHOT', status: 200, contentType: 'application/json',
           body: JSON.stringify({ step: 0, state: rec.snap }) + '\n',
         });
+        await recordPoll(rec, 'step-0');
       }
       res.end('ok\n');
     } else if (url.pathname === '/__control/end') {
       const rec = recordings.get(tag);
       recordings.delete(tag);
       if (rec) writeFile(path.join(rawdir, `${tag.replace(/__/g, "/")}.http`), rec.exchanges);
+      if (rec && rec.polls) writeFile(path.join(rawdir, `${tag.replace(/__/g, "/")}.polls.http`), rec.pollExchanges);
       res.end(`${rec ? rec.exchanges.length : 0}\n`);
     } else {
       res.statusCode = 404;
@@ -220,6 +238,7 @@ async function handle(req, res) {
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ step: rec.stepNo, changed: change }) + '\n',
     });
+    await recordPoll(rec, `step-${rec.stepNo}`);
   }
 }
 

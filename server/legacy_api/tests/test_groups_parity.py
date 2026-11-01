@@ -5,9 +5,14 @@
 the services. Here every `class.*`, `rank.*` and `partition.*` request goes
 through the Django endpoint, with PHP's ids turned into Django's, and after
 each step `query=class.list` must answer what PHP's did, ids left out, as
-`recorder.mjs` records it. The partitions, rounds and roster are compared
-from the database, since `poll` (#31) and `racer.list` (#29) are not ported.
-Racer requests go through the ORM as in `php_replay.Replay`.
+`recorder.mjs` records it, and the partitions, rounds and roster in the
+database must be what PHP's snapshot shows. Racer requests go through the ORM
+as in `php_replay.Replay`.
+
+For `test-racing-groups.sh` the recorder also kept PHP's reply to
+`query=poll&values=classes,partitions,race-structure` after each step
+(`suite/racing-groups.polls.http`). Django's reply, with its ids written as
+the PHP ids `php_replay.PhpIds` assigns, must match it byte for byte.
 """
 
 import json
@@ -17,6 +22,7 @@ import pytest
 
 from core.models import SiteState
 from legacy_api.tests.conftest import log_in, post
+from legacy_api.tests.php_http import Ids, as_php_body
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
 from roster.services import groups
 from roster.tests.php_replay import Replay, expected_after, recorded_state
@@ -152,3 +158,42 @@ def test_class_list_answers_what_php_recorded_after_every_step(client, fixture):
         steps += 1
     assert steps > 0
     assert replay.failures == EXPECTED_FAILURES[fixture]
+
+
+POLL_VALUES = "classes,partitions,race-structure"
+
+
+def _poll_as_php(client, replay, php_body: bytes) -> bytes:
+    """Django's poll reply with every id written as the PHP id `PhpIds`
+    gives that row, so no id is learned from the reply itself."""
+    ids = Ids()
+    for kind, known in replay.ids.php.items():
+        ids.to_php[kind].update(known)
+    response = client.get("/action.php", {"query": "poll", "values": POLL_VALUES})
+    return as_php_body(response, php_body, ids)
+
+
+def test_poll_answers_what_php_sent_after_every_step(client):
+    fixture = "racing-groups"
+    replay = HttpReplay(client)
+    log_in(client, -1, role="RaceCoordinator")
+    suite = GOLDEN_DIR / "http" / "suite"
+    exchanges = read_transcript(suite / f"{fixture}.http")
+    polls = {
+        name.split(" ", 1)[0]: exchange
+        for name, exchange in read_transcript(suite / f"{fixture}.polls.http").items()
+    }
+    assert _starts_with_reset(exchanges)
+    assert len(polls) == len(exchanges)
+    mismatches = []
+    for name, exchange in exchanges.items():
+        step = name.split(" ", 1)[0]
+        if step == "step-0":
+            # The state the script before left; the script starts with a reset.
+            continue
+        replay.post(exchange["request-body"])
+        php = polls[step]
+        assert php["request"] == f"GET action.php?query=poll&values={POLL_VALUES}"
+        if _poll_as_php(client, replay, php["body"]) != php["body"]:
+            mismatches.append(name)
+    assert mismatches == []
