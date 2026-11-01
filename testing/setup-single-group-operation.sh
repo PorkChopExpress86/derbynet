@@ -1,5 +1,11 @@
 #! /bin/bash
 
+# Sets up one group of 14 racers, all checked in, with the first heat racing.
+# The racers and the round are looked up, because the Django server never
+# reuses an id after a reset.  The check-ins go in import order, so on PHP the
+# requests are racer=1 to racer=14, as the golden capture (08-suite-scripts.sh)
+# recorded them.
+
 BASE_URL=$1
 set -e -E -o pipefail
 source `dirname $0`/common.sh
@@ -24,24 +30,13 @@ curl_postj action.php "action=racer.import&firstname=Clark&lastname=Chesnutt&car
 curl_postj action.php "action=racer.import&firstname=Cletus&lastname=Creager&carnumber=514" | check_jsuccess
 
 
-curl_postj action.php "action=racer.pass&racer=1&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=2&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=3&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=4&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=5&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=6&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=7&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=8&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=9&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=10&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=11&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=12&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=13&value=1" | check_jsuccess
-curl_postj action.php "action=racer.pass&racer=14&value=1" | check_jsuccess
-#curl_postj action.php "action=racer.pass&racer=15&value=1" | check_jsuccess
+for RACERID in $(racerids_of 101 202 303 504 405 106 207 308 509 410 111 212 313 514) ; do
+    curl_postj action.php "action=racer.pass&racer=$RACERID&value=1" | check_jsuccess
+done
 
 curl_postj action.php "action=settings.write&unused-lane-mask=0&n-lanes=4" | check_jsuccess
 
-curl_postj action.php "action=schedule.generate&roundid=1" | check_jsuccess
+ROUND=$(the_only_roundid)
+curl_postj action.php "action=schedule.generate&roundid=$ROUND" | check_jsuccess
 
-curl_postj action.php "action=heat.select&roundid=1&now_racing=1" | check_jsuccess
+curl_postj action.php "action=heat.select&roundid=$ROUND&now_racing=1" | check_jsuccess

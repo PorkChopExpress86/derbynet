@@ -1,7 +1,11 @@
 #! /bin/bash
 
 # Runs an unattended demo of the software.  Stand up a web server somewhere, and
-# a kiosk that points to it.  Run this script, pointed at the server.
+# a kiosk that points to it.  Run this script, pointed at the server.  It runs
+# until stopped, against the PHP or the Django server.
+#
+# Each pass resets the database, so it asks for every id by name: the Django
+# server never reuses an id, so the second pass gets new ones.
 
 BASE_URL=$1
 set -e -E -o pipefail
@@ -19,8 +23,11 @@ while true ; do
   ########## Please Check In ##############
   curl_postj action.php "action=kiosk.assign&all=kiosks/please-check-in.kiosk" | check_jsuccess
 
-  `dirname $0`/import-roster.sh $BASE_URL
-  `dirname $0`/test-photo-assignments.sh $BASE_URL
+  `dirname $0`/import-roster.sh "$BASE_URL"
+  # The photos test-photo-assignments.sh assigns.  Uploading them again replaces
+  # them.
+  `dirname $0`/photo-setup.sh "$BASE_URL"
+  `dirname $0`/test-photo-assignments.sh "$BASE_URL"
   sleep 6s
 
   ########## Slideshow ##############
@@ -31,13 +38,8 @@ while true ; do
   `dirname $0`/checkin-all.sh "$BASE_URL"
   sleep 15s
 
-  curl_postj action.php "action=class.edit&classid=1&name=Tigers" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=2&name=Wolves" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=3&name=Bears" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=4&name=Webelos%20I" | check_jsuccess
-  curl_postj action.php "action=class.edit&classid=5&name=Webelos%20II" | check_jsuccess
-
-  curl_postj action.php "action=class.order&classid_1=1&classid_2=2&classid_3=3&classid_4=4&classid_5=5" | check_jsuccess
+  # Sets LIONS, the classid of the class renamed Tigers, and the others
+  rename_demo_classes
 
   # Start the timer
   user_login_timer
@@ -46,17 +48,15 @@ while true ; do
 
   user_login_coordinator
   # Schedule Round 1
-  curl_postj action.php "action=schedule.generate&roundid=1" | check_jsuccess
-  curl_postj action.php "action=schedule.generate&roundid=2" | check_jsuccess
-  # curl_postj action.php "action=schedule.generate&roundid=3" | check_jsuccess
-  # curl_postj action.php "action=schedule.generate&roundid=4" | check_jsuccess
-  # curl_postj action.php "action=schedule.generate&roundid=5" | check_jsuccess
+  LIONS_1=$(roundid_of Tigers 1)
+  curl_postj action.php "action=schedule.generate&roundid=$LIONS_1" | check_jsuccess
+  curl_postj action.php "action=schedule.generate&roundid=$(roundid_of Wolves 1)" | check_jsuccess
 
   ########## On Deck ##############
   curl_postj action.php "action=kiosk.assign&all=kiosks/ondeck.kiosk" | check_jsuccess
 
   # Start racing
-  curl_postj action.php "action=heat.select&now_racing=1&roundid=1" | check_jsuccess
+  curl_postj action.php "action=heat.select&now_racing=1&roundid=$LIONS_1" | check_jsuccess
 
   user_login_timer
   sleep 1s
@@ -142,9 +142,11 @@ while true ; do
   sleep 3s
 
   ########## Awards Presentations ##############
+  # The timer can't assign a kiosk or present an award, on either server.
+  user_login_coordinator
   curl_postj action.php "action=kiosk.assign&all=kiosks/award-presentations.kiosk" | check_jsuccess
   sleep 6s
-  curl_postj action.php "action=award.present&key=speed-1-1" | check_jsuccess
+  curl_postj action.php "action=award.present&key=speed-1-$LIONS" | check_jsuccess
   sleep 15s
 
   ########## DerbyNet ##############

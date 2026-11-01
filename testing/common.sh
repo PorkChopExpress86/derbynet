@@ -498,6 +498,56 @@ partitionid_of() {
         | jq --arg n "$1" '.partitions | map(select(.name | tostring | startswith($n)))[0].partitionid'
 }
 
+# The roundid of the only round there is.  Fails unless there is exactly one.
+the_only_roundid() {
+    local IDS
+    IDS=$(lookup_get "action.php?query=poll&values=rounds" | jq -c '[.rounds[].roundid]')
+    [ "$(echo "$IDS" | jq length)" -eq 1 ] || lookup_fails "Expected one round, found $IDS"
+    echo "$IDS" | jq '.[0]'
+}
+
+# racerids_of <carnumber> ...: the racerid of each car number, in order, one
+# per line, from a single racer.list.  Fails for a car number no racer has.
+racerids_of() {
+    local LIST CAR ID
+    LIST=$(lookup_get "action.php?query=racer.list")
+    for CAR in "$@" ; do
+        ID=$(echo "$LIST" | jq --arg c "$CAR" \
+                 '.racers | map(select(.carnumber | tostring == $c))[0].racerid // empty')
+        [ -n "$ID" ] || lookup_fails "No racer has car number $CAR"
+        echo $ID
+    done
+}
+
+# For demo.sh and demo-multi.sh: renames and orders the five classes of
+# import-roster.sh.  Each variable is named after the class as imported:
+#   LIONS    "Lions & Tigers"      becomes "Tigers"
+#   WHITE    "White's Wolves"      becomes "Wolves"
+#   BEARS    "Bears and Frères"    becomes "Bears"
+#   WEBELOS  "Webelos ("Webes")"   becomes "Webelos I"
+#   ARROWS   "Arrows <<--<<"       becomes "Webelos II"
+# and holds its classid afterwards.  Fails if a class is missing.
+rename_demo_classes() {
+    LIONS=$(classid_of Lions)
+    WHITE=$(classid_of White)
+    BEARS=$(classid_of Bears)
+    WEBELOS=$(classid_of Webelos)
+    ARROWS=$(classid_of Arrows)
+    local ID
+    for ID in "$LIONS" "$WHITE" "$BEARS" "$WEBELOS" "$ARROWS" ; do
+        if [ -z "$ID" ] || [ "$ID" = null ] ; then
+            test_fails "rename_demo_classes: a class of import-roster.sh is missing" \
+                       "(Lions=$LIONS White=$WHITE Bears=$BEARS Webelos=$WEBELOS Arrows=$ARROWS)"
+        fi
+    done
+    curl_postj action.php "action=class.edit&classid=$LIONS&name=Tigers" | check_jsuccess
+    curl_postj action.php "action=class.edit&classid=$WHITE&name=Wolves" | check_jsuccess
+    curl_postj action.php "action=class.edit&classid=$BEARS&name=Bears" | check_jsuccess
+    curl_postj action.php "action=class.edit&classid=$WEBELOS&name=Webelos%20I" | check_jsuccess
+    curl_postj action.php "action=class.edit&classid=$ARROWS&name=Webelos%20II" | check_jsuccess
+    curl_postj action.php "action=class.order&classid_1=$LIONS&classid_2=$WHITE&classid_3=$BEARS&classid_4=$WEBELOS&classid_5=$ARROWS" | check_jsuccess
+}
+
 # standings_sheet <name>: the rows of the standings sheet "Standings for <name>"
 # in the workbook that export-json.php serves, as a JSON array of objects keyed
 # by column header.  The sheet's first row names it and its third row holds the

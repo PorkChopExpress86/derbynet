@@ -118,6 +118,34 @@ Wolves instead, so Django fits them in, and the charts are checked.  It reads it
 standings from `export-json.php`, since Django does not serve
 `query=standings`.
 
+## Dev and demo scripts
+
+These are not part of the suite, and run against the PHP or the Django server.
+Each takes the base URL first.
+
+- `demo.sh` runs an unattended kiosk demo until stopped: it resets the
+  database, imports and checks in the roster, races heats, and moves every
+  kiosk through the check-in, slideshow, on-deck, now-racing, results and award
+  pages.  `demo-multi.sh` does the same with three kiosks, `main`, `aux` and
+  `ondeck`, each on its own page.
+- `setup-basic.sh` and `setup-basic-no-photos.sh` start an event named
+  `testdb` with the suite's roster, with or without photos.
+  `setup-single-group-operation.sh` sets up one group of 14 racers, checked
+  in, with the first heat racing.  `checkin-all.sh` checks in every racer.
+- `run-scout-heats.sh` races every first round of `import-roster.sh`'s roster.
+  `test-aggregate-rounds.sh` and `test-aggregate-classes.sh` run it.
+- `send-snapshot.sh <url> <file>` puts a snapshot back.
+  `post-timer-log.sh <url> < text` appends to the timer log as the timer.
+- `simulate-replay.sh <url> [seconds]` polls `replay.message` the way
+  `replay.php` does, and prints each replay command.
+- `polling-loop.sh` polls `poll.coordinator` nonstop, for load.
+
+CI runs the ones that end on their own against Django, in
+`.github/workflows/server.yml`.  `server/legacy_api/tests/test_testing_scripts.py`
+checks that PHP has every endpoint a script in `testing/` names and that Django
+serves it or defers it to a backlog ticket, that every script a script runs is
+there, and that each parses.
+
 ## Test photos
 
 `data/carphotos/pattern-o6.jpg` stands in for a phone photo taken in portrait:
