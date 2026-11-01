@@ -245,6 +245,11 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
         for key in ("classid", "rankid")
     ),
     *(
+        # The places of a reinstated heat, which PHP's reinstate leaves empty.
+        ParityPath(endpoint, "$.racers[*].finishplace", "Q4", php="", django=int)
+        for endpoint in ("action heat.reinstate", "query poll.coordinator")
+    ),
+    *(
         # The scene applied last, by id.
         ParityPath(endpoint, "$.current-scene", "C19", php="", django=int)
         for endpoint in _KIOSK_LISTS

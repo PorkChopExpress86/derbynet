@@ -506,3 +506,15 @@ def test_a1_allows_class_and_rank_0_in_every_reply_that_lists_the_awards(endpoin
         assert allowed_by(endpoint, path, None, 0).startswith("A1: ")
         assert allowed_by(endpoint, path, None, 2) is None
         assert allowed_by(endpoint, path, 1, 0) is None
+
+
+@pytest.mark.parametrize(
+    "endpoint", ["action heat.reinstate", "query poll.coordinator"]
+)
+def test_q4_allows_the_place_a_reinstate_brings_back(endpoint):
+    path = "$.racers[2].finishplace"
+
+    assert allowed_by(endpoint, path, "", 3).startswith("Q4: ")
+    assert allowed_by(endpoint, path, 2, 3) is None
+    assert allowed_by(endpoint, path, "", "3") is None
+    assert allowed_by("action heat.select", path, "", 3) is None

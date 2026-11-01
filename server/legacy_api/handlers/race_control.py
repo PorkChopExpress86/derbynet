@@ -81,6 +81,12 @@ PAYLOAD_DIVERGENCES = (
     "R3: with no current heat after a round stops being current, classid and"
     " heat are null; PHP reports the -1 that set_current_heat(-1, -1) wrote.",
 )
+# Where the racers of a reinstated heat show their places again.
+REINSTATE_DIVERGENCES = (
+    *PAYLOAD_DIVERGENCES,
+    "Q4: a reinstated heat lists each lane's place again with its time; PHP"
+    " restores one column, the times in time racing, and lists every place empty.",
+)
 
 
 def _may_control(ctx: LegacyContext) -> bool:
@@ -128,7 +134,9 @@ def heat_rerun(ctx: LegacyContext) -> None:
     _coordinator(ctx)
 
 
-@action("heat.reinstate", permission=Perm.CONTROL_RACE, divergences=PAYLOAD_DIVERGENCES)
+@action(
+    "heat.reinstate", permission=Perm.CONTROL_RACE, divergences=REINSTATE_DIVERGENCES
+)
 def heat_reinstate(ctx: LegacyContext) -> None:
     failure = heats.reinstate(ctx.event)
     _done(ctx, failure)
@@ -376,7 +384,7 @@ def roster_delete(ctx: LegacyContext) -> None:
     "poll.coordinator",
     permission=Access.ANONYMOUS,
     get_writes=True,
-    divergences=PAYLOAD_DIVERGENCES,
+    divergences=REINSTATE_DIVERGENCES,
 )
 def poll_coordinator(ctx: LegacyContext) -> None:
     """`roundid` and `heat` name the heat the coordinator page shows, for
