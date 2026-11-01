@@ -449,6 +449,22 @@ def test_the_event_folder_and_mktemp_kiosk_names_are_masked():
     assert found.path == "$.settings.photo-directory"
 
 
+def test_the_madlib_of_a_mktemp_kiosk_is_masked_and_any_other_compared():
+    template = """
+        action.php?query=poll.kiosk.all
+
+        {{"kiosks": [{{"address": "kiosk1-{name}", "madlib": "{word}"}},
+                     {{"address": "10.0.0.5", "madlib": "{fixed}"}}]}}
+        """
+    php = template.format(name="JRN2XL", word="tiny ocean", fixed="kind bucket")
+    django = template.format(name="8cB1wX", word="tender island", fixed="kind bucket")
+    moved = template.format(name="8cB1wX", word="tender island", fixed="messy finger")
+
+    assert differences(php, django).ok
+    [found] = differences(php, moved).differences
+    assert found.path == "$.kiosks[1].madlib"
+
+
 def test_two_events_folders_still_differ():
     template = """
         post action.php action=settings.write&photo-dir=/var/lib/derbynet/{}/racers

@@ -71,7 +71,8 @@ What is normalized, on both runs alike:
 - Session ids: the value of `PHPSESSID=`, `sessionid=` and `csrftoken=`.
 - The port of a kiosk address `<ip>+<port>` (PHP's REMOTE_PORT).
 - A kiosk address the script made with `mktemp kiosk1-XXXXXX`
-  (`testing/test-scenes.sh`): the six random characters.
+  (`testing/test-scenes.sh`): the six random characters, and the kiosk's
+  `madlib`, which `madlib_string()` makes from the address.
 - An event's folder inside the data folder, before `racers`, `cars`,
   `videos`, `logs`, `imagery` or `slides`: PHP's `<year>/<name>` and
   Django's `events/<slug>` (owner decision D57) are both
@@ -528,6 +529,9 @@ def _json(value, endpoint: str, run: Run):
 
 def _mask_strings(value, run: Run):
     if isinstance(value, dict):
+        if _MKTEMP_KIOSK.fullmatch(str(value.get("address"))) and "madlib" in value:
+            # madlib_string() hashes the address, so it is as random as the name.
+            value = {**value, "madlib": "<mktemp>"}
         return {k: _mask_strings(v, run) for k, v in value.items()}
     if isinstance(value, list):
         return [_mask_strings(v, run) for v in value]
