@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62), and the Framework section below names it. This fills in the choice the decision left to #71 and does not change the decision.
+Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62). The last paragraph of the Decision names it. It fills in the choice the decision left to #71, and the decision itself is unchanged.
 
 ## Context
 
@@ -14,30 +14,26 @@ This ADR replaces the earlier proposal to port the kiosk pages as they look toda
 
 Kiosk pages are built in only. Django runs no custom PHP kiosk pages and loads no pages from `local/kiosks/` or any other folder. The built-in pages are rebuilt, not copied, in a front end that works well with Django and with the replay page and has proper animations. [#71](https://github.com/PorkChopExpress86/derbynet/issues/71) picks the framework. It prototypes the now-racing page and the standings reveal in Django templates with htmx, Alpine.js, and CSS View Transitions, and in Svelte, on a TV-size screen. The owner may build a custom page later in the chosen framework.
 
-## Framework
-
-The kiosk pages are Django templates with htmx and Alpine.js, the stack ADR-09 uses for the manager pages, with no Node at build time or at runtime (D62).
-
-- Motion uses CSS keyframes for elements that enter, and one shared helper that moves rows with the Web Animations API (a FLIP helper) for rows that change place, such as the standings reveal.
-- View Transitions are used only on a page where the Pi 4 recordings show they drop few frames. Pages that use them set `view-transition-name: none` on the root, because the default whole-page snapshot made the standings reveal drop more than half its frames in the spike.
-- Alpine shows and hides animated elements with a bound `hidden` attribute rather than `x-show`, which shows an element one frame late and so hides its entry motion.
-- Every kiosk view allows same-origin framing, so the page works inside the replay iframe and keeps the `replay-started` and `replay-ended` pause.
-- An owner-built custom page is one more template in the same stack.
+The framework #71 chose is Django templates with htmx and Alpine.js, the stack ADR-09 uses for the manager pages, with no Node at build time or at runtime (D62). Motion uses CSS keyframes for elements that enter, and one shared row-move helper (a FLIP helper on the Web Animations API) for rows that change place, such as the standings reveal. View Transitions are used only for whole-board swaps, and only where the Raspberry Pi 4 recordings for #71 show they are cheap; until those recordings exist, no page uses them.
 
 ## Consequences
 
-The legacy page strings and the `poll.kiosk` contract stay (ADR-02), so a Pi kiosk keeps working without a config edit. [#52](https://github.com/PorkChopExpress86/derbynet/issues/52) checks each page for function and animation on a TV, not for pixel parity with PHP. The seeded Wrap-Up scene no longer names the missing `local/kiosks/feedback.kiosk`.
+The legacy page strings and the `poll.kiosk` contract stay (ADR-02), so a Pi kiosk keeps working without a config edit. [#52](https://github.com/PorkChopExpress86/derbynet/issues/52) checks each page for function and animation on a TV, not for pixel parity with PHP. The seeded Wrap-Up scene no longer names the missing `local/kiosks/feedback.kiosk`. Each kiosk view must allow same-origin framing, so the page works inside the replay iframe and keeps the `replay-started` and `replay-ended` pause. The server's frame-options middleware refuses framing today, and #52 adds the exception.
 
 ## Evidence
 
 Kiosks are large screens. `extras/scripts/kiosk.sh` opens them in fullscreen Chromium on Raspberry Pi units. The seeded Wrap-Up scene in `website/sql/sqlite/scene-tables.inc` names `local/kiosks/feedback.kiosk`, which does not exist.
 
-The spike in [#71](https://github.com/PorkChopExpress86/derbynet/issues/71) built now racing, the standings reveal, and the intermission leaders screen in both candidates at 1920x1080, on the branch `spike-71-kiosk-frameworks`. It ran on a 4-vCPU VM with software rendering, so the ranking holds and the numbers are not those of a Pi.
+The spike's results are in the [#71 results comment](https://github.com/PorkChopExpress86/derbynet/issues/71#issuecomment-6538487054). It built now racing, the standings reveal, and the intermission leaders screen in both candidates at 1920x1080, on a 4-vCPU cloud container with no GPU, where Chromium rendered in software. The ranking holds there, and the numbers are not those of a Pi.
 
-| Page | Templates, keyframes and the row helper | Templates with View Transitions | Svelte |
+Dropped frames while animating, with the CPU not throttled:
+
+| Page | Templates, keyframes and the row-move helper | Templates with View Transitions | Svelte |
 | --- | --- | --- | --- |
-| Now racing | 0.5% dropped frames | 4.0% | 0.7% |
+| Now racing | 0.5% | 4.0% | 0.7% |
 | Standings reveal | 0% | 7.8% | 0.5% |
 | Leaders | 2.5% | 10.8% | 0.7% |
 
-Both candidates passed the replay iframe check. Svelte added a Node build stage to the image (`npm ci`, 39 packages), and the templates added none. Under polling, two TVs showed the same step about 0.25 s apart on now racing, and under a push notice 8 ms apart on average, the same for both candidates. The Raspberry Pi 4 recordings are still to come.
+With the CPU throttled 4x, the first column dropped 1 to 2% and Svelte 1.5 to 4.5%. Leaving the default whole-page View Transitions snapshot on made the standings reveal drop 56% of its frames.
+
+Both candidates passed the replay iframe check. Svelte would add a Node build stage to the image (`npm ci`, 39 packages), and the templates add none. A push notice brought two TVs to the same animation step 8 to 9 ms apart on average in both candidates. Under polling, now racing can be about 0.25 s apart and a `poll.kiosk` scene change up to 5 s apart, which ADR-15's push addresses.
