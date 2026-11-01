@@ -89,7 +89,10 @@ What is normalized, on both runs alike:
 
 Ids are numbered afresh after each database reset (`database.execute`
 with `script=schema`), since PHP then hands out ids from 1 again and an id
-from before the reset names another row. First-appearance numbering works
+from before the reset names another row. Group, subgroup and round ids are
+numbered afresh after a `partition.apply-rule` other than `custom`, which
+makes PHP rebuild them all (D31 has Django keep them when the rule is
+already in force). First-appearance numbering works
 only if both servers create rows in the same order. Where they
 legitimately differ, record a divergence (#37) rather than loosening this.
 
@@ -287,6 +290,11 @@ class FirstAppearance:
     def number(self, kind: str, raw: int) -> int:
         seen = self.order[kind]
         return seen.setdefault(raw, len(seen) + 1)
+
+    def forget(self, *kinds: str) -> None:
+        """Number these kinds afresh from 1."""
+        for kind in kinds:
+            self.order.pop(kind, None)
 
     def __call__(self, kind: str, value):
         if isinstance(value, bool):
@@ -760,6 +768,8 @@ def absorb(exchanges: Sequence[Exchange], run: Run) -> None:
             read_body(exchange.body, request, run)
         if _resets_database(request):
             run.ids = FirstAppearance()
+        elif _rebuilds_groups(request):
+            run.ids.forget(*GROUP_KINDS)
 
 
 def diff(
@@ -816,6 +826,9 @@ def diff(
                 report.differences.append(difference)
         if _resets_database(req_a):
             run_a.ids, run_b.ids = FirstAppearance(), FirstAppearance()
+        elif _rebuilds_groups(req_a):
+            run_a.ids.forget(*GROUP_KINDS)
+            run_b.ids.forget(*GROUP_KINDS)
     return report
 
 
@@ -825,6 +838,25 @@ def _resets_database(request: Request) -> bool:
     return (
         request.endpoint == "action database.execute"
         and ("script", "schema") in request.key[-1]
+    )
+
+
+# What partition.apply-rule rebuilds.
+GROUP_KINDS = ("class", "rank", "round")
+
+
+def _rebuilds_groups(request: Request) -> bool:
+    """`partition.apply-rule` with a rule other than `custom`: PHP deletes
+    every group, subgroup and round and makes them again, even when the rule
+    is already in force, where Django changes nothing (D31). Either way no
+    old id names a row PHP has."""
+    return (
+        request.endpoint == "action partition.apply-rule"
+        and (
+            "rule",
+            "custom",
+        )
+        not in request.key[-1]
     )
 
 

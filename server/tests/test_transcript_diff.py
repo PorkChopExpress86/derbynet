@@ -465,6 +465,57 @@ def test_the_madlib_of_a_mktemp_kiosk_is_masked_and_any_other_compared():
     assert found.path == "$.kiosks[1].madlib"
 
 
+def test_groups_are_numbered_afresh_after_partition_apply_rule():
+    """PHP rebuilds every group, subgroup and round on each apply, even of
+    the rule in force; Django keeps them (D31). Either way the old ids name
+    nothing PHP still has, so both runs number those kinds again."""
+    template = """
+        action.php?query=poll&values=classes
+
+        {{"classes": [{{"classid": {a}, "subgroups": [{{"rankid": {r}}}]}}]}}
+
+        post action.php action=partition.apply-rule&rule=by-partition
+
+        {{"outcome": {{"summary": "success"}}}}
+
+        action.php?query=poll&values=rounds
+
+        {{"rounds": [{{"roundid": {round}, "classid": {b}}}]}}
+
+        post action.php action=rank.move&rankid={s}&classid={b}
+
+        {{"outcome": {{"summary": "success"}}}}
+        """
+    php = template.format(a=12, r=17, round=4, b=16, s=21)
+    django = template.format(a=57, r=64, round=9, b=57, s=64)
+
+    report = differences(php, django)
+
+    assert report.ok, report.render()
+    assert report.diverged is None
+
+
+def test_a_class_after_a_custom_rule_keeps_its_number():
+    template = """
+        action.php?query=poll&values=classes
+
+        {{"classes": [{{"classid": {a}}}, {{"classid": {b}}}]}}
+
+        post action.php action=partition.apply-rule&rule=custom
+
+        {{"outcome": {{"summary": "success"}}}}
+
+        action.php?query=poll&values=classes
+
+        {{"classes": [{{"classid": {c}}}]}}
+        """
+
+    [found] = differences(
+        template.format(a=1, b=2, c=2), template.format(a=1, b=2, c=1)
+    ).differences
+    assert found.path == "$.classes[0].classid"
+
+
 def test_two_events_folders_still_differ():
     template = """
         post action.php action=settings.write&photo-dir=/var/lib/derbynet/{}/racers
