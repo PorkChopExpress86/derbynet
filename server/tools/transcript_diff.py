@@ -743,7 +743,13 @@ def new_runs(now: datetime | None = None) -> tuple[Run, Run]:
 
 def absorb(exchanges: Sequence[Exchange], run: Run) -> None:
     """Number the ids in exchanges only one run compared, so that the run's
-    numbering goes on as if they had been compared."""
+    numbering goes on as if they had been compared.
+
+    The other run never sees these rows, so until the next reset its
+    numbering can run behind: a row first seen here and a different row the
+    other run sees first later can get the same number, and compare equal.
+    That happens only after an excused stop or a parted step, whose tails
+    today are mostly pages, which are not numbered."""
     for exchange in exchanges:
         request = parse_request(exchange.request, run)
         if request.comparison is not Comparison.SKIPPED:
