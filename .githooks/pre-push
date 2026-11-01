@@ -1,0 +1,43 @@
+#! /bin/bash
+#
+# Runs the quick checks of the `lint` job in .github/workflows/server.yml
+# before a push that changes server/ or website/inc/generators/, so a red lint
+# shows up in seconds instead of after CI.  Turn it on once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# It checks the working tree, which is what was just committed when the tree
+# is clean.  `git push --no-verify` skips it.
+
+set -e -o pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+ZERO=0000000000000000000000000000000000000000
+
+# Git sends one "<local ref> <local sha> <remote ref> <remote sha>" line per
+# ref it pushes.  A new branch has no remote sha; compare it with master.
+changed=
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue  # a deleted ref
+  if [ "$remote_sha" = "$ZERO" ]; then
+    base="$(git merge-base "$local_sha" origin/master 2>/dev/null \
+              || git merge-base "$local_sha" master 2>/dev/null || true)"
+  else
+    base="$remote_sha"
+  fi
+  if [ -z "$base" ] \
+       || git diff --name-only "$base" "$local_sha" \
+            | grep -qE '^(server/|website/inc/generators/)'; then
+    changed=1
+  fi
+done
+[ -n "$changed" ] || exit 0
+
+cd "$ROOT/server"
+# makemigrations reads DATABASE_URL; the check needs no particular database.
+run() { echo "pre-push: $*" >&2; env -u DATABASE_URL uv run --locked "$@"; }
+run ruff check
+run ruff format --check
+run python tools/convert_generators.py --check
+run python tools/reschedule_deviations.py --check
+run python manage.py makemigrations --check --dry-run

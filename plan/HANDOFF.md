@@ -17,7 +17,8 @@ The shell suites in `testing/` run against Django one by one as their endpoints 
 
 - `testing/` is the PHP shell suite, now backend-agnostic, with no literal IDs, and run twice in CI with shifted IDs (#5, #6).
 - `server/tests/golden/` holds fixtures captured from PHP, checked in CI by the `golden-fixtures` workflow (#7). `deviations.json` (D25) lists approved differences.
-- `.github/workflows/`: `php-suite`, `golden-fixtures`, `server` (SQLite and Postgres 17), and `plan-checks` (ADR path check plus the issue lint).
+- `.github/workflows/`: `php-suite` (on pull requests only when the suite or the PHP image's inputs change), `golden-fixtures`, `server` (SQLite and Postgres 17, split into lint, pytest under pytest-xdist, and three shell-suite groups that run at once), and `plan-checks` (ADR path check plus the issue lint).
+- `.githooks/pre-push` runs the `server` workflow's lint checks in about 5 seconds before a push that changes `server/`.
 - `plan/lint-issues.py` lints every plan issue body live from GitHub, and checks issue state against merged PRs and dependencies.
 - `plan/bin/pr-wait` and `plan/bin/pr-merge` wait for checks and merge only the head that passed.
 - `.claude/skills/verify/` is a project skill that launches an isolated DerbyNet on port 8090 and drives it with the Playwright MCP.
@@ -47,6 +48,7 @@ The repo carries the code and the plan. The items below live outside it and must
 - `gh` (GitHub CLI). Log in with `gh auth login`, and make sure the token has the `repo` and `workflow` scopes.
 - `uv`, for `server/` (`uv sync`, `uv run pytest`). Python 3.14.
 - `jq`.
+- In each clone, `git config core.hooksPath .githooks`, which turns on the pre-push lint (`.githooks/pre-push`). Worktrees share the clone's setting.
 - For the Playwright MCP browser, run `npx -y playwright install --with-deps chrome` once, with sudo.
 - Git commits use the owner's identity through `-c` flags, so the global git config is never changed: `git -c user.name=PorkChopExpress86 -c user.email=<owner email> commit`. Every commit also ends with a `Co-Authored-By` line for Claude.
 

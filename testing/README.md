@@ -3,7 +3,8 @@
 The tests are shell scripts that drive a running DerbyNet server over HTTP, plus
 a few Puppeteer scripts in `puppeteer/`.  `exercise-one-database.sh` runs all of
 them.  The `php-suite` GitHub Actions workflow runs the suite against the PHP
-server image on every pull request and every push to master.
+server image on every push to master, and on a pull request that changes the
+suite or what the image is built from.
 
 ## Run the suite on Linux
 

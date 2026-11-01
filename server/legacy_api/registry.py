@@ -151,7 +151,14 @@ class Removed:
 REMOVED: tuple[Removed, ...] = ()
 
 
-ANY = object()  # A ParityPath value that matches any value.
+class _Any:
+    # A fixed repr, not object()'s address, so the test ids built from a
+    # ParityPath are the same in every pytest-xdist worker.
+    def __repr__(self):
+        return "ANY"
+
+
+ANY = _Any()  # A ParityPath value that matches any value.
 
 
 @dataclass(frozen=True)
