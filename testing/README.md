@@ -138,7 +138,11 @@ Each takes the base URL first.
   `post-timer-log.sh <url> < text` appends to the timer log as the timer.
 - `simulate-replay.sh <url> [seconds]` polls `replay.message` the way
   `replay.php` does, and prints each replay command.
-- `polling-loop.sh` polls `poll.coordinator` nonstop, for load.
+- `polling-loop.sh` polls `poll.coordinator` nonstop, for load.  For a
+  race day's whole load, with every kiosk, the timer, the coordinator, replay
+  and the kiosk dashboard at their real rates, use `server/tools/load_test.py`.
+  `server/README.md` ("Race-day load test") has its usage, and the one command
+  for the Raspberry Pi run.
 
 CI runs the ones that end on their own against Django, in
 `.github/workflows/server.yml`.  `server/legacy_api/tests/test_testing_scripts.py`
