@@ -53,6 +53,14 @@ def standings_snapshot(event) -> Snapshot:
     return Snapshot(_read(event))
 
 
+def all_standings(event) -> dict[str, oracle.Ladder]:
+    """`StandingsOracle::all_standings`: every ladder of the event, keyed as
+    `website/inc/standings.inc` keys them, in the order PHP adds them
+    (`test_every_ladder_comes_in_phps_order` in `racing/engine/tests/
+    test_standings_parity.py`)."""
+    return dict(standings_snapshot(event).standings.ladders)
+
+
 def current_award(event) -> CurrentAward | None:
     """The speed award that `RaceState.current_award_key` names, or None
     when the key names a judged award (#33) or no award."""

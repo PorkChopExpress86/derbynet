@@ -145,6 +145,22 @@ DEFERRED: tuple[Deferred, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class Removed:
+    """A PHP endpoint Django drops on purpose. `reason` cites the decision
+    (`D48: ...`). The coverage check of #37 counts it as accounted for."""
+
+    kind: Kind
+    name: str
+    reason: str
+
+
+# Every PHP endpoint Django drops for good. A name here is never registered
+# or deferred, and the dispatcher answers it as any unknown name. No PHP
+# handler is dropped today.
+REMOVED: tuple[Removed, ...] = ()
+
+
 # The legacy pages outside `/action.php` that differ from PHP on purpose, by
 # path, in the form of `Endpoint.divergences`.
 ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {

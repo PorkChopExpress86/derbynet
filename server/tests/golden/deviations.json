@@ -1756,6 +1756,15 @@
       "expected": "deviations/Q11/partial-and-non-numeric-results.http"
     },
     {
+      "quirk": "Q13",
+      "fixture": "http/standings/q13-drop-slowest.http",
+      "exchanges": [
+        "003 settings.list after the snapshot"
+      ],
+      "reason": "Django converts the legacy drop-slowest key to scoring=1 when it imports the snapshot, and reading the standings writes nothing; PHP lists no scoring until query=standings includes standings.inc, which writes scoring=1 (#64 C11). Only the settings Q13 touches are recorded.",
+      "expected": "deviations/Q13/q13-drop-slowest.http"
+    },
+    {
       "quirk": "C14",
       "fixture": "http/racers/walk-in-multiplier-0.http",
       "exchanges": [

@@ -45,6 +45,9 @@ _TIMESTAMP = re.compile(r'"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d"')
 _ROUND_IN_TEXT = re.compile(r"roundid (\d+)")
 _ROUND_IN_XML = re.compile(r'(roundid="|roundid )(\d+)')
 _SIGNATURE = re.compile(r"(\d+)-(\d+)")
+# A standings key (`website/inc/standings.inc`): `st-r<roundid>`,
+# `st-rr<roundid>-<rankid>`, `st-q<classid>`, or `st-ff`.
+_STANDINGS_KEY = re.compile(r"st-(r|rr|q)(\d+)(?:-(\d+))?")
 # An award key: `award-<awardid>`, or `speed-<place>[-<classid>[-<rankid>]]`.
 _AWARD_KEY = re.compile(r"award-(\d+)|speed-(\w+?)(?:-(\d+)(?:-(\d+))?)?")
 
@@ -61,6 +64,16 @@ def award_key(key: str, to_id) -> str:
         if part:
             key += f"-{to_id(kind, int(part))}"
     return key
+
+
+def standings_key(key: str, to_id) -> str:
+    """A standings key with its ids passed through `to_id(kind, id)`."""
+    found = _STANDINGS_KEY.fullmatch(key)
+    if found is None:
+        return key
+    id_kind = "class" if found[1] == "q" else "round"
+    key = f"st-{found[1]}{to_id(id_kind, int(found[2]))}"
+    return key + (f"-{to_id('rank', int(found[3]))}" if found[3] else "")
 
 
 class Ids:
@@ -149,6 +162,13 @@ class Ids:
                     out[k] = self.php("round", v)
                 elif k == "key" and isinstance(v, str):
                     out[k] = award_key(v, self.php)
+                elif k == "standings" and isinstance(v, dict):
+                    out[k] = {
+                        standings_key(key, self.php): [
+                            [self.php("racer", r) for r in rung] for rung in ladder
+                        ]
+                        for key, ladder in v.items()
+                    }
                 elif k == "chart" and isinstance(v, list) and key is None:
                     out[k] = [
                         None

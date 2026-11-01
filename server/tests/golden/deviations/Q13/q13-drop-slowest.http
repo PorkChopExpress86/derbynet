@@ -1,0 +1,13 @@
+### 003 settings.list after the snapshot
+request: GET action.php?query=settings.list
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 49
+body:
+{
+    "settings": {
+        "scoring": 1
+    }
+}
+
