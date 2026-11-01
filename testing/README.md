@@ -146,6 +146,19 @@ checks that PHP has every endpoint a script in `testing/` names and that Django
 serves it or defers it to a backlog ticket, that every script a script runs is
 there, and that each parses.
 
+## Compare two runs
+
+`common.sh` appends every request and its response to `output.curl`, next to
+the scripts.  Run the same scripts against two servers from two copies of
+`testing/`, then compare the transcripts from `server/`:
+
+    uv run python -m tools.transcript_diff --labels php,django php/testing/output.curl django/testing/output.curl
+
+It pairs the exchanges in order, numbers database ids by first appearance,
+masks clocks, cache breakers and session ids, and prints each difference with
+its endpoint, request and JSON or XML path.  It exits 1 on any difference.
+The docstring of `server/tools/transcript_diff.py` lists what it normalizes.
+
 ## Test photos
 
 `data/carphotos/pattern-o6.jpg` stands in for a phone photo taken in portrait:
