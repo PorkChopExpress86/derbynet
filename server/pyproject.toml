@@ -42,4 +42,5 @@ addopts = "--strict-markers -m 'not full'"
 markers = [
     "pr: schedule parity cases run on every pull request",
     "full: the whole schedule parity sweep; run with -m full",
+    "golden: replays the PHP golden fixtures (#7); the parity gate runs them",
 ]

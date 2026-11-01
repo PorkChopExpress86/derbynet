@@ -449,6 +449,129 @@ def test_the_event_folder_and_mktemp_kiosk_names_are_masked():
     assert found.path == "$.settings.photo-directory"
 
 
+def test_the_madlib_of_a_mktemp_kiosk_is_masked_and_any_other_compared():
+    template = """
+        action.php?query=poll.kiosk.all
+
+        {{"kiosks": [{{"address": "kiosk1-{name}", "madlib": "{word}"}},
+                     {{"address": "10.0.0.5", "madlib": "{fixed}"}}]}}
+        """
+    php = template.format(name="JRN2XL", word="tiny ocean", fixed="kind bucket")
+    django = template.format(name="8cB1wX", word="tender island", fixed="kind bucket")
+    moved = template.format(name="8cB1wX", word="tender island", fixed="messy finger")
+
+    assert differences(php, django).ok
+    [found] = differences(php, moved).differences
+    assert found.path == "$.kiosks[1].madlib"
+
+
+# Two groups with a subgroup and a round each, a partition.apply-rule, and the
+# groups and rounds after it.
+APPLY_RULE = """
+    action.php?query=poll&values=classes,rounds
+
+    {{"classes": [{{"classid": {c1}, "subgroups": [{{"rankid": {r1}}}]}},
+                  {{"classid": {c2}, "subgroups": [{{"rankid": {r2}}}]}}],
+     "rounds": [{{"roundid": {o1}, "classid": {c1}}},
+                {{"roundid": {o2}, "classid": {c2}}}]}}
+
+    post action.php action=partition.apply-rule&rule={rule}
+
+    {{"outcome": {{"summary": "{outcome}"}}}}
+
+    action.php?query=poll&values=classes,rounds
+
+    {{"classes": [{{"classid": {d1}, "subgroups": [{{"rankid": {s1}}}]}},
+                  {{"classid": {d2}, "subgroups": [{{"rankid": {s2}}}]}}],
+     "rounds": [{{"roundid": {p1}, "classid": {d1}}},
+                {{"roundid": {p2}, "classid": {d2}}}]}}
+
+    post action.php action=rank.move&rankid={s2}&classid={d1}
+
+    {{"outcome": {{"summary": "success"}}}}
+    """
+BEFORE = {"c1": 1, "c2": 2, "r1": 3, "r2": 4, "o1": 5, "o2": 6}
+KEPT = {"d1": 1, "d2": 2, "s1": 3, "s2": 4, "p1": 5, "p2": 6}
+REBUILT = {"d1": 11, "d2": 12, "s1": 13, "s2": 14, "p1": 15, "p2": 16}
+
+
+def apply_rule(after, rule="by-partition", outcome="success", prefix=""):
+    return prefix + APPLY_RULE.format(**BEFORE, **after, rule=rule, outcome=outcome)
+
+
+def test_groups_are_numbered_afresh_after_applying_the_rule_in_force():
+    """PHP rebuilds every group, subgroup and round on each apply, even of
+    the rule in force; Django keeps them (D31)."""
+    php, django = apply_rule(REBUILT), apply_rule(KEPT)
+
+    report = differences(php, django)
+
+    assert report.ok, report.render()
+    assert report.diverged is None
+
+
+def test_a_real_change_of_rule_that_keeps_the_groups_shows():
+    custom = apply_rule(KEPT, rule="custom")
+
+    report = differences(
+        apply_rule(REBUILT, prefix=custom), apply_rule(KEPT, prefix=custom)
+    )
+
+    assert not report.ok
+
+
+def test_a_refused_apply_numbers_nothing_afresh():
+    php = apply_rule(KEPT, outcome="failure")
+    django = apply_rule({**KEPT, "d1": 2, "d2": 1}, outcome="failure")
+
+    assert not differences(php, django).ok
+
+
+def test_an_apply_in_a_part_past_a_divergence_still_numbers_afresh():
+    runs = td.new_runs(NOW)
+    parted = "\n    post action.php action=racer.pass&racer=1\n\n    {{}}\n"
+    parting = td.diff(
+        run(apply_rule(REBUILT, prefix=parted.format())),
+        run(
+            apply_rule(
+                KEPT, prefix=parted.format().replace("racer.pass", "racer.delete")
+            )
+        ),
+        runs=runs,
+    )
+    assert parting.diverged is not None
+    after = """
+        action.php?query=poll&values=classes
+
+        {{"classes": [{{"classid": {}}}, {{"classid": {}}}]}}
+        """
+
+    report = td.diff(run(after.format(11, 12)), run(after.format(1, 2)), runs=runs)
+
+    assert report.ok, report.render()
+
+
+def test_a_class_after_a_custom_rule_keeps_its_number():
+    template = """
+        action.php?query=poll&values=classes
+
+        {{"classes": [{{"classid": {a}}}, {{"classid": {b}}}]}}
+
+        post action.php action=partition.apply-rule&rule=custom
+
+        {{"outcome": {{"summary": "success"}}}}
+
+        action.php?query=poll&values=classes
+
+        {{"classes": [{{"classid": {c}}}]}}
+        """
+
+    [found] = differences(
+        template.format(a=1, b=2, c=2), template.format(a=1, b=2, c=1)
+    ).differences
+    assert found.path == "$.classes[0].classid"
+
+
 def test_two_events_folders_still_differ():
     template = """
         post action.php action=settings.write&photo-dir=/var/lib/derbynet/{}/racers

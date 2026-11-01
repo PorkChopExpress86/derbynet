@@ -71,7 +71,8 @@ What is normalized, on both runs alike:
 - Session ids: the value of `PHPSESSID=`, `sessionid=` and `csrftoken=`.
 - The port of a kiosk address `<ip>+<port>` (PHP's REMOTE_PORT).
 - A kiosk address the script made with `mktemp kiosk1-XXXXXX`
-  (`testing/test-scenes.sh`): the six random characters.
+  (`testing/test-scenes.sh`): the six random characters, and the kiosk's
+  `madlib`, which `madlib_string()` makes from the address.
 - An event's folder inside the data folder, before `racers`, `cars`,
   `videos`, `logs`, `imagery` or `slides`: PHP's `<year>/<name>` and
   Django's `events/<slug>` (owner decision D57) are both
@@ -88,7 +89,11 @@ What is normalized, on both runs alike:
 
 Ids are numbered afresh after each database reset (`database.execute`
 with `script=schema`), since PHP then hands out ids from 1 again and an id
-from before the reset names another row. First-appearance numbering works
+from before the reset names another row. Group, subgroup and round ids are
+numbered afresh after a successful `partition.apply-rule` of the rule
+already in force (or of an unknown one), other than `custom`: PHP rebuilds
+them all, and Django keeps them (D31). A real change of rule rebuilds them
+on both servers, so its new ids are compared as usual. First-appearance numbering works
 only if both servers create rows in the same order. Where they
 legitimately differ, record a divergence (#37) rather than loosening this.
 
@@ -287,6 +292,11 @@ class FirstAppearance:
         seen = self.order[kind]
         return seen.setdefault(raw, len(seen) + 1)
 
+    def forget(self, *kinds: str) -> None:
+        """Number these kinds afresh from 1."""
+        for kind in kinds:
+            self.order.pop(kind, None)
+
     def __call__(self, kind: str, value):
         if isinstance(value, bool):
             return value
@@ -303,6 +313,8 @@ class Run:
 
     ids: FirstAppearance
     now: datetime
+    # The group formation rule the run last applied, or None when unknown.
+    rule: str | None = None
 
     def _renumber(self, pattern: re.Pattern, kind: str, text: str) -> str:
         """`pattern`'s second group, an id of `kind`, renumbered."""
@@ -528,6 +540,9 @@ def _json(value, endpoint: str, run: Run):
 
 def _mask_strings(value, run: Run):
     if isinstance(value, dict):
+        if _MKTEMP_KIOSK.fullmatch(str(value.get("address"))) and "madlib" in value:
+            # madlib_string() hashes the address, so it is as random as the name.
+            value = {**value, "madlib": "<mktemp>"}
         return {k: _mask_strings(v, run) for k, v in value.items()}
     if isinstance(value, list):
         return [_mask_strings(v, run) for v in value]
@@ -754,8 +769,7 @@ def absorb(exchanges: Sequence[Exchange], run: Run) -> None:
         request = parse_request(exchange.request, run)
         if request.comparison is not Comparison.SKIPPED:
             read_body(exchange.body, request, run)
-        if _resets_database(request):
-            run.ids = FirstAppearance()
+        _after(request, exchange.body, run)
 
 
 def diff(
@@ -810,9 +824,26 @@ def diff(
                 report.allowed.append(difference)
             else:
                 report.differences.append(difference)
-        if _resets_database(req_a):
-            run_a.ids, run_b.ids = FirstAppearance(), FirstAppearance()
+        _after(req_a, ex_a.body, run_a)
+        _after(req_b, ex_b.body, run_b)
     return report
+
+
+def _after(request: Request, body: str, run: Run) -> None:
+    """Number afresh what the request left no id of."""
+    if _resets_database(request):
+        run.ids, run.rule = FirstAppearance(), None
+        return
+    rule = _applied_rule(request, body)
+    if rule is None:
+        return
+    # PHP rebuilds every group, subgroup and round on each apply, even of
+    # the rule in force, where Django changes nothing (D31), so those old
+    # ids name nothing PHP has. On a real change both servers rebuild, and
+    # new ids number afresh by first appearance anyway.
+    if rule != "custom" and run.rule in (None, rule):
+        run.ids.forget(*GROUP_KINDS)
+    run.rule = rule
 
 
 def _resets_database(request: Request) -> bool:
@@ -822,6 +853,24 @@ def _resets_database(request: Request) -> bool:
         request.endpoint == "action database.execute"
         and ("script", "schema") in request.key[-1]
     )
+
+
+# What partition.apply-rule rebuilds.
+GROUP_KINDS = ("class", "rank", "round")
+
+
+def _applied_rule(request: Request, body: str) -> str | None:
+    """The rule a `partition.apply-rule` applied, or None for any other
+    request or a refusal."""
+    if request.endpoint != "action partition.apply-rule":
+        return None
+    values, _ = _json_values(body.strip())
+    outcome = (
+        values[0].get("outcome") if values and isinstance(values[0], dict) else None
+    )
+    if not isinstance(outcome, dict) or outcome.get("summary") != "success":
+        return None
+    return dict(request.key[-1]).get("rule")
 
 
 def main(argv: list[str] | None = None) -> int:
