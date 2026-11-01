@@ -329,7 +329,15 @@ def partition_order(ctx: LegacyContext) -> None:
     ctx.success()
 
 
-@action("partition.apply-rule", permission=Perm.CONTROL_RACE)
+@action(
+    "partition.apply-rule",
+    permission=Perm.CONTROL_RACE,
+    divergences=(
+        "D31: the rule already in force changes nothing and succeeds, even"
+        " once results exist; PHP deletes and remakes every group, subgroup,"
+        " round and group award, or refuses with results-exist.",
+    ),
+)
 def partition_apply_rule(ctx: LegacyContext) -> None:
     rule = ctx.args.get("rule")
     try:
