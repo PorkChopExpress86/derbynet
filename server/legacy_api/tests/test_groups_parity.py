@@ -12,7 +12,8 @@ as in `php_replay.Replay`.
 For `test-racing-groups.sh` the recorder also kept PHP's reply to
 `query=poll&values=classes,partitions,race-structure` after each step
 (`suite/racing-groups.polls.http`). Django's reply, with its ids written as
-the PHP ids `php_replay.PhpIds` assigns, must match it byte for byte.
+the PHP ids `php_replay.PhpIds` assigns, must match it byte for byte, with
+the same status and content type, and name no id of a row that is gone.
 """
 
 import json
@@ -163,14 +164,21 @@ def test_class_list_answers_what_php_recorded_after_every_step(client, fixture):
 POLL_VALUES = "classes,partitions,race-structure"
 
 
-def _poll_as_php(client, replay, php_body: bytes) -> bytes:
+def _poll_as_php(client, replay, php: dict) -> bytes:
     """Django's poll reply with every id written as the PHP id `PhpIds`
-    gives that row, so no id is learned from the reply itself."""
+    gives that row. `as_php_body` would pair an id it does not know with
+    PHP's id in the same place, so an id that names no live row fails here
+    instead."""
     ids = Ids()
     for kind, known in replay.ids.php.items():
         ids.to_php[kind].update(known)
+    before = {kind: dict(known) for kind, known in ids.to_php.items()}
     response = client.get("/action.php", {"query": "poll", "values": POLL_VALUES})
-    return as_php_body(response, php_body, ids)
+    assert response.status_code == int(php["status"])
+    assert response["Content-Type"] == php["content-type"]
+    body = as_php_body(response, php["body"], ids)
+    assert ids.to_php == before, "the reply names an id of no live row"
+    return body
 
 
 def test_poll_answers_what_php_sent_after_every_step(client):
@@ -194,6 +202,6 @@ def test_poll_answers_what_php_sent_after_every_step(client):
         replay.post(exchange["request-body"])
         php = polls[step]
         assert php["request"] == f"GET action.php?query=poll&values={POLL_VALUES}"
-        if _poll_as_php(client, replay, php["body"]) != php["body"]:
+        if _poll_as_php(client, replay, php) != php["body"]:
             mismatches.append(name)
     assert mismatches == []
