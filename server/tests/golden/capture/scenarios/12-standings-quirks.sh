@@ -68,6 +68,7 @@ done
 # Each award.list is followed by award.current for every listed speed award,
 # in award-current/standings/award-settings (#33).
 capture_scenario standings/award-settings
+current_award="$(saved_current_award)"
 note_timer_state
 capture racers "GET action.php?query=racer.list&order=car"
 capture classes "GET action.php?query=class.list"
@@ -90,6 +91,7 @@ for one in 1 0; do
   capture_award_list standings/award-settings "one-trophy-per=$one"
   capture "one-trophy-per=$one export-json" "GET export-json.php"
 done
+restore_current_award "$current_award"
 
 # ----- Q13: two racers whose order depends on dropping the slowest heat.  Their
 # snapshot, with drop-slowest=1 and no scoring in RaceInfo, is loaded back.

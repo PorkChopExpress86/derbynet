@@ -298,10 +298,13 @@ def test_award_current_matches_php_for_every_listed_speed_award():
     for path in sorted(AWARD_CURRENT_DIR.glob("*.http")):
         fixture = Fixture(path.stem)
         lists = {label(name): name for name in fixture.named(AWARD_LIST)}
+        computed = {}
         for name, exchange in read_transcript(path).items():
             *words, key, _request = name.split(" ")[1:]
             listed = lists[" ".join(words)]
-            standings, awards = django_awards(fixture, listed)
+            if listed not in computed:
+                computed[listed] = django_awards(fixture, listed)
+            standings, awards = computed[listed]
             found = current_speed_award(key, standings, awards)
             got = None
             if found is not None and found.racer_id is not None:

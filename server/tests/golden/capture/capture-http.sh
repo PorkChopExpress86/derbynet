@@ -204,7 +204,7 @@ standings_matrix() {
   local saved
   saved="$(curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/action.php?query=settings.list")"
   local current
-  current="$(saved_current_award)"
+  current="$(saved_current_award "$saved")"
   note_timer_state
   capture "as-the-script-left-it export-json" "GET export-json.php"
   capture "as-the-script-left-it standings" "GET action.php?query=standings"
@@ -257,7 +257,7 @@ capture_award_list() {
   capture_scenario "award-current/$transcript"
   while IFS= read -r key; do
     keep_timer_alive
-    post_ok "action=award.present&key=$key&reveal=1"
+    post_ok "action=award.present&key=$(jq -rn --arg k "$key" '$k|@uri')&reveal=1"
     capture "$label $key award.current" "GET action.php?query=award.current"
   done < "$keys"
   capture_scenario "$transcript"
@@ -288,11 +288,14 @@ keep_timer_alive() {
   TIMER_HEARTBEAT_AT=$SECONDS
 }
 
-# saved_current_award: the award being presented and whether it is revealed,
-# as award.present's form fields, so restore_current_award can put them back.
+# saved_current_award [<settings.list reply>]: the award being presented and
+# whether it is revealed, as award.present's form fields, so
+# restore_current_award can put them back.
 saved_current_award() {
-  curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/action.php?query=settings.list" \
-    | jq -r '"key=\(.settings.current_award_key // "")&reveal=\(if .settings.reveal_current_award == 1 or .settings.reveal_current_award == "1" then 1 else 0 end)"'
+  local settings="${1:-}"
+  [ -n "$settings" ] || settings="$(curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/action.php?query=settings.list")"
+  echo "$settings" \
+    | jq -r '"key=\(.settings.current_award_key // "" | @uri)&reveal=\(if .settings.reveal_current_award == 1 or .settings.reveal_current_award == "1" then 1 else 0 end)"'
 }
 
 # restore_current_award <fields>: award.present with what saved_current_award printed.
