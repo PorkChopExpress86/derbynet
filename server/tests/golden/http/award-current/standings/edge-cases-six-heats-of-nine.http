@@ -1,0 +1,2322 @@
+### 001 as-the-script-left-it speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 002 as-the-script-left-it speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 003 as-the-script-left-it speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 004 as-the-script-left-it speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 005 as-the-script-left-it speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 006 as-the-script-left-it speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 007 points=0 scoring=0 subgroups=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 008 points=0 scoring=0 subgroups=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 009 points=0 scoring=0 subgroups=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 010 points=0 scoring=0 subgroups=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 011 points=0 scoring=0 subgroups=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 012 points=0 scoring=0 subgroups=0 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 013 points=0 scoring=0 subgroups=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 014 points=0 scoring=0 subgroups=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 015 points=0 scoring=0 subgroups=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 016 points=0 scoring=0 subgroups=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 017 points=0 scoring=0 subgroups=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 018 points=0 scoring=0 subgroups=1 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 019 points=0 scoring=1 subgroups=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 020 points=0 scoring=1 subgroups=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 021 points=0 scoring=1 subgroups=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 022 points=0 scoring=1 subgroups=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 023 points=0 scoring=1 subgroups=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 024 points=0 scoring=1 subgroups=0 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 025 points=0 scoring=1 subgroups=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 026 points=0 scoring=1 subgroups=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 027 points=0 scoring=1 subgroups=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 028 points=0 scoring=1 subgroups=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 029 points=0 scoring=1 subgroups=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 030 points=0 scoring=1 subgroups=1 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 031 points=0 scoring=2 subgroups=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 032 points=0 scoring=2 subgroups=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 033 points=0 scoring=2 subgroups=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 034 points=0 scoring=2 subgroups=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 035 points=0 scoring=2 subgroups=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 036 points=0 scoring=2 subgroups=0 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 037 points=0 scoring=2 subgroups=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 038 points=0 scoring=2 subgroups=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 039 points=0 scoring=2 subgroups=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 040 points=0 scoring=2 subgroups=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 041 points=0 scoring=2 subgroups=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 042 points=0 scoring=2 subgroups=1 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 043 points=1 scoring=0 subgroups=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 044 points=1 scoring=0 subgroups=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 045 points=1 scoring=0 subgroups=0 speed-1c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1c-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 046 points=1 scoring=0 subgroups=0 speed-1d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1d-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 047 points=1 scoring=0 subgroups=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 048 points=1 scoring=0 subgroups=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 049 points=1 scoring=0 subgroups=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 107,
+        "carname": "",
+        "recipient": "Gus Oak",
+        "duration": "<seconds>"
+    }
+}
+
+### 050 points=1 scoring=0 subgroups=0 speed-2d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 238
+body:
+{
+    "current": {
+        "key": "speed-2d-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 108,
+        "carname": "",
+        "recipient": "Hal Pine",
+        "duration": "<seconds>"
+    }
+}
+
+### 051 points=1 scoring=0 subgroups=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 052 points=1 scoring=0 subgroups=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 053 points=1 scoring=0 subgroups=1 speed-1c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1c-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 054 points=1 scoring=0 subgroups=1 speed-1d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1d-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 055 points=1 scoring=0 subgroups=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 056 points=1 scoring=0 subgroups=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 057 points=1 scoring=0 subgroups=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 107,
+        "carname": "",
+        "recipient": "Gus Oak",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 058 points=1 scoring=0 subgroups=1 speed-2d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-2d-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 108,
+        "carname": "",
+        "recipient": "Hal Pine",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 059 points=1 scoring=1 subgroups=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 060 points=1 scoring=1 subgroups=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 061 points=1 scoring=1 subgroups=0 speed-1c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1c-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 062 points=1 scoring=1 subgroups=0 speed-1d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1d-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 063 points=1 scoring=1 subgroups=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 064 points=1 scoring=1 subgroups=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 065 points=1 scoring=1 subgroups=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 107,
+        "carname": "",
+        "recipient": "Gus Oak",
+        "duration": "<seconds>"
+    }
+}
+
+### 066 points=1 scoring=1 subgroups=0 speed-2d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 238
+body:
+{
+    "current": {
+        "key": "speed-2d-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 108,
+        "carname": "",
+        "recipient": "Hal Pine",
+        "duration": "<seconds>"
+    }
+}
+
+### 067 points=1 scoring=1 subgroups=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 068 points=1 scoring=1 subgroups=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 069 points=1 scoring=1 subgroups=1 speed-1c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1c-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 070 points=1 scoring=1 subgroups=1 speed-1d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1d-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 071 points=1 scoring=1 subgroups=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 072 points=1 scoring=1 subgroups=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 073 points=1 scoring=1 subgroups=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 107,
+        "carname": "",
+        "recipient": "Gus Oak",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 074 points=1 scoring=1 subgroups=1 speed-2d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-2d-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 108,
+        "carname": "",
+        "recipient": "Hal Pine",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 075 points=1 scoring=2 subgroups=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 076 points=1 scoring=2 subgroups=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 077 points=1 scoring=2 subgroups=0 speed-1c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1c-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 078 points=1 scoring=2 subgroups=0 speed-1d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1d-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 079 points=1 scoring=2 subgroups=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 080 points=1 scoring=2 subgroups=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 081 points=1 scoring=2 subgroups=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 107,
+        "carname": "",
+        "recipient": "Gus Oak",
+        "duration": "<seconds>"
+    }
+}
+
+### 082 points=1 scoring=2 subgroups=0 speed-2d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 238
+body:
+{
+    "current": {
+        "key": "speed-2d-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 108,
+        "carname": "",
+        "recipient": "Hal Pine",
+        "duration": "<seconds>"
+    }
+}
+
+### 083 points=1 scoring=2 subgroups=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 084 points=1 scoring=2 subgroups=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 085 points=1 scoring=2 subgroups=1 speed-1c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1c-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 086 points=1 scoring=2 subgroups=1 speed-1d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1d-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 087 points=1 scoring=2 subgroups=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 088 points=1 scoring=2 subgroups=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 089 points=1 scoring=2 subgroups=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 107,
+        "carname": "",
+        "recipient": "Gus Oak",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 090 points=1 scoring=2 subgroups=1 speed-2d-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-2d-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 108,
+        "carname": "",
+        "recipient": "Hal Pine",
+        "subgroup": "Edge",
+        "duration": "<seconds>"
+    }
+}
+
+### 091 one-trophy-per=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 092 one-trophy-per=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 093 one-trophy-per=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 094 one-trophy-per=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 095 one-trophy-per=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 096 one-trophy-per=0 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 097 one-trophy-per=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 098 one-trophy-per=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 099 one-trophy-per=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 100 one-trophy-per=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 101 one-trophy-per=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 102 one-trophy-per=1 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 103 n-rank-trophies=0 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 104 n-rank-trophies=0 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 105 n-rank-trophies=0 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 106 n-rank-trophies=0 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 107 n-rank-trophies=0 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 108 n-rank-trophies=0 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 109 n-rank-trophies=1 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 110 n-rank-trophies=1 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 111 n-rank-trophies=1 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 112 n-rank-trophies=1 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 113 n-rank-trophies=1 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 114 n-rank-trophies=1 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+
+### 115 n-rank-trophies=3 speed-1a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1a-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Ann Lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 116 n-rank-trophies=3 speed-1b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 233
+body:
+{
+    "current": {
+        "key": "speed-1b-1",
+        "awardname": "Fastest in Edge",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "Bob lee",
+        "duration": "<seconds>"
+    }
+}
+
+### 117 n-rank-trophies=3 speed-2a-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2a-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "Cy Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 118 n-rank-trophies=3 speed-2b-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2b-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "Di Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 119 n-rank-trophies=3 speed-2c-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-2c-1",
+        "awardname": "2nd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 105,
+        "carname": "",
+        "recipient": "Ed Moss",
+        "duration": "<seconds>"
+    }
+}
+
+### 120 n-rank-trophies=3 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 236
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Edge",
+        "reveal": true,
+        "carnumber": 106,
+        "carname": "",
+        "recipient": "Flo Nye",
+        "duration": "<seconds>"
+    }
+}
+

@@ -1964,6 +1964,20 @@
       "expected": "deviations/S23/refusals.http"
     },
     {
+      "quirk": "Q23",
+      "fixture": "http/award-current/standings/suite-points-racing.http",
+      "exchanges": [
+        "005 points=0 scoring=1 subgroups=0 speed-1 award.current",
+        "006 points=0 scoring=1 subgroups=0 speed-2 award.current",
+        "007 points=0 scoring=1 subgroups=0 speed-3 award.current",
+        "008 points=0 scoring=1 subgroups=1 speed-1 award.current",
+        "009 points=0 scoring=1 subgroups=1 speed-2 award.current",
+        "010 points=0 scoring=1 subgroups=1 speed-3 award.current"
+      ],
+      "reason": "Django gives a racer with no score in time scoring no place; PHP throws a TypeError or files the racer under rung -1.",
+      "expected": "deviations/Q23/award-current/suite-points-racing.http"
+    },
+    {
       "quirk": "Q24",
       "fixture": "engine/lane-bias.json",
       "cases": [
