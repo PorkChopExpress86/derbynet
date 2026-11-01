@@ -90,9 +90,10 @@ What is normalized, on both runs alike:
 Ids are numbered afresh after each database reset (`database.execute`
 with `script=schema`), since PHP then hands out ids from 1 again and an id
 from before the reset names another row. Group, subgroup and round ids are
-numbered afresh after a `partition.apply-rule` other than `custom`, which
-makes PHP rebuild them all (D31 has Django keep them when the rule is
-already in force). First-appearance numbering works
+numbered afresh after a successful `partition.apply-rule` of the rule
+already in force (or of an unknown one), other than `custom`: PHP rebuilds
+them all, and Django keeps them (D31). A real change of rule rebuilds them
+on both servers, so its new ids are compared as usual. First-appearance numbering works
 only if both servers create rows in the same order. Where they
 legitimately differ, record a divergence (#37) rather than loosening this.
 
@@ -312,6 +313,8 @@ class Run:
 
     ids: FirstAppearance
     now: datetime
+    # The group formation rule the run last applied, or None when unknown.
+    rule: str | None = None
 
     def _renumber(self, pattern: re.Pattern, kind: str, text: str) -> str:
         """`pattern`'s second group, an id of `kind`, renumbered."""
@@ -766,10 +769,7 @@ def absorb(exchanges: Sequence[Exchange], run: Run) -> None:
         request = parse_request(exchange.request, run)
         if request.comparison is not Comparison.SKIPPED:
             read_body(exchange.body, request, run)
-        if _resets_database(request):
-            run.ids = FirstAppearance()
-        elif _rebuilds_groups(request):
-            run.ids.forget(*GROUP_KINDS)
+        _after(request, exchange.body, run)
 
 
 def diff(
@@ -824,12 +824,26 @@ def diff(
                 report.allowed.append(difference)
             else:
                 report.differences.append(difference)
-        if _resets_database(req_a):
-            run_a.ids, run_b.ids = FirstAppearance(), FirstAppearance()
-        elif _rebuilds_groups(req_a):
-            run_a.ids.forget(*GROUP_KINDS)
-            run_b.ids.forget(*GROUP_KINDS)
+        _after(req_a, ex_a.body, run_a)
+        _after(req_b, ex_b.body, run_b)
     return report
+
+
+def _after(request: Request, body: str, run: Run) -> None:
+    """Number afresh what the request left no id of."""
+    if _resets_database(request):
+        run.ids, run.rule = FirstAppearance(), None
+        return
+    rule = _applied_rule(request, body)
+    if rule is None:
+        return
+    # PHP rebuilds every group, subgroup and round on each apply, even of
+    # the rule in force, where Django changes nothing (D31), so those old
+    # ids name nothing PHP has. On a real change both servers rebuild, and
+    # new ids number afresh by first appearance anyway.
+    if rule != "custom" and run.rule in (None, rule):
+        run.ids.forget(*GROUP_KINDS)
+    run.rule = rule
 
 
 def _resets_database(request: Request) -> bool:
@@ -845,19 +859,18 @@ def _resets_database(request: Request) -> bool:
 GROUP_KINDS = ("class", "rank", "round")
 
 
-def _rebuilds_groups(request: Request) -> bool:
-    """`partition.apply-rule` with a rule other than `custom`: PHP deletes
-    every group, subgroup and round and makes them again, even when the rule
-    is already in force, where Django changes nothing (D31). Either way no
-    old id names a row PHP has."""
-    return (
-        request.endpoint == "action partition.apply-rule"
-        and (
-            "rule",
-            "custom",
-        )
-        not in request.key[-1]
+def _applied_rule(request: Request, body: str) -> str | None:
+    """The rule a `partition.apply-rule` applied, or None for any other
+    request or a refusal."""
+    if request.endpoint != "action partition.apply-rule":
+        return None
+    values, _ = _json_values(body.strip())
+    outcome = (
+        values[0].get("outcome") if values and isinstance(values[0], dict) else None
     )
+    if not isinstance(outcome, dict) or outcome.get("summary") != "success":
+        return None
+    return dict(request.key[-1]).get("rule")
 
 
 def main(argv: list[str] | None = None) -> int:
