@@ -95,6 +95,7 @@ A transcript is a sequence of exchanges in the format `capture/transcript.mjs` d
 
 Files, by directory (`find http -type f` lists them all):
 
+- `http/award-current/standings/` One transcript per standings transcript that lists speed awards: after each of its `award.list` exchanges, `query=award.current` with each listed speed award presented, named `<label> <key> award.current` (#33, `capture_award_list` in `capture-http.sh`). A separate file keeps the exchange numbers of the standings transcripts as they were. These captures take long enough for PHP to time out a silent timer (60 s), and how long depends on the machine. So a timer that was connected before them sends a heartbeat at once and every 15 s while they run. With racing off, PHP answers the first heartbeat by aborting a staged heat, which is why `suite/new-rounds-master.http` shows the timer CONNECTED rather than Staging.
 - `http/envelope/` Dispatcher envelope (#18): `before-setup.http`, `dispatcher.http`
 - `http/kiosks/` Kiosk polling (#34): `pages.http`, `poll-kiosk.http`
 - `http/login/` role.login, role.list and the XML stubs (#16): `role-login.http`

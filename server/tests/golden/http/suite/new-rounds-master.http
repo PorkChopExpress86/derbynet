@@ -24,7 +24,7 @@ request-body: action=roster.new&roundid=1&top=3
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 6718
+length: 6731
 body:
 {
     "action": {
@@ -72,10 +72,10 @@ body:
     "timer-state": {
         "lanes": 4,
         "last-contact": "<epoch>",
-        "state": 3,
+        "state": 2,
         "icon": "img\/status\/ok.png",
         "remote-start": false,
-        "message": "Staging"
+        "message": "CONNECTED (<n> sec.)"
     },
     "replay-state": {
         "last_contact": 0,
@@ -294,7 +294,7 @@ request-body: action=roster.delete&roundid=8
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 6008
+length: 6021
 body:
 {
     "action": {
@@ -324,10 +324,10 @@ body:
     "timer-state": {
         "lanes": 4,
         "last-contact": "<epoch>",
-        "state": 3,
+        "state": 2,
         "icon": "img\/status\/ok.png",
         "remote-start": false,
-        "message": "Staging"
+        "message": "CONNECTED (<n> sec.)"
     },
     "replay-state": {
         "last_contact": 0,
@@ -552,7 +552,7 @@ request-body: action=roster.new&roundid=2&top=3&bucketed=1
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 6740
+length: 6753
 body:
 {
     "action": {
@@ -601,10 +601,10 @@ body:
     "timer-state": {
         "lanes": 4,
         "last-contact": "<epoch>",
-        "state": 3,
+        "state": 2,
         "icon": "img\/status\/ok.png",
         "remote-start": false,
-        "message": "Staging"
+        "message": "CONNECTED (<n> sec.)"
     },
     "replay-state": {
         "last_contact": 0,
@@ -823,7 +823,7 @@ request-body: action=roster.new&roundid=&top=4&bucketed=1&classid_1=1&classid_2=
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 8912
+length: 8925
 body:
 {
     "action": {
@@ -921,10 +921,10 @@ body:
     "timer-state": {
         "lanes": 4,
         "last-contact": "<epoch>",
-        "state": 3,
+        "state": 2,
         "icon": "img\/status\/ok.png",
         "remote-start": false,
-        "message": "Staging"
+        "message": "CONNECTED (<n> sec.)"
     },
     "replay-state": {
         "last_contact": 0,
@@ -1183,7 +1183,7 @@ request-body: action=roster.delete&roundid=9
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 6400
+length: 6413
 body:
 {
     "action": {
@@ -1213,10 +1213,10 @@ body:
     "timer-state": {
         "lanes": 4,
         "last-contact": "<epoch>",
-        "state": 3,
+        "state": 2,
         "icon": "img\/status\/ok.png",
         "remote-start": false,
-        "message": "Staging"
+        "message": "CONNECTED (<n> sec.)"
     },
     "replay-state": {
         "last_contact": 0,
@@ -1435,7 +1435,7 @@ request-body: action=roster.new&roundid=&top=5&classid_1=1&classid_2=1&classid_3
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 8333
+length: 8346
 body:
 {
     "action": {
@@ -1501,10 +1501,10 @@ body:
     "timer-state": {
         "lanes": 4,
         "last-contact": "<epoch>",
-        "state": 3,
+        "state": 2,
         "icon": "img\/status\/ok.png",
         "remote-start": false,
-        "message": "Staging"
+        "message": "CONNECTED (<n> sec.)"
     },
     "replay-state": {
         "last_contact": 0,
@@ -1763,7 +1763,7 @@ request-body: action=roster.delete&roundid=9
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 6400
+length: 6413
 body:
 {
     "action": {
@@ -1793,10 +1793,10 @@ body:
     "timer-state": {
         "lanes": 4,
         "last-contact": "<epoch>",
-        "state": 3,
+        "state": 2,
         "icon": "img\/status\/ok.png",
         "remote-start": false,
-        "message": "Staging"
+        "message": "CONNECTED (<n> sec.)"
     },
     "replay-state": {
         "last_contact": 0,

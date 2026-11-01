@@ -203,9 +203,12 @@ standings_matrix() {
   local points scoring subgroups label one n
   local saved
   saved="$(curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/action.php?query=settings.list")"
+  local current
+  current="$(saved_current_award)"
+  note_timer_state
   capture "as-the-script-left-it export-json" "GET export-json.php"
   capture "as-the-script-left-it standings" "GET action.php?query=standings"
-  capture "as-the-script-left-it award.list" "GET action.php?query=award.list"
+  capture_award_list "$1" "as-the-script-left-it"
   standings_by_car "$RAW/$1.by-car.json"
   for points in 0 1; do
     for scoring in 0 1 2; do
@@ -215,7 +218,7 @@ standings_matrix() {
         set_checkbox do-use-subgroups $subgroups
         label="points=$points scoring=$scoring subgroups=$subgroups"
         capture "$label standings" "GET action.php?query=standings"
-        capture "$label award.list" "GET action.php?query=award.list"
+        capture_award_list "$1" "$label"
       done
     done
   done
@@ -224,13 +227,14 @@ standings_matrix() {
   set_checkbox do-use-subgroups 0
   for one in 0 1; do
     set_checkbox one-trophy-per $one
-    capture "one-trophy-per=$one award.list" "GET action.php?query=award.list"
+    capture_award_list "$1" "one-trophy-per=$one"
   done
   set_checkbox one-trophy-per 0
   for n in 0 1 3; do
     post_ok "action=settings.write&n-rank-trophies=$n"
-    capture "n-rank-trophies=$n award.list" "GET action.php?query=award.list"
+    capture_award_list "$1" "n-rank-trophies=$n"
   done
+  restore_current_award "$current"
 
   # The scripts that follow expect the settings they left behind.
   post_ok "action=settings.write&scoring=$(echo "$saved" | jq '.settings.scoring // 0')"
@@ -238,6 +242,62 @@ standings_matrix() {
   set_checkbox use-points "$(echo "$saved" | jq '.settings["use-points"] // 0')"
   set_checkbox do-use-subgroups "$(echo "$saved" | jq '.settings["use-subgroups"] // 0')"
   set_checkbox one-trophy-per "$(echo "$saved" | jq '.settings["one-trophy-per"] // 0')"
+}
+
+# capture_award_list <transcript> <label>: query=award.list into <transcript>,
+# then query=award.current with each of the listed speed awards presented, into
+# award-current/<transcript>, named "<label> <key> award.current".  The second
+# transcript keeps the exchange numbers of the first as they were (#33).
+capture_award_list() {
+  local transcript="$1" label="$2" key
+  capture "$label award.list" "GET action.php?query=award.list"
+  local keys="$RAW/.speed-keys"
+  # Q22 makes PHP answer an empty line once a tie's letter runs past "z".
+  jq -r '.["speed-awards"][]?.key' "$CAPTURE_BODY" > "$keys" 2>/dev/null || : > "$keys"
+  capture_scenario "award-current/$transcript"
+  while IFS= read -r key; do
+    keep_timer_alive
+    post_ok "action=award.present&key=$key&reveal=1"
+    capture "$label $key award.current" "GET action.php?query=award.current"
+  done < "$keys"
+  capture_scenario "$transcript"
+}
+
+# These captures take long enough for PHP to time a timer out (60 s with no
+# contact), and how long depends on the machine, which the scripts after them
+# would see.  So a timer that was connected before them sends a heartbeat at
+# once and every 15 s while they run, as derby-timer.jar does.  With racing
+# off, PHP answers the first one by aborting a staged heat, so the timer is
+# CONNECTED afterwards on any machine.
+TIMER_ALIVE=0
+TIMER_HEARTBEAT_AT=0
+note_timer_state() {
+  local state
+  state="$(curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/action.php?query=poll&values=timer-state" \
+             | jq '.["timer-state"].state')"
+  TIMER_ALIVE=0
+  [ "$state" = 1 ] || TIMER_ALIVE=1
+  TIMER_HEARTBEAT_AT=$((SECONDS - 15))
+}
+keep_timer_alive() {
+  [ "$TIMER_ALIVE" = 1 ] && [ $((SECONDS - TIMER_HEARTBEAT_AT)) -ge 15 ] || return 0
+  local session="$COOKIES_CURL"
+  use_session timer
+  curl_post action.php "action=timer-message&message=HEARTBEAT" >/dev/null
+  COOKIES_CURL="$session"
+  TIMER_HEARTBEAT_AT=$SECONDS
+}
+
+# saved_current_award: the award being presented and whether it is revealed,
+# as award.present's form fields, so restore_current_award can put them back.
+saved_current_award() {
+  curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/action.php?query=settings.list" \
+    | jq -r '"key=\(.settings.current_award_key // "")&reveal=\(if .settings.reveal_current_award == 1 or .settings.reveal_current_award == "1" then 1 else 0 end)"'
+}
+
+# restore_current_award <fields>: award.present with what saved_current_award printed.
+restore_current_award() {
+  post_ok "action=award.present&$1"
 }
 
 # standings_by_car <file>: the standings ladders with each racerid replaced by

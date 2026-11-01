@@ -65,26 +65,29 @@ for group in Red Blue; do
   RACE_TIME_EXPR='({"201":2900,"202":3000,"203":3300,"204":2950,"205":3100,"206":3200}[(.carnumber|tostring)])' race_round
 done
 
+# Each award.list is followed by award.current for every listed speed award,
+# in award-current/standings/award-settings (#33).
 capture_scenario standings/award-settings
+note_timer_state
 capture racers "GET action.php?query=racer.list&order=car"
 capture classes "GET action.php?query=class.list"
 for calc in 0 -1 Both; do
   value="$calc"
   [ "$calc" != Both ] || value="$(classid_of Both)"
   capture_ok "full-field-calc=$calc award.calc-rule" "POST action.php action=award.calc-rule&full-field-calc=$value"
-  capture "full-field-calc=$calc award.list" "GET action.php?query=award.list"
+  capture_award_list standings/award-settings "full-field-calc=$calc"
   capture "full-field-calc=$calc export-json" "GET export-json.php"
 done
 capture_ok "full-field-calc=0 again award.calc-rule" "POST action.php action=award.calc-rule&full-field-calc=0"
 capture_ok "group-ntrophies=1 class.edit" "POST action.php action=class.edit&classid=$(classid_of Red)&name=Red&ntrophies=1"
-capture "group-ntrophies=1 award.list" "GET action.php?query=award.list"
+capture_award_list standings/award-settings "group-ntrophies=1"
 capture "group-ntrophies=1 export-json" "GET export-json.php"
 capture_ok "subgroup-ntrophies=2 rank.edit" "POST action.php action=rank.edit&rankid=$(rankid_of Blue)&name=Blue&ntrophies=2"
-capture "subgroup-ntrophies=2 award.list" "GET action.php?query=award.list"
+capture_award_list standings/award-settings "subgroup-ntrophies=2"
 capture "subgroup-ntrophies=2 export-json" "GET export-json.php"
 for one in 1 0; do
   set_checkbox one-trophy-per $one
-  capture "one-trophy-per=$one award.list" "GET action.php?query=award.list"
+  capture_award_list standings/award-settings "one-trophy-per=$one"
   capture "one-trophy-per=$one export-json" "GET export-json.php"
 done
 

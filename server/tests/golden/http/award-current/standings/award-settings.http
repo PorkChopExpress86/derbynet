@@ -1,0 +1,1400 @@
+### 001 full-field-calc=0 speed-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 258
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 002 full-field-calc=0 speed-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 003 full-field-calc=0 speed-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 262
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 004 full-field-calc=0 speed-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-3",
+        "awardname": "Fastest in Both",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 005 full-field-calc=0 speed-2-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-3",
+        "awardname": "2nd Fastest in Both",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 006 full-field-calc=0 speed-3-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-3",
+        "awardname": "3rd Fastest in Both",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 007 full-field-calc=0 speed-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+{
+    "current": {
+        "key": "speed-1-1",
+        "awardname": "Fastest in Red",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 008 full-field-calc=0 speed-2-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2-1",
+        "awardname": "2nd Fastest in Red",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 009 full-field-calc=0 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Red",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "Eve Cobb",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 010 full-field-calc=0 speed-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 011 full-field-calc=0 speed-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 012 full-field-calc=0 speed-3-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-2",
+        "awardname": "3rd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 206,
+        "carname": "",
+        "recipient": "Hap Fox",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 013 full-field-calc=-1 speed-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-3",
+        "awardname": "Fastest in Both",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 014 full-field-calc=-1 speed-2-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-3",
+        "awardname": "2nd Fastest in Both",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 015 full-field-calc=-1 speed-3-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-3",
+        "awardname": "3rd Fastest in Both",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 016 full-field-calc=-1 speed-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+{
+    "current": {
+        "key": "speed-1-1",
+        "awardname": "Fastest in Red",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 017 full-field-calc=-1 speed-2-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2-1",
+        "awardname": "2nd Fastest in Red",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 018 full-field-calc=-1 speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Red",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "Eve Cobb",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 019 full-field-calc=-1 speed-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 020 full-field-calc=-1 speed-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 021 full-field-calc=-1 speed-3-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-2",
+        "awardname": "3rd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 206,
+        "carname": "",
+        "recipient": "Hap Fox",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 022 full-field-calc=Both speed-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 258
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 023 full-field-calc=Both speed-2-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 024 full-field-calc=Both speed-3-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 262
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 025 full-field-calc=Both speed-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+{
+    "current": {
+        "key": "speed-1-1",
+        "awardname": "Fastest in Red",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 026 full-field-calc=Both speed-2-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2-1",
+        "awardname": "2nd Fastest in Red",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 027 full-field-calc=Both speed-3-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-3-1",
+        "awardname": "3rd Fastest in Red",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "Eve Cobb",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 028 full-field-calc=Both speed-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 029 full-field-calc=Both speed-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 030 full-field-calc=Both speed-3-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-2",
+        "awardname": "3rd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 206,
+        "carname": "",
+        "recipient": "Hap Fox",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 031 group-ntrophies=1 speed-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 258
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 032 group-ntrophies=1 speed-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 033 group-ntrophies=1 speed-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 262
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 034 group-ntrophies=1 speed-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-3",
+        "awardname": "Fastest in Both",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 035 group-ntrophies=1 speed-2-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-3",
+        "awardname": "2nd Fastest in Both",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 036 group-ntrophies=1 speed-3-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-3",
+        "awardname": "3rd Fastest in Both",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 037 group-ntrophies=1 speed-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+{
+    "current": {
+        "key": "speed-1-1",
+        "awardname": "Fastest in Red",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 038 group-ntrophies=1 speed-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 039 group-ntrophies=1 speed-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 040 group-ntrophies=1 speed-3-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-2",
+        "awardname": "3rd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 206,
+        "carname": "",
+        "recipient": "Hap Fox",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 041 subgroup-ntrophies=2 speed-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 258
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 042 subgroup-ntrophies=2 speed-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 043 subgroup-ntrophies=2 speed-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 262
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 044 subgroup-ntrophies=2 speed-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-3",
+        "awardname": "Fastest in Both",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 045 subgroup-ntrophies=2 speed-2-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-3",
+        "awardname": "2nd Fastest in Both",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 046 subgroup-ntrophies=2 speed-3-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-3",
+        "awardname": "3rd Fastest in Both",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 047 subgroup-ntrophies=2 speed-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+{
+    "current": {
+        "key": "speed-1-1",
+        "awardname": "Fastest in Red",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 048 subgroup-ntrophies=2 speed-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 049 subgroup-ntrophies=2 speed-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 050 subgroup-ntrophies=2 speed-3-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-2",
+        "awardname": "3rd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 206,
+        "carname": "",
+        "recipient": "Hap Fox",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 051 subgroup-ntrophies=2 speed-1-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-2-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 052 subgroup-ntrophies=2 speed-2-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-2-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 053 one-trophy-per=1 speed-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 258
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 054 one-trophy-per=1 speed-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 055 one-trophy-per=1 speed-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 262
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 056 one-trophy-per=1 speed-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1-3",
+        "awardname": "Fastest in Both",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 057 one-trophy-per=1 speed-2-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-3",
+        "awardname": "2nd Fastest in Both",
+        "reveal": true,
+        "carnumber": 206,
+        "carname": "",
+        "recipient": "Hap Fox",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 058 one-trophy-per=1 speed-3-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-3",
+        "awardname": "3rd Fastest in Both",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "Eve Cobb",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 059 one-trophy-per=0 speed-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 258
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 060 one-trophy-per=0 speed-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 061 one-trophy-per=0 speed-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 262
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 062 one-trophy-per=0 speed-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-3",
+        "awardname": "Fastest in Both",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 063 one-trophy-per=0 speed-2-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-3",
+        "awardname": "2nd Fastest in Both",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 064 one-trophy-per=0 speed-3-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-3",
+        "awardname": "3rd Fastest in Both",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "Dot Bell",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 065 one-trophy-per=0 speed-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 259
+body:
+{
+    "current": {
+        "key": "speed-1-1",
+        "awardname": "Fastest in Red",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "Cal Ames",
+        "subgroup": "Red",
+        "duration": "<seconds>"
+    }
+}
+
+### 066 one-trophy-per=0 speed-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 067 one-trophy-per=0 speed-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 265
+body:
+{
+    "current": {
+        "key": "speed-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 068 one-trophy-per=0 speed-3-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-3-2",
+        "awardname": "3rd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 206,
+        "carname": "",
+        "recipient": "Hap Fox",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 069 one-trophy-per=0 speed-1-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-2-2",
+        "awardname": "Fastest in Blue",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "Fay Dunn",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+
+### 070 one-trophy-per=0 speed-2-2-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-2-2-2",
+        "awardname": "2nd Fastest in Blue",
+        "reveal": true,
+        "carnumber": 205,
+        "carname": "",
+        "recipient": "Gil Eads",
+        "subgroup": "Blue",
+        "duration": "<seconds>"
+    }
+}
+

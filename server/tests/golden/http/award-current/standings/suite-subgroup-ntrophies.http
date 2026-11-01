@@ -1,0 +1,1400 @@
+### 001 as-the-script-left-it speed-1-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "B Two-B",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 002 as-the-script-left-it speed-2-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-1-1",
+        "awardname": "2nd Fastest in Two",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "A Two-A",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 003 as-the-script-left-it speed-1-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-1-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "A Three-A",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 004 as-the-script-left-it speed-2-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-2-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "C Three-C",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 005 as-the-script-left-it speed-3a-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3a-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "B Three-B",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 006 as-the-script-left-it speed-3b-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3b-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "D Three-D",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 007 as-the-script-left-it speed-1-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 301,
+        "carname": "",
+        "recipient": "A Four-A",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 008 as-the-script-left-it speed-2-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-2-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 303,
+        "carname": "",
+        "recipient": "C Four-C",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 009 as-the-script-left-it speed-3-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-3-1-3",
+        "awardname": "3rd Fastest in Four",
+        "reveal": true,
+        "carnumber": 304,
+        "carname": "",
+        "recipient": "D Four-D",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 010 as-the-script-left-it speed-4-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-4-1-3",
+        "awardname": "4th Fastest in Four",
+        "reveal": true,
+        "carnumber": 302,
+        "carname": "",
+        "recipient": "B Four-B",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 011 points=0 scoring=0 subgroups=1 speed-1-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "B Two-B",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 012 points=0 scoring=0 subgroups=1 speed-2-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-1-1",
+        "awardname": "2nd Fastest in Two",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "A Two-A",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 013 points=0 scoring=0 subgroups=1 speed-1-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-1-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "A Three-A",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 014 points=0 scoring=0 subgroups=1 speed-2-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-2-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "C Three-C",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 015 points=0 scoring=0 subgroups=1 speed-3a-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3a-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "B Three-B",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 016 points=0 scoring=0 subgroups=1 speed-3b-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3b-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "D Three-D",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 017 points=0 scoring=0 subgroups=1 speed-1-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 301,
+        "carname": "",
+        "recipient": "A Four-A",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 018 points=0 scoring=0 subgroups=1 speed-2-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-2-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 303,
+        "carname": "",
+        "recipient": "C Four-C",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 019 points=0 scoring=0 subgroups=1 speed-3-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-3-1-3",
+        "awardname": "3rd Fastest in Four",
+        "reveal": true,
+        "carnumber": 304,
+        "carname": "",
+        "recipient": "D Four-D",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 020 points=0 scoring=0 subgroups=1 speed-4-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-4-1-3",
+        "awardname": "4th Fastest in Four",
+        "reveal": true,
+        "carnumber": 302,
+        "carname": "",
+        "recipient": "B Four-B",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 021 points=0 scoring=1 subgroups=1 speed-1-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "B Two-B",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 022 points=0 scoring=1 subgroups=1 speed-2-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-1-1",
+        "awardname": "2nd Fastest in Two",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "A Two-A",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 023 points=0 scoring=1 subgroups=1 speed-1-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-1-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "A Three-A",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 024 points=0 scoring=1 subgroups=1 speed-2-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-2-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "C Three-C",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 025 points=0 scoring=1 subgroups=1 speed-3-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-3-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "B Three-B",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 026 points=0 scoring=1 subgroups=1 speed-1-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 301,
+        "carname": "",
+        "recipient": "A Four-A",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 027 points=0 scoring=1 subgroups=1 speed-2-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-2-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 303,
+        "carname": "",
+        "recipient": "C Four-C",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 028 points=0 scoring=1 subgroups=1 speed-3-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-3-1-3",
+        "awardname": "3rd Fastest in Four",
+        "reveal": true,
+        "carnumber": 304,
+        "carname": "",
+        "recipient": "D Four-D",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 029 points=0 scoring=1 subgroups=1 speed-4-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-4-1-3",
+        "awardname": "4th Fastest in Four",
+        "reveal": true,
+        "carnumber": 302,
+        "carname": "",
+        "recipient": "B Four-B",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 030 points=0 scoring=2 subgroups=1 speed-1-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "B Two-B",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 031 points=0 scoring=2 subgroups=1 speed-2-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-1-1",
+        "awardname": "2nd Fastest in Two",
+        "reveal": true,
+        "carnumber": 104,
+        "carname": "",
+        "recipient": "D Two-D",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 032 points=0 scoring=2 subgroups=1 speed-1-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-1-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "A Three-A",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 033 points=0 scoring=2 subgroups=1 speed-2-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-2-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "C Three-C",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 034 points=0 scoring=2 subgroups=1 speed-3-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-3-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "B Three-B",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 035 points=0 scoring=2 subgroups=1 speed-1-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 301,
+        "carname": "",
+        "recipient": "A Four-A",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 036 points=0 scoring=2 subgroups=1 speed-2-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-2-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 303,
+        "carname": "",
+        "recipient": "C Four-C",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 037 points=0 scoring=2 subgroups=1 speed-3-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-3-1-3",
+        "awardname": "3rd Fastest in Four",
+        "reveal": true,
+        "carnumber": 304,
+        "carname": "",
+        "recipient": "D Four-D",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 038 points=0 scoring=2 subgroups=1 speed-4-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-4-1-3",
+        "awardname": "4th Fastest in Four",
+        "reveal": true,
+        "carnumber": 302,
+        "carname": "",
+        "recipient": "B Four-B",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 039 points=1 scoring=0 subgroups=1 speed-1a-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "A Two-A",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 040 points=1 scoring=0 subgroups=1 speed-1b-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "B Two-B",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 041 points=1 scoring=0 subgroups=1 speed-2-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-1-1",
+        "awardname": "2nd Fastest in Two",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "C Two-C",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 042 points=1 scoring=0 subgroups=1 speed-1-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-1-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "A Three-A",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 043 points=1 scoring=0 subgroups=1 speed-2-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-2-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "D Three-D",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 044 points=1 scoring=0 subgroups=1 speed-3a-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3a-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "B Three-B",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 045 points=1 scoring=0 subgroups=1 speed-3b-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3b-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "C Three-C",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 046 points=1 scoring=0 subgroups=1 speed-1-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 304,
+        "carname": "",
+        "recipient": "D Four-D",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 047 points=1 scoring=0 subgroups=1 speed-2a-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 268
+body:
+{
+    "current": {
+        "key": "speed-2a-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 302,
+        "carname": "",
+        "recipient": "B Four-B",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 048 points=1 scoring=0 subgroups=1 speed-2b-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 268
+body:
+{
+    "current": {
+        "key": "speed-2b-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 303,
+        "carname": "",
+        "recipient": "C Four-C",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 049 points=1 scoring=0 subgroups=1 speed-3-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-3-1-3",
+        "awardname": "3rd Fastest in Four",
+        "reveal": true,
+        "carnumber": 301,
+        "carname": "",
+        "recipient": "A Four-A",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 050 points=1 scoring=1 subgroups=1 speed-1-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 260
+body:
+{
+    "current": {
+        "key": "speed-1-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "B Two-B",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 051 points=1 scoring=1 subgroups=1 speed-2-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-1-1",
+        "awardname": "2nd Fastest in Two",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "A Two-A",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 052 points=1 scoring=1 subgroups=1 speed-1-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 266
+body:
+{
+    "current": {
+        "key": "speed-1-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "A Three-A",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 053 points=1 scoring=1 subgroups=1 speed-2-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 270
+body:
+{
+    "current": {
+        "key": "speed-2-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "D Three-D",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 054 points=1 scoring=1 subgroups=1 speed-3a-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3a-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "B Three-B",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 055 points=1 scoring=1 subgroups=1 speed-3b-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-3b-1-2",
+        "awardname": "3rd Fastest in Three",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "C Three-C",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 056 points=1 scoring=1 subgroups=1 speed-1-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 263
+body:
+{
+    "current": {
+        "key": "speed-1-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 304,
+        "carname": "",
+        "recipient": "D Four-D",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 057 points=1 scoring=1 subgroups=1 speed-2a-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 268
+body:
+{
+    "current": {
+        "key": "speed-2a-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 302,
+        "carname": "",
+        "recipient": "B Four-B",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 058 points=1 scoring=1 subgroups=1 speed-2b-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 268
+body:
+{
+    "current": {
+        "key": "speed-2b-1-3",
+        "awardname": "2nd Fastest in Four",
+        "reveal": true,
+        "carnumber": 303,
+        "carname": "",
+        "recipient": "C Four-C",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 059 points=1 scoring=1 subgroups=1 speed-3-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-3-1-3",
+        "awardname": "3rd Fastest in Four",
+        "reveal": true,
+        "carnumber": 301,
+        "carname": "",
+        "recipient": "A Four-A",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 060 points=1 scoring=2 subgroups=1 speed-1a-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1a-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "A Two-A",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 061 points=1 scoring=2 subgroups=1 speed-1b-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 261
+body:
+{
+    "current": {
+        "key": "speed-1b-1-1",
+        "awardname": "Fastest in Two",
+        "reveal": true,
+        "carnumber": 102,
+        "carname": "",
+        "recipient": "B Two-B",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 062 points=1 scoring=2 subgroups=1 speed-2-1-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-2-1-1",
+        "awardname": "2nd Fastest in Two",
+        "reveal": true,
+        "carnumber": 103,
+        "carname": "",
+        "recipient": "C Two-C",
+        "subgroup": "Two",
+        "duration": "<seconds>"
+    }
+}
+
+### 063 points=1 scoring=2 subgroups=1 speed-1a-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-1a-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 201,
+        "carname": "",
+        "recipient": "A Three-A",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 064 points=1 scoring=2 subgroups=1 speed-1b-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 267
+body:
+{
+    "current": {
+        "key": "speed-1b-1-2",
+        "awardname": "Fastest in Three",
+        "reveal": true,
+        "carnumber": 204,
+        "carname": "",
+        "recipient": "D Three-D",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 065 points=1 scoring=2 subgroups=1 speed-2a-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-2a-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 202,
+        "carname": "",
+        "recipient": "B Three-B",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 066 points=1 scoring=2 subgroups=1 speed-2b-1-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 271
+body:
+{
+    "current": {
+        "key": "speed-2b-1-2",
+        "awardname": "2nd Fastest in Three",
+        "reveal": true,
+        "carnumber": 203,
+        "carname": "",
+        "recipient": "C Three-C",
+        "subgroup": "Three",
+        "duration": "<seconds>"
+    }
+}
+
+### 067 points=1 scoring=2 subgroups=1 speed-1a-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-1a-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 301,
+        "carname": "",
+        "recipient": "A Four-A",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 068 points=1 scoring=2 subgroups=1 speed-1b-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-1b-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 302,
+        "carname": "",
+        "recipient": "B Four-B",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 069 points=1 scoring=2 subgroups=1 speed-1c-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-1c-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 303,
+        "carname": "",
+        "recipient": "C Four-C",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+
+### 070 points=1 scoring=2 subgroups=1 speed-1d-1-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 264
+body:
+{
+    "current": {
+        "key": "speed-1d-1-3",
+        "awardname": "Fastest in Four",
+        "reveal": true,
+        "carnumber": 304,
+        "carname": "",
+        "recipient": "D Four-D",
+        "subgroup": "Four",
+        "duration": "<seconds>"
+    }
+}
+

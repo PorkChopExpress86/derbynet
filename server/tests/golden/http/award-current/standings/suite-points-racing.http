@@ -1,0 +1,661 @@
+### 001 as-the-script-left-it speed-1a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 245
+body:
+{
+    "current": {
+        "key": "speed-1a",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Adolfo \"Dolf\" Asher",
+        "duration": "<seconds>"
+    }
+}
+
+### 002 as-the-script-left-it speed-1b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 234
+body:
+{
+    "current": {
+        "key": "speed-1b",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "duration": "<seconds>"
+    }
+}
+
+### 003 as-the-script-left-it speed-2a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 249
+body:
+{
+    "current": {
+        "key": "speed-2a",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "duration": "<seconds>"
+    }
+}
+
+### 004 as-the-script-left-it speed-2b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 241
+body:
+{
+    "current": {
+        "key": "speed-2b",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "duration": "<seconds>"
+    }
+}
+
+### 005 points=0 scoring=1 subgroups=0 speed-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 244
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "duration": "<seconds>"
+    }
+}
+
+### 006 points=0 scoring=1 subgroups=0 speed-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 240
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "duration": "<seconds>"
+    }
+}
+
+### 007 points=0 scoring=1 subgroups=0 speed-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 237
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "duration": "<seconds>"
+    }
+}
+
+### 008 points=0 scoring=1 subgroups=1 speed-1 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 282
+body:
+{
+    "current": {
+        "key": "speed-1",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 009 points=0 scoring=1 subgroups=1 speed-2 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 278
+body:
+{
+    "current": {
+        "key": "speed-2",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 010 points=0 scoring=1 subgroups=1 speed-3 award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 275
+body:
+{
+    "current": {
+        "key": "speed-3",
+        "awardname": "3rd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 011 points=1 scoring=0 subgroups=0 speed-1a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 245
+body:
+{
+    "current": {
+        "key": "speed-1a",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Adolfo \"Dolf\" Asher",
+        "duration": "<seconds>"
+    }
+}
+
+### 012 points=1 scoring=0 subgroups=0 speed-1b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 234
+body:
+{
+    "current": {
+        "key": "speed-1b",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "duration": "<seconds>"
+    }
+}
+
+### 013 points=1 scoring=0 subgroups=0 speed-2a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 249
+body:
+{
+    "current": {
+        "key": "speed-2a",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "duration": "<seconds>"
+    }
+}
+
+### 014 points=1 scoring=0 subgroups=0 speed-2b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 241
+body:
+{
+    "current": {
+        "key": "speed-2b",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "duration": "<seconds>"
+    }
+}
+
+### 015 points=1 scoring=0 subgroups=1 speed-1a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 283
+body:
+{
+    "current": {
+        "key": "speed-1a",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Adolfo \"Dolf\" Asher",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 016 points=1 scoring=0 subgroups=1 speed-1b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 272
+body:
+{
+    "current": {
+        "key": "speed-1b",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 017 points=1 scoring=0 subgroups=1 speed-2a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "current": {
+        "key": "speed-2a",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 018 points=1 scoring=0 subgroups=1 speed-2b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 279
+body:
+{
+    "current": {
+        "key": "speed-2b",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 019 points=1 scoring=1 subgroups=0 speed-1a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 245
+body:
+{
+    "current": {
+        "key": "speed-1a",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Adolfo \"Dolf\" Asher",
+        "duration": "<seconds>"
+    }
+}
+
+### 020 points=1 scoring=1 subgroups=0 speed-1b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 234
+body:
+{
+    "current": {
+        "key": "speed-1b",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "duration": "<seconds>"
+    }
+}
+
+### 021 points=1 scoring=1 subgroups=0 speed-2a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 249
+body:
+{
+    "current": {
+        "key": "speed-2a",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "duration": "<seconds>"
+    }
+}
+
+### 022 points=1 scoring=1 subgroups=0 speed-2b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 241
+body:
+{
+    "current": {
+        "key": "speed-2b",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "duration": "<seconds>"
+    }
+}
+
+### 023 points=1 scoring=1 subgroups=1 speed-1a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 283
+body:
+{
+    "current": {
+        "key": "speed-1a",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Adolfo \"Dolf\" Asher",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 024 points=1 scoring=1 subgroups=1 speed-1b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 272
+body:
+{
+    "current": {
+        "key": "speed-1b",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 025 points=1 scoring=1 subgroups=1 speed-2a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "current": {
+        "key": "speed-2a",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 026 points=1 scoring=1 subgroups=1 speed-2b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 279
+body:
+{
+    "current": {
+        "key": "speed-2b",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 027 points=1 scoring=2 subgroups=0 speed-1a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 245
+body:
+{
+    "current": {
+        "key": "speed-1a",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Adolfo \"Dolf\" Asher",
+        "duration": "<seconds>"
+    }
+}
+
+### 028 points=1 scoring=2 subgroups=0 speed-1b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 234
+body:
+{
+    "current": {
+        "key": "speed-1b",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "duration": "<seconds>"
+    }
+}
+
+### 029 points=1 scoring=2 subgroups=0 speed-2a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 249
+body:
+{
+    "current": {
+        "key": "speed-2a",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "duration": "<seconds>"
+    }
+}
+
+### 030 points=1 scoring=2 subgroups=0 speed-2b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 241
+body:
+{
+    "current": {
+        "key": "speed-2b",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "duration": "<seconds>"
+    }
+}
+
+### 031 points=1 scoring=2 subgroups=1 speed-1a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 283
+body:
+{
+    "current": {
+        "key": "speed-1a",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 101,
+        "carname": "",
+        "recipient": "Adolfo \"Dolf\" Asher",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 032 points=1 scoring=2 subgroups=1 speed-1b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 272
+body:
+{
+    "current": {
+        "key": "speed-1b",
+        "awardname": "Fastest in Pack",
+        "reveal": true,
+        "carnumber": 141,
+        "carname": "",
+        "recipient": "Jesse Jara",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 033 points=1 scoring=2 subgroups=1 speed-2a award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "current": {
+        "key": "speed-2a",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 111,
+        "carname": "Vroom",
+        "recipient": "Carroll Cybulski",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
+### 034 points=1 scoring=2 subgroups=1 speed-2b award.current
+request: GET action.php?query=award.current
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 279
+body:
+{
+    "current": {
+        "key": "speed-2b",
+        "awardname": "2nd Fastest in Pack",
+        "reveal": true,
+        "carnumber": 121,
+        "carname": "",
+        "recipient": "Derick Dreier",
+        "subgroup": "Lions & Tigers",
+        "duration": "<seconds>"
+    }
+}
+
