@@ -44,13 +44,15 @@ class TimerScenario(Scenario):
         headers = {"User-Agent": ua} if ua else {}
         if method == "GET":
             path, _, query = target.partition("?")
-            fields = translate(parse_qsl(query, keep_blank_values=True), self.ids)
+            fields = translate(
+                parse_qsl(query, keep_blank_values=True), self.ids.django
+            )
             response = client.get(
                 f"/{path}?{urlencode(fields, quote_via=quote)}", headers=headers
             )
         else:
             body = exchange.get("request-body") or ""
-            fields = translate(parse_qsl(body, keep_blank_values=True), self.ids)
+            fields = translate(parse_qsl(body, keep_blank_values=True), self.ids.django)
             response = client.post(
                 "/" + target,
                 urlencode(fields, quote_via=quote),

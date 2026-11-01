@@ -4,9 +4,15 @@
 blank line and the response body, so the fixtures here are in that form.
 """
 
+import re
 import textwrap
+from datetime import datetime
+from pathlib import Path
 
 from tools import transcript_diff as td
+
+# When the hand-written runs ran: their timestamps are within a day of it.
+NOW = datetime(2026, 11, 1, 1, 40)
 
 
 def run(text: str) -> str:
@@ -14,7 +20,7 @@ def run(text: str) -> str:
 
 
 def differences(a: str, b: str, allow=None) -> td.Report:
-    return td.diff(run(a), run(b), allow=allow)
+    return td.diff(run(a), run(b), allow=allow, now=NOW)
 
 
 IMPORT_AND_LIST = """
@@ -254,7 +260,7 @@ def test_a_run_with_more_exchanges_fails():
 
     assert not report.ok
     assert report.diverged.index == 10
-    assert report.diverged.a is None
+    assert report.diverged.a is td.MISSING
 
 
 def test_responses_glued_together_are_compared_one_by_one():
@@ -321,7 +327,9 @@ def test_xml_against_json_fails():
     [found] = report.differences
     assert found.path == "$"
     assert found.index == 2
-    assert (found.a, found.b) == ("<xml>", "<json>")
+    # timer-message replies in XML (registry.format_of), so a JSON body is
+    # not parsed as JSON: it is text.
+    assert (found.a, found.b) == ("<xml>", "<text>")
 
 
 def test_pages_are_not_compared():
@@ -365,12 +373,220 @@ def test_the_command_exits_non_zero_and_names_the_path(tmp_path, capsys):
     )
     (tmp_path / "c.curl").write_text(run(IMPORT_AND_LIST.format(**SHIFTED)))
 
-    failed = td.main([str(tmp_path / "a.curl"), str(tmp_path / "b.curl")])
+    def command(a, b, now=NOW):
+        return td.main([str(tmp_path / a), str(tmp_path / b), "--now", now.isoformat()])
+
+    failed = command("a.curl", "b.curl")
     out = capsys.readouterr().out
-    passed = td.main([str(tmp_path / "a.curl"), str(tmp_path / "c.curl")])
+    passed = command("a.curl", "c.curl")
+    # Years later the runs' timestamps are fixed dates, and they differ.
+    later = command("a.curl", "c.curl", now=datetime(2030, 1, 1))
 
     assert failed == 1
     assert "query racer.list" in out
     assert "action.php?query=racer.list" in out
     assert "$.racers[1].firstname" in out
     assert passed == 0
+    assert later == 1
+
+
+# What `expect_photo_shape` (testing/test-photo-manipulations.sh) writes: a
+# `photo <tail> <shape>` line with no blank lines around it, after a reply
+# that may or may not end in a newline, and the tail ends in `$RANDOM`.
+PHOTO_SHAPES = """
+    post action.php action=photo.rotate&repo=car&image_name=pattern-o6.jpg&rotation=90
+
+    {{"outcome": {{"summary": "success"}}, "cache-breaker": {breaker}}}photo car/file/original/pattern-o6.jpg/{r1} 320x480 6 RGBW
+    photo car/file/200x200/pattern-o6.jpg/{r2} 200x133 none {quarters}
+
+    photo head/file/original/ISO_12233-reschart.jpg/{r3}
+
+    """  # noqa: E501
+
+
+def test_photo_shapes_are_exchanges_of_their_own():
+    exchanges = td.parse(
+        run(PHOTO_SHAPES.format(breaker=1, r1=5, r2=6, r3=7, quarters="RGBW"))
+    )
+
+    assert [(e.request, e.body.strip()) for e in exchanges] == [
+        (
+            "post action.php action=photo.rotate&repo=car"
+            "&image_name=pattern-o6.jpg&rotation=90",
+            '{"outcome": {"summary": "success"}, "cache-breaker": 1}',
+        ),
+        ("photo car/file/original/pattern-o6.jpg/5", "320x480 6 RGBW"),
+        ("photo car/file/200x200/pattern-o6.jpg/6", "200x133 none RGBW"),
+        ("photo head/file/original/ISO_12233-reschart.jpg/7", ""),
+    ]
+
+
+def test_random_breakers_in_requests_are_masked_even_when_zero():
+    a = PHOTO_SHAPES.format(breaker=1, r1=0, r2=31000, r3=0, quarters="RGBW")
+    b = PHOTO_SHAPES.format(breaker=2, r1=17, r2=0, r3=9, quarters="RGBW")
+
+    report = differences(a, b)
+
+    assert report.ok, report.render()
+    assert report.compared == 4
+
+
+def test_a_changed_photo_shape_fails():
+    a = PHOTO_SHAPES.format(breaker=1, r1=1, r2=2, r3=3, quarters="RGBW")
+    b = PHOTO_SHAPES.format(breaker=1, r1=4, r2=5, r3=6, quarters="GWRB")
+
+    [found] = differences(a, b).differences
+
+    assert found.index == 3
+    assert found.endpoint == "page photo.php"
+    assert found.path == "text"
+    assert (found.a, found.b) == ("200x133 none RGBW", "200x133 none GWRB")
+
+
+def test_a_reply_cache_breaker_of_zero_against_non_zero_fails():
+    a = PHOTO_SHAPES.format(breaker=0, r1=1, r2=2, r3=3, quarters="RGBW")
+    b = PHOTO_SHAPES.format(breaker=7, r1=1, r2=2, r3=3, quarters="RGBW")
+
+    [found] = differences(a, b).differences
+
+    assert (found.path, found.a, found.b) == ("$.cache-breaker", 0, 7)
+
+
+def test_bodies_without_a_trailing_newline_parse():
+    text = (
+        "\naction.php?query=poll\n\n"
+        '{"a": 1}'
+        "\npost action.php action=x.y&z=1\n\n"
+        '<?xml version="1.0"?>\n<action-response/>'
+        "\nlogin RaceCoordinator\n\n"
+        '{"b": 2}'
+    )
+
+    exchanges = td.parse(text)
+
+    assert [(e.request, e.body.strip()) for e in exchanges] == [
+        ("action.php?query=poll", '{"a": 1}'),
+        (
+            "post action.php action=x.y&z=1",
+            '<?xml version="1.0"?>\n<action-response/>',
+        ),
+        ("login RaceCoordinator", '{"b": 2}'),
+    ]
+
+
+KIOSKS = """
+    action.php?query=poll.kiosk.all
+
+    {{"kiosks": [{{"age": {age}, "last_contact": {contact}}}],
+      "timecheck": {timecheck}, "age": {top_age},
+      "replay": {{"last-contact": {replay}}}}}
+    """
+
+
+def kiosks(**values):
+    defaults = {"age": 3, "contact": 9, "timecheck": '"t"', "top_age": 1, "replay": 5}
+    return KIOSKS.format(**{**defaults, **values})
+
+
+def test_a_volatile_value_that_changes_type_fails():
+    report = differences(kiosks(), kiosks(age='"4"', timecheck="null"))
+
+    assert [(d.path, d.a, d.b) for d in report.differences] == [
+        ("$.kiosks[0].age", 3, "4"),
+        ("$.timecheck", "t", None),
+    ]
+
+
+def test_volatile_values_of_one_type_match():
+    changed = kiosks(age=8, contact=12, timecheck='"u"', replay=6)
+
+    assert differences(kiosks(), changed).ok
+
+
+def test_a_last_contact_of_zero_against_non_zero_fails():
+    [found] = differences(kiosks(), kiosks(contact=0)).differences
+
+    assert found.path == "$.kiosks[0].last_contact"
+
+
+def test_age_outside_a_kiosk_entry_is_compared():
+    [found] = differences(kiosks(), kiosks(top_age=2)).differences
+
+    assert (found.path, found.a, found.b) == ("$.age", 1, 2)
+
+
+AWARD = """
+    action.php?query=award.list
+
+    {{"awards": [{{"awardname": "Best", "presented": "{presented}",
+                  "note": "given at {presented}"}}]}}
+    """
+
+
+def test_a_wrong_fixed_date_is_reported():
+    a = AWARD.format(presented="2019-05-04 10:00:00")
+    b = AWARD.format(presented="2019-05-05 10:00:00")
+
+    found = differences(a, b).differences
+
+    assert [d.path for d in found] == ["$.awards[0].presented", "$.awards[0].note"]
+
+
+def test_timestamps_close_to_now_are_masked():
+    a = AWARD.format(presented="2026-11-01 01:39:28")
+    b = AWARD.format(presented="2026-10-31T20:39:29-0500")
+
+    assert differences(a, b).ok
+
+
+def test_an_xml_like_body_of_a_json_endpoint_is_text():
+    # PHP's not_authorized_body() writes XML into a JSON reply (C21). The
+    # endpoint's format, not the body, decides how it is read.
+    a = run("""
+        action.php?query=replay.message
+
+        <failure code="notauthorized">Not authorized</failure>
+        """)
+    b = a.replace("Not authorized", "Refused")
+
+    [found] = differences(a, b).differences
+
+    assert found.path == "text"
+
+
+ORDER = """
+    post action.php action=class.add&name=Bears&rankid_{r1}=1&rankid_{r2}=1
+
+    {{"classid": {c}}}
+
+    post action.php action=rank.order&rankid_1={r2}&rankid_2={r1}
+
+    {{"action": {{"action": "rank.order", "rankid_1": {r2}, "rankid_2": {r1}}},
+      "outcome": {{"summary": "success"}}}}
+
+    post action.php action=class.order&classid_1={c}
+
+    {{"outcome": {{"summary": "success"}}}}
+    """
+
+
+def test_order_fields_name_a_position_and_an_id():
+    # class.add's `rankid_<rankid>=1` names the rank in its key, rank.order's
+    # `rankid_<position>=<rankid>` in its value.
+    a = ORDER.format(r1=3, r2=8, c=2)
+
+    assert differences(a, ORDER.format(r1=11, r2=16, c=12)).ok
+    # The same ranks in the other order is another request.
+    swapped = a.replace("rankid_1=8&rankid_2=3", "rankid_1=3&rankid_2=8")
+    assert differences(a, swapped).diverged.index == 2
+
+
+NORMALIZE_MJS = Path(__file__).resolve().parent / "golden/capture/normalize.mjs"
+
+
+def test_every_golden_normalization_rule_is_accounted_for():
+    text = NORMALIZE_MJS.read_text()
+    rules = set(re.findall(r"^\s+id: '([\w-]+)',$", text, re.M))
+
+    assert len(rules) == 9
+    assert set(td.GOLDEN_RULES) == rules

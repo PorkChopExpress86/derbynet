@@ -8,6 +8,7 @@ with Django's ids written as PHP's and its volatile values masked as
 
 import json
 import re
+from collections.abc import Callable
 from urllib.parse import parse_qsl, quote, urlencode
 
 from legacy_api.encoding import encode_php_json
@@ -138,53 +139,61 @@ class Ids:
         return django_id
 
     def as_php(self, value, key=None):
-        if isinstance(value, dict):
-            out = {}
-            for k, v in value.items():
-                if k in ID_KEYS:
-                    out[k] = self.php(ID_KEYS[k], v)
-                elif k in LIST_KEYS and isinstance(v, list):
-                    out[k] = [self.php(LIST_KEYS[k], i) for i in v]
-                elif k == "schedule" and isinstance(v, list):
-                    out[k] = [[self.php("racer", r) for r in heat] for heat in v]
-                elif k == "schedule-signature" and isinstance(v, dict):
-                    out[k] = {
-                        str(self.php("round", int(r))): _SIGNATURE.sub(
-                            lambda m: (
-                                f"{self.php('result', int(m[1]))}"
-                                f"-{self.php('racer', int(m[2]))}"
-                            ),
-                            sig,
-                        )
-                        for r, sig in v.items()
-                    }
-                elif k == "tbodyid" and not value.get("use_master_sched"):
-                    out[k] = self.php("round", v)
-                elif k == "key" and isinstance(v, str):
-                    out[k] = award_key(v, self.php)
-                elif k == "standings" and isinstance(v, dict):
-                    out[k] = {
-                        standings_key(key, self.php): [
-                            [self.php("racer", r) for r in rung] for rung in ladder
-                        ]
-                        for key, ladder in v.items()
-                    }
-                elif k == "chart" and isinstance(v, list) and key is None:
-                    out[k] = [
-                        None
-                        if heat is None
-                        else " ".join(
-                            str(self.php("racer", int(r))) if r.isdigit() else r
-                            for r in heat.split(" ")
-                        )
-                        for heat in v
+        return rewrite_ids(value, self.php, key)
+
+
+# Maps an id of one kind to another numbering: `to_id(kind, value)`.
+IdMap = Callable[[str, object], object]
+
+
+def rewrite_ids(value, to_id: IdMap, key=None):
+    """`value` with every id the keys above name passed through `to_id`."""
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            if k in ID_KEYS:
+                out[k] = to_id(ID_KEYS[k], v)
+            elif k in LIST_KEYS and isinstance(v, list):
+                out[k] = [to_id(LIST_KEYS[k], i) for i in v]
+            elif k == "schedule" and isinstance(v, list):
+                out[k] = [[to_id("racer", r) for r in heat] for heat in v]
+            elif k == "schedule-signature" and isinstance(v, dict):
+                out[k] = {
+                    str(to_id("round", int(r))): _SIGNATURE.sub(
+                        lambda m: (
+                            f"{to_id('result', int(m[1]))}-{to_id('racer', int(m[2]))}"
+                        ),
+                        sig,
+                    )
+                    for r, sig in v.items()
+                }
+            elif k == "tbodyid" and not value.get("use_master_sched"):
+                out[k] = to_id("round", v)
+            elif k == "key" and isinstance(v, str):
+                out[k] = award_key(v, to_id)
+            elif k == "standings" and isinstance(v, dict):
+                out[k] = {
+                    standings_key(key, to_id): [
+                        [to_id("racer", r) for r in rung] for rung in ladder
                     ]
-                else:
-                    out[k] = self.as_php(v, k)
-            return out
-        if isinstance(value, list):
-            return [self.as_php(v, key) for v in value]
-        return value
+                    for key, ladder in v.items()
+                }
+            elif k == "chart" and isinstance(v, list) and key is None:
+                out[k] = [
+                    None
+                    if heat is None
+                    else " ".join(
+                        str(to_id("racer", int(r))) if r.isdigit() else r
+                        for r in heat.split(" ")
+                    )
+                    for heat in v
+                ]
+            else:
+                out[k] = rewrite_ids(v, to_id, k)
+        return out
+    if isinstance(value, list):
+        return [rewrite_ids(v, to_id, key) for v in value]
+    return value
 
 
 # A request field that names a row, and the kind of row.
@@ -204,25 +213,26 @@ VALUE_PREFIX_KINDS = {"awardid_": "award"}
 PREFIX_KINDS = {"classid_": "class", "rankid_": "rank", "constituent_": "class"}
 
 
-def translate(fields, ids: Ids):
+def translate(fields, to_id: IdMap):
+    """Request fields with the ids they name passed through `to_id`."""
     out = []
     for key, value in fields:
         if key in FIELD_KINDS and value.lstrip("-").isdigit():
-            value = str(ids.django(FIELD_KINDS[key], int(value)))
+            value = str(to_id(FIELD_KINDS[key], int(value)))
         for prefix, kind in VALUE_PREFIX_KINDS.items():
             if key.startswith(prefix) and value.isdigit():
-                value = str(ids.django(kind, int(value)))
+                value = str(to_id(kind, int(value)))
         if key == "key":
-            value = award_key(value, ids.django)
+            value = award_key(value, to_id)
         if key == "class_and_rank":
             # `classid[,rankid]`, where 0 is none.
             value = ",".join(
-                str(ids.django(kind, int(part))) if part.isdigit() else part
+                str(to_id(kind, int(part))) if part.isdigit() else part
                 for kind, part in zip(("class", "rank"), value.split(","), strict=False)
             )
         for prefix, kind in PREFIX_KINDS.items():
             if key.startswith(prefix) and key[len(prefix) :].isdigit():
-                key = prefix + str(ids.django(kind, int(key[len(prefix) :])))
+                key = prefix + str(to_id(kind, int(key[len(prefix) :])))
         out.append((key, value))
     return out
 
@@ -231,9 +241,9 @@ def send(client, request: str, body: str | None, ids: Ids):
     method, target = request.split(" ", 1)
     if method == "GET":
         path, _, query = target.partition("?")
-        fields = translate(parse_qsl(query, keep_blank_values=True), ids)
+        fields = translate(parse_qsl(query, keep_blank_values=True), ids.django)
         return client.get(f"/{path}?{urlencode(fields, quote_via=quote)}")
-    fields = translate(parse_qsl(body or "", keep_blank_values=True), ids)
+    fields = translate(parse_qsl(body or "", keep_blank_values=True), ids.django)
     return client.post(
         "/" + target,
         urlencode(fields, quote_via=quote),
