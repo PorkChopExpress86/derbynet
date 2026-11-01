@@ -14,6 +14,11 @@
 #   autoincrement
 #            Make the server's SQLite tables never reuse an ID, as Django's don't
 #   suite    Run test-face-detection.sh, js-syntax-check.sh, exercise-one-database.sh
+#   parity   Run exercise-one-database.sh as a leg of the parity gate (#37), from
+#            a copy of testing/ in $DERBYNET_PARITY_DIR, and record each step's
+#            transcript in $DERBYNET_PARITY_DIR/steps.  With DERBYNET_PARITY_URL
+#            set, run against that server on the host's network (Django)
+#            instead of the server container.  See server/tools/parity_gate.py.
 #   logs     Print the server container's log
 #   clean    Remove the server container and its data volume
 #
@@ -124,6 +129,27 @@ step_suite() {
   '
 }
 
+step_parity() {
+  local dir="${DERBYNET_PARITY_DIR:?set DERBYNET_PARITY_DIR to a directory for the leg}"
+  local network=(--network "container:$SERVER") url=http://localhost
+  if [ -n "$DERBYNET_PARITY_URL" ]; then
+    network=(--network host)
+    url="$DERBYNET_PARITY_URL"
+  fi
+  # Each leg has its own copy of testing/, since the suite keeps its cookies and
+  # transcript next to the scripts.
+  rm -rf "$dir"
+  mkdir -p "$dir/steps"
+  cp -R "$ROOT/testing" "$dir/testing"
+  rm -f "$dir"/testing/*.curl
+  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e DERBYNET_SHIFT_IDS \
+         -e DERBYNET_BACKEND -e PARITY_DIR=/leg/steps -v "$dir:/leg" -w /leg \
+         "${network[@]}" "$HARNESS_IMAGE" bash -c '
+    set -o pipefail
+    testing/exercise-one-database.sh "$0" ez 2>&1 | tee steps/suite.log
+  ' "$url"
+}
+
 step_logs() {
   docker logs "$SERVER" 2>&1
 }
@@ -148,7 +174,7 @@ if [ $# -eq 0 ]; then
 fi
 for step in "$@"; do
   case "$step" in
-    harness|assets|server|timeout|autoincrement|suite|logs|clean|all) "step_$step" ;;
+    harness|assets|server|timeout|autoincrement|suite|parity|logs|clean|all) "step_$step" ;;
     *) echo "Unknown step: $step" >&2; exit 2 ;;
   esac
 done

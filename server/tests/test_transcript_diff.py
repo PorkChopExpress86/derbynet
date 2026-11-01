@@ -346,6 +346,139 @@ def test_pages_are_not_compared():
     assert report.skipped == 1
 
 
+CLASS_ADD = """
+    post action.php action=class.add&rankid_{rank}=1&name=Agg
+
+    {{"outcome": {{"summary": "success"}},
+      "action": {{"action": "class.add", "rankid_{rank}": "1", "name": "Agg"}}}}
+
+    post action.php action=award.edit&class_and_rank=1,{rank}
+
+    {{"outcome": {{"summary": "success"}},
+      "action": {{"action": "award.edit", "class_and_rank": "1,{rank}"}}}}
+    """
+
+
+def test_ids_in_an_echoed_request_are_numbered_as_in_the_request():
+    report = differences(CLASS_ADD.format(rank=8), CLASS_ADD.format(rank=9))
+
+    assert report.ok, report.render()
+
+
+def test_echoed_number_fields_are_numbered_as_in_the_request():
+    template = """
+        post action.php action=roster.new&classid_{a}=1&classid_{b}=1
+
+        {{"outcome": {{"summary": "success"}},
+          "action": {{"action": "roster.new", "classid_{a}": 1, "classid_{b}": 1}}}}
+
+        post action.php action=award.order&awardid_1={c}
+
+        {{"outcome": {{"summary": "success"}},
+          "action": {{"action": "award.order", "awardid_1": {c}}}}}
+        """
+
+    report = differences(
+        template.format(a=1, b=2, c=4), template.format(a=97, b=98, c=17)
+    )
+
+    assert report.ok, report.render()
+
+
+RESET = """
+    post action.php action=racer.add&firstname=Ann&carno=1
+
+    {{"outcome": {{"summary": "success"}}, "new-row": {{"racerid": {first}}}}}
+
+    post action.php action=database.execute&script=schema
+
+    {{"outcome": {{"summary": "success"}}}}
+
+    post action.php action=racer.add&firstname=Bob&carno=2
+
+    {{"outcome": {{"summary": "success"}}, "new-row": {{"racerid": {second}}}}}
+
+    post action.php action=racer.delete&racer={second}
+
+    {{"outcome": {{"summary": "success"}}}}
+    """
+
+
+def test_ids_are_numbered_afresh_after_a_database_reset():
+    # PHP hands out racer 1 again after the reset; Django goes on to 2.
+    report = differences(
+        RESET.format(first=1, second=1), RESET.format(first=1, second=2)
+    )
+
+    assert report.ok, report.render()
+
+
+def test_partition_order_names_ids_in_its_values():
+    template = """
+        post action.php action=partition.order&partitionid_1={a}&partitionid_2={b}
+
+        {{"outcome": {{"summary": "success"}}}}
+
+        action.php?query=poll&values=partitions
+
+        {{"partitions": [{{"partitionid": {b}}}, {{"partitionid": {a}}}]}}
+        """
+
+    report = differences(template.format(a=3, b=2), template.format(a=48, b=47))
+
+    assert report.ok, report.render()
+
+
+def test_the_event_folder_and_mktemp_kiosk_names_are_masked():
+    template = """
+        action.php?query=settings.list&key=photo-directory
+
+        {{"settings": {{"photo-directory": "/var/lib/derbynet/{folder}/racers"}}}}
+
+        post action.php action=kiosk.assign&address=kiosk1-{name}&name=Main
+
+        {{"outcome": {{"summary": "success"}}}}
+        """
+    php = template.format(folder="2026/testdb", name="JRN2XL")
+    django = template.format(folder="events/testdb", name="8cB1wX")
+
+    assert differences(php, django).ok
+    # The data folder in front of the event's is compared.
+    moved = django.replace("/var/lib/derbynet", "/srv/data")
+    [found] = differences(php, moved).differences
+    assert found.path == "$.settings.photo-directory"
+
+
+def test_two_events_folders_still_differ():
+    template = """
+        post action.php action=settings.write&photo-dir=/var/lib/derbynet/{}/racers
+
+        {{"outcome": {{"summary": "success"}}}}
+        """
+
+    same = differences(template.format("2026/testdb"), template.format("events/testdb"))
+    other = differences(
+        template.format("2026/testdb"), template.format("events/another-event")
+    )
+
+    assert same.ok
+    assert other.diverged is not None
+
+
+def test_a_long_value_is_cut_in_the_report():
+    a = run("""
+        action.php?query=racer.list
+
+        {"text": "short"}
+        """)
+    b = a.replace("short", "x" * 1000)
+
+    rendered = differences(a, b).render()
+
+    assert "... (1002 characters)" in rendered
+    assert "x" * 400 not in rendered
+
+
 def test_an_allowed_difference_passes_and_is_listed():
     a = IMPORT_AND_LIST.format(**FIRST)
     b = IMPORT_AND_LIST.format(**dict(SHIFTED, bob_name="Robert"))

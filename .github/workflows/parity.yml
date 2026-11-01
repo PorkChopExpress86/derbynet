@@ -1,0 +1,179 @@
+name: parity
+
+# The parity gate (#37): the shell suite of testing/, in the order
+# testing/exercise-one-database.sh runs it, against the PHP server and against
+# the Django server on SQLite and on Postgres, each leg from its own copy of
+# testing/.  server/tools/parity_gate.py then compares each step's transcript
+# with PHP's, after the registry's allowlist (PARITY_PATHS in
+# server/legacy_api/registry.py), and fails on a failed step or any other
+# difference.
+#
+# The Django server runs as in server.yml, with runserver and the test
+# endpoints on; there is no Django image yet (#58).  Both legs run the suite
+# from the test harness image of testing/docker/run-suite.sh, so they use the
+# same curl, jq and xmllint.
+#
+# The gate can't pass until the tickets in WAITING (server/tools/parity_gate.py)
+# land, so it runs nightly, on demand, and on a push to a branch named
+# parity-check/<anything>.  It does not run on pull requests: a red gate would
+# stop plan/bin/pr-merge, which merges only when every check passed.  To try a
+# change to the gate, push its commit to parity-check/<name> as well.
+
+on:
+  schedule:
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+  push:
+    branches: ['parity-check/**']
+
+concurrency:
+  group: parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    name: leg (php)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the test harness image
+        run: testing/docker/run-suite.sh harness
+
+      - name: Build PHP assets
+        run: testing/docker/run-suite.sh assets
+
+      - name: Build and start the server image
+        run: testing/docker/run-suite.sh server
+
+      - name: Raise PHP and nginx timeouts
+        run: testing/docker/run-suite.sh timeout
+
+      # PHP's SQLite tables reuse the id of a deleted last row, and Django's
+      # never do (ADR-12), so ids would part between the legs; the php-suite
+      # job's second run does the same.
+      - name: Make the SQLite tables never reuse an ID
+        run: testing/docker/run-suite.sh autoincrement
+
+      # A failed step doesn't end the leg; the gate job judges it.
+      - name: Run the suite, step by step
+        env:
+          DERBYNET_PARITY_DIR: ${{ runner.temp }}/leg
+        run: testing/docker/run-suite.sh parity
+
+      - name: Collect the server log
+        if: always()
+        run: testing/docker/run-suite.sh logs > "$RUNNER_TEMP/leg/steps/server.log" || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: leg-php
+          path: ${{ runner.temp }}/leg/steps
+          if-no-files-found: error
+
+      - name: Remove the server container
+        if: always()
+        run: testing/docker/run-suite.sh clean
+
+  django:
+    name: leg (django, ${{ matrix.database }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: sqlite
+            url: ''
+          - database: postgres
+            url: postgres://postgres:postgres@localhost:5432/derbynet
+    services:
+      postgres:
+        # An empty image skips the service on the SQLite run.
+        image: ${{ matrix.database == 'postgres' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: derbynet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: ${{ matrix.url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        working-directory: server
+        run: uv sync --locked
+
+      - name: Build the test harness image
+        run: testing/docker/run-suite.sh harness
+
+      # runserver with DERBYNET_ENABLE_TEST_ENDPOINTS=1 and DERBYNET_BACKEND=django.
+      # The data folder is the PHP image's, so that the folder settings differ
+      # only where D57 says.
+      - name: Run the suite, step by step
+        env:
+          DERBYNET_PARITY_DATA_DIR: /var/lib/derbynet
+        run: |
+          sudo install -d -o "$(id -u)" -g "$(id -g)" /var/lib/derbynet
+          server/tools/parity-django.sh "$RUNNER_TEMP/leg" 8080
+
+      - name: Keep the server log with the steps
+        if: always()
+        run: cp "$RUNNER_TEMP/leg/server.log" "$RUNNER_TEMP/leg/suite/steps/" || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: leg-django-${{ matrix.database }}
+          path: ${{ runner.temp }}/leg/suite/steps
+          if-no-files-found: error
+
+  gate:
+    name: gate (django, ${{ matrix.database }})
+    needs: [php, django]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: leg-php
+          path: ${{ runner.temp }}/php
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: leg-django-${{ matrix.database }}
+          path: ${{ runner.temp }}/django
+
+      - name: Compare the legs
+        run: >-
+          uv run python -m tools.parity_gate
+          --labels php,django-${{ matrix.database }}
+          --summary "$GITHUB_STEP_SUMMARY"
+          "$RUNNER_TEMP/php" "$RUNNER_TEMP/django"

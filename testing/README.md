@@ -102,6 +102,9 @@ database reset (`shift-ids.sh`), so that nothing created in the suite gets its
 usual ID.
 
 `test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
+With `DERBYNET_BACKEND=django`, `test-visit-each-page.sh` expects `print.php` to
+answer 404, since the Django server drops the printables (#55), and
+`exercise-one-database.sh` skips `test-balloting.sh` (#54).
 
 `test-photo-manipulations.sh` checks how the renders of a photo with EXIF
 orientation 6 come out.  The PHP server ignores the tag (#73) and won't be
@@ -162,6 +165,30 @@ It pairs the exchanges in order, numbers database ids by first appearance,
 masks clocks, cache breakers and session ids, and prints each difference with
 its endpoint, request and JSON or XML path.  It exits 1 on any difference.
 The docstring of `server/tools/transcript_diff.py` lists what it normalizes.
+
+## The parity gate
+
+`.github/workflows/parity.yml` runs `exercise-one-database.sh` against the PHP
+server and against the Django server, on SQLite and on Postgres, and compares
+the runs step by step (#37).  With `PARITY_DIR` set, each step of
+`exercise-one-database.sh` (`steps.sh`) saves its slice of `output.curl` and
+its outcome there, retries once a failed step that resets the database itself,
+and the run goes on past a failure.  `server/tools/parity_gate.py` then judges
+the two legs: the steps that wait on another ticket are in its `WAITING`, the
+steps the Django leg skips in its `SKIPS`, and the reply paths a recorded
+divergence changes are in `PARITY_PATHS` in `server/legacy_api/registry.py`.
+A leg that ends writes `complete` next to `steps.tsv`; the gate fails a leg
+without it.
+
+The gate runs nightly, on demand, and on a push to a branch named
+`parity-check/<anything>`.  It does not run on pull requests, because it can't
+pass yet and `plan/bin/pr-merge` merges only when every check passed, so push a
+change to the gate to `parity-check/<name>` too.  To run it locally, from a
+regular checkout with the images built (`run-suite.sh harness assets`):
+
+    DERBYNET_PARITY_DIR=/tmp/leg-php testing/docker/run-suite.sh server timeout parity
+    server/tools/parity-django.sh /tmp/leg-django
+    cd server && uv run python -m tools.parity_gate /tmp/leg-php/steps /tmp/leg-django/suite/steps
 
 ## Test photos
 
