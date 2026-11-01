@@ -84,8 +84,9 @@ PAYLOAD_DIVERGENCES = (
 # Where the racers of a reinstated heat show their places again.
 REINSTATE_DIVERGENCES = (
     *PAYLOAD_DIVERGENCES,
-    "Q4: a reinstated heat lists each lane's place again with its time; PHP"
-    " restores one column, the times in time racing, and lists every place empty.",
+    "Q4: a reinstated heat lists each lane's time and place again; PHP restores"
+    " one column, so in time racing it lists every place empty, and under"
+    " points every time.",
 )
 
 

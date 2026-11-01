@@ -21,14 +21,18 @@ from legacy_api.registry import LegacyContext, action, query
 from racing.engine.phpcompat import php_equals, php_intval, php_truthy
 from roster.models import Group, Racer, Subgroup
 
+# Every reply that lists the awards.
+A1 = (
+    "A1: an award with no group or no subgroup lists 0 for the missing classid"
+    " or rankid; PHP lists null."
+)
 PRESENT_DIVERGENCES = (
     "A3: with neither key nor reveal it answers success; PHP sets no outcome"
     " and answers in-progress.",
     "A5: a key past 100 characters answers not-written; PHP stores it.",
 )
 EDIT_DIVERGENCES = (
-    "A1: a pack-wide award lists classid 0 and rankid 0 where PHP lists the"
-    " null it stored for an award made with no class_and_rank.",
+    A1,
     "A2: a class_and_rank naming no group or subgroup of the event answers"
     " unknownclass or unknownrank, and a subgroup of another group"
     " wrongclass; PHP stores the ids as given.",
@@ -37,13 +41,10 @@ EDIT_DIVERGENCES = (
 )
 LIST_DIVERGENCES = (
     "D5: it needs a login; PHP answers anyone. Every page that reads it has one.",
-    "A1: an award stored with no class lists classid 0 and rankid 0; PHP lists null.",
+    A1,
 )
 # The actions that answer with the award list, as award.list does.
-REPLY_DIVERGENCES = (
-    "A1: an award stored with no class lists classid 0 and rankid 0 in the"
-    " reply's award list; PHP lists null.",
-)
+REPLY_DIVERGENCES = (A1,)
 CALC_RULE_DIVERGENCES = (
     "A4: a full-field-calc that names no group of the event answers"
     " not-written; PHP stores it.",

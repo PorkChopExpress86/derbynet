@@ -334,8 +334,10 @@ def partition_order(ctx: LegacyContext) -> None:
     permission=Perm.CONTROL_RACE,
     divergences=(
         "D31: the rule already in force changes nothing and succeeds, even"
-        " once results exist; PHP deletes and remakes every group, subgroup,"
-        " round and group award, or refuses with results-exist.",
+        " once results exist. PHP applies it again: one-group and by-partition"
+        " delete and remake every group, subgroup, round and group award;"
+        " custom turns use-subgroups back on; and with results it refuses with"
+        " results-exist.",
     ),
 )
 def partition_apply_rule(ctx: LegacyContext) -> None:
