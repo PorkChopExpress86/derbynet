@@ -432,9 +432,10 @@ def order_steps(event, seqs: dict[PlaylistEntry, int]) -> None:
 
 def apply_due_scene(event, now: datetime) -> bool:
     """`maybe_apply_playlist_scene()`: show the finished step's scene once
-    its due time has passed. The kiosk poll (#34) and a periodic check call
-    it, so the scene changes even with no kiosk polling. Returns whether it
-    applied the scene. The polls call it every few seconds, so the lock is
+    its due time has passed. The kiosk polls (`kiosks.polls`) and the legacy
+    `query=poll.coordinator` call it, so the scene changes while either a
+    kiosk or the PHP coordinator page polls. Returns whether it applied the
+    scene. The polls call it every few seconds, so the lock is
     taken only when a scene is due."""
     due = RaceState.objects.filter(event=event, playlist_scene_at__lt=now)
     if not due.exists():

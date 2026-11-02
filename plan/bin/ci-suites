@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Lists each `testing/` shell suite an issue names, and whether
+`.github/workflows/server.yml` runs it against Django.
+
+Usage: plan/bin/ci-suites <number>
+
+Exits 1 when a named suite is missing from the workflow. A suite that still
+waits on another ticket stays missing; say which ticket in the PR body.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+SUITE = re.compile(r"\btesting/([\w-]+\.sh)\b")
+HELPERS = {"common.sh"}  # sourced by the suites, never run alone
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 1 or not argv[0].isdigit():
+        print("usage: ci-suites <number>", file=sys.stderr)
+        return 2
+    gh = os.environ.get("GH", "gh")
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+    body = json.loads(
+        subprocess.run(
+            [gh, "issue", "view", argv[0], "--repo", repo, "--json", "body"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )["body"]
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "server.yml").read_text()
+    ran = set(re.findall(r"bash testing/([\w-]+\.sh)", workflow))
+    missing = 0
+    for suite in sorted(set(SUITE.findall(body)) - HELPERS):
+        if suite in ran:
+            print(f"in CI    testing/{suite}")
+        else:
+            missing += 1
+            print(f"MISSING  testing/{suite}")
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

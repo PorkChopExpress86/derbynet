@@ -13,7 +13,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## Django handlers
 
 - A handler under `server/legacy_api/handlers/` is a thin adapter. It parses `ctx.args`, calls a service, and encodes the result. The guard in `server/legacy_api/tests/test_registry.py` fails a handler that writes through the ORM.
-- A service that changes roster, inspection, lane, or result data takes `core.services.lock_race_state(event_id)` first inside `transaction.atomic()`. A handler never reads race state before a service call and acts on it after.
+- A service that changes roster, inspection, lane, or result data takes `core.services.lock_race_state(event_id)` first inside `transaction.atomic()`. A handler or a `ui` view never reads race state before a service call and acts on it after: the service reads it again under the lock.
 - A record that must survive a refusal is written after the atomic block, because the rollback removes it.
 - Every endpoint needs a `LEAK_REQUESTS` entry in `server/legacy_api/tests/test_event_leak.py`.
 - A deliberate difference from PHP goes in the endpoint's `divergences` in the registry, citing a quirk id or an owner decision (`D48`). A difference that a recorded golden fixture shows also goes in `server/tests/golden/deviations.json` (D25).
@@ -23,7 +23,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## Evidence
 
 - A claim counts once a test or a real server run reproduces it. That covers a sentence in `GLOSSARY.md`, `plan/owner-decisions.md` or a docstring that says what the server does. Name the test or the code that shows it.
-- Run the shell suites in `testing/` against a live Django server the way `.github/workflows/server.yml` does. Add a suite to that workflow once it passes on SQLite and Postgres with no stand-in.
+- Run the shell suites in `testing/` against a live Django server the way `.github/workflows/server.yml` does. Add a suite to that workflow once it passes on SQLite and Postgres with no stand-in. `plan/bin/ci-suites N` lists the suites ticket N names that the workflow lacks; the PR body names the ticket each one waits on.
 - Run the full server suite once at the end, in the background, and read its exit code before pushing.
 - Golden captures from PHP need a regular clone, not a worktree. Ask the lead to run `server/tests/golden/capture.sh`, narrowed with `GOLDEN_SCENARIOS`.
 - Before the PR, merge `origin/master` into the branch and rerun the affected tests.

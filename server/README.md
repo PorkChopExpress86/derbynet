@@ -405,7 +405,7 @@ The `ui` app holds the base of every M4 page: `ui/base.html`, the CSS build, the
 - **Components.** `ui/templates/ui/components/` holds the #39 catalog. Wrapping components take a body with `{% component "sheet" name="x" title="..." %}...{% endcomponent %}` (`{% load ui %}`): sheet, confirm sheet, card list, card, filter bar and sortable list. The others are includes: switch, segmented control, search field, status pill, stepper, toast and icon. With `DERBYNET_DEBUG=1` or `DERBYNET_ENABLE_TEST_ENDPOINTS=1`, `components/` shows them all.
 - **Default passwords.** Every page shows a logged-in role a banner while a role keeps the password `accounts/defaults.py` seeds (D16). `accounts.services.roles_with_default_password()` checks the hashes, and remembers each result for as long as the role's hash stays the same.
 - **Server URLs.** `ui.server_urls.preferred_urls(request, use_https=False)` ports PHP's `preferred_urls()`: the URL in `<config dir>/config-url` when that file exists, else one URL per host address, or the `Host` header behind a proxy.
-- **Session writes.** Page and poll views never write the session (#15). Wrap a test's requests in `ui.tests.sessions.no_session_writes()` to prove it.
+- **Session and database writes.** Page, sheet and poll views never write the session (#15) or the database (#41). `ui/tests/test_every_view.py` sends a GET to every `ui` URL under `ui.tests.sessions.no_session_writes()` and `ui.tests.db.no_db_writes()`, and sends every URL junk in each parameter its module names, failing on a 500. A new URL is covered once it exists.
 
 ### Browser tests
 

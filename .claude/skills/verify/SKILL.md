@@ -7,7 +7,7 @@ description: Drive DerbyNet's web UI, PHP or the Django port, in a real browser 
 
 DerbyNet is a pinewood derby race manager served over HTTP: manager pages (setup, check-in, race dashboard, standings) and kiosk pages for TVs. Today the server is PHP (`website/`). The Django port under `server/` must pass the same journeys.
 
-Drive it with the Playwright MCP browser tools (`mcp__plugin_playwright_playwright__browser_*`). Seed preconditions with the legacy API; drive the feature under test through the browser.
+Drive it with the Playwright MCP browser tools (`mcp__plugin_playwright_playwright__browser_*`). When the session lists none, write a Python Playwright script and run it with `uv run --directory server python script.py`: `server/` installs Playwright and Chromium for its browser tests (`uv run playwright install chromium` once), and `server/ui/tests/browser/conftest.py` shows the login, the phone and desktop sizes, and the error listeners. Seed preconditions with the legacy API; drive the feature under test through the browser.
 
 ## Launch
 

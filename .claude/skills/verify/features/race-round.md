@@ -25,6 +25,21 @@ Preconditions:
 - **Race.** Select the fake timer tab and tick the auto-mode checkbox (`#auto-mode-checkbox`). Heats run about 8 s apart.
 - **Proof.** Poll `action.php?query=poll.coordinator` until the Lions round shows `heats_run` equal to `heats_scheduled` (4 heats for 4 racers on 4 lanes). Screenshot the dashboard, which lists the last heat's lane times.
 
+## The timer under `VERIFY_SERVER=django`
+
+Django has no `/fake-timer.php` until #50, and the Race Dashboard is `/dashboard/` (`coordinator.php` redirects there). Play the timer with curl, as `run_heat` in `testing/common.sh` does, in a cookie jar of its own:
+
+```bash
+T=.claude/verify-evidence/v1/timer-cookies.txt
+B=http://127.0.0.1:8090/action.php
+curl -s -c $T -b $T $B --data 'action=role.login&name=Timer&password='
+curl -s -c $T -b $T $B --data 'action=timer-message&message=HELLO'
+curl -s -c $T -b $T $B --data 'action=timer-message&message=STARTED'
+curl -s -c $T -b $T $B --data 'action=timer-message&message=FINISHED&lane1=2.111&lane2=2.222&lane3=2.333&lane4=2.444'
+```
+
+Each FINISHED records the current heat and answers `heat-ready` for the next. The page's stable handles (`[data-heat-text]`, `[data-lane="1"] [data-result]`, `[data-holding]`) are the ones `server/ui/tests/browser/test_dashboard.py` drives.
+
 ## Gotchas
 
 - Headless background tabs are throttled. A click in the background dashboard tab can time out, so select the tab first.
