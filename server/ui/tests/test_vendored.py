@@ -28,3 +28,25 @@ def test_the_base_template_loads_the_listed_versions():
     assert "http" not in re.sub(r"<!--.*?-->", "", base.split("<body")[0]).replace(
         "http-equiv", ""
     )
+
+
+TEMPLATES = sorted(
+    path
+    for app in (UI, UI.parent / "accounts")
+    for path in (app / "templates").rglob("*.html")
+)
+EXTERNAL = re.compile(r"""(?:src|href)\s*=\s*["']?\s*(?:https?:)?//""", re.I)
+
+
+def test_no_template_loads_anything_from_another_site():
+    """Race venues often have no internet: every script, stylesheet and link
+    a page loads comes from this server."""
+    assert len(TEMPLATES) > 20
+    offenders = [p.name for p in TEMPLATES if EXTERNAL.search(p.read_text())]
+    assert offenders == []
+
+
+def test_the_scan_finds_an_external_url():
+    assert EXTERNAL.search('<script src="https://cdn.example/htmx.js">')
+    assert EXTERNAL.search("<link href='//cdn.example/x.css'>")
+    assert not EXTERNAL.search('<script src="/static/ui/app.js">')

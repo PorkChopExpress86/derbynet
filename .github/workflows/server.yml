@@ -64,7 +64,8 @@ jobs:
   # no network and no Node, from the checkout and the pinned Tailwind CLI, and
   # fails if the committed ui/static/ui/app.css is stale. Then the Playwright
   # suite runs every page at 390x844 and 1280x800 against Django's live
-  # server, and the screenshots are uploaded whatever the outcome.
+  # server, and the screenshots are uploaded whatever the outcome.  The
+  # container image is pinned by digest.
   ui:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -82,7 +83,8 @@ jobs:
         run: |
           docker run --rm --network none \
             -v "$GITHUB_WORKSPACE:/w:ro" -v "$HOME/.cache:/cache:ro" \
-            -e XDG_CACHE_HOME=/cache -w /w/server python:3.14-slim \
+            -e XDG_CACHE_HOME=/cache -w /w/server \
+            python:3.14-slim@sha256:930e1abba7c4e8f96ed93e8012c35d174d7732752731bbd5e8e757d7ec6f3966 \
             sh -c 'if command -v node; then exit 1; fi
                    echo "node: not installed"
                    python -I ui/css_build.py check'

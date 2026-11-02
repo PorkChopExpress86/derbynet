@@ -32,10 +32,6 @@ from accounts.models import Role  # noqa: E402
 from core.tests.factories import EventFactory  # noqa: E402
 from ui.tests.roles import PASSWORDS  # noqa: E402
 
-# Playwright's sync API runs an event loop in the test thread, and Django
-# refuses ORM calls from a thread with a running loop.
-os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
-
 SIZES = {
     "phone": {
         "viewport": {"width": 390, "height": 844},
@@ -58,6 +54,17 @@ def pytest_collection_modifyitems(items):
     for item in items:
         if here in Path(item.fspath).parents:
             item.add_marker(pytest.mark.browser)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _async_unsafe():
+    """Playwright's sync API runs an event loop in the test thread, and Django
+    refuses ORM calls from a thread with a running loop. Session scope sets it
+    before pytest-django opens the database, and only once a browser test
+    runs, so a default run keeps the check."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
+        yield
 
 
 @pytest.fixture(autouse=True)

@@ -1,7 +1,10 @@
 """D16: every manager page warns while a role keeps its seeded password."""
 
+from unittest import mock
+
 import pytest
 
+from accounts import services
 from accounts.models import Role
 from accounts.services import roles_with_default_password
 
@@ -64,3 +67,16 @@ def test_the_seed_migration_reads_the_same_list():
     seed = import_module("accounts.migrations.0002_seed_default_roles")
 
     assert seed.DEFAULT_ROLES is defaults.DEFAULT_ROLES
+
+
+def test_each_hash_is_checked_once(event):
+    services._checked.clear()
+    real = services.check_password
+    with mock.patch.object(services, "check_password", side_effect=real) as check:
+        roles_with_default_password()
+        roles_with_default_password()
+        assert check.call_count == 3
+
+        change_password("RaceCrew", "new-crew")
+        assert roles_with_default_password() == ["Photo", "RaceCoordinator"]
+        assert check.call_count == 4

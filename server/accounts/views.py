@@ -116,7 +116,7 @@ def login(request):
         "attempted": attempted if isinstance(attempted, str) else "",
         # PHP hides the documentation hint on a hosted install.
         "locked_settings": settings.LOCK_SETTINGS,
-        # The kiosk and camera pages keep their PHP paths (#52, #53).
+        # The kiosk, replay and camera pages keep their PHP paths (#52, #53).
         "script_prefix": get_script_prefix(),
     }
     return render(request, "accounts/login.html", context, status=401 if error else 200)

@@ -54,7 +54,8 @@ class NavEntry:
     section: Section
     # The ticket that builds the page.
     ticket: int
-    # The PHP page it replaces, for the placeholder and the 301 table.
+    # The PHP page it replaces. The placeholder names it, and once `view` is
+    # set the page answers it with a 301 (`ui.redirects`).
     php: str = ""
     # The label in the phone bottom nav.
     short_label: str = ""
@@ -383,8 +384,10 @@ ENTRIES: tuple[NavEntry, ...] = (
         php="timer-test.php",
         menu=False,
     ),
-    # Replay is a kiosk page (#53). It is here for the Photo role's bottom
-    # nav (D20), and needs CONTROL_RACE (D16).
+    # Replay is a kiosk page that #53 ports. The entry is here only for the
+    # Photo role's bottom nav (D20), and needs CONTROL_RACE (D16). The login
+    # page's Replay Kiosk button links to replay.php, as the other kiosk
+    # buttons link to their PHP paths.
     NavEntry(
         "replay",
         "Replay",

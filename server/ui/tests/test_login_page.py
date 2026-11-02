@@ -19,7 +19,7 @@ def test_the_kiosk_and_camera_entries(client, event):
     for label, href in [
         ("Be a Kiosk", "/kiosk.php"),
         ("Fullscreen Kiosk", "/fullscreen.php"),
-        ("Replay Kiosk", "/replay/"),
+        ("Replay Kiosk", "/replay.php"),
         ("Be a Camera", "/camera.php"),
     ]:
         assert f'href="{href}"' in page

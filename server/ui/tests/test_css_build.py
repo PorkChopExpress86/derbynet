@@ -39,7 +39,8 @@ def test_every_release_platform_is_pinned():
     not css_build.binary_path().exists(), reason="the Tailwind CLI is not fetched"
 )
 def test_the_committed_css_is_up_to_date():
-    """CI's ui job runs `manage.py build_css --check` on every pull request."""
+    """CI's ui job runs the same check, `python -I ui/css_build.py check`, in a
+    container with no network and no Node."""
     assert css_build.check()
 
 

@@ -15,6 +15,15 @@ def test_a_new_install_goes_to_set_up(db):
     assert response["Location"] == "/setup/"
 
 
+def test_a_visitor_on_a_new_install_follows_home_to_set_up(db):
+    """H1: no login page on the way, as PHP sent everyone to setup.php."""
+    response = Client().get("/index.php", follow=True)
+
+    assert [url for url, _ in response.redirect_chain] == ["/", "/setup/"]
+    assert response.status_code == 200
+    assert 'data-placeholder="setup"' in response.content.decode()
+
+
 def test_set_up_opens_on_a_new_install(db):
     """Every session holds SET_UP until the first event exists."""
     assert Client().get("/setup/").status_code == 200

@@ -115,8 +115,10 @@ def fetch() -> Path:
     return path
 
 
-def build(output: Path = OUTPUT) -> Path:
-    """Write the minified CSS with the cached binary. Never downloads."""
+def build(output: Path | None = None) -> Path:
+    """Write the minified CSS, to `OUTPUT` by default, with the cached binary.
+    Never downloads."""
+    output = output or OUTPUT
     platform_name = _platform()
     path = binary_path(platform_name)
     if not path.exists():

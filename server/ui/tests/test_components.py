@@ -90,3 +90,14 @@ def test_a_toast_can_go_out_of_band():
     )
 
     assert html.strip().startswith('<div hx-swap-oob="beforeend:#toasts">')
+
+
+def test_the_toast_level_is_escaped_for_javascript():
+    """M4: x-data is JavaScript, where an HTML-escaped quote is a quote."""
+    html = render(
+        '{% include "ui/components/toast.html" with message="m" level=level %}',
+        level="x');alert(1);('",
+    )
+
+    assert "uiToast('x\\u0027)" in html
+    assert "&#x27;" not in html.split("uiToast(", 1)[1].split(")", 1)[0]
