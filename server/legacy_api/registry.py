@@ -224,6 +224,18 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
         for key in ("nheats", "ncars", "heats")
     ),
     ParityPath("action schedule.reschedule", "$.adjuster", "R6", django=MISSING),
+    ParityPath("action result.delete", "$.sql", "C23", django=MISSING),
+    ParityPath("query settings.list", "$.settings.db-connection", "S2", django=""),
+    *(
+        # What each reset ran, and the database and engine it ran on.
+        ParityPath(endpoint, path, "D67")
+        for endpoint in (
+            "action database.execute",
+            "action database.purge",
+            "action setup.nodata",
+        )
+        for path in ("$.executed*", "$.details.*")
+    ),
     *(
         # testing/test-photo-manipulations.sh measures the renders of
         # pattern-o6.jpg, stored 320x480 with EXIF orientation 6: PHP keeps the

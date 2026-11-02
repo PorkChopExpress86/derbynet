@@ -9,9 +9,15 @@ from core import race_settings, settings_form
 from legacy_api.registry import LegacyContext, action, query
 
 
-@query("settings.list", permission=Access.ANONYMOUS)
+@query(
+    "settings.list",
+    permission=Access.ANONYMOUS,
+    divergences=(
+        "S2: `db-connection` is always empty; PHP reports the database it"
+        " connected to, which clients ignore.",
+    ),
+)
 def settings_list(ctx: LegacyContext) -> None:
-    # PHP reports the database it connected to, which clients ignore.
     found: dict = {}
     if granted_for(ctx.session) & Perm.SET_UP:
         key = ctx.args.get("key")

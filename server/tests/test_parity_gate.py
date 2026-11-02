@@ -640,6 +640,32 @@ def test_p1_allows_the_upright_renders_of_the_photo_turned_by_exif():
     assert allowed_by(page, "text", "320x480 6 RGBW", "200x133 none RGBW") is None
 
 
+def test_c23_and_s2_allow_only_the_key_django_drops_or_empties():
+    sql = "UPDATE RaceChart SET finishtime = NULL WHERE roundid = :roundid"
+    conn = "sqlite:/var/lib/derbynet/2026/testdb/derbynet.sqlite3"
+    settings = "query settings.list"
+
+    assert allowed_by("action result.delete", "$.sql", sql, MISSING).startswith("C23: ")
+    assert allowed_by("action result.delete", "$.sql", sql, "UPDATE") is None
+    assert allowed_by(settings, "$.settings.db-connection", conn, "").startswith("S2: ")
+    assert allowed_by(settings, "$.settings.db-connection", conn, "x") is None
+    assert allowed_by(settings, "$.settings.photo-directory", "/a", "") is None
+
+
+def test_d67_allows_the_reset_replies_and_nothing_else_of_them():
+    php = {"sql": "DROP TABLE IF EXISTS `Awards`", "result": 1}
+
+    for endpoint in (
+        "action database.execute",
+        "action database.purge",
+        "action setup.nodata",
+    ):
+        assert allowed_by(endpoint, "$.executed[1]", php, MISSING).startswith("D67: ")
+        assert allowed_by(endpoint, "$.details.form_fields.drivers", 1, 2)
+        assert allowed_by(endpoint, "$.outcome.summary", "success", "failure") is None
+    assert allowed_by("action result.delete", "$.executed[0]", php, MISSING) is None
+
+
 def _step_allows(label, endpoint, path, php, django):
     return any(p.covers(endpoint, path, php, django) for p in gate.STEP_PATHS[label])
 
