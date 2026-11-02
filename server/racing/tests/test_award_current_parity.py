@@ -101,7 +101,11 @@ def test_award_current_matches_php_for_every_listed_speed_award():
             if not ok:
                 wrong.append((path.stem, name))
     assert wrong == []
-    assert compared > 4000
+    # A floor on the exchanges compared, so a transcript that stops matching
+    # the reader can't pass by comparing nothing. suite-aggregate-nonracing
+    # lists fewer speed awards since its script runs past the stray `exit`
+    # (#37): the Younger aggregate gets a round, with no times yet.
+    assert compared > 3900
     assert 0 < deviated < 20
 
 

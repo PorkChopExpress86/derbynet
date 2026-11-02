@@ -3,7 +3,7 @@ request: GET export-json.php
 status: 200
 content-type: application/json
 cache-control: no-store, no-cache, must-revalidate
-length: 93761
+length: 93841
 body:
 [
     [
@@ -2678,6 +2678,454 @@ body:
                 205.9,
                 2,
                 "<timestamp>"
+            ],
+            [
+                "Younger",
+                1,
+                1,
+                1,
+                "Pat",
+                "Petrone",
+                262,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                1,
+                2,
+                "Darrell & Darrell",
+                "Delaughter",
+                217,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                1,
+                3,
+                "Michal",
+                "Melendrez",
+                156,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                1,
+                4,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                2,
+                1,
+                "Kelvin",
+                "Knapp",
+                247,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                2,
+                2,
+                "Tracey",
+                "Trapp",
+                277,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                2,
+                3,
+                "Edgardo",
+                "Easterwood",
+                126,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                2,
+                4,
+                "Pat",
+                "Petrone",
+                262,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                3,
+                1,
+                "Darrell & Darrell",
+                "Delaughter",
+                217,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                3,
+                2,
+                "Michal",
+                "Melendrez",
+                156,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                3,
+                3,
+                "Rodrigo",
+                "Rencher",
+                171,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                3,
+                4,
+                "Kelvin",
+                "Knapp",
+                247,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                4,
+                1,
+                "Tracey",
+                "Trapp",
+                277,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                4,
+                2,
+                "Edgardo",
+                "Easterwood",
+                126,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                4,
+                3,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                4,
+                4,
+                "Darrell & Darrell",
+                "Delaughter",
+                217,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                5,
+                1,
+                "Michal",
+                "Melendrez",
+                156,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                5,
+                2,
+                "Rodrigo",
+                "Rencher",
+                171,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                5,
+                3,
+                "Pat",
+                "Petrone",
+                262,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                5,
+                4,
+                "Tracey",
+                "Trapp",
+                277,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                6,
+                1,
+                "Edgardo",
+                "Easterwood",
+                126,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                6,
+                2,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                6,
+                3,
+                "Kelvin",
+                "Knapp",
+                247,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                6,
+                4,
+                "Michal",
+                "Melendrez",
+                156,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                7,
+                1,
+                "Rodrigo",
+                "Rencher",
+                171,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                7,
+                2,
+                "Pat",
+                "Petrone",
+                262,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                7,
+                3,
+                "Darrell & Darrell",
+                "Delaughter",
+                217,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                7,
+                4,
+                "Edgardo",
+                "Easterwood",
+                126,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                8,
+                1,
+                "Adolfo \"Dolf\"",
+                "Asher",
+                101,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                8,
+                2,
+                "Kelvin",
+                "Knapp",
+                247,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                8,
+                3,
+                "Tracey",
+                "Trapp",
+                277,
+                "",
+                0,
+                "--",
+                null,
+                null
+            ],
+            [
+                "Younger",
+                1,
+                8,
+                4,
+                "Rodrigo",
+                "Rencher",
+                171,
+                "",
+                0,
+                "--",
+                null,
+                null
             ]
         ]
     ],
@@ -3727,402 +4175,6 @@ body:
         ]
     ],
     [
-        "Standings Younger",
-        [
-            [
-                "Standings for Younger"
-            ],
-            [
-                "Averaging all heat times"
-            ],
-            [
-                "Place",
-                "Car Number",
-                "Name",
-                "Den",
-                "In Den",
-                "Heats",
-                "Average",
-                "Best",
-                "Worst"
-            ],
-            [
-                1,
-                156,
-                "Michal Melendrez",
-                "Tiger B",
-                "",
-                4,
-                3.164,
-                2.843,
-                3.351
-            ],
-            [
-                2,
-                262,
-                "Pat Petrone",
-                "White's Wolves",
-                "",
-                4,
-                3.221,
-                3.033,
-                3.563
-            ],
-            [
-                3,
-                126,
-                "Edgardo Easterwood",
-                "Tiger B",
-                "",
-                4,
-                3.283,
-                2.464,
-                3.672
-            ],
-            [
-                4,
-                247,
-                "Kelvin Knapp",
-                "White's Wolves",
-                "",
-                4,
-                3.336,
-                3.178,
-                3.463
-            ],
-            [
-                5,
-                171,
-                "Rodrigo Rencher",
-                "Tiger A",
-                "",
-                4,
-                3.339,
-                3.09,
-                3.591
-            ],
-            [
-                6,
-                217,
-                "Darrell & Darrell Delaughter",
-                "White's Wolves",
-                "",
-                4,
-                3.349,
-                3.019,
-                3.786
-            ],
-            [
-                7,
-                277,
-                "Tracey Trapp",
-                "White's Wolves",
-                "",
-                4,
-                3.362,
-                3.248,
-                3.643
-            ],
-            [
-                8,
-                101,
-                "Adolfo \"Dolf\" Asher",
-                "Tiger A",
-                "",
-                4,
-                3.365,
-                3.127,
-                3.553
-            ],
-            [
-                9,
-                111,
-                "Carroll Cybulski",
-                "Tiger A",
-                "",
-                4,
-                3.366,
-                3.144,
-                3.465
-            ],
-            [
-                10,
-                252,
-                "Lewis Levitsky",
-                "White's Wolves",
-                "",
-                4,
-                3.379,
-                3.081,
-                3.666
-            ],
-            [
-                11,
-                116,
-                "Danial Depaolo",
-                "Tiger B",
-                "",
-                4,
-                3.385,
-                3.127,
-                3.553
-            ],
-            [
-                12,
-                151,
-                "Levi Lahr",
-                "Tiger A",
-                "",
-                4,
-                3.414,
-                3.116,
-                3.843
-            ],
-            [
-                13,
-                176,
-                "Toby Teed",
-                "Tiger B",
-                "",
-                4,
-                3.446,
-                3.233,
-                3.591
-            ],
-            [
-                14,
-                136,
-                "Herb Halfacre",
-                "Tiger B",
-                "",
-                4,
-                3.461,
-                3.26,
-                3.682
-            ],
-            [
-                15,
-                106,
-                "Ben Bittinger",
-                "Tiger B",
-                "",
-                4,
-                3.47,
-                3.293,
-                3.717
-            ],
-            [
-                "T16",
-                161,
-                "Owen O'Leary",
-                "Tiger A",
-                "",
-                4,
-                3.489,
-                3.026,
-                3.844
-            ],
-            [
-                "T16",
-                166,
-                "Raymon Ruffner",
-                "Tiger B",
-                "",
-                4,
-                3.489,
-                3.026,
-                3.844
-            ],
-            [
-                18,
-                202,
-                "Angelo Alas",
-                "White's Wolves",
-                "",
-                4,
-                3.493,
-                3.107,
-                3.811
-            ],
-            [
-                19,
-                282,
-                "Willard Woolfolk",
-                "White's Wolves",
-                "",
-                4,
-                3.497,
-                3.393,
-                3.642
-            ],
-            [
-                20,
-                237,
-                "Ian Ives",
-                "White's Wolves",
-                "",
-                4,
-                3.503,
-                3.189,
-                3.878
-            ],
-            [
-                21,
-                207,
-                "Blake Burling",
-                "White's Wolves",
-                "",
-                4,
-                3.508,
-                3.182,
-                3.805
-            ],
-            [
-                22,
-                131,
-                "Felton Fouche",
-                "Tiger A",
-                "",
-                4,
-                3.518,
-                3.26,
-                3.859
-            ],
-            [
-                23,
-                232,
-                "Freddie Font",
-                "White's Wolves",
-                "",
-                4,
-                3.521,
-                3.325,
-                3.792
-            ],
-            [
-                24,
-                257,
-                "Mohamed McGrew",
-                "White's Wolves",
-                "",
-                4,
-                3.534,
-                3.085,
-                3.757
-            ],
-            [
-                25,
-                121,
-                "Derick Dreier",
-                "Tiger A",
-                "",
-                4,
-                3.574,
-                3.339,
-                3.672
-            ],
-            [
-                26,
-                242,
-                "Josh Jose",
-                "White's Wolves",
-                "",
-                4,
-                3.591,
-                3.311,
-                3.816
-            ],
-            [
-                27,
-                222,
-                "Dexter Dawes",
-                "White's Wolves",
-                "",
-                4,
-                3.598,
-                3.104,
-                3.874
-            ],
-            [
-                28,
-                267,
-                "Renaldo Raposo",
-                "White's Wolves",
-                "",
-                4,
-                3.605,
-                3.488,
-                3.868
-            ],
-            [
-                29,
-                181,
-                "Willard Wile",
-                "Tiger A",
-                "",
-                4,
-                3.615,
-                3.381,
-                3.845
-            ],
-            [
-                30,
-                212,
-                "Christoper Chauncey",
-                "White's Wolves",
-                "",
-                4,
-                3.627,
-                3.108,
-                3.846
-            ],
-            [
-                31,
-                272,
-                "Royce Rohman",
-                "White's Wolves",
-                "",
-                4,
-                3.648,
-                3.245,
-                3.843
-            ],
-            [
-                "T32",
-                141,
-                "Jesse Jara",
-                "Tiger A",
-                "",
-                4,
-                3.649,
-                3.36,
-                3.8
-            ],
-            [
-                "T32",
-                146,
-                "Kelvin Kinman",
-                "Tiger B",
-                "",
-                4,
-                3.649,
-                3.36,
-                3.8
-            ],
-            [
-                34,
-                227,
-                "Elliot Eastman",
-                "White's Wolves",
-                "",
-                4,
-                3.653,
-                3.42,
-                3.788
-            ]
-        ]
-    ],
-    [
         "Awards",
         [
             [
@@ -4156,33 +4208,6 @@ body:
                 "3rd Fastest in Pack",
                 "Speed Trophy",
                 null,
-                "Edgardo",
-                "Easterwood",
-                126,
-                ""
-            ],
-            [
-                "Fastest in Younger",
-                "Speed Trophy",
-                "Younger",
-                "Michal",
-                "Melendrez",
-                156,
-                ""
-            ],
-            [
-                "2nd Fastest in Younger",
-                "Speed Trophy",
-                "Younger",
-                "Pat",
-                "Petrone",
-                262,
-                ""
-            ],
-            [
-                "3rd Fastest in Younger",
-                "Speed Trophy",
-                "Younger",
                 "Edgardo",
                 "Easterwood",
                 126,
@@ -4679,7 +4704,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -4730,30 +4755,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -5361,7 +5362,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -5412,30 +5413,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -6151,7 +6128,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -6202,30 +6179,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -6831,7 +6784,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -6882,30 +6835,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -7619,7 +7548,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -7670,30 +7599,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -8296,7 +8201,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7541
+length: 6950
 body:
 {
     "award-types": [
@@ -8347,30 +8252,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -9089,7 +8970,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7541
+length: 6950
 body:
 {
     "award-types": [
@@ -9140,30 +9021,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -9704,7 +9561,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 10575
+length: 8795
 body:
 {
     "award-types": [
@@ -9797,78 +9654,6 @@ body:
             "key": "speed-3d",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 1,
-            "key": "speed-2a-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-2b-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 36,
-            "key": "speed-2c-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 37,
-            "key": "speed-2d-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 31,
-            "key": "speed-3a-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 52,
-            "key": "speed-3b-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-3c-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 77,
-            "key": "speed-3d-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -10533,7 +10318,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 10575
+length: 8795
 body:
 {
     "award-types": [
@@ -10626,78 +10411,6 @@ body:
             "key": "speed-3d",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 1,
-            "key": "speed-2a-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-2b-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 36,
-            "key": "speed-2c-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 37,
-            "key": "speed-2d-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 31,
-            "key": "speed-3a-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 52,
-            "key": "speed-3b-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-3c-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 77,
-            "key": "speed-3d-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -11260,7 +10973,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 12138
+length: 10160
 body:
 {
     "award-types": [
@@ -11360,86 +11073,6 @@ body:
             "key": "speed-3e",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 37,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-2a-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 31,
-            "key": "speed-2b-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 36,
-            "key": "speed-2c-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2d-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 1,
-            "key": "speed-3a-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 16,
-            "key": "speed-3b-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 52,
-            "key": "speed-3c-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-3d-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 77,
-            "key": "speed-3e-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -12137,7 +11770,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 12138
+length: 10160
 body:
 {
     "award-types": [
@@ -12237,86 +11870,6 @@ body:
             "key": "speed-3e",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 37,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-2a-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 31,
-            "key": "speed-2b-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 36,
-            "key": "speed-2c-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2d-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 1,
-            "key": "speed-3a-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 16,
-            "key": "speed-3b-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 52,
-            "key": "speed-3c-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-3d-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 77,
-            "key": "speed-3e-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -12890,7 +12443,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 26631
+length: 19903
 body:
 {
     "award-types": [
@@ -13158,278 +12711,6 @@ body:
             "key": "speed-2h",
             "place": 2,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 2,
-            "key": "speed-1a-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 1,
-            "key": "speed-1b-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 7,
-            "key": "speed-1c-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 12,
-            "key": "speed-1d-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 22,
-            "key": "speed-1e-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-1f-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 16,
-            "key": "speed-1g-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 21,
-            "key": "speed-1h-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-1i-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 32,
-            "key": "speed-1j-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 31,
-            "key": "speed-1k-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 36,
-            "key": "speed-1l-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 37,
-            "key": "speed-1m-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 41,
-            "key": "speed-1n-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 46,
-            "key": "speed-1o-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 47,
-            "key": "speed-1p-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 51,
-            "key": "speed-1q-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 52,
-            "key": "speed-1r-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 57,
-            "key": "speed-1s-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1t-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 61,
-            "key": "speed-1u-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-1v-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 71,
-            "key": "speed-1w-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 72,
-            "key": "speed-1x-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 66,
-            "key": "speed-1y-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 77,
-            "key": "speed-1z-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 6,
-            "key": "speed-2a-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 11,
-            "key": "speed-2b-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 27,
-            "key": "speed-2c-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 42,
-            "key": "speed-2d-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 67,
-            "key": "speed-2e-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 76,
-            "key": "speed-2f-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 81,
-            "key": "speed-2g-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 82,
-            "key": "speed-2h-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -14302,7 +13583,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 26631
+length: 19903
 body:
 {
     "award-types": [
@@ -14570,278 +13851,6 @@ body:
             "key": "speed-2h",
             "place": 2,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 2,
-            "key": "speed-1a-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 1,
-            "key": "speed-1b-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 7,
-            "key": "speed-1c-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 12,
-            "key": "speed-1d-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 22,
-            "key": "speed-1e-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-1f-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 16,
-            "key": "speed-1g-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 21,
-            "key": "speed-1h-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-1i-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 32,
-            "key": "speed-1j-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 31,
-            "key": "speed-1k-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 36,
-            "key": "speed-1l-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 37,
-            "key": "speed-1m-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 41,
-            "key": "speed-1n-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 46,
-            "key": "speed-1o-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 47,
-            "key": "speed-1p-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 51,
-            "key": "speed-1q-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 52,
-            "key": "speed-1r-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 57,
-            "key": "speed-1s-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1t-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 61,
-            "key": "speed-1u-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-1v-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 71,
-            "key": "speed-1w-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 72,
-            "key": "speed-1x-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 66,
-            "key": "speed-1y-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 77,
-            "key": "speed-1z-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 6,
-            "key": "speed-2a-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 11,
-            "key": "speed-2b-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 27,
-            "key": "speed-2c-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 42,
-            "key": "speed-2d-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 67,
-            "key": "speed-2e-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 76,
-            "key": "speed-2f-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 81,
-            "key": "speed-2g-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 82,
-            "key": "speed-2h-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -15387,7 +14396,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -15438,30 +14447,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -15695,7 +14680,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7339
+length: 6750
 body:
 {
     "award-types": [
@@ -15749,31 +14734,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 47,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
             "racerid": 71,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 17,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 1,
             "key": "speed-1-7",
             "place": 1,
             "category": "group",
@@ -15781,7 +14742,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 11,
+            "racerid": 1,
             "key": "speed-2-7",
             "place": 2,
             "category": "group",
@@ -15789,7 +14750,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 16,
+            "racerid": 11,
             "key": "speed-3-7",
             "place": 3,
             "category": "group",
@@ -15821,7 +14782,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 77,
+            "racerid": 47,
             "key": "speed-1-2",
             "place": 1,
             "category": "group",
@@ -15829,7 +14790,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 52,
+            "racerid": 17,
             "key": "speed-2-2",
             "place": 2,
             "category": "group",
@@ -15837,7 +14798,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 2,
+            "racerid": 77,
             "key": "speed-3-2",
             "place": 3,
             "category": "group",
@@ -15845,7 +14806,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 76,
+            "racerid": 16,
             "key": "speed-1-6",
             "place": 1,
             "category": "group",
@@ -15853,7 +14814,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 36,
+            "racerid": 76,
             "key": "speed-2-6",
             "place": 2,
             "category": "group",
@@ -15861,7 +14822,7 @@ body:
         },
         {
             "type": "speed-award",
-            "racerid": 6,
+            "racerid": 36,
             "key": "speed-3-6",
             "place": 3,
             "category": "group",
@@ -16003,7 +14964,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -16054,30 +15015,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -16311,7 +15248,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -16362,30 +15299,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
@@ -16619,7 +15532,7 @@ request: GET action.php?query=award.list
 status: 200
 content-type: application/json; charset=utf-8
 cache-control: no-store, no-cache, must-revalidate
-length: 7341
+length: 6750
 body:
 {
     "award-types": [
@@ -16670,30 +15583,6 @@ body:
             "key": "speed-3",
             "place": 3,
             "category": "supergroup"
-        },
-        {
-            "type": "speed-award",
-            "racerid": 56,
-            "key": "speed-1-8",
-            "place": 1,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 62,
-            "key": "speed-2-8",
-            "place": 2,
-            "category": "group",
-            "classid": 8
-        },
-        {
-            "type": "speed-award",
-            "racerid": 26,
-            "key": "speed-3-8",
-            "place": 3,
-            "category": "group",
-            "classid": 8
         },
         {
             "type": "speed-award",
