@@ -19,6 +19,7 @@ from django.db.models import Q
 from core import race_settings
 from core.models import Event, RaceSettings
 from core.services import lock_race_state
+from racing.engine.phpcompat import php_intval
 from racing.models import HeatLane
 from roster.models import Group, GroupConstituent, GroupConstituentSubgroup
 
@@ -87,13 +88,6 @@ LOCKED_FORM_KEYS = ("photo-dir", "car-photo-dir", "video-dir")
 LANE_FORM_KEYS = {"n-lanes": "lane_count", "unused-lane-mask": "unused-lane-mask"}
 
 _NUMERIC = re.compile(r"\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\s*")
-_NUMERIC_PREFIX = re.compile(r"\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
-
-
-def _intval(text: str) -> str:
-    """PHP's `strval(intval($text))`: `123x` is 123 and `abc` is 0."""
-    found = _NUMERIC_PREFIX.match(text)
-    return str(int(float(found.group()))) if found else "0"
 
 
 def _number(text: str) -> str:
@@ -140,7 +134,7 @@ def _value(setting: FormSetting, form_key: str, post: Mapping) -> str:
     if setting.kind is Kind.CHECKBOX:
         return "1" if form_key in post else "0"
     if setting.kind is Kind.INT:
-        return _intval(posted)
+        return str(php_intval(posted))
     if setting.kind is Kind.NUMBER:
         return _number(posted)
     return posted

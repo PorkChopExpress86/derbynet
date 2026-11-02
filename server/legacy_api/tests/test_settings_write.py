@@ -149,6 +149,9 @@ def test_an_unknown_field_is_unrecognized_but_known_ones_are_written(
         ("max-runs-per-car", "2.9", "2"),
         ("replay-rate", "abc", "0"),
         ("replay-rate", "80.0", "80"),
+        # PHP's intval gives 0 for a number past a float's range.
+        ("n-pack-trophies", "1e999", "0"),
+        ("n-pack-trophies", "-1e999", "0"),
     ],
 )
 def test_numbers_are_read_as_php_reads_them(
