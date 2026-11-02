@@ -13,10 +13,16 @@ request for a static file, unless the test expects that error with
 `DERBYNET_SCREENSHOT_DIR` (default `server/var/screenshots`), which CI
 uploads, and `assert_accessible(page)` runs axe-core and fails on a serious or
 critical violation.
+
+After a control posts, wrap the click in `with htmx_post(page, path):` before
+reading the database: it waits for the POST's reply and htmx's swap.
+`wait_for_load_state("networkidle")` waits for a page load only, and returns
+at once after an htmx request.
 """
 
 import os
 import re
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -244,6 +250,20 @@ def login(page, event):
         return page
 
     return as_role
+
+
+@contextmanager
+def htmx_post(page, path: str):
+    """Wait for the change the block makes: a POST to a URL holding `path`
+    answers OK, and htmx has swapped and settled what it sent back."""
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and path in r.url
+    ) as reply:
+        yield
+    assert reply.value.ok, reply.value.status
+    page.wait_for_function(
+        "!document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')"
+    )
 
 
 def shoot(page, name: str, full_page: bool = True) -> Path:
