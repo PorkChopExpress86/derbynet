@@ -74,8 +74,10 @@ def test_the_text_form_is_decoded_when_read(coordinator):
     """PHP stores `message` as sent and json_decode()s it, null if not JSON."""
     act(coordinator, 'action=message.send&recipient=AA&message={"a":1}')
     act(coordinator, "action=message.send&recipient=AA&message=hello")
+    # PHP decodes 1e999 as INF, which no JSON reply or column holds.
+    act(coordinator, "action=message.send&recipient=AA&message=1e999")
 
-    assert retrieve(coordinator, "AA") == [{"a": 1}, None]
+    assert retrieve(coordinator, "AA") == [{"a": 1}, None, None]
 
 
 def test_an_oversized_message_is_refused(coordinator):

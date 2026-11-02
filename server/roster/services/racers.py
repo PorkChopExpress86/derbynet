@@ -82,7 +82,12 @@ def _car_number(text: str) -> int:
     """A posted car number, which SQLite stores as an integer when it reads
     as one. Django refuses anything else."""
     number = php_numeric(text)
-    if number is None or number != int(number) or int(number) not in CAR_NUMBER_RANGE:
+    if (
+        number is None
+        or not math.isfinite(number)
+        or number != int(number)
+        or int(number) not in CAR_NUMBER_RANGE
+    ):
         raise RacerFailure(
             Failure.INVALID_CAR_NUMBER, f"Car number {text} is not a whole number."
         )
