@@ -38,9 +38,10 @@ How a body is compared:
   `true` all differ.
 - A `photo.php` body (the digest or shape the script printed) is text.
 - Other pages are not compared, because each server renders HTML its own way
-  (`curl_page` in `common.sh`); they count as skipped. So does an
-  `action.php` request both servers answered with an HTML page, because curl
-  followed a redirect: PHP's to its setup page when no event is open, for one.
+  (`curl_page` in `common.sh`); they count as skipped. An `action.php`
+  request answered with a page, because curl followed a redirect, is
+  compared as text, except the pages `WAITING_PAGES` lists by title, which
+  are allowed and name the ticket that serves Django's page.
 
 What is normalized, on both runs alike:
 
@@ -813,13 +814,23 @@ def diff(
             continue
         body_a = read_body(ex_a.body, req_a, run_a)
         body_b = read_body(ex_b.body, req_b, run_b)
-        if _is_page(body_a) and _is_page(body_b):
-            # Both servers redirected the request to a page.
-            report.skipped += 1
+        report.compared += 1
+        waiting = _waiting_page(req_a, body_a, body_b)
+        if waiting:
+            report.allowed.append(
+                Difference(
+                    ex_a.index,
+                    req_a.endpoint,
+                    ex_a.request,
+                    "text",
+                    _title(body_a),
+                    _title(body_b),
+                    waiting,
+                )
+            )
             _after(req_a, ex_a.body, run_a)
             _after(req_b, ex_b.body, run_b)
             continue
-        report.compared += 1
         found = diff_bodies(body_a, body_b, req_a.endpoint)
         for item in found:
             difference = Difference(
@@ -835,11 +846,35 @@ def diff(
     return report
 
 
-def _is_page(body: Body) -> bool:
-    """An HTML page where a JSON or XML reply was due: curl followed a
-    redirect, such as PHP's to its setup page when no event is open."""
+# The pages a request is redirected to that Django doesn't serve yet: the
+# endpoint, the <title> of PHP's page and of Django's, and the ticket that
+# serves it. PHP's role.login with no event redirects to its setup page, and
+# Django's to setup.php, which answers 404 until #48 builds it.
+WAITING_PAGES: dict[tuple[str, str, str], str] = {
+    ("action role.login", "DerbyNet Set-Up", "Not Found"): (
+        "#48: Django serves no setup.php yet, where PHP redirects a login with"
+        " no event to its setup page"
+    ),
+}
+
+_TITLE = re.compile(r"<title>([^<]*)</title>", re.IGNORECASE)
+
+
+def _title(body: Body) -> str | None:
+    """The <title> of an HTML page where a JSON or XML reply was due, as when
+    curl followed a redirect, or None."""
     start = body.trailing[:15].lower()
-    return body.kind is BodyKind.TEXT and start.startswith(("<!doctype html", "<html"))
+    if body.kind is not BodyKind.TEXT or not start.startswith(
+        ("<!doctype html", "<html")
+    ):
+        return None
+    found = _TITLE.search(body.trailing)
+    return found[1].strip() if found else ""
+
+
+def _waiting_page(request: Request, a: Body, b: Body) -> str | None:
+    """The WAITING_PAGES entry that explains the two pages, or None."""
+    return WAITING_PAGES.get((request.endpoint, _title(a), _title(b)))
 
 
 def _after(request: Request, body: str, run: Run) -> None:

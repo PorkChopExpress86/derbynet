@@ -129,39 +129,128 @@ _COORDINATOR = (
     "action heat.select",
     "query poll.coordinator",
 )
+
+
+def _paths(endpoints, paths, divergence, pairs) -> tuple[ParityPath, ...]:
+    """A ParityPath for each endpoint, path and (php, django) value pair."""
+    return tuple(
+        ParityPath(endpoint, path, divergence, php=php, django=django)
+        for endpoint in endpoints
+        for path in paths
+        for php, django in pairs
+    )
+
+
+# The racers of a heat: another heat's racers, or a racer one heat lacks.
+_HEAT_RACERS = (
+    (("$.racers[*]",), ((MISSING, dict), (dict, MISSING))),
+    (
+        ("$.racers[*].racerid", "$.racers[*].carnumber", "$.racers[*].lane"),
+        ((int, int),),
+    ),
+    (("$.racers[*].name",), ((str, str),)),
+)
+
 STEP_PATHS: dict[str, tuple[ParityPath, ...]] = {
     # Django keeps the running and the staged heat and adds heats at the end
     # (D34, Q20), and refuses a racer who is not on the roster (D39, Q25), so
-    # its charts differ from PHP's, and with them the heats each later reply
-    # shows. PHP turns racing off when it squeezes a heat out of the running
-    # round; Django never changes that heat (D39). The timings name the
-    # searches each server ran.
+    # its charts differ from PHP's, and with them the heat counts and the
+    # racers each later reply shows. PHP turns racing off when it squeezes a
+    # heat out of the running round; Django never changes that heat (D39). The
+    # timing keys name the searches each server ran: Django tries one more
+    # with its last added heat where PHP's search times out (Q21); the golden
+    # replays check them (deviations.json, Q20 and Q21).
     "test-reschedule.sh": (
-        ParityPath("action schedule.reschedule", "$.chart[*]", "D34"),
-        ParityPath("action schedule.reschedule", "$.timing.internal.*", "D34"),
-        *(
-            ParityPath(endpoint, path, "D34")
-            for endpoint in _COORDINATOR
-            for path in (
-                "$.racers[*]",
-                "$.racers[*].*",
-                "$.current-heat.number-of-heats",
-                "$.rounds[*].heats_scheduled",
-            )
+        *_paths(
+            ("action schedule.reschedule",),
+            ("$.chart[*]",),
+            "Q20",
+            (
+                (str, str),
+                (MISSING, str),
+                (str, MISSING),
+                # A heat number the chart skips, as its renumbering leaves it.
+                (None, str),
+                (str, None),
+            ),
+        ),
+        *_paths(
+            ("action schedule.reschedule",),
+            ("$.timing.internal.run-*-extra-*-start",),
+            "Q21",
+            ((MISSING, "<seconds>"),),
+        ),
+        *_paths(
+            ("action schedule.reschedule",),
+            ("$.timing.internal.run-*-timed-out",),
+            "Q21",
+            ((True, MISSING),),
         ),
         *(
-            ParityPath(
-                endpoint, "$.current-heat.now_racing", "D39", php=False, django=True
-            )
-            for endpoint in _COORDINATOR
+            allowed
+            for paths, pairs in _HEAT_RACERS
+            for allowed in _paths(_COORDINATOR, paths, "D34", pairs)
         ),
+        *_paths(
+            _COORDINATOR,
+            ("$.current-heat.number-of-heats", "$.rounds[*].heats_scheduled"),
+            "D34",
+            ((int, int),),
+        ),
+        *_paths(_COORDINATOR, ("$.current-heat.now_racing",), "D39", ((False, True),)),
     ),
     # Under the master schedule, PHP's reply to schedule.generate shows the
     # current heat and its racers from before it numbers the master heats and
-    # moves to the next-up heat (R7).
-    "test-master-schedule.sh": tuple(
-        ParityPath("action schedule.generate", path, "R7")
-        for path in ("$.current-heat.*", "$.racers[*]", "$.racers[*].*")
+    # moves to the next-up heat; Django's shows the next-up heat, numbered,
+    # which has no result yet (R7, D51).
+    "test-master-schedule.sh": (
+        *_paths(
+            ("action schedule.generate",),
+            (
+                "$.current-heat.classid",
+                "$.current-heat.round",
+                "$.current-heat.tbodyid",
+                "$.current-heat.heat",
+            ),
+            "R7",
+            ((None, int), (int, int)),
+        ),
+        *_paths(
+            ("action schedule.generate",),
+            (
+                "$.current-heat.roundid",
+                "$.current-heat.number-of-heats",
+                "$.current-heat.max_masterheat",
+            ),
+            "R7",
+            ((int, int),),
+        ),
+        *_paths(
+            ("action schedule.generate",),
+            ("$.current-heat.masterheat",),
+            "R7",
+            ((False, int), (int, int)),
+        ),
+        *_paths(
+            ("action schedule.generate",),
+            ("$.current-heat.class",),
+            "R7",
+            ((str, str),),
+        ),
+        *(
+            allowed
+            for paths, pairs in _HEAT_RACERS
+            for allowed in _paths(("action schedule.generate",), paths, "R7", pairs)
+        ),
+        *_paths(
+            ("action schedule.generate",), ("$.racers[*].note",), "R7", ((str, str),)
+        ),
+        *_paths(
+            ("action schedule.generate",),
+            ("$.racers[*].finishtime", "$.racers[*].finishplace"),
+            "R7",
+            ((float, ""), (int, "")),
+        ),
     ),
 }
 

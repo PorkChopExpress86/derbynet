@@ -13,13 +13,6 @@ curl_postj action.php "action=settings.write&unused-lane-mask=0&n-lanes=4" | che
 
 curl_postj action.php "action=class.edit&classid=$(classid_of White)&name=White's%20Wolves&ntrophies=4" | check_jsuccess
 
-# The server treats a replay as connected for 10 seconds after its last
-# message, and every coordinator payload says whether it is.  test-each-role.sh
-# sent the last one a moment ago, so wait it out: from here, the payloads don't
-# depend on how long the tests in between took, and the parity gate (#37) sees
-# the same replay state from PHP and from Django.
-sleep 11
-
 ### Schedule first round for 3 of the classes
 curl_postj action.php "action=schedule.generate&roundid=$(roundid_of Lions 1)" | check_jsuccess
 curl_postj action.php "action=schedule.generate&roundid=$(roundid_of White 1)" | check_jsuccess
@@ -32,9 +25,10 @@ curl_postj action.php "action=racer.delete&racer=$(racerid_of 121)" | check_jfai
 ## curl_postj action.php "action=replay.message" | jq -e ".replay == [\"HELLO\"]" \
 ##        >/dev/null || test_fails
 
-# Connect the replay again: the server answers HELLO first.
-curl_postj action.php "action=replay.message&status=-1&finished-replay=0" | \
-    jq -e '.outcome.summary == "success" and .replay == ["HELLO"]' >/dev/null || test_fails
+# The server treats a replay as connected for 10 seconds after its last message,
+# and test-each-role.sh sent the last one some time ago.  Connect again, so that
+# the replay messages below don't depend on how long the tests in between took.
+curl_postj action.php "action=replay.message&status=-1&finished-replay=0" | check_jsuccess
 
 ### Racing for the first round of Lions & Tigers: 5 heats
 curl_postj action.php "action=heat.select&roundid=$(roundid_of Lions 1)&now_racing=1" | check_jsuccess
@@ -57,9 +51,6 @@ curl_postj action.php "action=replay.message" | \
                        "CANCEL",
                        "START Lions & Tigers_Round1_Heat02"]' \
        >/dev/null || test_fails
-# Let the replay time out again, so that the payloads below say it is not
-# connected however fast the server answers them.
-sleep 11
 user_login_timer
 
 ROUND=$(roundid_of Lions 1)

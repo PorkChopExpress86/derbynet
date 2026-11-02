@@ -93,8 +93,9 @@ render or number:
   `rankid_of`, `partitionid_of` and `awardid_of`, or take it from the response
   that created the thing.  Each lookup fails when nothing matches.  To check
   that a group is gone, use `expect_no_class`, `expect_no_rank` or
-  `expect_no_partition`, which fail unless the server sent the list.  `normalize_ids` replaces every ID in a response with
-  a label, to compare it with a golden response.
+  `expect_no_partition`, which fail unless the server sent the list.
+  `normalize_ids` replaces every ID in a response with a label, to compare it
+  with a golden response.
 - `check-no-literal-ids.sh` fails when a script contains a literal ID.  An
   exception goes in `check-no-literal-ids.allowlist`, with its reason.
 
@@ -179,7 +180,12 @@ its outcome there, retries once a failed step that resets the database itself,
 and the run goes on past a failure.  `server/tools/parity_gate.py` then judges
 the two legs: the steps that wait on another ticket are in its `WAITING`, the
 steps the Django leg skips in its `SKIPS`, and the reply paths a recorded
-divergence changes are in `PARITY_PATHS` in `server/legacy_api/registry.py`.
+divergence changes in one step only, with the values it explains, in its
+`STEP_PATHS`.  The reply paths a divergence changes in every reply of an
+endpoint are in `PARITY_PATHS` in `server/legacy_api/registry.py`.  Both are
+lists of `ParityPath` (`server/legacy_api/parity_paths.py`), which loads no
+Django.  A page that curl reached by a redirect, and that Django doesn't serve
+yet, is in `WAITING_PAGES` in `server/tools/transcript_diff.py`.
 A leg that ends writes `complete` next to `steps.tsv`; the gate fails a leg
 without it.
 
@@ -191,7 +197,8 @@ regular checkout with the images built (`run-suite.sh harness assets`):
 
     DERBYNET_PARITY_DIR=/tmp/leg-php testing/docker/run-suite.sh server timeout parity
     server/tools/parity-django.sh /tmp/leg-django
-    cd server && uv run python -m tools.parity_gate /tmp/leg-php/steps /tmp/leg-django/suite/steps
+    cd server && uv run python -m tools.parity_gate \
+        /tmp/leg-php/steps /tmp/leg-django/suite/steps
 
 ## Test photos
 

@@ -211,16 +211,12 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
         ParityPath(endpoint, "$.kiosks[*].parameters", "C20", php=None, django=str)
         for endpoint in _KIOSK_LISTS
     ),
-    ParityPath("action result.delete", "$.sql", "C23", php=str, django=MISSING),
     *(
         # The rotation scheduler's debug output.
         ParityPath("action schedule.generate", f"$.{key}", "R6", django=MISSING)
         for key in ("nheats", "ncars", "heats")
     ),
     ParityPath("action schedule.reschedule", "$.adjuster", "R6", django=MISSING),
-    ParityPath(
-        "query settings.list", "$.settings.db-connection", "S2", php=str, django=""
-    ),
     *(
         # testing/test-photo-manipulations.sh measures the renders of
         # pattern-o6.jpg, stored 320x480 with EXIF orientation 6: PHP keeps the

@@ -102,9 +102,6 @@ QUIRK_DECISIONS = {
     "S10": "fix",
     "S19": "fix",
     "S20": "fix",
-    # The row of #64 that the #63 settings endpoint fixes: S2 settings.list
-    # names no database and lists keys only to a caller with SET_UP.
-    "S2": "fix",
     # Accepted in D61 (#35): P1 renders apply the EXIF orientation and keep
     # the upload (#8, #73), P2 render sizes are allowlisted, P3 an upload is
     # decoded and its name and size checked, P4 autocrop runs OpenCV and
