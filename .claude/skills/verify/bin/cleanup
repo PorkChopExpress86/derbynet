@@ -1,8 +1,15 @@
 #!/bin/bash
-# Removes this run's container, volume, and images.  Keeps the evidence in
+# Removes this run's container, volume, and images, or its django server and
+# database.  Keeps the evidence in
 # .claude/verify-evidence/$VERIFY_RUN.
 set -uo pipefail
 source "$(dirname "$0")/env.sh"
+if [ "$KIND" = django ]; then
+  pid=$(cat "$PIDFILE" 2>/dev/null) && kill "$pid" 2>/dev/null
+  rm -rf "$DJANGO_STATE" "$JAR"
+  echo "cleaned $DJANGO_STATE; evidence kept in $EVIDENCE"
+  exit 0
+fi
 "$REPO/testing/docker/run-suite.sh" clean >/dev/null 2>&1
 docker rmi "$DERBYNET_TEST_PREFIX-server" "$DERBYNET_TEST_PREFIX-harness" >/dev/null 2>&1
 rm -f "$JAR"

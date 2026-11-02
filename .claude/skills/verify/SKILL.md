@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Drive DerbyNet's web UI in a real browser to prove a change works, as a race crew would. Use after changing a page, an action.php handler, or a kiosk, and before reporting UI work as done.
+description: Drive DerbyNet's web UI, PHP or the Django port, in a real browser to prove a change works, as a race crew would. Use after changing a page, an action.php handler, or a kiosk, and before reporting UI work as done.
 ---
 
 # Verify DerbyNet
@@ -11,7 +11,9 @@ Drive it with the Playwright MCP browser tools (`mcp__plugin_playwright_playwrig
 
 ## Launch
 
-Run from a regular clone (not a git worktree). Each run gets its own container, volume, and port:
+`VERIFY_SERVER` picks the server: `php` (the default) or `django`. Verify a page or endpoint of the Django port with `VERIFY_SERVER=django`, the PHP behavior it copies with `php`. Pass the same variables to every helper of a run.
+
+PHP runs from a regular clone (not a git worktree). Each run gets its own container, volume, and port:
 
 ```bash
 VERIFY_RUN=v1 VERIFY_PORT=8090 .claude/skills/verify/bin/launch   # prints "ready http://127.0.0.1:8090"
@@ -19,6 +21,8 @@ VERIFY_RUN=v1 VERIFY_PORT=8090 .claude/skills/verify/bin/seed     # baseline bel
 ```
 
 `launch` builds the PHP image from this checkout with `testing/docker/run-suite.sh` (minutes the first time, seconds after) and refuses a name or port already in use. A fresh instance redirects every page to `setup.php` until `seed` creates the event.
+
+`VERIFY_SERVER=django` runs `server/` from this checkout, a worktree too, with no Docker. Its database and settings live in `server/var/verify-<VERIFY_RUN>/`, and its log in the evidence folder as `server.log`. It runs with DEBUG off, as on race day, so `runserver --insecure` serves the static files. `seed` works the same, and `/login.php` redirects to the Django login page.
 
 Baseline after `seed`: event `Verify`, 4 lanes, racers `Ava`..`Hal Verify` in dens `Lions` (cars 101-104) and `Tigers` (201-204), all checked in. Role passwords: RaceCoordinator `doyourbest`, RaceCrew `murphy`, Photo `flashbulb`.
 
@@ -30,7 +34,7 @@ Never drive `derbynet-local` on port 8080: that is the owner's own instance.
 VERIFY_RUN=v1 VERIFY_PORT=8090 .claude/skills/verify/bin/doctor
 ```
 
-Requires `doctor: ok`: the run's container is running, port 8090 is published by that container, `index.php` answers, and it prints the checked-out commit. Run it first whenever a page behaves unexpectedly.
+Requires `doctor: ok`: the run's container (or runserver process) is running and owns port 8090, `index.php` answers, and it prints the checked-out commit. For Django it also checks that `static/ui/app.css` loads. Run it first whenever a page behaves unexpectedly.
 
 ## Drive
 
@@ -58,4 +62,4 @@ Exercise the real user path; the API is for seeding and for the second view only
 VERIFY_RUN=v1 VERIFY_PORT=8090 .claude/skills/verify/bin/cleanup
 ```
 
-Removes the run's container, volume, and images, and keeps `.claude/verify-evidence/v1/`. Close the browser with `browser_close`.
+Removes the run's container, volume, and images, or stops its Django server and deletes its database, and keeps `.claude/verify-evidence/v1/`. Close the browser with `browser_close`.
