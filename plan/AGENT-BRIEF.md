@@ -13,7 +13,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## Django handlers
 
 - A handler under `server/legacy_api/handlers/` is a thin adapter. It parses `ctx.args`, calls a service, and encodes the result. The guard in `server/legacy_api/tests/test_registry.py` fails a handler that writes through the ORM.
-- A service that changes roster, inspection, lane, or result data takes `core.services.lock_race_state(event_id)` first inside `transaction.atomic()`. A handler or a `ui` view never reads race state before a service call and acts on it after: the service reads it again under the lock.
+- A service that changes roster, inspection, lane, or result data takes `core.services.lock_race_state(event_id)` first inside `transaction.atomic()`. A handler or a `ui` view never reads race state before a service call and acts on it after: the service reads it again under the lock. `server/ui/tests/test_read_then_act.py` flags a view that refuses on what it read.
 - One user action is one service call, so all its writes commit or roll back together. #42's review found a racer saved in one transaction and its award settings in a second.
 - A record that must survive a refusal is written after the atomic block, because the rollback removes it.
 - Every endpoint needs a `LEAK_REQUESTS` entry in `server/legacy_api/tests/test_event_leak.py`.
