@@ -79,8 +79,6 @@ curl_getj "action.php?query=poll.coordinator" | \
     jq -e --argjson a $(classid_of Tigers) --argjson b $(classid_of Younger) \
        '.["ready-aggregate"] | map(.classid) | sort == ([$a, $b] | sort)' >/dev/null || test_fails
 
-exit
-
 curl_postj action.php "action=roster.new&classid=$(classid_of Younger)&top=4&bucketed=1" | check_jsuccess
 finalists_carnumbers < $DEBUG_CURL | expect_eq '[101,126,156,171,217,247,262,277]'
 

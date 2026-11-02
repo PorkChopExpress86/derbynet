@@ -12,6 +12,7 @@ from legacy_api.missing import MISSING
 from legacy_api.registry import (
     PARITY_PATHS,
     REGISTRY,
+    ROUTE_DIVERGENCES,
     ParityPath,
     allowed_by,
     divergence_text,
@@ -49,6 +50,7 @@ def leg(tmp_path, name, steps):
 def judge(php, django, **kwargs):
     kwargs.setdefault("waiting", {})
     kwargs.setdefault("step_divergences", {})
+    kwargs.setdefault("step_paths", {})
     kwargs.setdefault("after_skip", {})
     kwargs.setdefault("skips", {})
     kwargs.setdefault("allow", lambda difference: None)
@@ -226,6 +228,64 @@ def test_an_allowed_difference_is_listed_and_passes(tmp_path):
 
     assert result.problems == ["1 differences from PHP"]
     assert [d.path for d in result.report.allowed] == ["$.current-heat.heat"]
+
+
+def test_a_step_path_allows_a_difference_in_its_step_only(tmp_path):
+    php = leg(
+        tmp_path,
+        "php",
+        [
+            ("test-r.sh", "pass", 1, poll() + poll(), ""),
+            ("test-s.sh", "pass", 1, poll(), ""),
+        ],
+    )
+    django = leg(
+        tmp_path,
+        "django",
+        [
+            ("test-r.sh", "pass", 1, poll(heat="2") + "\nexport-json.php\n\n{}\n", ""),
+            ("test-s.sh", "pass", 1, poll(heat="2"), ""),
+        ],
+    )
+    paths = {
+        "test-r.sh": (
+            ParityPath("query poll.coordinator", "$.current-heat.heat", "D34"),
+        )
+    }
+
+    in_step, other_step = judge(
+        php, django, step_divergences={"test-r.sh": "D34: on purpose"}, step_paths=paths
+    )
+
+    assert not in_step.failed
+    assert [d.allowed_by for d in in_step.report.allowed] == [
+        "test-r.sh: D34: on purpose"
+    ]
+    assert other_step.problems == ["1 differences from PHP"]
+
+
+def test_a_step_path_cites_the_endpoints_divergence_first(tmp_path):
+    php = leg(tmp_path, "php", [("test-r.sh", "pass", 1, poll(heat="4"), "")])
+    django = leg(tmp_path, "django", [("test-r.sh", "pass", 1, poll(heat="5"), "")])
+    paths = {
+        "test-r.sh": (
+            ParityPath("query poll.coordinator", "$.current-heat.heat", "R3"),
+        )
+    }
+
+    [result] = judge(php, django, step_paths=paths)
+
+    assert not result.failed
+    assert result.report.allowed[0].allowed_by.startswith("R3: ")
+
+
+@pytest.mark.parametrize(
+    "label, allowed",
+    [(label, allowed) for label, paths in gate.STEP_PATHS.items() for allowed in paths],
+    ids=str,
+)
+def test_every_step_path_cites_its_step_or_its_endpoint(label, allowed):
+    assert gate.step_path_text(label, allowed, gate.STEP_DIVERGENCES), (label, allowed)
 
 
 def test_main_reports_a_leg_with_no_steps(tmp_path, capsys):
@@ -485,7 +545,10 @@ def test_r3_allows_null_for_minus_one_and_nothing_else():
 def test_every_parity_path_cites_a_divergence_of_its_endpoint(allowed):
     kind, _, name = allowed.endpoint.partition(" ")
 
-    assert REGISTRY.get(kind, name) is not None, allowed.endpoint
+    if kind == "page":
+        assert name in ROUTE_DIVERGENCES, allowed.endpoint
+    else:
+        assert REGISTRY.get(kind, name) is not None, allowed.endpoint
     assert divergence_text(allowed.endpoint, allowed.divergence), allowed
 
 
@@ -518,3 +581,72 @@ def test_q4_allows_the_place_a_reinstate_brings_back(endpoint):
     assert allowed_by(endpoint, path, 2, 3) is None
     assert allowed_by(endpoint, path, "", "3") is None
     assert allowed_by("action heat.select", path, "", 3) is None
+
+
+@pytest.mark.parametrize("key", ["nheats", "ncars", "heats"])
+def test_r6_allows_the_rotation_debug_keys_django_leaves_out(key):
+    endpoint = "action schedule.generate"
+
+    assert allowed_by(endpoint, f"$.{key}", 6, MISSING).startswith("R6: ")
+    assert allowed_by(endpoint, f"$.{key}", 6, 7) is None
+    assert allowed_by("action schedule.reschedule", f"$.{key}", 6, MISSING) is None
+
+
+def test_r6_allows_the_adjuster_trace_django_leaves_out():
+    endpoint = "action schedule.reschedule"
+
+    assert allowed_by(endpoint, "$.adjuster", {"roundid": 1}, MISSING).startswith(
+        "R6: "
+    )
+    assert allowed_by(endpoint, "$.adjuster", {"roundid": 1}, {}) is None
+
+
+def test_p1_allows_the_upright_renders_of_the_photo_turned_by_exif():
+    page = "page photo.php"
+
+    assert allowed_by(
+        page, "text", "133x200 none GWRB", "200x133 none RGBW"
+    ).startswith("P1: ")
+    assert allowed_by(
+        page, "text", "400x600 none GWRB", "600x400 none RGBW"
+    ).startswith("P1: ")
+    assert allowed_by(page, "text", "133x200 none GWRB", "133x200 none GWRB") is None
+    assert allowed_by(page, "text", "320x480 6 RGBW", "200x133 none RGBW") is None
+
+
+def _step_allows(label, endpoint, path, php, django):
+    return any(p.covers(endpoint, path, php, django) for p in gate.STEP_PATHS[label])
+
+
+def test_the_reschedule_step_allows_only_the_shapes_d34_changes():
+    def allows(endpoint, path, php, django):
+        return _step_allows("test-reschedule.sh", endpoint, path, php, django)
+
+    resched = "action schedule.reschedule"
+    assert allows(resched, "$.chart[3]", "1 2 3 4", "4 3 2 1")
+    assert not allows(resched, "$.chart[3]", "1 2 3 4", 7)
+    assert allows("query poll.coordinator", "$.racers[0].racerid", 3, 4)
+    assert not allows("query poll.coordinator", "$.racers[0].racerid", 3, "4")
+    assert not allows("query poll.coordinator", "$.racers[0].finishtime", 3.1, 2.9)
+    assert not allows("query poll.coordinator", "$.current-heat.heat", 2, 3)
+    assert allows(resched, "$.timing.internal.run-1-timed-out", True, MISSING)
+    assert allows(
+        resched, "$.timing.internal.run-0-extra-1-start", MISSING, "<seconds>"
+    )
+    assert not allows(resched, "$.timing.internal.run-0-start", 0, 1)
+
+
+def test_the_master_schedule_step_allows_only_the_next_up_heat_r7_shows():
+    def allows(path, php, django):
+        return _step_allows(
+            "test-master-schedule.sh", "action schedule.generate", path, php, django
+        )
+
+    assert allows("$.current-heat.heat", None, 1)
+    assert allows("$.current-heat.masterheat", False, 1)
+    assert not allows("$.current-heat.heat", 1, None)
+    assert not allows("$.current-heat.now_racing", False, True)
+    assert not allows("$.current-heat.use_master_sched", True, False)
+    assert allows("$.racers[0].finishtime", 3.977, "")
+    assert not allows("$.racers[0].finishtime", "", 3.977)
+    assert not allows("$.racers[0].finishplace", 4, 2)

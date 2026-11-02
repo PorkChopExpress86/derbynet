@@ -9,6 +9,8 @@ import textwrap
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from tools import transcript_diff as td
 
 # When the hand-written runs ran: their timestamps are within a day of it.
@@ -344,6 +346,74 @@ def test_pages_are_not_compared():
 
     assert report.ok
     assert report.skipped == 1
+
+
+SETUP_PAGE = """
+    {request}
+
+    <!DOCTYPE html>
+    <html><head><title>DerbyNet Set-Up</title></head></html>
+    """
+NOT_FOUND = (
+    '<!doctype html>\n<html lang="en">\n<head>\n  <title>Not Found</title>\n'
+    "</head>\n<body>\n  <h1>Not Found</h1></body>\n</html>"
+)
+SERVER_ERROR = (
+    '<!doctype html>\n<html lang="en">\n<head>\n'
+    "  <title>Server Error (500)</title>\n</head></html>"
+)
+
+
+def _page_runs(request, django_page):
+    a = run(SETUP_PAGE.format(request=request))
+    i = a.index("<!DOCTYPE")
+    return a, a[:i] + django_page + "\n"
+
+
+def test_a_login_redirected_to_the_setup_page_waits_on_48():
+    # role.login with no event: PHP redirects to its setup page, and Django
+    # to setup.php, which it doesn't serve until #48.
+    a, b = _page_runs("login RaceCoordinator", NOT_FOUND)
+
+    report = differences(a, b)
+
+    assert report.ok
+    [waiting] = report.allowed
+    assert waiting.allowed_by.startswith("#48: ")
+
+
+@pytest.mark.parametrize("page", [NOT_FOUND, SERVER_ERROR], ids=["404", "500"])
+def test_an_error_page_against_the_setup_page_is_a_difference(page):
+    a, b = _page_runs("post action.php action=heat.select&roundid=1", page)
+
+    report = differences(a, b)
+
+    assert not report.ok
+
+
+def test_a_login_answered_by_a_server_error_is_a_difference():
+    a, b = _page_runs("login RaceCoordinator", SERVER_ERROR)
+
+    assert not differences(a, b).ok
+
+
+def test_a_page_against_a_json_reply_is_compared():
+    a = run("""
+        login RaceCoordinator
+
+        <!DOCTYPE html>
+        <html><head><title>DerbyNet Set-Up</title></head></html>
+        """)
+    b = run("""
+        login RaceCoordinator
+
+        {"outcome": {"summary": "success"}}
+        """)
+
+    report = differences(a, b)
+
+    [found] = report.differences
+    assert (found.a, found.b) == ("<text>", "<json>")
 
 
 CLASS_ADD = """

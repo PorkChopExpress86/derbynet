@@ -7,7 +7,6 @@ handlers write `$json_out` or echo XML: the last outcome wins.
 """
 
 import logging
-import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
@@ -19,6 +18,7 @@ from accounts.permissions import Requirement
 from core.models import Event
 from legacy_api.formats import Format, format_of
 from legacy_api.missing import MISSING
+from legacy_api.parity_paths import ANY, ParityPath
 from legacy_api.xml import XmlWriter
 
 logger = logging.getLogger(__name__)
@@ -151,61 +151,6 @@ class Removed:
 REMOVED: tuple[Removed, ...] = ()
 
 
-class _Any:
-    # A fixed repr, not object()'s address, so the test ids built from a
-    # ParityPath are the same in every pytest-xdist worker.
-    def __repr__(self):
-        return "ANY"
-
-
-ANY = _Any()  # A ParityPath value that matches any value.
-
-
-@dataclass(frozen=True)
-class ParityPath:
-    """Where in an endpoint's reply the parity gate (#37) lets Django differ
-    from PHP, under one of the endpoint's `divergences`.
-
-    `endpoint` is `action <name>` or `query <name>`. `path` is a reply path as
-    `tools/transcript_diff.py` prints it (`$.current-heat.classid`,
-    `/action-response/heat-ready/@heat`), where `*` stands for any run of
-    characters and `[*]` for any list index. `php` and `django` are the
-    values the divergence gives each server there, after the differ's
-    normalizing: a value, `MISSING` (`legacy_api.missing`) for a key one
-    reply lacks, a type such as `int` for any value of it, or `ANY`.
-    `divergence` is the id that starts one of the endpoint's `divergences`
-    (`R3`); the guard in legacy_api/tests/test_registry.py checks it does."""
-
-    endpoint: str
-    path: str
-    divergence: str
-    php: object = ANY
-    django: object = ANY
-
-    def covers(self, endpoint: str, path: str, php=ANY, django=ANY) -> bool:
-        return (
-            endpoint == self.endpoint
-            and _path_pattern(self.path).fullmatch(path) is not None
-            and _matches(self.php, php)
-            and _matches(self.django, django)
-        )
-
-
-def _matches(expected, value) -> bool:
-    if expected is ANY or value is ANY:
-        return True
-    # 0 == False and 1 == True in Python; JSON tells them apart.
-    if isinstance(expected, type):
-        return type(value) is expected
-    return type(expected) is type(value) and expected == value
-
-
-def _path_pattern(pattern: str) -> re.Pattern:
-    parts = re.split(r"(\[\*\]|\*)", pattern)
-    wild = {"[*]": r"\[\d+\]", "*": ".*"}
-    return re.compile("".join(wild.get(part, re.escape(part)) for part in parts))
-
-
 # Every reply that carries the coordinator payload's `current-heat` (R3).
 _CURRENT_HEAT = (
     "action heat.select",
@@ -266,14 +211,35 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
         ParityPath(endpoint, "$.kiosks[*].parameters", "C20", php=None, django=str)
         for endpoint in _KIOSK_LISTS
     ),
+    *(
+        # The rotation scheduler's debug output.
+        ParityPath("action schedule.generate", f"$.{key}", "R6", django=MISSING)
+        for key in ("nheats", "ncars", "heats")
+    ),
+    ParityPath("action schedule.reschedule", "$.adjuster", "R6", django=MISSING),
+    *(
+        # testing/test-photo-manipulations.sh measures the renders of
+        # pattern-o6.jpg, stored 320x480 with EXIF orientation 6: PHP keeps the
+        # stored pixels and drops the tag, Django turns them upright.
+        ParityPath("page photo.php", "text", "P1", php=php, django=django)
+        for php, django in (
+            ("133x200 none GWRB", "200x133 none RGBW"),
+            ("400x600 none GWRB", "600x400 none RGBW"),
+        )
+    ),
 )
 
 
 def divergence_text(endpoint: str, divergence: str) -> str | None:
-    """The endpoint's divergence entry whose ids include `divergence`."""
+    """The endpoint's divergence entry whose ids include `divergence`. A
+    `page <path>` endpoint's entries are its `ROUTE_DIVERGENCES`."""
     kind, _, name = endpoint.partition(" ")
-    found = REGISTRY.get(kind, name)
-    for text in found.divergences if found else ():
+    if kind == "page":
+        texts = ROUTE_DIVERGENCES.get(name, ())
+    else:
+        found = REGISTRY.get(kind, name)
+        texts = found.divergences if found else ()
+    for text in texts:
         ids = text.split(": ", 1)[0].split(", ")
         if divergence in ids:
             return text
@@ -293,6 +259,11 @@ def allowed_by(endpoint: str, path: str, php=ANY, django=ANY) -> str | None:
 # The legacy pages outside `/action.php` that differ from PHP on purpose, by
 # path, in the form of `Endpoint.divergences`.
 ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
+    "photo.php": (
+        "P1: a render applies the photo's EXIF orientation, so a photo stored on"
+        " its side renders upright; PHP renders the stored pixels and drops the"
+        " tag.",
+    ),
     "photo.php/info": (
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",

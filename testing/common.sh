@@ -496,23 +496,58 @@ awardid_of() {
     echo $ID
 }
 
-# These three print "null", not a failure, when there is no match, because some
-# tests check that a group is gone.
-#
-# "$1" is a (unique) prefix for the rank name sought
+# groups_named <class|rank|partition> <name prefix>: every class, subgroup
+# (rank) or partition whose name starts with the prefix, as a JSON array.  Fails
+# when the server's reply holds no such list, so that an empty answer always
+# comes from a list the server sent.
+groups_named() {
+    local URL LIST FOUND
+    case "$1" in
+        class) URL="action.php?query=class.list" ; LIST='.classes' ;;
+        rank) URL="action.php?query=class.list" ; LIST='.classes | map(.subgroups) | add // []' ;;
+        partition) URL="action.php?query=poll&values=partitions" ; LIST='.partitions' ;;
+    esac
+    FOUND=$(lookup_get "$URL" | jq -c --arg n "$2" \
+        "$LIST"' | if type == "array" then map(select(.name | tostring | startswith($n))) else error("no list") end') \
+        || lookup_fails "$URL holds no $1 list"
+    echo "$FOUND"
+}
+
+# classid_of, rankid_of and partitionid_of <name prefix>: the id of the first
+# class, subgroup (rank) or partition whose name starts with the prefix.  Each
+# fails when none does; to check that a group is gone, use expect_no_class,
+# expect_no_rank or expect_no_partition.
 # E.g. WOLF_RANK=$(rankid_of "White")
 rankid_of() {
-    lookup_get "action.php?query=class.list" \
-        | jq --arg n "$1" '.classes | map(.subgroups) | add | map(select(.name | tostring | startswith($n)))[0].rankid'
+    local ID
+    ID=$(groups_named rank "$1" | jq '.[0].rankid // empty')
+    [ -n "$ID" ] || lookup_fails "No subgroup is named $1"
+    echo $ID
 }
 classid_of() {
-    lookup_get "action.php?query=class.list" \
-        | jq --arg n "$1" '.classes | map(select(.name | tostring | startswith($n)))[0].classid'
+    local ID
+    ID=$(groups_named class "$1" | jq '.[0].classid // empty')
+    [ -n "$ID" ] || lookup_fails "No class is named $1"
+    echo $ID
 }
 partitionid_of() {
-    lookup_get "action.php?query=poll&values=partitions" \
-        | jq --arg n "$1" '.partitions | map(select(.name | tostring | startswith($n)))[0].partitionid'
+    local ID
+    ID=$(groups_named partition "$1" | jq '.[0].partitionid // empty')
+    [ -n "$ID" ] || lookup_fails "No partition is named $1"
+    echo $ID
 }
+
+# expect_no_class, expect_no_rank and expect_no_partition <name prefix>: the
+# server lists no class, subgroup (rank) or partition whose name starts with
+# the prefix.
+expect_no_group() {
+    local FOUND
+    FOUND=$(groups_named "$1" "$2")
+    [ "$FOUND" = "[]" ] || test_fails "Expected no $1 named $2, found $FOUND"
+}
+expect_no_class() { expect_no_group class "$1" ; }
+expect_no_rank() { expect_no_group rank "$1" ; }
+expect_no_partition() { expect_no_group partition "$1" ; }
 
 # The roundid of the only round there is.  Fails unless there is exactly one.
 the_only_roundid() {
