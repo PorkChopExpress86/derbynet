@@ -67,6 +67,10 @@ class NavEntry:
     menu: bool = True
     # The view's dotted path. Empty serves the placeholder.
     view: str = ""
+    # A callable's dotted path that sees the page request before its guard,
+    # and may answer it: the check-in page's QR token grants the permission
+    # the guard then checks (#42).
+    pre_guard: str = ""
 
     @property
     def phone_label(self) -> str:
@@ -127,6 +131,8 @@ ENTRIES: tuple[NavEntry, ...] = (
         short_label="Check-In",
         icon="checkin",
         phone_rank={"RaceCoordinator": 2, "RaceCrew": 1, "Photo": 2, OTHER_ROLES: 2},
+        view="ui.checkin.views.page",
+        pre_guard="ui.checkin.views.accept_token",
     ),
     NavEntry(
         "racer-photos",
@@ -471,5 +477,18 @@ def _view(nav_entry: NavEntry):
     return placeholder
 
 
+def _page(nav_entry: NavEntry):
+    guarded = requires_page(nav_entry.key)(_view(nav_entry))
+    if not nav_entry.pre_guard:
+        return guarded
+    before = import_string(nav_entry.pre_guard)
+
+    @wraps(guarded)
+    def page(request, *args, **kwargs):
+        return before(request) or guarded(request, *args, **kwargs)
+
+    return page
+
+
 def urlpatterns() -> list[URLPattern]:
-    return [path(e.path, requires_page(e.key)(_view(e)), name=e.key) for e in ENTRIES]
+    return [path(e.path, _page(e), name=e.key) for e in ENTRIES]

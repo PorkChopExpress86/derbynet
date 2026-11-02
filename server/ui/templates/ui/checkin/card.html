@@ -1,0 +1,58 @@
+{# One racer: every column of PHP's check-in table (checkin.js), as a card (D64, check-in A). #}
+<li class="rounded-xl border border-line bg-surface p-3" data-racer="{{ card.id }}" data-passed="{{ card.passed|yesno:'1,0' }}">
+  <div class="flex items-center gap-3">
+    {% if can_photo %}<button type="button" hx-get="{% url 'checkin-photo' card.id 'head' %}" hx-target="#checkin-sheet-body" @click="checkin.open('Racer photo', $event)" aria-haspopup="dialog" aria-label="Racer photo of {{ card.name }}" data-photo="head" class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 font-semibold text-ink-muted">{% else %}<span class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 font-semibold text-ink-muted">{% endif %}
+      {% if card.headshot %}<img src="{{ card.headshot }}" alt="" class="size-full object-cover" data-thumb="head">{% else %}<span aria-hidden="true">{{ card.initials }}</span>{% endif %}
+    {% if can_photo %}</button>{% else %}</span>{% endif %}
+    <div class="min-w-0 flex-1">
+      {% if can_edit %}<button type="button" hx-get="{% url 'checkin-edit' card.id %}" hx-target="#checkin-sheet-body" @click="checkin.open('{{ card.car }} {{ card.name|escapejs }}', $event)" aria-haspopup="dialog" class="block max-w-full truncate text-left text-base font-semibold underline-offset-2 hover:underline" data-action="edit">{{ card.first_name }} {{ card.last_name }}</button>{% else %}<p class="truncate text-base font-semibold">{{ card.first_name }} {{ card.last_name }}</p>{% endif %}
+      <p class="truncate text-sm text-ink-muted"><span class="font-mono font-semibold text-ink" data-car>{{ card.car }}</span> · <span data-partition>{{ card.partition }}</span></p>
+    </div>
+    <div class="flex shrink-0 flex-col items-center">
+      {% if card.locked %}
+      {% include "ui/components/status_pill.html" with state="ok" text="Raced" %}
+      {% elif card.passed and not can_revert %}
+      {% include "ui/components/status_pill.html" with state="ok" text="Passed" %}
+      {% else %}
+      {% with label="Passed, "|add:card.name %}{% url 'checkin-pass' card.id as pass_url %}{% include "ui/components/switch.html" with checked=card.passed url=pass_url name="passed" label=label %}{% endwith %}
+      <span class="text-xs text-ink-muted" aria-hidden="true">Passed</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="mt-2 flex items-center gap-3">
+    {% if can_photo %}<button type="button" hx-get="{% url 'checkin-photo' card.id 'car' %}" hx-target="#checkin-sheet-body" @click="checkin.open('Car photo', $event)" aria-haspopup="dialog" aria-label="Car photo of {{ card.name }}" data-photo="car" class="grid h-12 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2 text-ink-muted">{% else %}<span class="grid h-12 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2 text-ink-muted">{% endif %}
+      {% if card.car_photo %}<img src="{{ card.car_photo }}" alt="" class="size-full object-cover" data-thumb="car">{% else %}{% include "ui/components/icon.html" with name="car" cls="size-6" %}{% endif %}
+    {% if can_photo %}</button>{% else %}</span>{% endif %}
+    <p class="min-w-0 flex-1 text-sm">
+      {% if card.car_name %}<span class="block truncate" data-car-name>{{ card.car_name }}</span>{% endif %}
+      {% if card.note %}<span class="block truncate text-ink-muted" data-note>from {{ card.note }}</span>{% endif %}
+      {% if not card.car_photo %}<span class="block text-warn-ink">No car photo</span>{% endif %}
+    </p>
+    {% if listing.use_xbs %}
+    <div class="flex shrink-0 flex-col items-center">
+      {% with label="Exclusively By Scout, "|add:card.name %}{% url 'checkin-xbs' card.id as xbs_url %}{% include "ui/components/switch.html" with checked=card.xbs url=xbs_url name="xbs" label=label %}{% endwith %}
+      <span class="text-xs text-ink-muted" aria-hidden="true">XBS</span>
+    </div>
+    {% endif %}
+  </div>
+  {% if card.final == "can" %}
+  <div class="mt-2 flex items-center gap-2" data-final="can">
+    <p class="min-w-0 flex-1 text-sm text-warn-ink">Round 1 is over for {{ card.group }}.</p>
+    <button type="button" hx-post="{% url 'checkin-final' card.id %}" hx-target="#toasts" hx-swap="beforeend" data-action="request-final" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold">Request place in final</button>
+  </div>
+  {% elif card.final %}
+  <p class="mt-2 text-sm" data-final="{{ card.final }}">Place in final: <strong>{% if card.final == "requested" %}waiting for the race coordinator{% elif card.final == "allowed" %}allowed{% else %}declined{% endif %}</strong></p>
+  {% elif card.round_id %}
+  <div class="mt-2 flex items-center gap-2" data-late>
+    <p class="min-w-0 flex-1 text-sm text-warn-ink" data-status>Late! {{ card.round_name }} is in progress.</p>
+    <button type="button" hx-get="{% url 'checkin-question' card.id %}" hx-target="#checkin-sheet-body" @click="checkin.open('Add to the current round?', $event)" aria-haspopup="dialog" data-action="ask" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold">Add to round…</button>
+  </div>
+  {% elif card.left_out_of %}
+  <p class="mt-2 text-sm text-warn-ink" data-left-out>Not added to {{ card.left_out_of }}. The race coordinator can add the car.</p>
+  {% elif card.status %}
+  <p class="mt-2 text-sm {% if card.status == 'Racing!' %}text-ok-ink{% else %}text-warn-ink{% endif %}" data-status>{{ card.status }}</p>
+  {% endif %}
+  {% if card.exclude or card.no_speed_awards %}<p class="mt-1 text-xs text-ink-muted" data-awards>{% if card.exclude %}Not eligible for any award{% else %}Not eligible for speed awards{% endif %}</p>{% endif %}
+  {# Room for the weigh-in step (#70). #}
+  <div data-weigh-in class="empty:hidden"></div>
+</li>

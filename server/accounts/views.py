@@ -1,5 +1,5 @@
 """Role login for pages: the login and logout views, `page_requires()`, and
-the mobile check-in link (#15, #16, #40)."""
+the mobile check-in token (#15, #16, #40, #42)."""
 
 from functools import wraps
 from urllib.parse import urlencode
@@ -11,7 +11,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import get_script_prefix, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_GET, require_http_methods, require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.models import Role
 from accounts.permissions import (
@@ -129,11 +129,10 @@ def logout(request):
     return HttpResponseRedirect(reverse("login"))
 
 
-@require_GET
-def mcheckin(request):
-    """The phone link from the check-in page's QR code."""
-    if _valid_mcheckin_token(request.GET.get("tok", "")):
-        add_bits(request.session, MCHECKIN)
-    if not all(allows(request, bit) for bit in MCHECKIN):
-        return _to_login(request)
-    return render(request, "accounts/mcheckin.html")
+def grant_mcheckin_token(request) -> bool:
+    """The check-in page's QR link (#16, #42): a valid `tok` adds check-in,
+    un-pass and photo upload to this session. Returns whether it did."""
+    if not _valid_mcheckin_token(request.GET.get("tok", "")):
+        return False
+    add_bits(request.session, MCHECKIN)
+    return True

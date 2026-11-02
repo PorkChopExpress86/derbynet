@@ -14,7 +14,6 @@ _legacy_prefix = (settings.FORCE_SCRIPT_NAME or "/derbynet").strip("/")
 urlpatterns = [
     path("health/", views.health, name="health"),
     path("logout/", accounts.logout, name="logout"),
-    path("mcheckin.php", accounts.mcheckin, name="mcheckin"),
     path("action.php", dispatch, name="action-php"),
     path(f"{_legacy_prefix}/action.php", dispatch),
     path("post-timer-log.php", post_timer_log, name="post-timer-log"),

@@ -1,0 +1,35 @@
+{# Photo capture (#42). The file input with capture is the main path: it opens the phone's camera and works over plain HTTP. In a secure context the live camera is offered too, and its Capture stays disabled until the stream runs. Each photo is downscaled in the browser before upload. #}
+<div x-data="checkinPhoto()" x-init="checkin.show('{{ repo_label }} · {{ car }} {{ racer.first_name|escapejs }} {{ racer.last_name|escapejs }}')" data-photo-sheet="{{ repo }}">
+  <form hx-post="{% url 'checkin-upload' racer.pk repo %}" hx-encoding="multipart/form-data" hx-target="#checkin-sheet-body" class="flex flex-col gap-3" @htmx:before-request="busy = true" @htmx:after-request="busy = false">
+    <input type="file" name="photo" x-ref="upload" hidden tabindex="-1" aria-hidden="true">
+    <label class="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-field px-4 text-base font-semibold has-focus-visible:outline-3 has-focus-visible:outline-accent">
+      {% include "ui/components/icon.html" with name="car" cls="size-6" %}<span>{% if repo == "car" %}Take car photo{% else %}Take racer photo{% endif %}</span>
+      <input type="file" accept="image/*" capture="environment" class="sr-only" @change="picked($event)" data-pick>
+    </label>
+    <p class="text-center text-sm text-ink-muted">Or pick a photo from the phone or the computer.</p>
+    <template x-if="secure">
+      <div class="flex flex-col gap-2 rounded-xl border border-line p-3" data-live>
+        <button type="button" x-show="!stream" @click="start()" class="min-h-11 rounded-xl border border-line px-3 font-semibold" data-action="live">Use the live camera</button>
+        <div x-show="stream" class="flex flex-col gap-2">
+          <label for="p-device" class="text-sm font-medium">Camera</label>
+          <select id="p-device" x-model="device" @change="start()" class="h-11 rounded-lg border border-field bg-surface px-2"><template x-for="d in devices" :key="d.deviceId"><option :value="d.deviceId" x-text="d.label || 'Camera'"></option></template></select>
+          <video x-ref="video" playsinline muted class="aspect-[3/4] w-full rounded-lg bg-black object-cover"></video>
+          <button type="button" :disabled="!live" @click="capture()" class="min-h-11 rounded-xl bg-accent px-3 font-semibold text-accent-ink disabled:opacity-50" data-action="snapshot">Capture</button>
+        </div>
+      </div>
+    </template>
+    <div x-show="preview" x-cloak class="flex items-center gap-3" data-preview>
+      <img :src="preview" alt="The photo to upload" class="h-24 w-20 rounded-lg object-cover">
+      <p class="min-w-0 flex-1 text-sm text-ink-muted" x-text="summary"></p>
+    </div>
+    <label class="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line px-3">
+      <span>Autocrop to the face</span>
+      <input type="checkbox" name="autocrop" value="1" class="size-5 accent-accent"{% if repo == "head" %} checked{% endif %} data-autocrop>
+    </label>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" name="checkin" value="1" :disabled="!ready || busy" disabled class="min-h-12 flex-1 rounded-xl bg-ok px-4 font-semibold text-white disabled:opacity-50 dark:text-black" data-action="capture-checkin">Capture and check in</button>
+      <button type="submit" name="checkin" value="0" :disabled="!ready || busy" disabled class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold disabled:opacity-50" data-action="capture-only">Capture only</button>
+    </div>
+    {% if has_photo and can_crop %}<button type="button" hx-get="{% url 'checkin-crop-sheet' racer.pk repo %}" hx-target="#checkin-sheet-body" class="min-h-11 self-start rounded-lg px-2 text-sm font-semibold text-accent underline underline-offset-2" data-action="crop-existing">Crop the current photo</button>{% endif %}
+  </form>
+</div>

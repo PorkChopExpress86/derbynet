@@ -1,0 +1,12 @@
+{# The card list's content. The polled section around it is in page.html, so a reply swaps only its inside and the section keeps its request queue. #}
+  <input type="hidden" id="checkin-sig" name="sig" value="{{ listing.signature }}">
+  <p class="mb-2 text-sm text-ink-muted" data-count><strong class="text-ink">{{ listing.passed }}</strong> of {{ listing.total }} passed{% if listing.shown != listing.total %} · {{ listing.shown }} shown{% endif %}</p>
+  {% if listing.cards %}
+  <ul role="list" class="grid gap-2 lg:grid-cols-2" data-cards>
+    {% for card in listing.cards %}{% include "ui/checkin/card.html" %}{% endfor %}
+  </ul>
+  {% elif listing.total %}
+  <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No racer matches.</p>
+  {% else %}
+  <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No racers yet.{% if can_add %} Tap New racer to add the first one.{% endif %}</p>
+  {% endif %}

@@ -1,0 +1,9 @@
+{# D36: a racer passed while a round of the racer's group is running. The race crew or the race coordinator answers. Yes fits the car into the remaining heats with no preview; No leaves it out, and the dashboard lists it. #}
+<div x-data x-init="checkin.show('Add to the current round?')" data-question="{{ racer.pk }}">
+  <p class="text-base"><strong>{{ round_name }}</strong> is in progress. Add this car to the current round?</p>
+  <p class="mt-2 text-sm text-ink-muted"><span class="font-mono font-semibold text-ink">{{ car }}</span> {{ racer.first_name }} {{ racer.last_name }}</p>
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="button" hx-post="{% url 'checkin-answer' racer.pk 'yes' %}" hx-target="#toasts" hx-swap="beforeend" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-autofocus data-action="yes" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Yes</button>
+    <button type="button" hx-post="{% url 'checkin-answer' racer.pk 'no' %}" hx-target="#toasts" hx-swap="beforeend" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-action="no" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">No</button>
+  </div>
+</div>

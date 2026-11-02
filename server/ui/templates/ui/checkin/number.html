@@ -1,0 +1,15 @@
+{# The car number's hint (D48): warnings for a duplicate or a number outside the class's ranges, and a new range when every range is full. With fill, the class's next number goes into the field, unless the volunteer typed one meanwhile. #}
+{% if fill %}<span hidden x-data x-init="checkin.suggest('{{ carno }}')" data-suggested="{{ carno }}"></span>{% endif %}
+{% if warnings %}<ul class="flex flex-col gap-1 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn-ink" data-number-warnings>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+{% if range_full %}
+<div class="flex flex-col gap-2 rounded-lg border border-warn px-3 py-2" data-range-full>
+  <p class="text-sm text-warn-ink">Every car number range of {{ range_partition.name }} is taken.{% if not can_set_up %} Ask the race coordinator for another range.{% endif %}</p>
+  {% if can_set_up %}
+  <div class="flex items-end gap-2">
+    <div class="min-w-0 flex-1"><label for="f-range-first" class="mb-1 block text-sm font-medium">From</label><input id="f-range-first" name="range_first" inputmode="numeric" placeholder="400" class="h-11 w-full rounded-lg border border-field bg-surface px-2 font-mono"></div>
+    <div class="min-w-0 flex-1"><label for="f-range-last" class="mb-1 block text-sm font-medium">To</label><input id="f-range-last" name="range_last" inputmode="numeric" placeholder="499" class="h-11 w-full rounded-lg border border-field bg-surface px-2 font-mono"></div>
+    <button type="button" hx-post="{% url 'checkin-range' range_partition.pk %}" hx-include="closest form" hx-target="#checkin-sheet-body" data-action="add-range" class="min-h-11 rounded-lg bg-accent px-3 font-semibold text-accent-ink">Add range</button>
+  </div>
+  {% endif %}
+</div>
+{% endif %}

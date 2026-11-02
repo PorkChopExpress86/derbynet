@@ -5,6 +5,7 @@ from ui import navigation, redirects, views
 urlpatterns = [
     *navigation.urlpatterns(),
     path("", include("ui.dashboard.urls")),
+    path("", include("ui.checkin.urls")),
     *redirects.urlpatterns(),
     path("quickref.pdf", views.quickref, name="quickref"),
     path("components/", views.components, name="components"),

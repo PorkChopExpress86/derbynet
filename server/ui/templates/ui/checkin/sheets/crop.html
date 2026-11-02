@@ -1,0 +1,17 @@
+{# The crop sheet (#42, reused by #47): Cropper.js at the 3:4 autocrop ratio, with rotate buttons. The box is sent in pixels of the upright work render, as photo.crop takes it. #}
+<div x-data="checkinCrop()" x-init="checkin.show('Crop {{ repo_label|lower }}')" data-crop-sheet="{{ repo }}">
+  <form hx-post="{% url 'checkin-crop' racer.pk repo %}" hx-target="#checkin-sheet-body" class="flex flex-col gap-3">
+    <div class="h-[50dvh] max-h-96 w-full overflow-hidden rounded-lg bg-surface-2">
+      <img x-ref="image" src="{{ work_url }}" alt="{{ repo_label }} of {{ racer.first_name }} {{ racer.last_name }}" class="block max-w-full" data-crop-image>
+    </div>
+    <input type="hidden" name="left" x-ref="left"><input type="hidden" name="top" x-ref="top"><input type="hidden" name="right" x-ref="right"><input type="hidden" name="bottom" x-ref="bottom"><input type="hidden" name="original_width" x-ref="width"><input type="hidden" name="original_height" x-ref="height">
+    <div class="flex gap-2">
+      <button type="button" hx-post="{% url 'checkin-rotate' racer.pk repo 'left' %}" hx-target="#checkin-sheet-body" class="min-h-11 flex-1 rounded-xl border border-line px-3 font-semibold" data-action="rotate-left">Turn left</button>
+      <button type="button" hx-post="{% url 'checkin-rotate' racer.pk repo 'right' %}" hx-target="#checkin-sheet-body" class="min-h-11 flex-1 rounded-xl border border-line px-3 font-semibold" data-action="rotate-right">Turn right</button>
+    </div>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" :disabled="!ready" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink disabled:opacity-50" data-action="crop">Crop</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Keep as is</button>
+    </div>
+  </form>
+</div>
