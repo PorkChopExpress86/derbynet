@@ -118,12 +118,14 @@ document.addEventListener('alpine:init', () => {
   // when a page has such a list) or by Move up and Move down in the row's
   // menu, so drag is never the only way (#39). Each move posts the new order
   // as `name=<id>,<id>,...` when the list has a URL, and dispatches `reorder`.
+  // A list nested in another's rows names its own handles with
+  // `data-handle-selector`, so a drag moves only rows of its own list.
   Alpine.data('uiSortable', (url, name) => ({
     status: '',
     init() {
       const start = () => {
         Sortable.create(this.$refs.list, {
-          handle: '[data-handle]',
+          handle: this.$el.dataset.handleSelector || '[data-handle]',
           animation: 150,
           onEnd: (e) => { if (e.oldIndex !== e.newIndex) this.changed(e.item); },
         });

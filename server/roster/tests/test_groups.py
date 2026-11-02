@@ -553,3 +553,72 @@ def test_deleting_a_partition_keeps_its_groups_other_partitions(replay):
         assert Group.objects.filter(pk=wolves.pk).exists()
         groups.delete_partition(partition(replay, name))
     assert not Group.objects.filter(pk=wolves.pk).exists()
+
+
+# ----- rule_change_effects (D31, #43) ----------------------------------------
+
+
+def _scheduled_race(replay):
+    """Two dens by partition, a chart for Lions round 1, a second round,
+    a group award, a subgroup award, a pack award and a playlist step."""
+    with_dens(replay)
+    lions = Round.objects.get(group=group(replay, "Lions"))
+    for entry in lions.roster.all():
+        HeatLaneFactory(round=lions, racer=entry.racer)
+    Round.objects.create(event=replay.event, group=lions.group, number=2)
+    AwardFactory(event=replay.event, group=group(replay, "Lions"))
+    AwardFactory(event=replay.event, subgroup=Subgroup.objects.get(name="Tigers"))
+    AwardFactory(event=replay.event)
+    PlaylistEntryFactory(group=lions.group, round_number=1)
+
+
+def _rows(event):
+    return {
+        "rounds": set(Round.objects.filter(event=event).values_list("id", flat=True)),
+        "schedules": set(
+            HeatLane.objects.filter(event=event).values_list("round_id", flat=True)
+        ),
+        "group_awards": set(
+            Award.objects.filter(event=event)
+            .exclude(group__isnull=True, subgroup__isnull=True)
+            .values_list("id", flat=True)
+        ),
+        "playlist_steps": set(
+            PlaylistEntry.objects.filter(event=event).values_list("id", flat=True)
+        ),
+    }
+
+
+@pytest.mark.parametrize("rule", ["one-group", "by-partition"])
+def test_rule_change_effects_counts_the_rows_the_change_deletes(replay, rule):
+    _scheduled_race(replay)
+    if rule == "by-partition":
+        groups.form_groups_by_rule(replay.event, "custom")
+    before = _rows(replay.event)
+
+    effects = groups.rule_change_effects(replay.event, rule)
+    groups.form_groups_by_rule(replay.event, rule)
+
+    after = _rows(replay.event)
+    gone = {kind: before[kind] - after[kind] for kind in before}
+    assert effects == groups.RuleChangeEffects(
+        rounds=len(gone["rounds"]),
+        schedules=len(gone["schedules"]),
+        group_awards=len(gone["group_awards"]),
+        playlist_steps=len(gone["playlist_steps"]),
+    )
+    assert effects == groups.RuleChangeEffects(3, 1, 2, 1)
+    assert gone == before
+
+
+def test_rule_change_effects_is_nothing_for_the_rule_in_force_or_custom(replay):
+    _scheduled_race(replay)
+    assert groups.rule_change_effects(replay.event, "by-partition").deletes_nothing
+    assert groups.rule_change_effects(replay.event, "custom").deletes_nothing
+    assert not groups.rule_change_effects(replay.event, "one-group").deletes_nothing
+
+
+def test_rule_change_effects_refuses_an_unknown_rule(replay):
+    assert failure_of(groups.rule_change_effects, replay.event, "by-den") == (
+        Failure.BAD_RULE
+    )

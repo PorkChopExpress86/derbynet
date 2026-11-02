@@ -190,3 +190,30 @@ def reconcile_partition_lists(event_id) -> None:
             row_id for p, row_id in rows.items() if p not in kept or kept == every
         )
     AwardPartition.objects.filter(id__in=doomed).delete()
+
+
+@dataclass(frozen=True)
+class PartitionChoice:
+    """A unit's partition list as an editor shows it: the partitions it can
+    draw from, in partition order, and the narrowed list, or None for "all
+    partitions" (D38)."""
+
+    offered: list[Partition]
+    narrowed: frozenset[int] | None
+
+    def chosen(self, partition_id: int) -> bool:
+        return self.narrowed is None or partition_id in self.narrowed
+
+
+def partition_choice(
+    event, *, group: Group | None = None, subgroup: Subgroup | None = None
+) -> PartitionChoice:
+    unit = _unit(group, subgroup, None)
+    every = _draws_from(event.id, *_ids(group, subgroup, None))
+    offered = list(Partition.objects.filter(id__in=every).order_by("sort_order", "id"))
+    stored = frozenset(
+        AwardPartition.objects.filter(event=event, **unit).values_list(
+            "partition_id", flat=True
+        )
+    )
+    return PartitionChoice(offered, stored or None)

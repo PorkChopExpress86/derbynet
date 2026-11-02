@@ -1,0 +1,20 @@
+{# The confirm sheet for a change of formation rule (D31): it names each kind of row the change deletes, with its count, before anything changes. #}
+<div x-data x-init="groups.show('{{ chosen_label|escapejs }}?')" data-rule-confirm="{{ chosen }}">
+  {% if effects.deletes_nothing %}
+  <p data-deletes-nothing>{% if chosen == "custom" %}Custom starts from the groups you have now. Nothing is deleted.{% else %}Nothing is scheduled yet, so nothing is deleted. The groups are formed again.{% endif %}</p>
+  {% else %}
+  <p>The groups are formed again, and this deletes:</p>
+  <ul class="mt-2 flex flex-col gap-1" data-deletes>
+    <li data-delete="rounds"><strong class="tabular-nums">{{ effects.rounds }}</strong> round{{ effects.rounds|pluralize }}</li>
+    <li data-delete="schedules"><strong class="tabular-nums">{{ effects.schedules }}</strong> schedule{{ effects.schedules|pluralize }}</li>
+    <li data-delete="group_awards"><strong class="tabular-nums">{{ effects.group_awards }}</strong> group award{{ effects.group_awards|pluralize }}</li>
+    <li data-delete="playlist_steps"><strong class="tabular-nums">{{ effects.playlist_steps }}</strong> playlist step{{ effects.playlist_steps|pluralize }}</li>
+  </ul>
+  <p class="mt-2 text-sm text-ink-muted">Once any heat has a result, the rule can't change.</p>
+  {% endif %}
+  <form hx-post="{% url 'groups-rule' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <input type="hidden" name="rule" value="{{ chosen }}">
+    <button type="submit" data-confirm class="min-h-12 flex-1 rounded-xl {% if effects.deletes_nothing %}bg-accent text-accent-ink{% else %}bg-danger text-white dark:text-black{% endif %} px-4 font-semibold">{% if effects.deletes_nothing %}Change{% else %}Delete and change{% endif %}</button>
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </form>
+</div>

@@ -25,7 +25,7 @@ from django.db.models import Count, Max, Min, Q, Value
 from django.db.models.functions import Left, Lower
 
 from awards.models import Award, BallotAward
-from awards.services import reconcile_partition_lists
+from awards.services import reconcile_partition_lists, set_partition_list
 from core.models import ActionLog, FullFieldRule, RaceSettings, RaceState
 from core.services import lock_race_state
 from racing.engine.heat_state import Cancel
@@ -589,6 +589,50 @@ def form_groups_by_rule(event, rule: str) -> None:
         settings.save(update_fields=["use_subgroups"])
 
 
+@dataclass(frozen=True)
+class RuleChangeEffects:
+    """What a change of the formation rule would delete (D31)."""
+
+    rounds: int = 0
+    # Rounds with a schedule, a chart of heats.
+    schedules: int = 0
+    # Group and subgroup awards.
+    group_awards: int = 0
+    playlist_steps: int = 0
+
+    @property
+    def deletes_nothing(self) -> bool:
+        return not (
+            self.rounds or self.schedules or self.group_awards or self.playlist_steps
+        )
+
+
+def rule_change_effects(event, rule: str) -> RuleChangeEffects:
+    """The rounds, schedules, group awards and playlist steps a change to
+    `rule` would delete, counted from the rows `_clear_group_structure`
+    deletes, and nothing for the rule in force or for `custom`, which keeps
+    the groups. The group editor shows it before the change (#43)."""
+    try:
+        rule = Rule(rule)
+    except ValueError:
+        raise GroupFailure(
+            Failure.BAD_RULE, f"Rule value {rule} not recognized."
+        ) from None
+    if rule == Rule.CUSTOM or _rule(event.id) == rule:
+        return RuleChangeEffects()
+    return RuleChangeEffects(
+        rounds=Round.objects.filter(event=event).count(),
+        schedules=HeatLane.objects.filter(event=event)
+        .values("round_id")
+        .distinct()
+        .count(),
+        group_awards=Award.objects.filter(event=event)
+        .filter(Q(group__isnull=False) | Q(subgroup__isnull=False))
+        .count(),
+        playlist_steps=PlaylistEntry.objects.filter(event=event).count(),
+    )
+
+
 def _clear_group_structure(event_id) -> tuple[list[Group], list[Subgroup]]:
     old_groups = list(Group.objects.filter(event_id=event_id))
     old_subgroups = list(Subgroup.objects.filter(event_id=event_id))
@@ -957,6 +1001,23 @@ def rename_group(group: Group, name: str, n_trophies=KEEP) -> None:
             Group.objects.filter(pk=group.pk).update(n_trophies=n_trophies)
 
 
+def edit_group(group: Group, name: str, n_trophies=KEEP, award_partitions=KEEP) -> None:
+    """The group editor's save (#43): `class.edit` and the group's speed-award
+    partition list (D35), in one transaction. `award_partitions` empty or
+    every partition the group draws from is "all partitions". A name that
+    is unchanged renames nothing, so a group whose partitions cannot share a
+    name still takes a new trophy count."""
+    with transaction.atomic():
+        lock_race_state(group.event_id)
+        group = Group.objects.select_related("event").get(pk=group.pk)
+        if _cut(name) != group.name:
+            rename_group(group, name, n_trophies)
+        elif n_trophies is not KEEP:
+            Group.objects.filter(pk=group.pk).update(n_trophies=n_trophies)
+        if award_partitions is not KEEP:
+            set_partition_list(group.event, award_partitions, group=group)
+
+
 def delete_group(group: Group) -> None:
     """`class.delete`: refused while racers are in the group or an aggregate
     draws from it."""
@@ -1056,6 +1117,22 @@ def rename_subgroup(subgroup: Subgroup, name: str, n_trophies=KEEP) -> None:
         partitions.update(name=name)
         if n_trophies is not KEEP:
             Subgroup.objects.filter(pk=subgroup.pk).update(n_trophies=n_trophies)
+
+
+def edit_subgroup(
+    subgroup: Subgroup, name: str, n_trophies=KEEP, award_partitions=KEEP
+) -> None:
+    """The subgroup editor's save (#43): `rank.edit` and the subgroup's
+    speed-award partition list (D35), in one transaction, as `edit_group`."""
+    with transaction.atomic():
+        lock_race_state(subgroup.event_id)
+        subgroup = Subgroup.objects.select_related("event").get(pk=subgroup.pk)
+        if _cut(name) != subgroup.name:
+            rename_subgroup(subgroup, name, n_trophies)
+        elif n_trophies is not KEEP:
+            Subgroup.objects.filter(pk=subgroup.pk).update(n_trophies=n_trophies)
+        if award_partitions is not KEEP:
+            set_partition_list(subgroup.event, award_partitions, subgroup=subgroup)
 
 
 def delete_subgroup(subgroup: Subgroup) -> None:

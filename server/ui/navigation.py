@@ -300,6 +300,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         43,
         php="racing-groups.php",
         menu=False,
+        view="ui.groups.views.page",
     ),
     NavEntry(
         "playlist",

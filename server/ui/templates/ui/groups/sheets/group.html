@@ -1,0 +1,20 @@
+{# The group sheet (class.edit): name, trophy count, and the speed-award partition list (D35), which offers the group's own partitions (D38). An aggregate uses it too. #}
+<div x-data x-init="groups.show('Edit {{ row.name|escapejs }}')" data-group-sheet="{{ row.id }}">
+  {% include "ui/groups/notice.html" %}
+  <form hx-post="{% url 'groups-group' row.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="flex flex-col gap-3">
+    <div>
+      <label for="gs-name" class="mb-1 block text-sm font-medium">{% if aggregate %}Aggregate{% else %}{{ tree.labels.group }}{% endif %} name</label>
+      <input id="gs-name" name="name" value="{{ values.name }}" data-autofocus autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    {% include "ui/groups/trophies.html" with id="gs-trophies" value=values.ntrophies %}
+    {% include "ui/groups/award_partitions.html" with key="gs" plural=tree.partitions_label|lower %}
+    {% if aggregate %}<p class="text-sm text-ink-muted" data-constituents>Draws from {{ row.constituents|join:", " }}.</p>{% endif %}
+    {% if not aggregate and row.count == 0 and row.nrounds %}<p class="text-sm text-ink-muted">{{ row.nrounds }} completed round{{ row.nrounds|pluralize }} exist for this {{ tree.labels.group|lower }}.</p>{% endif %}
+    {% if row.constituent_of %}<p class="text-sm text-ink-muted" data-constituent-of>Part of {{ row.constituent_of }}, and maybe other aggregates.</p>{% endif %}
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+  {% if deletable %}<button type="button" hx-get="{% url 'groups-group-delete' row.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" data-action="delete" class="mt-4 min-h-12 w-full rounded-xl border border-danger px-4 font-semibold text-danger-ink">Delete {% if aggregate %}aggregate{% else %}{{ tree.labels.group|lower }}{% endif %}</button>{% endif %}
+</div>

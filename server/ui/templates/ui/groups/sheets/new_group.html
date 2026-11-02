@@ -1,0 +1,15 @@
+{# A new group under the custom rule (class.add), with a subgroup and partition of its name. #}
+<div x-data x-init="groups.show('New group')" data-new-group>
+  {% include "ui/groups/notice.html" %}
+  <form hx-post="{% url 'groups-group-new' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="flex flex-col gap-3">
+    <div>
+      <label for="ng-name" class="mb-1 block text-sm font-medium">Group name</label>
+      <input id="ng-name" name="name" value="{{ values.name|default:'' }}" data-autofocus autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    {% include "ui/groups/trophies.html" with id="ng-trophies" value=values.ntrophies %}
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Add group</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

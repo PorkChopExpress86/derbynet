@@ -190,3 +190,20 @@ def apply_form(event: Event, post: Mapping) -> FormResult:
 
 def _not_written(setting: str) -> tuple[str, str]:
     return ("not-written", f"Value for {setting} could not be written.")
+
+
+@transaction.atomic
+def apply_group_form(event: Event, post: Mapping) -> FormResult:
+    """A field of the racing groups editor (#43): `apply_form`, and a pack
+    trophy count above zero turns "Don't calculate" pack standings back to
+    "Calculate normally", as `racing-groups.js` does, since pack trophies
+    need the pack standings."""
+    result = apply_form(event, post)
+    if (
+        result.failure is None
+        and "n-pack-trophies" in post
+        and int(race_settings.read(event, "n-pack-trophies") or 0) > 0
+        and race_settings.read(event, "full-field-calc") == "-1"
+    ):
+        race_settings.write(event, "full-field-calc", "0")
+    return result

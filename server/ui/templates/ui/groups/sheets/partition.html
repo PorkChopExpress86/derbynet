@@ -1,0 +1,34 @@
+{# One partition (partition.edit): its name, which a rename changes and nothing else (D31), its car number ranges (D48), and Delete while no racer is in it. #}
+<div x-data x-init="groups.show('{{ row.name|escapejs }}')" data-partition-sheet="{{ row.id }}">
+  {% include "ui/groups/notice.html" %}
+  <form hx-post="{% url 'groups-partition' row.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="flex items-end gap-2">
+    <div class="min-w-0 flex-1">
+      <label for="pe-name" class="mb-1 block text-sm font-medium">{{ tree.labels.partition }} name</label>
+      <input id="pe-name" name="name" value="{{ values.name }}" data-autofocus autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    <button type="submit" class="min-h-12 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Rename</button>
+  </form>
+  <p class="mt-2 text-sm text-ink-muted">{{ row.count }} racer{{ row.count|pluralize }}.</p>
+  <section aria-labelledby="pe-ranges-h" class="mt-4" data-ranges>
+    <h3 id="pe-ranges-h" class="font-semibold">Car numbers</h3>
+    {% if row.ranges %}
+    <ul role="list" class="mt-2 flex flex-col gap-2">
+      {% for r in row.ranges %}
+      <li class="flex min-h-12 items-center gap-2 rounded-xl border border-line px-3" data-range="{{ r.first }}-{{ r.last }}">
+        <span class="flex-1 font-mono">{{ r.first }} to {{ r.last }}</span>
+        <button type="button" hx-post="{% url 'groups-range-remove' r.rangeid %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="closest ul:drop" aria-label="Remove {{ r.first }} to {{ r.last }}" class="min-h-11 rounded-lg px-3 text-sm font-semibold text-danger-ink">Remove</button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="mt-1 text-sm text-ink-muted">No range. Car numbers follow the car numbering setting.</p>{% endif %}
+    <form hx-post="{% url 'groups-range-add' row.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="mt-2 flex items-end gap-2" data-add-range>
+      <div class="min-w-0 flex-1"><label for="pe-first" class="mb-1 block text-sm font-medium">From</label><input id="pe-first" name="range_first" inputmode="numeric" placeholder="100" class="h-12 w-full rounded-xl border border-field bg-surface px-3 font-mono text-base"></div>
+      <div class="min-w-0 flex-1"><label for="pe-last" class="mb-1 block text-sm font-medium">To</label><input id="pe-last" name="range_last" inputmode="numeric" placeholder="199" class="h-12 w-full rounded-xl border border-field bg-surface px-3 font-mono text-base"></div>
+      <button type="submit" class="min-h-12 rounded-xl border border-line px-4 font-semibold">Add range</button>
+    </form>
+  </section>
+  <div class="mt-4 flex flex-col gap-2">
+    {% if row.count == 0 %}<button type="button" hx-get="{% url 'groups-partition-delete' row.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" data-action="delete" class="min-h-12 w-full rounded-xl border border-danger px-4 font-semibold text-danger-ink">Delete {{ tree.labels.partition|lower }}</button>{% endif %}
+    <button type="button" hx-get="{% url 'groups-partitions' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" class="min-h-12 w-full rounded-xl border border-line px-4 font-semibold">All {{ tree.partitions_label|lower }}</button>
+  </div>
+</div>

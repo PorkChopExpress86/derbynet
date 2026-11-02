@@ -44,7 +44,7 @@
       <div>
         <div class="mb-1 flex items-baseline justify-between gap-2">
           <label for="f-partition" class="block text-sm font-medium">Class</label>
-          {% if can_edit_partitions %}<a href="{% url 'racing-groups' %}" class="text-sm font-medium text-accent underline underline-offset-2" data-edit-partitions>Edit partitions</a>{% endif %}
+          {% if can_edit_partitions %}<a href="{% url 'groups-partitions' %}" class="text-sm font-medium text-accent underline underline-offset-2" data-edit-partitions>Edit partitions</a>{% endif %}
         </div>
         <select id="f-partition" name="partitionid" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
           {% for pk, name in partitions %}<option value="{{ pk }}"{% if values.partitionid|stringformat:"s" == pk|stringformat:"s" %} selected{% endif %}>{{ name }}</option>{% empty %}<option value="">Default</option>{% endfor %}

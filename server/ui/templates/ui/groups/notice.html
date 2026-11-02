@@ -1,0 +1,1 @@
+{% if notice %}<p class="mb-3 rounded-lg bg-ok-soft px-3 py-2 text-sm font-medium text-ok-ink" role="status" data-sheet-notice>{{ notice }}</p>{% endif %}{% if error %}<p class="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-sm font-medium text-danger-ink" role="alert" data-error="{{ error_code|default:'' }}">{{ error }}</p>{% endif %}
