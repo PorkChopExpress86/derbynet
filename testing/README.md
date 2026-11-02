@@ -91,7 +91,9 @@ render or number:
 - Never write a database ID.  Look it up by a stable key with `racerid_of`
   (car number), `racerid_named`, `roundid_of` (class and round), `classid_of`,
   `rankid_of`, `partitionid_of` and `awardid_of`, or take it from the response
-  that created the thing.  `normalize_ids` replaces every ID in a response with
+  that created the thing.  Each lookup fails when nothing matches.  To check
+  that a group is gone, use `expect_no_class`, `expect_no_rank` or
+  `expect_no_partition`, which fail unless the server sent the list.  `normalize_ids` replaces every ID in a response with
   a label, to compare it with a golden response.
 - `check-no-literal-ids.sh` fails when a script contains a literal ID.  An
   exception goes in `check-no-literal-ids.allowlist`, with its reason.
