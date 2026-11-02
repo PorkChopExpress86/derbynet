@@ -16,6 +16,10 @@ DEVIATIONS_FILE = GOLDEN_DIR / "deviations.json"
 SERVER_DIR = GOLDEN_DIR.parents[1]
 
 # The decisions of #20, "Quirk decisions". Only a Fix may have a deviation.
+# The registry's divergences and the parity gate's allowances may cite any key
+# here, so add a #64 row only once a ticket or an owner decision settles it,
+# and say which in a comment. A row the ticket lists under "Owner decisions"
+# waits for the owner.
 QUIRK_DECISIONS = {
     "Q1": "fix",
     "Q2": "fix",

@@ -4,7 +4,11 @@ A leg is what `testing/steps.sh` writes with `PARITY_DIR` set: `steps.tsv`
 and one transcript per step, in the form `testing/common.sh` writes.
 """
 
+import os
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -306,6 +310,28 @@ def test_main_writes_the_summary_and_exits_on_the_verdict(tmp_path):
 
     assert status == 1
     assert "$.current-heat.heat: php=1 django=2" in summary.read_text()
+
+
+def test_the_gate_runs_as_the_parity_workflow_starts_it(tmp_path):
+    """`python -m tools.parity_gate`, with no Django settings loaded before
+    the module's own `django.setup()`: a module-level import that needs
+    Django crashes here and nowhere else in the tests."""
+    leg(tmp_path, "php", [("test-balloting.sh", "pass", 1, poll(), "")])
+    leg(tmp_path, "django", [("test-balloting.sh", "pass", 1, poll(), "")])
+    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+
+    result = subprocess.run(
+        [sys.executable, "-m", "tools.parity_gate"]
+        + [str(tmp_path / "php"), str(tmp_path / "django")],
+        cwd=Path(gate.__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    # The real WAITING entries no leg ran fail the verdict; the gate judged.
+    assert "Traceback" not in result.stderr, result.stderr
+    assert "`test-balloting.sh`" in result.stdout
 
 
 # Found in the review of PR #159
