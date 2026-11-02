@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62), and the last paragraph of the Decision names that framework. The same day the owner said the kiosks are laptops, not Raspberry Pis (D63). It fills in the choice the decision left to #71, and the decision itself is unchanged.
+Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62), and the last paragraph of the Decision names that framework. The same day the owner said the kiosks are laptops, not Raspberry Pis (D63). That fills in the choice the decision left to #71, and the decision itself is unchanged. On 2026-11-02 the owner dropped View Transitions from the kiosk pages (D66).
 
 ## Context
 
@@ -14,7 +14,7 @@ This ADR replaces the earlier proposal to port the kiosk pages as they look toda
 
 Kiosk pages are built in only. Django runs no custom PHP kiosk pages and loads no pages from `local/kiosks/` or any other folder. The built-in pages are rebuilt, not copied, in a front end that works well with Django and with the replay page and has proper animations. [#71](https://github.com/PorkChopExpress86/derbynet/issues/71) picks the framework. It prototypes the now-racing page and the standings reveal in Django templates with htmx, Alpine.js, and CSS View Transitions, and in Svelte, on a TV-size screen. The owner may build a custom page later in the chosen framework.
 
-The framework #71 chose is Django templates with htmx and Alpine.js, the stack ADR-09 uses for the manager pages, with no Node at build time or at runtime (D62). Motion uses CSS keyframes for elements that enter, and one shared row-move helper (a FLIP helper on the Web Animations API) for rows that change place, such as the standings reveal. View Transitions are used only for whole-board swaps, and only where recordings on a kiosk laptop for #71 show they are cheap (D63); until those recordings exist, no page uses them.
+The framework #71 chose is Django templates with htmx and Alpine.js, the stack ADR-09 uses for the manager pages, with no Node at build time or at runtime (D62). Motion uses CSS keyframes for elements that enter, and one shared row-move helper (a FLIP helper on the Web Animations API) for rows that change place, such as the standings reveal. No page uses View Transitions (D66). The spike showed the keyframes and the helper animate as smoothly as Svelte without them, and a later ticket can add them for whole-board swaps if a crew asks.
 
 ## Consequences
 
