@@ -3,10 +3,15 @@
 # merge to that head SHA so a push after the check can't slip in. Then prints
 # each issue the PR closes with its state, and exits 1 if one is still open.
 #
-# Usage: plan/bin/pr-merge <pr> --squash|--rebase|--merge [--delete-branch]
+# Usage: plan/bin/pr-merge <pr> [--squash|--rebase|--merge] [--delete-branch]
+# With no merge method it squashes and deletes the branch, as the plan's PRs do.
 set -euo pipefail
-PR=${1:?usage: pr-merge <pr> --squash|--rebase|--merge [--delete-branch]}
+PR=${1:?usage: pr-merge <pr> [--squash|--rebase|--merge] [--delete-branch]}
 shift
+case " $* " in
+  *" --squash "*|*" --rebase "*|*" --merge "*|*" -s "*|*" -r "*|*" -m "*) ;;
+  *) set -- --squash --delete-branch "$@" ;;
+esac
 GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 # GitHub closes the issues a few seconds after the merge.

@@ -2,6 +2,7 @@
 every control over the racing services."""
 
 import re
+from html.parser import HTMLParser
 
 import pytest
 
@@ -38,9 +39,63 @@ def signature(html: str) -> str:
     return re.search(r'name="sig" value="([^"]+)"', html).group(1)
 
 
+class _LiveControls(HTMLParser):
+    """Each element inside #live that makes a request: an hx-get or hx-post,
+    or a switch with a URL."""
+
+    VOID = {"input", "img", "br", "hr", "meta", "link", "source", "wbr"}
+
+    def __init__(self):
+        super().__init__()
+        self.depth = None
+        self.level = 0
+        self.controls: list[dict] = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if self.depth is not None and (
+            {"hx-get", "hx-post"} & attrs.keys()
+            or "uiSwitch(" in (attrs.get("x-data") or "")
+            and ", '/" in attrs["x-data"]
+        ):
+            self.controls.append(attrs)
+        if tag in self.VOID:
+            return
+        self.level += 1
+        if self.depth is None and attrs.get("id") == "live":
+            self.depth = self.level
+
+    def handle_endtag(self, tag):
+        if tag in self.VOID:
+            return
+        if self.level == self.depth:
+            self.depth = None
+        self.level -= 1
+
+
+def assert_live_controls_send_the_shown_heat(html: str):
+    """htmx inheritance is off (base.html), so a control inside #live sends
+    the heat on screen only when it names #shown-heat itself; without it a
+    reply ends the hold of a finished heat (`updated()`) and the results
+    sheet answers 404."""
+    parser = _LiveControls()
+    parser.feed(html)
+    missing = [
+        c for c in parser.controls if "#shown-heat" not in c.get("hx-include", "")
+    ]
+    assert missing == [], missing
+
+
 def live_of(response) -> str:
     html = response.content.decode()
     assert 'id="live" hx-swap-oob="true"' in html, html[:500]
+    assert_live_controls_send_the_shown_heat(html)
+    return html
+
+
+def page_of(client) -> str:
+    html = client.get("/dashboard/").content.decode()
+    assert_live_controls_send_the_shown_heat(html)
     return html
 
 
@@ -68,7 +123,7 @@ def test_coordinator_php_moves_to_the_dashboard(client, event):
 
 def test_the_poll_answers_204_while_nothing_changed(coordinator, event, wolves):
     scheduled(wolves)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     shown = {"round": wolves.pk, "heat": 1, "hold": 0, "sig": signature(html)}
 
     with no_session_writes():
@@ -90,7 +145,7 @@ def test_the_timer_age_alone_changes_no_signature(coordinator, event, wolves):
     TimerStatus.objects.filter(event=event).update(
         state=TimerStatus.State.CONNECTED, last_contact=timezone.now()
     )
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "Timer: CONNECTED" in html and "sec.)" not in html
     shown = {"sig": signature(html), "round": "", "heat": "", "hold": 0}
     assert coordinator.get("/dashboard/live/", shown).status_code == 204
@@ -218,7 +273,7 @@ def test_rerun_has_four_states(coordinator, event, wolves, setup, state, label):
     elif setup == "rerun":
         run_heat(event)
         heats.rerun(event, "last")
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert f'data-rerun="{state}"' in html and f">{label}</button>" in html
     if state != "none":
         live_of(post(coordinator, "/dashboard/rerun/", {"rerun": state}))
@@ -241,20 +296,20 @@ def test_start_race_shows_when_the_timer_offers_remote_start(
     from racing.models import TimerStatus
 
     scheduled(wolves)
-    assert "Start Race" not in coordinator.get("/dashboard/").content.decode()
+    assert "Start Race" not in page_of(coordinator)
     TimerStatus.objects.filter(event=event).update(
         remote_start_seen_at=timezone.now(),
         last_contact=timezone.now(),
         state=TimerStatus.State.STAGING,
     )
-    assert "Start Race" in coordinator.get("/dashboard/").content.decode()
+    assert "Start Race" in page_of(coordinator)
     live_of(post(coordinator, "/dashboard/remote-start/"))
     assert TimerStatus.objects.get(event=event).remote_start_requested
 
 
 def test_not_monitoring_the_timer(coordinator, event):
     RaceSettings.objects.filter(event=event).update(warn_no_timer=False)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "Not monitoring timer state" in html and 'data-action="timer"' not in html
 
 
@@ -264,7 +319,7 @@ def test_replay_trigger_and_settings(coordinator, event):
     ReplayStatus.objects.filter(event=event).update(
         state=ReplayStatus.State.CONNECTED, last_contact=timezone.now()
     )
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "Trigger Replay" in html
     live_of(post(coordinator, "/dashboard/replay/test/"))
     sheet = coordinator.get("/dashboard/replay/settings/sheet/").content.decode()
@@ -288,7 +343,7 @@ def test_replay_trigger_and_settings(coordinator, event):
 def test_simulated_racing_shows_a_herald_with_stop(coordinator, event):
     timer.set_test_mode(event, True)
     heats.set_racing(event, True)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "Simulated racing in progress" in html
     live_of(post(coordinator, "/dashboard/timer-test/stop/"))
     assert not RaceState.objects.get(event=event).timer_test
@@ -296,7 +351,7 @@ def test_simulated_racing_shows_a_herald_with_stop(coordinator, event):
 
 def test_unexpected_results_count(coordinator, event):
     RaceState.objects.filter(event=event).update(refused_results=2)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "2 unexpected results from the timer have been received." in html
 
 
@@ -367,7 +422,7 @@ def test_adjust_schedule_fits_in_late_racers(coordinator, event, wolves):
     scheduled(wolves)
     run_heat(event)
     late = add_racers(event, "Wolves", 1, 150)[0]
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "1 not in schedule" in html and 'data-button="adjust"' in html
     sheet = coordinator.get(f"/dashboard/round/{wolves.pk}/sheet/adjust/").content
     assert b"150 Wolves1 Racer is fitted in." in sheet
@@ -380,7 +435,7 @@ def test_master_schedule_next_up(coordinator, event):
     RaceSettings.objects.filter(event=event).update(use_master_sched=True)
     for r in found.values():
         scheduled(r, race=False)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "Interleaved Schedule" in html and "Next Up" in html
     assert "data-master-heats" in html
     assert "Rounds Playlist" not in html
@@ -399,7 +454,7 @@ def finished(event, round):
 
 def test_the_new_round_stepper_makes_a_follow_on_round(coordinator, event, wolves):
     finished(event, wolves)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "Add New Rounds" in html
     sheet = coordinator.get("/dashboard/new-round/sheet/").content.decode()
     assert "Round 2 of Wolves" in sheet
@@ -449,7 +504,7 @@ def test_a_late_racer_previews_then_joins(coordinator, event, wolves):
     run_heat(event)
     late = add_racers(event, "Wolves", 1, 150)[0]
     before = chart(wolves)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert f'data-not-added-row="{late.pk}"' in html
 
     preview = post(coordinator, f"/dashboard/late/{wolves.pk}/{late.pk}/preview/")
@@ -492,7 +547,7 @@ def late_for_round_1(event, wolves):
 def test_a_final_request_is_allowed(coordinator, event, wolves):
     request = late_for_round_1(event, wolves)
     built = rounds.new_round_roster(FollowOn(wolves), 3)
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert f'data-final-request="{request.pk}"' in html
     live_of(post(coordinator, f"/dashboard/final-request/{request.pk}/allow/"))
     roster = set(built.round.roster.values_list("racer_id", flat=True))
@@ -514,11 +569,11 @@ def test_closing_a_lane_names_the_rounds_and_reopens(coordinator, event, wolves)
     assert "Wolves, Round 1" in sheet and 'value="0" checked' in sheet
     live_of(post(coordinator, "/dashboard/lanes/close/", {"lane": "3", "scoring": "1"}))
     assert LaneClosure.objects.filter(event=event).exists()
-    html = coordinator.get("/dashboard/").content.decode()
+    html = page_of(coordinator)
     assert "Lane 3 closed · Drop the slowest heat" in html
     assert "Reopen lane 3" in html
     live_of(post(coordinator, "/dashboard/lanes/3/reopen/"))
-    assert "Reopen lane 3" not in coordinator.get("/dashboard/").content.decode()
+    assert "Reopen lane 3" not in page_of(coordinator)
 
 
 def test_a_service_refusal_is_a_422_toast(coordinator, event, wolves):

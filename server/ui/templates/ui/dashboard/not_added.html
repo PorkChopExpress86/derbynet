@@ -6,7 +6,7 @@
     <li class="py-2" data-not-added-row="{{ row.racer_id }}">
       <div class="flex min-h-11 items-center gap-2">
         <span class="min-w-0 flex-1"><span class="font-mono font-semibold">{{ row.car }}</span> {{ row.name }} <span class="block text-sm text-ink-muted">{{ row.round_name }}</span></span>
-        <button type="button" hx-post="{% url 'dashboard-late-preview' row.round_id row.racer_id %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-sync="#live:replace" @click="dashboard.open('Add {{ row.name|escapejs }} to the schedule', $event)" aria-haspopup="dialog" data-action="preview" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold">Preview and add</button>
+        <button type="button" hx-post="{% url 'dashboard-late-preview' row.round_id row.racer_id %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-include="#shown-heat" hx-sync="#live:replace" @click="dashboard.open('Add {{ row.name|escapejs }} to the schedule', $event)" aria-haspopup="dialog" data-action="preview" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold">Preview and add</button>
       </div>
       {% include "ui/dashboard/award_settings.html" with racer_id=row.racer_id racer_key=row.racer_id|stringformat:"d" where="na" exclude=row.exclude no_speed=row.no_speed_awards %}
     </li>

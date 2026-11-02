@@ -4,7 +4,7 @@
     <h2 id="rounds-title" class="min-w-0 flex-1 text-base font-semibold">Rounds</h2>
     {% if not use_master_sched %}
     <a href="{% url 'playlist' %}" data-action="playlist-link" class="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-accent underline underline-offset-2">Rounds Playlist</a>
-    {% if playlist_start %}<button type="button" hx-post="{% url 'dashboard-playlist-start' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="start-playlist" class="min-h-11 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-ink">Start Playlist</button>{% endif %}
+    {% if playlist_start %}<button type="button" hx-post="{% url 'dashboard-playlist-start' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="#shown-heat" hx-sync="#live:replace" data-action="start-playlist" class="min-h-11 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-ink">Start Playlist</button>{% endif %}
     {% endif %}
   </div>
   {% for key, label, cards in groups %}
@@ -18,6 +18,6 @@
   <p class="rounded-xl border border-line bg-surface p-4 text-ink-muted">No rounds yet. Racing groups and their first rounds come from the roster and the racing groups page.</p>
   {% endfor %}
   {% if add_new_rounds %}
-  <button type="button" hx-get="{% url 'dashboard-new-round-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-sync="#live:replace" @click="dashboard.open('New round', $event)" aria-haspopup="dialog" data-action="add-new-rounds" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-field font-semibold">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}Add New Rounds</button>
+  <button type="button" hx-get="{% url 'dashboard-new-round-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-include="#shown-heat" hx-sync="#live:replace" @click="dashboard.open('New round', $event)" aria-haspopup="dialog" data-action="add-new-rounds" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-field font-semibold">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}Add New Rounds</button>
   {% endif %}
 </section>

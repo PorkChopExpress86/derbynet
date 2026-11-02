@@ -126,11 +126,19 @@ def size(request) -> str:
 
 
 class PageErrors:
-    """What went wrong while a page loaded or ran."""
+    """What went wrong while a page loaded or ran.
+
+    htmx logs an aborted request (an `hx-sync` replace, or a poll cut short)
+    as two console errors, `htmx:afterRequest` then `htmx:sendAbort`. An abort
+    is no failure, so that pair is dropped here and counted in `aborts`; the
+    browser's `net::ERR_ABORTED` for the request still needs the test's
+    `allow()`. A lone `htmx:afterRequest` is a failed request and stays."""
 
     def __init__(self):
         self.errors: list[str] = []
         self.allowed: list[re.Pattern] = []
+        self.aborts = 0
+        self._after_request = False
 
     def allow(self, pattern: str):
         self.allowed.append(re.compile(pattern))
@@ -138,6 +146,24 @@ class PageErrors:
     def add(self, message: str):
         if not any(p.search(message) for p in self.allowed):
             self.errors.append(message)
+
+    def console_error(self, text: str):
+        after_request, self._after_request = self._after_request, False
+        if text == "htmx:sendAbort":
+            self.aborts += 1
+            return
+        if after_request:
+            self.add("console: htmx:afterRequest")
+        if text == "htmx:afterRequest":
+            self._after_request = True
+        else:
+            self.add(f"console: {text}")
+
+    def final(self) -> list[str]:
+        if self._after_request:
+            self._after_request = False
+            self.add("console: htmx:afterRequest")
+        return self.errors
 
 
 @pytest.fixture
@@ -153,7 +179,7 @@ def page(browser, live_server, size, page_errors):
     page.on("pageerror", lambda error: page_errors.add(f"pageerror: {error}"))
     page.on(
         "console",
-        lambda msg: msg.type == "error" and page_errors.add(f"console: {msg.text}"),
+        lambda msg: msg.type == "error" and page_errors.console_error(msg.text),
     )
     page.on(
         "requestfailed",
@@ -171,7 +197,7 @@ def page(browser, live_server, size, page_errors):
     page.on("dialog", lambda dialog: page_errors.add(f"dialog: {dialog.message}"))
     yield page
     context.close()
-    assert page_errors.errors == []
+    assert page_errors.final() == []
 
 
 def log_in(page, role: str):
