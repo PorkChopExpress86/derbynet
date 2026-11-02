@@ -202,8 +202,8 @@ def test_pass_and_unpass_with_undo(crew, event):
     racer.refresh_from_db()
     assert not racer.passed_inspection
     undo = re.search(r'hx-post="([^"]+)"', unpassed.content.decode()).group(1)
-    assert undo == f"/checkin/racer/{racer.pk}/pass/?passed=1"
-    post(crew, undo)
+    assert undo == f"/checkin/racer/{racer.pk}/pass/?passed=1&amp;undo=1"
+    post(crew, undo.replace("&amp;", "&"))
     racer.refresh_from_db()
     assert racer.passed_inspection
 
@@ -637,3 +637,93 @@ def test_crop_and_rotate(crew, event, folders):
 def test_an_upload_with_no_photo_is_refused(crew, event, folders):
     racer = add_racers(event, "Scouts", 1, 101)[0]
     assert post(crew, f"/checkin/racer/{racer.pk}/photo/car/upload/").status_code == 422
+
+
+# ----- review: the status filter -----
+
+
+def test_the_status_filter_picks_racing_late_and_scheduled_but_not_passed(crew, event):
+    """The filter bar's status, beside passed or not: the status text PHP's
+    table shows ("Racing!", "Scheduled but not passed", "Late!")."""
+    wolves = race_setup(event)["Wolves"]
+    scheduled(wolves, race=False)
+    unpassed = HeatLane.objects.filter(round=wolves).first().racer
+    Racer.objects.filter(pk=unpassed.pk).update(passed_inspection=False)
+    late = add_racers(event, "Wolves", 1, 150)[0]
+    waiting = add_racers(event, "Bears", 1, 201, passed=False)[0]
+
+    def shown(state):
+        return set(
+            card_ids(get(crew, "/checkin/list/", {"state": state}).content.decode())
+        )
+
+    racing = set(
+        HeatLane.objects.filter(round=wolves)
+        .exclude(racer=unpassed)
+        .values_list("racer_id", flat=True)
+    )
+    assert shown("racing") == racing
+    assert shown("unpassed") == {unpassed.pk}
+    assert shown("late") == {late.pk}
+    assert shown("unscheduled") == {waiting.pk}
+    assert len(shown("")) == len(racing) + 3
+    assert 'name="state"' in crew.get("/checkin/").content.decode()
+
+
+# ----- review: the award settings save with the racer -----
+
+
+def _award_step_fails(*args, **kwargs):
+    raise RuntimeError("award settings failed")
+
+
+def test_a_failed_award_step_stores_no_new_racer(crew, event, monkeypatch):
+    from roster.services import racers
+
+    monkeypatch.setattr(racers, "_store_award_settings", _award_step_fails)
+    with pytest.raises(RuntimeError):
+        post(
+            crew,
+            "/checkin/racer/new/",
+            {"firstname": "A", "lastname": "B", "carno": "101", "no_speed": "1"},
+        )
+    assert not Racer.objects.filter(event=event).exists()
+
+
+def test_a_failed_award_step_leaves_the_edit_unsaved(crew, event, monkeypatch):
+    from roster.services import racers
+
+    racer = add_racers(event, "Scouts", 1, 101)[0]
+    monkeypatch.setattr(racers, "_store_award_settings", _award_step_fails)
+    with pytest.raises(RuntimeError):
+        post(
+            crew,
+            f"/checkin/racer/{racer.pk}/",
+            {
+                "firstname": "Changed",
+                "lastname": "Racer",
+                "carno": "101",
+                "partitionid": racer.partition_id,
+                "no_speed": "1",
+            },
+        )
+    racer.refresh_from_db()
+    assert racer.first_name == "Scouts1"
+
+
+# ----- review: Undo restores, and asks nothing -----
+
+
+def test_undo_of_an_unpass_does_not_ask_the_question_again(crew, running):
+    wolves, late = running
+    post(crew, f"/checkin/racer/{late.pk}/pass/", {"passed": "1"})
+    unpassed = post(crew, f"/checkin/racer/{late.pk}/pass/", {"passed": "0"})
+    undo = re.search(r'hx-post="([^"]+)"', unpassed.content.decode()).group(1)
+
+    restored = post(crew, undo.replace("&amp;", "&")).content.decode()
+    late.refresh_from_db()
+    assert late.passed_inspection
+    assert "data-question" not in restored
+    # The card still offers the question to whoever wants to answer it.
+    html = get(crew, "/checkin/list/", {"q": "150"}).content.decode()
+    assert 'data-action="ask"' in html

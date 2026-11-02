@@ -23,38 +23,28 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from accounts.permissions import Perm, allows, granted
 from accounts.views import MCHECKIN, grant_mcheckin_token, make_mcheckin_token
 from awards.editing import toggle_xbs_award
-from core.models import SiteState
 from media import photos
 from racing.engine.phpcompat import php_numeric, php_truthy
 from racing.models import RosterEntry
 from racing.services import finals
 from racing.services.finals import FinalsFailure
 from racing.services.reschedule import RescheduleFailure
-from roster.models import Group, Partition, Racer
-from roster.services import car_numbers, checkin, racers
+from roster.models import Partition, Racer
+from roster.services import car_numbers, checkin, groups, racers
 from roster.services.car_numbers import RangeFailure
 from roster.services.checkin import CheckInFailure
 from roster.services.racers import Bulk, Edit, Failure, RacerFailure
 from ui.checkin import state
 from ui.checkin.state import Filters
 from ui.navigation import requires_page
-from ui.responses import service_error
+from ui.responses import active_event as _event
+from ui.responses import racer_name, refused, service_error, toast_html
 
 guard = requires_page("checkin")
 
 REPOS = {"head": "Racer photo", "car": "Car photo"}
 WHOLE_NUMBER = re.compile(r"[0-9]{1,9}")
 ROTATIONS = {"left": 90, "right": 270}
-
-
-def _event(request):
-    found = getattr(request, "_checkin_event", None)
-    if found is None:
-        site = SiteState.objects.select_related("active_event").filter(pk=1).first()
-        if site is None or site.active_event is None:
-            raise Http404("No event is open.")
-        found = request._checkin_event = site.active_event
-    return found
 
 
 def _racer(request, racer_id) -> Racer:
@@ -66,15 +56,11 @@ def _racer(request, racer_id) -> Racer:
 
 
 def _name(racer: Racer) -> str:
-    return f"{racer.first_name} {racer.last_name}"
+    return racer_name(racer.first_name, racer.last_name)
 
 
 def _toast(request, message: str, level: str = "ok", undo_url: str = "") -> str:
-    return render_to_string(
-        "ui/components/toast.html",
-        {"message": message, "level": level, "undo_url": undo_url, "oob": False},
-        request,
-    )
+    return toast_html(request, message, level, undo_url)
 
 
 def _reply(request, body: str, *, refresh=True) -> HttpResponse:
@@ -118,21 +104,13 @@ def sheet_reply(request, sheet_html: str, message: str = "", *, refresh=True):
 def closed_reply(request, message: str):
     """Close the sheet, and say what happened in a toast."""
     closed = render_to_string("ui/checkin/sheets/closed.html", {}, request)
-    toast = render_to_string(
-        "ui/components/toast.html",
-        {"message": message, "level": "ok", "oob": _in_sheet(request)},
-        request,
-    )
+    toast = toast_html(request, message, oob=_in_sheet(request))
     if _in_sheet(request):
         return _reply(request, closed + toast)
     return _reply(
         request,
         f'<div id="{SHEET_BODY}" hx-swap-oob="innerHTML">{closed}</div>' + toast,
     )
-
-
-def refused(request, failure) -> HttpResponse:
-    return service_error(request, getattr(failure, "description", str(failure)))
 
 
 def _need(request, perm: Perm, message: str):
@@ -186,6 +164,7 @@ def page(request):
             **_list_context(request, listing, filters),
             "orders": state.ORDERS,
             "statuses": state.STATUSES,
+            "states": state.STATES,
             "poll_seconds": state.POLL_SECONDS,
             "page_title": "Check-In",
         },
@@ -265,13 +244,16 @@ def pass_racer(request, racer_id):
         return refused(request, failure)
     from_sheet = _in_sheet(request)
     if not passed:
-        undo = reverse("checkin-pass", args=[racer.pk]) + "?passed=1"
+        undo = reverse("checkin-pass", args=[racer.pk]) + "?passed=1&undo=1"
         message = f"{_name(racer)} is not passed."
         if from_sheet:
             return sheet_reply(request, _sheet_racer(request, racer), message)
         return toasted(request, message, level="info", undo_url=undo)
     message = f"{state.car(racer.car_number)} {_name(racer)} passed."
-    question = _question(request, racer)
+    # Undo restores the pass and asks nothing; the card still offers the
+    # question when it was never answered.
+    undo = request.GET.get("undo") == "1"
+    question = None if undo else _question(request, racer)
     if question is not None:
         return sheet_reply(request, question, message)
     if from_sheet:
@@ -361,39 +343,7 @@ def _number_text(posted: str) -> str | None:
 
 
 def _partition(request, posted) -> Partition | None:
-    try:
-        pk = int(posted)
-    except TypeError, ValueError:
-        return None
-    return Partition.objects.filter(event=_event(request), pk=pk).first()
-
-
-def _number_warnings(event, partition, number: int | None, racer_id=None) -> list[str]:
-    """D48's warnings for a typed number: a duplicate, or a number outside
-    the partition's ranges."""
-    if number is None:
-        return []
-    found = []
-    other = (
-        Racer.objects.filter(event=event, car_number=number)
-        .exclude(pk=racer_id)
-        .first()
-    )
-    if other is not None:
-        found.append(f"Car number {state.car(number)} belongs to {_name(other)} too.")
-    if partition is not None and (
-        warning := car_numbers.outside_warning(partition, number)
-    ):
-        found.append(warning)
-    return found
-
-
-def _suggestion(event, partition: Partition | None) -> int | None:
-    if partition is None:
-        if Partition.objects.filter(event=event).exists():
-            return None
-        return state.first_number(event)
-    return state.next_numbers(event).get(partition.pk)
+    return groups.partition_of(_event(request).id, posted)
 
 
 def _racer_sheet_context(
@@ -413,10 +363,8 @@ def _racer_sheet_context(
             "no_speed": racer.not_eligible_for_speed_awards,
         }
     elif values is None:
-        first = (
-            Partition.objects.filter(event=event).order_by("sort_order", "id").first()
-        )
-        suggested = _suggestion(event, first)
+        first = groups.first_partition(event.id)
+        suggested = car_numbers.suggested_number(event.id, first)
         values = {
             "partitionid": first.pk if first else "",
             "carno": state.car(suggested) if suggested is not None else "",
@@ -430,9 +378,7 @@ def _racer_sheet_context(
         "notice": notice,
         "warnings": list(warnings),
         "error": error,
-        "range_full": partition is not None
-        and car_numbers.has_ranges(partition)
-        and state.next_numbers(event).get(partition.pk) is None,
+        "range_full": car_numbers.ranges_full(partition),
         "range_partition": partition,
         **_perms(request),
     }
@@ -488,7 +434,7 @@ def racer_new(request):
         return _sheet_error(request, None, values, "Enter the racer's name.")
     posted_partition = values["partitionid"]
     partition = _partition(request, posted_partition)
-    if partition is None and Partition.objects.filter(event=event).exists():
+    if partition is None and groups.first_partition(event.id) is not None:
         return _sheet_error(request, None, values, "Pick the racer's class.")
     try:
         new = racers.insert_new_racer(
@@ -500,13 +446,12 @@ def racer_new(request):
             note=values["note_from"],
             partition=partition,
             exclude=values["exclude"],
+            no_speed_awards=values["no_speed"],
         )
     except RacerFailure as failure:
         if failure.code == Failure.RANGE_FULL:
             values["carno"] = ""
         return _sheet_error(request, None, values, failure.description)
-    if values["no_speed"]:
-        racers.set_award_settings(new.racer, no_speed_awards=True)
     racer = Racer.objects.select_related("group", "partition").get(pk=new.racer.pk)
     return sheet_reply(
         request,
@@ -551,15 +496,15 @@ def racer_edit(request, racer_id):
         car_name=values["carname"],
         note=values["note_from"],
         exclude=values["exclude"],
+        no_speed_awards=values["no_speed"],
     )
     try:
         result = racers.edit_racer(racer, edit)
     except RacerFailure as failure:
         return _sheet_error(request, racer, values, failure.description)
-    racers.set_award_settings(racer, no_speed_awards=values["no_speed"])
     racer = Racer.objects.select_related("group", "partition").get(pk=racer.pk)
-    warnings = _number_warnings(
-        _event(request), racer.partition, racer.car_number, racer.pk
+    warnings = car_numbers.number_warnings(
+        racer.event_id, racer.partition, racer.car_number, racer.pk
     )
     if result.warning and not warnings:
         warnings = [w for w in result.warning if w.strip()]
@@ -587,21 +532,21 @@ def number(request):
     except ValueError:
         pass
     fill = racer is None and request.GET.get("touched", "") != "1"
-    suggested = _suggestion(event, partition) if fill else None
+    suggested = car_numbers.suggested_number(event.id, partition) if fill else None
     typed = _number_text(request.GET.get("carno", ""))
     if fill:
         typed = str(suggested) if suggested is not None else ""
     shown = int(typed) if typed else None
-    warnings = _number_warnings(event, partition, shown, racer.pk if racer else None)
+    warnings = car_numbers.number_warnings(
+        event.id, partition, shown, racer.pk if racer else None
+    )
     if typed is None:
         warnings = ["The car number must be a whole number."]
     context = {
         "warnings": warnings,
         "fill": fill,
         "carno": state.car(suggested) if suggested is not None else "",
-        "range_full": partition is not None
-        and car_numbers.has_ranges(partition)
-        and state.next_numbers(event).get(partition.pk) is None,
+        "range_full": car_numbers.ranges_full(partition),
         "range_partition": partition,
         **_perms(request),
     }
@@ -629,7 +574,7 @@ def add_range(request, partition_id):
     except RangeFailure as failure:
         return refused(request, failure)
     values = _racer_values(request.POST)
-    suggested = state.next_numbers(_event(request)).get(partition.pk)
+    suggested = car_numbers.suggested_number(partition.event_id, partition)
     values["carno"] = state.car(suggested) if suggested is not None else ""
     return sheet_reply(
         request,
@@ -675,15 +620,6 @@ BULK_ACTIONS = (
 )
 
 
-def _bulk_choices(event) -> list[tuple[str, str]]:
-    choices = [("all", "All racers")]
-    choices += [(f"d{pk}", name) for pk, name in state.partitions(event)]
-    groups = Group.objects.filter(event=event).order_by("sort_order", "id")
-    if groups.count() > 1:
-        choices += [(f"c{g.pk}", f"{g.name} (group)") for g in groups]
-    return choices
-
-
 @require_http_methods(["GET", "POST"])
 @guard
 def bulk(request):
@@ -698,7 +634,7 @@ def bulk(request):
             request,
             "ui/checkin/sheets/bulk.html",
             {
-                "choices": _bulk_choices(event),
+                "choices": racers.bulk_choices(event),
                 "actions": BULK_ACTIONS,
                 **_perms(request),
             },
@@ -720,7 +656,7 @@ def bulk(request):
             value = "1" if request.POST.get("eligible", "1") == "1" else "0"
         case _:
             return service_error(request, "Pick what to change.")
-    if who not in dict(_bulk_choices(event)):
+    if who not in dict(racers.bulk_choices(event)):
         return service_error(request, "Pick which racers to change.")
     try:
         racers.apply_bulk(
@@ -738,7 +674,7 @@ def bulk(request):
         return refused(request, failure)
     label = dict(BULK_ACTIONS)[action]
     return closed_reply(
-        request, f"{label}: done for {dict(_bulk_choices(event))[who]}."
+        request, f"{label}: done for {dict(racers.bulk_choices(event))[who]}."
     )
 
 

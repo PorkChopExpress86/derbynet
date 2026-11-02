@@ -17,8 +17,12 @@
         <option value="">All dens</option>
         {% for pk, name in listing.partitions %}<option value="{{ pk }}"{% if filters.partition == pk %} selected{% endif %}>{{ name }}</option>{% endfor %}
       </select>
-      {% include "ui/components/segmented.html" with name="status" legend="Show" options=statuses selected=filters.status cls="flex-[2] min-w-0" %}
+      <label for="f-state" class="sr-only">Status</label>
+      <select id="f-state" name="state" class="h-12 min-w-0 flex-1 rounded-xl border border-field bg-surface px-3 text-base">
+        {% for value, label in states %}<option value="{{ value }}"{% if filters.state == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
     </div>
+    {% include "ui/components/segmented.html" with name="status" legend="Show" options=statuses selected=filters.status %}
     {% include "ui/components/segmented.html" with name="order" legend="Sort by" options=orders selected=filters.order %}
   </form>
   {% endcomponent %}

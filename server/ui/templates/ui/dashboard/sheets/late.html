@@ -1,8 +1,8 @@
-{# The preview of Add to schedule for one racer: the chart now, and the chart a dry run gives (D32, D36). #}
+{% load ui %}{# The preview of Add to schedule for one racer: the chart now, and the chart a dry run gives (D32, D36). #}
 <div data-late-preview>
-  <p><span class="font-mono font-semibold">{{ car }}</span> {{ racer.first_name }} {{ racer.last_name }} · {{ name }}</p>
+  <p><span class="font-mono font-semibold">{{ car }}</span> {{ racer|racer_name }} · {{ name }}</p>
   {% if failure %}
-  <p class="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-danger-ink" role="alert" data-late-failure="{{ failure.code }}">{% if not_on_roster %}{{ racer.first_name }} {{ racer.last_name }} is not on the roster of {{ name }}, so the racer cannot be added to its schedule. Put the racer on the roster first.{% else %}{{ failure.description }}{% endif %}</p>
+  <p class="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-danger-ink" role="alert" data-late-failure="{{ failure.code }}">{% if not_on_roster %}{{ racer|racer_name }} is not on the roster of {{ name }}, so the racer cannot be added to its schedule. Put the racer on the roster first.{% else %}{{ failure.description }}{% endif %}</p>
   {% if not_on_roster and is_final %}
   <button type="button" hx-post="{% url 'dashboard-roster-add' round.pk racer.pk %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" class="mt-3 min-h-12 w-full rounded-xl border border-line font-semibold" data-action="roster-add">Put on the roster of {{ name }}</button>
   {% endif %}

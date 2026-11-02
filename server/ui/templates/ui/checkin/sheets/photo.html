@@ -1,5 +1,5 @@
-{# Photo capture (#42). The file input with capture is the main path: it opens the phone's camera and works over plain HTTP. In a secure context the live camera is offered too, and its Capture stays disabled until the stream runs. Each photo is downscaled in the browser before upload. #}
-<div x-data="checkinPhoto()" x-init="checkin.show('{{ repo_label }} · {{ car }} {{ racer.first_name|escapejs }} {{ racer.last_name|escapejs }}')" data-photo-sheet="{{ repo }}">
+{% load ui %}{# Photo capture (#42). The file input with capture is the main path: it opens the phone's camera and works over plain HTTP. In a secure context the live camera is offered too, and its Capture stays disabled until the stream runs. Each photo is downscaled in the browser before upload. #}
+<div x-data="checkinPhoto()" x-init="checkin.show('{{ repo_label }} · {{ car }} {{ racer|racer_name|escapejs }}')" data-photo-sheet="{{ repo }}">
   <form hx-post="{% url 'checkin-upload' racer.pk repo %}" hx-encoding="multipart/form-data" hx-target="#checkin-sheet-body" class="flex flex-col gap-3" @htmx:before-request="busy = true" @htmx:after-request="busy = false">
     <input type="file" name="photo" x-ref="upload" hidden tabindex="-1" aria-hidden="true">
     <label class="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-field px-4 text-base font-semibold has-focus-visible:outline-3 has-focus-visible:outline-accent">

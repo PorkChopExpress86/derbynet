@@ -25,6 +25,7 @@ from roster.models import Partition, Racer
 from roster.services import car_numbers
 from roster.services.checkin import round_in_progress_for
 from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url
+from ui.responses import racer_name
 
 THUMBNAIL = "100x100"
 POLL_SECONDS = 10
@@ -36,6 +37,20 @@ ORDERS = (
     ("class", "Class"),
 )
 STATUSES = (("all", "All"), ("waiting", "Not passed"), ("passed", "Passed"))
+# The status text of PHP's table (checkin.js), as a filter.
+STATES = (
+    ("", "Any status"),
+    ("racing", "Racing!"),
+    ("late", "Late!"),
+    ("unpassed", "Scheduled but not passed"),
+    ("unscheduled", "Not scheduled"),
+)
+_STATE_TEXT = {
+    "racing": "Racing!",
+    "late": "Late!",
+    "unpassed": "Scheduled but not passed",
+    "unscheduled": "",
+}
 
 
 def car(number) -> str:
@@ -55,13 +70,14 @@ def _nocase(text: str) -> str:
 
 @dataclass(frozen=True)
 class Filters:
-    """The filter bar: the search text, the partition, passed or not, and the
-    order."""
+    """The filter bar: the search text, the partition, passed or not, the
+    status text, and the order."""
 
     q: str = ""
     partition: int | None = None
     status: str = "all"
     order: str = "name"
+    state: str = ""
 
     @classmethod
     def from_request(cls, data) -> Filters:
@@ -75,12 +91,18 @@ class Filters:
             partition = None
         status = text("status")
         order = text("order")
+        state = text("state")
         return cls(
             q=text("q")[:100],
             partition=partition,
             status=status if status in dict(STATUSES) else "all",
             order=order if order in dict(ORDERS) else "name",
+            state=state if state in _STATE_TEXT else "",
         )
+
+    def shows(self, card: Card) -> bool:
+        """The status filter, which needs the card's status."""
+        return not self.state or card.status == _STATE_TEXT[self.state]
 
     def matches(self, racer: Racer) -> bool:
         if self.partition is not None and racer.partition_id != self.partition:
@@ -95,7 +117,7 @@ class Filters:
         if needle.isdigit():
             return needle in str(racer.car_number) or needle in car(racer.car_number)
         names = (
-            f"{racer.first_name} {racer.last_name}",
+            racer_name(racer.first_name, racer.last_name),
             f"{racer.last_name}, {racer.first_name}",
             f"{racer.last_name} {racer.first_name}",
         )
@@ -149,7 +171,7 @@ class Card:
 
     @property
     def name(self) -> str:
-        return f"{self.first_name} {self.last_name}"
+        return racer_name(self.first_name, self.last_name)
 
     @property
     def initials(self) -> str:
@@ -311,13 +333,6 @@ def next_numbers(event) -> dict[int, int | None]:
     }
 
 
-def first_number(event) -> int:
-    """The number the first racer of an event with no partition gets: the
-    lower bound of the `Default` partition it creates."""
-    rule = car_numbers.numbering(event.id)
-    return rule.smallest
-
-
 def build(event, filters: Filters) -> Listing:
     everyone = list(racers_of(event))
     chosen = sorted(
@@ -328,11 +343,12 @@ def build(event, filters: Filters) -> Listing:
         for r in everyone
         if filters.partition is None or r.partition_id == filters.partition
     ]
+    cards = [c for c in cards_for(event, chosen) if filters.shows(c)]
     listing = Listing(
-        cards=cards_for(event, chosen),
+        cards=cards,
         total=len(in_partition),
         passed=sum(r.passed_inspection for r in in_partition),
-        shown=len(chosen),
+        shown=len(cards),
         partitions=partitions(event),
         use_xbs=RaceSettings.objects.get(event=event).use_xbs,
         next_numbers=next_numbers(event),

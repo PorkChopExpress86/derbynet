@@ -19,7 +19,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from accounts.permissions import Perm, allows
 from core import settings_form
-from core.models import RaceSettings, SiteState
+from core.models import RaceSettings
 from racing.engine.phpcompat import php_truthy
 from racing.models import FinalRequest, HeatLane, Round
 from racing.services import (
@@ -52,7 +52,9 @@ from roster.services.racers import set_award_settings
 from ui.dashboard import presenter
 from ui.dashboard.state import Shown, build, racers_of_heat
 from ui.navigation import requires_page
-from ui.responses import service_error
+from ui.responses import active_event as _event
+from ui.responses import racer_name, refused, service_error
+from ui.responses import toast_html as _toast
 
 guard = requires_page("dashboard")
 
@@ -78,28 +80,9 @@ REPLAY_CHOICES = {
 }
 
 
-def _event(request):
-    """The open event. A new install with no event has no race to run."""
-    found = getattr(request, "_dashboard_event", None)
-    if found is None:
-        state = SiteState.objects.select_related("active_event").filter(pk=1).first()
-        if state is None or state.active_event is None:
-            raise Http404("No event is open.")
-        found = request._dashboard_event = state.active_event
-    return found
-
-
 def _live_html(request, live, *, oob: bool) -> str:
     return render_to_string(
         "ui/dashboard/live.html", {**live.context, "oob": oob}, request
-    )
-
-
-def _toast(request, message: str, level: str = "ok", undo_url: str = "") -> str:
-    return render_to_string(
-        "ui/components/toast.html",
-        {"message": message, "level": level, "undo_url": undo_url},
-        request,
     )
 
 
@@ -123,10 +106,6 @@ def updated(
     if message:
         body += _toast(request, message, level, undo_url)
     return HttpResponse(body)
-
-
-def refused(request, failure) -> HttpResponse:
-    return service_error(request, getattr(failure, "description", str(failure)))
 
 
 def _hs_reply(request, failure, message: str = "", *, hold=True):
@@ -747,7 +726,9 @@ def late_add(request, round_id, racer_id):
     except RescheduleFailure as failure:
         return refused(request, failure)
     return updated(
-        request, f"{racer.first_name} {racer.last_name} added to {_round_name(round)}."
+        request,
+        f"{racer_name(racer.first_name, racer.last_name)} added to"
+        f" {_round_name(round)}.",
     )
 
 
@@ -764,7 +745,7 @@ def roster_add(request, round_id, racer_id):
         return refused(request, failure)
     return updated(
         request,
-        f"{racer.first_name} {racer.last_name} is on the roster"
+        f"{racer_name(racer.first_name, racer.last_name)} is on the roster"
         f" of {_round_name(round)}.",
     )
 
@@ -789,7 +770,7 @@ def award_settings(request, racer_id):
 @guard
 def final_request(request, request_id, decision):
     found = get_object_or_404(FinalRequest, pk=request_id, event=_event(request))
-    name = f"{found.racer.first_name} {found.racer.last_name}"
+    name = racer_name(found.racer.first_name, found.racer.last_name)
     try:
         if decision == "allow":
             finals.allow_final_request(found)
@@ -811,7 +792,7 @@ def finalist(request, round_id, op, racer_id):
     coordinator taps one."""
     round = _round(request, round_id)
     racer = _racer(request, racer_id)
-    name = f"{racer.first_name} {racer.last_name}"
+    name = racer_name(racer.first_name, racer.last_name)
     try:
         if op == "add":
             finals.add_to_final(racer, round)

@@ -1,5 +1,5 @@
-{# The confirm sheet for a delete, naming the count (#39). #}
-<div x-data x-init="checkin.show('Delete {{ car }} {{ racer.first_name|escapejs }} {{ racer.last_name|escapejs }}?')" data-delete="{{ racer.pk }}">
+{% load ui %}{# The confirm sheet for a delete, naming the count (#39). #}
+<div x-data x-init="checkin.show('Delete {{ car }} {{ racer|racer_name|escapejs }}?')" data-delete="{{ racer.pk }}">
   <p>The racer leaves the roster. A racer who has heats in a schedule can't be deleted.</p>
   <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
     <button type="button" hx-post="{% url 'checkin-delete' racer.pk %}" hx-target="#checkin-sheet-body" data-confirm class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Delete 1 racer</button>

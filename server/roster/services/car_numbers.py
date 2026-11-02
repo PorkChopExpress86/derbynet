@@ -253,3 +253,68 @@ def base_car_number_by_partition(event_id) -> int | dict[int, int]:
     return {
         p.pk: rule.lower_bound(p) for p in Partition.objects.filter(event_id=event_id)
     }
+
+
+# ----- What check-in shows as the volunteer types (#42) ------------------------
+
+
+def first_number(event_id) -> int:
+    """The number the first racer of an event with no partition gets: the
+    lower bound of the `Default` partition `insert_new_racer` creates."""
+    return numbering(event_id).smallest
+
+
+def suggested_number(event_id, partition: Partition | None) -> int | None:
+    """The car number check-in offers for a new racer of `partition`: its
+    next number (None when its ranges are full, D48). With no partition,
+    the first number while the event has none, else None."""
+    if partition is None:
+        if Partition.objects.filter(event_id=event_id).exists():
+            return None
+        return first_number(event_id)
+    return _offered(partition)
+
+
+def _offered(partition: Partition) -> int | None:
+    """The partition's row of `next_car_numbers()`, which is what PHP's
+    check-in page offers."""
+    return next(
+        (
+            row["next_carnumber"]
+            for row in next_car_numbers(partition.event_id)
+            if row["partitionid"] == partition.pk
+        ),
+        None,
+    )
+
+
+def ranges_full(partition: Partition | None) -> bool:
+    """D48: the partition has ranges and every number in them is taken, so
+    check-in asks for another range."""
+    return (
+        partition is not None and has_ranges(partition) and _offered(partition) is None
+    )
+
+
+def number_warnings(
+    event_id, partition: Partition | None, number: int | None, racer_id=None
+) -> list[str]:
+    """D48's warnings for a typed number, before it is saved: another racer
+    has it, or it is outside the partition's ranges. Both are allowed."""
+    if number is None:
+        return []
+    found = []
+    other = (
+        Racer.objects.filter(event_id=event_id, car_number=number)
+        .exclude(pk=racer_id)
+        .order_by("pk")
+        .first()
+    )
+    if other is not None:
+        found.append(
+            f"Car number {number:03d} belongs to"
+            f" {other.first_name} {other.last_name} too."
+        )
+    if partition is not None and (warning := outside_warning(partition, number)):
+        found.append(warning)
+    return found

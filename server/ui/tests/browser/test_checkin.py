@@ -681,3 +681,16 @@ def test_screenshots_and_accessibility(login, event, folders):
     expect(sheet(page).locator("[data-photo-sheet]")).to_be_visible()
     shoot(page, "checkin-photo-sheet", full_page=False)
     assert_accessible(page)
+
+
+def test_the_status_filter(login, event):
+    wolves = race_setup(event, groups=(("Scouts", 4),))["Scouts"]
+    scheduled(wolves, race=False)
+    late = add_racers(event, "Scouts", 1, 150)[0]
+    page = open_checkin(login("RaceCrew"))
+    expect(page.locator("[data-racer]")).to_have_count(5)
+    page.get_by_label("Status").select_option(label="Late!")
+    expect(page.locator("[data-racer]")).to_have_count(1)
+    expect(card(page, late)).to_be_visible()
+    page.get_by_label("Status").select_option(label="Racing!")
+    expect(page.locator("[data-racer]")).to_have_count(4)

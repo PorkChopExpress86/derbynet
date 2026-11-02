@@ -1,5 +1,5 @@
-{# The racer sheet, for add and edit: PHP's seven fields, in the order of the owner's station (D6): the racer and car names and the class first, then the car number the class suggests. After an add it offers Take car photo and Pass. #}
-<div x-data x-init="checkin.show('{% if racer %}{{ card.car }} {{ racer.first_name|escapejs }} {{ racer.last_name|escapejs }}{% else %}New racer{% endif %}')" data-racer-sheet="{% if racer %}{{ racer.pk }}{% else %}new{% endif %}">
+{% load ui %}{# The racer sheet, for add and edit: PHP's seven fields, in the order of the owner's station (D6): the racer and car names and the class first, then the car number the class suggests. After an add it offers Take car photo and Pass. #}
+<div x-data x-init="checkin.show('{% if racer %}{{ card.car }} {{ racer|racer_name|escapejs }}{% else %}New racer{% endif %}')" data-racer-sheet="{% if racer %}{{ racer.pk }}{% else %}new{% endif %}">
   {% if notice %}<p class="mb-3 rounded-lg bg-ok-soft px-3 py-2 font-medium text-ok-ink" role="status" data-notice>{{ notice }}</p>{% endif %}
   {% if warnings %}
   <ul class="mb-3 flex flex-col gap-1 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn-ink" role="alert" data-warnings>
