@@ -339,6 +339,27 @@ def edit_racer(racer: Racer, edit: Edit) -> EditResult:
     return result
 
 
+def set_award_settings(
+    racer: Racer,
+    *,
+    exclude: bool | None = None,
+    no_speed_awards: bool | None = None,
+) -> Racer:
+    """The two award settings of D33, which the race dashboard sets for a
+    racer added late (#41): "not eligible for any award" (the legacy
+    `exclude`) and "not eligible for speed awards". None leaves a setting as
+    it is."""
+    with transaction.atomic():
+        lock_race_state(racer.event_id)
+        racer = Racer.objects.select_for_update().get(pk=racer.pk)
+        if exclude is not None:
+            racer.exclude = exclude
+        if no_speed_awards is not None:
+            racer.not_eligible_for_speed_awards = no_speed_awards
+        racer.save(update_fields=["exclude", "not_eligible_for_speed_awards"])
+        return racer
+
+
 class EditFailure(RacerFailure):
     """A refused edit, with what PHP wrote before it refused."""
 

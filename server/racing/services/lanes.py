@@ -109,6 +109,12 @@ def _rounds_to_close(event: Event) -> list[Round]:
     ]
 
 
+def rounds_to_close(event: Event) -> list[Round]:
+    """The rounds a closure now would reschedule, for the confirm sheet that
+    names them before the race coordinator commits (D45, #41)."""
+    return _rounds_to_close(event)
+
+
 def close_lanes(
     event: Event,
     lanes: Iterable[int],

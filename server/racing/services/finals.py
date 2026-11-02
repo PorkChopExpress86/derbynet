@@ -259,6 +259,12 @@ class Suggestions:
     remove: tuple[Racer, ...]
 
 
+def is_final(round: Round) -> bool:
+    """A round chosen from another: a later round of a group, or round 1 of
+    a combined group."""
+    return _is_final(round)
+
+
 def _is_final(round: Round) -> bool:
     if round.number > 1:
         return True

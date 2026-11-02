@@ -1,0 +1,33 @@
+{# Close a damaged lane (D36, D45): the lanes, how to score, and every round the closure reschedules, named before it commits. #}
+<form hx-post="{% url 'dashboard-lanes-close' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-lanes-form>
+  <fieldset>
+    <legend class="text-sm font-semibold">Lanes to close</legend>
+    <div class="mt-1 flex flex-wrap gap-2">
+      {% for n in open_lanes %}
+      <label class="flex min-h-11 min-w-16 cursor-pointer items-center justify-center gap-2 rounded-lg border border-field px-3 has-checked:border-2 has-checked:border-danger has-checked:bg-danger-soft"><input type="checkbox" name="lane" value="{{ n }}" {% if forloop.first %}data-autofocus{% endif %} class="size-5">Lane {{ n }}</label>
+      {% empty %}<p class="text-ink-muted">No lane can be closed.</p>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <fieldset class="mt-4">
+    <legend class="text-sm font-semibold">How to score the round</legend>
+    <div class="mt-1 flex flex-col gap-1">
+      {% for value, label in choices %}
+      <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-line px-3 has-checked:border-2 has-checked:border-accent"><input type="radio" name="scoring" value="{{ value }}"{% if value == scoring %} checked{% endif %} class="size-5">{{ label }}{% if value == scoring %} <span class="text-sm text-ink-muted">(in force)</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <div class="mt-4 rounded-lg bg-surface-2 px-3 py-2 text-sm" data-affected>
+    {% if affected %}
+    <p class="font-semibold">These rounds are rescheduled on the open lanes:</p>
+    <ul class="ml-4 list-disc">{% for name in affected %}<li>{{ name }}</li>{% endfor %}</ul>
+    <p class="mt-1 text-ink-muted">Heats already run keep their racers, and the running and staging heats stay as they are. Times run in a closed lane in a racing round are dropped.</p>
+    {% else %}
+    <p>No round has heats left to run, so only later rounds leave the lane out.</p>
+    {% endif %}
+  </div>
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="submit" data-confirm class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Close lanes</button>
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</form>

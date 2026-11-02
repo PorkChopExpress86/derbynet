@@ -94,11 +94,11 @@ def test_the_helper_catches_a_write(login):
 
 
 def test_the_page_is_a_placeholder_until_its_ticket_lands(login):
-    page = login("RaceCoordinator").get("/dashboard/").content.decode()
+    page = login("RaceCoordinator").get("/checkin/").content.decode()
 
-    assert 'data-placeholder="dashboard"' in page
-    assert "Ticket #41 builds this page" in page
-    assert "coordinator.php" in page
+    assert 'data-placeholder="checkin"' in page
+    assert "Ticket #42 builds this page" in page
+    assert "checkin.php" in page
 
 
 def test_the_active_page_is_marked_in_the_menus(login):

@@ -1,0 +1,30 @@
+{# The sheet behind a round card's button: Schedule, or a confirm sheet that names the round and the heats it touches. #}
+{% if kind == "schedule" %}
+<form hx-post="{% url 'dashboard-round' round.pk 'schedule' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-schedule-form>
+  <p class="text-sm text-ink-muted">{{ name }} · {{ card.passed }} racer{{ card.passed|pluralize }} passed</p>
+  {% include "ui/components/stepper.html" with id="schedule-runs" name="runs" label="Times each racer runs in each lane" value=1 min=1 max=6 cls="mt-3" %}
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    {% if not use_master_sched %}<button type="submit" name="race" value="1" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink" data-action="schedule-race">Schedule + Race</button>{% endif %}
+    <button type="submit" name="race" value="0" class="min-h-12 flex-1 rounded-xl {% if use_master_sched %}bg-accent text-accent-ink{% else %}border border-line{% endif %} px-4 font-semibold" data-action="schedule-only">{% if use_master_sched %}Make Schedule{% else %}Schedule Only{% endif %}</button>
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</form>
+{% else %}
+<form hx-post="{% url 'dashboard-round' round.pk kind %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-confirm-form="{{ kind }}">
+  <h3 class="font-semibold">{{ name }}</h3>
+  {% if kind == "unschedule" %}
+  <p class="mt-1">{{ name }} has a schedule of {{ card.heats_scheduled }} heat{{ card.heats_scheduled|pluralize }}, and none has run. To add or remove racers, remove its schedule.</p>
+  {% elif kind == "delete" %}
+  <p class="mt-1">{{ name }} has no schedule and no results. To choose different racers, delete the round and make it again.</p>
+  {% elif kind == "purge" %}
+  <p class="mt-1">{{ card.heats_run }} heat{{ card.heats_run|pluralize }} of {{ name }} {{ card.heats_run|pluralize:"has,have" }} results. Repeating the round purges them all, so every heat runs again. This cannot be undone.</p>
+  {% elif kind == "adjust" %}
+  <p class="mt-1">The remaining heats of {{ name }} are rescheduled:</p>
+  <ul class="ml-4 mt-1 list-disc">{% for a in card.adjustments %}<li>{{ a.carnumber|stringformat:"03d" }} {{ a.firstname }} {{ a.lastname }} {% if a.why == "unscheduled" %}is fitted in.{% else %}leaves the heats it has not run.{% endif %}</li>{% endfor %}</ul>
+  {% endif %}
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="submit" data-confirm class="min-h-12 flex-1 rounded-xl {% if kind == 'adjust' %}bg-accent text-accent-ink{% else %}bg-danger text-white dark:text-black{% endif %} px-4 font-semibold">{% if kind == "unschedule" %}Unschedule {{ card.heats_scheduled }} heat{{ card.heats_scheduled|pluralize }}{% elif kind == "delete" %}Delete {{ name }}{% elif kind == "purge" %}Purge {{ card.heats_run }} heat{{ card.heats_run|pluralize }} of results{% else %}Adjust Schedule{% endif %}</button>
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</form>
+{% endif %}

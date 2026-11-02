@@ -1,0 +1,70 @@
+{% load ui %}{# The current heat (D64 layout A): sticky under the app bar while the round cards scroll. #}
+<section id="heat-card" aria-labelledby="heat-title" class="sticky top-14 z-10 -mx-4 bg-bg px-4 pb-1 pt-1">
+  <div class="rounded-xl border border-line bg-surface p-3 shadow-sm lg:p-4" data-heat="{{ heat.round_id|default_if_none:'' }}:{{ heat.heat|default_if_none:'' }}"{% if heat.holding %} data-holding{% endif %}>
+    <div class="flex items-start gap-2">
+      <div class="min-w-0 flex-1">
+        <h2 id="heat-title" class="truncate text-base font-semibold" data-heat-title>{{ heat.title }}</h2>
+        <p class="text-sm text-ink-muted"><span data-heat-text>{{ heat.heat_text }}</span>{% if heat.master_text %}<span class="sr-only">, </span><span class="block text-xs" data-master-text>{{ heat.master_text }}</span>{% endif %}</p>
+      </div>
+      <span id="racing-label" class="pt-2.5 text-sm font-medium">{% if heat.racing %}Racing{% else %}Not racing{% endif %}</span>
+      {% url 'dashboard-racing' as racing_url %}{% include "ui/components/switch.html" with labelledby="racing-label" checked=heat.racing name="now_racing" url=racing_url %}
+    </div>
+
+    {% if heat.holding %}
+    <p class="mt-1 rounded-lg bg-accent-soft px-3 py-1.5 text-sm" data-hold-note>Results of heat {{ heat.heat }}. The next heat is staging.</p>
+    {% elif heat.emptied %}
+    <p class="mt-1 rounded-lg bg-warn-soft px-3 py-1.5 text-sm text-warn-ink" data-emptied>Every car has left heat {{ heat.current_heat }}. It keeps its number: skip it, or run it empty.</p>
+    {% endif %}
+
+    {% if heat.lanes %}
+    <ul class="mt-1 divide-y divide-line" aria-label="Lanes" data-lanes>
+      {% for lane in heat.lanes %}
+      <li class="flex min-h-11 items-center gap-2 py-0.5" data-lane="{{ lane.lane }}">
+        {% include "ui/dashboard/lane_badge.html" with n=lane.lane color=lane.color %}
+        {% if lane.closed and not lane.car %}
+        <span class="min-w-0 flex-1 text-sm italic text-ink-muted" data-closed>Closed</span>
+        {% elif lane.car %}
+        {% if lane.photo %}<img src="{{ lane.photo }}" alt="" class="size-9 shrink-0 rounded-full object-cover" loading="lazy">{% endif %}
+        <span class="w-10 shrink-0 font-mono font-semibold tabular-nums" data-car>{{ lane.car }}</span>
+        <span class="min-w-0 flex-1 truncate" data-name>{{ lane.name }}{% if lane.closed %} <span class="text-xs text-ink-muted">(lane closed)</span>{% endif %}</span>
+        {% else %}
+        <span class="min-w-0 flex-1 text-sm italic text-ink-muted">Empty lane</span>
+        {% endif %}
+        <span class="w-14 shrink-0 text-right font-mono text-sm tabular-nums" data-result><span class="sr-only">{% if heat.use_points %}Place{% else %}Time{% endif %} </span>{{ lane.result }}</span>
+        {% if heat.holding %}
+        <span class="w-24 shrink-0 truncate border-l border-line pl-2 text-xs text-ink-muted" data-staging><span class="sr-only">Staging: </span>{% if lane.staging %}<span class="font-mono">{{ lane.staging.car }}</span> {{ lane.staging.name }}{% endif %}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {# The large heat buttons stay on screen while the page scrolls. #}
+    <div class="mt-2 grid grid-cols-3 gap-2">
+      <button type="button" hx-post="{% url 'dashboard-heat' 'prev' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="prev" class="flex min-h-12 items-center justify-center gap-1 rounded-lg border border-line px-2 text-sm font-medium">{% include "ui/components/icon.html" with name="back" cls="size-5" %}Previous</button>
+      <button type="button" {% if not heat.in_round %}disabled{% endif %} hx-get="{% url 'dashboard-results-sheet' %}" hx-target="#dash-sheet-body" hx-sync="#live:replace" @click="dashboard.open('Manual results', $event)" aria-haspopup="dialog" data-action="manual-results" class="min-h-12 rounded-lg border border-line px-2 text-sm font-medium disabled:opacity-40">Manual results</button>
+      <button type="button" hx-post="{% url 'dashboard-heat' 'next' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="next" class="flex min-h-12 items-center justify-center gap-1 rounded-lg bg-accent px-2 text-sm font-semibold text-accent-ink">{% if heat.emptied %}Skip heat{% else %}Next heat{% endif %}{% include "ui/components/icon.html" with name="chevron" cls="size-5" %}</button>
+    </div>
+    <div class="mt-2 flex flex-wrap gap-2">
+      <button type="button" {% if not rerun.enabled %}disabled{% endif %} hx-post="{% url 'dashboard-rerun' %}" hx-vals='{"rerun": "{{ rerun.state }}"}' hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="rerun" data-rerun="{{ rerun.state }}" class="min-h-11 flex-1 rounded-lg border border-line px-3 text-sm font-medium disabled:opacity-40">{{ rerun.label }}</button>
+      {% if remote_start %}
+      <button type="button" hx-post="{% url 'dashboard-remote-start' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="start-race" class="min-h-11 flex-1 rounded-lg bg-ok px-3 text-sm font-semibold text-white dark:text-black">Start Race</button>
+      {% endif %}
+      {% if lane_count %}
+      <button type="button" hx-get="{% url 'dashboard-lanes-sheet' %}" hx-target="#dash-sheet-body" hx-sync="#live:replace" @click="dashboard.open('Close a lane', $event)" aria-haspopup="dialog" data-action="close-lane" class="min-h-11 rounded-lg border border-line px-3 text-sm font-medium">Close a lane</button>
+      {% endif %}
+    </div>
+    {% if closed_lanes %}
+    <ul class="mt-2 flex flex-col gap-1" aria-label="Closed lanes" data-closed-lanes>
+      {% for row in closed_lanes %}
+      <li class="flex min-h-11 items-center gap-2 rounded-lg bg-surface-2 px-3 text-sm">
+        <span class="min-w-0 flex-1">Lane {{ row.lane }} closed · {{ scoring }}</span>
+        {% if row.reopen %}<button type="button" hx-post="{% url 'dashboard-lanes-reopen' row.lane %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="reopen" class="min-h-11 rounded-lg px-3 font-semibold text-accent underline underline-offset-2">Reopen lane {{ row.lane }}</button>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% include "ui/dashboard/status.html" %}
+  </div>
+</section>

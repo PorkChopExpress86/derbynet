@@ -1,0 +1,14 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/dashboard.js' %}"></script>{% endblock %}
+{% block main %}
+{# Concerns from a new round stay until dismissed, outside the polled region. #}
+<div id="notices" class="mb-3 flex flex-col gap-2 empty:hidden"></div>
+{% include "ui/dashboard/live.html" %}
+{% endblock %}
+{% block sheets %}
+{# One sheet for every dashboard dialog. Its body loads when a control opens it, so the 2 s poll never replaces an open form. #}
+{% component "sheet" name="dash" title="" title_x="$store.dash.title" %}
+  <div id="dash-sheet-body" aria-live="polite"><p class="py-6 text-center text-ink-muted">Loading…</p></div>
+{% endcomponent %}
+{% endblock %}

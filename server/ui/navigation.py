@@ -162,6 +162,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         short_label="Dashboard",
         icon="dashboard",
         phone_rank={"RaceCoordinator": 1, OTHER_ROLES: 1},
+        view="ui.dashboard.views.dashboard",
     ),
     NavEntry(
         "kiosk-dashboard",
