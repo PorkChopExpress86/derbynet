@@ -29,13 +29,15 @@ from ui.tests.race import (
     scheduled,
 )
 
+ABORTED_POLL = r"request failed: \S*/dashboard/live/\S* net::ERR_ABORTED$"
+
 
 @pytest.fixture(autouse=True)
 def _polls_may_be_cut_short(page_errors):
     """A control aborts a poll still in flight (`hx-sync="#live:replace"`),
     so a stale poll never swaps after the control's own reply. The browser
     reports the aborted poll as a failed request."""
-    page_errors.allow(r"request failed: .*/dashboard/live/")
+    page_errors.allow(ABORTED_POLL)
 
 
 def open_dashboard(page):
@@ -521,3 +523,51 @@ def test_screenshots_and_accessibility(login, event):
     expect(sheet(page).get_by_label("Time, lane 1")).to_be_focused()
     shoot(page, "dashboard-manual-results")
     assert_accessible(page)
+
+
+def test_the_review_names_the_buckets_step_2_named(login, event):
+    wolves = race_setup(event)["Wolves"]
+    finished(event, wolves)
+    page = open_dashboard(login("RaceCoordinator"))
+    page.get_by_role("button", name="Add New Rounds").click()
+    form = sheet(page)
+    form.get_by_text("Round 2 of Wolves").click()
+    form.get_by_role("button", name="Next").click()
+    form.locator("[data-bucketed]").click()
+    step_2 = form.locator("#bucketed-label").inner_text()
+    assert step_2.startswith("From each ")
+    form.get_by_role("button", name="Next").click()
+    expect(form.locator("[data-review]")).to_contain_text(
+        "Top 3 " + step_2[0].lower() + step_2[1:]
+    )
+
+
+def test_a_poll_that_fails_otherwise_still_fails_the_test(login, event, page_errors):
+    """Only an aborted poll is allowed; a poll the network drops is an error."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.route("**/dashboard/live/**", lambda route: route.abort("failed"))
+    page.wait_for_event("requestfailed", timeout=5000)
+    failed = [e for e in page_errors.errors if "/dashboard/live/" in e]
+    assert failed and "ERR_FAILED" in failed[0]
+    page.unroute("**/dashboard/live/**")
+    page_errors.errors.clear()
+    page_errors.allow(".*")
+
+
+def test_a_control_pressed_during_the_hold_keeps_the_held_heat(login, event):
+    """Every control sends the heat on screen and its hold, so a sheet saved
+    during the 10 s hold leaves the finished heat on screen."""
+    wolves = race_setup(event)["Wolves"]
+    scheduled(wolves)
+    page = open_dashboard(login("RaceCoordinator"))
+    page.get_by_role("button", name="Manual results").click()
+    for lane, time in enumerate(("2.5", "2.6", "2.7", "2.8"), 1):
+        sheet(page).get_by_label(f"Time, lane {lane}").fill(time)
+    sheet(page).get_by_role("button", name="Save results").click()
+    note = page.locator("[data-hold-note]")
+    expect(note).to_contain_text("Results of heat 1")
+    dismiss_toasts(page)
+    page.get_by_role("button", name="Replay settings").click()
+    sheet(page).get_by_role("button", name="Save").click()
+    expect(page.locator("#toasts")).to_contain_text("Replay settings saved.")
+    expect(note).to_contain_text("Results of heat 1")

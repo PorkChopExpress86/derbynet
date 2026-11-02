@@ -288,9 +288,10 @@ jobs:
         run: |
           bash testing/test-reschedule.sh http://127.0.0.1:8080
 
-      # The award suite (#33) after the master schedule, in
-      # testing/exercise-one-database.sh order.  `test-awards.sh basic` follows
-      # test-basic-racing.sh, which reads history.php (#49), so it waits.
+      # The award suite (#33) after the master schedule, then test-new-rounds.sh
+      # (#41), in testing/exercise-one-database.sh order.  `test-awards.sh
+      # basic`, and the first test-new-rounds.sh run after it, follow
+      # test-basic-racing.sh, which reads history.php (#49), so they wait.
       - name: Run the award suite against Django
         if: matrix.group == 2
         working-directory: .
@@ -300,6 +301,7 @@ jobs:
           bash testing/test-den-changes.sh http://127.0.0.1:8080
           bash testing/test-master-schedule.sh http://127.0.0.1:8080
           bash testing/test-awards.sh http://127.0.0.1:8080 master
+          bash testing/test-new-rounds.sh http://127.0.0.1:8080
 
       # The standings suites read their rows from export-json.php (#36). The
       # points racing suite checks the points in the middle of a round only in

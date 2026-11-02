@@ -295,6 +295,33 @@ def heat_times(event: Event, round: Round, heat: int) -> list[LaneTimes]:
     ]
 
 
+def discard_heat(
+    event: Event,
+    round: Round,
+    heat: int,
+    *,
+    control_race: bool = True,
+    finalists_for: FinalistsFor | None = None,
+) -> tuple[hs.Failure | None, list[LaneTimes]]:
+    """The dashboard's Discard (#41): clear one heat's results, as
+    `delete_results` does, and return what it cleared, read under the same
+    lock, so Undo (`restore_results`) brings back every time it cleared,
+    one the timer wrote a moment before included."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        ended = state.ended_round_id
+        locked = locked_failure(round.id, control_race)
+        if locked is not None:
+            return locked, []
+        cleared = heat_times(event, round, heat)
+        HeatLane.objects.filter(event=event, round=round, heat=heat).update(
+            finish_time=None, finish_place=None, completed=None
+        )
+        rebuild_waiting_final(event, [round.id], ended, finalists_for)
+    audit.write(event.id, [audit.discarded((round.id, heat))])
+    return None, cleared
+
+
 def restore_results(
     event: Event,
     round: Round,

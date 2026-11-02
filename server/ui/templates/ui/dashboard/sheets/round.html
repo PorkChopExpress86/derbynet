@@ -1,6 +1,6 @@
 {# The sheet behind a round card's button: Schedule, or a confirm sheet that names the round and the heats it touches. #}
 {% if kind == "schedule" %}
-<form hx-post="{% url 'dashboard-round' round.pk 'schedule' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-schedule-form>
+<form hx-post="{% url 'dashboard-round' round.pk 'schedule' %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-schedule-form>
   <p class="text-sm text-ink-muted">{{ name }} · {{ card.passed }} racer{{ card.passed|pluralize }} passed</p>
   {% include "ui/components/stepper.html" with id="schedule-runs" name="runs" label="Times each racer runs in each lane" value=1 min=1 max=6 cls="mt-3" %}
   <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
@@ -10,7 +10,7 @@
   </div>
 </form>
 {% else %}
-<form hx-post="{% url 'dashboard-round' round.pk kind %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-confirm-form="{{ kind }}">
+<form hx-post="{% url 'dashboard-round' round.pk kind %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-confirm-form="{{ kind }}">
   <h3 class="font-semibold">{{ name }}</h3>
   {% if kind == "unschedule" %}
   <p class="mt-1">{{ name }} has a schedule of {{ card.heats_scheduled }} heat{{ card.heats_scheduled|pluralize }}, and none has run. To add or remove racers, remove its schedule.</p>

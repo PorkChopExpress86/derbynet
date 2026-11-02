@@ -1,5 +1,5 @@
 {# Close a damaged lane (D36, D45): the lanes, how to score, and every round the closure reschedules, named before it commits. #}
-<form hx-post="{% url 'dashboard-lanes-close' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-lanes-form>
+<form hx-post="{% url 'dashboard-lanes-close' %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-lanes-form>
   <fieldset>
     <legend class="text-sm font-semibold">Lanes to close</legend>
     <div class="mt-1 flex flex-wrap gap-2">

@@ -7,6 +7,7 @@ helps. A refusal is a 422 error toast (`ui.responses.service_error`). The
 page and the poll never write the session.
 """
 
+import math
 from urllib.parse import urlencode
 
 from django.db import transaction
@@ -139,7 +140,7 @@ def _hs_reply(request, failure, message: str = "", *, hold=True):
 
 @require_GET
 def dashboard(request):
-    live = build(request, _event(request), Shown(), poll=True)
+    live = build(request, _event(request), Shown())
     return render(
         request,
         "ui/dashboard/page.html",
@@ -152,9 +153,7 @@ def dashboard(request):
 def live(request):
     """The 2 s poll. 204 when the signature the page sent still matches, so
     htmx swaps nothing and no open control resets (#39 pattern 2)."""
-    current = build(
-        request, _event(request), Shown.from_request(request.GET), poll=True
-    )
+    current = build(request, _event(request), Shown.from_request(request.GET))
     if request.GET.get("sig") == current.signature:
         return HttpResponse(status=204)
     return HttpResponse(_live_html(request, current, oob=False))
@@ -281,8 +280,7 @@ def results_discard(request):
     never "current" (#41), with Undo."""
     event = _event(request)
     round, heat_no = _shown_heat(request)
-    found = results.heat_times(event, round, heat_no)
-    failure = results.delete_results(event, round, heat_no)
+    failure, found = results.discard_heat(event, round, heat_no)
     if failure is not None:
         return refused(request, failure)
     query = [("round", round.pk), ("heat", heat_no)]
@@ -297,6 +295,15 @@ def results_discard(request):
     )
 
 
+def _lane_times(lane: int, time_text: str, place_text: str) -> results.LaneTimes:
+    """One lane of an Undo link. A time that is not a finite number, or a
+    place that is not a whole number, raises ValueError."""
+    time = float(time_text) if time_text else None
+    if time is not None and not math.isfinite(time):
+        raise ValueError(time_text)
+    return results.LaneTimes(lane, time, int(place_text) if place_text else None)
+
+
 @require_POST
 @guard
 def results_restore(request):
@@ -309,18 +316,14 @@ def results_restore(request):
         heat_no = int(data["heat"])
     except KeyError, ValueError:
         raise Http404 from None
-    found = []
-    for key in data:
-        if key.startswith("t") and key[1:].isdigit():
-            lane = int(key[1:])
-            time_text, place_text = data.get(key, ""), data.get(f"p{lane}", "")
-            found.append(
-                results.LaneTimes(
-                    lane,
-                    float(time_text) if time_text else None,
-                    int(place_text) if place_text else None,
-                )
-            )
+    try:
+        found = [
+            _lane_times(int(key[1:]), data.get(key, ""), data.get(f"p{key[1:]}", ""))
+            for key in data
+            if key.startswith("t") and key[1:].isdigit()
+        ]
+    except ValueError:
+        raise Http404 from None
     failure = results.restore_results(event, round, heat_no, found)
     if failure is not None:
         return refused(request, failure)
@@ -381,11 +384,13 @@ def replay_settings_sheet(request):
 def replay_settings(request):
     if (refusal := _need_set_up(request)) is not None:
         return refusal
+    for key, choices in REPLAY_CHOICES.items():
+        posted = request.POST.get(key)
+        if posted is not None and posted not in {value for value, _ in choices}:
+            return service_error(request, f"{posted} is not a choice for {key}.")
     # `apply_form` counts the legacy form's `action` field among the keys.
     post = {"action": "settings.write"} | {
-        key: request.POST[key]
-        for key, choices in REPLAY_CHOICES.items()
-        if request.POST.get(key) in {value for value, _ in choices}
+        key: request.POST[key] for key in REPLAY_CHOICES if key in request.POST
     }
     with transaction.atomic():
         result = settings_form.apply_form(_event(request), post)

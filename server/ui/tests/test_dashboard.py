@@ -528,3 +528,92 @@ def test_a_service_refusal_is_a_422_toast(coordinator, event, wolves):
 
 def test_a_round_that_is_not_found_is_a_404(coordinator, event, wolves):
     assert post(coordinator, "/dashboard/round/999999/race/").status_code == 404
+
+
+def test_undo_of_a_discard_keeps_a_time_written_just_before_it(
+    coordinator, event, wolves, monkeypatch
+):
+    """The timer writes lane 1 of the heat on screen just before the discard
+    takes the race-state lock: the discard clears it, so Undo must bring it
+    back too (AGENT-BRIEF: read race state only under the service's lock)."""
+    import racing.services.results as results_service
+
+    scheduled(wolves)
+    heats.set_racing(event, False)
+    run_heat(event, (2.1, 2.2, 2.3, 2.4))
+    real_lock = results_service.lock_race_state
+
+    def timer_writes_first(event_id):
+        HeatLane.objects.filter(round=wolves, heat=1, lane=1).update(finish_time=1.5)
+        return real_lock(event_id)
+
+    monkeypatch.setattr(results_service, "lock_race_state", timer_writes_first)
+    html = live_of(
+        post(
+            coordinator, "/dashboard/results/discard/", {"round": wolves.pk, "heat": 1}
+        )
+    )
+    monkeypatch.setattr(results_service, "lock_race_state", real_lock)
+    undo = re.search(r'hx-post="([^"]*results/restore[^"]*)"', html).group(1)
+    live_of(post(coordinator, undo.replace("&amp;", "&")))
+    lane_1 = HeatLane.objects.get(round=wolves, heat=1, lane=1)
+    assert float(lane_1.finish_time) == 1.5
+
+
+def test_the_page_and_its_poll_leave_a_due_playlist_scene_to_the_kiosks(
+    coordinator, event
+):
+    """Neither the page nor its poll writes the race state (#41 risks). A
+    due playlist scene comes due at the next kiosk poll, which applies it
+    before it reads the scene, as PHP's query.poll.kiosk.inc does."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from kiosks.polls import poll_kiosk
+
+    due = timezone.now() - timedelta(seconds=5)
+    RaceState.objects.filter(event=event).update(playlist_scene_at=due)
+    with no_session_writes():
+        assert coordinator.get("/dashboard/").status_code == 200
+        coordinator.get("/dashboard/live/", {"sig": "", "round": "", "heat": ""})
+    assert RaceState.objects.get(event=event).playlist_scene_at == due
+    poll_kiosk(event, None)
+    assert RaceState.objects.get(event=event).playlist_scene_at is None
+
+
+def test_the_dashboard_never_reads_the_legacy_coordinator_feed(
+    coordinator, event, wolves, monkeypatch
+):
+    """D52: the page and its poll build their state through the racing
+    services, never through `query=poll.coordinator`'s builder."""
+    from racing.services import polls
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the dashboard read the legacy coordinator feed")
+
+    monkeypatch.setattr(polls, "poll_coordinator", refuse)
+    monkeypatch.setattr("legacy_api.handlers.race_control.poll_coordinator", refuse)
+    scheduled(wolves)
+    assert coordinator.get("/dashboard/").status_code == 200
+    assert coordinator.get("/dashboard/live/", {"sig": ""}).status_code == 200
+    live_of(post(coordinator, "/dashboard/heat/next/"))
+
+
+@pytest.mark.parametrize("junk", ["t1=abc", "t1=nan", "t1=inf", "t1=2.1&p1=x"])
+def test_undo_refuses_junk(coordinator, event, wolves, junk):
+    scheduled(wolves)
+    url = f"/dashboard/results/restore/?round={wolves.pk}&heat=1&{junk}"
+    assert post(coordinator, url).status_code == 404
+    assert not HeatLane.objects.filter(round=wolves, finish_time__isnull=False)
+
+
+def test_replay_settings_refuse_a_choice_the_sheet_does_not_offer(coordinator, event):
+    reply = post(
+        coordinator,
+        "/dashboard/replay/settings/",
+        {"replay-skipback": "2500", "replay-rate": "999"},
+    )
+    assert reply.status_code == 422 and b"Replay settings saved" not in reply.content
+    settings = RaceSettings.objects.get(event=event)
+    assert (settings.replay_skipback_ms, settings.replay_rate) == (4000, 50)

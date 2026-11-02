@@ -1,4 +1,4 @@
-<form hx-post="{% url 'dashboard-replay-settings' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" class="flex flex-col gap-3" data-replay-settings>
+<form hx-post="{% url 'dashboard-replay-settings' %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" class="flex flex-col gap-3" data-replay-settings>
   {% for key, label, choices, selected in fields %}
   <div>
     <label for="rs-{{ key }}" class="block text-sm font-medium">{{ label }}</label>

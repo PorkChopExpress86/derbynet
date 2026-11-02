@@ -262,10 +262,6 @@ class Suggestions:
 def is_final(round: Round) -> bool:
     """A round chosen from another: a later round of a group, or round 1 of
     a combined group."""
-    return _is_final(round)
-
-
-def _is_final(round: Round) -> bool:
     if round.number > 1:
         return True
     return _is_aggregate(round.group_id)
@@ -315,7 +311,7 @@ def finalist_suggestions(
     awards (D34). No suggestion names a racer with either award setting.
     """
     final = Round.objects.get(pk=final.pk)
-    if not _is_final(final):
+    if not is_final(final):
         raise FinalsFailure(Failure.NOT_A_FINAL, "The round is not a final.")
     cut = _cut(final, top, bucketed)
     allowed = {r.pk for r in allowed_racers(final)}
@@ -362,7 +358,7 @@ def add_to_final(racer: Racer, final: Round) -> None:
     with transaction.atomic():
         lock_race_state(final.event_id)
         final = Round.objects.get(pk=final.pk)
-        if not _is_final(final):
+        if not is_final(final):
             raise FinalsFailure(Failure.NOT_A_FINAL, "The round is not a final.")
         racer = Racer.objects.get(pk=racer.pk, event_id=final.event_id)
         if not _racer_of_final(racer, final):
@@ -384,7 +380,7 @@ def remove_from_final(racer: Racer, final: Round) -> None:
     with transaction.atomic():
         lock_race_state(final.event_id)
         final = Round.objects.get(pk=final.pk)
-        if not _is_final(final):
+        if not is_final(final):
             raise FinalsFailure(Failure.NOT_A_FINAL, "The round is not a final.")
         entry = final.roster.filter(racer_id=racer.pk).first()
         if entry is None:
@@ -407,7 +403,7 @@ def _raced_finals(event) -> list[Round]:
         .distinct()
     )
     rounds = Round.objects.filter(pk__in=raced).select_related("group")
-    return [r for r in rounds.order_by("id") if _is_final(r)]
+    return [r for r in rounds.order_by("id") if is_final(r)]
 
 
 def poll_finals(event) -> dict:

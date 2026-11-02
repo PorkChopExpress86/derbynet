@@ -1,9 +1,8 @@
 """The race dashboard's live state (#41): the coordinator payload, what the
 dashboard adds to it, the heat held on screen, and the state signature.
 
-Reads only, through the racing services. `polls.poll_coordinator` writes
-only when a finished playlist step's scene comes due, as PHP's poll does
-(#34), and the page writes neither the session nor the race settings.
+Reads only, through the racing services: the page and its poll write
+neither the session nor the race state.
 
 The page sends the heat it shows (`round`, `heat`) and the time until which
 it holds a finished heat (`hold`, epoch milliseconds, 0 for none). PHP keeps
@@ -238,15 +237,13 @@ def _material(payload: dict, extras: Extras, shown: Shown) -> str:
     )
 
 
-def build(request, event: Event, shown: Shown, *, poll: bool = False) -> Live:
-    """The dashboard's context for `shown`, with its signature. `poll` shows
-    a playlist step's scene when it comes due, as the coordinator's poll does
-    in PHP."""
+def build(request, event: Event, shown: Shown) -> Live:
+    """The dashboard's context for `shown`, with its signature. It writes
+    nothing: a finished playlist step's scene comes due at the next kiosk
+    poll, which applies it before it reads the scene, as PHP's
+    `query.poll.kiosk.inc` does (#41 risks: a poll writes no race state)."""
     now = timezone.now()
-    if poll:
-        payload = polls.poll_coordinator(event)
-    else:
-        payload = polls.coordinator(event)
+    payload = polls.coordinator(event)
     settings = RaceSettings.objects.get(event=event)
     state = RaceState.objects.select_related(
         "waiting_entry__group", "ended_round__group"
