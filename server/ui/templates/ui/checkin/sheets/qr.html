@@ -1,0 +1,6 @@
+{# The QR code for another phone (#16): a signed link good for 60 minutes that grants check-in, un-pass and photo upload only. #}
+<div x-data x-init="checkin.show('Check in on another phone'); checkin.qr($refs.code, '{{ url|escapejs }}')" data-qr>
+  <div x-ref="code" class="mx-auto grid size-64 place-items-center rounded-xl bg-white p-3" role="img" aria-label="QR code for the check-in link"></div>
+  <p class="mt-3 text-sm">Scan this with another phone's camera. The link opens check-in for 60 minutes and grants check-in and photo upload only.</p>
+  <p class="mt-2 break-all font-mono text-xs text-ink-muted" data-qr-url>{{ url }}</p>
+</div>

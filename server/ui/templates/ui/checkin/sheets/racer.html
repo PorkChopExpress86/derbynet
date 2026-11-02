@@ -1,0 +1,81 @@
+{% load ui %}{# The racer sheet, for add and edit: PHP's seven fields, in the order of the owner's station (D6): the racer and car names and the class first, then the car number the class suggests. After an add it offers Take car photo and Pass. #}
+<div x-data x-init="checkin.show('{% if racer %}{{ card.car }} {{ racer|racer_name|escapejs }}{% else %}New racer{% endif %}')" data-racer-sheet="{% if racer %}{{ racer.pk }}{% else %}new{% endif %}">
+  {% if notice %}<p class="mb-3 rounded-lg bg-ok-soft px-3 py-2 font-medium text-ok-ink" role="status" data-notice>{{ notice }}</p>{% endif %}
+  {% if warnings %}
+  <ul class="mb-3 flex flex-col gap-1 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn-ink" role="alert" data-warnings>
+    {% for w in warnings %}<li>{{ w }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if error %}<p class="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-danger-ink" role="alert" data-sheet-error>{{ error }}</p>{% endif %}
+  {% if racer %}
+  <div class="mb-4 flex flex-col gap-2 rounded-xl border border-line p-3" data-next>
+    <div class="flex items-center gap-3">
+      <p class="min-w-0 flex-1 text-sm">{% if card.passed %}<strong class="text-ok-ink">Passed</strong>{% else %}Not passed yet{% endif %}{% if card.status and card.status != "Racing!" %} · {{ card.status }}{% endif %}</p>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      {% if can_photo %}
+      <button type="button" hx-get="{% url 'checkin-photo' racer.pk 'car' %}" hx-target="#checkin-sheet-body" data-action="take-car-photo" class="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl border border-line px-3 font-semibold">{% include "ui/components/icon.html" with name="car" cls="size-5" %}{% if card.car_photo %}New car photo{% else %}Take car photo{% endif %}</button>
+      <button type="button" hx-get="{% url 'checkin-photo' racer.pk 'head' %}" hx-target="#checkin-sheet-body" data-action="take-racer-photo" class="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl border border-line px-3 font-semibold">{% include "ui/components/icon.html" with name="photos" cls="size-5" %}Racer photo</button>
+      {% endif %}
+      {% if not card.passed and not card.locked %}
+      <button type="button" hx-post="{% url 'checkin-pass' racer.pk %}" hx-vals='{"passed": "1"}' hx-target="#checkin-sheet-body" data-action="pass" class="col-span-2 min-h-12 rounded-xl bg-ok px-3 font-semibold text-white dark:text-black">Pass</button>
+      {% endif %}
+    </div>
+    {% if notice and can_add %}<button type="button" hx-get="{% url 'checkin-new' %}" hx-target="#checkin-sheet-body" data-action="add-another" class="min-h-11 rounded-xl border border-line px-3 font-semibold">Add another racer</button>{% endif %}
+  </div>
+  {% endif %}
+  <form hx-post="{% if racer %}{% url 'checkin-edit' racer.pk %}{% else %}{% url 'checkin-new' %}{% endif %}" hx-target="#checkin-sheet-body" hx-swap="innerHTML" class="flex flex-col gap-3" data-racer-form>
+    {% if racer %}<input type="hidden" name="racer" value="{{ racer.pk }}">{% endif %}
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label for="f-first" class="mb-1 block text-sm font-medium">First name</label>
+        <input id="f-first" name="firstname" value="{{ values.firstname|default:'' }}" autocomplete="off" autocapitalize="words" {% if not racer %}data-autofocus{% endif %} class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+      </div>
+      <div>
+        <label for="f-last" class="mb-1 block text-sm font-medium">Last name</label>
+        <input id="f-last" name="lastname" value="{{ values.lastname|default:'' }}" autocomplete="off" autocapitalize="words" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+      </div>
+    </div>
+    <div>
+      <label for="f-carname" class="mb-1 block text-sm font-medium">Car name</label>
+      <input id="f-carname" name="carname" value="{{ values.carname|default:'' }}" autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <div class="mb-1 flex items-baseline justify-between gap-2">
+          <label for="f-partition" class="block text-sm font-medium">Class</label>
+          {% if can_edit_partitions %}<a href="{% url 'racing-groups' %}" class="text-sm font-medium text-accent underline underline-offset-2" data-edit-partitions>Edit partitions</a>{% endif %}
+        </div>
+        <select id="f-partition" name="partitionid" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+          {% for pk, name in partitions %}<option value="{{ pk }}"{% if values.partitionid|stringformat:"s" == pk|stringformat:"s" %} selected{% endif %}>{{ name }}</option>{% empty %}<option value="">Default</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="f-carno" class="mb-1 block text-sm font-medium">Car number</label>
+        {% include "ui/checkin/carno_input.html" with carno=values.carno %}
+        <input type="hidden" name="touched" id="f-touched" value="{% if racer %}1{% endif %}">
+      </div>
+    </div>
+    <div id="carno-hint" hx-get="{% url 'checkin-number' %}" hx-include="closest form"  hx-target="this" hx-trigger="change from:#f-partition, input from:#f-carno delay:400ms{% if not racer %}, every 10s [checkin.sheetOpen()]{% endif %}" hx-swap="innerHTML" hx-sync="this:queue last" aria-live="polite">
+      {% include "ui/checkin/number.html" with fill=False warnings=None %}
+    </div>
+    <div>
+      <label for="f-note" class="mb-1 block text-sm font-medium">From <span class="font-normal text-ink-muted">(pack, den or town)</span></label>
+      <input id="f-note" name="note_from" value="{{ values.note_from|default:'' }}" autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    <fieldset class="flex flex-col gap-1 rounded-xl border border-line px-3 py-2">
+      <legend class="px-1 text-sm font-medium">Awards</legend>
+      <label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="exclude" value="1"{% if values.exclude %} checked{% endif %} class="size-5 accent-accent" data-setting="exclude">Not eligible for any award</label>
+      <label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="no_speed" value="1"{% if values.no_speed %} checked{% endif %} class="size-5 accent-accent" data-setting="no-speed">Not eligible for speed awards</label>
+    </fieldset>
+    {# Room for the weigh-in step (#70). #}
+    <div data-weigh-in class="empty:hidden"></div>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink" data-action="save">{% if racer %}Save{% else %}Add racer{% endif %}</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">{% if racer %}Close{% else %}Cancel{% endif %}</button>
+    </div>
+    {% if racer and can_edit %}
+    <button type="button" hx-get="{% url 'checkin-delete' racer.pk %}" hx-target="#checkin-sheet-body" data-action="delete" class="min-h-11 self-start rounded-lg px-2 text-sm font-semibold text-danger underline underline-offset-2">Delete racer</button>
+    {% endif %}
+  </form>
+</div>

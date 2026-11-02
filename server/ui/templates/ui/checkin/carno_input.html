@@ -1,0 +1,2 @@
+{# The car number field. Shown padded to three digits (D47); the server stores the plain number. Typing marks it touched, so the class's suggestion stops replacing it. #}
+<input id="f-carno" name="carno" value="{{ carno|default:'' }}" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="document.getElementById('f-touched').value = '1'" class="h-12 w-full rounded-xl border border-field bg-surface px-3 font-mono text-base">

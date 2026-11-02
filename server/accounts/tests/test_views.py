@@ -185,9 +185,12 @@ MCHECKIN = Perm.CHECK_IN_RACERS | Perm.REVERT_CHECK_IN | Perm.PHOTO_UPLOAD
 
 
 def test_a_check_in_link_grants_check_in_and_photos(client, event):
-    response = client.get(f"/mcheckin.php?tok={make_mcheckin_token()}")
+    response = client.get(f"/checkin/?tok={make_mcheckin_token()}")
 
-    assert response.status_code == 200
+    # The page opens without the token in its URL (#42).
+    assert response.status_code == 302
+    assert response["Location"] == "/checkin/"
+    assert client.get("/checkin/").status_code == 200
     assert client.session["permissions"] == Perm.VIEW_RACE_RESULTS | MCHECKIN
     assert "role" not in client.session
 
@@ -195,7 +198,7 @@ def test_a_check_in_link_grants_check_in_and_photos(client, event):
 def test_a_check_in_link_keeps_the_logged_in_role(client, event):
     log_in(client, "Photo", "flashbulb")
 
-    client.get(f"/mcheckin.php?tok={make_mcheckin_token()}")
+    client.get(f"/checkin/?tok={make_mcheckin_token()}")
 
     assert client.session["role"] == "Photo"
     assert client.session["permissions"] == Perm.PHOTO_UPLOAD | MCHECKIN
@@ -207,7 +210,7 @@ def test_a_check_in_link_issues_a_new_session_id(client, event):
     session.save()
     planted = session.session_key
 
-    client.get(f"/mcheckin.php?tok={make_mcheckin_token()}")
+    client.get(f"/checkin/?tok={make_mcheckin_token()}")
 
     assert session_cookie(client) != planted
 
@@ -217,10 +220,10 @@ def test_a_check_in_link_expires_after_an_hour(client, event):
     token = make_mcheckin_token()
 
     with mock.patch("django.core.signing.time.time", return_value=issued + 3599):
-        assert client.get(f"/mcheckin.php?tok={token}").status_code == 200
+        assert client.get(f"/checkin/?tok={token}")["Location"] == "/checkin/"
     client.cookies.clear()
     with mock.patch("django.core.signing.time.time", return_value=issued + 3602):
-        response = client.get(f"/mcheckin.php?tok={token}")
+        response = client.get(f"/checkin/?tok={token}")
 
     assert response.status_code == 302
     assert response["Location"].startswith("/login/?next=")
@@ -238,9 +241,10 @@ def test_a_check_in_link_expires_after_an_hour(client, event):
     ids=["signature", "value", "empty", "php-token"],
 )
 def test_a_tampered_check_in_link_grants_nothing(client, event, tamper):
-    response = client.get(f"/mcheckin.php?tok={tamper(make_mcheckin_token())}")
+    response = client.get(f"/checkin/?tok={tamper(make_mcheckin_token())}")
 
     assert response.status_code == 302
+    assert response["Location"].startswith("/login/")
     assert "permissions" not in client.session
 
 
@@ -254,5 +258,5 @@ def test_another_salt_does_not_make_a_check_in_link(client, event, signer):
     for another purpose must not open check-in."""
     token = signer.sign("mcheckin")
 
-    assert client.get(f"/mcheckin.php?tok={token}").status_code == 302
+    assert client.get(f"/checkin/?tok={token}")["Location"].startswith("/login/")
     assert "permissions" not in client.session

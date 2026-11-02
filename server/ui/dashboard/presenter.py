@@ -14,6 +14,8 @@ round card offers, the Re-Run label, and the master schedule's totals.
 import re
 from dataclasses import dataclass, field
 
+from ui.responses import racer_name
+
 CATEGORIES = (
     ("now-racing", "Now racing"),
     ("master-schedule", "Master schedule"),
@@ -179,7 +181,7 @@ def _category(round: dict) -> str:
 
 
 def _who(a: dict) -> str:
-    return f"{car(a['carnumber'])} {a['firstname']} {a['lastname']}"
+    return f"{car(a['carnumber'])} {racer_name(a['firstname'], a['lastname'])}"
 
 
 def round_buttons(round: dict, current_id: int, lanes: int) -> tuple[list[str], str]:
@@ -420,7 +422,7 @@ def present(payload: dict, extras: Extras | None = None) -> dict:
                 NotAddedRow(
                     racer_id=a["racerid"],
                     car=car(a["carnumber"]),
-                    name=f"{a['firstname']} {a['lastname']}",
+                    name=racer_name(a["firstname"], a["lastname"]),
                     round_id=r["roundid"],
                     round_name=r["name"],
                     exclude=exclude,

@@ -20,7 +20,9 @@ from django.urls import path, reverse
 from ui import navigation
 
 # PHP page to the URL name of its replacement, for pages not in the registry.
-EXTRA_PAGES: dict[str, str] = {}
+# The phone page `mcheckin.php` folds into check-in, which reads its `tok`
+# (#42).
+EXTRA_PAGES: dict[str, str] = {"mcheckin.php": "checkin"}
 
 
 def legacy_pages() -> dict[str, str]:

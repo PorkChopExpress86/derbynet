@@ -46,6 +46,15 @@ def component(parser, token):
     return ComponentNode(parser.compile_filter(bits[1]), kwargs, nodelist)
 
 
+@register.filter
+def racer_name(racer) -> str:
+    """`{{ racer|racer_name }}`: the name as `ui.responses.racer_name`
+    writes it."""
+    from ui.responses import racer_name as name
+
+    return name(racer.first_name, racer.last_name)
+
+
 @register.simple_tag
 def poll_trigger(seconds):
     return format_html('hx-trigger="every {}s [derbynet.pollable(this)]"', seconds)

@@ -29,6 +29,7 @@ from racing.services.standings import standings_snapshot
 from roster.models import Racer
 from roster.services.racers import HEADSHOTS
 from ui.dashboard.presenter import Extras, Held, present, strip_seconds
+from ui.responses import racer_name
 
 HOLD_MS = 10_000
 LEADERS = 3
@@ -134,7 +135,7 @@ def _intermission(event: Event, state: RaceState) -> dict | None:
             {
                 "place": i,
                 "car": by_id[pk].car_number,
-                "name": f"{by_id[pk].first_name} {by_id[pk].last_name}",
+                "name": racer_name(by_id[pk].first_name, by_id[pk].last_name),
             }
             for i, pk in enumerate(picked, 1)
             if pk in by_id
@@ -160,7 +161,7 @@ def _finals(event: Event) -> tuple[list[dict], list[dict]]:
                 "state": r["state"],
                 "racer_id": racer.pk,
                 "car": racer.car_number,
-                "name": f"{racer.first_name} {racer.last_name}",
+                "name": racer_name(racer.first_name, racer.last_name),
                 "group": racer.group.name,
                 "exclude": racer.exclude,
                 "no_speed_awards": racer.not_eligible_for_speed_awards,
@@ -169,7 +170,11 @@ def _finals(event: Event) -> tuple[list[dict], list[dict]]:
 
     def named(pk):
         r = racers[pk]
-        return {"id": pk, "car": r.car_number, "name": f"{r.first_name} {r.last_name}"}
+        return {
+            "id": pk,
+            "car": r.car_number,
+            "name": racer_name(r.first_name, r.last_name),
+        }
 
     suggestions = []
     for s in polled["finalist-suggestions"]:

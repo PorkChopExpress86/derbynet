@@ -133,6 +133,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Outside SecurityMiddleware, so it sees the header that one adds.
+    "core.middleware.PlainHttpCoop",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "accounts.middleware.RoleSessionMiddleware",

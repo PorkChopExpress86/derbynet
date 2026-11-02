@@ -109,13 +109,14 @@ def insert_new_racer(
     partition: Partition | None = None,
     partition_name: str = "",
     exclude: bool = False,
+    no_speed_awards: bool = False,
 ) -> NewRacer:
     """`insert_new_racer()`: a racer in `partition`, else in the partition
     named `partition_name` (D34: a name that differs only in case joins the
     existing partition), else in `Default`. A blank car number takes the
     partition's next one. A car number another racer has is allowed, with a
     warning. The racer is entered in round 1 of its group, and the history
-    gets `racer.*create`."""
+    gets `racer.*create`. Both award settings (D33) save with the racer."""
     with transaction.atomic():
         lock_race_state(event.id)
         if partition is None:
@@ -156,8 +157,8 @@ def insert_new_racer(
             partition=partition,
             subgroup=subgroup,
             group_id=subgroup.group_id,
-            exclude=exclude,
         )
+        _store_award_settings(racer, exclude=exclude, no_speed_awards=no_speed_awards)
         groups.fill_in_missing_roster_entries(event.id)
         _record(
             event.id,
@@ -272,6 +273,8 @@ class Edit:
     car_name: str | None = None
     note: str | None = None
     exclude: bool | None = None
+    # Django only: "not eligible for speed awards" (D33).
+    no_speed_awards: bool | None = None
 
 
 MISSING: Final = object()
@@ -329,9 +332,10 @@ def edit_racer(racer: Racer, edit: Edit) -> EditResult:
                 )
             ):
                 result.warning = (result.warning or []) + [outside]
-        if edit.exclude is not None:
-            racer.exclude = edit.exclude
         racer.save()
+        _store_award_settings(
+            racer, exclude=edit.exclude, no_speed_awards=edit.no_speed_awards
+        )
         if racer.group_id != old_place[0]:
             _move_round_1_entry(racer, old_place[0])
         if (racer.group_id, racer.subgroup_id, racer.partition_id) != old_place:
@@ -352,12 +356,20 @@ def set_award_settings(
     with transaction.atomic():
         lock_race_state(racer.event_id)
         racer = Racer.objects.select_for_update().get(pk=racer.pk)
-        if exclude is not None:
-            racer.exclude = exclude
-        if no_speed_awards is not None:
-            racer.not_eligible_for_speed_awards = no_speed_awards
-        racer.save(update_fields=["exclude", "not_eligible_for_speed_awards"])
+        _store_award_settings(racer, exclude=exclude, no_speed_awards=no_speed_awards)
         return racer
+
+
+def _store_award_settings(
+    racer: Racer, *, exclude: bool | None, no_speed_awards: bool | None
+) -> None:
+    """Write the settings that are not None. The caller holds the lock, in
+    the transaction that writes the rest of the racer."""
+    if exclude is not None:
+        racer.exclude = exclude
+    if no_speed_awards is not None:
+        racer.not_eligible_for_speed_awards = no_speed_awards
+    racer.save(update_fields=["exclude", "not_eligible_for_speed_awards"])
 
 
 class EditFailure(RacerFailure):
@@ -467,6 +479,21 @@ class Bulk:
     start: str = ""
     auto: bool = False
     may_revert: bool = False
+
+
+def bulk_choices(event) -> list[tuple[str, str]]:
+    """The `who` values a bulk change offers, with their labels: everyone,
+    each partition (`d<id>`), and each group (`c<id>`) when there are
+    several."""
+    choices = [("all", "All racers")]
+    choices += [
+        (f"d{p.pk}", p.name)
+        for p in Partition.objects.filter(event=event).order_by("sort_order", "id")
+    ]
+    found = Group.objects.filter(event=event).order_by("sort_order", "id")
+    if found.count() > 1:
+        choices += [(f"c{g.pk}", f"{g.name} (group)") for g in found]
+    return choices
 
 
 def _bulk_racers(event, who: str):

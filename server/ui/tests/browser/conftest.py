@@ -18,6 +18,7 @@ critical violation.
 import os
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -27,8 +28,10 @@ from importlib import import_module  # noqa: E402
 
 from django.apps import apps  # noqa: E402
 from django.conf import settings  # noqa: E402
+from django.db import connection  # noqa: E402
 
 from accounts.models import Role  # noqa: E402
+from awards.models import AwardType  # noqa: E402
 from core.tests.factories import EventFactory  # noqa: E402
 from ui.tests.roles import PASSWORDS  # noqa: E402
 
@@ -54,6 +57,27 @@ def pytest_collection_modifyitems(items):
     for item in items:
         if here in Path(item.fspath).parents:
             item.add_marker(pytest.mark.browser)
+
+
+# A host name that reaches the live server over plain HTTP. `localhost` is a
+# secure context, so a page there may use the camera; check-in's photo sheet
+# must also work where the browser refuses it, as on a venue's LAN (#42).
+PLAIN_HTTP_HOST = "derbynet.test"
+
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """Chromium resolves `PLAIN_HTTP_HOST` to the live server, and offers a
+    fake camera that needs no permission prompt."""
+    return {
+        **browser_type_launch_args,
+        "args": [
+            *browser_type_launch_args.get("args", []),
+            f"--host-resolver-rules=MAP {PLAIN_HTTP_HOST} 127.0.0.1",
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+        ],
+    }
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -86,6 +110,9 @@ def _database(transactional_db, live_server):
     seeded, so seed them again, with the migration's own function."""
     if not Role.objects.exists():
         import_module("accounts.migrations.0002_seed_default_roles").seed(apps, None)
+    if not AwardType.objects.exists():
+        seed = import_module("awards.migrations.0003_seed_award_types")
+        seed.seed_award_types(apps, SimpleNamespace(connection=connection))
 
 
 @pytest.fixture
@@ -171,10 +198,11 @@ def login(page, event):
     return as_role
 
 
-def shoot(page, name: str) -> Path:
+def shoot(page, name: str, full_page: bool = True) -> Path:
+    """`full_page=False` for an open sheet, which is fixed to the screen."""
     path = SCREENSHOTS / f"{name}-{page.size}.png"
     path.parent.mkdir(parents=True, exist_ok=True)
-    page.screenshot(path=path, full_page=True)
+    page.screenshot(path=path, full_page=full_page)
     return path
 
 

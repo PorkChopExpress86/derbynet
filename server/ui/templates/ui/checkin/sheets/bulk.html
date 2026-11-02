@@ -1,0 +1,35 @@
+{# Bulk changes, as PHP's bulk dialog: check in, undo check-in, renumber (standard or from a start), or award eligibility, for everyone or one den or group. Eligibility sets "not eligible for any award" only (D33). #}
+<div x-data="{ what: 'checkin', numbering: 'standard' }" x-init="checkin.show('Change many racers')" data-bulk>
+  <form hx-post="{% url 'checkin-bulk' %}" hx-target="#checkin-sheet-body" class="flex flex-col gap-3">
+    <div>
+      <label for="b-who" class="mb-1 block text-sm font-medium">Racers</label>
+      <select id="b-who" name="who" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+        {% for value, label in choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <fieldset>
+      <legend class="mb-1 text-sm font-medium">Change</legend>
+      <div class="grid grid-cols-2 gap-2">
+        {% for value, label in actions %}
+        <label class="flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-line px-3 has-checked:border-accent has-checked:bg-accent-soft"><input type="radio" name="what" value="{{ value }}" x-model="what" class="size-5 accent-accent"{% if forloop.first %} checked{% endif %}>{{ label }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <fieldset x-show="what === 'number'" x-cloak class="flex flex-col gap-2">
+      <legend class="mb-1 text-sm font-medium">Numbers</legend>
+      <label class="flex min-h-11 items-center gap-2"><input type="radio" name="numbering" value="standard" x-model="numbering" class="size-5 accent-accent" checked>Standard: each den from its first number (101, 201, …)</label>
+      <label class="flex min-h-11 items-center gap-2"><input type="radio" name="numbering" value="custom" x-model="numbering" class="size-5 accent-accent">Count up from</label>
+      <div x-show="numbering === 'custom'"><label for="b-start" class="sr-only">First car number</label><input id="b-start" name="start" inputmode="numeric" placeholder="101" class="h-12 w-full rounded-xl border border-field bg-surface px-3 font-mono text-base"></div>
+    </fieldset>
+    <fieldset x-show="what === 'eligibility'" x-cloak class="flex flex-col gap-2">
+      <legend class="mb-1 text-sm font-medium">Awards</legend>
+      <label class="flex min-h-11 items-center gap-2"><input type="radio" name="eligible" value="1" class="size-5 accent-accent" checked>Eligible for awards</label>
+      <label class="flex min-h-11 items-center gap-2"><input type="radio" name="eligible" value="0" class="size-5 accent-accent">Not eligible for any award</label>
+    </fieldset>
+    <p x-show="what === 'uncheckin'" x-cloak class="text-sm text-ink-muted">{% if can_revert %}Racers with results keep their check-in.{% else %}Only the race coordinator can undo check-ins.{% endif %}</p>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink" data-action="apply">Apply</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

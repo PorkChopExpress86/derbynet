@@ -8,12 +8,13 @@ UI = Path(__file__).resolve().parent.parent
 MANIFEST = (UI / "static" / "ui" / "vendor" / "VENDORED.md").read_text()
 VENDORED = [
     *sorted((UI / "static" / "ui" / "vendor").glob("*.js")),
+    *sorted((UI / "static" / "ui" / "vendor").glob("*.css")),
     *sorted((UI / "tests" / "browser" / "vendor").glob("*.js")),
 ]
 
 
 def test_every_vendored_file_is_listed_with_its_checksum():
-    assert len(VENDORED) == 4
+    assert len(VENDORED) == 8
     for path in VENDORED:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         assert path.name in MANIFEST, path.name

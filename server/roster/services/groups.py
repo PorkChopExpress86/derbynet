@@ -427,6 +427,24 @@ def _record_subgroup_created(subgroup: Subgroup) -> None:
     )
 
 
+def first_partition(event_id) -> Partition | None:
+    """The partition a new racer's sheet starts on, or None while the event
+    has none and `insert_new_racer` will make `Default`."""
+    return (
+        Partition.objects.filter(event_id=event_id).order_by("sort_order", "id").first()
+    )
+
+
+def partition_of(event_id, raw_id) -> Partition | None:
+    """The event's partition with a posted id, or None. A form posts a
+    partition picked from the existing ones (D34), never a name."""
+    try:
+        pk = int(raw_id)
+    except TypeError, ValueError:
+        return None
+    return Partition.objects.filter(event_id=event_id, pk=pk).first()
+
+
 def find_or_create_partition(event_id, name: str) -> Partition:
     """`find_or_create_partition()`: by name, ignoring case. PHP matches the
     exact name, and so makes `cubs` beside `Cubs`.
