@@ -1,0 +1,18 @@
+{# The subgroup sheet (rank.edit): name, trophy count, and the speed-award partition list (D35, D38). #}
+<div x-data x-init="groups.show('Edit {{ row.name|escapejs }}')" data-subgroup-sheet="{{ row.id }}">
+  {% include "ui/groups/notice.html" %}
+  <form hx-post="{% url 'groups-subgroup' row.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="flex flex-col gap-3">
+    <div>
+      <label for="ss-name" class="mb-1 block text-sm font-medium">{{ tree.labels.subgroup }} name</label>
+      <input id="ss-name" name="name" value="{{ values.name }}" data-autofocus autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    {% include "ui/groups/trophies.html" with id="ss-trophies" value=values.ntrophies %}
+    {% include "ui/groups/award_partitions.html" with key="ss" plural=tree.partitions_label|lower %}
+    <p class="text-sm text-ink-muted">In {{ group.name }}.{% if row.constituent_of %} Part of {{ row.constituent_of }}.{% endif %}</p>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+  {% if deletable %}<button type="button" hx-get="{% url 'groups-subgroup-delete' row.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" data-action="delete" class="mt-4 min-h-12 w-full rounded-xl border border-danger px-4 font-semibold text-danger-ink">Delete {{ tree.labels.subgroup|lower }}</button>{% endif %}
+</div>

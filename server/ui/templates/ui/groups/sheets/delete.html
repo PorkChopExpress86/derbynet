@@ -1,0 +1,8 @@
+{# The confirm sheet for a delete, in place of PHP's confirm(). Pass name, noun, delete_url and back_url. #}
+<div x-data x-init="groups.show('Delete {{ name|escapejs }}?')" data-delete-confirm>
+  <p>The {{ noun }} {{ name }} is deleted.</p>
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="button" hx-post="{{ delete_url }}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" data-confirm class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Delete 1 {{ noun }}</button>
+    <button type="button" hx-get="{{ back_url }}" hx-target="#groups-sheet-body" hx-swap="innerHTML" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</div>

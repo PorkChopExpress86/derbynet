@@ -190,3 +190,49 @@ def reconcile_partition_lists(event_id) -> None:
             row_id for p, row_id in rows.items() if p not in kept or kept == every
         )
     AwardPartition.objects.filter(id__in=doomed).delete()
+
+
+@dataclass(frozen=True)
+class PartitionChoice:
+    """A unit's partition list as an editor shows it: the partitions it can
+    draw from, in partition order, and the narrowed list, or None for "all
+    partitions" (D38)."""
+
+    offered: list[Partition]
+    narrowed: frozenset[int] | None
+
+    def chosen(self, partition_id: int) -> bool:
+        return self.narrowed is None or partition_id in self.narrowed
+
+
+def partition_choice(
+    event, *, group: Group | None = None, subgroup: Subgroup | None = None
+) -> PartitionChoice:
+    unit = _unit(group, subgroup, None)
+    every = _draws_from(event.id, *_ids(group, subgroup, None))
+    offered = list(Partition.objects.filter(id__in=every).order_by("sort_order", "id"))
+    stored = frozenset(
+        AwardPartition.objects.filter(event=event, **unit).values_list(
+            "partition_id", flat=True
+        )
+    )
+    return PartitionChoice(offered, stored or None)
+
+
+def set_partition_list_by_id(
+    event,
+    partition_ids: Iterable[int],
+    *,
+    group: Group | None = None,
+    subgroup: Subgroup | None = None,
+) -> None:
+    """`set_partition_list` from posted partition ids, resolved and checked
+    under the lock. An id that names no partition of the event, or one the
+    unit does not draw from, is a `ValueError`."""
+    wanted = set(partition_ids)
+    with transaction.atomic():
+        lock_race_state(event.id)
+        found = list(Partition.objects.filter(event=event, pk__in=wanted))
+        if len(found) != len(wanted):
+            raise ValueError("a partition of another event or none")
+        set_partition_list(event, found, group=group, subgroup=subgroup)

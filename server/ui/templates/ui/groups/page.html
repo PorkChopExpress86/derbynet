@@ -1,0 +1,15 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/groups.js' %}"></script>{% endblock %}
+{% block main %}
+{# The structure loads once and is never polled. Every change answers with this editor again, out of band (#43). #}
+<div id="groups-editor" data-groups{% if open_url %} data-open-sheet="{{ open_url }}"{% endif %}>
+{% include "ui/groups/editor.html" %}
+</div>
+{% endblock %}
+{% block sheets %}
+{# One sheet for every racing groups dialog. Its body loads when a control opens it. #}
+{% component "sheet" name="groups" title="" title_x="$store.groups.title" %}
+  <div id="groups-sheet-body" aria-live="polite"><p class="py-6 text-center text-ink-muted">Loading…</p></div>
+{% endcomponent %}
+{% endblock %}

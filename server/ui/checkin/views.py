@@ -38,7 +38,15 @@ from ui.checkin import state
 from ui.checkin.state import Filters
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import racer_name, refused, service_error, toast_html
+from ui.responses import (
+    closing_sheet,
+    in_sheet,
+    into_sheet,
+    racer_name,
+    refused,
+    service_error,
+    toast_html,
+)
 
 guard = requires_page("checkin")
 
@@ -79,7 +87,7 @@ SHEET_BODY = "checkin-sheet-body"
 
 
 def _in_sheet(request) -> bool:
-    return request.headers.get("HX-Target") == SHEET_BODY
+    return in_sheet(request, SHEET_BODY)
 
 
 def sheet_reply(request, sheet_html: str, message: str = "", *, refresh=True):
@@ -92,25 +100,12 @@ def sheet_reply(request, sheet_html: str, message: str = "", *, refresh=True):
             render_to_string("ui/checkin/notice.html", {"message": message}, request)
             + sheet_html
         )
-    if _in_sheet(request):
-        return _reply(request, sheet_html, refresh=refresh)
-    return _reply(
-        request,
-        f'<div id="{SHEET_BODY}" hx-swap-oob="innerHTML">{sheet_html}</div>',
-        refresh=refresh,
-    )
+    return _reply(request, into_sheet(request, SHEET_BODY, sheet_html), refresh=refresh)
 
 
 def closed_reply(request, message: str):
     """Close the sheet, and say what happened in a toast."""
-    closed = render_to_string("ui/checkin/sheets/closed.html", {}, request)
-    toast = toast_html(request, message, oob=_in_sheet(request))
-    if _in_sheet(request):
-        return _reply(request, closed + toast)
-    return _reply(
-        request,
-        f'<div id="{SHEET_BODY}" hx-swap-oob="innerHTML">{closed}</div>' + toast,
-    )
+    return _reply(request, closing_sheet(request, SHEET_BODY, message))
 
 
 def _need(request, perm: Perm, message: str):
@@ -269,7 +264,7 @@ def question_sheet(request, racer_id):
     racer = _racer(request, racer_id)
     question = _question(request, racer)
     if question is None:
-        return render(request, "ui/checkin/sheets/closed.html")
+        return render(request, "ui/components/sheet_closed.html")
     return HttpResponse(question)
 
 

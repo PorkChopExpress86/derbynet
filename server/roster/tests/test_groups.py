@@ -2,7 +2,7 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from awards.models import Award, BallotAward
+from awards.models import Award, AwardPartition, BallotAward
 from awards.tests.factories import AwardFactory, BallotAwardFactory
 from core.models import RaceSettings
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round
@@ -553,3 +553,241 @@ def test_deleting_a_partition_keeps_its_groups_other_partitions(replay):
         assert Group.objects.filter(pk=wolves.pk).exists()
         groups.delete_partition(partition(replay, name))
     assert not Group.objects.filter(pk=wolves.pk).exists()
+
+
+# ----- rule_change_effects (D31, #43) ----------------------------------------
+
+
+def _scheduled_race(replay):
+    """Two dens by partition, a chart for Lions round 1, a second round,
+    a group award, a subgroup award, a pack award and a playlist step."""
+    with_dens(replay)
+    lions = Round.objects.get(group=group(replay, "Lions"))
+    for entry in lions.roster.all():
+        HeatLaneFactory(round=lions, racer=entry.racer)
+    Round.objects.create(event=replay.event, group=lions.group, number=2)
+    AwardFactory(event=replay.event, group=group(replay, "Lions"))
+    AwardFactory(event=replay.event, subgroup=Subgroup.objects.get(name="Tigers"))
+    AwardFactory(event=replay.event)
+    PlaylistEntryFactory(group=lions.group, round_number=1)
+
+
+def _rows(event):
+    return {
+        "rounds": set(Round.objects.filter(event=event).values_list("id", flat=True)),
+        "schedules": set(
+            HeatLane.objects.filter(event=event).values_list("round_id", flat=True)
+        ),
+        "group_awards": set(
+            Award.objects.filter(event=event)
+            .exclude(group__isnull=True, subgroup__isnull=True)
+            .values_list("id", flat=True)
+        ),
+        "playlist_steps": set(
+            PlaylistEntry.objects.filter(event=event).values_list("id", flat=True)
+        ),
+    }
+
+
+@pytest.mark.parametrize("rule", ["one-group", "by-partition"])
+def test_rule_change_effects_counts_the_rows_the_change_deletes(replay, rule):
+    _scheduled_race(replay)
+    if rule == "by-partition":
+        groups.form_groups_by_rule(replay.event, "custom")
+    before = _rows(replay.event)
+
+    effects = groups.rule_change_effects(replay.event, rule)
+    groups.form_groups_by_rule(replay.event, rule)
+
+    after = _rows(replay.event)
+    gone = {kind: before[kind] - after[kind] for kind in before}
+    assert effects == groups.RuleChangeEffects(
+        rounds=len(gone["rounds"]),
+        schedules=len(gone["schedules"]),
+        group_awards=len(gone["group_awards"]),
+        playlist_steps=len(gone["playlist_steps"]),
+    )
+    assert effects == groups.RuleChangeEffects(3, 1, 2, 1)
+    assert gone == before
+
+
+def test_rule_change_effects_is_nothing_for_the_rule_in_force_or_custom(replay):
+    _scheduled_race(replay)
+    assert groups.rule_change_effects(replay.event, "by-partition").deletes_nothing
+    assert groups.rule_change_effects(replay.event, "custom").deletes_nothing
+    assert not groups.rule_change_effects(replay.event, "one-group").deletes_nothing
+
+
+def test_rule_change_effects_refuses_an_unknown_rule(replay):
+    assert failure_of(groups.rule_change_effects, replay.event, "by-den") == (
+        Failure.BAD_RULE
+    )
+
+
+# ----- the group editor's services (#43) ---------------------------------------
+
+
+def _custom(replay):
+    with_dens(replay, dens=("Lions", "Tigers", "Parents"))
+    groups.form_groups_by_rule(replay.event, "one-group")
+    groups.form_groups_by_rule(replay.event, "custom")
+    return replay.event
+
+
+def _order(model, event):
+    return list(
+        model.objects.filter(event=event)
+        .order_by("sort_order", "id")
+        .values_list("name", flat=True)
+    )
+
+
+def test_reorder_groups_keeps_aggregates_after_the_groups(replay):
+    event = _custom(replay)
+    bears = groups.add_group(event, "Bears")
+    all_racers = group(replay, "All Racers")
+    groups.add_group(event, "Cats", constituents=[all_racers, bears])
+    dogs = groups.add_group(event, "Dogs", constituents=[all_racers, bears])
+    groups.reorder_groups(event, [bears.pk, all_racers.pk])
+    assert _order(Group, event) == ["Bears", "All Racers", "Cats", "Dogs"]
+    groups.reorder_groups(event, [dogs.pk])
+    assert _order(Group, event) == ["Bears", "All Racers", "Dogs", "Cats"]
+
+
+@pytest.mark.parametrize("mixed", [True, False])
+def test_reorder_groups_refuses_a_mix_or_an_unknown_group(replay, mixed):
+    event = _custom(replay)
+    bears = groups.add_group(event, "Bears")
+    cats = groups.add_group(
+        event, "Cats", constituents=[bears, group(replay, "All Racers")]
+    )
+    ids = [bears.pk, cats.pk] if mixed else [999999]
+    assert failure_of(groups.reorder_groups, event, ids) == Failure.BAD_ORDER
+
+
+def test_reorder_subgroups_refuses_subgroups_of_two_groups(replay):
+    event = _custom(replay)
+    bears = groups.add_group(event, "Bears")
+    lions = Subgroup.objects.get(event=event, name="Lions")
+    ids = [lions.pk, Subgroup.objects.get(group=bears).pk]
+    assert failure_of(groups.reorder_subgroups, event, ids) == Failure.BAD_ORDER
+    assert failure_of(groups.reorder_subgroups, event, []) == Failure.BAD_ORDER
+
+
+def test_reorder_subgroups_and_partitions(replay):
+    event = _custom(replay)
+    names = ["Parents", "Tigers", "Lions"]
+    groups.reorder_subgroups(
+        event, [Subgroup.objects.get(event=event, name=n).pk for n in names]
+    )
+    assert _order(Subgroup, event) == names
+    groups.reorder_partitions(event, [partition(replay, n).pk for n in names])
+    assert _order(Partition, event) == names
+    assert failure_of(groups.reorder_partitions, event, [999999]) == Failure.BAD_ORDER
+
+
+def test_move_subgroup_to_refuses_an_aggregate_or_an_unknown_group(replay):
+    event = _custom(replay)
+    bears = groups.add_group(event, "Bears")
+    cats = groups.add_group(
+        event, "Cats", constituents=[bears, group(replay, "All Racers")]
+    )
+    lions = Subgroup.objects.get(event=event, name="Lions")
+    for target in (cats.pk, 999999):
+        assert failure_of(groups.move_subgroup_to, event, lions.pk, target) == (
+            Failure.NOT_A_GROUP
+        )
+    groups.move_subgroup_to(event, lions.pk, bears.pk)
+    assert Subgroup.objects.get(pk=lions.pk).group == bears
+    groups.move_subgroup_to(event, lions.pk, None)
+    assert Subgroup.objects.get(pk=lions.pk).group.name == "Lions"
+
+
+def test_add_aggregate_needs_two_or_more(replay):
+    event = _custom(replay)
+    one = [Subgroup.objects.get(event=event, name="Lions").pk]
+    assert (
+        failure_of(groups.add_aggregate, event, "Cats", subgroup_ids=one)
+        == Failure.TOO_FEW
+    )
+    assert (
+        failure_of(groups.add_aggregate, event, "Cats", group_ids=[999999, 999998])
+        == Failure.TOO_FEW
+    )
+    assert not Group.objects.filter(event=event, name="Cats").exists()
+
+
+def test_add_aggregate_with_its_partition_list(replay):
+    event = _custom(replay)
+    ids = [Subgroup.objects.get(event=event, name=n).pk for n in ("Lions", "Tigers")]
+    cats = groups.add_aggregate(
+        event,
+        "Cats",
+        subgroup_ids=ids,
+        n_trophies=2,
+        award_partition_ids=[partition(replay, "Lions").pk],
+    )
+    assert cats.n_trophies == 2 and groups.is_aggregate(cats.pk)
+    assert set(
+        AwardPartition.objects.filter(group=cats).values_list(
+            "partition__name", flat=True
+        )
+    ) == {"Lions"}
+
+
+def test_add_aggregate_refuses_a_partition_it_does_not_draw_from(replay):
+    event = _custom(replay)
+    ids = [Subgroup.objects.get(event=event, name=n).pk for n in ("Lions", "Tigers")]
+    assert (
+        failure_of(
+            groups.add_aggregate,
+            event,
+            "Cats",
+            subgroup_ids=ids,
+            award_partition_ids=[partition(replay, "Parents").pk],
+        )
+        == Failure.BAD_PARTITIONS
+    )
+    assert not Group.objects.filter(event=event, name="Cats").exists()
+
+
+@pytest.mark.parametrize("kind", ["group", "subgroup"])
+def test_edit_saves_name_trophies_and_the_award_list(replay, kind):
+    _custom(replay)
+    lions = partition(replay, "Lions")
+    tigers = partition(replay, "Tigers")
+    groups.move_partition(tigers, GroupRef("rankid", lions.subgroup_id))
+    row = (
+        Subgroup.objects.get(pk=lions.subgroup_id)
+        if kind == "subgroup"
+        else group(replay, "All Racers")
+    )
+    edit = groups.edit_subgroup if kind == "subgroup" else groups.edit_group
+    edit(row, row.name, 4, [lions.pk])
+    row.refresh_from_db()
+    assert row.n_trophies == 4
+    unit = {kind: row}
+    assert set(
+        AwardPartition.objects.filter(**unit).values_list("partition__name", flat=True)
+    ) == {"Lions"}
+    edit(row, row.name, None, [])
+    row.refresh_from_db()
+    assert row.n_trophies is None
+    assert not AwardPartition.objects.filter(**unit).exists()
+
+
+@pytest.mark.parametrize("kind", ["group", "subgroup"])
+def test_a_failed_award_list_rolls_back_the_name_and_trophies(replay, kind):
+    event = _custom(replay)
+    row = (
+        Subgroup.objects.get(event=event, name="Lions")
+        if kind == "subgroup"
+        else group(replay, "All Racers")
+    )
+    edit = groups.edit_subgroup if kind == "subgroup" else groups.edit_group
+    before = (row.name, row.n_trophies)
+    with pytest.raises(GroupFailure) as caught:
+        edit(row, "Renamed", 5, [999999])
+    assert caught.value.code == Failure.BAD_PARTITIONS
+    row.refresh_from_db()
+    assert (row.name, row.n_trophies) == before

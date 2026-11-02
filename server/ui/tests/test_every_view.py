@@ -18,7 +18,8 @@ from django.test import Client
 from django.urls import URLPattern, URLResolver, get_resolver
 
 from core.models import RaceState
-from roster.models import Racer
+from roster.models import Partition, Racer
+from roster.services.car_numbers import add_range
 from ui.tests.db import no_db_writes
 from ui.tests.race import race_setup, scheduled
 from ui.tests.roles import PASSWORDS
@@ -76,10 +77,16 @@ def fill(route: str, ids: dict[str, int], word: str) -> str:
 def race(event):
     wolves = race_setup(event)["Wolves"]
     scheduled(wolves)
+    partition = Partition.objects.filter(event=event).first()
+    car_range = add_range(partition, 100, 199)
     return {
         "round_id": wolves.pk,
         "racer_id": Racer.objects.filter(event=event).first().pk,
         "lane": 1,
+        "group_id": wolves.group_id,
+        "subgroup_id": partition.subgroup_id,
+        "partition_id": partition.pk,
+        "range_id": car_range.pk,
     }
 
 

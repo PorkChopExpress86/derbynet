@@ -58,3 +58,31 @@ def service_error(request, message: str):
 def refused(request, failure) -> HttpResponse:
     """A service's failure, as an error toast with HTTP 422."""
     return service_error(request, getattr(failure, "description", str(failure)))
+
+
+# ----- a page's one sheet (#42, #43) -----
+#
+# A page keeps one sheet whose body, `#<body_id>`, a control loads. A
+# control inside the sheet sends its request there, so its reply is the
+# sheet's next body; a control on the page sends its request to #toasts, so
+# the sheet's body goes out of band.
+
+
+def in_sheet(request, body_id: str) -> bool:
+    """The request came from a control inside the sheet."""
+    return request.headers.get("HX-Target") == body_id
+
+
+def into_sheet(request, body_id: str, html: str) -> str:
+    """`html` as the sheet's next body: the reply itself for a control in
+    the sheet, out of band for a control on the page."""
+    if in_sheet(request, body_id):
+        return html
+    return f'<div id="{body_id}" hx-swap-oob="innerHTML">{html}</div>'
+
+
+def closing_sheet(request, body_id: str, message: str) -> str:
+    """Close the sheet, and say what happened in a toast."""
+    closed = render_to_string("ui/components/sheet_closed.html", {}, request)
+    toast = toast_html(request, message, oob=in_sheet(request, body_id))
+    return into_sheet(request, body_id, closed) + toast

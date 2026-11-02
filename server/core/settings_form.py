@@ -14,11 +14,13 @@ from enum import Enum
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
 from core import race_settings
-from core.models import Event
+from core.models import Event, RaceSettings
 from core.services import lock_race_state
 from racing.models import HeatLane
+from roster.models import Group, GroupConstituent, GroupConstituentSubgroup
 
 
 class Kind(Enum):
@@ -190,3 +192,52 @@ def apply_form(event: Event, post: Mapping) -> FormResult:
 
 def _not_written(setting: str) -> tuple[str, str]:
     return ("not-written", f"Value for {setting} could not be written.")
+
+
+class PackStandingsRefused(Exception):
+    """The pack standings choice the group editor cannot store (#43)."""
+
+
+def _pack_trophies(event: Event) -> bool:
+    return (RaceSettings.objects.get(event=event).n_pack_trophies or 0) > 0
+
+
+@transaction.atomic
+def apply_group_form(event: Event, post: Mapping) -> FormResult:
+    """A field of the racing groups editor (#43): `apply_form`, and a pack
+    trophy count above zero turns "Don't calculate" pack standings back to
+    "Calculate normally", as `racing-groups.js` does, since pack trophies
+    need the pack standings. `set_pack_standings` holds the other half of
+    that rule."""
+    result = apply_form(event, post)
+    if (
+        result.failure is None
+        and "n-pack-trophies" in post
+        and _pack_trophies(event)
+        and race_settings.read(event, "full-field-calc") == "-1"
+    ):
+        race_settings.write(event, "full-field-calc", "0")
+    return result
+
+
+@transaction.atomic
+def set_pack_standings(event: Event, value: str) -> None:
+    """The group editor's pack standings choice (`award.calc-rule`): `0`
+    calculate normally, `-1` don't calculate, or an aggregate's id to use
+    its standings. "Don't calculate" is refused while pack trophies exist,
+    which need the pack standings (`racing-groups.js`), and anything but an
+    aggregate of the event is refused."""
+    lock_race_state(event.pk)
+    if value == "-1" and _pack_trophies(event):
+        raise PackStandingsRefused("Pack trophies need the pack standings.")
+    if value not in ("0", "-1"):
+        aggregates = Group.objects.filter(event=event).filter(
+            Q(pk__in=GroupConstituent.objects.values("aggregate_id"))
+            | Q(pk__in=GroupConstituentSubgroup.objects.values("aggregate_id"))
+        )
+        if not value.isdigit() or not aggregates.filter(pk=int(value)).exists():
+            raise PackStandingsRefused("Pick how to calculate the standings.")
+    try:
+        race_settings.write(event, "full-field-calc", value)
+    except race_settings.NotWritten:
+        raise PackStandingsRefused("Pick how to calculate the standings.") from None

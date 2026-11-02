@@ -1,0 +1,8 @@
+{# The trophy count select of PHP's dialogs: Default, then 0 to 10. Pass id, value. #}
+<div>
+  <label for="{{ id }}" class="mb-1 block text-sm font-medium">Speed trophies</label>
+  <select id="{{ id }}" name="ntrophies" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    <option value="-1"{% if value == "-1" or not value %} selected{% endif %}>Default</option>
+    {% for n in trophy_choices %}<option value="{{ n }}"{% if value == n|stringformat:"s" %} selected{% endif %}>{{ n }}</option>{% endfor %}
+  </select>
+</div>

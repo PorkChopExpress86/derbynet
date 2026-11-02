@@ -326,7 +326,7 @@ def test_the_partition_field_lists_exactly_the_partitions(login, event):
     expect(field.locator("option")).to_have_text(names)
     assert sheet(page).locator('input[name="partitionid"]').count() == 0
     expect(sheet(page).get_by_role("link", name="Edit partitions")).to_have_attribute(
-        "href", "/groups/"
+        "href", "/groups/partitions/"
     )
     sheet(page).get_by_role("button", name="Cancel").click()
 

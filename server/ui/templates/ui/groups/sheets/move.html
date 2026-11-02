@@ -1,0 +1,10 @@
+{# "Move to…" (rank.move): the other groups and a new group, so a subgroup changes group with a tap, never a drag. #}
+<div x-data x-init="groups.show('Move {{ subgroup.name|escapejs }} to…')" data-move-sheet="{{ subgroup.pk }}">
+  <ul role="list" class="flex flex-col gap-2">
+    {% for g in targets %}
+    <li><button type="button" hx-post="{% url 'groups-subgroup-move' subgroup.pk %}" hx-vals='{"group": "{{ g.id }}"}' hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="closest ul:drop" data-target-group="{{ g.id }}" class="flex min-h-12 w-full items-center justify-between rounded-xl border border-line px-4 text-left font-medium">{{ g.name }}{% include "ui/components/icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</button></li>
+    {% endfor %}
+    <li><button type="button" hx-post="{% url 'groups-subgroup-move' subgroup.pk %}" hx-vals='{"group": "{{ new_group }}"}' hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="closest ul:drop" data-target-group="new" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-dashed border-line px-4 text-left font-medium">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}New group</button></li>
+  </ul>
+  <button type="button" @click="$store.ui.close()" class="mt-4 min-h-12 w-full rounded-xl border border-line px-4 font-semibold">Cancel</button>
+</div>

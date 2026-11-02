@@ -229,3 +229,36 @@ def test_a_rule_change_keeps_the_packs_list_and_drops_the_groups(event, den):
     groups.form_groups_by_rule(event, "one-group")
     assert named(partition_list(event)) == ["Lions", "Tigers"]
     assert not AwardPartition.objects.filter(event=event, group__isnull=False).exists()
+
+
+# ----- the editor's readers and writers (#43) --------------------------------
+
+
+def test_partition_choice_offers_what_the_unit_draws_from_and_its_narrowing(event):
+    from awards.services import partition_choice
+
+    pack = partition_choice(event)
+    assert named(pack.offered) == ["Lions", "Tigers", "Parents"]
+    assert pack.narrowed is None and pack.chosen(partition(event, "Parents").pk)
+
+    set_partition_list(event, [partition(event, "Lions")])
+    pack = partition_choice(event)
+    assert pack.narrowed == {partition(event, "Lions").pk}
+    assert not pack.chosen(partition(event, "Tigers").pk)
+
+    lions = Subgroup.objects.get(event=event, name="Lions")
+    assert named(partition_choice(event, subgroup=lions).offered) == ["Lions"]
+
+
+def test_set_partition_list_by_id_resolves_and_checks_under_the_lock(event):
+    from awards.services import set_partition_list_by_id
+
+    lions = Subgroup.objects.get(event=event, name="Lions")
+    with pytest.raises(ValueError):
+        set_partition_list_by_id(event, [partition(event, "Tigers").pk], subgroup=lions)
+    with pytest.raises(ValueError):
+        set_partition_list_by_id(event, [999999])
+    set_partition_list_by_id(event, [partition(event, "Lions").pk])
+    assert named(partition_list(event)) == ["Lions"]
+    set_partition_list_by_id(event, [])
+    assert not AwardPartition.objects.filter(event=event).exists()

@@ -1,0 +1,31 @@
+{% load static %}{# The partitions sheet (partitions-modal.js): add, rename, delete and reorder, and each partition's car number ranges (D48). Check-in's "Edit partitions" opens it by its own URL. #}
+<div x-data x-init="groups.show('{{ tree.partitions_label|escapejs }}')" data-partitions-sheet>
+  {% include "ui/groups/notice.html" %}
+  {% if tree.partitions %}
+  <div x-data="uiSortable('{% url 'groups-order-partitions' %}', 'order')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" data-handle-selector='[data-handle="partition"]'>
+    <ul role="list" aria-label="{{ tree.partitions_label }}" x-ref="list" class="flex flex-col gap-2" data-partitions-list>
+      {% for p in tree.partitions %}
+      <li data-id="{{ p.id }}" data-label="{{ p.name }}" data-partition-row="{{ p.id }}" x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="relative flex min-h-14 items-center gap-1 rounded-xl border border-line bg-surface pr-1">
+        <button type="button" data-handle="partition" aria-label="Drag to reorder {{ p.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>
+        <button type="button" hx-get="{% url 'groups-partition' p.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" data-edit-partition class="min-h-11 min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline">{{ p.name }} <span class="text-sm text-ink-muted">({{ p.count }})</span></button>
+        <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ p.name }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
+        <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
+          <button type="button" role="menuitem" @click="menu = false; move($root, -1)" class="min-h-11 px-4 text-left">Move up</button>
+          <button type="button" role="menuitem" @click="menu = false; move($root, 1)" class="min-h-11 px-4 text-left">Move down</button>
+          <button type="button" role="menuitem" hx-get="{% url 'groups-partition' p.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" class="min-h-11 px-4 text-left">Rename</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="sr-only" aria-live="polite" x-text="status"></p>
+  </div>
+  {% endif %}
+  <form hx-post="{% url 'groups-partition-add' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="mt-4 flex items-end gap-2" data-add-partition>
+    <div class="min-w-0 flex-1">
+      <label for="pa-name" class="mb-1 block text-sm font-medium">New {{ tree.labels.partition|lower }}</label>
+      <input id="pa-name" name="name" value="{{ values.name|default:'' }}" autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    <button type="submit" class="min-h-12 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Add</button>
+  </form>
+  <button type="button" @click="$store.ui.close()" class="mt-4 min-h-12 w-full rounded-xl border border-line px-4 font-semibold">Done</button>
+</div>

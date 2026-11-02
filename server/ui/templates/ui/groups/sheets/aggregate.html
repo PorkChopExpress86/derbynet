@@ -1,0 +1,52 @@
+{# A new aggregate (class.add with constituents): name, trophy count, two or more groups, or with aggregate-by on, two or more subgroups (racing-groups-add.js), and the speed-award partition list beside the trophy count (D35), which offers the partitions of the constituents picked so far (D38). #}
+<div x-data="{ by: '{{ values.by|default:'group' }}', pickedGroups: [{% if values.by == 'group' %}{% for i in values.picked %}'{{ i }}',{% endfor %}{% endif %}], pickedSubgroups: [{% if values.by == 'subgroup' %}{% for i in values.picked %}'{{ i }}',{% endfor %}{% endif %}] }" x-init="groups.show('New aggregate')" data-aggregate-sheet>
+  {% include "ui/groups/notice.html" %}
+  <form hx-post="{% url 'groups-aggregate-new' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-sync="this:drop" class="flex flex-col gap-3">
+    <div>
+      <label for="ag-name" class="mb-1 block text-sm font-medium">Aggregate name</label>
+      <input id="ag-name" name="name" value="{{ values.name|default:'' }}" data-autofocus autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    {% include "ui/groups/trophies.html" with id="ag-trophies" value=values.ntrophies %}
+    {% if tree.partitions|length > 1 %}
+    <fieldset x-data="{ some: {% if values.scope == 'some' %}true{% else %}false{% endif %} }" data-partition-list="ag" class="rounded-xl border border-line p-3">
+      <legend class="px-1 text-sm font-medium">Speed awards go to</legend>
+      <div class="flex flex-col gap-1">
+        <label class="flex min-h-11 items-center gap-2"><input type="radio" id="ag-all" name="scope" value="all" @change="some = false"{% if values.scope != "some" %} checked{% endif %} class="size-5 accent-accent">All {{ tree.partitions_label|lower }}</label>
+        <label class="flex min-h-11 items-center gap-2"><input type="radio" id="ag-some" name="scope" value="some" @change="some = true"{% if values.scope == "some" %} checked{% endif %} class="size-5 accent-accent">Only these</label>
+      </div>
+      <div x-show="some" {% if values.scope != "some" %}x-cloak{% endif %} class="mt-1 grid grid-cols-2 gap-1 pl-7">
+        {% for p in tree.partitions %}
+        <label x-show="by === 'group' ? pickedGroups.includes('{{ p.group_id }}') : pickedSubgroups.includes('{{ p.subgroup_id }}')" class="flex min-h-11 items-center gap-2"><input type="checkbox" id="ag-p{{ p.id }}" name="partition" value="{{ p.id }}" :disabled="!(by === 'group' ? pickedGroups.includes('{{ p.group_id }}') : pickedSubgroups.includes('{{ p.subgroup_id }}'))"{% if values.scope != "some" or p.id in values.partitions %} checked{% endif %} class="size-5 accent-accent">{{ p.name }}</label>
+        {% endfor %}
+        <p x-show="!(by === 'group' ? pickedGroups : pickedSubgroups).length" class="col-span-2 text-sm text-ink-muted">Pick the {% if tree.settings.use_subgroups %}groups or subgroups{% else %}groups{% endif %} first.</p>
+      </div>
+    </fieldset>
+    {% endif %}
+    {% if tree.settings.use_subgroups %}
+    <fieldset>
+      <legend class="mb-1 text-sm font-medium">Aggregate by</legend>
+      <div class="flex rounded-xl border border-field bg-surface p-1">
+        <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink"><input type="radio" class="sr-only" name="by" value="group" x-model="by">{{ tree.labels.group }}</label>
+        <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink"><input type="radio" class="sr-only" name="by" value="subgroup" x-model="by">{{ tree.labels.subgroup }}</label>
+      </div>
+    </fieldset>
+    {% else %}<input type="hidden" name="by" value="group">{% endif %}
+    <fieldset x-show="by === 'group'" data-constituents="group">
+      <legend class="mb-1 text-sm font-medium">From these {{ tree.labels.group|lower }}s</legend>
+      <div class="grid grid-cols-2 gap-1">
+        {% for g in tree.groups %}<label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="group" value="{{ g.id }}" x-model="pickedGroups" class="size-5 accent-accent">{{ g.name }}</label>{% endfor %}
+        {% for a in tree.aggregates %}<label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="group" value="{{ a.id }}" x-model="pickedGroups" class="size-5 accent-accent">{{ a.name }}</label>{% endfor %}
+      </div>
+    </fieldset>
+    <fieldset x-show="by === 'subgroup'" x-cloak data-constituents="subgroup">
+      <legend class="mb-1 text-sm font-medium">From these {{ tree.labels.subgroup|lower }}s</legend>
+      <div class="grid grid-cols-2 gap-1">
+        {% for g in tree.groups %}{% for s in g.subgroups %}<label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="subgroup" value="{{ s.id }}" x-model="pickedSubgroups" class="size-5 accent-accent">{{ s.name }}</label>{% endfor %}{% endfor %}
+      </div>
+    </fieldset>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Add aggregate</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

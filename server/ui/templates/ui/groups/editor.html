@@ -1,0 +1,161 @@
+{% load static ui %}{# The racing groups editor (#43): the formation rule, the labels and trophy counts, the group tree and the aggregates. Every change answers with this template again, out of band into #groups-editor, so each field keeps its id for htmx to put the focus back. #}
+<div class="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
+<div class="flex flex-col gap-4">
+
+<section aria-labelledby="g-rule-h" class="rounded-2xl border border-line bg-surface p-4" data-section="rule">
+  <h2 id="g-rule-h" class="text-lg font-semibold">How racers are grouped</h2>
+  {# A change opens the confirm sheet, which names what a real change deletes (D31). Picking the rule in force fires no change, so it sends nothing. Closing the sheet puts the choice back. #}
+  <fieldset x-data="groupsRule('{{ tree.rule|escapejs }}')" hx-get="{% url 'groups-rule' %}" hx-trigger="change" hx-target="#groups-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:replace" @change="groups.open('Change how racers are grouped?')" data-rule="{{ tree.rule }}" class="mt-3">
+    <legend class="sr-only">Group formation rule</legend>
+    <div class="flex rounded-xl border border-field bg-surface p-1">
+      {% for value, label in tree.rule_choices %}
+      <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-lg px-2 text-center text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent">
+        <input type="radio" class="sr-only" id="g-rule-{{ value }}" name="rule" value="{{ value }}"{% if value == tree.rule %} checked{% endif %}>{{ label }}
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <p class="mt-2 text-sm text-ink-muted" data-rule-help>{% if tree.by_partition %}Each {{ tree.labels.partition|lower }} races as its own group.{% elif tree.rule == "one-group" %}Everyone races as one group, with each {{ tree.labels.partition|lower }} as a subgroup.{% else %}You make the groups and move subgroups between them.{% endif %}</p>
+</section>
+
+<section aria-labelledby="g-labels-h" class="rounded-2xl border border-line bg-surface p-4" data-section="labels">
+  <h2 id="g-labels-h" class="text-lg font-semibold">Labels</h2>
+  <div class="mt-3 flex items-center justify-between gap-3">
+    <span id="g-subgroups-l" class="font-medium">Use subgroups</span>
+    {% url 'groups-setting' as setting_url %}{% include "ui/components/switch.html" with checked=tree.settings.use_subgroups url=setting_url name="do-use-subgroups" labelledby="g-subgroups-l" %}
+  </div>
+  <div class="mt-3 grid grid-cols-2 gap-3">
+    <div>
+      <label for="g-supergroup" class="mb-1 block text-sm font-medium">The whole roster is a</label>
+      <input id="g-supergroup" name="supergroup-label" value="{{ tree.settings.supergroup_label }}" autocomplete="off" hx-post="{% url 'groups-setting' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:queue last" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    <div>
+      <label for="g-partition" class="mb-1 block text-sm font-medium">A sub-division is a</label>
+      <input id="g-partition" name="partition-label" value="{{ tree.settings.partition_label }}" autocomplete="off" hx-post="{% url 'groups-setting' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:queue last" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="g-awards-h" class="rounded-2xl border border-line bg-surface p-4" data-section="awards">
+  <h2 id="g-awards-h" class="text-lg font-semibold">Speed trophies</h2>
+  <div class="mt-3 flex flex-col gap-4">
+    <div class="flex flex-col gap-3" data-unit="pack">
+      {% with tree.labels.supergroup|add:" trophies" as pack_label %}
+      <div hx-post="{% url 'groups-setting' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:queue last">{% include "ui/components/stepper.html" with id="g-n-pack" name="n-pack-trophies" label=pack_label value=tree.settings.n_pack_trophies min=0 max=tree.max_default_trophies %}</div>
+      {% endwith %}
+      <div hx-post="{% url 'groups-pack-awards' %}" hx-trigger="change[target.name==='partition'||target.value==='all']" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:queue last">
+        {% include "ui/groups/award_partitions.html" with choice=tree.pack key="pack" plural=tree.partitions_label|lower %}
+      </div>
+      <fieldset hx-post="{% url 'groups-calc-rule' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:queue last" data-calc="{{ tree.calc }}">
+        <legend class="mb-1 text-sm font-medium">{{ tree.labels.supergroup }} standings</legend>
+        {% for value, label in tree.calc_choices %}
+        <label class="flex min-h-11 items-center gap-2{% if value == '-1' and tree.pack_trophies %} text-ink-muted{% endif %}"><input type="radio" id="g-calc-{{ value }}" name="full-field-calc" value="{{ value }}"{% if value == tree.calc %} checked{% endif %}{% if value == '-1' and tree.pack_trophies %} disabled{% endif %} class="size-5 accent-accent">{{ label }}{% if value == '-1' and tree.pack_trophies %} <span class="text-xs">(needed for {{ tree.labels.supergroup }} trophies)</span>{% endif %}</label>
+        {% endfor %}
+      </fieldset>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      {% with tree.labels.group|lower as group_word %}{% with "Per "|add:group_word as group_label %}
+      <div hx-post="{% url 'groups-setting' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:queue last">{% include "ui/components/stepper.html" with id="g-n-den" name="n-den-trophies" label=group_label value=tree.settings.n_den_trophies min=0 max=tree.max_default_trophies %}</div>
+      {% endwith %}{% endwith %}
+      {% with tree.labels.subgroup|lower as subgroup_word %}{% with "Per "|add:subgroup_word as subgroup_label %}
+      <div hx-post="{% url 'groups-setting' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:queue last">{% include "ui/components/stepper.html" with id="g-n-rank" name="n-rank-trophies" label=subgroup_label value=tree.settings.n_rank_trophies min=0 max=tree.max_default_trophies %}</div>
+      {% endwith %}{% endwith %}
+    </div>
+  </div>
+</section>
+</div>
+
+<div class="flex flex-col gap-4">
+<section aria-labelledby="g-tree-h" class="rounded-2xl border border-line bg-surface p-4" data-section="tree">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 id="g-tree-h" class="text-lg font-semibold">{% if tree.by_partition %}{{ tree.partitions_label }}{% else %}Groups{% endif %}</h2>
+    <div class="flex flex-wrap gap-2">
+      {% if tree.custom %}<button type="button" hx-get="{% url 'groups-group-new' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="groups.open('New group', $event)" aria-haspopup="dialog" data-action="new-group" class="flex min-h-11 items-center gap-1 rounded-xl border border-line px-3 font-semibold">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}Group</button>{% endif %}
+      <button type="button" hx-get="{% url 'groups-partitions' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="groups.open('{{ tree.partitions_label|escapejs }}', $event)" aria-haspopup="dialog" data-action="partitions" class="flex min-h-11 items-center gap-1 rounded-xl bg-accent px-3 font-semibold text-accent-ink">{{ tree.partitions_label }}</button>
+    </div>
+  </div>
+  <p class="mt-1 text-sm text-ink-muted">Tap a name to edit it. Drag a handle, or use a row's menu, to reorder.</p>
+  {% if tree.groups %}
+  <div x-data="uiSortable('{% url 'groups-order-groups' %}', 'order')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" data-handle-selector='[data-handle="group"]' class="mt-3">
+    <ul role="list" aria-label="Groups" x-ref="list" class="flex flex-col gap-3" data-groups-list>
+      {% for g in tree.groups %}
+      <li data-id="{{ g.id }}" data-label="{{ g.name }}" data-group="{{ g.id }}" x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="rounded-xl border border-line bg-bg">
+        <div class="relative flex min-h-14 items-center gap-1 pr-1">
+          {% if tree.groups|length > 1 %}<button type="button" data-handle="group" aria-label="Drag to reorder {{ g.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>{% else %}<span class="w-3"></span>{% endif %}
+          <button type="button" hx-get="{% url 'groups-group' g.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="groups.open('Edit {{ g.name|escapejs }}', $event)" aria-haspopup="dialog" data-edit-group class="min-h-11 min-w-0 flex-1 truncate text-left font-semibold underline-offset-2 hover:underline">{{ g.name }}</button>
+          <span class="shrink-0 text-sm text-ink-muted" data-count>{{ g.count }} racer{{ g.count|pluralize }}</span>
+          <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ tree.labels.group|lower }} {{ g.name }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
+          <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
+            <button type="button" role="menuitem" @click="menu = false; move($root, -1)" class="min-h-11 px-4 text-left">Move up</button>
+            <button type="button" role="menuitem" @click="menu = false; move($root, 1)" class="min-h-11 px-4 text-left">Move down</button>
+            <button type="button" role="menuitem" hx-get="{% url 'groups-group' g.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="menu = false; groups.open('Edit {{ g.name|escapejs }}', $event)" class="min-h-11 px-4 text-left">Edit</button>
+          </div>
+        </div>
+        {% if not tree.by_partition %}
+        <div x-data="uiSortable('{% url 'groups-order-subgroups' %}', 'order')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" data-handle-selector='[data-handle="subgroup"]' class="px-2 pb-2">
+          <ul role="list" aria-label="Subgroups of {{ g.name }}" x-ref="list" class="flex flex-col gap-2" data-subgroups-of="{{ g.id }}">
+            {% for s in g.subgroups %}
+            <li data-id="{{ s.id }}" data-label="{{ s.name }}" data-subgroup="{{ s.id }}" x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="relative rounded-xl border border-line bg-surface">
+              <div class="flex min-h-12 items-center gap-1 pr-1">
+                {% if g.subgroups|length > 1 %}<button type="button" data-handle="subgroup" aria-label="Drag to reorder {{ s.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>{% else %}<span class="w-3"></span>{% endif %}
+                <button type="button" hx-get="{% url 'groups-subgroup' s.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="groups.open('Edit {{ s.name|escapejs }}', $event)" aria-haspopup="dialog" data-edit-subgroup class="min-h-11 min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline">{{ s.name }}</button>
+                <span class="shrink-0 text-sm text-ink-muted" data-count>{{ s.count }}</span>
+                <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ tree.labels.subgroup|lower }} {{ s.name }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
+              </div>
+              <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
+                <button type="button" role="menuitem" @click="menu = false; move($root, -1)" class="min-h-11 px-4 text-left">Move up</button>
+                <button type="button" role="menuitem" @click="menu = false; move($root, 1)" class="min-h-11 px-4 text-left">Move down</button>
+                {% if tree.custom %}<button type="button" role="menuitem" hx-get="{% url 'groups-subgroup-move' s.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="menu = false; groups.open('Move {{ s.name|escapejs }} to…', $event)" data-move-to class="min-h-11 px-4 text-left">Move to…</button>{% endif %}
+                <button type="button" role="menuitem" hx-get="{% url 'groups-subgroup' s.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="menu = false; groups.open('Edit {{ s.name|escapejs }}', $event)" class="min-h-11 px-4 text-left">Edit</button>
+              </div>
+              {% if tree.show_partitions and s.partitions %}
+              <ul role="list" aria-label="{{ tree.partitions_label }} in {{ s.name }}" class="flex flex-wrap gap-1 px-3 pb-2" data-partitions-of="{{ s.id }}">
+                {% for p in s.partitions %}<li><button type="button" hx-get="{% url 'groups-partition' p.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="groups.open('Edit {{ p.name|escapejs }}', $event)" aria-haspopup="dialog" data-partition="{{ p.id }}" class="min-h-9 rounded-full bg-surface-2 px-3 text-sm">{{ p.name }} <span class="text-ink-muted">({{ p.count }})</span></button></li>{% endfor %}
+              </ul>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          <p class="sr-only" aria-live="polite" x-text="status"></p>
+        </div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="sr-only" aria-live="polite" x-text="status"></p>
+  </div>
+  {% else %}
+  <p class="mt-3 rounded-xl border border-line p-6 text-center text-ink-muted" data-empty>No groups yet. Add a {{ tree.labels.partition|lower }} to start.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="g-agg-h" class="rounded-2xl border border-line bg-surface p-4" data-section="aggregates">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 id="g-agg-h" class="text-lg font-semibold">Aggregates</h2>
+    <button type="button" hx-get="{% url 'groups-aggregate-new' %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="groups.open('New aggregate', $event)" aria-haspopup="dialog" data-action="new-aggregate" class="flex min-h-11 items-center gap-1 rounded-xl border border-line px-3 font-semibold">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}Aggregate</button>
+  </div>
+  <p class="mt-1 text-sm text-ink-muted">An aggregate ranks racers from several groups or subgroups together, for awards. It has no rounds of its own.</p>
+  {% if tree.aggregates %}
+  <div x-data="uiSortable('{% url 'groups-order-groups' %}', 'order')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" data-handle-selector='[data-handle="aggregate"]' class="mt-3">
+    <ul role="list" aria-label="Aggregates" x-ref="list" class="flex flex-col gap-2" data-aggregates-list>
+      {% for a in tree.aggregates %}
+      <li data-id="{{ a.id }}" data-label="{{ a.name }}" data-aggregate="{{ a.id }}" x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="relative flex min-h-14 items-center gap-1 rounded-xl border border-line bg-bg pr-1">
+        {% if tree.aggregates|length > 1 %}<button type="button" data-handle="aggregate" aria-label="Drag to reorder {{ a.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>{% else %}<span class="w-3"></span>{% endif %}
+        <div class="min-w-0 flex-1 py-2">
+          <button type="button" hx-get="{% url 'groups-group' a.id %}" hx-target="#groups-sheet-body" hx-swap="innerHTML" @click="groups.open('Edit {{ a.name|escapejs }}', $event)" aria-haspopup="dialog" data-edit-group class="block max-w-full truncate text-left font-semibold underline-offset-2 hover:underline">{{ a.name }}</button>
+          <p class="truncate text-sm text-ink-muted" data-constituents>{{ a.constituents|join:", " }}</p>
+        </div>
+        <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ a.name }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
+        <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
+          <button type="button" role="menuitem" @click="menu = false; move($root, -1)" class="min-h-11 px-4 text-left">Move up</button>
+          <button type="button" role="menuitem" @click="menu = false; move($root, 1)" class="min-h-11 px-4 text-left">Move down</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="sr-only" aria-live="polite" x-text="status"></p>
+  </div>
+  {% endif %}
+</section>
+</div>
+</div>
