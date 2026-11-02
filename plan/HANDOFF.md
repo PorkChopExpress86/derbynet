@@ -21,7 +21,7 @@ The shell suites in `testing/` run against Django one by one as their endpoints 
 - `.githooks/pre-push` runs the `server` workflow's lint checks in about 5 seconds before a push that changes `server/`.
 - `plan/lint-issues.py` lints every plan issue body live from GitHub, and checks issue state against merged PRs and dependencies.
 - `plan/bin/pr-wait` and `plan/bin/pr-merge` wait for checks and merge only the head that passed.
-- `.claude/skills/verify/` is a project skill that launches an isolated DerbyNet on port 8090 and drives it with the Playwright MCP.
+- `.claude/skills/verify/` is a project skill that launches an isolated PHP or Django server on port 8090 and drives it with the Playwright MCP.
 
 ## Open questions for the owner
 
