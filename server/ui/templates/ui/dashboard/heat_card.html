@@ -7,7 +7,7 @@
         <p class="text-sm text-ink-muted"><span data-heat-text>{{ heat.heat_text }}</span>{% if heat.master_text %}<span class="sr-only">, </span><span class="block text-xs" data-master-text>{{ heat.master_text }}</span>{% endif %}</p>
       </div>
       <span id="racing-label" class="pt-2.5 text-sm font-medium">{% if heat.racing %}Racing{% else %}Not racing{% endif %}</span>
-      {% url 'dashboard-racing' as racing_url %}{% include "ui/components/switch.html" with labelledby="racing-label" checked=heat.racing name="now_racing" url=racing_url %}
+      {% url 'dashboard-racing' as racing_url %}{% include "ui/components/switch.html" with labelledby="racing-label" checked=heat.racing name="now_racing" url=racing_url include="#shown-heat" sync="#live:replace" %}
     </div>
 
     {% if heat.holding %}
@@ -41,9 +41,9 @@
 
     {# The large heat buttons stay on screen while the page scrolls. #}
     <div class="mt-2 grid grid-cols-3 gap-2">
-      <button type="button" hx-post="{% url 'dashboard-heat' 'prev' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="prev" class="flex min-h-12 items-center justify-center gap-1 rounded-lg border border-line px-2 text-sm font-medium">{% include "ui/components/icon.html" with name="back" cls="size-5" %}Previous</button>
-      <button type="button" {% if not heat.in_round %}disabled{% endif %} hx-get="{% url 'dashboard-results-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-sync="#live:replace" @click="dashboard.open('Manual results', $event)" aria-haspopup="dialog" data-action="manual-results" class="min-h-12 rounded-lg border border-line px-2 text-sm font-medium disabled:opacity-40">Manual results</button>
-      <button type="button" hx-post="{% url 'dashboard-heat' 'next' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="next" class="flex min-h-12 items-center justify-center gap-1 rounded-lg bg-accent px-2 text-sm font-semibold text-accent-ink">{% if heat.emptied %}Skip heat{% else %}Next heat{% endif %}{% include "ui/components/icon.html" with name="chevron" cls="size-5" %}</button>
+      <button type="button" hx-post="{% url 'dashboard-heat' 'prev' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="#shown-heat" hx-sync="#live:replace" data-action="prev" class="flex min-h-12 items-center justify-center gap-1 rounded-lg border border-line px-2 text-sm font-medium">{% include "ui/components/icon.html" with name="back" cls="size-5" %}Previous</button>
+      <button type="button" {% if not heat.in_round %}disabled{% endif %} hx-get="{% url 'dashboard-results-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-include="#shown-heat" hx-sync="#live:replace" @click="dashboard.open('Manual results', $event)" aria-haspopup="dialog" data-action="manual-results" class="min-h-12 rounded-lg border border-line px-2 text-sm font-medium disabled:opacity-40">Manual results</button>
+      <button type="button" hx-post="{% url 'dashboard-heat' 'next' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="#shown-heat" hx-sync="#live:replace" data-action="next" class="flex min-h-12 items-center justify-center gap-1 rounded-lg bg-accent px-2 text-sm font-semibold text-accent-ink">{% if heat.emptied %}Skip heat{% else %}Next heat{% endif %}{% include "ui/components/icon.html" with name="chevron" cls="size-5" %}</button>
     </div>
   </div>
 </section>

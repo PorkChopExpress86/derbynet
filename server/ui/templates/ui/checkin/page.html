@@ -32,7 +32,7 @@
     {% if can_qr %}<button type="button" hx-get="{% url 'checkin-qr' %}" hx-target="#checkin-sheet-body" @click="checkin.open('Check in on another phone', $event)" aria-haspopup="dialog" data-action="qr" class="min-h-11 rounded-xl border border-line bg-surface px-4 font-semibold">Phone QR</button>{% endif %}
   </div>
   {# The polled card list (#39 pattern 2). It sends the filter bar and the signature of what it shows; the server answers 204 while nothing changed. A mutation's reply triggers checkin-refresh, which fetches it at once. Requests queue rather than abort, so no reply is lost. #}
-  <section id="checkin-list" aria-label="Racers" hx-get="{% url 'checkin-list' %}" hx-trigger="every {{ poll_seconds }}s [derbynet.pollable(this)], checkin-refresh from:body" hx-include="#checkin-filters, #checkin-sig" hx-swap="innerHTML" hx-sync="this:queue last" hx-disinherit="*">
+  <section id="checkin-list" aria-label="Racers" hx-get="{% url 'checkin-list' %}" hx-trigger="every {{ poll_seconds }}s [derbynet.pollable(this)], checkin-refresh from:body" hx-include="#checkin-filters, #checkin-sig" hx-swap="innerHTML" hx-sync="this:queue last">
   {% include "ui/checkin/list.html" %}
   </section>
 </div>

@@ -12,8 +12,9 @@ Reads every issue labeled django-migration, then checks each body for:
   "## Still open" section names what is left
 - ready-for-agent on an open ticket with an open dependency that has no
   "## Still open" section
-- blocked on an open ticket whose dependencies are all closed, unless a
-  "## Waiting on" section names what it waits on
+- blocked on an open ticket whose dependencies are all closed or have a
+  "## Still open" section, unless a "## Waiting on" section names what it
+  waits on
 
 --file N=PATH lints a local draft in place of issue N's live body, so an edit can be
 checked before `gh issue edit N --body-file PATH`. Exits 1 on any finding.
@@ -267,7 +268,8 @@ for n, issue in sorted(issues.items()):
                         + ', '.join(f'#{d}' for d in open_deps))
     if ('blocked' in labels and not open_deps
             and not has_section(issue, WAITING_ON) and not has_section(issue, STILL_OPEN)):
-        findings.append(f'#{n}: blocked, but every dependency is closed; drop the label, or add a '
+        findings.append(f'#{n}: blocked, but every dependency is closed or has a '
+                        f'"## {STILL_OPEN}" section; drop the label, or add a '
                         f'"## {WAITING_ON}" section that names what it waits on')
 
 for note in notes_out:

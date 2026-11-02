@@ -1,6 +1,6 @@
 {# The two award settings of D33 for a racer added late. Pass racer_id, racer_key (the id as text), exclude, no_speed, and `where`, which keeps the switch ids unique on the page. #}
 {% url 'dashboard-awards' racer_id as awards_url %}
 <div class="mt-2 flex flex-col border-t border-line pt-1 text-sm" data-award-settings>
-  <div class="flex min-h-11 items-center justify-between gap-2"><span id="{{ where }}-ex-{{ racer_id }}">Not eligible for any award</span>{% with url=awards_url|add:"?setting=exclude" %}{% include "ui/components/switch.html" with labelledby=where|add:"-ex-"|add:racer_key checked=exclude name="on" url=url %}{% endwith %}</div>
-  <div class="flex min-h-11 items-center justify-between gap-2"><span id="{{ where }}-sp-{{ racer_id }}">Not eligible for speed awards</span>{% with url=awards_url|add:"?setting=no-speed" %}{% include "ui/components/switch.html" with labelledby=where|add:"-sp-"|add:racer_key checked=no_speed name="on" url=url %}{% endwith %}</div>
+  <div class="flex min-h-11 items-center justify-between gap-2"><span id="{{ where }}-ex-{{ racer_id }}">Not eligible for any award</span>{% with url=awards_url|add:"?setting=exclude" %}{% include "ui/components/switch.html" with labelledby=where|add:"-ex-"|add:racer_key checked=exclude name="on" url=url include="#shown-heat" sync="#live:replace" %}{% endwith %}</div>
+  <div class="flex min-h-11 items-center justify-between gap-2"><span id="{{ where }}-sp-{{ racer_id }}">Not eligible for speed awards</span>{% with url=awards_url|add:"?setting=no-speed" %}{% include "ui/components/switch.html" with labelledby=where|add:"-sp-"|add:racer_key checked=no_speed name="on" url=url include="#shown-heat" sync="#live:replace" %}{% endwith %}</div>
 </div>

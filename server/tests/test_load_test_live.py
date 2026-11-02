@@ -111,10 +111,11 @@ def report(server, tmp_path_factory):
 
 # Requests each client type can make in DURATION seconds, at most and at
 # least. Kiosks start their poll.kiosk at a random point in their first 5 s
-# and their content poll 1 to 1.5 s in, as the pages do.
+# and their content poll 1 to 1.5 s in, as the pages do. The content poll's
+# lower bound depends on the server's latency (see `least_polls`).
 EXPECTED = {
     "poll.kiosk": (10 * DURATION // 5 - 1, 10 * DURATION // 5),
-    "poll": (10 * (DURATION - 1.5) / 0.5 * 0.8, 10 * DURATION / 0.5),
+    "poll": (None, 10 * DURATION / 0.5),
     # Heartbeats 0.5 s apart, plus STARTED and FINISHED sent at once, as the
     # jar sends them: a heat takes at least 0.5 s staging and 2.5 s racing.
     # The handshake adds HELLO, FLAGS and IDENTIFIED.
@@ -133,9 +134,24 @@ def requests_of(report: dict, label: str) -> int:
     )
 
 
+def least_polls(report: dict) -> float:
+    """Each kiosk's content poll waits 0.5 s after each response, so one poll
+    takes 0.5 s plus its latency plus the script's lag in starting it. The
+    script's `expected_per_s` counts the mean latency; add the p95 lag. From
+    1.5 s in at the latest, less the poll the deadline cuts off. A fixed
+    fraction of the 0.5 s rate failed under the full parallel suite, whose
+    latency is higher (372 polls against a bound of 376, #42)."""
+    (rate,) = [r for r in report["rates"] if r["client"] == "kiosk now-racing poll"]
+    kiosks = rate["instances"]
+    period = kiosks / rate["expected_per_s"] + (rate["lag_p95_ms"] or 0) / 1000
+    return kiosks * ((DURATION - 1.5) / period - 1)
+
+
 @pytest.mark.parametrize("label", EXPECTED)
 def test_each_client_type_polls_at_its_rate(report, label):
     low, high = EXPECTED[label]
+    if low is None:
+        low = least_polls(report)
     assert low <= requests_of(report, label) <= high
 
 

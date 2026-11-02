@@ -10,5 +10,5 @@
     {% endfor %}
   </ol>
   {% endif %}
-  <button type="button" hx-post="{% url 'dashboard-start-next-round' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="start-next-round" class="mt-3 min-h-14 w-full rounded-xl bg-accent text-lg font-semibold text-accent-ink">Start next round</button>
+  <button type="button" hx-post="{% url 'dashboard-start-next-round' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="#shown-heat" hx-sync="#live:replace" data-action="start-next-round" class="mt-3 min-h-14 w-full rounded-xl bg-accent text-lg font-semibold text-accent-ink">Start next round</button>
 </section>
