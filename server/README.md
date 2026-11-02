@@ -387,11 +387,36 @@ uv run python manage.py import_roles /path/to/local/config-roles.inc
 
 `--dry-run` prints each role and its bit mask and writes nothing. When the file holds PHP that the command cannot read, it runs `php` instead, if `php` is installed. That executes the file as PHP, with `--dry-run` too, so import only a file you trust.
 
-Pages log in at `login/` and log out with a POST to `logout/`. A page view declares its permission with `@page_requires(Perm.X)` from `accounts/views.py`, which sends a visitor without it to `login/?next=<page>`. A mobile check-in link is `mcheckin.php?tok=<make_mcheckin_token()>`. It grants check-in, revert and photo upload to the phone's session, and expires after 60 minutes.
+Pages log in at `login/` and log out with a POST to `logout/`. A manager page takes its permission from its navigation registry entry (see "The manager UI shell"), which applies `page_requires()` from `accounts/views.py`: a visitor without it goes to `login/?next=<page>`, and an htmx request gets 403. A mobile check-in link is `mcheckin.php?tok=<make_mcheckin_token()>`. It grants check-in, revert and photo upload to the phone's session, and expires after 60 minutes.
 
 A POST to `/action.php` that carries an `Origin` header for another site answers `notauthorized`. The server's own origin and the origins in `DERBYNET_CSRF_TRUSTED_ORIGINS` pass. Hardware clients send no `Origin`.
 
 Behind a proxy that ends TLS, the server takes its own scheme from the `X-Forwarded-Proto` header. If the proxy does not send that header, the server thinks it serves `http`, and every browser POST to `/action.php` answers `notauthorized`, logins included. Set the proxy to send `X-Forwarded-Proto: https`, or set `DERBYNET_CSRF_TRUSTED_ORIGINS` to the public origin, such as `https://derby.example`.
+
+## The manager UI shell (#40)
+
+The `ui` app holds the base of every M4 page: `ui/base.html`, the CSS build, the vendored htmx, Alpine.js and SortableJS, the #39 components, the navigation registry, home and login.
+
+- **Navigation registry.** `ui/navigation.py` lists one `NavEntry` per manager page: its URL name and path, its permission, its section (Before, During, After, Other), its phone rank per role (D20), and the ticket that builds it. The registry makes each page's URL with the entry's guard, and the home page, the desktop sidebar, the phone bottom nav and its More drawer show an entry exactly when that guard lets the visitor in (C36). A page whose ticket has not landed is a placeholder. To build a page, set the entry's `view`; give each extra URL of the page, such as a polled partial, the same guard with `@requires_page("<key>")`. The guard sends a page request without the permission to `login/?next=` and answers an htmx request with 403 and a toast. `ui/tests/data/role_nav.json` holds what each default role sees.
+- **Old page URLs.** `ui/redirects.py` answers each PHP page in `LEGACY_PAGES` with a 301 to its new page, query string kept, at the root and under `derbynet/` (D20). Each M4 ticket adds its pages there.
+- **CSS.** `ui/tailwind/app.css` is the Tailwind input, and `ui/static/ui/app.css` the committed, minified build. After changing classes in a template, run `uv run python manage.py build_css` and commit the CSS. The build uses the Tailwind standalone CLI, pinned by version and sha256 in `ui/css_build.py`, never Node. `--fetch` downloads the CLI once into `~/.cache/derbynet/` (or set `DERBYNET_TAILWIND` to a binary), and the build itself then needs no network. `--check` exits 1 when the committed file is stale; the `ui` CI job runs it in a container with no network and no Node. An app whose templates use Tailwind classes adds an `@source` line to the input.
+- **Front-end libraries.** `ui/static/ui/vendor/VENDORED.md` lists each file, its version, source URL and sha256, and `ui/tests/test_vendored.py` checks them. Nothing loads from a CDN. SortableJS loads only on a page with a sortable list.
+- **htmx defaults.** `ui/base.html` sends the CSRF token in `hx-headers`, swaps nothing on a 204, and swaps a 403 or 422 into the `#toasts` region whatever the request's target. `ui.responses.service_error(request, message)` is the 422 toast a view returns when a service refuses. `{% poll_trigger 2 %}` polls a section every 2 s and pauses while a sheet is open or a field in the section has focus.
+- **Components.** `ui/templates/ui/components/` holds the #39 catalog. Wrapping components take a body with `{% component "sheet" name="x" title="..." %}...{% endcomponent %}` (`{% load ui %}`): sheet, confirm sheet, card list, card, filter bar and sortable list. The others are includes: switch, segmented control, search field, status pill, stepper, toast and icon. With `DERBYNET_DEBUG=1` or `DERBYNET_ENABLE_TEST_ENDPOINTS=1`, `components/` shows them all.
+- **Default passwords.** Every page shows a logged-in role a banner while a role keeps the password `accounts/defaults.py` seeds (D16). `accounts.services.roles_with_default_password()` checks the hashes, and remembers each result for as long as the role's hash stays the same.
+- **Server URLs.** `ui.server_urls.preferred_urls(request, use_https=False)` ports PHP's `preferred_urls()`: the URL in `<config dir>/config-url` when that file exists, else one URL per host address, or the `Host` header behind a proxy.
+- **Session writes.** Page and poll views never write the session (#15). Wrap a test's requests in `ui.tests.sessions.no_session_writes()` to prove it.
+
+### Browser tests
+
+The Playwright tests live in `ui/tests/browser/` and run only with `-m browser`:
+
+```sh
+uv run playwright install chromium
+uv run pytest -m browser ui
+```
+
+Each test that takes `page` runs on a phone (390x844, touch) and a desktop (1280x800) against pytest-django's live server. A page error, a console error, a failed request for a static file, or an `alert()` fails the test, unless it calls `page_errors.allow(pattern)`. `login(role)` logs in through the login page, `shoot(page, name)` saves a screenshot under `DERBYNET_SCREENSHOT_DIR` (default `var/screenshots`), and `assert_accessible(page)` fails on any serious or critical axe-core 4.10.3 violation. `test_smoke.py` opens every registry page for each default role at both sizes, so a new page is covered once its entry exists. The `ui` CI job runs them and uploads the screenshots as the `ui-screenshots` artifact.
 
 ## Settings
 
@@ -413,6 +438,8 @@ Behind a proxy that ends TLS, the server takes its own scheme from the `X-Forwar
 | `DERBYNET_PHOTO_MAX_MEGAPIXELS` | `50` | The largest photo, in megapixels, that is decoded. `photo.upload` refuses a larger one, and renders of one answer 404 |
 | `DERBYNET_VIDEO_UPLOAD_MAX_MB` | `100` | The largest replay clip `video.upload` takes, in MB |
 | `DERBYNET_FACEDETECT` | unset | An executable autocrop runs on the photo's path instead of OpenCV. Its last line of output is `x y width height` |
+| `DERBYNET_VERSION` | the checkout's branch and commit, else `dev` | The build version the menu shows |
+| `DERBYNET_QUICKREF_PDF` | `../docs/dist/Quick Reference.pdf` | The quick reference the help link serves at `quickref.pdf`. The docs build writes the default |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server generates a key into `<DERBYNET_CONFIG_DIR>/secret_key` with mode 0600 on first start, and reuses it after that |
 
 SQLite runs in WAL mode with `synchronous=NORMAL`, `IMMEDIATE` transactions, and a 20 second busy timeout (ADR-05). WAL writes `-wal` and `-shm` files next to the database, so keep `DERBYNET_DATA_DIR` on a writable local disk. A database on a network share can be corrupted. A Postgres `DATABASE_URL` is used as `dj-database-url` parses it, with no extra options.

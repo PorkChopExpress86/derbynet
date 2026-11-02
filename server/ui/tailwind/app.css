@@ -1,0 +1,80 @@
+/* Tailwind v4 input for the manager UI (#39, #40).
+   `manage.py build_css` builds it into ../static/ui/app.css with the pinned
+   standalone CLI. Commit the built file. An app whose templates use Tailwind
+   classes adds its templates folder below. */
+@import "tailwindcss" source(none);
+@source "../templates";
+@source "../../accounts/templates";
+@source "../static/ui/app.js";
+
+/* Semantic tokens. Utilities read the variables, so the dark block below swaps
+   the whole palette, following the device setting (D20). */
+@theme {
+  --color-bg: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-surface-2: #f9fafb;
+  --color-ink: #111827;
+  --color-ink-muted: #4b5563;
+  --color-line: #d1d5db;
+  --color-accent: #1d4ed8;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #dbeafe;
+  --color-ok: #15803d;
+  --color-ok-soft: #dcfce7;
+  --color-ok-ink: #14532d;
+  --color-warn: #b45309;
+  --color-warn-soft: #fef3c7;
+  --color-warn-ink: #78350f;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-danger-ink: #7f1d1d;
+  --color-switch-off: #6b7280;
+  --color-field: #6b7280;
+  /* Lane colors (the lane-colors setting). Same hue in both themes; each badge
+     carries its own text color. */
+  --color-lane-1: #dc2626;
+  --color-lane-2: #2563eb;
+  --color-lane-3: #15803d;
+  --color-lane-4: #facc15;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #030712;
+    --color-surface: #111827;
+    --color-surface-2: #1f2937;
+    --color-ink: #f9fafb;
+    --color-ink-muted: #b6bcc6;
+    --color-line: #374151;
+    --color-accent: #93c5fd;
+    --color-accent-ink: #0b1220;
+    --color-accent-soft: #1e3a8a;
+    --color-ok: #4ade80;
+    --color-ok-soft: #14532d;
+    --color-ok-ink: #dcfce7;
+    --color-warn: #fbbf24;
+    --color-warn-soft: #451a03;
+    --color-warn-ink: #fde68a;
+    --color-danger: #f87171;
+    --color-danger-soft: #450a0a;
+    --color-danger-ink: #fecaca;
+    --color-switch-off: #9ca3af;
+    --color-field: #9ca3af;
+  }
+}
+
+@layer base {
+  /* 16px keeps iOS from zooming into a focused input (#39). */
+  html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+  [x-cloak] { display: none !important; }
+  :focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+  button, [role="button"] { cursor: pointer; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

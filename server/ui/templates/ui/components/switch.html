@@ -1,0 +1,6 @@
+{# A switch (#39). Pass label (or labelledby), checked, and name. With url, it flips at once, posts name=1 or name=0, and flips back when the server refuses. #}
+<button type="button" role="switch" x-data="uiSwitch({{ checked|yesno:'true,false' }}, '{{ url|default:''|escapejs }}', '{{ name|default:''|escapejs }}')" :aria-checked="on.toString()" aria-checked="{{ checked|yesno:'true,false' }}" @click="toggle()"{% if labelledby %} aria-labelledby="{{ labelledby }}"{% else %} aria-label="{{ label }}"{% endif %} class="group grid h-11 w-16 shrink-0 place-items-center rounded-full">
+  <span class="relative block h-7 w-12 rounded-full bg-switch-off group-aria-checked:bg-ok motion-safe:transition-colors">
+    <span class="absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow group-aria-checked:translate-x-5 motion-safe:transition-transform"></span>
+  </span>
+</button>

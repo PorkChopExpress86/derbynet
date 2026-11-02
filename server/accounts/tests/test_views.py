@@ -31,17 +31,27 @@ def log_in(client, name, password, **extra):
 def test_the_login_page_lists_the_interactive_roles(client, event):
     page = client.get("/login/").content.decode()
 
-    assert "<option>RaceCrew</option>" in page
-    assert "<option>RaceCoordinator</option>" in page
-    assert "<option>Timer</option>" not in page
-    assert "<option></option>" not in page
+    assert 'data-role="RaceCrew"' in page
+    assert 'data-role="RaceCoordinator"' in page
+    assert 'data-role="Timer"' not in page
+    assert 'data-role=""' not in page
+    assert "Show all roles" in page
 
 
 def test_all_lists_the_roles_for_machines_too(client, event):
     page = client.get("/login/?all").content.decode()
 
-    assert "<option>Timer</option>" in page
-    assert "<option>Photo</option>" in page
+    assert 'data-role="Timer"' in page
+    assert 'data-role="Photo"' in page
+    assert "Show fewer roles" in page
+
+
+def test_a_failed_login_keeps_all_the_roles(client, event):
+    response = client.post(
+        "/login/?all", {"name": "Photo", "password": "wrong", "all": "1"}
+    )
+
+    assert 'data-role="Timer"' in response.content.decode()
 
 
 def test_a_login_returns_to_the_page_that_asked(client, event):
@@ -55,14 +65,22 @@ def test_a_login_returns_to_the_page_that_asked(client, event):
 def test_a_login_never_returns_to_another_site(client, event):
     response = log_in(client, "RaceCrew", "murphy", next="https://evil.example/")
 
-    assert response["Location"] == "/login/"
+    assert response["Location"] == "/"
+
+
+def test_a_login_with_no_page_to_return_to_goes_home(client, event):
+    assert log_in(client, "RaceCrew", "murphy")["Location"] == "/"
 
 
 def test_a_wrong_password_shows_the_form_again(client, event):
     response = log_in(client, "RaceCrew", "wrong")
 
+    page = response.content.decode()
     assert response.status_code == 401
-    assert "Incorrect password." in response.content.decode()
+    assert 'role="alert"' in page
+    assert "Incorrect password." in page
+    assert 'data-failed="RaceCrew"' in page
+    assert "alert(" not in page
     assert "role" not in client.session
 
 

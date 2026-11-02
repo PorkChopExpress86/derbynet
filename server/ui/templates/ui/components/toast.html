@@ -1,0 +1,10 @@
+{# A toast for the #toasts region (#39). level: info, ok or error. With undo_url, an Undo button posts there. With oob, it goes out of band, next to the partials a response swaps. #}
+{% if oob %}<div hx-swap-oob="beforeend:#toasts">{% endif %}
+<div x-data="uiToast('{{ level|default:'info' }}')" @mouseenter="hold()" @mouseleave="arm()" @focusin="hold()" @focusout="arm()" data-toast="{{ level|default:'info' }}"
+  class="pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-xl border px-4 py-2 shadow-lg {% if level == 'error' %}border-danger bg-danger-soft text-danger-ink{% elif level == 'ok' %}border-ok bg-ok-soft text-ok-ink{% else %}border-line bg-surface text-ink{% endif %}"
+  {% if level == 'error' %}role="alert"{% else %}role="status"{% endif %}>
+  <p data-message class="min-w-0 flex-1 py-2 text-sm font-medium">{{ message }}</p>
+  {% if undo_url %}<button type="button" hx-post="{{ undo_url }}" hx-target="#toasts" hx-swap="beforeend" @htmx:after-request="dismiss()" class="min-h-11 rounded-lg px-3 text-sm font-semibold underline underline-offset-2">Undo</button>{% endif %}
+  <button type="button" @click="dismiss()" aria-label="Dismiss" class="-mr-2 grid size-11 shrink-0 place-items-center rounded-full">{% include "ui/components/icon.html" with name="close" cls="size-5" %}</button>
+</div>
+{% if oob %}</div>{% endif %}

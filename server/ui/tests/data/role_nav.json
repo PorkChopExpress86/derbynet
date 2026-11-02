@@ -1,0 +1,45 @@
+{
+  "_comment": "What each default role sees (#40): the home page and desktop sidebar entries by section, and the phone bottom nav, its last button included (null: no bottom nav). Written by hand from the page gates of #15 and the D20 table of #39, so a registry change that moves a link shows here.",
+  "anonymous": {
+    "sections": {
+      "During": ["Slideshow", "Racers On Deck", "Results By Racer"],
+      "After": ["Standings", "Export Results"],
+      "Other": ["About"]
+    },
+    "phone": ["Results", "On Deck", "Slideshow", "Log in"]
+  },
+  "Timer": {
+    "sections": {
+      "During": ["Slideshow", "Racers On Deck", "Results By Racer"],
+      "After": ["Standings"],
+      "Other": ["About"]
+    },
+    "phone": null
+  },
+  "Photo": {
+    "sections": {
+      "During": ["Slideshow", "Racers On Deck", "Results By Racer"],
+      "After": ["Standings"],
+      "Other": ["About"]
+    },
+    "phone": ["More"]
+  },
+  "RaceCrew": {
+    "sections": {
+      "Before": ["Race Check-In", "Racer Photos", "Car Photos"],
+      "During": ["Judging", "Slideshow", "Racers On Deck", "Results By Racer"],
+      "After": ["Standings", "Export Results", "Retrospective"],
+      "Other": ["About"]
+    },
+    "phone": ["Check-In", "Photos", "On Deck", "More"]
+  },
+  "RaceCoordinator": {
+    "sections": {
+      "Before": ["Set-Up", "Race Check-In", "Racer Photos", "Car Photos"],
+      "During": ["Race Dashboard", "Kiosk Dashboard", "Judging", "Slideshow", "Racers On Deck", "Results By Racer"],
+      "After": ["Present Awards", "Standings", "Export Results", "Retrospective"],
+      "Other": ["About"]
+    },
+    "phone": ["Dashboard", "Check-In", "Standings", "More"]
+  }
+}

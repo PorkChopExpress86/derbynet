@@ -12,6 +12,10 @@ dependencies = [
 ]
 
 [dependency-groups]
+browser = [
+    "playwright==1.64.0",
+    "pytest-playwright==0.9.0",
+]
 dev = [
     "factory-boy>=3.3",
     "hypothesis>=6.170.11",
@@ -28,6 +32,9 @@ serve = [
 
 [tool.uv]
 package = false
+# The browser tests' Playwright installs with the rest, so a plain `uv run`
+# never uninstalls it. Its tests still run only with `-m browser`.
+default-groups = ["dev", "browser"]
 
 [tool.ruff]
 target-version = "py314"
@@ -38,10 +45,11 @@ select = ["E", "F", "W", "I", "UP", "B", "DJ"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "derbynet.settings"
-testpaths = ["tests", "core", "roster", "racing", "awards", "kiosks", "accounts", "legacy_api", "transfer", "media"]
-addopts = "--strict-markers -m 'not full'"
+testpaths = ["tests", "core", "roster", "racing", "awards", "kiosks", "accounts", "legacy_api", "transfer", "media", "ui"]
+addopts = "--strict-markers -m 'not full and not browser'"
 markers = [
     "pr: schedule parity cases run on every pull request",
     "full: the whole schedule parity sweep; run with -m full",
     "golden: replays the PHP golden fixtures (#7); the parity gate runs them",
+    "browser: drives the pages in Chromium with Playwright (#40); run with -m browser",
 ]

@@ -1,0 +1,7 @@
+{% load static %}{# {% component "sortable_list" label="Awards" url=... name="order" %}{% include "ui/components/sortable_item.html" ... %}{% endcomponent %}. Rows move by drag handle or by Move up and Move down in each row's menu (#39). With url, each move posts name=<ids in order>. SortableJS loads only on a page with such a list. #}
+<div x-data="uiSortable('{{ url|default:''|escapejs }}', '{{ name|default:'order'|escapejs }}')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" class="{{ cls }}">
+  <ul role="list" aria-label="{{ label }}" x-ref="list" class="flex flex-col gap-2">
+{{ body }}
+  </ul>
+  <p class="sr-only" aria-live="polite" x-text="status"></p>
+</div>

@@ -1,0 +1,10 @@
+{# One row of a sortable list. Pass id and label; the row shows the label unless a body template is given. #}
+<li data-id="{{ id }}" data-label="{{ label }}" x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="relative flex min-h-14 items-center gap-1 rounded-xl border border-line bg-surface pr-1">
+  <button type="button" data-handle aria-label="Drag to reorder {{ label }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>
+  <span class="min-w-0 flex-1 truncate">{{ label }}</span>
+  <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ label }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
+  <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
+    <button type="button" role="menuitem" @click="menu = false; move($root, -1)" class="min-h-11 px-4 text-left">Move up</button>
+    <button type="button" role="menuitem" @click="menu = false; move($root, 1)" class="min-h-11 px-4 text-left">Move down</button>
+  </div>
+</li>
