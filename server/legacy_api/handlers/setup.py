@@ -11,6 +11,7 @@ from django.conf import settings
 
 from accounts.permissions import Perm, log_in
 from core import setup_details, setup_event
+from legacy_api.handlers.database import RESET_REPLY
 from legacy_api.registry import LegacyContext, action, query
 
 S25 = (
@@ -26,7 +27,12 @@ def _text(ctx: LegacyContext, key: str) -> str | None:
     return value if isinstance(value, str) else None
 
 
-@action("setup.nodata", permission=Perm.SET_UP, session_write=True, divergences=(D57,))
+@action(
+    "setup.nodata",
+    permission=Perm.SET_UP,
+    session_write=True,
+    divergences=(D57, RESET_REPLY),
+)
 def setup_nodata(ctx: LegacyContext) -> None:
     if settings.LOCK_SETTINGS:
         ctx.failure("locked", "Settings are locked and cannot be changed.")

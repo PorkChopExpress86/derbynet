@@ -2,11 +2,12 @@
 
 from accounts.permissions import Perm
 from core import setup_details
+from legacy_api.handlers.database import RESET_REPLY
 from legacy_api.registry import LegacyContext, action
 from racing.services import purge
 
 
-@action("database.purge", permission=Perm.SET_UP)
+@action("database.purge", permission=Perm.SET_UP, divergences=(RESET_REPLY,))
 def database_purge(ctx: LegacyContext) -> None:
     what = ctx.args.get("purge")
     what = what if isinstance(what, str) else ""

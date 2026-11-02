@@ -9,8 +9,14 @@ from legacy_api.registry import LegacyContext, action
 
 SEPARATORS = ("/", "\\")
 
+# Also cited by setup.nodata and database.purge, which send the same details.
+RESET_REPLY = (
+    "D67: `executed` names each script in one line, not PHP's SQL statements,"
+    " and `details` describe Django's database and engine."
+)
 
-@action("database.execute", permission=Perm.SET_UP)
+
+@action("database.execute", permission=Perm.SET_UP, divergences=(RESET_REPLY,))
 def database_execute(ctx: LegacyContext) -> None:
     script = ctx.args.get("script", "")
     script = script if isinstance(script, str) else ""

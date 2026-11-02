@@ -56,7 +56,7 @@ QUIRK_DECISIONS = {
     # car number must be a whole number.
     "R1": "fix",
     "R2": "fix",
-    # Rows of #64 that a #31 endpoint fixes.
+    # Rows of #64 that a #31 endpoint fixes. The owner accepted C23 in D67.
     "C23": "fix",
     "C24": "fix",
     "S17": "fix",
@@ -65,6 +65,8 @@ QUIRK_DECISIONS = {
     "S6": "fix",
     "S7": "fix",
     "S25": "fix",
+    # Accepted in D67 (#37): settings.list never reports the database.
+    "S2": "fix",
     # Rows of #64 and owner decisions that the #34 kiosk, scene, playlist,
     # message and replay endpoints fix.
     "C18": "fix",
