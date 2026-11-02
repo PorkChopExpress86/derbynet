@@ -20,6 +20,8 @@ The script builds the harness and server images by calling the steps of `testing
 
 The `golden-fixtures` workflow runs `capture.sh --check` on every pull request and push to master that touches `website/`, `installer/docker/`, `testing/` or this directory.
 
+A full HTTP capture also writes `inputs.sha256`, the SHA-256 of each `testing/` and `capture/` file it read. `server/tools/golden_inputs.py --check` (pytest and the pre-push hook) fails as soon as one of those files changes, so you know to recapture before the workflow does.
+
 The committed fixtures were captured against the image built from `installer/docker/Dockerfile`. `capture.sh` writes what that image held to `provenance.txt`: the PHP major and minor version, `TZ`, and the extensions the PHP CLI (engine capture) and php-fpm (HTTP capture) load. `--check` compares it like any fixture, so CI fails when the image it builds moves to another PHP minor version or loads other extensions, and someone recaptures. The PHP patch level and the Alpine release are printed to the capture log, not written to the file. The Dockerfile takes whatever patch release Alpine publishes, so comparing them would turn CI red on a routine Alpine update with no change to the code. A patch release that changes a response still fails `--check` through the fixture it changes.
 
 The file leaves out the commit SHA and the image digest on purpose. Both change on every commit and every image build, even when PHP and every fixture stay the same, so `--check` would always fail. The commit that captured the fixtures is the one that last changed them (`git log -1 -- server/tests/golden/engine server/tests/golden/http`).
@@ -44,6 +46,7 @@ The Dockerfile starts `FROM alpine:3.23` and runs `apk upgrade`, so the PHP it g
 | `engine/master-heats.json` | `assign_master_heats()` and the master-schedule `get_next_heat()` over hand-made and seeded random chart states | same |
 | `engine/aggregates.json` | `topological_sort()` and `compute_aggregate_constituents_tc()` over hand-made and seeded random aggregate graphs | same |
 | `engine/summary.txt` | The case counts the tool printed | same |
+| `inputs.sha256` | SHA-256 of each `testing/` and `capture/` file the HTTP capture read | `server/tools/golden_inputs.py`, from `capture.sh` |
 | `provenance.txt` | PHP major and minor version, `TZ` and PHP extensions of the image the fixtures were captured against | `capture.sh` |
 | `http/**/*.http` | HTTP transcripts: request, status, content type, `Location`, `Set-Cookie`, `Cache-Control`, body | `capture/capture-http.sh` and its `scenarios/` |
 | `http/**/*.by-car.json` | Standings ladders with racer IDs replaced by car number and name | `standings_by_car` in `capture-http.sh` |
