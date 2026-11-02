@@ -30,6 +30,14 @@ from ui.tests.race import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _polls_may_be_cut_short(page_errors):
+    """A control aborts a poll still in flight (`hx-sync="#live:replace"`),
+    so a stale poll never swaps after the control's own reply. The browser
+    reports the aborted poll as a failed request."""
+    page_errors.allow(r"request failed: .*/dashboard/live/")
+
+
 def open_dashboard(page):
     page.goto("/dashboard/")
     expect(page.locator("#live")).to_be_visible()
