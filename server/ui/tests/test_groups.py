@@ -547,3 +547,76 @@ def test_the_partition_layer_shows_only_outside_by_partition(coordinator, event)
     assert "data-partitions-of" not in html(coordinator.get("/groups/"))
     groups.form_groups_by_rule(event, "one-group")
     assert "data-partitions-of" in html(coordinator.get("/groups/"))
+
+
+# ----- review fixes -----
+
+
+@pytest.mark.parametrize(("value", "status"), [("20", 200), ("21", 422), ("-1", 422)])
+def test_trophy_settings_take_what_the_steppers_offer(
+    coordinator, event, value, status
+):
+    """The pack, per-group and per-subgroup steppers run 0 to 20, as PHP's
+    number fields do, and the server takes exactly that."""
+    for key in ("n-pack-trophies", "n-den-trophies", "n-rank-trophies"):
+        response = post(coordinator, "/groups/setting/", {key: value})
+        assert response.status_code == status, (key, value)
+    page = html(coordinator.get("/groups/"))
+    assert page.count('max="20"') == 3
+
+
+@pytest.mark.parametrize(("value", "saved"), [("10", 10), ("11", None)])
+def test_a_sheet_takes_the_trophy_counts_its_select_offers(
+    coordinator, event, value, saved
+):
+    dens(event)
+    lions = group(event, "Lions")
+    body = html(get(coordinator, f"/groups/group/{lions.pk}/"))
+    assert re.findall(r'<option value="(-?\d+)"', body) == ["-1", *map(str, range(11))]
+    response = sheet_post(
+        coordinator, f"/groups/group/{lions.pk}/", {"name": "Lions", "ntrophies": value}
+    )
+    lions.refresh_from_db()
+    assert lions.n_trophies == saved
+    if saved is None:
+        assert "Pick a number of trophies." in html(response)
+
+
+def test_the_aggregate_sheet_has_a_partition_list(coordinator, event):
+    dens(event)
+    groups.form_groups_by_rule(event, "custom")
+    body = html(get(coordinator, "/groups/aggregate/new/"))
+    assert 'data-partition-list="ag"' in body
+    lions, tigers = group(event, "Lions"), group(event, "Tigers")
+    response = sheet_post(
+        coordinator,
+        "/groups/aggregate/new/",
+        {
+            "name": "Cats",
+            "by": "group",
+            "group": [lions.pk, tigers.pk],
+            "scope": "some",
+            "partition": [partition(event, "Lions").pk],
+        },
+    )
+    assert "$store.ui.close()" in html(response)
+    assert stored(event, group=group(event, "Cats")) == {"Lions"}
+
+
+def test_an_aggregate_list_naming_a_partition_it_does_not_draw_from(coordinator, event):
+    dens(event)
+    groups.form_groups_by_rule(event, "custom")
+    lions, tigers = group(event, "Lions"), group(event, "Tigers")
+    response = sheet_post(
+        coordinator,
+        "/groups/aggregate/new/",
+        {
+            "name": "Cats",
+            "by": "group",
+            "group": [lions.pk, tigers.pk],
+            "scope": "some",
+            "partition": [partition(event, "Parents").pk],
+        },
+    )
+    assert "Pick partitions this aggregate draws from." in html(response)
+    assert not Group.objects.filter(event=event, name="Cats").exists()

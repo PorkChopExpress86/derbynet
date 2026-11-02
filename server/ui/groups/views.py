@@ -17,9 +17,12 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from awards.services import partition_choice, set_partition_list
-from core import race_settings
-from core.settings_form import apply_group_form
+from awards.services import partition_choice, set_partition_list_by_id
+from core.settings_form import (
+    PackStandingsRefused,
+    apply_group_form,
+    set_pack_standings,
+)
 from roster.models import CarRange, Group, Partition, Subgroup
 from roster.services import car_numbers, groups
 from roster.services.car_numbers import RangeFailure
@@ -27,12 +30,20 @@ from roster.services.groups import GroupFailure, Rule
 from ui.groups import state
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import refused, service_error, toast_html
+from ui.responses import (
+    closing_sheet,
+    in_sheet,
+    into_sheet,
+    refused,
+    service_error,
+    toast_html,
+)
 
 guard = requires_page("racing-groups")
 
 SHEET_BODY = "groups-sheet-body"
 DEFAULT_TROPHIES = "-1"
+TROPHIES_MESSAGE = "Pick a number of trophies."
 # The settings fields the editor writes, as `settings.write` names them.
 TEXT_SETTINGS = ("supergroup-label", "partition-label")
 COUNT_SETTINGS = ("n-pack-trophies", "n-den-trophies", "n-rank-trophies")
@@ -41,10 +52,6 @@ LARGEST_NUMBER = 999_999_999
 
 
 # ----- replies -----
-
-
-def _in_sheet(request) -> bool:
-    return request.headers.get("HX-Target") == SHEET_BODY
 
 
 def _editor(request, tree=None) -> str:
@@ -57,18 +64,16 @@ def _editor_oob(request) -> str:
 
 
 def changed(request, message: str, *, body: str | None = None) -> HttpResponse:
-    """The reply to a change: the sheet's next body (or a body that closes
-    it) for a form in the sheet, a toast, and the re-rendered editor."""
-    parts = []
-    in_sheet = _in_sheet(request)
-    if in_sheet:
-        parts.append(body or render_to_string("ui/groups/sheets/closed.html"))
-    elif body is not None:
-        parts.append(f'<div id="{SHEET_BODY}" hx-swap-oob="innerHTML">{body}</div>')
-    if message:
-        parts.append(toast_html(request, message, oob=in_sheet))
-    parts.append(_editor_oob(request))
-    return HttpResponse("".join(parts))
+    """The reply to a change: the sheet's next body, or for a form in the
+    sheet with no next body, a body that closes it; a toast; and the
+    re-rendered editor."""
+    if body is None and in_sheet(request, SHEET_BODY):
+        html = closing_sheet(request, SHEET_BODY, message)
+    else:
+        html = into_sheet(request, SHEET_BODY, body) if body is not None else ""
+        if message:
+            html += toast_html(request, message, oob=in_sheet(request, SHEET_BODY))
+    return HttpResponse(html + _editor_oob(request))
 
 
 def _sheet(request, template: str, context: dict) -> str:
@@ -89,13 +94,14 @@ def _int(value) -> int | None:
 
 
 def _trophies(posted: str | None):
-    """A posted trophy count: "-1" or blank is the setting's default, None
-    here; 0 to 10 is that count; anything else is not a choice."""
+    """A posted trophy count of a group, subgroup or aggregate: "-1" or
+    blank is the setting's default, None here; 0 to `MAX_UNIT_TROPHIES` is
+    that count; anything else is not a choice."""
     if posted is None or posted.strip() in ("", DEFAULT_TROPHIES):
         return None
     n = _int(posted)
     if n is None or n not in state.TROPHY_CHOICES:
-        raise ValueError(posted)
+        raise ValueError(TROPHIES_MESSAGE)
     return n
 
 
@@ -108,20 +114,22 @@ def _ids(posted: str) -> list[int]:
     return found
 
 
-def _award_partitions(post, choice) -> list[Partition]:
-    """The posted partition list of an award unit: `scope=all` is all
-    partitions, the empty list; `scope=some` is the checked partitions,
-    which must be offered and at least one. Raises ValueError with what to
-    tell the manager."""
+def _award_partitions(post) -> list[int]:
+    """The posted partition list of an award unit, as partition ids:
+    `scope=all` is all partitions, the empty list; `scope=some` is the
+    checked partitions, at least one. The service checks them under its
+    lock. Raises ValueError with what to tell the manager."""
     if post.get("scope", "all") != "some":
         return []
-    offered = {p.pk: p for p in choice.offered}
     picked = [_int(raw) for raw in post.getlist("partition")]
-    if any(pk not in offered for pk in picked):
-        raise ValueError("That partition is not one the award draws from.")
     if not picked:
         raise ValueError("Check at least one, or pick all of them.")
-    return [offered[pk] for pk in dict.fromkeys(picked)]
+    if None in picked:
+        raise ValueError(NOT_DRAWN)
+    return list(dict.fromkeys(picked))
+
+
+NOT_DRAWN = "Pick only partitions this award draws from."
 
 
 def _group(request, group_id) -> Group:
@@ -175,7 +183,7 @@ def rule(request):
         effects = groups.rule_change_effects(event, chosen)
         tree = state.build(event)
         if tree.rule == chosen:
-            return render(request, "ui/groups/sheets/closed.html")
+            return render(request, "ui/components/sheet_closed.html")
         return render(
             request,
             "ui/groups/sheets/rule.html",
@@ -212,8 +220,11 @@ def setting(request):
     for key in COUNT_SETTINGS:
         if key in request.POST:
             n = _int(request.POST[key])
-            if n is None or not 0 <= n <= 99:
-                return service_error(request, "A trophy count is a number, 0 to 99.")
+            if n is None or not 0 <= n <= state.MAX_DEFAULT_TROPHIES:
+                return service_error(
+                    request,
+                    f"A trophy count is a number, 0 to {state.MAX_DEFAULT_TROPHIES}.",
+                )
             post[key] = str(n)
     if USE_SUBGROUPS in request.POST:
         post[f"{USE_SUBGROUPS}-checkbox"] = "1"
@@ -231,22 +242,12 @@ def setting(request):
 @guard
 def calc_rule(request):
     """The pack aggregate choice (`award.calc-rule`): calculate normally,
-    don't calculate, or use an aggregate's standings."""
-    event = _event(request)
-    value = request.POST.get("full-field-calc", "")
-    tree = state.build(event)
-    if value not in dict(tree.calc_choices):
-        return service_error(request, "Pick how to calculate the standings.")
-    if value == "-1" and tree.pack_trophies:
-        return service_error(
-            request,
-            f"{tree.labels.supergroup} trophies need the"
-            f" {tree.labels.supergroup.lower()} standings.",
-        )
+    don't calculate, or use an aggregate's standings. The service checks
+    the choice, and that pack trophies need the standings, under its lock."""
     try:
-        race_settings.write(event, "full-field-calc", value)
-    except race_settings.NotWritten:
-        return service_error(request, "Pick how to calculate the standings.")
+        set_pack_standings(_event(request), request.POST.get("full-field-calc", ""))
+    except PackStandingsRefused as failure:
+        return service_error(request, str(failure))
     return changed(request, "Saved.")
 
 
@@ -254,17 +255,26 @@ def calc_rule(request):
 @guard
 def pack_awards(request):
     """The pack's speed-award partition list (D35, D38)."""
-    event = _event(request)
-    choice = partition_choice(event)
     try:
-        picked = _award_partitions(request.POST, choice)
-        set_partition_list(event, picked)
+        picked = _award_partitions(request.POST)
     except ValueError as error:
         return service_error(request, str(error))
+    try:
+        set_partition_list_by_id(_event(request), picked)
+    except ValueError:
+        return service_error(request, NOT_DRAWN)
     return changed(request, "Saved.")
 
 
 # ----- ordering -----
+
+
+def _reordered(request, reorder):
+    try:
+        reorder(_event(request), _ids(request.POST.get("order", "")))
+    except GroupFailure as failure:
+        return refused(request, failure)
+    return changed(request, "Order saved.")
 
 
 @require_POST
@@ -272,48 +282,21 @@ def pack_awards(request):
 def order_groups(request):
     """Groups, or aggregates, in a new order, from a drag or the row menu
     (`class.order`). The other kind keeps its order after them."""
-    event = _event(request)
-    tree = state.build(event)
-    organic = [g.id for g in tree.groups]
-    aggregate = [a.id for a in tree.aggregates]
-    posted = _ids(request.POST.get("order", ""))
-    if posted and set(posted) <= set(organic):
-        ids = [*posted, *[g for g in organic if g not in posted], *aggregate]
-    elif posted and set(posted) <= set(aggregate):
-        ids = [*organic, *posted, *[a for a in aggregate if a not in posted]]
-    else:
-        return service_error(request, "That order names no groups of this event.")
-    rows = {g.pk: g for g in Group.objects.filter(event=event, pk__in=ids)}
-    groups.order_groups(event, [rows[pk] for pk in ids if pk in rows])
-    return changed(request, "Order saved.")
+    return _reordered(request, groups.reorder_groups)
 
 
 @require_POST
 @guard
 def order_subgroups(request):
     """One group's subgroups in a new order (`rank.order`)."""
-    event = _event(request)
-    posted = _ids(request.POST.get("order", ""))
-    rows = {s.pk: s for s in Subgroup.objects.filter(event=event, pk__in=posted)}
-    ordered = [rows[pk] for pk in posted if pk in rows]
-    if not ordered or len({s.group_id for s in ordered}) != 1:
-        return service_error(request, "That order names no subgroups of one group.")
-    groups.order_subgroups(event, ordered)
-    return changed(request, "Order saved.")
+    return _reordered(request, groups.reorder_subgroups)
 
 
 @require_POST
 @guard
 def order_partitions(request):
     """Partitions in a new order (`partition.order`)."""
-    event = _event(request)
-    posted = _ids(request.POST.get("order", ""))
-    rows = {p.pk: p for p in Partition.objects.filter(event=event, pk__in=posted)}
-    ordered = [rows[pk] for pk in posted if pk in rows]
-    if not ordered:
-        return service_error(request, "That order names no partitions.")
-    groups.order_partitions(event, ordered)
-    return changed(request, "Order saved.")
+    return _reordered(request, groups.reorder_partitions)
 
 
 # ----- groups and aggregates -----
@@ -359,14 +342,10 @@ def group_edit(request, group_id):
         n_trophies = _trophies(values["ntrophies"])
     except ValueError:
         return HttpResponse(
-            _group_sheet(
-                request, group, values=values, error="Pick a number of trophies."
-            )
+            _group_sheet(request, group, values=values, error=TROPHIES_MESSAGE)
         )
     try:
-        picked = _award_partitions(
-            request.POST, partition_choice(_event(request), group=group)
-        )
+        picked = _award_partitions(request.POST)
         groups.edit_group(group, values["name"], n_trophies, picked)
     except (GroupFailure, ValueError) as failure:
         return HttpResponse(
@@ -427,7 +406,7 @@ def group_new(request):
                 "tree": tree,
                 "values": values,
                 "trophy_choices": state.TROPHY_CHOICES,
-                "error": getattr(failure, "description", "Pick a number of trophies."),
+                "error": getattr(failure, "description", TROPHIES_MESSAGE),
             },
         )
     return changed(request, f"Added {values['name'].strip()}.")
@@ -446,38 +425,42 @@ def aggregate_new(request):
         return render(
             request,
             "ui/groups/sheets/aggregate.html",
-            {**context, "values": {"by": "group", "picked": []}},
+            {
+                **context,
+                "values": {"by": "group", "picked": [], "scope": "all"},
+            },
         )
     by = "subgroup" if request.POST.get("by") == "subgroup" else "group"
     picked = _ids(",".join(request.POST.getlist(by)))
-    values = {**_sheet_values(request.POST), "by": by, "picked": picked}
-    model = Subgroup if by == "subgroup" else Group
-    rows = {r.pk: r for r in model.objects.filter(event=event, pk__in=picked)}
-    chosen = [rows[pk] for pk in picked if pk in rows]
-    error = ""
-    if len(chosen) < 2:
-        error = f"Pick two or more {'subgroups' if by == 'subgroup' else 'groups'}."
-    else:
-        try:
-            n_trophies = _trophies(values["ntrophies"])
-            groups.add_group(
-                event,
-                values["name"],
-                constituents=chosen if by == "group" else (),
-                subgroups=chosen if by == "subgroup" else (),
-                n_trophies=n_trophies,
-            )
-        except GroupFailure as failure:
-            error = failure.description
-        except ValueError:
-            error = "Pick a number of trophies."
-    if error:
-        return render(
-            request,
-            "ui/groups/sheets/aggregate.html",
-            {**context, "values": values, "error": error},
+    values = {
+        **_sheet_values(request.POST),
+        "by": by,
+        "picked": picked,
+        "scope": request.POST.get("scope", "all"),
+        "partitions": _ids(",".join(request.POST.getlist("partition"))),
+    }
+    try:
+        n_trophies = _trophies(values["ntrophies"])
+        award_ids = _award_partitions(request.POST)
+        groups.add_aggregate(
+            event,
+            values["name"],
+            group_ids=picked if by == "group" else (),
+            subgroup_ids=picked if by == "subgroup" else (),
+            n_trophies=n_trophies,
+            award_partition_ids=award_ids,
         )
-    return changed(request, f"Added {values['name'].strip()}.")
+    except GroupFailure as failure:
+        error = failure.description
+    except ValueError as failure:
+        error = str(failure)
+    else:
+        return changed(request, f"Added {values['name'].strip()}.")
+    return render(
+        request,
+        "ui/groups/sheets/aggregate.html",
+        {**context, "values": values, "error": error},
+    )
 
 
 # ----- subgroups -----
@@ -521,14 +504,10 @@ def subgroup_edit(request, subgroup_id):
         n_trophies = _trophies(values["ntrophies"])
     except ValueError:
         return HttpResponse(
-            _subgroup_sheet(
-                request, subgroup, values=values, error="Pick a number of trophies."
-            )
+            _subgroup_sheet(request, subgroup, values=values, error=TROPHIES_MESSAGE)
         )
     try:
-        picked = _award_partitions(
-            request.POST, partition_choice(_event(request), subgroup=subgroup)
-        )
+        picked = _award_partitions(request.POST)
         groups.edit_subgroup(subgroup, values["name"], n_trophies, picked)
     except (GroupFailure, ValueError) as failure:
         return HttpResponse(
@@ -587,14 +566,11 @@ def subgroup_move(request, subgroup_id):
             },
         )
     target = request.POST.get("group", "")
-    if target == NEW_GROUP:
-        group = None
-    else:
-        group = Group.objects.filter(event=event, pk=_int(target) or 0).first()
-        if group is None or groups.is_aggregate(group.pk):
-            return service_error(request, "Pick a group to move it to.")
-    groups.move_subgroup(subgroup, group)
-    subgroup.refresh_from_db()
+    group_id = None if target == NEW_GROUP else (_int(target) or 0)
+    try:
+        subgroup = groups.move_subgroup_to(event, subgroup.pk, group_id)
+    except GroupFailure as failure:
+        return refused(request, failure)
     return changed(request, f"Moved {subgroup.name} to {subgroup.group.name}.")
 
 

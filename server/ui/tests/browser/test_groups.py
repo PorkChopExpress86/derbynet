@@ -528,11 +528,17 @@ def test_add_an_aggregate(login, event):
     form.locator('[data-constituents="subgroup"]').get_by_label("Lions").check()
     form.locator('[data-constituents="subgroup"]').get_by_label("Tigers").check()
     form.get_by_label("Speed trophies").select_option("2")
+    awards = form.locator('[data-partition-list="ag"]')
+    awards.get_by_label("Only these").check()
+    expect(awards.locator('input[name="partition"]:visible')).to_have_count(2)
+    awards.get_by_label("Tigers").uncheck()
     shoot(page, "groups-aggregate-sheet", full_page=False)
     form.get_by_role("button", name="Add aggregate").click()
     expect(sheet(page)).to_be_hidden()
     cats = Group.objects.get(event=event, name="Cats")
     assert groups.is_aggregate(cats.pk) and cats.n_trophies == 2
+    listed = AwardPartition.objects.filter(group=cats)
+    assert list(listed.values_list("partition__name", flat=True)) == ["Lions"]
     expect(
         page.locator(f'[data-aggregate="{cats.pk}"] [data-constituents]')
     ).to_have_text("Lions, Tigers")

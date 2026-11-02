@@ -217,3 +217,22 @@ def partition_choice(
         )
     )
     return PartitionChoice(offered, stored or None)
+
+
+def set_partition_list_by_id(
+    event,
+    partition_ids: Iterable[int],
+    *,
+    group: Group | None = None,
+    subgroup: Subgroup | None = None,
+) -> None:
+    """`set_partition_list` from posted partition ids, resolved and checked
+    under the lock. An id that names no partition of the event, or one the
+    unit does not draw from, is a `ValueError`."""
+    wanted = set(partition_ids)
+    with transaction.atomic():
+        lock_race_state(event.id)
+        found = list(Partition.objects.filter(event=event, pk__in=wanted))
+        if len(found) != len(wanted):
+            raise ValueError("a partition of another event or none")
+        set_partition_list(event, found, group=group, subgroup=subgroup)

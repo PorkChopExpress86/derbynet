@@ -25,7 +25,7 @@ from django.db.models import Count, Max, Min, Q, Value
 from django.db.models.functions import Left, Lower
 
 from awards.models import Award, BallotAward
-from awards.services import reconcile_partition_lists, set_partition_list
+from awards.services import reconcile_partition_lists, set_partition_list_by_id
 from core.models import ActionLog, FullFieldRule, RaceSettings, RaceState
 from core.services import lock_race_state
 from racing.engine.heat_state import Cancel
@@ -74,6 +74,11 @@ class Failure(StrEnum):
     LAST_RANK = "last-rank"
     EXISTING_RACERS = "existing-racers"
     CONSTITUENT = "constituent"
+    # Django only, for the group editor (#43).
+    BAD_ORDER = "bad-order"
+    TOO_FEW = "too-few"
+    NOT_A_GROUP = "not-a-group"
+    BAD_PARTITIONS = "bad-partitions"
 
 
 class GroupFailure(Exception):
@@ -1001,21 +1006,37 @@ def rename_group(group: Group, name: str, n_trophies=KEEP) -> None:
             Group.objects.filter(pk=group.pk).update(n_trophies=n_trophies)
 
 
-def edit_group(group: Group, name: str, n_trophies=KEEP, award_partitions=KEEP) -> None:
-    """The group editor's save (#43): `class.edit` and the group's speed-award
-    partition list (D35), in one transaction. `award_partitions` empty or
-    every partition the group draws from is "all partitions". A name that
-    is unchanged renames nothing, so a group whose partitions cannot share a
-    name still takes a new trophy count."""
+def _edit(row, rename, name: str, n_trophies, award_partition_ids, **unit) -> None:
+    """The group editor's save of a group or subgroup (#43): the rename,
+    the trophy count and the speed-award partition list (D35), in one
+    transaction, so a refused list rolls the rest back. A name that is
+    unchanged renames nothing, so a row whose partitions cannot share a
+    name still takes a new trophy count. `award_partition_ids` empty, or
+    every partition the row draws from, is "all partitions"."""
     with transaction.atomic():
-        lock_race_state(group.event_id)
-        group = Group.objects.select_related("event").get(pk=group.pk)
-        if _cut(name) != group.name:
-            rename_group(group, name, n_trophies)
+        lock_race_state(row.event_id)
+        row = type(row).objects.select_related("event").get(pk=row.pk)
+        if _cut(name) != row.name:
+            rename(row, name, n_trophies)
         elif n_trophies is not KEEP:
-            Group.objects.filter(pk=group.pk).update(n_trophies=n_trophies)
-        if award_partitions is not KEEP:
-            set_partition_list(group.event, award_partitions, group=group)
+            type(row).objects.filter(pk=row.pk).update(n_trophies=n_trophies)
+        if award_partition_ids is not KEEP:
+            try:
+                set_partition_list_by_id(
+                    row.event, award_partition_ids, **{unit["kind"]: row}
+                )
+            except ValueError:
+                raise GroupFailure(
+                    Failure.BAD_PARTITIONS,
+                    "Pick partitions this award draws from.",
+                ) from None
+
+
+def edit_group(
+    group: Group, name: str, n_trophies=KEEP, award_partition_ids=KEEP
+) -> None:
+    """`class.edit` with the group's speed-award partition list (#43)."""
+    _edit(group, rename_group, name, n_trophies, award_partition_ids, kind="group")
 
 
 def delete_group(group: Group) -> None:
@@ -1120,19 +1141,17 @@ def rename_subgroup(subgroup: Subgroup, name: str, n_trophies=KEEP) -> None:
 
 
 def edit_subgroup(
-    subgroup: Subgroup, name: str, n_trophies=KEEP, award_partitions=KEEP
+    subgroup: Subgroup, name: str, n_trophies=KEEP, award_partition_ids=KEEP
 ) -> None:
-    """The subgroup editor's save (#43): `rank.edit` and the subgroup's
-    speed-award partition list (D35), in one transaction, as `edit_group`."""
-    with transaction.atomic():
-        lock_race_state(subgroup.event_id)
-        subgroup = Subgroup.objects.select_related("event").get(pk=subgroup.pk)
-        if _cut(name) != subgroup.name:
-            rename_subgroup(subgroup, name, n_trophies)
-        elif n_trophies is not KEEP:
-            Subgroup.objects.filter(pk=subgroup.pk).update(n_trophies=n_trophies)
-        if award_partitions is not KEEP:
-            set_partition_list(subgroup.event, award_partitions, subgroup=subgroup)
+    """`rank.edit` with the subgroup's speed-award partition list (#43)."""
+    _edit(
+        subgroup,
+        rename_subgroup,
+        name,
+        n_trophies,
+        award_partition_ids,
+        kind="subgroup",
+    )
 
 
 def delete_subgroup(subgroup: Subgroup) -> None:
@@ -1204,3 +1223,130 @@ def order_subgroups(
         ):
             _renumber_densely(Subgroup.objects.filter(group_id=group_id), subgroups)
         _reorder_partitions(event.id)
+
+
+# ----- The group editor (#43) ---------------------------------------------
+#
+# The editor posts ids. These services resolve them and check the editor's
+# rules under the lock, so no view reads the structure before a change and
+# acts on it after.
+
+
+def _bad_order(what: str) -> GroupFailure:
+    return GroupFailure(Failure.BAD_ORDER, f"That order names no {what}.")
+
+
+def _in_order(rows) -> list:
+    return sorted(rows, key=lambda r: (r.sort_order, _fold(r.name), r.pk))
+
+
+def reorder_groups(event, ids: Sequence[int]) -> None:
+    """Groups, or aggregates, in the posted order (`class.order`). The other
+    kind keeps its order, and aggregates stay after the groups. A list that
+    mixes the two kinds, or names a group of no event's, is `bad-order`."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        rows = list(Group.objects.filter(event=event))
+        aggregates = set(
+            GroupConstituent.objects.filter(event=event).values_list(
+                "aggregate_id", flat=True
+            )
+        ) | set(
+            GroupConstituentSubgroup.objects.filter(event=event).values_list(
+                "aggregate_id", flat=True
+            )
+        )
+        organic = [g for g in _in_order(rows) if g.pk not in aggregates]
+        rolled = [g for g in _in_order(rows) if g.pk in aggregates]
+        posted = list(dict.fromkeys(ids))
+        by_id = {g.pk: g for g in rows}
+        if posted and set(posted) <= {g.pk for g in organic}:
+            first = [by_id[i] for i in posted]
+            ordered = [*first, *[g for g in organic if g not in first], *rolled]
+        elif posted and set(posted) <= {g.pk for g in rolled}:
+            first = [by_id[i] for i in posted]
+            ordered = [*organic, *first, *[g for g in rolled if g not in first]]
+        else:
+            raise _bad_order("groups of one kind")
+        order_groups(event, ordered)
+
+
+def reorder_subgroups(event, ids: Sequence[int]) -> None:
+    """One group's subgroups in the posted order (`rank.order`). Subgroups
+    of two groups, or none, are `bad-order`."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        posted = list(dict.fromkeys(ids))
+        by_id = {s.pk: s for s in Subgroup.objects.filter(event=event, pk__in=posted)}
+        if not posted or len(by_id) != len(posted):
+            raise _bad_order("subgroups of this event")
+        if len({s.group_id for s in by_id.values()}) != 1:
+            raise _bad_order("subgroups of one group")
+        order_subgroups(event, [by_id[i] for i in posted])
+
+
+def reorder_partitions(event, ids: Sequence[int]) -> None:
+    """Partitions in the posted order (`partition.order`)."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        posted = list(dict.fromkeys(ids))
+        by_id = {p.pk: p for p in Partition.objects.filter(event=event, pk__in=posted)}
+        if not posted or len(by_id) != len(posted):
+            raise _bad_order("partitions of this event")
+        order_partitions(event, [by_id[i] for i in posted])
+
+
+def move_subgroup_to(event, subgroup_id: int, group_id: int | None) -> Subgroup:
+    """ "Move to...": the subgroup into group `group_id`, or with None into a
+    new group (`rank.move`). An aggregate, or a group of no event's, is
+    `not-a-group`. Returns the moved subgroup."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        subgroup = Subgroup.objects.get(event=event, pk=subgroup_id)
+        group = None
+        if group_id is not None:
+            group = Group.objects.filter(event=event, pk=group_id).first()
+            if group is None or is_aggregate(group.pk):
+                raise GroupFailure(Failure.NOT_A_GROUP, "Pick a group to move it to.")
+        move_subgroup(subgroup, group)
+        return Subgroup.objects.select_related("group").get(pk=subgroup.pk)
+
+
+def add_aggregate(
+    event,
+    name: str,
+    *,
+    group_ids: Sequence[int] = (),
+    subgroup_ids: Sequence[int] = (),
+    n_trophies=KEEP,
+    award_partition_ids: Sequence[int] = (),
+) -> Group:
+    """The editor's new aggregate (`class.add` with constituents): two or
+    more groups, or two or more subgroups, of the event, else `too-few`,
+    with its speed-award partition list, which may name only partitions
+    the aggregate draws from (`bad-partitions`)."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        groups = list(Group.objects.filter(event=event, pk__in=set(group_ids)))
+        subgroups = list(Subgroup.objects.filter(event=event, pk__in=set(subgroup_ids)))
+        if len(groups) + len(subgroups) < 2 or (groups and subgroups):
+            raise GroupFailure(
+                Failure.TOO_FEW, "Pick two or more groups, or two or more subgroups."
+            )
+        rank = {pk: n for n, pk in enumerate([*group_ids, *subgroup_ids])}
+        groups.sort(key=lambda g: rank[g.pk])
+        subgroups.sort(key=lambda s: rank[s.pk])
+        aggregate = add_group(
+            event,
+            name,
+            constituents=groups,
+            subgroups=subgroups,
+            n_trophies=n_trophies,
+        )
+        try:
+            set_partition_list_by_id(event, award_partition_ids, group=aggregate)
+        except ValueError:
+            raise GroupFailure(
+                Failure.BAD_PARTITIONS, "Pick partitions this aggregate draws from."
+            ) from None
+        return aggregate

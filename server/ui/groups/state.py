@@ -20,8 +20,13 @@ RULES = (
     (Rule.ONE_GROUP.value, "One group"),
     (Rule.CUSTOM.value, "Custom"),
 )
-# PHP's trophy count select: Default, then 0 to 10.
-TROPHY_CHOICES = tuple(range(11))
+# The trophy count select of PHP's group, subgroup and aggregate dialogs:
+# Default, then 0 to 10.
+MAX_UNIT_TROPHIES = 10
+TROPHY_CHOICES = tuple(range(MAX_UNIT_TROPHIES + 1))
+# PHP's number fields for the pack, per-group and per-subgroup trophy
+# settings take 0 to 20 (`racing-groups.php`).
+MAX_DEFAULT_TROPHIES = 20
 
 
 def group_labels(event) -> Labels:
@@ -40,6 +45,8 @@ class PartitionRow:
     name: str
     count: int
     ranges: list = field(default_factory=list)
+    subgroup_id: int = 0
+    group_id: int = 0
 
 
 @dataclass
@@ -82,6 +89,10 @@ class Tree:
     aggregates: list[AggregateRow]
     partitions: list[PartitionRow]
     pack: PartitionChoice
+
+    @property
+    def max_default_trophies(self) -> int:
+        return MAX_DEFAULT_TROPHIES
 
     @property
     def rule_choices(self) -> list[tuple[str, str]]:
@@ -143,8 +154,13 @@ def build(event) -> Tree:
     subgroup_of = dict(
         Partition.objects.filter(event=event).values_list("id", "subgroup_id")
     )
+    group_of = {
+        s["rankid"]: entry["classid"] for entry in classes for s in entry["subgroups"]
+    }
     for row in partitions:
-        by_subgroup.setdefault(subgroup_of[row.id], []).append(row)
+        row.subgroup_id = subgroup_of[row.id]
+        row.group_id = group_of.get(row.subgroup_id, 0)
+        by_subgroup.setdefault(row.subgroup_id, []).append(row)
 
     owner_of_group: dict[int, str] = {}
     owner_of_subgroup: dict[int, str] = {}
