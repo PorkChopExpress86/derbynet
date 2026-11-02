@@ -39,8 +39,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # testing/docker/run-suite.sh harness, with its layers cached between
+      # runs, as in php-suite.yml.
+      - uses: docker/setup-buildx-action@v4.4.1
+
       - name: Build the test harness image
-        run: testing/docker/run-suite.sh harness
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: testing/puppeteer
+          file: testing/docker/Dockerfile
+          tags: derbynet-test-harness
+          load: true
+          cache-from: type=gha,scope=harness
+          cache-to: type=gha,scope=harness,mode=max
 
       - name: Build PHP assets
         run: testing/docker/run-suite.sh assets
@@ -115,8 +126,19 @@ jobs:
         working-directory: server
         run: uv sync --locked
 
+      # testing/docker/run-suite.sh harness, with its layers cached between
+      # runs, as in php-suite.yml.
+      - uses: docker/setup-buildx-action@v4.4.1
+
       - name: Build the test harness image
-        run: testing/docker/run-suite.sh harness
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: testing/puppeteer
+          file: testing/docker/Dockerfile
+          tags: derbynet-test-harness
+          load: true
+          cache-from: type=gha,scope=harness
+          cache-to: type=gha,scope=harness,mode=max
 
       # runserver with DERBYNET_ENABLE_TEST_ENDPOINTS=1 and DERBYNET_BACKEND=django.
       # The data folder is the PHP image's, so that the folder settings differ
