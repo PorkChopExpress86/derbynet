@@ -24,6 +24,8 @@ VERIFY_RUN=v1 VERIFY_PORT=8090 .claude/skills/verify/bin/seed     # baseline bel
 
 `VERIFY_SERVER=django` runs `server/` from this checkout, a worktree too, with no Docker. Its database and settings live in `server/var/verify-<VERIFY_RUN>/`, and its log in the evidence folder as `server.log`. It runs with DEBUG off, as on race day, so `runserver --insecure` serves the static files. `seed` works the same, and `/login.php` redirects to the Django login page.
 
+The Django server keeps the code and templates it started with. After each edit under `server/`, run `VERIFY_RUN=v1 VERIFY_PORT=8090 VERIFY_SERVER=django .claude/skills/verify/bin/restart` before driving again; the database, seed included, stays.
+
 Baseline after `seed`: event `Verify`, 4 lanes, racers `Ava`..`Hal Verify` in dens `Lions` (cars 101-104) and `Tigers` (201-204), all checked in. Role passwords: RaceCoordinator `doyourbest`, RaceCrew `murphy`, Photo `flashbulb`.
 
 Never drive `derbynet-local` on port 8080: that is the owner's own instance.
