@@ -383,6 +383,8 @@ ENTRIES: tuple[NavEntry, ...] = (
         php="timer-test.php",
         menu=False,
     ),
+    # Scratch: a stub page, to show the smoke test covers a new entry.
+    NavEntry("stub", "Stub Page", "stub/", Perm.SET_UP, OTHER, 40, menu=False),
     # Replay is a kiosk page (#53). It is here for the Photo role's bottom
     # nav (D20), and needs CONTROL_RACE (D16).
     NavEntry(
