@@ -14,6 +14,7 @@ The PHP server under `website/` is frozen: fix every defect in the Django port (
 
 ## Running things
 
+- Django checks (pytest, ruff, migrations, xdist rules): `server/README.md`; run them from `server/` with `uv run`.
 - Builds and tests run in containers through `testing/docker/run-suite.sh`; the host has no PHP, Java, or Ant. Run it from a regular clone, not a git worktree.
 - To see what PHP does with one script, from a worktree too: `testing/docker/php-scratch.sh` (usage in `testing/README.md`).
 - Tests that pass on SQLite can fail on Postgres, which CI also runs. Check with `server/tools/pytest-postgres.sh`.
