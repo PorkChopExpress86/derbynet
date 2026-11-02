@@ -1,0 +1,16 @@
+<header class="sticky top-0 z-20 flex h-14 items-center gap-1 border-b border-line bg-surface pl-1 pr-1">
+  {% if back_url %}
+  <a href="{{ back_url }}" aria-label="Back" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="back" %}</a>
+  {% elif shell.entry.key != "home" %}
+  <a href="{% url 'home' %}" aria-label="Home" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2 lg:hidden">{% include "ui/components/icon.html" with name="home" %}</a>
+  {% endif %}
+  <h1 class="min-w-0 flex-1 truncate pl-2 text-lg font-semibold">{% firstof page_title shell.entry.label "DerbyNet" %}</h1>
+  {% if shell.role %}
+  <span class="max-w-36 truncate rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink-muted" data-role-chip><span class="sr-only">Logged in as </span>{{ shell.role }}</span>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+    <button type="submit" aria-label="Log out" class="grid size-11 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="logout" %}</button>
+  </form>
+  {% elif shell.entry.key != "login" %}
+  <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" class="flex min-h-11 items-center gap-1 rounded-full px-3 text-sm font-semibold text-accent hover:bg-surface-2">{% include "ui/components/icon.html" with name="login" cls="size-5" %}Log in</a>
+  {% endif %}
+</header>

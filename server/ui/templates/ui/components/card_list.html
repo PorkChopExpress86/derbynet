@@ -1,0 +1,4 @@
+{# {% component "card_list" label="Racers" %}cards{% endcomponent %}. Replaces wide tables with one card per row (#39). Put {% component "card" %} items inside. #}
+<ul role="list" aria-label="{{ label }}" class="flex flex-col gap-2 {{ cls }}">
+{{ body }}
+</ul>

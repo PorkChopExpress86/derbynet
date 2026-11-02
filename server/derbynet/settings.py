@@ -156,6 +156,7 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "ui.context_processors.shell",
             ],
         },
     },
@@ -190,6 +191,12 @@ USE_TZ = True
 
 # Relative, so Django puts FORCE_SCRIPT_NAME in front of it.
 STATIC_URL = "static/"
+
+# The quick reference the help link opens. The docs build writes it.
+QUICKREF_PDF = Path(
+    os.environ.get("DERBYNET_QUICKREF_PDF")
+    or BASE_DIR.parent / "docs" / "dist" / "Quick Reference.pdf"
+)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

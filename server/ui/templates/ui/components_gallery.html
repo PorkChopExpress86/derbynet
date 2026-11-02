@@ -1,0 +1,85 @@
+{% extends "ui/base.html" %}
+{% load ui %}
+{% block title %}Components{% endblock %}
+{% block main %}
+<p class="mb-4 text-ink-muted">The #39 component catalog, as M4 pages use it. Served with DERBYNET_DEBUG or DERBYNET_ENABLE_TEST_ENDPOINTS only.</p>
+
+<section aria-labelledby="c-filter" class="mb-8">
+  <h2 id="c-filter" class="mb-2 text-lg font-semibold">Card list with a sticky filter bar</h2>
+  {% component "filter_bar" label="Filter racers" %}
+    {% include "ui/components/search_field.html" with id="gallery-find" %}
+    {% include "ui/components/segmented.html" with name="order" legend="Order racers by" options=orders selected="name" %}
+  {% endcomponent %}
+  {% component "card_list" label="Racers" %}
+    {% for r in racers %}
+    {% component "card" id=r.id %}
+      <span class="w-12 font-semibold tabular-nums">{{ r.car }}</span>
+      <span class="min-w-0 flex-1 truncate" id="racer-{{ r.id }}-name">{{ r.name }}</span>
+      {% include "ui/components/switch.html" with label="Passed: "|add:r.name checked=r.passed name="passed" %}
+    {% endcomponent %}
+    {% endfor %}
+  {% endcomponent %}
+</section>
+
+<section aria-labelledby="c-switch" class="mb-8">
+  <h2 id="c-switch" class="mb-2 text-lg font-semibold">Switches</h2>
+  <div class="flex flex-col gap-2 rounded-xl border border-line bg-surface p-4">
+    <div class="flex items-center justify-between"><span id="sw-ok">Saves (204)</span>{% url 'components-demo' 'ok' as ok_url %}{% include "ui/components/switch.html" with labelledby="sw-ok" checked=False name="value" url=ok_url %}</div>
+    <div class="flex items-center justify-between"><span id="sw-refuse">Refused (422), flips back</span>{% url 'components-demo' 'refuse' as refuse_url %}{% include "ui/components/switch.html" with labelledby="sw-refuse" checked=False name="value" url=refuse_url %}</div>
+  </div>
+</section>
+
+<section aria-labelledby="c-toast" class="mb-8">
+  <h2 id="c-toast" class="mb-2 text-lg font-semibold">Toast with Undo</h2>
+  <div class="flex flex-wrap gap-2">
+    <button type="button" hx-post="{% url 'components-demo' 'toast' %}" hx-target="#toasts" hx-swap="beforeend" class="min-h-11 rounded-xl border border-line bg-surface px-4 font-semibold" data-demo="toast">Pass Ben</button>
+    <button type="button" hx-post="{% url 'components-demo' 'refuse' %}" class="min-h-11 rounded-xl border border-line bg-surface px-4 font-semibold" data-demo="refuse">Refused change</button>
+  </div>
+</section>
+
+<section aria-labelledby="c-sheet" class="mb-8">
+  <h2 id="c-sheet" class="mb-2 text-lg font-semibold">Sheet and confirm sheet</h2>
+  <div class="flex flex-wrap gap-2">
+    <button type="button" @click="$store.ui.open('gallery-sheet', $event)" class="min-h-11 rounded-xl border border-line bg-surface px-4 font-semibold" data-demo="sheet">Open a sheet</button>
+    <button type="button" @click="$store.ui.open('gallery-confirm', $event)" class="min-h-11 rounded-xl border border-danger bg-surface px-4 font-semibold text-danger" data-demo="confirm">Delete racers</button>
+  </div>
+  {% component "sheet" name="gallery-sheet" title="Racer details" %}
+    <p>A bottom sheet on a phone and a centered dialog on a desktop.</p>
+  {% endcomponent %}
+  {% url 'components-demo' 'toast' as toast_url %}
+  {% component "confirm_sheet" name="gallery-confirm" title="Delete racers?" verb="Delete" count=42 noun="racer" hx_post=toast_url %}
+    <p>This deletes every racer in Lions and their results.</p>
+  {% endcomponent %}
+</section>
+
+<section aria-labelledby="c-stepper" class="mb-8">
+  <h2 id="c-stepper" class="mb-2 text-lg font-semibold">Stepper and status pills</h2>
+  <div class="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4">
+    {% include "ui/components/stepper.html" with id="gallery-top" name="top" label="Racers in the final" value=4 min=1 max=8 %}
+    <div class="flex flex-wrap gap-2">
+      {% include "ui/components/status_pill.html" with text="Timer: connected" state="ok" age="3 s" %}
+      {% include "ui/components/status_pill.html" with text="Replay: no contact" state="warn" age="45 s" %}
+      {% include "ui/components/status_pill.html" with text="Timer: malfunction" state="danger" %}
+      {% include "ui/components/status_pill.html" with text="Replay: not set up" %}
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="c-sortable" class="mb-8">
+  <h2 id="c-sortable" class="mb-2 text-lg font-semibold">Sortable list</h2>
+  {% url 'components-demo' 'ok' as order_url %}
+  {% component "sortable_list" label="Awards in presentation order" url=order_url name="order" %}
+    {% include "ui/components/sortable_item.html" with id="a1" label="Best Design" %}
+    {% include "ui/components/sortable_item.html" with id="a2" label="Most Colorful" %}
+    {% include "ui/components/sortable_item.html" with id="a3" label="Fastest Car" %}
+  {% endcomponent %}
+</section>
+
+<section aria-labelledby="c-poll" class="mb-8">
+  <h2 id="c-poll" class="mb-2 text-lg font-semibold">Polled section</h2>
+  <div id="gallery-poll" hx-post="{% url 'components-demo' 'ok' %}" {% poll_trigger poll_seconds %} class="rounded-xl border border-line bg-surface p-4">
+    <label for="gallery-poll-field" class="block text-sm font-medium">Polling pauses while this field has focus</label>
+    <input id="gallery-poll-field" type="text" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+  </div>
+</section>
+{% endblock %}

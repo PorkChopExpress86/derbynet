@@ -1,0 +1,21 @@
+{# The phone bottom nav, under 1024px: the role's fixed entries (D20), then More, or Log in for a visitor. #}
+<nav aria-label="Primary" class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden" data-bottom-nav>
+  <ul role="list" class="grid grid-flow-col auto-cols-fr">
+    {% for e in shell.bottom_nav %}<li>
+      <a href="{% url e.key %}"{% if e == shell.entry %} aria-current="page"{% endif %} class="flex h-16 w-full flex-col items-center justify-center gap-0.5 text-xs font-medium {% if e == shell.entry %}text-ink{% else %}text-ink-muted{% endif %}">
+        <span class="grid h-7 w-14 place-items-center rounded-full{% if e == shell.entry %} bg-accent-soft{% endif %}">{% include "ui/components/icon.html" with name=e.icon %}</span>{{ e.phone_label }}
+      </a>
+    </li>{% endfor %}
+    <li>
+      {% if shell.role %}
+      <button type="button" aria-haspopup="dialog" @click="$store.ui.open('more', $event)" class="flex h-16 w-full flex-col items-center justify-center gap-0.5 text-xs font-medium text-ink-muted">
+        <span class="grid h-7 w-14 place-items-center rounded-full">{% include "ui/components/icon.html" with name="more" %}</span>More
+      </button>
+      {% else %}
+      <a href="{% url 'login' %}" class="flex h-16 w-full flex-col items-center justify-center gap-0.5 text-xs font-medium {% if shell.entry.key == 'login' %}text-ink{% else %}text-ink-muted{% endif %}"{% if shell.entry.key == 'login' %} aria-current="page"{% endif %}>
+        <span class="grid h-7 w-14 place-items-center rounded-full{% if shell.entry.key == 'login' %} bg-accent-soft{% endif %}">{% include "ui/components/icon.html" with name="login" %}</span>Log in
+      </a>
+      {% endif %}
+    </li>
+  </ul>
+</nav>

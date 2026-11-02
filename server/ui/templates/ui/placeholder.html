@@ -1,0 +1,7 @@
+{% extends "ui/base.html" %}
+{% block main %}
+<div class="rounded-xl border border-line bg-surface p-6" data-placeholder="{{ shell.entry.key }}">
+  <h2 class="text-lg font-semibold">{{ shell.entry.label }} is not built yet</h2>
+  <p class="mt-2 text-ink-muted">Ticket #{{ shell.entry.ticket }} builds this page{% if shell.entry.php %}, which replaces <code>{{ shell.entry.php }}</code>{% endif %}.</p>
+</div>
+{% endblock %}

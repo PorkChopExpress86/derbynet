@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.urls import path
+from django.urls import include, path
 
 from accounts import views as accounts
 from core import views
@@ -13,7 +13,6 @@ _legacy_prefix = (settings.FORCE_SCRIPT_NAME or "/derbynet").strip("/")
 
 urlpatterns = [
     path("health/", views.health, name="health"),
-    path("login/", accounts.login, name="login"),
     path("logout/", accounts.logout, name="logout"),
     path("mcheckin.php", accounts.mcheckin, name="mcheckin"),
     path("action.php", dispatch, name="action-php"),
@@ -30,4 +29,7 @@ urlpatterns = [
     path(f"{_legacy_prefix}/image.php/<path:rest>", media.image),
     path("slide.php/<path:rest>", media.slide, name="slide-php"),
     path(f"{_legacy_prefix}/slide.php/<path:rest>", media.slide),
+    # The manager pages: the navigation registry, home and login among them,
+    # and the 301s from their PHP pages (#40).
+    path("", include("ui.urls")),
 ]

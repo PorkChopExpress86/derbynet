@@ -1,0 +1,4 @@
+{# A status pill: text, an icon, and the age of the state (#39). state: ok, warn, danger or idle. #}
+<span class="inline-flex min-h-7 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {% if state == 'ok' %}bg-ok-soft text-ok-ink{% elif state == 'warn' %}bg-warn-soft text-warn-ink{% elif state == 'danger' %}bg-danger-soft text-danger-ink{% else %}bg-surface-2 text-ink-muted{% endif %}" data-state="{{ state|default:'idle' }}">
+  {% if state == 'danger' or state == 'warn' %}{% include "ui/components/icon.html" with name="warn" cls="size-3.5" %}{% else %}<span class="size-2 rounded-full bg-current" aria-hidden="true"></span>{% endif %}{{ text }}{% if age %}<span class="sr-only">,</span> {{ age }} ago{% endif %}
+</span>

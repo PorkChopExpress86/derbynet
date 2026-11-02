@@ -1,0 +1,9 @@
+{% load ui %}{# A confirm sheet that names the count, as "Delete 42 racers" (#39). Pass name, title, verb, count, noun (singular), noun_plural (default noun + "s"), and either hx_post (an htmx POST) or action (a form POST). The body explains what the action does. #}
+{% component "sheet" name=name title=title %}
+  {{ body }}
+  <form {% if action %}method="post" action="{{ action }}"{% else %}hx-post="{{ hx_post }}" hx-target="{{ hx_target|default:'#toasts' }}" hx-swap="{{ hx_swap|default:'beforeend' }}" @htmx:after-request="$store.ui.close()"{% endif %} class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    {% csrf_token %}
+    <button type="submit" data-confirm class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">{{ verb }} {{ count }} {% if count == 1 %}{{ noun }}{% elif noun_plural %}{{ noun_plural }}{% else %}{{ noun }}s{% endif %}</button>
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </form>
+{% endcomponent %}

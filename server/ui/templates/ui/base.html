@@ -1,0 +1,34 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  {# htmx defaults (#39): 204 swaps nothing, and a 403 or 422 is a toast for the toast region whatever the request's target. #}
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "403", "swap": true, "error": true, "target": "#toasts", "swapOverride": "beforeend"}, {"code": "422", "swap": true, "error": true, "target": "#toasts", "swapOverride": "beforeend"}, {"code": "[45]..", "swap": false, "error": true}]}'>
+  <title>{% block title %}{% firstof page_title shell.entry.label "DerbyNet" %}{% endblock %} · DerbyNet</title>
+  <link rel="stylesheet" href="{% static 'ui/app.css' %}">
+  <script src="{% static 'ui/app.js' %}"></script>
+  <script defer src="{% static 'ui/vendor/alpinejs-3.14.8.min.js' %}"></script>
+  <script src="{% static 'ui/vendor/htmx-2.0.4.min.js' %}"></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="min-h-dvh bg-bg text-ink antialiased" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data @keydown.escape.window="$store.ui.close()">
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-surface focus:p-3">Skip to content</a>
+  <div id="page" x-effect="$el.inert = $store.ui.modal()" class="lg:flex">
+    {% include "ui/shell/sidebar.html" %}
+    <div class="min-w-0 flex-1">
+      {% include "ui/shell/appbar.html" %}
+      {% if shell.default_password_roles %}{% include "ui/shell/default_password_banner.html" %}{% endif %}
+      <main id="main" class="mx-auto w-full max-w-5xl px-4 pt-4 {% if shell.bottom_nav is None %}pb-8{% else %}pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8{% endif %}">
+        {% block main %}{% endblock %}
+      </main>
+    </div>
+    {% if shell.bottom_nav is not None %}{% include "ui/shell/bottom_nav.html" %}{% endif %}
+  </div>
+  {# The sheet container. Sheets teleport here from wherever a page defines them. #}
+  <div id="sheets">{% include "ui/shell/more_drawer.html" %}{% block sheets %}{% endblock %}</div>
+  <div id="toasts" aria-live="polite" class="pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 {% if shell.bottom_nav is None %}bottom-4{% else %}bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:bottom-6{% endif %}"></div>
+  <template id="toast-template">{% include "ui/components/toast.html" with level="error" message="" %}</template>
+</body>
+</html>

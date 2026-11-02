@@ -1,0 +1,11 @@
+{# A segmented control: one choice of a few, as radio buttons (#39). Pass name, legend, options (pairs of value and label) and selected. With hx_get, a change fetches it with the choice. #}
+<fieldset class="{{ cls }}"{% if hx_get %} hx-get="{{ hx_get }}" hx-trigger="change" hx-target="{{ hx_target }}" hx-include="this"{% endif %}>
+  <legend class="{{ legend_class|default:'sr-only' }}">{{ legend }}</legend>
+  <div class="flex rounded-xl border border-field bg-surface p-1">
+    {% for value, label in options %}
+    <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent">
+      <input type="radio" class="sr-only" name="{{ name }}" value="{{ value }}"{% if value == selected %} checked{% endif %}>{{ label }}
+    </label>
+    {% endfor %}
+  </div>
+</fieldset>
