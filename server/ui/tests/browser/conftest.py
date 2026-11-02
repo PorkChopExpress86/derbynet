@@ -91,15 +91,37 @@ def _async_unsafe():
         yield
 
 
+def _css_is_fresh(tmp_path_factory, worker_id) -> bool:
+    """`css_build.check()`, run once per pytest run. Tailwind CLIs started at
+    once by several xdist workers can fail to load their native binding, so
+    the first worker runs it under a file lock in the directory every worker
+    shares, and the others read its answer."""
+    from ui import css_build
+
+    if worker_id == "master":
+        return css_build.check()
+    import fcntl
+
+    shared = tmp_path_factory.getbasetemp().parent
+    answer = shared / "css-fresh.txt"
+    with (shared / "css-fresh.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not answer.exists():
+            answer.write_text(str(css_build.check()))
+        return answer.read_text() == "True"
+
+
 @pytest.fixture(scope="session", autouse=True)
-def _fresh_css():
+def _fresh_css(tmp_path_factory, worker_id):
     """A page styled by a stale `app.css` lacks the classes a template just
     gained, so its screenshots and layout checks mislead. Where the Tailwind
     CLI is installed, refuse to run on a stale build; the `ui` CI job checks
     the same before it runs these tests."""
     from ui import css_build
 
-    if css_build.binary_path().exists() and not css_build.check():
+    if css_build.binary_path().exists() and not _css_is_fresh(
+        tmp_path_factory, worker_id
+    ):
         pytest.fail(css_build.OUT_OF_DATE.format(css_build.OUTPUT), pytrace=False)
 
 
