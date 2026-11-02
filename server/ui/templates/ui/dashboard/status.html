@@ -20,7 +20,7 @@
     <button type="button" hx-post="{% url 'dashboard-replay-test' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="trigger-replay" class="min-h-11 rounded-lg border border-line px-3 text-sm font-medium">Trigger Replay</button>
     {% endif %}
     {% if can_set_up %}
-    <button type="button" hx-get="{% url 'dashboard-replay-settings-sheet' %}" hx-target="#dash-sheet-body" hx-sync="#live:replace" @click="dashboard.open('Replay settings', $event)" aria-haspopup="dialog" data-action="replay-settings" class="min-h-11 rounded-lg border border-line px-3 text-sm font-medium">Replay settings</button>
+    <button type="button" hx-get="{% url 'dashboard-replay-settings-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-sync="#live:replace" @click="dashboard.open('Replay settings', $event)" aria-haspopup="dialog" data-action="replay-settings" class="min-h-11 rounded-lg border border-line px-3 text-sm font-medium">Replay settings</button>
     {% endif %}
     {% if timer.monitored %}
     {# Desktop: open or focus the browser timer, as timer-alive.js does. Phone: the timer status page (#50). #}

@@ -7,6 +7,7 @@
     <input type="hidden" name="hold" value="{{ shown.hold }}">
   </div>
   {% include "ui/dashboard/heat_card.html" %}
+  {% include "ui/dashboard/heat_tools.html" %}
   {% include "ui/dashboard/alerts.html" %}
   {% if intermission %}{% include "ui/dashboard/intermission.html" %}{% endif %}
   {% if final_requests or suggestions %}{% include "ui/dashboard/finals.html" %}{% endif %}

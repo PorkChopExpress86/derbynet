@@ -1,0 +1,24 @@
+{# The current heat's other controls and the device status, below the sticky card so the card stays short on a phone. #}
+<section aria-label="Heat controls and status" class="rounded-xl border border-line bg-surface p-3 lg:p-4" data-heat-tools>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" {% if not rerun.enabled %}disabled{% endif %} hx-post="{% url 'dashboard-rerun' %}" hx-vals='{"rerun": "{{ rerun.state }}"}' hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="rerun" data-rerun="{{ rerun.state }}" class="min-h-11 flex-1 rounded-lg border border-line px-3 text-sm font-medium disabled:opacity-40">{{ rerun.label }}</button>
+      {% if remote_start %}
+      <button type="button" hx-post="{% url 'dashboard-remote-start' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="start-race" class="min-h-11 flex-1 rounded-lg bg-ok px-3 text-sm font-semibold text-white dark:text-black">Start Race</button>
+      {% endif %}
+      {% if lane_count %}
+      <button type="button" hx-get="{% url 'dashboard-lanes-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-sync="#live:replace" @click="dashboard.open('Close a lane', $event)" aria-haspopup="dialog" data-action="close-lane" class="min-h-11 rounded-lg border border-line px-3 text-sm font-medium">Close a lane</button>
+      {% endif %}
+    </div>
+    {% if closed_lanes %}
+    <ul class="mt-2 flex flex-col gap-1" aria-label="Closed lanes" data-closed-lanes>
+      {% for row in closed_lanes %}
+      <li class="flex min-h-11 items-center gap-2 rounded-lg bg-surface-2 px-3 text-sm">
+        <span class="min-w-0 flex-1">Lane {{ row.lane }} closed · {{ scoring }}</span>
+        {% if row.reopen %}<button type="button" hx-post="{% url 'dashboard-lanes-reopen' row.lane %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="reopen" class="min-h-11 rounded-lg px-3 font-semibold text-accent underline underline-offset-2">Reopen lane {{ row.lane }}</button>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% include "ui/dashboard/status.html" %}
+</section>

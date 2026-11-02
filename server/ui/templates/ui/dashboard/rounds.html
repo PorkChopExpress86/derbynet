@@ -18,6 +18,6 @@
   <p class="rounded-xl border border-line bg-surface p-4 text-ink-muted">No rounds yet. Racing groups and their first rounds come from the roster and the racing groups page.</p>
   {% endfor %}
   {% if add_new_rounds %}
-  <button type="button" hx-get="{% url 'dashboard-new-round-sheet' %}" hx-target="#dash-sheet-body" hx-sync="#live:replace" @click="dashboard.open('New round', $event)" aria-haspopup="dialog" data-action="add-new-rounds" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-field font-semibold">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}Add New Rounds</button>
+  <button type="button" hx-get="{% url 'dashboard-new-round-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-sync="#live:replace" @click="dashboard.open('New round', $event)" aria-haspopup="dialog" data-action="add-new-rounds" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-field font-semibold">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}Add New Rounds</button>
   {% endif %}
 </section>

@@ -110,10 +110,14 @@ def _notices(request, notices) -> str:
     )
 
 
-def updated(request, message: str = "", *, level="ok", undo_url="", notices=()):
+def updated(
+    request, message: str = "", *, level="ok", undo_url="", notices=(), hold=True
+):
     """A mutation's reply: the live region out of band, then a toast for the
-    toast region the request swaps into."""
-    live = build(request, _event(request), Shown.from_request(request.POST))
+    toast region the request swaps into. A move to another heat by hand
+    (`hold=False`) ends the hold of a finished heat at once."""
+    shown = Shown.from_request(request.POST) if hold else Shown()
+    live = build(request, _event(request), shown)
     body = _live_html(request, live, oob=True) + _notices(request, notices)
     if message:
         body += _toast(request, message, level, undo_url)
@@ -124,10 +128,10 @@ def refused(request, failure) -> HttpResponse:
     return service_error(request, getattr(failure, "description", str(failure)))
 
 
-def _hs_reply(request, failure, message: str = ""):
+def _hs_reply(request, failure, message: str = "", *, hold=True):
     if failure is not None:
         return refused(request, failure)
-    return updated(request, message)
+    return updated(request, message, hold=hold)
 
 
 # ----- the page and its poll -------------------------------------------------------
@@ -175,7 +179,7 @@ def heat(request, which):
         raise Http404
     racing_after = False if which == "next-up" else None
     failure = heats.select_heat(_event(request), heat=which, now_racing=racing_after)
-    return _hs_reply(request, failure)
+    return _hs_reply(request, failure, hold=False)
 
 
 @require_POST

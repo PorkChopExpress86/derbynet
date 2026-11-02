@@ -51,3 +51,12 @@ setInterval(() => {
     el.textContent = formatAge(next);
   }
 }, 1000);
+
+// A sheet's body arrives after the sheet opens, so move the focus to its
+// first field once it does.
+document.addEventListener('htmx:afterSwap', (e) => {
+  if (e.detail.target && e.detail.target.id === 'dash-sheet-body') {
+    const first = e.detail.target.querySelector('[data-autofocus]');
+    if (first) first.focus();
+  }
+});
