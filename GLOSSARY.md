@@ -4,6 +4,9 @@ DerbyNet runs a pinewood derby race day: registering racers, checking cars in, s
 
 ## Race structure
 
+**Backup**:
+A copy of the server's data volumes, taken with the server stopped. It holds every event with its photos, videos, and logs.
+
 **Pack**:
 Everyone taking part in one event. The label is configurable (`supergroup-label`).
 _Avoid_: Supergroup (the setting's name, not a word for people)
@@ -105,5 +108,5 @@ One race day's data: its racers, rounds, results, awards, and settings. A server
 The folder that holds an event's racer photos, car photos, videos, and logs.
 
 **Snapshot**:
-One file that holds a whole event's data. Restoring a snapshot replaces the event of the same name with the data in the file.
-_Avoid_: Backup (a snapshot does not carry videos)
+One file that holds one event's data, and optionally its racer and car photos, in the format older DerbyNet reads. Restoring a snapshot replaces the event of the same name. It does not bring back videos, lane closures, racer notes, or check-in times.
+_Avoid_: Backup
