@@ -346,6 +346,44 @@ def test_pages_are_not_compared():
     assert report.skipped == 1
 
 
+def test_an_action_redirected_to_a_page_in_both_runs_is_not_compared():
+    # role.login with no event: PHP redirects to its setup page, and Django
+    # to setup.php, which #48 serves.
+    a = run("""
+        login RaceCoordinator
+
+        <!DOCTYPE html>
+        <html><head><title>DerbyNet Set-Up</title></head></html>
+        """)
+    b = a.replace("<!DOCTYPE html>", "<!doctype html>").replace(
+        "DerbyNet Set-Up", "Not Found"
+    )
+
+    report = differences(a, b)
+
+    assert report.ok
+    assert (report.compared, report.skipped) == (0, 1)
+
+
+def test_a_page_against_a_json_reply_is_compared():
+    a = run("""
+        login RaceCoordinator
+
+        <!DOCTYPE html>
+        <html><head><title>DerbyNet Set-Up</title></head></html>
+        """)
+    b = run("""
+        login RaceCoordinator
+
+        {"outcome": {"summary": "success"}}
+        """)
+
+    report = differences(a, b)
+
+    [found] = report.differences
+    assert (found.a, found.b) == ("<text>", "<json>")
+
+
 CLASS_ADD = """
     post action.php action=class.add&rankid_{rank}=1&name=Agg
 

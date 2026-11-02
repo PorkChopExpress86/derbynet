@@ -34,7 +34,8 @@ The gate fails when:
 A step in `AFTER_SKIP` shows the state of a step Django skipped, so its
 replies may differ. A difference in a reply is allowed when the registry's
 `PARITY_PATHS` covers its endpoint, path and values
-(`legacy_api.registry.allowed_by`). A step in `STEP_DIVERGENCES` asks the two
+(`legacy_api.registry.allowed_by`), or, in one step only, when that step's
+`STEP_PATHS` entry does. A step in `STEP_DIVERGENCES` asks the two
 servers different questions on purpose, so its transcripts are compared up
 to where they part. Every allowed difference, waiting step, skip and retry
 is printed, so nothing is hidden.
@@ -48,6 +49,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from legacy_api.parity_paths import ParityPath
 from tools.transcript_diff import (
     MISSING,
     Difference,
@@ -117,6 +119,67 @@ STEP_DIVERGENCES: dict[str, str] = {
         " charts and refusals, and races other heats (testing/README.md)"
     ),
 }
+
+# Reply paths that may differ from PHP's in one step only, because a divergence
+# changes the state the step builds, and so the replies that show that state,
+# rather than one endpoint's reply. Each entry cites an id of the endpoint's
+# divergences or of the step's STEP_DIVERGENCES entry (`step_path_text`).
+_COORDINATOR = (
+    "action schedule.reschedule",
+    "action heat.select",
+    "query poll.coordinator",
+)
+STEP_PATHS: dict[str, tuple[ParityPath, ...]] = {
+    # Django keeps the running and the staged heat and adds heats at the end
+    # (D34, Q20), and refuses a racer who is not on the roster (D39, Q25), so
+    # its charts differ from PHP's, and with them the heats each later reply
+    # shows. PHP turns racing off when it squeezes a heat out of the running
+    # round; Django never changes that heat (D39). The timings name the
+    # searches each server ran.
+    "test-reschedule.sh": (
+        ParityPath("action schedule.reschedule", "$.chart[*]", "D34"),
+        ParityPath("action schedule.reschedule", "$.timing.internal.*", "D34"),
+        *(
+            ParityPath(endpoint, path, "D34")
+            for endpoint in _COORDINATOR
+            for path in (
+                "$.racers[*]",
+                "$.racers[*].*",
+                "$.current-heat.number-of-heats",
+                "$.rounds[*].heats_scheduled",
+            )
+        ),
+        *(
+            ParityPath(
+                endpoint, "$.current-heat.now_racing", "D39", php=False, django=True
+            )
+            for endpoint in _COORDINATOR
+        ),
+    ),
+    # Under the master schedule, PHP's reply to schedule.generate shows the
+    # current heat and its racers from before it numbers the master heats and
+    # moves to the next-up heat (R7).
+    "test-master-schedule.sh": tuple(
+        ParityPath("action schedule.generate", path, "R7")
+        for path in ("$.current-heat.*", "$.racers[*]", "$.racers[*].*")
+    ),
+}
+
+
+def step_path_text(
+    label: str, allowed: ParityPath, step_divergences: dict[str, str]
+) -> str | None:
+    """The divergence a step path cites: the endpoint's entry with its id, or
+    else the step's STEP_DIVERGENCES entry when that names the id."""
+    from legacy_api.registry import divergence_text
+
+    text = divergence_text(allowed.endpoint, allowed.divergence)
+    if text:
+        return text
+    reason = step_divergences.get(label, "")
+    ids = reason.split(": ", 1)[0].split(", ")
+    return f"{label}: {reason}" if allowed.divergence in ids else None
+
 
 # The steps after a skipped step whose replies show the state that step would
 # have left, up to the next reset. Their replies may differ from PHP's; their
@@ -212,6 +275,7 @@ def judge(
     allow=_allow,
     after_skip: dict[str, str] | None = None,
     skips: dict[str, str] | None = None,
+    step_paths: dict[str, tuple[ParityPath, ...]] | None = None,
 ) -> list[StepResult]:
     waiting = WAITING if waiting is None else waiting
     after_skip = AFTER_SKIP if after_skip is None else after_skip
@@ -219,6 +283,7 @@ def judge(
     step_divergences = (
         STEP_DIVERGENCES if step_divergences is None else step_divergences
     )
+    step_paths = STEP_PATHS if step_paths is None else step_paths
     # One numbering per leg, carried from step to step.
     runs = new_runs(now)
     by_label = {s.label: s for s in django}
@@ -252,7 +317,12 @@ def judge(
                 if leg_step is not None and leg_step.outcome != "skip":
                     absorb(parse(_read(leg_step.transcript)), run)
             continue
-        report = diff(_read(step.transcript), _read(other.transcript), allow, now, runs)
+        step_allow = _with_step_paths(
+            step.label, step_paths.get(step.label, ()), step_divergences, allow
+        )
+        report = diff(
+            _read(step.transcript), _read(other.transcript), step_allow, now, runs
+        )
         result.report = report
         _judge_step(result, report, other, step_divergences)
     for label, other in by_label.items():
@@ -265,6 +335,24 @@ def judge(
                 StepResult(label, None, None, problems=["is listed but no leg ran it"])
             )
     return results
+
+
+def _with_step_paths(label, paths, step_divergences, allow):
+    """`allow`, and the step's own STEP_PATHS before it."""
+    if not paths:
+        return allow
+
+    def check(difference):
+        for allowed in paths:
+            if allowed.covers(
+                difference.endpoint, difference.path, difference.a, difference.b
+            ):
+                text = step_path_text(label, allowed, step_divergences)
+                if text:
+                    return text
+        return allow(difference)
+
+    return check
 
 
 def _first_request(transcript: str, start: str) -> int | None:

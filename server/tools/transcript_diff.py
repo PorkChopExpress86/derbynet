@@ -38,7 +38,9 @@ How a body is compared:
   `true` all differ.
 - A `photo.php` body (the digest or shape the script printed) is text.
 - Other pages are not compared, because each server renders HTML its own way
-  (`curl_page` in `common.sh`); they count as skipped.
+  (`curl_page` in `common.sh`); they count as skipped. So does an
+  `action.php` request both servers answered with an HTML page, because curl
+  followed a redirect: PHP's to its setup page when no event is open, for one.
 
 What is normalized, on both runs alike:
 
@@ -809,12 +811,16 @@ def diff(
         if req_a.comparison is Comparison.SKIPPED:
             report.skipped += 1
             continue
+        body_a = read_body(ex_a.body, req_a, run_a)
+        body_b = read_body(ex_b.body, req_b, run_b)
+        if _is_page(body_a) and _is_page(body_b):
+            # Both servers redirected the request to a page.
+            report.skipped += 1
+            _after(req_a, ex_a.body, run_a)
+            _after(req_b, ex_b.body, run_b)
+            continue
         report.compared += 1
-        found = diff_bodies(
-            read_body(ex_a.body, req_a, run_a),
-            read_body(ex_b.body, req_b, run_b),
-            req_a.endpoint,
-        )
+        found = diff_bodies(body_a, body_b, req_a.endpoint)
         for item in found:
             difference = Difference(
                 ex_a.index, req_a.endpoint, ex_a.request, item.path, item.a, item.b
@@ -827,6 +833,13 @@ def diff(
         _after(req_a, ex_a.body, run_a)
         _after(req_b, ex_b.body, run_b)
     return report
+
+
+def _is_page(body: Body) -> bool:
+    """An HTML page where a JSON or XML reply was due: curl followed a
+    redirect, such as PHP's to its setup page when no event is open."""
+    start = body.trailing[:15].lower()
+    return body.kind is BodyKind.TEXT and start.startswith(("<!doctype html", "<html"))
 
 
 def _after(request: Request, body: str, run: Run) -> None:
