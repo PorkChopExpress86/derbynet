@@ -67,6 +67,18 @@ def _async_unsafe():
         yield
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _fresh_css():
+    """A page styled by a stale `app.css` lacks the classes a template just
+    gained, so its screenshots and layout checks mislead. Where the Tailwind
+    CLI is installed, refuse to run on a stale build; the `ui` CI job checks
+    the same before it runs these tests."""
+    from ui import css_build
+
+    if css_build.binary_path().exists() and not css_build.check():
+        pytest.fail(css_build.OUT_OF_DATE.format(css_build.OUTPUT), pytrace=False)
+
+
 @pytest.fixture(autouse=True)
 def _database(transactional_db, live_server):
     """The live server reads what the test writes, so the test runs outside a
