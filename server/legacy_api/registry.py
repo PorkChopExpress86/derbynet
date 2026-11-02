@@ -172,7 +172,14 @@ _KIOSK_LISTS = ("query poll.kiosk.all", "action kiosk.assign", "action scene.app
 # Each reply path a recorded divergence changes, as the parity gate saw it,
 # with the values the divergence names. Add one only for a difference that an
 # existing divergence of that endpoint already explains; any other difference
-# fails the gate.
+# fails the gate. The divergence must be listed on the endpoint
+# (`test_every_parity_path_cites_a_divergence_of_its_endpoint` in
+# tests/test_parity_gate.py), and its id must be a key of QUIRK_DECISIONS
+# (racing/engine/tests/golden.py), a quirk of tests/golden/deviations.json or
+# a D row of plan/owner-decisions.md
+# (`test_every_divergence_names_a_recorded_decision` in
+# legacy_api/tests/test_registry.py). A #64 row the ticket leaves to the owner
+# is none of these until the owner decides it.
 PARITY_PATHS: tuple[ParityPath, ...] = (
     *(
         ParityPath(endpoint, f"$.current-heat.{key}", "R3", php=-1, django=None)

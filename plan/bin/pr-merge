@@ -13,8 +13,13 @@ REPO=${REPO:-PorkChopExpress86/derbynet}
 CLOSE_WAIT=${CLOSE_WAIT:-30}
 
 head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
-not_passed=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name \
-               --jq '.[] | select(.bucket != "pass" and .bucket != "skipping") | "\(.bucket) \(.name)"')
+# A push of the head commit to parity-check/<name> runs the parity gate on the
+# same SHA (.github/workflows/parity.yml), so its checks show on the PR. The
+# gate is not a pull request check yet; leave those runs out.
+not_passed=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,workflow,event \
+               --jq '.[] | select(.bucket != "pass" and .bucket != "skipping")
+                     | select(.workflow != "parity" or .event != "push")
+                     | "\(.bucket) \(.name)"')
 if [ -n "$not_passed" ]; then
   echo "not merging #$PR; checks on $head not passed:" >&2
   echo "$not_passed" >&2

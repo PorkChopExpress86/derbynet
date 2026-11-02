@@ -95,6 +95,11 @@ step_http() {
   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e GOLDEN_SCENARIOS \
          --network "container:$SERVER" -v "$ROOT:/derbynet" "$HARNESS_IMAGE" \
          bash /derbynet/server/tests/golden/capture/capture-http.sh /derbynet/server/tests/golden
+  # inputs.sha256: the testing/ and capture/ files this capture read, which
+  # `golden_inputs.py --check` compares in pytest and the pre-push hook.  A
+  # capture of some scenarios leaves the rest as they were, so it keeps the
+  # old file.
+  [ -n "${GOLDEN_SCENARIOS:-}" ] || python3 -I "$ROOT/server/tools/golden_inputs.py"
 }
 
 step_clean() {

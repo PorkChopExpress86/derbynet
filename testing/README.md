@@ -192,13 +192,31 @@ without it.
 The gate runs nightly, on demand, and on a push to a branch named
 `parity-check/<anything>`.  It does not run on pull requests, because it can't
 pass yet and `plan/bin/pr-merge` merges only when every check passed, so push a
-change to the gate to `parity-check/<name>` too.  To run it locally, from a
+change to the gate to `parity-check/<name>` too.  Its checks then show on the
+pull request, and `pr-merge` leaves them out.  To run it locally, from a
 regular checkout with the images built (`run-suite.sh harness assets`):
 
-    DERBYNET_PARITY_DIR=/tmp/leg-php testing/docker/run-suite.sh server timeout parity
+    DERBYNET_PARITY_DIR=/tmp/leg-php \
+        testing/docker/run-suite.sh server timeout parity
     server/tools/parity-django.sh /tmp/leg-django
     cd server && uv run python -m tools.parity_gate \
         /tmp/leg-php/steps /tmp/leg-django/suite/steps
+
+A change to the gate or to its allowances needs no new run: judge the legs of
+a finished run again, from its `leg-php` and `leg-django-<database>`
+artifacts:
+
+    gh run download <run> --repo PorkChopExpress86/derbynet \
+        -n leg-php -D /tmp/php
+    gh run download <run> --repo PorkChopExpress86/derbynet \
+        -n leg-django-sqlite -D /tmp/django
+    cd server && uv run python -m tools.parity_gate /tmp/php /tmp/django
+
+A difference that depends on how fast a server answers usually comes from a
+contact window: PHP counts a replay client as connected for 10 s after its
+last poll (`REPLAY_TIMEOUT_LIMIT`, `website/inc/replay.inc`) and a timer for
+60 s (`website/inc/timer-state.inc`).  Django keeps both, in
+`server/racing/services/replay.py` and `server/racing/services/timer.py`.
 
 ## Test photos
 
