@@ -1,0 +1,253 @@
+{
+ "current-heat": {
+  "now_racing": true,
+  "use_master_sched": true,
+  "use_points": false,
+  "classid": 2,
+  "roundid": 2,
+  "round": 1,
+  "tbodyid": 2,
+  "heat": 13,
+  "number-of-heats": 13,
+  "class": "White's Wolves"
+ },
+ "heat-results": [],
+ "ready-aggregate": [],
+ "racers": [
+  {
+   "lane": 1,
+   "name": "Willard Woolfolk",
+   "carname": "",
+   "carnumber": "282",
+   "photo": "",
+   "finishtime": "3.977",
+   "finishplace": 4
+  },
+  {
+   "lane": 2,
+   "name": "Blake Burling",
+   "carname": "",
+   "carnumber": "207",
+   "photo": "",
+   "finishtime": "3.646",
+   "finishplace": 2
+  },
+  {
+   "lane": 3,
+   "name": "Elliot Eastman",
+   "carname": "",
+   "carnumber": "227",
+   "photo": "",
+   "finishtime": "2.295",
+   "finishplace": 1
+  },
+  {
+   "lane": 4,
+   "name": "Dexter Dawes",
+   "carname": "",
+   "carnumber": "222",
+   "photo": "",
+   "finishtime": "3.720",
+   "finishplace": 3
+  }
+ ],
+ "timer-state": {
+  "lanes": 4,
+  "last_contact": 1526246081,
+  "state": 3,
+  "icon": "img/status/ok.png",
+  "message": "Staging"
+ },
+ "replay-state": {
+  "last_contact": 0,
+  "state": 1,
+  "icon": "img/status/not_connected.png",
+  "connected": false,
+  "message": "NOT CONNECTED"
+ },
+ "classes": [
+  {
+   "classid": 1,
+   "count": 17,
+   "nrounds": 1,
+   "ntrophies": -1,
+   "name": "Lions &amp; Tigers",
+   "subgroups": [
+    {
+     "rankid": 1,
+     "count": 17,
+     "name": "Lions &amp; Tigers"
+    }
+   ]
+  },
+  {
+   "classid": 2,
+   "count": 18,
+   "nrounds": 1,
+   "ntrophies": -1,
+   "name": "White's Wolves",
+   "subgroups": [
+    {
+     "rankid": 2,
+     "count": 18,
+     "name": "White's Wolves"
+    }
+   ]
+  },
+  {
+   "classid": 3,
+   "count": 17,
+   "nrounds": 1,
+   "ntrophies": -1,
+   "name": "Bears and Frèr",
+   "subgroups": [
+    {
+     "rankid": 3,
+     "count": 17,
+     "name": "Bears and Frèr"
+    }
+   ]
+  },
+  {
+   "classid": 4,
+   "count": 16,
+   "nrounds": 1,
+   "ntrophies": -1,
+   "name": "Webelos (\"Webes",
+   "subgroups": [
+    {
+     "rankid": 4,
+     "count": 16,
+     "name": "Webelos (\"Webes"
+    }
+   ]
+  },
+  {
+   "classid": 5,
+   "count": 15,
+   "nrounds": 1,
+   "ntrophies": -1,
+   "name": "Arrows &lt;&lt;--&lt;&lt;",
+   "subgroups": [
+    {
+     "rankid": 5,
+     "count": 15,
+     "name": "Arrows &lt;&lt;--&lt;&lt;"
+    }
+   ]
+  },
+  {
+   "classid": 7,
+   "count": 0,
+   "nrounds": 1,
+   "ntrophies": -1,
+   "name": "TheLastClass",
+   "subgroups": [
+    {
+     "rankid": 7,
+     "count": 0,
+     "name": "TheLastClass"
+    }
+   ]
+  }
+ ],
+ "rounds": [
+  {
+   "roundid": 7,
+   "classid": 2,
+   "class": "White's Wolves",
+   "round": 2,
+   "roster_size": 3,
+   "passed": 3,
+   "unscheduled": 3,
+   "heats_scheduled": 0,
+   "heats_run": 0,
+   "name": "White's Wolves, Round 2"
+  },
+  {
+   "roundid": 1,
+   "classid": 1,
+   "class": "Lions &amp; Tigers",
+   "round": 1,
+   "roster_size": 17,
+   "passed": 17,
+   "unscheduled": 0,
+   "heats_scheduled": 17,
+   "heats_run": 17,
+   "name": "Lions &amp; Tigers, Round 1"
+  },
+  {
+   "roundid": 2,
+   "classid": 2,
+   "class": "White's Wolves",
+   "round": 1,
+   "roster_size": 17,
+   "passed": 13,
+   "unscheduled": 0,
+   "heats_scheduled": 13,
+   "heats_run": 13,
+   "name": "White's Wolves, Round 1"
+  },
+  {
+   "roundid": 3,
+   "classid": 3,
+   "class": "Bears and Frèr",
+   "round": 1,
+   "roster_size": 16,
+   "passed": 2,
+   "unscheduled": 0,
+   "heats_scheduled": 4,
+   "heats_run": 4,
+   "name": "Bears and Frèr, Round 1"
+  },
+  {
+   "roundid": 4,
+   "classid": 4,
+   "class": "Webelos (\"Webes",
+   "round": 1,
+   "roster_size": 16,
+   "passed": 3,
+   "unscheduled": 0,
+   "heats_scheduled": 4,
+   "heats_run": 4,
+   "name": "Webelos (\"Webes, Round 1"
+  },
+  {
+   "roundid": 5,
+   "classid": 5,
+   "class": "Arrows &lt;&lt;--&lt;&lt;",
+   "round": 1,
+   "roster_size": 16,
+   "passed": 0,
+   "unscheduled": 0,
+   "heats_scheduled": 0,
+   "heats_run": 0,
+   "name": "Arrows &lt;&lt;--&lt;&lt;, Round 1"
+  },
+  {
+   "roundid": 6,
+   "classid": 6,
+   "class": "TheLastClass",
+   "round": 1,
+   "roster_size": 0,
+   "passed": 0,
+   "unscheduled": 0,
+   "heats_scheduled": 0,
+   "heats_run": 0,
+   "name": "TheLastClass, Round 1"
+  },
+  {
+   "roundid": 8,
+   "classid": 7,
+   "class": "Grand Finals",
+   "aggregate": true,
+   "round": 1,
+   "roster_size": 5,
+   "passed": 5,
+   "unscheduled": 5,
+   "heats_scheduled": 0,
+   "heats_run": 0,
+   "name": "Grand Finals, Round 1"
+  }
+ ]
+}

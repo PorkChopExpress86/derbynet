@@ -1,0 +1,30 @@
+{# Final requests made at check-in, and finalist suggestions after a changed round 1 result (D32, D33). Nothing changes until a button is tapped. #}
+{% for req in final_requests %}
+<section aria-label="Final request from {{ req.name }}" class="rounded-xl border border-line bg-surface p-4" data-final-request="{{ req.id }}">
+  <h2 class="text-base font-semibold">Request for a place in the final</h2>
+  <p class="text-sm"><span class="font-mono">{{ req.car|stringformat:"03d" }}</span> {{ req.name }} · {{ req.group }}{% if req.state == "declined" %} · <span class="text-ink-muted">declined</span>{% endif %}</p>
+  <div class="mt-2 grid grid-cols-2 gap-2">
+    <button type="button" hx-post="{% url 'dashboard-final-request' req.id 'allow' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="allow" class="min-h-11 rounded-lg bg-accent font-semibold text-accent-ink">Allow</button>
+    {% if req.state != "declined" %}<button type="button" hx-post="{% url 'dashboard-final-request' req.id 'decline' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="decline" class="min-h-11 rounded-lg border border-line font-semibold">Decline</button>{% endif %}
+  </div>
+  {% include "ui/dashboard/award_settings.html" with racer_id=req.racer_id racer_key=req.racer_id|stringformat:"d" where="fr" exclude=req.exclude no_speed=req.no_speed_awards %}
+</section>
+{% endfor %}
+{% for s in suggestions %}
+<section aria-label="Finalist suggestions for {{ s.name }}" class="rounded-xl border border-line bg-surface p-4" data-suggestions="{{ s.round_id }}">
+  <h2 class="text-base font-semibold">{{ s.name }}: the standings changed</h2>
+  {% if s.failure %}
+  <p class="text-sm text-ink-muted">This final was made without a stored cut, so the dashboard cannot suggest finalists.</p>
+  {% else %}
+  <p class="text-sm text-ink-muted">A round result changed after the final raced. Nothing changes until you tap a button.</p>
+  <ul class="mt-2 flex flex-col gap-1">
+    {% for r in s.add %}
+    <li class="flex min-h-11 items-center gap-2"><span class="min-w-0 flex-1">Now qualifies: <span class="font-mono">{{ r.car|stringformat:"03d" }}</span> {{ r.name }}</span><button type="button" hx-post="{% url 'dashboard-finalist' s.round_id 'add' r.id %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="suggest-add" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold">Add {{ r.name }}</button></li>
+    {% endfor %}
+    {% for r in s.remove %}
+    <li class="flex min-h-11 items-center gap-2"><span class="min-w-0 flex-1">No longer qualifies: <span class="font-mono">{{ r.car|stringformat:"03d" }}</span> {{ r.name }}</span><button type="button" hx-post="{% url 'dashboard-finalist' s.round_id 'remove' r.id %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="suggest-remove" class="min-h-11 rounded-lg border border-danger px-3 text-sm font-semibold text-danger">Remove {{ r.name }}</button></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endfor %}

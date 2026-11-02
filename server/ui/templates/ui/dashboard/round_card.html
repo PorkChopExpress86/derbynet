@@ -1,0 +1,44 @@
+<li class="rounded-xl border {% if card.current %}border-2 border-accent{% elif card.adjust_needed %}border-warn{% else %}border-line{% endif %} bg-surface p-4" data-roundid="{{ card.roundid }}">
+  <div class="flex items-start gap-2">
+    <div class="min-w-0 flex-1">
+      <h4 class="text-base font-semibold" data-round-name>{{ card.name }}</h4>
+      <p class="text-sm text-ink-muted" data-progress-text>{% if card.show_checkins %}{{ card.roster_size }} racer{{ card.roster_size|pluralize }}, {{ card.passed }} passed, {{ card.scheduled_racers }} in schedule. {% endif %}{{ card.heats_scheduled }} heat{{ card.heats_scheduled|pluralize }} scheduled, {{ card.heats_run }} run.</p>
+    </div>
+    <div class="flex shrink-0 flex-col items-end gap-1">
+      {% if card.current %}<span class="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-ink">Now racing</span>{% endif %}
+      {% if card.next_round %}<span class="rounded-full border border-accent px-2.5 py-1 text-xs font-semibold text-accent" data-next>Next</span>{% endif %}
+      {% if card.not_scheduled %}<span class="rounded-full bg-warn-soft px-2.5 py-1 text-xs font-semibold text-warn-ink" data-not-scheduled>Not scheduled</span>{% endif %}
+      {% if card.left_out or card.departed %}<span class="rounded-full bg-warn-soft px-2.5 py-1 text-xs font-semibold text-warn-ink" data-adjust-badge>{% if card.left_out %}{{ card.left_out }} not in schedule{% endif %}{% if card.left_out and card.departed %} · {% endif %}{% if card.departed %}{{ card.departed }} departed{% endif %}</span>{% endif %}
+    </div>
+  </div>
+  {% if card.show_checkins and card.roster_size %}
+  <div class="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="{{ card.name }}: racers passed" aria-valuenow="{{ card.passed_percent }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="h-full rounded-full bg-warn" style="width: {{ card.passed_percent }}%"></div>
+  </div>
+  {% endif %}
+  {% if card.heats_scheduled %}
+  <div class="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="{{ card.name }}: heats run" aria-valuenow="{{ card.heats_percent }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="h-full rounded-full {% if card.heats_run == card.heats_scheduled %}bg-ok{% else %}bg-accent{% endif %}" style="width: {{ card.heats_percent }}%"></div>
+  </div>
+  {% endif %}
+  {% if card.closed_lanes %}<p class="mt-2 text-sm" data-round-closed>Lane{{ card.closed_lanes|length|pluralize }} {{ card.closed_lanes|join:", " }} closed · {{ scoring }}</p>{% endif %}
+  {% if card.emptied_heats %}<p class="mt-2 text-sm text-warn-ink" data-round-emptied>Emptied heat{{ card.emptied_heats|length|pluralize }} {{ card.emptied_heats|join:", " }}: run or skip by hand.</p>{% endif %}
+  {% if card.adjust_needed %}
+  <div class="mt-2 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn-ink" data-adjust-notice>
+    <p>{% if card.adjust_needed == "regenerate" %}The schedule needs to be made again, because:{% else %}The schedule needs to be adjusted, because:{% endif %}</p>
+    <ul class="ml-4 list-disc">{% for a in card.adjustments %}<li>{{ a.carnumber|stringformat:"03d" }} {{ a.firstname }} {{ a.lastname }} {% if a.why == "unscheduled" %}isn't in the schedule.{% else %}is in the schedule but not the racing group.{% endif %}</li>{% endfor %}</ul>
+    {% if card.adjust_needed == "regenerate" %}<p>Start by removing the schedule.</p>{% endif %}
+  </div>
+  {% endif %}
+  {% if card.no_lanes %}<p class="mt-2 text-sm text-warn-ink" data-no-lanes>Heats cannot be scheduled until the number of lanes is set on the <a href="{% url 'settings' %}" class="font-semibold underline">Settings</a> page.</p>{% endif %}
+  {% if card.roundid == -1 and master_heats %}
+  <ol class="mt-3 flex flex-col divide-y divide-line border-t border-line text-sm" aria-label="Master schedule" data-master-heats>
+    {% for n, name, h in master_heats %}<li class="flex min-h-9 items-center gap-2"><span class="w-10 font-mono tabular-nums">{{ n }}</span><span class="min-w-0 flex-1 truncate">{{ name }}</span><span class="text-ink-muted">Heat {{ h }}</span></li>{% endfor %}
+  </ol>
+  {% endif %}
+  {% if card.buttons %}
+  <div class="mt-3 flex flex-wrap gap-2" data-buttons>
+    {% for b in card.buttons %}{% include "ui/dashboard/round_button.html" %}{% endfor %}
+  </div>
+  {% endif %}
+</li>

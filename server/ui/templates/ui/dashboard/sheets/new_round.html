@@ -1,0 +1,75 @@
+{# The new-round stepper: what kind of round, who races, then a review (PHP's choose-new-round and new-round modals). How many racers is always asked (D43). #}
+<form hx-post="{% url 'dashboard-new-round' %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()"
+  x-data="{ step: 1, choice: '', kind: '', label: '', hideBucketed: false, bySubgroup: false, top: 3, bucketed: false,
+            get bucketText() { return this.bucketed ? ((this.bySubgroup || this.kind === 'follow-on') ? 'from each {{ subgroup_label|escapejs }}' : 'from each {{ group_label|escapejs }}') : 'overall'; },
+            pick(kind, value, label, hide, bySub) { this.choice = kind + ':' + value; this.kind = kind; this.label = label; this.hideBucketed = hide; this.bySubgroup = bySub; if (hide) this.bucketed = false; } }"
+  data-new-round>
+  <ol class="flex gap-2 text-xs font-semibold" aria-label="Steps">
+    <li class="flex-1 border-t-4 pt-1" :class="step >= 1 ? 'border-accent' : 'border-line text-ink-muted'" :aria-current="step === 1 ? 'step' : false">1. Round</li>
+    <li class="flex-1 border-t-4 pt-1" :class="step >= 2 ? 'border-accent' : 'border-line text-ink-muted'" :aria-current="step === 2 ? 'step' : false">2. Racers</li>
+    <li class="flex-1 border-t-4 pt-1" :class="step >= 3 ? 'border-accent' : 'border-line text-ink-muted'" :aria-current="step === 3 ? 'step' : false">3. Review</li>
+  </ol>
+  <input type="hidden" name="kind" :value="kind">
+  <input type="hidden" name="roundid" :value="kind === 'follow-on' ? choice.split(':')[1] : ''">
+  <input type="hidden" name="classid" :value="kind === 'aggregate' ? choice.split(':')[1] : ''">
+
+  <fieldset x-show="step === 1" class="mt-4">
+    <legend class="text-base font-semibold">Which round?</legend>
+    <div class="mt-2 flex flex-col gap-2">
+      {% for r in follow_on %}
+      <label class="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-line px-4 has-checked:border-2 has-checked:border-accent">
+        <input type="radio" name="pick" value="follow-on:{{ r.roundid }}" @change="pick('follow-on', '{{ r.roundid }}', 'Round {{ r.round|add:1 }} of {{ r.class|escapejs }}', {{ r.hide_bucketed|yesno:'true,false' }}, false)" class="size-5" data-kind="follow-on">
+        <span><span class="block font-medium">Round {{ r.round|add:1 }} of {{ r.class }}</span><span class="block text-sm text-ink-muted">The top racers of {{ r.name }}</span></span>
+      </label>
+      {% endfor %}
+      {% for a in ready %}
+      <label class="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-line px-4 has-checked:border-2 has-checked:border-accent">
+        <input type="radio" name="pick" value="aggregate:{{ a.classid }}" @change="pick('aggregate', '{{ a.classid }}', '{{ a.class|escapejs }}', false, {{ a.by_subgroup|yesno:'true,false' }})" class="size-5" data-kind="aggregate">
+        <span><span class="block font-medium">{{ a.class }}</span><span class="block text-sm text-ink-muted">Round 1 of this aggregate group</span></span>
+      </label>
+      {% endfor %}
+      {% if add_aggregate %}
+      <label class="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-line px-4 has-checked:border-2 has-checked:border-accent">
+        <input type="radio" name="pick" value="new-aggregate:" @change="pick('new-aggregate', '', 'A new aggregate round', false, false)" class="size-5" data-kind="new-aggregate">
+        <span><span class="block font-medium">Aggregate Round</span><span class="block text-sm text-ink-muted">Top racers from several groups, such as a Grand Final</span></span>
+      </label>
+      {% endif %}
+    </div>
+  </fieldset>
+
+  <div x-show="step === 2" x-cloak class="mt-4 flex flex-col gap-4">
+    {% include "ui/components/stepper.html" with id="new-round-top" name="top" label="How many racers" value=3 min=1 max=99 %}
+    <div x-show="!hideBucketed" class="flex min-h-11 items-center justify-between gap-2">
+      <span id="bucketed-label" class="font-medium" x-text="bucketText.charAt(0).toUpperCase() + bucketText.slice(1)">Overall</span>
+      <button type="button" role="switch" :aria-checked="bucketed.toString()" aria-checked="false" aria-labelledby="bucketed-label" @click="bucketed = !bucketed" class="group grid h-11 w-16 shrink-0 place-items-center rounded-full" data-bucketed><span class="relative block h-7 w-12 rounded-full bg-switch-off group-aria-checked:bg-ok"><span class="absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow group-aria-checked:translate-x-5 motion-safe:transition-transform"></span></span></button>
+      <input type="hidden" name="bucketed" :value="bucketed ? 1 : 0">
+    </div>
+    <template x-if="kind === 'new-aggregate'">
+      <div class="flex flex-col gap-3">
+        <div><label for="agg-classname" class="block text-sm font-medium">Name for the new round</label><input id="agg-classname" name="classname" value="Grand Finals" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3"></div>
+        {% if use_subgroups and subgroups %}
+        <div class="flex min-h-11 items-center justify-between gap-2"><span id="aggregate-by-label" class="font-medium" x-text="bySubgroup ? 'Draw from each {{ subgroup_label|escapejs }}' : 'Draw from each {{ group_label|escapejs }}'"></span><button type="button" role="switch" :aria-checked="bySubgroup.toString()" aria-labelledby="aggregate-by-label" @click="bySubgroup = !bySubgroup" class="group grid h-11 w-16 shrink-0 place-items-center rounded-full"><span class="relative block h-7 w-12 rounded-full bg-switch-off group-aria-checked:bg-ok"><span class="absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow group-aria-checked:translate-x-5 motion-safe:transition-transform"></span></span></button><input type="hidden" name="by_subgroup" :value="bySubgroup ? 1 : 0"></div>
+        {% endif %}
+        <fieldset x-show="!bySubgroup"><legend class="text-sm font-semibold">From these groups</legend>
+          {% for c in constituents %}<label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="{{ c.id }}" value="1"{% if c.checked %} checked{% endif %} class="size-5">{{ c.name }}</label>{% endfor %}
+        </fieldset>
+        {% if subgroups %}
+        <fieldset x-show="bySubgroup"><legend class="text-sm font-semibold">From these {{ subgroup_label }}s</legend>
+          {% for s in subgroups %}<label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="{{ s.id }}" value="1" checked class="size-5">{{ s.name }}</label>{% endfor %}
+        </fieldset>
+        {% endif %}
+      </div>
+    </template>
+  </div>
+
+  <div x-show="step === 3" x-cloak class="mt-4" data-review>
+    <p class="font-semibold" x-text="label"></p>
+    <p class="mt-1 text-ink-muted"><span x-text="'Top ' + top"></span> <span x-text="bucketText"></span>, and anyone tied with the last.</p>
+  </div>
+
+  <div class="mt-5 grid grid-cols-2 gap-2">
+    <button type="button" @click="step > 1 ? step-- : $store.ui.close()" class="min-h-12 rounded-xl border border-line font-semibold" x-text="step > 1 ? 'Back' : 'Cancel'">Cancel</button>
+    <button type="button" x-show="step < 3" :disabled="!kind" @click="top = Number(document.getElementById('new-round-top').value); step++" class="min-h-12 rounded-xl bg-accent font-semibold text-accent-ink disabled:opacity-40" data-action="next-step">Next</button>
+    <button type="submit" x-show="step === 3" x-cloak class="min-h-12 rounded-xl bg-accent font-semibold text-accent-ink" data-action="make-round">Make round</button>
+  </div>
+</form>

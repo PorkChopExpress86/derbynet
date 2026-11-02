@@ -1,0 +1,16 @@
+{% load ui %}{# The polled region (#39 pattern 2). It sends the heat it shows and the signature of what it shows; the server answers 204 while nothing changed. #}
+<div id="live"{% if oob %} hx-swap-oob="true"{% endif %} hx-get="{% url 'dashboard-live' %}" {% poll_trigger 2 %} hx-swap="outerHTML" hx-include="#shown-heat" hx-sync="#live:abort" data-signature="{{ signature }}" class="flex flex-col gap-3">
+  <div id="shown-heat" hidden>
+    <input type="hidden" name="sig" value="{{ signature }}">
+    <input type="hidden" name="round" value="{{ shown.round_id|default_if_none:'' }}">
+    <input type="hidden" name="heat" value="{{ shown.heat|default_if_none:'' }}">
+    <input type="hidden" name="hold" value="{{ shown.hold }}">
+  </div>
+  {% include "ui/dashboard/heat_card.html" %}
+  {% include "ui/dashboard/heat_tools.html" %}
+  {% include "ui/dashboard/alerts.html" %}
+  {% if intermission %}{% include "ui/dashboard/intermission.html" %}{% endif %}
+  {% if final_requests or suggestions %}{% include "ui/dashboard/finals.html" %}{% endif %}
+  {% if not_added %}{% include "ui/dashboard/not_added.html" %}{% endif %}
+  {% include "ui/dashboard/rounds.html" %}
+</div>

@@ -118,7 +118,9 @@ def page(browser, live_server, size, page_errors):
     )
     page.on(
         "requestfailed",
-        lambda request: page_errors.add(f"request failed: {request.url}"),
+        lambda request: page_errors.add(
+            f"request failed: {request.url} {request.failure}"
+        ),
     )
 
     def static_status(response):

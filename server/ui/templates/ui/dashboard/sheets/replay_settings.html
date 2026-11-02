@@ -1,0 +1,14 @@
+<form hx-post="{% url 'dashboard-replay-settings' %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" class="flex flex-col gap-3" data-replay-settings>
+  {% for key, label, choices, selected in fields %}
+  <div>
+    <label for="rs-{{ key }}" class="block text-sm font-medium">{{ label }}</label>
+    <select id="rs-{{ key }}" name="{{ key }}" {% if forloop.first %}data-autofocus{% endif %} class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3">
+      {% for value, text in choices %}<option value="{{ value }}"{% if selected == value %} selected{% endif %}>{{ text }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endfor %}
+  <div class="mt-2 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save</button>
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</form>

@@ -14,7 +14,8 @@ def test_every_built_registry_page_redirects_from_its_php_page():
 
 
 def test_a_placeholder_does_not_take_its_php_url():
-    assert "coordinator.php" not in redirects.legacy_pages()
+    assert "checkin.php" not in redirects.legacy_pages()
+    assert "coordinator.php" in redirects.legacy_pages()
 
 
 def test_a_php_page_with_a_query_is_not_a_path():

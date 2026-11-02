@@ -1,0 +1,28 @@
+{# Manual results for the heat on screen, one number per lane. It names the round and heat, so neither a save nor a discard can reach another heat (D19, #41). #}
+<form hx-post="{% url 'dashboard-results' %}" hx-include="#shown-heat [name='hold']" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-results-form>
+  {% if trigger_replay %}<div hx-post="{% url 'dashboard-replay-trigger' %}" hx-trigger="load" hx-swap="none" hidden data-replay-trigger></div>{% endif %}
+  <input type="hidden" name="round" value="{{ round.pk }}">
+  <input type="hidden" name="heat" value="{{ heat }}">
+  <p class="text-sm text-ink-muted">{{ round.group.name }}, Round {{ round.number }} · Heat {{ heat }}</p>
+  <ul class="mt-2 flex flex-col gap-2">
+    {% for row in rows %}
+    <li class="flex items-center gap-2">
+      <label for="lane-{{ row.lane }}" class="flex min-w-0 flex-1 items-center gap-2"><span class="w-14 shrink-0 text-sm font-semibold">Lane {{ row.lane }}</span><span class="font-mono tabular-nums">{{ row.car }}</span> <span class="truncate">{{ row.name }}</span></label>
+      {% if use_points %}
+      <input id="lane-{{ row.lane }}" name="place{{ row.lane }}" type="number" inputmode="numeric" min="1" step="1" value="{{ row.place }}" {% if forloop.first %}data-autofocus{% endif %} aria-label="Place, lane {{ row.lane }}" class="h-12 w-24 rounded-xl border border-field bg-surface text-center text-lg tabular-nums">
+      {% else %}
+      <input id="lane-{{ row.lane }}" name="lane{{ row.lane }}" type="text" inputmode="decimal" value="{{ row.time }}" {% if forloop.first %}data-autofocus{% endif %} aria-label="Time, lane {{ row.lane }}" class="h-12 w-28 rounded-xl border border-field bg-surface text-center text-lg tabular-nums">
+      {% endif %}
+    </li>
+    {% empty %}
+    <li class="text-ink-muted">This heat has no cars.</li>
+    {% endfor %}
+  </ul>
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink" data-action="save-results">Save results</button>
+    {% if any_results %}
+    <button type="button" hx-post="{% url 'dashboard-results-discard' %}" hx-include="#shown-heat [name='hold']" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-danger px-4 font-semibold text-danger" data-action="discard">Discard results</button>
+    {% endif %}
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</form>

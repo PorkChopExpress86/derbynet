@@ -93,7 +93,7 @@ def _new_lanes(settings: RaceSettings, lanes: set[int]) -> int:
     return new
 
 
-def _rounds_to_close(event: Event) -> list[Round]:
+def rounds_to_close(event: Event) -> list[Round]:
     """Every round with a chart and a heat left to run (D45): a lane with no
     result, or an emptied heat held under D39. That is every round in
     progress, interleaved ones under the master schedule included, and
@@ -139,7 +139,7 @@ def close_lanes(
     try:
         return adjust_rounds(
             event.id,
-            lambda: _rounds_to_close(event),
+            lambda: rounds_to_close(event),
             close=new,
             also=lambda state, rounds: _record_closure(
                 event.id, rounds, lanes, scoring, clock(), expected=new
@@ -258,7 +258,7 @@ def poll_lanes(event: Event) -> dict:
     event's. A lane opened again on the settings page stays closed only
     for the remaining heats of the rounds it closed in."""
     unused = RaceSettings.objects.get(event=event).unused_lane_mask
-    to_run = {r.pk for r in _rounds_to_close(event)}
+    to_run = {r.pk for r in rounds_to_close(event)}
     lanes: dict[int, dict] = {}
     for closure in LaneClosure.objects.filter(
         event=event, reopened_at__isnull=True

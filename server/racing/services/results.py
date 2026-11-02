@@ -270,3 +270,94 @@ def delete_results(
 
 def _has_result(result: LaneResult) -> bool:
     return result.time is not None or result.place is not None
+
+
+@dataclass(frozen=True)
+class LaneTimes:
+    """One lane's time and place, as a discard found them."""
+
+    lane: int
+    time: float | None
+    place: int | None
+
+
+def heat_times(event: Event, round: Round, heat: int) -> list[LaneTimes]:
+    """The lanes of a heat that have a result, so a discard can be undone."""
+    rows = (
+        HeatLane.objects.filter(event=event, round=round, heat=heat)
+        .exclude(finish_time__isnull=True, finish_place__isnull=True)
+        .order_by("lane")
+        .values_list("lane", "finish_time", "finish_place")
+    )
+    return [
+        LaneTimes(lane, None if time is None else float(time), place)
+        for lane, time, place in rows
+    ]
+
+
+def discard_heat(
+    event: Event,
+    round: Round,
+    heat: int,
+    *,
+    control_race: bool = True,
+    finalists_for: FinalistsFor | None = None,
+) -> tuple[hs.Failure | None, list[LaneTimes]]:
+    """The dashboard's Discard (#41): clear one heat's results, as
+    `delete_results` does, and return what it cleared, read under the same
+    lock, so Undo (`restore_results`) brings back every time it cleared,
+    one the timer wrote a moment before included."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        ended = state.ended_round_id
+        locked = locked_failure(round.id, control_race)
+        if locked is not None:
+            return locked, []
+        cleared = heat_times(event, round, heat)
+        HeatLane.objects.filter(event=event, round=round, heat=heat).update(
+            finish_time=None, finish_place=None, completed=None
+        )
+        rebuild_waiting_final(event, [round.id], ended, finalists_for)
+    audit.write(event.id, [audit.discarded((round.id, heat))])
+    return None, cleared
+
+
+def restore_results(
+    event: Event,
+    round: Round,
+    heat: int,
+    lanes: Iterable[LaneTimes],
+    *,
+    control_race: bool = True,
+    finalists_for: FinalistsFor | None = None,
+) -> hs.Failure | None:
+    """Undo a discard (#41): write back the times and places
+    `delete_results` cleared from one heat. A lane that has a result again,
+    from the timer or by hand, keeps it. The current heat and racing stay as
+    they are, as for `delete_results`."""
+    now = timezone.now()
+    restored = False
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        ended = state.ended_round_id
+        locked = locked_failure(round.id, control_race)
+        if locked is not None:
+            return locked
+        for found in lanes:
+            restored |= bool(
+                HeatLane.objects.filter(
+                    event=event,
+                    round=round,
+                    heat=heat,
+                    lane=found.lane,
+                    finish_time__isnull=True,
+                    finish_place__isnull=True,
+                ).update(
+                    finish_time=found.time, finish_place=found.place, completed=now
+                )
+            )
+        if restored:
+            rebuild_waiting_final(event, [round.id], ended, finalists_for)
+    if restored:
+        audit.write(event.id, [audit.reinstated((round.id, heat))])
+    return None

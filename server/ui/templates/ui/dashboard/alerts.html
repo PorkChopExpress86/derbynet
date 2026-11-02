@@ -1,0 +1,14 @@
+{# Notification cards: simulated racing, unexpected timer results, racing off. #}
+{% if timer_test_running %}
+<div role="status" class="flex items-center gap-3 rounded-xl border border-warn bg-warn-soft px-4 py-2 text-warn-ink" data-herald>
+  <p class="min-w-0 flex-1 font-semibold">Simulated racing in progress</p>
+  <button type="button" hx-post="{% url 'dashboard-stop-test' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" data-action="stop-test" class="min-h-11 rounded-lg bg-danger px-4 font-semibold text-white dark:text-black">Stop</button>
+</div>
+{% elif refused_results %}
+<div role="status" class="rounded-xl border border-warn bg-warn-soft px-4 py-3 font-semibold text-warn-ink" data-refused>
+  {{ refused_results }} unexpected result{{ refused_results|pluralize:" from the timer has,s from the timer have" }} been received.
+</div>
+{% endif %}
+{% if not_racing and heat.in_round %}
+<p class="rounded-xl border border-line bg-surface px-4 py-2 text-sm text-ink-muted" data-not-racing>Turn on racing, or <a href="{% url 'timer-test' %}" class="font-semibold text-accent underline underline-offset-2">simulate racing</a>, to record results.</p>
+{% endif %}

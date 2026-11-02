@@ -418,6 +418,15 @@ uv run pytest -m browser ui
 
 Each test that takes `page` runs on a phone (390x844, touch) and a desktop (1280x800) against pytest-django's live server. A page error, a console error, a failed request for a static file, or an `alert()` fails the test, unless it calls `page_errors.allow(pattern)`. `login(role)` logs in through the login page, `shoot(page, name)` saves a screenshot under `DERBYNET_SCREENSHOT_DIR` (default `var/screenshots`), and `assert_accessible(page)` fails on any serious or critical axe-core 4.10.3 violation. `test_smoke.py` opens every registry page for each default role at both sizes, so a new page is covered once its entry exists. The `ui` CI job runs them and uploads the screenshots as the `ui-screenshots` artifact.
 
+### The race dashboard (#41)
+
+`ui/dashboard/` is the race dashboard, the D64 layout A: a sticky card with the current heat and its three large buttons, the other heat controls and the timer and replay status, notification cards, the not-added list (D36), final requests and finalist suggestions (D32), the playlist intermission (D12), and the round cards.
+
+- `presenter.present(payload, extras)` turns the coordinator payload (`racing.services.polls.coordinator`) and what the payload lacks into the template context. It reads no database, so `ui/tests/test_dashboard_golden.py` renders PHP's recorded payloads with it. `state.build()` reads the rest through the racing services.
+- The live region polls `dashboard/live/` every 2 s and sends the heat it shows, the hold of a finished heat (10 s, as `coordinator-poll.js` holds it) and a signature of what it shows. The view answers 204 while the signature matches. The seconds since the timer and the replay client called are left out of the signature and count up on the page. The page and its poll write neither the session nor the race state: a finished playlist step's scene comes due at the next kiosk poll, which applies it before it reads the scene, as PHP's `query.poll.kiosk.inc` does (`test_the_page_and_its_poll_leave_a_due_playlist_scene_to_the_kiosks`).
+- Every control posts to a view under `dashboard/` that calls a racing service, and answers with the live region out of band and a toast, or a 422 toast. Sheets load their body when they open, outside the live region. Discard names the round and heat on screen and calls `results.discard_heat`, which returns what it cleared under the race-state lock, and its Undo calls `results.restore_results`.
+- The dashboard polls its own view behind `CONTROL_RACE` and never reads `poll.coordinator`, so it needs no login-only feed (D52, `test_the_dashboard_never_reads_the_legacy_coordinator_feed`).
+
 ## Settings
 
 `derbynet/settings.py` reads every install-level setting from the environment.

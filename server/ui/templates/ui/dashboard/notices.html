@@ -1,0 +1,10 @@
+{# Concerns a new round's roster raised (PHP's #notifications), appended out of band and kept until dismissed. #}
+{% if oob %}<div hx-swap-oob="beforeend:#notices">{% endif %}
+{% for notice in notices %}
+<div x-data role="status" data-notice class="flex items-start gap-2 rounded-xl border border-warn bg-warn-soft px-4 py-2 text-warn-ink">
+  {% include "ui/components/icon.html" with name="warn" cls="mt-2.5 size-5 shrink-0" %}
+  <p class="min-w-0 flex-1 py-2 text-sm font-medium">{{ notice }}</p>
+  <button type="button" @click="$root.remove()" aria-label="Dismiss" class="-mr-2 grid size-11 shrink-0 place-items-center rounded-full">{% include "ui/components/icon.html" with name="close" cls="size-5" %}</button>
+</div>
+{% endfor %}
+{% if oob %}</div>{% endif %}
