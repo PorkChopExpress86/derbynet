@@ -25,6 +25,10 @@ The PHP server under `website/` is frozen: fix every defect in the Django port (
 
 Briefing an agent on a ticket: `plan/AGENT-BRIEF.md`. No subagent uses the fable model.
 
+Working every ready ticket in a loop: `plan/implement-all-tickets.md`.
+
+mattpocock skills marked `disable-model-invocation` (implement, retro, ask-matt, triage): read their `SKILL.md` under `~/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/*/skills/` and follow it.
+
 ## Reviews
 
 Standards sources for a review: `CONTRIBUTING.md` and `plan/AGENT-BRIEF.md`. A review finding counts as confirmed only after it is reproduced: run the test script, the suite, or the `verify` skill against a real server. Report any finding checked only by reading code as unverified.
