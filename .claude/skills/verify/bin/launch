@@ -18,22 +18,9 @@ fi
 if [ "$KIND" = django ]; then
   [ -e "$DJANGO_STATE" ] && { echo "$DJANGO_STATE exists; run bin/cleanup first, or pick another VERIFY_RUN" >&2; exit 1; }
   mkdir -p "$DJANGO_STATE/data" "$DJANGO_STATE/config"
-  export DERBYNET_DATA_DIR="$DJANGO_STATE/data" DERBYNET_CONFIG_DIR="$DJANGO_STATE/config"
   cd "$REPO/server"
   uv sync --locked -q > "$EVIDENCE/launch.log" 2>&1 || { tail -20 "$EVIDENCE/launch.log" >&2; exit 1; }
-  .venv/bin/python manage.py migrate -v 0 >> "$EVIDENCE/launch.log" 2>&1 \
-    || { tail -20 "$EVIDENCE/launch.log" >&2; exit 1; }
-  # DEBUG is off, as on race day, and runserver then serves no static files
-  # unless --insecure is given.  The python process itself is the pid, so
-  # cleanup stops the server and not a wrapper.
-  nohup .venv/bin/python manage.py runserver "127.0.0.1:$PORT" --noreload --insecure \
-    > "$EVIDENCE/server.log" 2>&1 &
-  echo $! > "$PIDFILE"
-  for _ in $(seq 30); do
-    curl -s -o /dev/null "$BASE/login.php" && break
-    sleep 1
-  done
-  "$BIN/doctor"
+  start_django
   echo ready "$BASE"
   exit 0
 fi

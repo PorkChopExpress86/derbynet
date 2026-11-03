@@ -16,3 +16,23 @@ JAR="$EVIDENCE/cookies.txt"
 DJANGO_STATE="$REPO/server/var/verify-$RUN"
 PIDFILE="$DJANGO_STATE/runserver.pid"
 mkdir -p "$EVIDENCE"
+
+# Starts runserver on this run's database, migrated, and waits for doctor.
+# DEBUG is off, as on race day, so templates are cached and --noreload keeps
+# the code it started with: bin/restart picks up an edit.  runserver serves no
+# static files without --insecure.  The python process itself is the pid, so
+# cleanup stops the server and not a wrapper.
+start_django() {
+  export DERBYNET_DATA_DIR="$DJANGO_STATE/data" DERBYNET_CONFIG_DIR="$DJANGO_STATE/config"
+  cd "$REPO/server"
+  .venv/bin/python manage.py migrate -v 0 >> "$EVIDENCE/launch.log" 2>&1 \
+    || { tail -20 "$EVIDENCE/launch.log" >&2; exit 1; }
+  nohup .venv/bin/python manage.py runserver "127.0.0.1:$PORT" --noreload --insecure \
+    >> "$EVIDENCE/server.log" 2>&1 &
+  echo $! > "$PIDFILE"
+  for _ in $(seq 30); do
+    curl -s -o /dev/null "$BASE/login.php" && break
+    sleep 1
+  done
+  "$REPO/.claude/skills/verify/bin/doctor"
+}

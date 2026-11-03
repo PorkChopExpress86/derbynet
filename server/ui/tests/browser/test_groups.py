@@ -3,7 +3,6 @@
 boxes, and the screenshots."""
 
 import re
-from contextlib import contextmanager
 
 import pytest
 from playwright.sync_api import expect
@@ -15,7 +14,7 @@ from racing.models import HeatLane, PlaylistEntry, Round
 from racing.tests.factories import PlaylistEntryFactory
 from roster.models import Group, Partition, Subgroup
 from roster.services import groups
-from ui.tests.browser.conftest import assert_accessible, shoot
+from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
 from ui.tests.race import add_racers, race_setup, scheduled
 
 
@@ -68,18 +67,8 @@ def menu_item(page, name):
     page.get_by_role("menuitem", name=name).locator("visible=true").click()
 
 
-@contextmanager
 def saved(page):
-    """Wait for the change the block makes: its POST answers, and htmx has
-    swapped and settled the editor it sends back."""
-    with page.expect_response(
-        lambda r: r.request.method == "POST" and "/groups/" in r.url
-    ) as reply:
-        yield
-    assert reply.value.ok, reply.value.status
-    page.wait_for_function(
-        "!document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')"
-    )
+    return htmx_post(page, "/groups/")
 
 
 def order(event, model, **where) -> list[str]:

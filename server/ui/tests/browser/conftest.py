@@ -13,10 +13,16 @@ request for a static file, unless the test expects that error with
 `DERBYNET_SCREENSHOT_DIR` (default `server/var/screenshots`), which CI
 uploads, and `assert_accessible(page)` runs axe-core and fails on a serious or
 critical violation.
+
+After a control posts, wrap the click in `with htmx_post(page, path):` before
+reading the database: it waits for the POST's reply and htmx's swap.
+`wait_for_load_state("networkidle")` waits for a page load only, and returns
+at once after an htmx request.
 """
 
 import os
 import re
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -91,15 +97,37 @@ def _async_unsafe():
         yield
 
 
+def _css_is_fresh(tmp_path_factory, worker_id) -> bool:
+    """`css_build.check()`, run once per pytest run. Tailwind CLIs started at
+    once by several xdist workers can fail to load their native binding, so
+    the first worker runs it under a file lock in the directory every worker
+    shares, and the others read its answer."""
+    from ui import css_build
+
+    if worker_id == "master":
+        return css_build.check()
+    import fcntl
+
+    shared = tmp_path_factory.getbasetemp().parent
+    answer = shared / "css-fresh.txt"
+    with (shared / "css-fresh.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not answer.exists():
+            answer.write_text(str(css_build.check()))
+        return answer.read_text() == "True"
+
+
 @pytest.fixture(scope="session", autouse=True)
-def _fresh_css():
+def _fresh_css(tmp_path_factory, worker_id):
     """A page styled by a stale `app.css` lacks the classes a template just
     gained, so its screenshots and layout checks mislead. Where the Tailwind
     CLI is installed, refuse to run on a stale build; the `ui` CI job checks
     the same before it runs these tests."""
     from ui import css_build
 
-    if css_build.binary_path().exists() and not css_build.check():
+    if css_build.binary_path().exists() and not _css_is_fresh(
+        tmp_path_factory, worker_id
+    ):
         pytest.fail(css_build.OUT_OF_DATE.format(css_build.OUTPUT), pytrace=False)
 
 
@@ -222,6 +250,20 @@ def login(page, event):
         return page
 
     return as_role
+
+
+@contextmanager
+def htmx_post(page, path: str):
+    """Wait for the change the block makes: a POST to a URL holding `path`
+    answers OK, and htmx has swapped and settled what it sent back."""
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and path in r.url
+    ) as reply:
+        yield
+    assert reply.value.ok, reply.value.status
+    page.wait_for_function(
+        "!document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')"
+    )
 
 
 def shoot(page, name: str, full_page: bool = True) -> Path:

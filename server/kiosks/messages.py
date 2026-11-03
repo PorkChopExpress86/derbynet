@@ -7,6 +7,7 @@ second. A directed message nobody reads expires after 15 s.
 """
 
 import json
+import math
 from datetime import datetime, timedelta
 
 from django.db import transaction
@@ -25,11 +26,21 @@ class TooLarge(Exception):
     pass
 
 
+def _finite(text: str) -> float:
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError(text)
+    return value
+
+
 def decoded(text: str):
-    """PHP's `json_decode()`: the value, or None for text that is not JSON."""
+    """PHP's `json_decode()`: the value, or None for text that is not JSON.
+    A number past a float's range, such as `1e999`, is None too: PHP decodes
+    it as INF, which no JSON column holds and `json_encode()` refuses, so
+    PHP's `message.retrieve` could not encode its reply either (inferred)."""
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
+        return json.loads(text, parse_float=_finite)
+    except ValueError:
         return None
 
 
