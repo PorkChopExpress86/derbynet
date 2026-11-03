@@ -1,0 +1,35 @@
+{% load ui %}{# The list's content: the repository's badge and diagnostics, the unassigned photos, and the racer cards. The section around it is in page.html. #}
+{% if oob %}{% include "ui/photos/repos.html" %}{% endif %}
+<div class="mb-3 flex flex-wrap items-center gap-2" data-status="{{ listing.status.kind }}">
+  {% if listing.status.kind == "ok" %}{% include "ui/components/status_pill.html" with state="ok" text=listing.status.label %}{% elif listing.status.kind == "empty" %}{% include "ui/components/status_pill.html" with state="idle" text=listing.status.label %}{% elif listing.status.kind == "read-only" %}{% include "ui/components/status_pill.html" with state="warn" text=listing.status.label %}{% else %}{% include "ui/components/status_pill.html" with state="danger" text=listing.status.label %}{% endif %}
+  {% if listing.status.message %}<p class="min-w-0 flex-1 text-sm break-all {% if listing.status.needs_fix %}text-danger-ink{% else %}text-ink-muted{% endif %}" data-diagnostic>{{ listing.status.message }}</p>{% endif %}
+  <button type="button" hx-get="{% url 'photos-list' repo %}" hx-include="#photos-filters" hx-target="#photos-list" hx-swap="innerHTML" hx-sync="#photos-list:queue last" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold" data-action="refresh">Refresh</button>
+</div>
+{% if not listing.status.writable %}
+<p class="mb-3 rounded-xl border border-warn bg-warn-soft p-3 text-sm break-words text-warn-ink" data-not-writable>Photo directory is not writable, so photos can't be uploaded here. {% if settings_url %}<a href="{{ settings_url }}" class="font-semibold underline underline-offset-2">Check the settings.</a>{% else %}Ask the race coordinator to check the settings.{% endif %}</p>
+{% endif %}
+<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-4">
+  <section aria-labelledby="pool-title" class="mb-3 rounded-xl border border-line bg-surface p-3 lg:sticky lg:top-40 lg:order-2" data-pool>
+    <h2 id="pool-title" class="mb-2 text-base font-semibold">Unassigned photos <span class="text-ink-muted">({{ listing.pool|length }})</span></h2>
+    {% if listing.pool %}
+    <ul role="list" class="grid max-h-[50dvh] grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6 lg:max-h-[60dvh] lg:grid-cols-3">
+      {% for photo in listing.pool %}
+      <li><button type="button" hx-get="{% url 'photos-racer-choices' repo %}?photo={{ photo.name|urlencode:'' }}" hx-target="#photos-sheet-body" hx-swap="innerHTML" @click="photos.open('Assign {{ photo.name|escapejs }}', $event)" aria-haspopup="dialog" aria-label="Assign {{ photo.name }}" class="block aspect-square w-full overflow-hidden rounded-lg bg-surface-2" data-pool-photo="{{ photo.name }}"><img src="{{ photo.thumbnail }}" alt="" loading="lazy" class="size-full object-cover"></button></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-ink-muted" data-pool-empty>{% if listing.status.kind == "ok" %}Every photo is assigned.{% else %}No photos.{% endif %}</p>
+    {% endif %}
+  </section>
+  <section aria-label="Racers" class="lg:order-1">
+    {% if listing.cards %}
+    <ul role="list" class="grid gap-2 sm:grid-cols-2" data-cards>
+      {% for card in listing.cards %}{% include "ui/photos/card.html" %}{% endfor %}
+    </ul>
+    {% elif listing.total %}
+    <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No racer matches.</p>
+    {% else %}
+    <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No racers yet.</p>
+    {% endif %}
+  </section>
+</div>

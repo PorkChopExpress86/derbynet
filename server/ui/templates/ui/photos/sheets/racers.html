@@ -1,0 +1,10 @@
+{# Tap a photo: the racers it can go to (no photo, or a lost one), with a search field, and the photo's crop sheet. #}
+<div x-data x-init="photoSheets.show('photos', '{{ title|escapejs }}')" data-racer-choices>
+  <div class="mb-3 flex items-center gap-3">
+    <img src="{{ thumbnail }}" alt="{{ photo }}" class="size-20 shrink-0 rounded-lg bg-surface-2 object-cover">
+    <button type="button" hx-get="{% url 'photos-crop-sheet' repo %}{{ query }}" hx-target="#photos-sheet-body" hx-swap="innerHTML" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold" data-action="crop">Crop, turn or delete</button>
+  </div>
+  {% url 'photos-racer-choices-list' repo as choices_url %}
+  {% include "ui/components/search_field.html" with id="photos-racer-find" name="q" hx_get=choices_url|add:query hx_target="#photos-racer-list" cls="mb-2" %}
+  <div id="photos-racer-list">{% include "ui/photos/sheets/racer_choices.html" %}</div>
+</div>

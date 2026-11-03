@@ -1,6 +1,7 @@
 """Responses for htmx requests (#39 htmx patterns)."""
 
 from django.http import Http404, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.urls import reverse
 
@@ -67,6 +68,18 @@ def car(number) -> str:
 def racer_name(first: str, last: str) -> str:
     """A racer's name as the manager pages show it."""
     return f"{first} {last}"
+
+
+def name_of(racer) -> str:
+    """`racer_name()` of a racer."""
+    return racer_name(racer.first_name, racer.last_name)
+
+
+def event_racer(request, racer_id):
+    """The racer of the open event, or 404."""
+    from roster.models import Racer
+
+    return get_object_or_404(Racer, pk=racer_id, event=active_event(request))
 
 
 def round_name(round) -> str:

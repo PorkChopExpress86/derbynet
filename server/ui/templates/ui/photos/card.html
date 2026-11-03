@@ -1,0 +1,17 @@
+{# One racer and the repository's photo of it: assigned, no photo, or lost (the stored file is not in the folder, photo-thumbs.php's lost_photo). #}
+<li class="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 data-highlight:ring-4 data-highlight:ring-accent" data-racer="{{ card.id }}" data-photo-state="{{ card.state }}"{% if highlight == card.id %} data-highlight{% endif %}>
+  {% if card.state == "assigned" %}
+  <button type="button" hx-get="{% url 'photos-crop-sheet' repo %}?photo={{ card.photo|urlencode:'' }}" hx-target="#photos-sheet-body" hx-swap="innerHTML" @click="photos.open('Crop {{ card.photo|escapejs }}', $event)" aria-haspopup="dialog" aria-label="Crop the photo of {{ card.name }}" class="size-20 shrink-0 overflow-hidden rounded-lg bg-surface-2" data-action="crop"><img src="{{ card.thumbnail }}" alt="" loading="lazy" class="size-full object-cover" data-thumb></button>
+  {% else %}
+  <button type="button" hx-get="{% url 'photos-photo-choices' repo card.id %}" hx-target="#photos-sheet-body" hx-swap="innerHTML" @click="photos.open('Photo for {{ card.name|escapejs }}', $event)" aria-haspopup="dialog" aria-label="Pick a photo for {{ card.name }}" class="grid size-20 shrink-0 place-items-center rounded-lg border-2 border-dashed {% if card.state == 'lost' %}border-danger text-danger-ink{% else %}border-field text-ink-muted{% endif %}" data-action="pick">{% include "ui/components/icon.html" with name="photos" cls="size-7" %}</button>
+  {% endif %}
+  <div class="min-w-0 flex-1">
+    <p class="truncate text-base font-semibold">{{ card.name }}</p>
+    <p class="truncate text-sm text-ink-muted"><span class="font-mono font-semibold text-ink">{{ card.car }}</span> · {{ card.group }}</p>
+    {% if card.state == "none" %}<p class="text-sm text-ink-muted" data-no-photo>No photo</p>{% elif card.state == "lost" %}<p class="truncate text-sm text-danger-ink" data-lost-photo>Lost photo: {{ card.photo }}</p>{% endif %}
+    <div class="mt-1 flex flex-wrap gap-1">
+      {% if card.state != "none" %}<button type="button" hx-post="{% url 'photos-unassign' repo card.id %}" hx-target="#toasts" hx-swap="beforeend" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold" aria-label="Unassign the photo of {{ card.name }}" data-action="unassign">Unassign</button>{% endif %}
+      {% if can_upload and listing.status.writable %}<button type="button" hx-get="{% url 'photos-capture' repo card.id %}" hx-target="#photos-sheet-body" hx-swap="innerHTML" @click="photos.open('Take photo', $event)" aria-haspopup="dialog" aria-label="Take a photo of {{ card.name }}" class="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold" data-action="take-photo">Take photo</button>{% endif %}
+    </div>
+  </div>
+</li>
