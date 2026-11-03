@@ -21,6 +21,7 @@ from core.models import Event, RaceSettings
 from core.services import lock_race_state
 from racing.engine.phpcompat import php_intval
 from racing.models import HeatLane
+from racing.services.lanes import mask_of
 from roster.models import Group, GroupConstituent, GroupConstituentSubgroup
 
 
@@ -113,7 +114,9 @@ class FormResult:
     failure: tuple[str, str] | None
 
 
-def _unraced(event: Event) -> bool:
+def lanes_locked(event: Event) -> bool:
+    """Unraced heats exist, so a change of the lane count or the unused
+    lanes is refused (`already-scheduled`)."""
     return HeatLane.objects.filter(event=event, completed__isnull=True).exists()
 
 
@@ -125,7 +128,7 @@ def _lane_change_refused(event: Event, post: Mapping) -> bool:
         if not isinstance(posted, str) or _differs(
             posted, race_settings.read(event, setting) or ""
         ):
-            return _unraced(event)
+            return lanes_locked(event)
     return False
 
 
@@ -235,3 +238,41 @@ def set_pack_standings(event: Event, value: str) -> None:
         race_settings.write(event, "full-field-calc", value)
     except race_settings.NotWritten:
         raise PackStandingsRefused("Pick how to calculate the standings.") from None
+
+
+# ----- the scheduling method and the lanes in use (#44) -----------------------------
+
+SETTINGS_WRITE = {"action": "settings.write"}
+
+# The scheduling method radio of `settings.php` to the two settings it
+# writes, as `on_schedule_method_change()` in `website/js/settings.js`.
+SCHEDULING_METHODS: dict[str, dict[str, str]] = {
+    "normal": {"max-runs-per-car": "0", "rotation-schedule": "0"},
+    "abbreviated": {"max-runs-per-car": "1", "rotation-schedule": "0"},
+    "rotation": {"max-runs-per-car": "0", "rotation-schedule": "1"},
+}
+
+
+def scheduling_method(settings: RaceSettings) -> str:
+    """`settings.php`: abbreviated when max-runs-per-car is set, else
+    rotation when rotation-schedule is on, else normal."""
+    if settings.max_runs_per_car:
+        return "abbreviated"
+    if settings.rotation_schedule:
+        return "rotation"
+    return "normal"
+
+
+def set_scheduling_method(event: Event, method: str) -> FormResult:
+    """Raises KeyError for a method that is not one of `SCHEDULING_METHODS`."""
+    return apply_form(event, {**SETTINGS_WRITE, **SCHEDULING_METHODS[method]})
+
+
+def set_lanes_in_use(event: Event, lane_count: int, in_use) -> FormResult:
+    """The unused-lane mask: lanes 1 to `lane_count`, the count the page
+    showed, that are not in `in_use`. While unraced heats exist the change
+    is refused (`already-scheduled`)."""
+    unused = [n for n in range(1, lane_count + 1) if n not in set(in_use)]
+    return apply_form(
+        event, {**SETTINGS_WRITE, "unused-lane-mask": str(mask_of(unused))}
+    )

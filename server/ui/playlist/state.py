@@ -8,12 +8,12 @@ neither); every change answers with the queue again.
 from dataclasses import dataclass, field
 
 from core.models import RaceSettings, RaceState
+from core.settings_form import lanes_locked, scheduling_method
 from kiosks.models import Scene
-from racing.engine.scheduling.lanes import count_one_bits
 from racing.models import PlaylistEntry
 from racing.services import lanes as lane_service
-from racing.services.finals import allowed_for_step
-from racing.services.playlist import MAX_RUNS_PER_LANE, NEXT_ROUND, STOP, needs_cut
+from racing.services.finals import allowed_for_steps
+from racing.services.playlist import MAX_RUNS_PER_LANE, NEXT_ROUND, STOP, cuts_needed
 from racing.services.rounds import round_counts
 from roster.models import Group, GroupConstituent, GroupConstituentSubgroup
 from roster.services.groups import labels
@@ -146,15 +146,19 @@ def build(event) -> Playlist:
         return f"{group.name}, Round {number}" if with_group else f"Round {number}"
 
     entries = []
-    steps = (
+    steps = list(
         PlaylistEntry.objects.filter(event=event)
         .select_related("group")
         .order_by("seq")
     )
+    needs_cut = cuts_needed(event)
+    allowed_by_step = allowed_for_steps(
+        event.id, [(s.group_id, s.round_number) for s in steps]
+    )
     for position, step in enumerate(steps, 1):
         then = _then(step)
         cut = needs_cut(step.group_id, step.round_number)
-        allowed = allowed_for_step(event.id, step.group_id, step.round_number)
+        allowed = allowed_by_step[step.group_id, step.round_number]
         entries.append(
             EntryRow(
                 id=step.pk,
@@ -191,14 +195,16 @@ def build(event) -> Playlist:
         use_master_sched=settings.use_master_sched,
         entries=entries,
         available=_available(
-            event, groups, entries, counts, state, settings, aggregates, name
+            event, groups, entries, counts, state, settings, aggregates, name, needs_cut
         ),
         waiting_id=state.waiting_entry_id,
         default_waits=bool(entries),
     )
 
 
-def _available(event, groups, entries, counts, state, settings, aggregates, name):
+def _available(
+    event, groups, entries, counts, state, settings, aggregates, name, needs_cut
+):
     """`build_rounds()` of `playlist.js`: from round 1 up to one past the
     highest round queued or made, each group's round that is not queued,
     if it is made, or if every round of the group is queued or raced and
@@ -284,43 +290,28 @@ class Scheduling:
     locked: bool = False
 
 
-def method_of(settings: RaceSettings) -> str:
-    """`settings.php`: abbreviated when max-runs-per-car is set, else
-    rotation when rotation-schedule is on, else normal."""
-    if settings.max_runs_per_car:
-        return "abbreviated"
-    if settings.rotation_schedule:
-        return "rotation"
-    return "normal"
-
-
 def scheduling(event) -> Scheduling:
     """The method, and the lanes: each one open, unused, or closed (D36,
     D45). A closed lane is in the unused-lane mask too; the poll of closed
     lanes says which ones were closed as damaged."""
-    from racing.models import HeatLane
-
     settings = RaceSettings.objects.get(event=event)
     closed = {row["lane"] for row in lane_service.poll_lanes(event)["closed-lanes"]}
-    mask = settings.unused_lane_mask
+    unused = set(lane_service.lanes_of(settings.unused_lane_mask))
     rows = []
     for lane in range(1, settings.lane_count + 1):
         if lane in closed:
             state = "closed"
-        elif mask & (1 << (lane - 1)):
+        elif lane in unused:
             state = "unused"
         else:
             state = "open"
         rows.append(LaneRow(lane, state))
-    in_range = (1 << settings.lane_count) - 1
-    closed_mask = sum(1 << (lane - 1) for lane in closed)
-    off = count_one_bits((mask | closed_mask) & in_range)
     return Scheduling(
-        method=method_of(settings),
+        method=scheduling_method(settings),
         lane_count=settings.lane_count,
         lanes=rows,
-        usable=settings.lane_count - off,
+        usable=sum(1 for r in rows if not r.off),
         closed=[r.lane for r in rows if r.state == "closed"],
         unused=[r.lane for r in rows if r.state == "unused"],
-        locked=HeatLane.objects.filter(event=event, completed__isnull=True).exists(),
+        locked=lanes_locked(event),
     )

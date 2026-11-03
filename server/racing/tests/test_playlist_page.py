@@ -334,3 +334,35 @@ def test_a_stale_order_is_refused(event):
         .order_by("seq")
         .values_list("pk", flat=True)
     ) == [second.pk, first.pk]
+
+
+def test_restore_checks_the_step_as_a_new_one(event):
+    """The #44 review: a restore stored runs 0 from a forged Undo link."""
+    from racing.services.playlist import RemovedStep
+
+    wolves = GroupFactory(event=event)
+    forged = RemovedStep(wolves.pk, 1, 1, StepChoice(runs=0))
+    refused(Failure.BAD_RUNS, playlist.restore_step, event, forged)
+    final = RemovedStep(wolves.pk, 2, 1, StepChoice(top=0))
+    refused(Failure.NEEDS_TOP, playlist.restore_step, event, final)
+    assert not PlaylistEntry.objects.exists()
+
+
+def test_a_second_restore_changes_nothing(event):
+    wolves = GroupFactory(event=event)
+    step = playlist.queue_step(event, wolves.pk, 1, StepChoice())
+    removed = playlist.remove_step(event, step.pk)
+
+    assert playlist.restore_step(event, removed) is not None
+    assert playlist.restore_step(event, removed) is None
+    assert len(rows(event)) == 1
+
+
+def test_an_undo_query_round_trips():
+    from racing.services.playlist import RemovedStep
+
+    removed = RemovedStep(3, 2, 1, StepChoice(top=4, bucketed=True, runs=2, then=-1))
+    query = {k: str(v) for k, v in removed.to_query().items()}
+    assert RemovedStep.from_query(query) == removed
+    assert RemovedStep.from_query({**query, "runs": "x"}) is None
+    assert RemovedStep.from_query({}) is None

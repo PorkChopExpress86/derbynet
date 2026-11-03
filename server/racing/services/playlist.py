@@ -28,8 +28,8 @@ from core.services import lock_race_state
 from kiosks.models import Scene
 from kiosks.services import apply_scene
 from racing.engine import heat_state as hs
-from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, Round
-from racing.services import heats, renumber_playlist, schedule
+from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
+from racing.services import heats, schedule
 from racing.services.rounds import (
     Entrants,
     make_new_round,
@@ -490,17 +490,52 @@ class StepChoice:
 
 @dataclass(frozen=True)
 class RemovedStep:
-    """A removed step, enough to put it back where it was (Undo)."""
+    """A removed step, enough to put it back where it was (Undo). It travels
+    in the Undo link's query, so `restore_step` checks it again as it would
+    a new step."""
 
     group_id: int
     round_number: int
     position: int
-    bucket_limit: int
-    bucketed: bool
-    n_times_per_lane: int
-    scene_id: int | None
-    continue_racing: bool
-    waits: bool
+    choice: StepChoice
+
+    def to_query(self) -> dict[str, int]:
+        c = self.choice
+        return {
+            "group": self.group_id,
+            "round": self.round_number,
+            "position": self.position,
+            "top": c.top or 0,
+            "bucketed": int(c.bucketed),
+            "runs": c.runs,
+            "then": c.then,
+            "waits": int(c.waits),
+        }
+
+    @classmethod
+    def from_query(cls, query) -> RemovedStep | None:
+        """The step `to_query` wrote, or None for a query that lacks a field
+        or holds one that is not a whole number."""
+        values = {}
+        for name in cls(0, 0, 0, StepChoice()).to_query():
+            try:
+                values[name] = int(str(query.get(name, "")).strip())
+            except ValueError:
+                return None
+            if not -(2**31) < values[name] < 2**31:
+                return None
+        return cls(
+            group_id=values["group"],
+            round_number=values["round"],
+            position=values["position"],
+            choice=StepChoice(
+                top=values["top"],
+                bucketed=bool(values["bucketed"]),
+                runs=values["runs"],
+                then=values["then"],
+                waits=bool(values["waits"]),
+            ),
+        )
 
 
 def is_aggregate(group_id: int) -> bool:
@@ -510,15 +545,40 @@ def is_aggregate(group_id: int) -> bool:
     )
 
 
+def _cut_rule(round_number: int, aggregate: bool, built: bool) -> bool:
+    return (round_number >= 2 or aggregate) and not built
+
+
 def needs_cut(group_id: int, round_number: int) -> bool:
     """A step whose round picks its racers when it starts: a follow-on round,
     or an aggregate's first round, whose roster is not built yet. Its top N
     is asked for and kept (D43). `playlist.php` shows the cut fields when the
     round does not exist yet."""
-    if round_number < 2 and not is_aggregate(group_id):
-        return False
-    round = Round.objects.filter(group_id=group_id, number=round_number).first()
-    return round is None or not round.roster.exists()
+    built = RosterEntry.objects.filter(
+        round__group_id=group_id, round__number=round_number
+    ).exists()
+    return _cut_rule(round_number, is_aggregate(group_id), built)
+
+
+def cuts_needed(event) -> Callable[[int, int], bool]:
+    """`needs_cut` for every step of a page, from three queries."""
+    aggregates = set(
+        GroupConstituent.objects.filter(event=event).values_list(
+            "aggregate_id", flat=True
+        )
+    ) | set(
+        GroupConstituentSubgroup.objects.filter(event=event).values_list(
+            "aggregate_id", flat=True
+        )
+    )
+    built = set(
+        RosterEntry.objects.filter(event=event)
+        .values_list("round__group_id", "round__number")
+        .distinct()
+    )
+    return lambda group_id, number: _cut_rule(
+        number, group_id in aggregates, (group_id, number) in built
+    )
 
 
 def _choice_fields(event, choice: StepChoice, stored=None) -> dict:
@@ -557,21 +617,25 @@ def _check_cut(group_id: int, round_number: int, top: int) -> None:
         )
 
 
+def _group(event, group_id: int, round_number: int) -> Group:
+    group = Group.objects.filter(event=event, pk=group_id).first()
+    if group is None:
+        raise PlaylistFailure(Failure.NO_SUCH_GROUP, "That group is gone.")
+    if not 1 <= round_number <= 99:
+        raise PlaylistFailure(Failure.BAD_ROUND, "Pick a round to add.")
+    return group
+
+
 def queue_step(event, group_id: int, round_number: int, choice: StepChoice):
     """Add a round to the end of the playlist from the entry sheet."""
     with transaction.atomic():
         lock_race_state(event.id)
-        group = Group.objects.filter(event=event, pk=group_id).first()
-        if group is None:
-            raise PlaylistFailure(Failure.NO_SUCH_GROUP, "That group is gone.")
-        if not 1 <= round_number <= 99:
-            raise PlaylistFailure(Failure.BAD_ROUND, "Pick a round to add.")
+        group = _group(event, group_id, round_number)
         fields = _choice_fields(event, choice)
         _check_cut(group.pk, round_number, fields["bucket_limit"])
-        last = PlaylistEntry.objects.filter(event=event).aggregate(last=Max("seq"))
         return PlaylistEntry.objects.create(
             event=event,
-            seq=max(last["last"] or 0, 0) + 1,
+            seq=_free_seq(event),
             group=group,
             round_number=round_number,
             **fields,
@@ -630,12 +694,13 @@ def remove_step(event, entry_id: int) -> RemovedStep:
             group_id=step.group_id,
             round_number=step.round_number,
             position=order.index(step.pk) + 1,
-            bucket_limit=step.bucket_limit,
-            bucketed=step.bucketed,
-            n_times_per_lane=step.n_times_per_lane,
-            scene_id=step.scene_at_finish_id,
-            continue_racing=step.continue_racing,
-            waits=step.waits_for_operator,
+            choice=StepChoice(
+                top=step.bucket_limit,
+                bucketed=step.bucketed,
+                runs=step.n_times_per_lane,
+                then=_then_of(step),
+                waits=step.waits_for_operator,
+            ),
         )
         if state.waiting_entry_id == step.pk:
             state.waiting_entry = None
@@ -645,62 +710,78 @@ def remove_step(event, entry_id: int) -> RemovedStep:
         return removed
 
 
-def restore_step(event, removed: RemovedStep) -> PlaylistEntry:
+def _then_of(step: PlaylistEntry) -> int:
+    """`append_playlist_entry_li()`: a scene, else the next round if the
+    step continues racing, else stop."""
+    if step.scene_at_finish_id:
+        return step.scene_at_finish_id
+    return NEXT_ROUND if step.continue_racing else STOP
+
+
+def restore_step(event, removed: RemovedStep) -> PlaylistEntry | None:
     """Undo a removal: the step comes back at its old position, or last if
-    the playlist is shorter now. A scene deleted since is no scene. An
-    intermission the removal closed stays closed."""
+    the playlist is shorter now, checked as `queue_step` checks a new step.
+    A step of that round already in the playlist, as a second tap on Undo
+    finds, leaves the playlist as it is and returns None. An intermission
+    the removal closed stays closed."""
     with transaction.atomic():
         lock_race_state(event.id)
-        group = Group.objects.filter(event=event, pk=removed.group_id).first()
-        if group is None:
-            raise PlaylistFailure(Failure.NO_SUCH_GROUP, "That group is gone.")
-        if not 1 <= removed.round_number <= 99:
-            raise PlaylistFailure(Failure.BAD_ROUND, "Pick a round to add.")
-        if not 0 <= removed.n_times_per_lane <= MAX_RUNS_PER_LANE:
-            raise PlaylistFailure(
-                Failure.BAD_RUNS, f"Runs per lane is 1 to {MAX_RUNS_PER_LANE}."
-            )
-        scene = (
-            Scene.objects.filter(event=event, pk=removed.scene_id).first()
-            if removed.scene_id
-            else None
-        )
-        order = list(
-            PlaylistEntry.objects.filter(event=event)
-            .order_by("seq")
-            .values_list("pk", flat=True)
-        )
-        last = PlaylistEntry.objects.filter(event=event).aggregate(
-            last=Max("seq"), first=Min("seq")
-        )
+        group = _group(event, removed.group_id, removed.round_number)
+        queued = PlaylistEntry.objects.filter(event=event)
+        if queued.filter(group=group, round_number=removed.round_number).exists():
+            return None
+        fields = _choice_fields(event, removed.choice)
+        _check_cut(group.pk, removed.round_number, fields["bucket_limit"])
+        order = list(queued.order_by("seq").values_list("pk", flat=True))
         step = PlaylistEntry.objects.create(
             event=event,
-            seq=max(abs(last["last"] or 0), abs(last["first"] or 0)) + 1,
+            seq=_free_seq(event),
             group=group,
             round_number=removed.round_number,
-            bucket_limit=max(removed.bucket_limit, 0),
-            bucketed=removed.bucketed,
-            n_times_per_lane=removed.n_times_per_lane,
-            scene_at_finish=scene,
-            continue_racing=removed.continue_racing,
-            waits_for_operator=removed.waits,
+            **fields,
         )
         order.insert(max(removed.position, 1) - 1, step.pk)
-        renumber_playlist(event, order)
+        _renumber(event, order)
         step.refresh_from_db()
         return step
 
 
+def _free_seq(event) -> int:
+    """A seq past every one held, negative ones too."""
+    held = PlaylistEntry.objects.filter(event=event).aggregate(
+        last=Max("seq"), first=Min("seq")
+    )
+    return max(abs(held["last"] or 0), abs(held["first"] or 0)) + 1
+
+
 def reorder_steps(event, entry_ids: list[int]) -> None:
     """The playlist in a new order, from a drag or a row's Move up and Move
-    down. The order names every step once, or a stale tab's order is
-    refused."""
+    down: `entry_ids[i]` gets `seq = i + 1`. The order names every step
+    once, or a stale tab's order is refused."""
     with transaction.atomic():
         lock_race_state(event.id)
-        try:
-            renumber_playlist(event, entry_ids)
-        except ValueError:
-            raise PlaylistFailure(
-                Failure.STALE_ORDER,
-                "The playlist changed in another tab. Reload to see it.",
-            ) from None
+        _renumber(event, entry_ids)
+
+
+def _renumber(event, entry_ids) -> None:
+    """Renumber the playlist under the lock the caller holds.
+
+    `seq` is unique per event, and SQLite has no deferrable unique constraint,
+    so every entry first moves to a seq below `-max(abs(seq))`, which no entry
+    holds even when an imported seq is already negative. The second pass then
+    never meets a seq that is still taken.
+    """
+    entries = {
+        entry.id: entry
+        for entry in PlaylistEntry.objects.select_for_update().filter(event=event)
+    }
+    if sorted(entry_ids) != sorted(entries):
+        raise PlaylistFailure(
+            Failure.STALE_ORDER,
+            "The playlist changed in another tab. Reload to see it.",
+        )
+    offset = max((abs(entry.seq) for entry in entries.values()), default=0)
+    for position, entry_id in enumerate(entry_ids, start=1):
+        PlaylistEntry.objects.filter(id=entry_id).update(seq=-(offset + position))
+    for position, entry_id in enumerate(entry_ids, start=1):
+        PlaylistEntry.objects.filter(id=entry_id).update(seq=position)

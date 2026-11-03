@@ -105,11 +105,13 @@ class Timer:
         self.api.dispose()
 
 
-def test_the_owners_race_day(login, event, playwright, live_server):
+def test_the_owners_race_day(login, event, playwright, live_server, page_errors):
     """At 390x844: queue Scouts round 1, a Scouts top 4 final, Outlaws round
     1 and an Outlaws top 4 final on this page, start the playlist, finish
     each round through the legacy timer, and start each next round with
-    one tap on its waiting card. No other operator step."""
+    one tap on the dashboard's intermission card, with no page load between
+    rounds. No other operator step."""
+    page_errors.allow(r"request failed: \S*/dashboard/live/\S* net::ERR_ABORTED$")
     page = login("RaceCoordinator")
     phone_only(page)
     race_day(event)
@@ -139,6 +141,13 @@ def test_the_owners_race_day(login, event, playwright, live_server):
     with htmx_post(page, "/playlist/start/"):
         page.get_by_role("button", name="Start playlist").click()
 
+    # The race coordinator races from the dashboard, which polls (#41);
+    # this page loads once and does not (#44). From here on no page loads:
+    # the timer ends each round, and one tap starts the next.
+    page.goto("/dashboard/")
+    expect(page.locator("#live")).to_be_visible()
+    loads = []
+    page.on("framenavigated", lambda frame: loads.append(frame.url))
     timer = Timer(playwright, live_server)
     try:
         expected = ["Scouts, Round 2", "Outlaws, Round 1", "Outlaws, Round 2"]
@@ -146,21 +155,12 @@ def test_the_owners_race_day(login, event, playwright, live_server):
             assert timer.race_round(event) > 0
             state = RaceState.objects.get(event=event)
             assert not state.racing and state.waiting_entry is not None
-            open_playlist(page)
-            waiting = page.locator("[data-queue] > li[data-waiting]")
-            expect(waiting).to_have_count(1)
-            expect(waiting).to_contain_text(name)
-            expect(waiting).not_to_contain_text("Racing now")
-            # Clear of the bottom nav, as the race coordinator scrolls to it.
-            waiting.evaluate("e => e.scrollIntoView({block: 'center'})")
+            intermission = page.locator("[data-intermission]")
+            expect(intermission).to_contain_text(f"Up next: {name}", timeout=5000)
             if name == expected[0]:
-                shoot(page, "playlist-intermission", full_page=False)
-            btn = waiting.get_by_role("button", name="Start this round")
-            # A waiting card with its pill never widens the page past 390.
-            width = page.evaluate("document.documentElement.scrollWidth")
-            assert width <= page.viewport_size["width"], width
-            with htmx_post(page, "/playlist/start-next/"):
-                btn.click()
+                shoot(page, "playlist-race-day-intermission")
+            intermission.get_by_role("button", name="Start next round").click()
+            expect(page.locator("[data-intermission]")).to_have_count(0)
             state = RaceState.objects.get(event=event)
             assert state.racing and state.waiting_entry is None
             round = Round.objects.select_related("group").get(pk=state.current_round_id)
@@ -172,6 +172,36 @@ def test_the_owners_race_day(login, event, playwright, live_server):
         timer.close()
     state = RaceState.objects.get(event=event)
     assert state.waiting_entry is None and not state.racing
+    assert loads == []
+
+
+def test_the_waiting_card_on_the_playlist_page(login, event):
+    """D12: while the intermission waits on a step, its card says so and
+    starts it with one tap."""
+    from racing.services import playlist
+    from racing.services.rounds import playlist_finalists
+
+    rounds = race_day(event)
+    PlaylistEntryFactory(group=rounds["Scouts"].group, seq=1, waits_for_operator=False)
+    PlaylistEntryFactory(group=rounds["Outlaws"].group, seq=2)
+    playlist.start_playlist(event, playlist_finalists())
+    while RaceState.objects.get(event=event).racing:
+        run_heat(event)
+    assert RaceState.objects.get(event=event).waiting_entry is not None
+
+    page = open_playlist(login("RaceCoordinator"))
+    waiting = page.locator("[data-queue] > li[data-waiting]")
+    expect(waiting).to_contain_text("Outlaws, Round 1")
+    expect(waiting.locator('[data-state="warn"]')).to_have_text("Waiting")
+    # Clear of the bottom nav, as the race coordinator scrolls to it.
+    waiting.evaluate("e => e.scrollIntoView({block: 'center'})")
+    shoot(page, "playlist-intermission", full_page=False)
+    width = page.evaluate("document.documentElement.scrollWidth")
+    assert width <= page.viewport_size["width"], width
+    with htmx_post(page, "/playlist/start-next/"):
+        waiting.get_by_role("button", name="Start this round").click()
+    state = RaceState.objects.get(event=event)
+    assert state.racing and state.current_round == rounds["Outlaws"]
 
 
 # ----- reordering on a phone, with no drag ----------------------------------------

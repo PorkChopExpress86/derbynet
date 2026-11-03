@@ -398,3 +398,59 @@ def test_the_dashboards_schedule_sheet_opens_the_partial(coordinator, event):
     wolves = race_setup(event)["Wolves"]
     sheet = html(get(coordinator, f"/dashboard/round/{wolves.pk}/sheet/schedule/"))
     assert 'hx-get="/playlist/scheduling/"' in sheet
+
+
+def _undo_url(response) -> str:
+    found = re.search(r'hx-post="(/playlist/restore/\?[^"]+)"', html(response))
+    assert found, html(response)[:500]
+    return found.group(1).replace("&amp;", "&")
+
+
+def test_a_second_undo_restores_nothing(coordinator, event, race_day):
+    """The #44 review: a double tap on Undo put the step back twice."""
+    for name in ("Scouts", "Outlaws"):
+        add(coordinator, event, name, 1)
+    first = PlaylistEntry.objects.get(event=event, group__name="Scouts")
+    undo = _undo_url(post(coordinator, f"/playlist/step/{first.pk}/remove/"))
+
+    post(coordinator, undo)
+    post(coordinator, undo)
+
+    assert [s[0] for s in steps(event)] == ["Scouts", "Outlaws"]
+
+
+def test_a_forged_undo_stores_nothing(coordinator, event, race_day):
+    """The #44 review: `runs=0` in a hand-made Undo link was stored."""
+    add(coordinator, event, "Scouts", 1)
+    step = PlaylistEntry.objects.get(event=event)
+    undo = _undo_url(post(coordinator, f"/playlist/step/{step.pk}/remove/"))
+    forged = re.sub(r"runs=\d+", "runs=0", undo)
+    if forged == undo:
+        forged = undo + "&runs=0"
+
+    response = post(coordinator, forged)
+
+    assert response.status_code == 422
+    assert steps(event) == []
+
+
+def test_the_queue_reads_no_more_for_more_steps(event):
+    """The #44 review: `state.build` read the cut and the allowed racers
+    once per step."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from ui.playlist import state
+
+    rounds = race_setup(event, groups=(("Scouts", 4), ("Outlaws", 4)))
+
+    def reads(n_steps):
+        PlaylistEntry.objects.filter(event=event).delete()
+        for seq in range(1, n_steps + 1):
+            group = rounds["Scouts" if seq % 2 else "Outlaws"].group
+            PlaylistEntryFactory(group=group, seq=seq, round_number=(seq + 1) // 2)
+        with CaptureQueriesContext(connection) as seen:
+            state.build(event)
+        return len(seen)
+
+    assert reads(6) == reads(2)

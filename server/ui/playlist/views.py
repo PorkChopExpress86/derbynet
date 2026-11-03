@@ -21,14 +21,9 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from accounts.permissions import Perm, allows
 from accounts.views import page_requires
-from core.settings_form import apply_form
+from core.settings_form import apply_form, set_lanes_in_use, set_scheduling_method
 from racing.services import playlist, rounds
-from racing.services.playlist import (
-    MAX_RUNS_PER_LANE,
-    PlaylistFailure,
-    RemovedStep,
-    StepChoice,
-)
+from racing.services.playlist import PlaylistFailure, RemovedStep, StepChoice
 from ui.navigation import requires_page
 from ui.playlist import state
 from ui.responses import active_event as _event
@@ -44,13 +39,6 @@ guard = requires_page("playlist")
 
 SHEET_BODY = "playlist-sheet-body"
 SETTINGS_WRITE = {"action": "settings.write"}
-# The scheduling method radio to the two settings it writes, as
-# `on_schedule_method_change()` in `website/js/settings.js` sets them.
-METHOD_SETTINGS = {
-    "normal": {"max-runs-per-car": "0", "rotation-schedule": "0"},
-    "abbreviated": {"max-runs-per-car": "1", "rotation-schedule": "0"},
-    "rotation": {"max-runs-per-car": "0", "rotation-schedule": "1"},
-}
 # `playlist.php`'s back button, by the PHP page a link names in `back`.
 BACK_PAGES = {"setup.php": "setup", "coordinator.php": "dashboard"}
 MAX_LANES = 31
@@ -68,20 +56,15 @@ def _int(value) -> int | None:
 
 
 def _choice(post, *, cut: bool) -> StepChoice:
-    """The entry sheet's fields. With `cut`, the sheet showed the top N,
-    which a final must have (D43): a blank or a number that is not one is
-    the refusal. Raises ValueError with what to tell the manager."""
+    """The entry sheet's fields, parsed only: the service holds the rules.
+    With `cut` the sheet showed the top N, and a blank one is 0, which the
+    service refuses for a final (D43). Raises ValueError for a field that
+    is not a whole number."""
     runs = _int(post.get("runs", ""))
-    if runs is None or not 1 <= runs <= MAX_RUNS_PER_LANE:
-        raise ValueError(f"Runs per lane is 1 to {MAX_RUNS_PER_LANE}.")
     then = _int(post.get("then", "0"))
-    if then is None:
-        raise ValueError("Pick what happens after the round.")
-    top = None
-    if cut:
-        top = _int(post.get("top", ""))
-        if top is None or top < 1:
-            raise ValueError("Say how many racers go to this final.")
+    top = _int(post.get("top", "") or "0") if cut else None
+    if runs is None or then is None or (cut and top is None):
+        raise ValueError("Each field takes a whole number.")
     return StepChoice(
         top=top,
         bucketed=post.get("bucketed") == "1",
@@ -307,18 +290,6 @@ def waits(request, entry_id):
 
 # ----- remove, Undo, reorder -------------------------------------------------------
 
-RESTORE_FIELDS = (
-    "group",
-    "round",
-    "position",
-    "top",
-    "bucketed",
-    "runs",
-    "scene",
-    "continue",
-    "waits",
-)
-
 
 @require_POST
 @guard
@@ -328,19 +299,7 @@ def remove(request, entry_id):
         gone = playlist.remove_step(_event(request), entry_id)
     except PlaylistFailure as failure:
         return refused(request, failure)
-    query = urlencode(
-        {
-            "group": gone.group_id,
-            "round": gone.round_number,
-            "position": gone.position,
-            "top": gone.bucket_limit,
-            "bucketed": int(gone.bucketed),
-            "runs": gone.n_times_per_lane,
-            "scene": gone.scene_id or 0,
-            "continue": int(gone.continue_racing),
-            "waits": int(gone.waits),
-        }
-    )
+    query = urlencode(gone.to_query())
     return changed(
         request,
         "Step removed.",
@@ -352,29 +311,16 @@ def remove(request, entry_id):
 @require_POST
 @guard
 def restore(request):
-    """Undo a removal: the step comes back where it was."""
-    data = request.GET
-    values = {name: _int(data.get(name, "")) for name in RESTORE_FIELDS}
-    if any(v is None for v in values.values()):
+    """Undo a removal: the step comes back where it was, checked as a new
+    step is. A second Undo finds it back and changes nothing."""
+    removed = RemovedStep.from_query(request.GET)
+    if removed is None:
         return service_error(request, "That step cannot come back. Add it again.")
     try:
-        playlist.restore_step(
-            _event(request),
-            RemovedStep(
-                group_id=values["group"],
-                round_number=values["round"],
-                position=values["position"],
-                bucket_limit=values["top"],
-                bucketed=bool(values["bucketed"]),
-                n_times_per_lane=values["runs"],
-                scene_id=values["scene"] or None,
-                continue_racing=bool(values["continue"]),
-                waits=bool(values["waits"]),
-            ),
-        )
+        step = playlist.restore_step(_event(request), removed)
     except PlaylistFailure as failure:
         return refused(request, failure)
-    return changed(request, "Step put back.")
+    return changed(request, "Step put back." if step else "That step is back already.")
 
 
 @require_POST
@@ -448,27 +394,23 @@ def scheduling(request):
 def scheduling_method(request):
     """Normal, abbreviated or rotation, as `max-runs-per-car` and
     `rotation-schedule` (`settings.php`)."""
-    chosen = METHOD_SETTINGS.get(request.POST.get("method", ""))
-    if chosen is None:
+    try:
+        result = set_scheduling_method(_event(request), request.POST.get("method", ""))
+    except KeyError:
         return _scheduling(request, error="Pick a scheduling method.")
-    result = apply_form(_event(request), {**SETTINGS_WRITE, **chosen})
     return _scheduling(request, error=result.failure[1] if result.failure else "")
 
 
 @require_POST
 @guard
 def scheduling_lanes(request):
-    """The lanes left out of new schedules, as `unused-lane-mask`: lanes 1
-    to `lanes`, the lane count the partial showed, that are not checked as
-    in use. While unraced heats exist the settings service refuses the
-    change (`already-scheduled`), and the partial shows the refusal beside
-    the lanes as they were."""
+    """The lanes in use: the checked lanes of 1 to `lanes`, the lane count
+    the partial showed. While unraced heats exist the settings service
+    refuses the change (`already-scheduled`), and the partial shows the
+    refusal beside the lanes as they were."""
     count = _int(request.POST.get("lanes", ""))
-    used = {_int(raw) for raw in request.POST.getlist("used")}
+    used = [_int(raw) for raw in request.POST.getlist("used")]
     if count is None or not 0 <= count <= MAX_LANES or None in used:
         return _scheduling(request, error="Pick lanes the track has.")
-    mask = sum(1 << (n - 1) for n in range(1, count + 1) if n not in used)
-    result = apply_form(
-        _event(request), {**SETTINGS_WRITE, "unused-lane-mask": str(mask)}
-    )
+    result = set_lanes_in_use(_event(request), count, used)
     return _scheduling(request, error=result.failure[1] if result.failure else "")
