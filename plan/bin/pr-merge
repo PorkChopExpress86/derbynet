@@ -30,6 +30,22 @@ if [ -n "$not_passed" ]; then
   echo "$not_passed" >&2
   exit 1
 fi
+# An issue whose body has a "## Still open" section stays open for what that
+# section names (plan/README.md), so a PR that would close it is refused here
+# rather than the issue reopened after the merge.
+held=()
+for n in $("$GH" pr view "$PR" --repo "$REPO" --json closingIssuesReferences \
+             --jq '.closingIssuesReferences[].number'); do
+  if "$GH" issue view "$n" --repo "$REPO" --json state,body \
+       --jq 'select(.state == "OPEN") | .body' | tr -d '\r' |
+     awk '/^## /{on = ($0 == "## Still open"); next} on && NF {found = 1} END {exit !found}'; then
+    held+=("#$n")
+  fi
+done
+if [ ${#held[@]} -gt 0 ]; then
+  echo "not merging #$PR; it closes ${held[*]}, whose body has a \"## Still open\" section; write \"Part of #N\" in the PR body instead" >&2
+  exit 1
+fi
 "$GH" pr merge "$PR" --repo "$REPO" --match-head-commit "$head" "$@"
 "$GH" pr view "$PR" --repo "$REPO" --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"'
 

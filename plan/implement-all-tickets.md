@@ -41,7 +41,7 @@ Spawn a general-purpose agent with `model: opus`, briefed per plan/AGENT-BRIEF.m
 
 1. Run `plan/bin/pr-wait <pr>` in the background and wait for its notification.
 2. When a check fails, send its name and link to the implementer, which reads the log with `gh run view --log-failed`, fixes the cause, and pushes. Then wait again.
-3. When every check is green, run `plan/bin/pr-merge <pr>`, which squashes and deletes the branch. If it reports the issue still open, close it, or add a `## Still open` section and move the frontier again (Pick a ticket, step 1), because that section unblocks the tickets that depend on it.
+3. When every check is green, run `plan/bin/pr-merge <pr>`, which squashes and deletes the branch. It refuses a PR whose body would close an issue that has a `## Still open` section; change the PR body to `Part of #N`. If it reports the issue still open, close it, or add a `## Still open` section and move the frontier again (Pick a ticket, step 1), because that section unblocks the tickets that depend on it.
 
 ## 5. Reset
 
