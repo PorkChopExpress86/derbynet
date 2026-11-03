@@ -11,7 +11,7 @@ The plan lives in GitHub issues on PorkChopExpress86/derbynet, labeled `django-m
 | `bin/pr-wait` | Waits for every check on a PR's current head and prints one line per check |
 | `bin/issue` | Prints an issue's title, body, and comments, because `gh issue view --comments` prints nothing on some gh versions |
 | `bin/ci-suites` | Lists each `testing/` suite an issue names and whether `.github/workflows/server.yml` runs it; exits 1 when one is missing |
-| `bin/pr-merge` | Merges a PR only if every check on its current head passed, pinned to that head SHA, then prints each issue the PR closes with its state and exits 1 if one is still open |
+| `bin/pr-merge` | Merges a PR only if every check on its current head passed, pinned to that head SHA, and refuses one that would close an issue with a `## Still open` section; then prints each issue the PR closes with its state and exits 1 if one is still open |
 
 ## Edit an issue body
 
