@@ -28,12 +28,31 @@ from ui.kiosks import state
 from ui.kiosks.views import posted_parameters, qr_default
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import back_url, closing_sheet, posted_int, refused
+from ui.responses import closing_sheet, posted_int, refused
 
 guard = requires_page("scenes")
 SHEET_BODY = "scenes-sheet-body"
-# `scenes.php`'s back button, by the PHP page a link names in `back`.
-BACK_PAGES = {"kiosk-dashboard.php": "kiosk-dashboard", "setup.php": "setup"}
+# The pages `make_banner()` (`templates/banner.inc`) draws a back button for,
+# by the URL name of each new page. `scenes.php` names kiosk-dashboard.php
+# when the link gives no `back`.
+BACK_PAGES = {
+    "index.php": "home",
+    "setup.php": "setup",
+    "checkin.php": "checkin",
+    "kiosk-dashboard.php": "kiosk-dashboard",
+    "coordinator.php": "dashboard",
+}
+
+
+def editor_back(request) -> str | None:
+    """The back button's URL, as `make_banner()` draws it: a page of its
+    list, the kiosk dashboard with no `back`, and no button for any other
+    value, so a `back` can never send the visitor off the server."""
+    back = request.GET.get("back")
+    if back is None:
+        return reverse("kiosk-dashboard")
+    name = BACK_PAGES.get(back)
+    return reverse(name) if name else None
 
 
 def _data(request):
@@ -90,7 +109,7 @@ def page(request):
         {
             "editor": editor,
             "back": back,
-            "back_url": back_url(request, BACK_PAGES, "kiosk-dashboard"),
+            "back_url": editor_back(request),
             "scene_links": [
                 (pk, name, _page_url(pk, back)) for pk, name in editor.scenes
             ],

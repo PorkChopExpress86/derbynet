@@ -355,9 +355,22 @@ def test_the_php_pages_redirect_keeping_back(client, event, old, new):
         ("", "/kiosks/"),
         ("?back=setup.php", "/setup/"),
         ("?back=kiosk-dashboard.php", "/kiosks/"),
-        ("?back=https://evil.example/", "/kiosks/"),
+        ("?back=index.php", "/"),
+        ("?back=checkin.php", "/checkin/"),
+        ("?back=coordinator.php", "/dashboard/"),
     ],
 )
 def test_the_editor_goes_back_to_the_calling_page(coordinator, event, query, back):
+    """`make_banner()` (`templates/banner.inc`) shows a back button for these
+    five pages, and `scenes.php` names kiosk-dashboard.php with no `back`."""
     html = coordinator.get(f"/kiosks/scenes/{query}").content.decode()
     assert f'<a href="{back}" aria-label="Back"' in html
+
+
+@pytest.mark.parametrize(
+    "back", ["https://evil.example/", "/groups/", "scenes.php", "racer-results.php"]
+)
+def test_any_other_back_shows_no_back_button(coordinator, event, back):
+    """`make_banner()` draws no back button for a page off its list."""
+    html = coordinator.get("/kiosks/scenes/", {"back": back}).content.decode()
+    assert 'aria-label="Back"' not in html

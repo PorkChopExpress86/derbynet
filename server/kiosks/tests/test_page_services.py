@@ -124,15 +124,10 @@ def test_remove_scene_twice_changes_nothing_the_second_time(event):
     assert services.remove_scene(event, awards.pk) is False
 
 
-def test_set_scene_page_keeps_parameters_for_the_same_page_only(event):
+def test_set_scene_page_sets_another_page_or_none(event):
     awards = scene(event, "Awards")
-    page = "kiosks/award-presentations.kiosk"
-    services.configure_scene_kiosk(event, awards.pk, "Main", page, Posted())
-    services.set_scene_page(event, awards.pk, "Main", page)
-    row = SceneKiosk.objects.get(scene=awards, kiosk_name="Main")
-    assert row.params == '{"confetti":true}'
     services.set_scene_page(event, awards.pk, "Main", "kiosks/flag.kiosk")
-    row.refresh_from_db()
+    row = SceneKiosk.objects.get(scene=awards, kiosk_name="Main")
     assert (row.page, row.params) == ("kiosks/flag.kiosk", "")
     services.set_scene_page(event, awards.pk, "Main", "")
     assert not SceneKiosk.objects.filter(scene=awards, kiosk_name="Main").exists()
@@ -159,3 +154,29 @@ def test_scene_changes_refuse_a_scene_gone_or_a_blank_name(event):
         services.configure_scene_kiosk(
             event, scene(event, "Welcome").pk, "Main", "kiosks/qrcode.kiosk", Posted()
         )
+
+
+def test_setting_the_same_page_again_drops_its_parameters(event):
+    """`scenes.js` `on_change_assigned_page` posts `scene.setkiosk` with no
+    `params`, so picking a page, the same one too, stores none."""
+    awards = scene(event, "Awards")
+    page = "kiosks/award-presentations.kiosk"
+    services.configure_scene_kiosk(event, awards.pk, "Main", page, Posted())
+    services.set_scene_page(event, awards.pk, "Main", page)
+    row = SceneKiosk.objects.get(scene=awards, kiosk_name="Main")
+    assert (row.page, row.params) == (page, "")
+
+
+def test_a_kiosk_silent_past_the_list_window_still_takes_a_change(event):
+    """PHP's `kiosk.assign` and `kiosk.reload` UPDATE the row by address,
+    whatever its last contact; only a kiosk that is gone is refused."""
+    quiet = kiosk(event, "quiet", page="kiosks/flag.kiosk")
+    Kiosk.objects.filter(pk=quiet.pk).update(
+        last_contact=timezone.now() - timedelta(minutes=5)
+    )
+    services.set_kiosk_page(event, "quiet", "kiosks/welcome.kiosk")
+    services.reload_kiosk(event, "quiet")
+    found = Kiosk.objects.get(pk=quiet.pk)
+    assert (found.page, found.reload_requested) == ("kiosks/welcome.kiosk", True)
+    with pytest.raises(KioskFailure, match="That kiosk is gone"):
+        services.reload_kiosk(event, "gone")

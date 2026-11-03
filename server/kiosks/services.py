@@ -304,8 +304,11 @@ def choose_scene(event, scene: Scene | None) -> None:
 # ----- the kiosk dashboard and scene editor pages (#46) ------------------------
 #
 # Each change the pages make is one call here, under the `RaceState` lock, and
-# checks again what the page showed: the kiosk is still listed, the scene still
-# exists, the kiosk still shows the page its Configure sheet was for.
+# checks again what the page showed: the kiosk's row still exists, the scene
+# still exists, the kiosk still shows the page its Configure sheet was for. A
+# kiosk silent past the 60 s list window still takes a change, as PHP's
+# `kiosk.assign` and `kiosk.reload` UPDATE its row by address; only one that
+# is gone, dropped after an hour or never seen, is refused.
 
 NAME_LIMIT = 200
 
@@ -316,7 +319,7 @@ class KioskFailure(Exception):
         self.description = description
 
 
-KIOSK_GONE = "That kiosk is not listed anymore. Reload the page."
+KIOSK_GONE = "That kiosk is gone. Reload the page."
 SCENE_GONE = "That scene is gone. Reload the page."
 
 
@@ -445,9 +448,10 @@ def set_scene_page(
 ) -> None:
     """`scene.setkiosk` from the scene editor: the page kiosks named
     `kiosk_name` show in the scene, or none, which takes the name out. The
-    same page keeps its parameters; another page starts with none, as
-    `scenes.js` posts none. With `new_name`, a name some scene already has,
-    in any case, is refused, as "Add Kiosk Name" refuses it."""
+    page starts with no parameters, the same page again too, as `scenes.js`
+    `on_change_assigned_page` posts no `params`. With `new_name`, a name some
+    scene already has, in any case, is refused, as "Add Kiosk Name" refuses
+    it."""
     kiosk_name = _name(kiosk_name, "kiosk name")
     if not kiosk_name:
         raise KioskFailure("Name the kiosk.")
@@ -464,9 +468,7 @@ def set_scene_page(
         if not page:
             set_scene_kiosk(scene, kiosk_name, "", None)
             return
-        row = SceneKiosk.objects.filter(scene=scene, kiosk_name=kiosk_name).first()
-        params = row.params if row is not None and row.page == page else ""
-        set_scene_kiosk(scene, kiosk_name, _built_in(page), params)
+        set_scene_kiosk(scene, kiosk_name, _built_in(page), None)
 
 
 def configure_scene_kiosk(
