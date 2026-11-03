@@ -125,11 +125,8 @@ def test_the_owners_station_flow(login, event, folders):
         ("Sam", "Scouts", "104", "Capture and check in"),
         ("Nora", "Non-Scouts", "201", "Capture only"),
     ):
-        if first == "Nora":
-            page.evaluate("htmx.config.defaultSettleDelay = 1000")
         form = add_racer(page, first, "Station", f"{first}'s Rocket", partition)
         expect(form.locator("#f-carno")).to_have_value(number)
-        page.evaluate("htmx.config.defaultSettleDelay = 20")
         if first == "Sam":
             shoot(page, "checkin-add-sheet", full_page=False)
         form.get_by_role("button", name="Add racer").click()

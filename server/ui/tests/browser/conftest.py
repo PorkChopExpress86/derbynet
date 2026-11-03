@@ -22,7 +22,8 @@ test body returns, the harness waits for every request the page still has in
 flight before any fixture tears down (#45 retro), so a late reply never meets
 a flushed database or `settings` already put back.
 `wait_for_load_state("networkidle")` waits for a page load only, and returns
-at once after an htmx request.
+at once after an htmx request. A swap that leaves an `hx-get` or `hx-post`
+control unbound once its task ends fails the test (#46 retro).
 """
 
 import os
@@ -55,6 +56,25 @@ SIZES = {
     },
     "desktop": {"viewport": {"width": 1280, "height": 800}},
 }
+# A swap must bind its content's hx-* attributes before the browser can run
+# anything else, or a tap on a control just shown sends nothing (#45's award
+# sheet in CI, #46 retro). htmx binds at settle, so the base template settles
+# at once; this fails any test whose swap leaves a control unbound after the
+# task that swapped it, whatever the timing of the test's own steps.
+UNBOUND_AFTER_SWAP = """document.addEventListener('htmx:afterSwap', (event) => {
+  const root = event.detail.target;
+  setTimeout(() => {
+    if (!root.isConnected) return;
+    const unbound = [root, ...root.querySelectorAll('[hx-get], [hx-post]')].filter(
+      (e) => e.matches('[hx-get], [hx-post]') && e.isConnected
+        && !(e['htmx-internal-data'] || {}).initHash);
+    if (unbound.length) {
+      const asked = event.detail.requestConfig || {};
+      const tag = unbound[0].outerHTML.slice(0, 120);
+      console.error(`htmx left unbound after ${asked.verb} ${asked.path}: ${tag}`);
+    }
+  }, 0);
+});"""
 AXE = Path(__file__).parent / "vendor" / "axe-4.10.3.min.js"
 AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
 SCREENSHOTS = Path(
@@ -266,6 +286,7 @@ def pytest_runtest_call(item):
 @pytest.fixture
 def page(browser, live_server, size, page_errors):
     context = browser.new_context(**SIZES[size], base_url=live_server.url)
+    context.add_init_script(UNBOUND_AFTER_SWAP)
     in_flight = InFlight(context)
     page = context.new_page()
     page.size = size
@@ -336,10 +357,10 @@ def htmx_post(page, path: str):
 
 def htmx_settled(page):
     """Wait until htmx has no request in flight and has settled every swap.
-    htmx binds the `hx-*` attributes of swapped-in content only when it
-    settles, 20 ms after the swap, so a control clicked or changed before
-    then makes no request: wait for this after a swap that brings controls
-    the test uses next."""
+    The page settles at once (`defaultSettleDelay` 0), so a swapped-in
+    control is bound as soon as it shows, and every swap is checked for that
+    (UNBOUND_AFTER_SWAP); wait for this before reading what a request
+    changed."""
     page.wait_for_function(
         "!document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')"
     )

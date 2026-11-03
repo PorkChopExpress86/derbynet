@@ -18,6 +18,24 @@ def test_inheritance_is_off(client, db):
     assert json.loads(html.unescape(meta.group(1)))["disableInheritance"] is True
 
 
+def test_a_swap_settles_at_once(client, db):
+    """htmx binds the hx-* attributes of swapped-in content when the swap
+    settles, and Alpine shows that content before then. With htmx's default
+    20 ms settle, more under load, a control used in between sent nothing:
+    #45's award sheet select in CI, and every browser test that taps after a
+    swap when the settle is slowed to 1.5 s (#46 retro: 61 of 248 failed).
+    A `settle:` modifier on an element brings the gap back."""
+    page = client.get("/login/").content.decode()
+    meta = re.search(r"<meta name=\"htmx-config\" content='([^']+)'>", page)
+    assert json.loads(html.unescape(meta.group(1)))["defaultSettleDelay"] == 0
+    settles = [
+        p.name
+        for p in (UI / "templates").rglob("*.html")
+        if re.search(r"hx-swap=\"[^\"]*\bsettle:", p.read_text())
+    ]
+    assert settles == []
+
+
 def test_no_reply_replaces_an_element_a_trigger_listens_to():
     """`hx-trigger="... from:#x"` listens on the element #x was when htmx
     processed the trigger. A reply that swaps #x itself (out of band, or as an

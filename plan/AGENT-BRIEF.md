@@ -32,6 +32,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## Evidence
 
 - A claim counts once a test or a real server run reproduces it. That covers a sentence in `GLOSSARY.md`, `plan/owner-decisions.md` or a docstring that says what the server does. Name the test or the code that shows it.
+- A comment saying the port does what a PHP page does is a claim too: check it against PHP with `testing/docker/php-scratch.sh`. #44's playlist back button said "as playlist.php does" and was wrong until #46's retro. The PHP files `.gitignore` lists under `website/` are built from `templates/` by `build.xml`, so `make_banner()` is in `templates/banner.inc`.
 - Run the shell suites in `testing/` against a live Django server the way `.github/workflows/server.yml` does. Add a suite to that workflow once it passes on SQLite and Postgres with no stand-in. `plan/bin/ci-suites N` lists the suites ticket N names that the workflow lacks; the PR body names the ticket each one waits on.
 - Run the full server suite once at the end, in the background, and read its exit code before pushing.
 - Golden captures from PHP need a regular clone, not a worktree. Ask the lead to run `server/tests/golden/capture.sh`, narrowed with `GOLDEN_SCENARIOS`.
