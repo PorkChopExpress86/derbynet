@@ -26,10 +26,11 @@ document.addEventListener('alpine:init', () => {
   Alpine.store('kioskSheet', { title: '' });
   Alpine.store('sceneSheet', { title: '' });
 
-  // The board's "Last contact: Ns ago", counted here each second from the
-  // contact time the board carries, so the polled board stays the same
-  // between contacts and its poll can answer 204. The server's clock at
-  // page load sets the offset from this device's clock.
+  // The board's "Last contact: Ns ago" for a quiet kiosk, counted here each
+  // second from the contact time the board carries only once the kiosk is
+  // quiet, so a kiosk checking in on time never changes the board and its
+  // poll answers 204. The server's clock at page load sets the offset from
+  // this device's clock.
   Alpine.data('kioskDashboard', (serverNow, quiet) => ({
     offset: serverNow - Date.now() / 1000,
     init() {

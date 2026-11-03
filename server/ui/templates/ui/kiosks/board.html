@@ -5,7 +5,7 @@
   <div role="group" aria-labelledby="ks-scenes-h" class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
     {% for id, name in board.scenes %}
     {% if can_control %}
-    <button type="button" name="scene" value="{{ id }}" hx-post="{% url 'kiosks-scene' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:queue all" aria-pressed="{% if id == board.current_scene_id %}true{% else %}false{% endif %}" data-scene="{{ id }}" class="min-h-12 truncate rounded-xl border px-2 text-sm font-semibold aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink border-line bg-surface">{{ name }}</button>
+    <button type="button" name="scene" value="{{ id }}" hx-post="{% url 'kiosks-scene' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:replace" aria-pressed="{% if id == board.current_scene_id %}true{% else %}false{% endif %}" data-scene="{{ id }}" class="min-h-12 truncate rounded-xl border px-2 text-sm font-semibold aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink border-line bg-surface">{{ name }}</button>
     {% else %}
     <span data-scene="{{ id }}"{% if id == board.current_scene_id %} aria-current="true"{% endif %} class="flex min-h-12 items-center justify-center truncate rounded-xl border px-2 text-sm font-semibold {% if id == board.current_scene_id %}border-accent bg-accent text-accent-ink{% else %}border-line bg-surface text-ink-muted{% endif %}">{{ name }}</span>
     {% endif %}
@@ -34,7 +34,7 @@
         <p class="truncate text-sm text-ink-muted" data-madlib>{{ k.madlib }}</p>
         <p class="mt-1 truncate text-sm font-medium" data-page="{{ k.page.full }}">{{ k.page.label }}{% if k.page.custom %} <span class="text-ink-muted">(for {{ k.page.custom }})</span>{% endif %}</p>
         {% if k.summary %}<p class="truncate text-sm text-ink-muted" data-summary>{{ k.summary }}</p>{% endif %}
-        <p class="text-sm text-warn-ink" data-last-contact="{{ k.last_contact }}" hidden></p>
+        {% if k.quiet_since %}<p class="text-sm text-warn-ink" data-last-contact="{{ k.quiet_since }}" hidden></p>{% endif %}
         {% if k.reload %}<p class="mt-1">{% include "ui/components/status_pill.html" with state="warn" text="Reloading" %}</p>{% endif %}
       </div>
     </div>
@@ -45,8 +45,8 @@
       {% if k.page.configurable %}
       <button type="button" hx-get="{% url 'kiosks-configure' %}?address={{ k.address|urlencode }}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="kioskSheet.open('Configure {{ k.page.label|escapejs }}', $event)" aria-haspopup="dialog" data-action="configure" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Configure</button>
       {% endif %}
-      <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-reload' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:queue all" data-action="reload" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Reload</button>
-      <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-identify' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:queue all" data-action="identify" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Identify</button>
+      <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-reload' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:replace" data-action="reload" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Reload</button>
+      <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-identify' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:replace" data-action="identify" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Identify</button>
     </div>
     {% endif %}
   </li>

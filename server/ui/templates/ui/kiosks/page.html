@@ -6,7 +6,7 @@
   {% if not can_control %}
   <p role="status" data-view-only class="mb-3 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm">You can see the kiosks. Changing them needs a role with race control.</p>
   {% endif %}
-  {# The board polls every 2 s and waits while a sheet is open. Its signature is the hidden #kiosks-sig inside it. #}
+  {# The board polls every 2 s and waits while a sheet is open. Its signature is the hidden #kiosks-sig inside it. Each change syncs on the board with replace: it aborts a poll in flight, as the race dashboard's controls do (#41). Queued behind the poll instead, a tap on a board button the poll's reply replaced was dropped, since htmx sends no request for a detached element. #}
   <div id="kiosk-board" hx-get="{% url 'kiosks-board' %}" hx-trigger="every {{ poll_seconds }}s [derbynet.pollable(this)]" hx-include="#kiosks-sig" hx-swap="innerHTML" hx-sync="this:drop" @htmx:after-settle="tick()">
   {{ board_html|safe }}
   </div>

@@ -99,7 +99,28 @@ def test_a_card_shows_the_names_contact_page_and_parameters(coordinator, event):
     assert services.madlib("10.0.0.7") in html
     assert 'data-page="kiosks/please-check-in.kiosk">Please check in' in html
     assert "data-summary>Lions<" in html
-    assert re.search(r'data-last-contact="\d+"', html)
+    assert "data-last-contact" not in html
+
+
+def test_a_kiosk_checking_in_on_time_leaves_the_board_unchanged(coordinator, event):
+    """A kiosk checks in every 5 s. The board changes only when one goes
+    quiet, so the poll answers 204 between real changes and a tap never
+    lands on a board being swapped (#46 CI)."""
+    kiosk(event, "a", name="Main")
+    Kiosk.objects.filter(address="a").update(
+        last_contact=timezone.now() - timedelta(seconds=3)
+    )
+    sig = SIG.search(board(coordinator).content.decode()).group(1)
+    Kiosk.objects.filter(address="a").update(last_contact=timezone.now())
+    assert board(coordinator, sig).status_code == 204
+    Kiosk.objects.filter(address="a").update(
+        last_contact=timezone.now() - timedelta(seconds=20)
+    )
+    quiet = board(coordinator, sig)
+    assert quiet.status_code == 200
+    stamp = int((timezone.now() - timedelta(seconds=20)).timestamp())
+    found = int(re.search(r'data-last-contact="(\d+)"', quiet.content.decode())[1])
+    assert abs(found - stamp) <= 1
 
 
 def test_the_named_warning_counts_the_named_kiosks(coordinator, event):

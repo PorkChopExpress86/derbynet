@@ -239,7 +239,7 @@ def configure(request):
                 "post_url": request.path,
                 "sheet_body": SHEET_BODY,
                 "sheet_js": "kioskSheet",
-                "sync": "#kiosk-board:queue all",
+                "sync": "#kiosk-board:replace",
             },
         )
     try:

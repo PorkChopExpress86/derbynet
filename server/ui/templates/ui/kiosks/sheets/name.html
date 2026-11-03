@@ -1,6 +1,6 @@
 {# Name a kiosk (#46), with chips for the names the scenes use. A named kiosk takes the current scene's page for its name. #}
 <div x-data x-init="kioskSheet.show('Name {{ label|escapejs }}')" data-name-sheet>
-  <form hx-post="{% url 'kiosks-name' %}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="#kiosk-board:queue all" class="flex flex-col gap-4">
+  <form hx-post="{% url 'kiosks-name' %}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="#kiosk-board:replace" class="flex flex-col gap-4">
     <input type="hidden" name="address" value="{{ kiosk.address }}">
     <div>
       <label for="kn-name" class="mb-1 block text-sm font-medium">Name for this kiosk</label>

@@ -23,6 +23,16 @@ from ui.tests.browser.conftest import (
 )
 
 ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
+ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
+
+
+@pytest.fixture(autouse=True)
+def _polls_may_be_cut_short(page_errors):
+    """A change aborts a board poll still in flight
+    (`hx-sync="#kiosk-board:replace"`), so the tap is sent at once and no
+    stale poll swaps after its reply. The browser reports the aborted poll
+    as a failed request."""
+    page_errors.allow(ABORTED_POLL)
 
 
 def phone_only(page):
@@ -61,6 +71,39 @@ def sheet(page, name):
     return page.locator(f'[data-sheet="{name}"]')
 
 
+# True once htmx has processed every element under `root` (and `root`) that
+# makes a request: htmx 2 sets `initHash` on an element's internal data when
+# it binds the element's `hx-*` attributes.
+BOUND = """root => [root, ...root.querySelectorAll('[hx-get], [hx-post]')]
+  .filter((e) => e.matches('[hx-get], [hx-post]'))
+  .every((e) => (e['htmx-internal-data'] || {}).initHash)"""
+
+
+def bound(page, locator):
+    """Wait until htmx has bound the requests of what `locator` shows. Alpine
+    shows swapped-in content at once, but htmx binds its `hx-*` attributes
+    only when the swap settles, 20 ms later or more under load, and a
+    control used before then sends nothing (#46 CI: the award sheet's "For"
+    select never fetched the partition list). No settling class marks every
+    such swap, so `htmx_settled()` alone does not cover it."""
+    page.wait_for_function(BOUND, arg=locator.element_handle())
+
+
+def ready(page, body):
+    """`body`, a sheet body just loaded, once its controls are bound."""
+    expect(body).to_be_visible()
+    bound(page, body)
+    return body
+
+
+def tap(page, control):
+    """Click a control of a list or board that htmx may have just swapped
+    (a poll, a filter, a reply out of band), once htmx has bound it."""
+    htmx_settled(page)
+    bound(page, control)
+    control.click()
+
+
 def scene_button(page, found):
     return page.locator(f'#kiosk-board button[data-scene="{found.pk}"]')
 
@@ -82,7 +125,7 @@ def test_a_scene_switch_still_shows_after_three_polls(login, event):
     page = open_dashboard(login("RaceCoordinator"))
     racing = scene(event, "Racing")
     with htmx_post(page, "/kiosks/scene/"):
-        scene_button(page, racing).click()
+        tap(page, scene_button(page, racing))
     expect(scene_button(page, racing)).to_have_attribute("aria-pressed", "true")
     next_polls(page, 3)
     expect(scene_button(page, racing)).to_have_attribute("aria-pressed", "true")
@@ -98,9 +141,8 @@ def test_three_fake_kiosks_follow_a_scene_tapped_on_the_phone(login, event):
         assert poll_kiosk(page, address)["page"] == "kiosks/identify.kiosk"
     open_dashboard(page)
     for address, name in zip(ADDRESSES, ("Main", "Aux1", "Aux2"), strict=True):
-        card(page, address).locator('[data-action="name"]').click()
-        form = sheet(page, "kiosks").locator("[data-name-sheet]")
-        expect(form).to_be_visible()
+        tap(page, card(page, address).locator('[data-action="name"]'))
+        form = ready(page, sheet(page, "kiosks").locator("[data-name-sheet]"))
         form.locator(f'[data-name-chips] button[data-value="{name}"]').click()
         expect(form.get_by_label("Name for this kiosk")).to_have_value(name)
         with htmx_post(page, "/kiosks/name/"):
@@ -115,7 +157,7 @@ def test_three_fake_kiosks_follow_a_scene_tapped_on_the_phone(login, event):
         ("Awards", ("award-presentations", "please-check-in", "welcome")),
     ):
         with htmx_post(page, "/kiosks/scene/"):
-            scene_button(page, scene(event, name)).click()
+            tap(page, scene_button(page, scene(event, name)))
         for address, brief in zip(ADDRESSES, pages, strict=True):
             assert poll_kiosk(page, address)["page"] == f"kiosks/{brief}.kiosk"
             expect(card(page, address).locator("[data-page]")).to_have_attribute(
@@ -130,9 +172,10 @@ def test_the_slideshow_configure_sheet_shows_what_was_saved(login, event):
     Group.objects.create(event=event, name="Tigers", sort_order=2)
     kiosk(event, "tv", name="Lobby", page="kiosks/slideshow.kiosk")
     page = open_dashboard(login("RaceCoordinator"))
-    card(page, "tv").locator('[data-action="configure"]').click()
-    form = sheet(page, "kiosks").locator('[data-configure-sheet="slideshow"]')
-    expect(form).to_be_visible()
+    tap(page, card(page, "tv").locator('[data-action="configure"]'))
+    form = ready(
+        page, sheet(page, "kiosks").locator('[data-configure-sheet="slideshow"]')
+    )
     form.get_by_label("Title text").fill("Welcome, Pack 1")
     form.get_by_label("Tigers").uncheck()
     with htmx_post(page, "/kiosks/configure/"):
@@ -148,8 +191,10 @@ def test_the_slideshow_configure_sheet_shows_what_was_saved(login, event):
     }
 
     page.reload()
-    card(page, "tv").locator('[data-action="configure"]').click()
-    form = sheet(page, "kiosks").locator('[data-configure-sheet="slideshow"]')
+    tap(page, card(page, "tv").locator('[data-action="configure"]'))
+    form = ready(
+        page, sheet(page, "kiosks").locator('[data-configure-sheet="slideshow"]')
+    )
     expect(form.get_by_label("Title text")).to_have_value("Welcome, Pack 1")
     expect(form.get_by_label("Lions")).to_be_checked()
     expect(form.get_by_label("Tigers")).not_to_be_checked()
@@ -200,8 +245,8 @@ def test_kiosk_dashboard_parity(login, event):
     assert_accessible(page)
 
     # The page select, with a thumbnail per page.
-    card(page, "10.0.0.2").locator('[data-action="page"]').click()
-    picker = sheet(page, "kiosks").locator("[data-page-sheet]")
+    tap(page, card(page, "10.0.0.2").locator('[data-action="page"]'))
+    picker = ready(page, sheet(page, "kiosks").locator("[data-page-sheet]"))
     expect(picker.locator("[data-page-choice]")).to_have_count(15)
     expect(picker.locator("[data-page-choice] svg[data-thumbnail]")).to_have_count(15)
     with htmx_post(page, "/kiosks/page/"):
@@ -223,9 +268,10 @@ def test_kiosk_dashboard_parity(login, event):
             "data-page", f"kiosks/{brief}.kiosk"
         )
         htmx_settled(page)
-        card(page, "10.0.0.2").locator('[data-action="configure"]').click()
-        form = sheet(page, "kiosks").locator(f'[data-configure-sheet="{brief}"]')
-        expect(form).to_be_visible()
+        tap(page, card(page, "10.0.0.2").locator('[data-action="configure"]'))
+        form = ready(
+            page, sheet(page, "kiosks").locator(f'[data-configure-sheet="{brief}"]')
+        )
         if label:
             expect(form.get_by_text(label, exact=True)).to_be_visible()
         page.keyboard.press("Escape")
@@ -233,12 +279,12 @@ def test_kiosk_dashboard_parity(login, event):
 
     # Reload.
     with htmx_post(page, "/kiosks/reload/"):
-        card(page, "10.0.0.1").locator('[data-action="reload"]').click()
+        tap(page, card(page, "10.0.0.1").locator('[data-action="reload"]'))
     expect(card(page, "10.0.0.1")).to_contain_text("Reloading")
     assert poll_kiosk(page, "10.0.0.1")["reload"] is True
     # Identify.
     with htmx_post(page, "/kiosks/identify/"):
-        card(page, "10.0.0.1").locator('[data-action="identify"]').click()
+        tap(page, card(page, "10.0.0.1").locator('[data-action="identify"]'))
     assert Kiosk.objects.get(address="10.0.0.1").page == "kiosks/identify.kiosk"
 
     # New Kiosk Window, on a desktop only.
@@ -291,7 +337,7 @@ def test_scene_editor_parity(login, event):
 
     # New scene: the page loads at it, keeping back.
     page.locator('[data-action="new-scene"]').click()
-    form = sheet(page, "scenes").locator("[data-new-scene-sheet]")
+    form = ready(page, sheet(page, "scenes").locator("[data-new-scene-sheet]"))
     form.get_by_label("Scene name").fill("Pack Night")
     with page.expect_navigation():
         form.locator("[data-submit]").click()
@@ -303,7 +349,7 @@ def test_scene_editor_parity(login, event):
 
     # Add kiosk name, with its page.
     page.locator('[data-action="add-name"]').click()
-    form = sheet(page, "scenes").locator("[data-add-name-sheet]")
+    form = ready(page, sheet(page, "scenes").locator("[data-add-name-sheet]"))
     form.get_by_label("Kiosk name").fill("Lobby")
     form.get_by_label("Page in this scene").select_option("kiosks/slideshow.kiosk")
     with htmx_post(page, "/kiosks/scenes/name/"):
@@ -313,8 +359,10 @@ def test_scene_editor_parity(login, event):
     expect(lobby.locator("[data-page]")).to_have_text("Slideshow")
 
     # Its parameters.
-    lobby.locator('[data-action="configure"]').click()
-    form = sheet(page, "scenes").locator('[data-configure-sheet="slideshow"]')
+    tap(page, lobby.locator('[data-action="configure"]'))
+    form = ready(
+        page, sheet(page, "scenes").locator('[data-configure-sheet="slideshow"]')
+    )
     form.get_by_label("Title text").fill("Pack night")
     with htmx_post(page, "/kiosks/scenes/configure/"):
         form.locator("[data-submit]").click()
@@ -323,8 +371,8 @@ def test_scene_editor_parity(login, event):
     assert json.loads(row.params)["title"] == "Pack night"
 
     # Another page for Main in this scene.
-    page.locator('#scene-entries [data-entry="Main"] [data-action="page"]').click()
-    picker = sheet(page, "scenes").locator("[data-page-sheet]")
+    tap(page, page.locator('#scene-entries [data-entry="Main"] [data-action="page"]'))
+    picker = ready(page, sheet(page, "scenes").locator("[data-page-sheet]"))
     with htmx_post(page, "/kiosks/scenes/page/"):
         picker.locator('[data-page-choice="standings"]').click()
     expect(page.locator('#scene-entries [data-entry="Main"] [data-page]')).to_have_text(
@@ -334,7 +382,7 @@ def test_scene_editor_parity(login, event):
 
     # Delete scene: the page loads at the first scene.
     page.locator('[data-action="delete-scene"]').click()
-    confirm = sheet(page, "scenes").locator("[data-delete-scene-sheet]")
+    confirm = ready(page, sheet(page, "scenes").locator("[data-delete-scene-sheet]"))
     with page.expect_navigation():
         confirm.locator("[data-confirm]").click()
     assert not Scene.objects.filter(pk=made.pk).exists()
@@ -342,3 +390,28 @@ def test_scene_editor_parity(login, event):
         "Welcome"
     )
     expect(page.locator('a[aria-label="Back"]')).to_have_attribute("href", "/setup/")
+
+
+def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
+    """A scene tapped while a board poll is in flight reaches the server,
+    even when that poll's reply changes the board. Queued behind the poll,
+    the tap belonged to a button the reply then replaced, and htmx drops
+    the request of a detached element (#46 CI: the switch never posted)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene(event, "Racing")
+    htmx_settled(page)
+    held = []
+    page.route("**/kiosks/board/**", lambda route: held.append(route))
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    page.wait_for_function("() => document.querySelector('#kiosk-board.htmx-request')")
+    with htmx_post(page, "/kiosks/scene/"):
+        scene_button(page, racing).click()
+        page.unroute("**/kiosks/board/**")
+        for route in held:
+            try:
+                route.continue_()
+            except Exception:
+                pass  # the tap aborted it
+    expect(scene_button(page, racing)).to_have_attribute("aria-pressed", "true")
+    assert held, "no poll was out"

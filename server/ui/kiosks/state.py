@@ -101,7 +101,11 @@ class Card:
     address: str
     name: str
     madlib: str
-    last_contact: int
+    # The last contact, epoch seconds, once the kiosk has been silent past
+    # QUIET_SECONDS; None while it checks in on time. A kiosk polls every
+    # 5 s, so the board changes when one goes quiet, not at each check-in,
+    # and the page counts the age from here.
+    quiet_since: int | None
     page: Shown
     summary: str
     reload: bool
@@ -123,6 +127,13 @@ def group_names(event) -> dict[int, str]:
     return dict(Group.objects.filter(event=event).values_list("pk", "name"))
 
 
+def quiet_since(last_contact, now) -> int | None:
+    """`kiosk-dashboard.js` shows "Last contact" when the age, in whole
+    seconds, is over 5."""
+    contact = int(last_contact.timestamp())
+    return contact if int(now.timestamp()) - contact > QUIET_SECONDS else None
+
+
 def board(event, now) -> Board:
     listed = kiosks.listed_kiosks(event, now)
     groups = group_names(event) if listed else {}
@@ -131,7 +142,7 @@ def board(event, now) -> Board:
             address=k.address,
             name=k.name,
             madlib=madlib(k.address),
-            last_contact=int(k.last_contact.timestamp()),
+            quiet_since=quiet_since(k.last_contact, now),
             page=Shown.of(k.page),
             summary=summary(k.page, parameters.stored(k.params), groups),
             reload=k.reload_requested,
