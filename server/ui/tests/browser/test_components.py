@@ -114,11 +114,14 @@ def test_the_stepper_stays_in_range(gallery):
 def test_the_sortable_list_moves_by_the_row_menu(gallery):
     rows = gallery.get_by_role("list", name="Awards in presentation order")
 
-    with gallery.expect_request("**/components/demo/ok/") as posted:
+    # Wait for the answer, not only the request: the endpoint 404s once the
+    # test ends and `settings` turns the test endpoints off again.
+    with gallery.expect_response("**/components/demo/ok/") as posted:
         gallery.get_by_role("button", name="Actions for Fastest Car").click()
         gallery.get_by_role("menuitem", name="Move up").click()
 
-    assert posted.value.post_data == "order=a1%2Ca3%2Ca2"
+    assert posted.value.status == 204
+    assert posted.value.request.post_data == "order=a1%2Ca3%2Ca2"
     expect(rows.locator("li > span")).to_have_text(
         ["Best Design", "Fastest Car", "Most Colorful"]
     )

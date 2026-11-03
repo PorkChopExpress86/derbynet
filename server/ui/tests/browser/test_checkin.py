@@ -21,6 +21,7 @@ from ui.tests.browser.conftest import (
     PLAIN_HTTP_HOST,
     SIZES,
     assert_accessible,
+    htmx_settled,
     log_in,
     no_sideways_scroll,
     shoot,
@@ -100,6 +101,10 @@ def crop(page):
 def add_racer(page, first, last, car_name, partition):
     page.get_by_role("button", name="New racer").click()
     form = sheet(page)
+    # The class's change refreshes the car number only once htmx has bound
+    # the hint's trigger.
+    expect(form.locator('[data-racer-sheet="new"]')).to_be_visible()
+    htmx_settled(page)
     form.get_by_label("First name").fill(first)
     form.get_by_label("Last name").fill(last)
     form.get_by_label("Car name").fill(car_name)
@@ -120,8 +125,11 @@ def test_the_owners_station_flow(login, event, folders):
         ("Sam", "Scouts", "104", "Capture and check in"),
         ("Nora", "Non-Scouts", "201", "Capture only"),
     ):
+        if first == "Nora":
+            page.evaluate("htmx.config.defaultSettleDelay = 1000")
         form = add_racer(page, first, "Station", f"{first}'s Rocket", partition)
         expect(form.locator("#f-carno")).to_have_value(number)
+        page.evaluate("htmx.config.defaultSettleDelay = 20")
         if first == "Sam":
             shoot(page, "checkin-add-sheet", full_page=False)
         form.get_by_role("button", name="Add racer").click()

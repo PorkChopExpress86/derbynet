@@ -15,7 +15,7 @@ set -e -E -o pipefail
 
 SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 NAME="derbynet-pytest-postgres-$$"
-trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
+trap 'docker rm -f -v "$NAME" >/dev/null 2>&1 || true' EXIT
 
 docker run -d --name "$NAME" -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=derbynet \
        -p 127.0.0.1::5432 postgres:17 >/dev/null
