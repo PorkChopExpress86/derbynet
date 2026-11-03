@@ -1,0 +1,24 @@
+{# The award being presented, from query=award.current, with Reveal. Swapped by the 1 s poll and by each button's reply. #}
+<input type="hidden" id="presenter-sig" name="sig" value="{{ current.signature }}">
+<div x-data x-init="$store.presenter.key = '{{ current.key|escapejs }}'" data-current="{{ current.key }}" data-reveal="{{ current.reveal|yesno:'1,0' }}">
+  {% if current.shown %}
+  <div class="mt-2 flex items-center gap-3">
+    {% if current.photo %}<img src="{{ current.photo }}" alt="" class="size-16 shrink-0 rounded-lg object-cover">{% endif %}
+    <div class="min-w-0 flex-1">
+      <p class="truncate text-xl font-semibold" data-awardname>{{ current.shown.awardname }}</p>
+      <p class="truncate"><span class="font-mono font-semibold" data-carnumber>{{ current.car }}</span> <span data-recipient>{{ current.shown.recipient }}</span></p>
+      {% if current.shown.carname or current.shown.subgroup %}<p class="truncate text-sm text-ink-muted">{{ current.shown.carname }}{% if current.shown.carname and current.shown.subgroup %} · {% endif %}{{ current.shown.subgroup }}</p>{% endif %}
+    </div>
+  </div>
+  <p class="mt-2 text-sm font-medium {% if current.reveal %}text-ok-ink{% else %}text-ink-muted{% endif %}" data-reveal-state>{% if current.reveal %}Showing the winner{% else %}Hidden: the kiosk shows the award, not the winner{% endif %}</p>
+  {% if current.reveal %}
+  <button type="button" name="reveal" value="0" hx-post="{% url 'presenter-reveal' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" data-action="hide" class="mt-3 min-h-14 w-full rounded-xl border border-line px-4 text-lg font-semibold">Hide the winner</button>
+  {% else %}
+  <button type="button" name="reveal" value="1" hx-post="{% url 'presenter-reveal' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" data-action="reveal" class="mt-3 min-h-14 w-full rounded-xl bg-ok px-4 text-lg font-semibold text-white dark:text-black">Reveal</button>
+  {% endif %}
+  {% elif current.key %}
+  <p class="mt-2 text-ink-muted" data-nothing>The award picked has no winner, so the kiosk shows nothing.</p>
+  {% else %}
+  <p class="mt-2 text-ink-muted" data-nothing>No award is on the kiosk. Tap an award, or Next.</p>
+  {% endif %}
+</div>

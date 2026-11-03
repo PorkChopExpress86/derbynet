@@ -1,0 +1,31 @@
+{% load static ui %}{# The awards editor's list (#45): one card per award that is not ad hoc, in sort order. Every change answers with this template again, out of band into #awards-list. #}
+<section aria-labelledby="aw-list-h" class="rounded-2xl border border-line bg-surface p-4" data-section="awards">
+  <h2 id="aw-list-h" class="text-lg font-semibold">Awards</h2>
+  {% if editor.awards %}
+  <p class="mt-1 text-sm text-ink-muted">Awards are presented in this order. Tap a name to edit it. Drag a handle, or use a row's menu, to reorder.</p>
+  <div x-data="uiSortable('{% url 'awards-editor-order' %}', 'order')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" class="mt-3">
+    <ul role="list" aria-label="Awards" x-ref="list" class="grid gap-2 lg:grid-cols-2" data-award-list>
+      {% for a in editor.awards %}
+      <li data-id="{{ a.id }}" data-label="{{ a.name }}" data-award="{{ a.id }}" x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="relative flex min-h-16 items-center gap-1 rounded-xl border border-line bg-bg pr-1">
+        {% if editor.awards|length > 1 %}<button type="button" data-handle aria-label="Drag to reorder {{ a.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>{% else %}<span class="w-3"></span>{% endif %}
+        <div class="min-w-0 flex-1 py-2">
+          <button type="button" hx-get="{% url 'awards-editor-award' a.id %}" hx-target="#awards-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="awardsPage.open('Edit {{ a.name|escapejs }}', $event)" aria-haspopup="dialog" data-edit-award class="block max-w-full truncate text-left font-semibold underline-offset-2 hover:underline">{{ a.name }}</button>
+          <p class="truncate text-sm text-ink-muted"><span data-type>{{ a.award_type }}</span> · <span data-scope>{{ a.scope }}</span></p>
+          <p class="truncate text-xs text-ink-muted" data-partitions>{{ a.partitions }}</p>
+        </div>
+        <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ a.name }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
+        <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
+          <button type="button" role="menuitem" @click="menu = false; move($root, -1)" class="min-h-11 px-4 text-left">Move up</button>
+          <button type="button" role="menuitem" @click="menu = false; move($root, 1)" class="min-h-11 px-4 text-left">Move down</button>
+          <button type="button" role="menuitem" hx-get="{% url 'awards-editor-award' a.id %}" hx-target="#awards-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="menu = false; awardsPage.open('Edit {{ a.name|escapejs }}', $event)" class="min-h-11 px-4 text-left">Edit</button>
+          <button type="button" role="menuitem" hx-get="{% url 'awards-editor-delete' a.id %}" hx-target="#awards-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="menu = false; awardsPage.open('Delete {{ a.name|escapejs }}?', $event)" data-delete class="min-h-11 px-4 text-left text-danger">Delete</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="sr-only" aria-live="polite" x-text="status"></p>
+  </div>
+  {% else %}
+  <p class="mt-2 text-ink-muted" data-empty>No awards yet. Tap New award to add the first one, or import them.</p>
+  {% endif %}
+</section>

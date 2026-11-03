@@ -236,3 +236,26 @@ def set_partition_list_by_id(
         if len(found) != len(wanted):
             raise ValueError("a partition of another event or none")
         set_partition_list(event, found, group=group, subgroup=subgroup)
+
+
+def award_partition_choice(
+    event, group_id: int | None, subgroup_id: int | None, award: Award | None = None
+) -> PartitionChoice:
+    """A judged award's partition list as the awards editor shows it, for
+    the award with this group and subgroup: the partitions it would draw
+    from, and the award's narrowed list while its scope is unchanged, else
+    "all partitions" (D38)."""
+    every = _Places.read(event.id).draws_from(group_id, subgroup_id)
+    offered = list(Partition.objects.filter(id__in=every).order_by("sort_order", "id"))
+    narrowed = None
+    if award is not None and (award.group_id, award.subgroup_id) == (
+        group_id,
+        subgroup_id,
+    ):
+        stored = frozenset(
+            AwardPartition.objects.filter(event=event, award=award).values_list(
+                "partition_id", flat=True
+            )
+        )
+        narrowed = (stored & every) or None
+    return PartitionChoice(offered, narrowed)

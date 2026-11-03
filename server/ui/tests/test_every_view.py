@@ -17,6 +17,8 @@ import pytest
 from django.test import Client
 from django.urls import URLPattern, URLResolver, get_resolver
 
+from awards.editing import set_winner
+from awards.models import Award
 from core.models import RaceState
 from racing.models import PlaylistEntry
 from roster.models import Partition, Racer
@@ -83,7 +85,14 @@ def race(event):
     step = PlaylistEntry.objects.create(
         event=event, seq=1, group=wolves.group, round_number=2, bucket_limit=4
     )
+    racer = Racer.objects.filter(event=event).first()
+    award = Award.objects.create(
+        event=event, name="Best Paint", award_type_id=1, group=wolves.group
+    )
+    set_winner(event, award, racer)
+    RaceState.objects.filter(event=event).update(current_award_key=f"award-{award.pk}")
     return {
+        "award_id": award.pk,
         "entry_id": step.pk,
         "round_id": wolves.pk,
         "racer_id": Racer.objects.filter(event=event).first().pk,

@@ -12,24 +12,21 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.db.models import Max
 
+from awards.eligibility import Eligibility, Refusal
 from awards.listing import AD_HOC
 from awards.models import Award, AwardType, BallotAward, Vote
-from awards.services import partition_list
+from awards.services import set_partition_list
 from core.models import ActionLog, RaceSettings, RaceState
 from core.race_settings import INTEGER_RANGES
 from core.services import lock_race_state
 from racing.engine.phpcompat import php_intval, php_numeric, php_truthy
-from roster.models import (
-    Group,
-    GroupConstituent,
-    GroupConstituentSubgroup,
-    Racer,
-    Subgroup,
-)
+from roster.models import Group, Partition, Racer, Subgroup
 from roster.services.groups import _named, labels
 
 # `CLASS_COLUMN_WIDTH` and `RANK_COLUMN_WIDTH`.
 NAME_WIDTH = 75
+# `Awards.awardname`.
+NAME_LIMIT = Award._meta.get_field("name").max_length
 # The award type `award.xbs` gives, "Other".
 XBS_AWARD_TYPE = 3
 AD_HOC_SORT = 999
@@ -216,32 +213,6 @@ def set_ad_hoc_award(event, racer: Racer | None, name: str) -> None:
             )
 
 
-def _aggregate_allows(group_id: int, racer: Racer) -> tuple[bool, bool]:
-    """Whether a racer is in an aggregate group's groups, through aggregates
-    of aggregates, and in its subgroups, when it names any."""
-    members, todo = set(), [group_id]
-    while todo:
-        for constituent in GroupConstituent.objects.filter(
-            aggregate_id=todo.pop()
-        ).values_list("constituent_id", flat=True):
-            if constituent not in members:
-                members.add(constituent)
-                todo.append(constituent)
-    only = set(
-        GroupConstituentSubgroup.objects.filter(aggregate_id=group_id).values_list(
-            "subgroup_id", flat=True
-        )
-    )
-    return racer.group_id in members, not only or racer.subgroup_id in only
-
-
-def _is_aggregate(group_id: int) -> bool:
-    return (
-        GroupConstituent.objects.filter(aggregate_id=group_id).exists()
-        or GroupConstituentSubgroup.objects.filter(aggregate_id=group_id).exists()
-    )
-
-
 def set_winner(event, award: Award | None, racer: Racer | None) -> None:
     """`award.winner`: give a judged award to a racer, or clear its winner
     when `racer` is None.
@@ -261,21 +232,9 @@ def set_winner(event, award: Award | None, racer: Racer | None) -> None:
             raise AwardFailure("no-such-award", "Award not found")
         award = Award.objects.get(pk=award.pk)
         racer = Racer.objects.get(pk=racer.pk)
-        group_ok = award.group_id is None or award.group_id == racer.group_id
-        subgroup_ok = (
-            award.subgroup_id is None or award.subgroup_id == racer.subgroup_id
-        )
-        if award.group_id is not None and _is_aggregate(award.group_id):
-            in_groups, subgroup_ok = _aggregate_allows(award.group_id, racer)
-            group_ok = group_ok or in_groups
-        if racer.exclude:
-            raise AwardFailure("ineligible", "Racer not eligible for awards")
-        if not group_ok:
-            raise AwardFailure("wrong-class", "Award is for a different class")
-        if not subgroup_ok:
-            raise AwardFailure("wrong-subgroup", "Award is for a different subgroup")
-        if racer.partition_id not in {p.pk for p in partition_list(event, award=award)}:
-            raise AwardFailure("ineligible", "Racer not eligible for this award")
+        refusal = Eligibility(event.id).refusal(award, racer)
+        if refusal is not None:
+            raise AwardFailure(refusal.legacy_code, refusal.description)
         Award.objects.filter(pk=award.pk).update(racer=racer)
 
 
@@ -410,3 +369,192 @@ def toggle_xbs_award(event, racer: Racer | None, on: bool) -> None:
             )
         else:
             _delete(Award.objects.filter(event=event, racer=racer, name=name))
+
+
+# ----- the awards editor and judging pages (#45) -----
+#
+# Each takes the ids the page posted and resolves them under the lock, so a
+# row that changed or went away since the page loaded is refused here, and
+# the same post twice changes nothing more.
+
+
+def _event_award(event, award_id) -> Award:
+    found = Award.objects.filter(event=event, pk=award_id).first()
+    if found is None:
+        raise AwardFailure("no-such-award", "That award is gone. Reload the page.")
+    return found
+
+
+def _event_racer(event, racer_id) -> Racer:
+    found = Racer.objects.filter(event=event, pk=racer_id).first()
+    if found is None:
+        raise AwardFailure("no-such-racer", "That racer is gone. Reload the page.")
+    return found
+
+
+def _editor_scope(event, group_id, subgroup_id) -> tuple[Group | None, Subgroup | None]:
+    group = subgroup = None
+    if group_id is not None:
+        group = Group.objects.filter(event=event, pk=group_id).first()
+        if group is None:
+            raise AwardFailure("unknownclass", "That group is gone. Pick another.")
+    if subgroup_id is not None:
+        subgroup = Subgroup.objects.filter(event=event, pk=subgroup_id).first()
+        if subgroup is None:
+            raise AwardFailure("unknownrank", "That subgroup is gone. Pick another.")
+        if group is None or subgroup.group_id != group.pk:
+            raise AwardFailure("wrongclass", "That subgroup is in another group.")
+    return group, subgroup
+
+
+def save_award(
+    event,
+    award_id: int | None,
+    *,
+    name: str,
+    award_type_id: int | None,
+    group_id: int | None,
+    subgroup_id: int | None,
+    partition_ids: list[int] | None,
+) -> Award:
+    """The awards editor's sheet: a new award (`award_id` None) or an
+    award's name, type, group or subgroup, and its partition list, in one
+    transaction. `partition_ids` None, or every partition the award draws
+    from, is "all partitions" (D35, D38); an empty list is refused. An ad
+    hoc award belongs to the judging page, so the editor neither picks the
+    type nor edits one."""
+    name = name.strip()
+    if not name:
+        raise AwardFailure("emptyaward", "Give the award a name.")
+    if len(name) > NAME_LIMIT:
+        raise AwardFailure("toolong", f"Keep the name to {NAME_LIMIT} characters.")
+    if partition_ids is not None and not partition_ids:
+        raise AwardFailure("nopartitions", "Check at least one, or pick all of them.")
+    with transaction.atomic():
+        lock_race_state(event.id)
+        if award_type_id == AD_HOC:
+            raise AwardFailure("adhoc", "Pick a type other than Ad Hoc.")
+        award_type = AwardType.objects.filter(pk=award_type_id).first()
+        if award_type is None:
+            raise AwardFailure("unknownawardtype", "Pick the award's type.")
+        group, subgroup = _editor_scope(event, group_id, subgroup_id)
+        if award_id is None:
+            award = Award(event=event, sort=_next_sort(event))
+        else:
+            award = _event_award(event, award_id)
+            if award.award_type_id == AD_HOC:
+                raise AwardFailure("adhoc", "Change an ad hoc award on Judging.")
+        award.name, award.award_type = name, award_type
+        award.group, award.subgroup = group, subgroup
+        award.save()
+        chosen = []
+        if partition_ids is not None:
+            chosen = list(Partition.objects.filter(event=event, pk__in=partition_ids))
+            if len(chosen) != len(set(partition_ids)):
+                raise AwardFailure("nopartitions", "That partition is gone.")
+        try:
+            set_partition_list(event, chosen, award=award)
+        except ValueError:
+            raise AwardFailure(
+                "nopartitions", "Pick only partitions this award draws from."
+            ) from None
+    return award
+
+
+def reorder_awards(event, award_ids: list[int]) -> None:
+    """The editor's list in a new order, from a drag or a row's menu: the
+    awards take sorts 1, 2, 3... as `award.order` gets them. The ids must be
+    every award the editor lists, each once."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        listed = set(
+            Award.objects.filter(event=event)
+            .exclude(award_type_id=AD_HOC)
+            .values_list("pk", flat=True)
+        )
+        if len(award_ids) != len(set(award_ids)) or set(award_ids) != listed:
+            raise AwardFailure("order", "The awards changed. Reload the page.")
+        for sort, award_id in enumerate(award_ids, 1):
+            Award.objects.filter(pk=award_id).update(sort=sort)
+
+
+def delete_award_by_id(event, award_id: int) -> str:
+    """The editor's Delete, after its confirm sheet: `delete_award`, with the
+    entry `history.php` reads. Returns the award's name."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        award = _event_award(event, award_id)
+        delete_award(event, award, str(award_id))
+    return award.name
+
+
+def assign_award(event, award_id: int, racer_id: int) -> Award:
+    """Judging's tap to assign, and the Undo of a removal: give a judged
+    award to a racer who can win it (`Eligibility`). An award given to
+    another racer is refused, so a judge removes that racer first; given to
+    this racer already, nothing changes."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        award = _event_award(event, award_id)
+        racer = _event_racer(event, racer_id)
+        if award.award_type_id == AD_HOC:
+            raise AwardFailure("adhoc", "An ad hoc award stays with its racer.")
+        if award.racer_id == racer.pk:
+            return award
+        if award.racer_id is not None:
+            raise AwardFailure("filled", f"{award.name} already has a winner.")
+        refusal = Eligibility(event.id).refusal(award, racer)
+        if refusal is not None:
+            raise AwardFailure(refusal.code, refusal_text(refusal, award, racer))
+        award.racer = racer
+        award.save(update_fields=["racer"])
+    return award
+
+
+def remove_winner(event, award_id: int) -> tuple[Award, Racer | None]:
+    """Judging's remove: the award loses its winner, returned for the Undo.
+    An award with no winner changes nothing, and returns None."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        award = (
+            Award.objects.select_related("racer")
+            .filter(event=event, pk=award_id)
+            .first()
+        )
+        if award is None:
+            raise AwardFailure("no-such-award", "That award is gone. Reload the page.")
+        if award.award_type_id == AD_HOC:
+            raise AwardFailure("adhoc", "Clear an ad hoc award from its racer.")
+        racer = award.racer
+        if racer is not None:
+            Award.objects.filter(pk=award.pk).update(racer=None)
+    return award, racer
+
+
+def set_ad_hoc_award_by_id(event, racer_id: int, name: str) -> Racer:
+    """The racer sheet's ad hoc award field: `set_ad_hoc_award`, with the
+    name trimmed and kept to the column."""
+    name = name.strip()
+    if len(name) > NAME_LIMIT:
+        raise AwardFailure("toolong", f"Keep the name to {NAME_LIMIT} characters.")
+    with transaction.atomic():
+        lock_race_state(event.id)
+        racer = _event_racer(event, racer_id)
+        set_ad_hoc_award(event, racer, name)
+    return racer
+
+
+def refusal_text(refusal: Refusal, award: Award, racer: Racer) -> str:
+    """A refusal as the judging page says it, naming the group, subgroup or
+    partition. The award and racer carry their group, subgroup and
+    partition, which the caller reads with them."""
+    match refusal.code:
+        case "wrong-class":
+            return f"For {award.group.name} only"
+        case "wrong-subgroup":
+            if award.subgroup_id is not None:
+                return f"For {award.subgroup.name} only"
+            return f"Not open to {racer.subgroup.name}"
+        case "not-in-list":
+            return f"Not open to {racer.partition.name}"
+    return "Not eligible for any award"

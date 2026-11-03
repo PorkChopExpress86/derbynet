@@ -1,0 +1,79 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/awards.js' %}"></script>{% endblock %}
+{% block main %}
+<div x-data="presenterFilters()" class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start" data-presenter>
+<div class="flex min-w-0 flex-col gap-4 lg:order-2 lg:sticky lg:top-16">
+  {% if not kiosks %}
+  <section role="status" aria-labelledby="pr-kiosk-h" data-no-kiosk class="rounded-2xl border border-warn bg-warn-soft p-4 text-warn-ink">
+    <h2 id="pr-kiosk-h" class="flex items-center gap-2 font-semibold">{% include "ui/components/icon.html" with name="warn" cls="size-5" %}No kiosk shows award presentations</h2>
+    <p class="mt-1 text-sm">What you pick here shows nowhere until a kiosk shows the award presentations page.</p>
+    <a href="{% url 'kiosk-dashboard' %}" class="mt-2 inline-flex min-h-11 items-center font-semibold underline underline-offset-2">Assign a kiosk on the Kiosk Dashboard</a>
+  </section>
+  {% endif %}
+  {# The award being presented, as query=award.current gives it, polled every second. A button's reply swaps it out of band. #}
+  <section aria-labelledby="pr-now-h" class="rounded-2xl border border-line bg-surface p-4" data-section="console">
+    <h2 id="pr-now-h" class="text-lg font-semibold">On the award kiosk</h2>
+    <div id="presenter-current" aria-live="polite" hx-get="{% url 'presenter-current' %}" hx-trigger="every {{ poll_seconds }}s" hx-include="#presenter-sig" hx-swap="innerHTML" hx-sync="this:drop">
+    {% include "ui/presenter/current.html" %}
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-2">
+      <button type="button" hx-post="{% url 'presenter-next' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="#presenter-filters" hx-sync="this:drop" data-action="next" class="col-span-2 min-h-14 rounded-xl bg-accent px-4 text-lg font-semibold text-accent-ink">Next award</button>
+      <button type="button" hx-post="{% url 'presenter-clear' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" data-action="clear" class="col-span-2 min-h-14 rounded-xl border border-line px-4 text-lg font-semibold">Clear the kiosk</button>
+    </div>
+  </section>
+</div>
+
+<div class="flex min-w-0 flex-col gap-4 lg:order-1">
+  {% if listing.calc_choices %}
+  <section aria-labelledby="pr-calc-h" class="rounded-2xl border border-line bg-surface p-4" data-section="calc">
+    <fieldset hx-post="{% url 'presenter-calc-rule' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:replace">
+      <legend id="pr-calc-h" class="text-lg font-semibold">{{ listing.supergroup_label }} standings</legend>
+      {% for value, label in listing.calc_choices %}
+      <label class="flex min-h-11 items-center gap-2"><input type="radio" id="pr-calc-{{ value }}" name="full-field-calc" value="{{ value }}"{% if value == listing.calc %} checked{% endif %} class="size-5 accent-accent">{{ label }}</label>
+      {% endfor %}
+    </fieldset>
+  </section>
+  {% endif %}
+
+  <section aria-labelledby="pr-list-h" class="rounded-2xl border border-line bg-surface p-4" data-section="awards">
+    <h2 id="pr-list-h" class="text-lg font-semibold">Awards</h2>
+    <form id="presenter-filters" @submit.prevent class="mt-2 flex flex-col gap-3">
+      <fieldset>
+        <legend class="mb-1 text-sm font-medium">Type</legend>
+        <div class="flex flex-wrap gap-2" data-type-chips>
+          <label class="flex min-h-11 cursor-pointer items-center rounded-full border border-line px-4 text-sm font-medium has-checked:border-accent has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent"><input type="radio" class="sr-only" name="type" value="" x-model="type" checked>All</label>
+          {% for id, name in listing.types %}<label class="flex min-h-11 cursor-pointer items-center rounded-full border border-line px-4 text-sm font-medium has-checked:border-accent has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent"><input type="radio" class="sr-only" name="type" value="{{ id }}" x-model="type">{{ name }}</label>{% endfor %}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="mb-1 text-sm font-medium">For</legend>
+        <div class="flex flex-wrap gap-2" data-scope-chips>
+          {% for value, label, indented in listing.scopes %}<label class="flex min-h-11 cursor-pointer items-center rounded-full border border-line px-4 text-sm font-medium has-checked:border-accent has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent{% if indented %} border-dashed{% endif %}"><input type="radio" class="sr-only" name="scope" value="{{ value }}" x-model="scope"{% if forloop.first %} checked{% endif %}>{{ label }}</label>{% endfor %}
+        </div>
+      </fieldset>
+    </form>
+    {% if listing.awards %}
+    <p class="mt-3 text-sm text-ink-muted">Tap an award to put it on the kiosk, hidden. Then tap Reveal.</p>
+    <ul role="list" aria-label="Awards to present" class="mt-2 flex flex-col gap-2" data-presentation-list>
+      {% for a in listing.awards %}
+      <li x-show="shows({{ a.award_type_id }}, {{ a.group_id }}, {{ a.subgroup_id }})" data-key="{{ a.key }}">
+        <button type="button" name="key" value="{{ a.key }}" hx-post="{% url 'presenter-present' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" :class="$store.presenter.key === '{{ a.key|escapejs }}' ? 'border-accent ring-2 ring-accent' : 'border-line'" class="flex min-h-14 w-full items-center gap-3 rounded-xl border bg-bg px-3 py-2 text-left">
+          <span class="min-w-0 flex-1">
+            <span class="block truncate font-semibold">{{ a.name }}</span>
+            <span class="block truncate text-sm text-ink-muted">{% if a.racer_id %}<span class="font-mono font-semibold text-ink">{{ a.car_number|stringformat:"03d" }}</span> {{ a.recipient }}{% else %}No winner yet{% endif %}</span>
+          </span>
+          {% if a.subgroup %}<span class="shrink-0 text-xs text-ink-muted">{{ a.subgroup }}</span>{% elif a.group %}<span class="shrink-0 text-xs text-ink-muted">{{ a.group }}</span>{% endif %}
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+    {{ listing.rows|json_script:"presenter-rows" }}
+    <p x-cloak x-show="none" class="mt-2 text-ink-muted" data-none>No award matches these filters.</p>
+    {% else %}
+    <p class="mt-2 text-ink-muted" data-empty>There are no awards to present yet.</p>
+    {% endif %}
+  </section>
+</div>
+</div>
+{% endblock %}

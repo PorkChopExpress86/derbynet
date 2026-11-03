@@ -1,0 +1,39 @@
+{# A racer's sheet: each judged award, given to the racer, open to them, or refused with the reason the service gives (C31); and the racer's ad hoc award. #}
+{% with r=sheet.racer %}
+<div x-data x-init="judging.show('{{ r.car }} {{ r.name|escapejs }}')" data-racer-sheet="{{ r.id }}">
+  <p class="text-sm text-ink-muted">{{ r.group }}{% if r.subgroup and r.subgroup != r.group %} · {{ r.subgroup }}{% endif %}{% if r.speed_ineligible %} · <span class="text-warn-ink">not eligible for speed awards</span>{% endif %}</p>
+  <h3 class="mt-3 text-sm font-semibold">Awards</h3>
+  {% if sheet.choices %}
+  <ul role="list" class="mt-2 flex flex-col gap-2" data-choices>
+    {% for c in sheet.choices %}
+    <li data-choice="{{ c.award.id }}"{% if c.mine %} data-mine{% elif c.reason %} data-refused{% endif %}>
+      {% if c.mine %}
+      <div class="flex min-h-12 items-center gap-2 rounded-xl border border-accent bg-accent-soft pl-3 pr-1">
+        {% include "ui/components/icon.html" with name="awards" cls="size-5 shrink-0 text-accent" %}
+        <span class="min-w-0 flex-1"><span class="block truncate font-semibold">{{ c.award.name }}</span><span class="block truncate text-sm text-ink-muted">Given to {{ r.name }}</span></span>
+        <button type="button" hx-post="{% url 'judging-remove' c.award.id %}" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" data-remove class="min-h-11 rounded-lg px-3 text-sm font-semibold text-danger-ink">Remove</button>
+      </div>
+      {% elif c.reason %}
+      <button type="button" disabled aria-disabled="true" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-line px-3 text-left opacity-70">
+        <span class="min-w-0 flex-1"><span class="block truncate font-semibold">{{ c.award.name }}</span><span class="block truncate text-sm text-ink-muted" data-reason>{{ c.reason }}</span></span>
+      </button>
+      {% else %}
+      <button type="button" name="racer" value="{{ r.id }}" hx-post="{% url 'judging-assign' c.award.id %}" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" data-assign class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-line px-3 text-left">
+        {% include "ui/components/icon.html" with name="plus" cls="size-5 shrink-0 text-accent" %}
+        <span class="min-w-0 flex-1"><span class="block truncate font-semibold">{{ c.award.name }}</span><span class="block truncate text-sm text-ink-muted">{{ c.award.scope }}</span></span>
+      </button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-2 text-ink-muted">There are no awards yet.</p>
+  {% endif %}
+  <form hx-post="{% url 'judging-adhoc' r.id %}" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" class="mt-5 flex flex-col gap-2 border-t border-line pt-4" data-adhoc-form>
+    <label for="jd-adhoc" class="text-sm font-semibold">Ad hoc award</label>
+    <p id="jd-adhoc-help" class="text-sm text-ink-muted">An award just for this racer, such as "Most Creative". Leave it empty to take it away.</p>
+    <input id="jd-adhoc" name="awardname" value="{{ r.ad_hoc }}" maxlength="100" autocomplete="off" aria-describedby="jd-adhoc-help" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    <button type="submit" class="min-h-12 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save ad hoc award</button>
+  </form>
+</div>
+{% endwith %}
