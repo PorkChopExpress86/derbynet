@@ -189,6 +189,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         45,
         php="judging.php",
         icon="judging",
+        view="ui.judging.views.page",
     ),
     NavEntry(
         "slideshow",
@@ -235,6 +236,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         45,
         php="awards-presentation.php",
         icon="awards",
+        view="ui.presenter.views.page",
     ),
     NavEntry(
         "standings",
@@ -362,6 +364,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         45,
         php="awards-editor.php",
         menu=False,
+        view="ui.awards.views.page",
     ),
     NavEntry(
         "fakeroster",

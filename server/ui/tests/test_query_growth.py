@@ -17,7 +17,12 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from awards.editing import set_ad_hoc_award, set_winner
+from awards.models import Award
+from awards.services import set_partition_list
+from core.models import RaceState
 from racing.models import PlaylistEntry
+from roster.models import Racer
 from ui.tests.race import race_setup, run_heat, scheduled
 from ui.tests.roles import PASSWORDS
 
@@ -32,6 +37,11 @@ URLS = [
     "/checkin/number/",
     "/groups/",
     "/playlist/",
+    "/awards/edit/",
+    "/judging/",
+    "/judging/board/",
+    "/awards/present/",
+    "/awards/present/current/",
 ]
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 # An element whose hx-get names a URL and whose trigger polls.
@@ -51,9 +61,27 @@ def test_every_polled_url_is_measured():
 
 
 def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
-    """Groups of passed racers, each round 1 scheduled, and rounds 1 and 2
-    of each group queued. With `race`, the first round races a heat."""
+    """Groups of passed racers, each round 1 scheduled, rounds 1 and 2 of
+    each group queued, and each group's judged award, narrowed to its
+    partition and given to its first racer. With `race`, the first round
+    races a heat, and the kiosk presents the first award."""
     rounds = list(race_setup(event, groups=groups).values())
+    for round in rounds:
+        award = Award.objects.create(
+            event=event,
+            name=f"Best {round.group.name}",
+            award_type_id=1,
+            group=round.group,
+            sort=round.group.pk,
+        )
+        racers = Racer.objects.filter(event=event, group=round.group).order_by("pk")
+        set_partition_list(event, [racers[0].partition], award=award)
+        set_winner(event, award, racers[0])
+        set_ad_hoc_award(event, racers[1], f"Shiniest {round.group.name}")
+        if race and round is rounds[0]:
+            RaceState.objects.filter(event=event).update(
+                current_award_key=f"award-{award.pk}"
+            )
     for i, round in enumerate(rounds):
         scheduled(round, race=race and i == 0)
     if race:

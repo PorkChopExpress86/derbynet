@@ -18,6 +18,30 @@ def active_event(request):
     return found
 
 
+# The integer columns' range on every database.
+INT32 = 2**31
+
+
+def posted_int(value, *, positive: bool = False) -> int | None:
+    """A posted whole number the integer columns hold, or None for text that
+    is not one, a number past the columns, or, with `positive`, one below 1."""
+    try:
+        n = int(str(value).strip())
+    except TypeError, ValueError:
+        return None
+    if not -INT32 < n < INT32 or (positive and n < 1):
+        return None
+    return n
+
+
+def car(number) -> str:
+    """A car number padded to three digits (D47)."""
+    try:
+        return f"{int(number):03d}"
+    except TypeError, ValueError:
+        return str(number or "")
+
+
 def racer_name(first: str, last: str) -> str:
     """A racer's name as the manager pages show it."""
     return f"{first} {last}"

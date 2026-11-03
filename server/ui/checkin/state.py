@@ -25,7 +25,7 @@ from roster.models import Partition, Racer
 from roster.services import car_numbers
 from roster.services.checkin import round_in_progress_for
 from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url
-from ui.responses import racer_name
+from ui.responses import car, racer_name
 
 THUMBNAIL = "100x100"
 POLL_SECONDS = 10
@@ -51,14 +51,6 @@ _STATE_TEXT = {
     "unpassed": "Scheduled but not passed",
     "unscheduled": "",
 }
-
-
-def car(number) -> str:
-    """A car number padded to three digits (D47)."""
-    try:
-        return f"{int(number):03d}"
-    except TypeError, ValueError:
-        return str(number or "")
 
 
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")

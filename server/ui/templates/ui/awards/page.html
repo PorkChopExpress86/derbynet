@@ -1,0 +1,20 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/awards.js' %}"></script>{% endblock %}
+{% block main %}
+{# The awards load once and are never polled, as awards-editor.php. Every change answers with the list again, out of band (#45). #}
+<div class="mb-3 flex flex-wrap items-center gap-2" data-awards-actions>
+  <button type="button" hx-get="{% url 'awards-editor-new' %}" hx-target="#awards-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="awardsPage.open('New award', $event)" aria-haspopup="dialog" data-action="new-award" class="flex min-h-11 items-center gap-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">{% include "ui/components/icon.html" with name="plus" cls="size-5" %}New award</button>
+  <a href="{% url 'import-awards' %}" data-action="import-awards" class="flex min-h-11 items-center rounded-xl border border-line bg-surface px-4 font-semibold">Import awards</a>
+  <a href="{% url 'judging' %}" class="flex min-h-11 items-center rounded-xl border border-line bg-surface px-4 font-semibold">Judging</a>
+</div>
+<div id="awards-list" data-awards-editor>
+{% include "ui/awards/list.html" %}
+</div>
+{% endblock %}
+{% block sheets %}
+{# One sheet for the award form and the delete confirm. Its body loads when a control opens it. #}
+{% component "sheet" name="awards" title="" title_x="$store.awards.title" %}
+  <div id="awards-sheet-body" aria-live="polite"><p class="py-6 text-center text-ink-muted">Loading…</p></div>
+{% endcomponent %}
+{% endblock %}

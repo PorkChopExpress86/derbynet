@@ -1,7 +1,7 @@
-{# A speed award's partition list (D35, D38), beside its trophy count. "All" is its own choice: it always means every partition the award draws from, so it picks up one added or moved in later. A narrowed list shows the offered partitions as checkboxes. Pass choice, key (an id prefix), and plural (the partition label, plural). Shown only when the award draws from two or more partitions. #}
+{# A speed award's partition list (D35, D38), beside its trophy count. "All" is its own choice: it always means every partition the award draws from, so it picks up one added or moved in later. A narrowed list shows the offered partitions as checkboxes. Pass choice, key (an id prefix), plural (the partition label, plural), and legend (default "Speed awards go to"). Shown only when the award draws from two or more partitions. #}
 {% if choice.offered|length > 1 %}
 <fieldset x-data="{ some: {{ choice.narrowed|yesno:'true,false' }} }" data-partition-list="{{ key }}" class="rounded-xl border border-line p-3">
-  <legend class="px-1 text-sm font-medium">Speed awards go to</legend>
+  <legend class="px-1 text-sm font-medium">{{ legend|default:"Speed awards go to" }}</legend>
   <div class="flex flex-col gap-1">
     <label class="flex min-h-11 items-center gap-2"><input type="radio" id="{{ key }}-all" name="scope" value="all" @change="some = false"{% if not choice.narrowed %} checked{% endif %} class="size-5 accent-accent" data-scope="all">All {{ plural }}</label>
     <label class="flex min-h-11 items-center gap-2"><input type="radio" id="{{ key }}-some" name="scope" value="some" @change="some = true"{% if choice.narrowed %} checked{% endif %} class="size-5 accent-accent" data-scope="some">Only these</label>

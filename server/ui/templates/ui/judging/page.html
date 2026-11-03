@@ -1,0 +1,26 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/awards.js' %}"></script>{% endblock %}
+{% block main %}
+<div data-judging>
+  {% component "filter_bar" label="Find and sort racers" cls="[@media(max-height:500px)]:static" %}
+  <form id="judging-filters" hx-get="{% url 'judging-board' %}" hx-target="#judging-board" hx-swap="innerHTML" hx-trigger="input delay:250ms, change, submit" hx-include="this" hx-sync="#judging-board:queue last" class="flex flex-col gap-2 sm:grid sm:grid-cols-2">
+    {% include "ui/components/search_field.html" with id="judging-find" name="q" value=board.filters.q %}
+    {% include "ui/components/segmented.html" with name="order" legend="Sort racers by" options=orders selected=board.filters.order %}
+  </form>
+  {% endcomponent %}
+  <div class="mb-3 flex flex-wrap gap-2">
+    <a href="{% url 'awards-editor' %}" class="flex min-h-11 items-center rounded-xl border border-line bg-surface px-4 font-semibold">Edit awards</a>
+  </div>
+  {# The polled board (#39 pattern 2): the award list and the racer grid. It sends the filter bar and the signature of what it shows; the server answers 204 while nothing changed. A change's reply triggers judging-refresh, which fetches it at once. #}
+  <section id="judging-board" aria-label="Awards and racers" hx-get="{% url 'judging-board' %}" hx-trigger="every {{ poll_seconds }}s [derbynet.pollable(this)], judging-refresh from:body" hx-include="#judging-filters, #judging-sig" hx-swap="innerHTML" hx-sync="this:queue last">
+  {% include "ui/judging/board.html" %}
+  </section>
+</div>
+{% endblock %}
+{% block sheets %}
+{# One sheet for a racer's awards and an award's racers. Its body loads when a control opens it, and the 30 s poll waits while it is open. #}
+{% component "sheet" name="judging" title="" title_x="$store.judging.title" %}
+  <div id="judging-sheet-body" aria-live="polite"><p class="py-6 text-center text-ink-muted">Loading…</p></div>
+{% endcomponent %}
+{% endblock %}

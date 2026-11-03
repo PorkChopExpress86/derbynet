@@ -30,6 +30,25 @@ AD_HOC = 6  # AD_HOC_AWARDTYPEID in website/inc/awards.inc
 RENDER_CROPPED = "cropped"
 
 
+def sort_key(award: Award) -> tuple:
+    """`ORDER BY sort, awardtype, awardname`, the order PHP lists awards in.
+    The award's type must be read with it."""
+    return (award.sort, award.award_type.name, award.name, award.pk)
+
+
+def scope_label(award: Award, supergroup: str) -> str:
+    """Who an award is for, as the award pages name it: its group and
+    subgroup, its group, or the pack. The group and subgroup must be read
+    with it."""
+    if award.subgroup_id:
+        if award.group_id:
+            return f"{award.group.name} · {award.subgroup.name}"
+        return award.subgroup.name
+    if award.group_id:
+        return award.group.name
+    return supergroup
+
+
 def award_types(include_ad_hoc: bool) -> list[dict]:
     types = AwardType.objects.order_by("id")
     if not include_ad_hoc:
@@ -121,7 +140,7 @@ def awards(event, include_ad_hoc: bool) -> list[dict]:
     rows = Award.objects.filter(event=event).select_related("award_type", "racer")
     if not include_ad_hoc:
         rows = rows.exclude(award_type_id=AD_HOC)
-    rows = sorted(rows, key=lambda a: (a.sort, a.award_type.name, a.name, a.pk))
+    rows = sorted(rows, key=sort_key)
     eligible = _eligibility(event)
     depths = dict(
         BallotAward.objects.filter(event=event).values_list("award_id", "depth")
@@ -220,6 +239,25 @@ def presented(
     if use_subgroups:
         shown["subgroup"] = subgroup
     return shown
+
+
+def current_recipient(event, key: str) -> int | None:
+    """The racer the award `key` names goes to, or None: one indexed read
+    for a judged award, the standings for a speed award. The presenter's
+    poll keys its signature on it, so a new winner shows (#45)."""
+    parts = key.split("-")
+    if len(parts) < 2:
+        return None
+    if parts[0] == "award":
+        return (
+            Award.objects.filter(event=event, pk=_row_id(parts[1]))
+            .values_list("racer_id", flat=True)
+            .first()
+        )
+    if parts[0] == "speed":
+        found = current_speed_award(event)
+        return found.racer_id if found else None
+    return None
 
 
 def current(event, started: float) -> dict | None:

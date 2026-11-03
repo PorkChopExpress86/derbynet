@@ -46,7 +46,7 @@ def _unit(group, subgroup, award) -> dict:
 
 
 @dataclass(frozen=True)
-class _Places:
+class Places:
     """Where an event's partitions and racers sit, read once.
 
     `places` holds a (partition, group, subgroup) triple for each
@@ -62,7 +62,7 @@ class _Places:
     subgroup_filters: Mapping[int, frozenset[int]]
 
     @classmethod
-    def read(cls, event_id) -> _Places:
+    def read(cls, event_id) -> Places:
         partitions = Partition.objects.filter(event_id=event_id)
         places = set(partitions.values_list("id", "subgroup__group_id", "subgroup_id"))
         places |= set(
@@ -87,6 +87,20 @@ class _Places:
             subgroup_filters={a: frozenset(s) for a, s in filters.items()},
         )
 
+    def is_aggregate(self, group_id: int) -> bool:
+        return group_id in self.constituents or group_id in self.subgroup_filters
+
+    def members(self, group_id: int) -> set[int]:
+        """The groups that roll up to an aggregate, through aggregates of
+        aggregates; none for a group that is not one."""
+        members, todo = set(), [group_id]
+        while todo:
+            for constituent in self.constituents.get(todo.pop(), ()):
+                if constituent not in members:
+                    members.add(constituent)
+                    todo.append(constituent)
+        return members
+
     def draws_from(self, group_id, subgroup_id) -> set[int]:
         """The partitions a unit draws from, as the standings rank it. An
         aggregate draws from every group that rolls up to it, through
@@ -96,12 +110,7 @@ class _Places:
             return {p for p, _, s in self.places if s == subgroup_id}
         if group_id is None:
             return set(self.partitions)
-        members, todo = {group_id}, [group_id]
-        while todo:
-            for constituent in self.constituents.get(todo.pop(), ()):
-                if constituent not in members:
-                    members.add(constituent)
-                    todo.append(constituent)
+        members = {group_id} | self.members(group_id)
         only = self.subgroup_filters.get(group_id)
         return {
             p for p, g, s in self.places if g in members and (only is None or s in only)
@@ -117,7 +126,7 @@ def _scope(group_id, subgroup_id, award_id) -> tuple:
 
 def _draws_from(event_id, group_id, subgroup_id, award_id) -> set[int]:
     """The ids of the partitions the unit draws from."""
-    return _Places.read(event_id).draws_from(*_scope(group_id, subgroup_id, award_id))
+    return Places.read(event_id).draws_from(*_scope(group_id, subgroup_id, award_id))
 
 
 def _ids(group, subgroup, award) -> tuple:
@@ -181,7 +190,7 @@ def reconcile_partition_lists(event_id) -> None:
         lists.setdefault(tuple(unit), {})[partition_id] = row_id
     if not lists:
         return
-    places = _Places.read(event_id)
+    places = Places.read(event_id)
     doomed: list[int] = []
     for unit, rows in lists.items():
         every = places.draws_from(*_scope(*unit))
@@ -236,3 +245,26 @@ def set_partition_list_by_id(
         if len(found) != len(wanted):
             raise ValueError("a partition of another event or none")
         set_partition_list(event, found, group=group, subgroup=subgroup)
+
+
+def award_partition_choice(
+    event, group_id: int | None, subgroup_id: int | None, award: Award | None = None
+) -> PartitionChoice:
+    """A judged award's partition list as the awards editor shows it, for
+    the award with this group and subgroup: the partitions it would draw
+    from, and the award's narrowed list while its scope is unchanged, else
+    "all partitions" (D38)."""
+    every = Places.read(event.id).draws_from(group_id, subgroup_id)
+    offered = list(Partition.objects.filter(id__in=every).order_by("sort_order", "id"))
+    narrowed = None
+    if award is not None and (award.group_id, award.subgroup_id) == (
+        group_id,
+        subgroup_id,
+    ):
+        stored = frozenset(
+            AwardPartition.objects.filter(event=event, award=award).values_list(
+                "partition_id", flat=True
+            )
+        )
+        narrowed = (stored & every) or None
+    return PartitionChoice(offered, narrowed)

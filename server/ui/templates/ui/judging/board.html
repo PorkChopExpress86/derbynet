@@ -1,0 +1,50 @@
+{% load ui %}{# The judging board's content: the judged awards and the racer grid. The polled section around it is in page.html, so a reply swaps only its inside. #}
+<input type="hidden" id="judging-sig" name="sig" value="{{ board.signature }}">
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-start">
+<section aria-labelledby="jd-awards-h" class="min-w-0 rounded-2xl border border-line bg-surface p-4" data-section="awards">
+  <h2 id="jd-awards-h" class="text-lg font-semibold">Awards</h2>
+  {% if board.awards %}
+  <p class="mt-1 text-sm text-ink-muted">Tap an award to pick its winner, or tap a racer below.</p>
+  <ul role="list" aria-label="Awards" class="mt-3 flex flex-col gap-2" data-award-cards>
+    {% for a in board.awards %}
+    <li class="flex min-h-14 items-center gap-1 rounded-xl border border-line bg-bg pl-3 pr-1" data-award-card="{{ a.id }}"{% if a.winner_name %} data-filled{% endif %}>
+      <button type="button" hx-get="{% url 'judging-award' a.id %}" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="#judging-filters" hx-sync="this:replace" @click="judging.open('{{ a.name|escapejs }}', $event)" aria-haspopup="dialog" data-open-award class="min-w-0 flex-1 py-2 text-left">
+        <span class="block truncate font-semibold">{{ a.name }}</span>
+        <span class="block truncate text-sm text-ink-muted">{{ a.scope }} · {{ a.award_type }}</span>
+        <span class="block truncate text-sm" data-winner>{% if a.winner_name %}{% include "ui/components/icon.html" with name="awards" cls="inline size-4 text-accent" %} {{ a.winner_name }}{% else %}<span class="text-ink-muted">No winner yet</span>{% endif %}</span>
+      </button>
+      {% if a.winner_name %}<button type="button" hx-post="{% url 'judging-remove' a.id %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" aria-label="Remove {{ a.winner_name }} from {{ a.name }}" data-remove class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="close" cls="size-5" %}</button>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-2 text-ink-muted" data-empty>There are no awards yet. Add them in the awards editor.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="jd-racers-h" class="min-w-0" data-section="racers">
+  <h2 id="jd-racers-h" class="mb-2 text-lg font-semibold">Racers <span class="text-sm font-normal text-ink-muted" data-count>{{ board.shown|length }}{% if board.shown|length != board.racers|length %} of {{ board.racers|length }}{% endif %}</span></h2>
+  {% if board.shown %}
+  <ul role="list" aria-label="Racers" class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4" data-racer-cards>
+    {% for r in board.shown %}
+    <li data-racer="{{ r.id }}">
+      <button type="button" hx-get="{% url 'judging-racer' r.id %}" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="judging.open('{{ r.car }} {{ r.name|escapejs }}', $event)" aria-haspopup="dialog" class="flex size-full flex-col overflow-hidden rounded-xl border border-line bg-surface text-left">
+        <span class="grid aspect-[4/3] w-full place-items-center bg-surface-2 text-ink-muted">{% if r.photo %}<img src="{{ r.photo }}" alt="" loading="lazy" class="size-full object-cover" data-photo>{% else %}{% include "ui/components/icon.html" with name="car" cls="size-10" %}{% endif %}</span>
+        <span class="flex min-w-0 flex-1 flex-col gap-0.5 p-2">
+          <span class="flex items-center gap-1"><span class="font-mono text-lg font-semibold" data-car>{{ r.car }}</span>{% if r.awards %}<span class="ml-auto text-accent" title="{{ r.awards|join:', ' }}" data-has-award>{% include "ui/components/icon.html" with name="awards" cls="size-5" %}<span class="sr-only">Has {{ r.awards|join:", " }}</span></span>{% endif %}{% if r.ad_hoc %}<span class="{% if not r.awards %}ml-auto {% endif %}text-warn-ink" title="{{ r.ad_hoc }}" data-has-adhoc>{% include "ui/components/icon.html" with name="judging" cls="size-5" %}<span class="sr-only">Ad hoc award {{ r.ad_hoc }}</span></span>{% endif %}</span>
+          <span class="truncate font-semibold" data-name>{{ r.name }}</span>
+          {% if board.use_groups %}<span class="truncate text-sm text-ink-muted" data-group>{{ r.group }}</span>{% endif %}
+          {% if board.use_subgroups %}<span class="truncate text-sm text-ink-muted" data-subgroup>{{ r.subgroup }}</span>{% endif %}
+          {% if r.speed_ineligible %}<span class="mt-1 self-start rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn-ink" data-speed-ineligible>No speed awards</span>{% endif %}
+        </span>
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif board.racers %}
+  <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No racer matches.</p>
+  {% else %}
+  <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No racer has passed check-in yet.</p>
+  {% endif %}
+</section>
+</div>

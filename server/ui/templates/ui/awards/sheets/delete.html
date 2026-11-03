@@ -1,0 +1,8 @@
+{# The confirm sheet for a delete, in place of PHP's confirm(). Pass name, delete_url and back_url. #}
+<div x-data x-init="awardsPage.show('Delete {{ name|escapejs }}?')" data-delete-confirm>
+  <p>The award {{ name }} is deleted, with its winner and its votes.</p>
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="button" hx-post="{{ delete_url }}" hx-target="#awards-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" data-confirm class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Delete 1 award</button>
+    <button type="button" hx-get="{{ back_url }}" hx-target="#awards-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</div>

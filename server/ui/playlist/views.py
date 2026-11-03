@@ -30,6 +30,7 @@ from ui.responses import active_event as _event
 from ui.responses import (
     closing_sheet,
     in_sheet,
+    posted_int,
     refused,
     service_error,
     toast_html,
@@ -47,22 +48,14 @@ MAX_LANES = 31
 # ----- parsing ---------------------------------------------------------------------
 
 
-def _int(value) -> int | None:
-    try:
-        n = int(str(value).strip())
-    except TypeError, ValueError:
-        return None
-    return n if -(2**31) < n < 2**31 else None
-
-
 def _choice(post, *, cut: bool) -> StepChoice:
     """The entry sheet's fields, parsed only: the service holds the rules.
     With `cut` the sheet showed the top N, and a blank one is 0, which the
     service refuses for a final (D43). Raises ValueError for a field that
     is not a whole number."""
-    runs = _int(post.get("runs", ""))
-    then = _int(post.get("then", "0"))
-    top = _int(post.get("top", "") or "0") if cut else None
+    runs = posted_int(post.get("runs", ""))
+    then = posted_int(post.get("then", "0"))
+    top = posted_int(post.get("top", "") or "0") if cut else None
     if runs is None or then is None or (cut and top is None):
         raise ValueError("Each field takes a whole number.")
     return StepChoice(
@@ -134,7 +127,7 @@ def racing_scene(request):
     """The racing scene select (`settings.write racing_scene`): the scene
     kiosks show while racing. -1 is none. The settings service checks the
     scene is the event's."""
-    scene = _int(request.POST.get("racing_scene", ""))
+    scene = posted_int(request.POST.get("racing_scene", ""))
     if scene is None:
         return service_error(request, "Pick a scene, or none.")
     result = apply_form(_event(request), {**SETTINGS_WRITE, "racing_scene": str(scene)})
@@ -162,8 +155,8 @@ def add(request):
     (`playlist.add`): its cut for a final, runs per lane, what happens
     after it, and whether it waits for the operator (D12)."""
     data = request.POST if request.method == "POST" else request.GET
-    group_id = _int(data.get("group", ""))
-    number = _int(data.get("round", ""))
+    group_id = posted_int(data.get("group", ""))
+    number = posted_int(data.get("round", ""))
     if group_id is None or number is None:
         return service_error(request, "Pick a round to add.")
     found = state.build(_event(request))
@@ -215,8 +208,8 @@ def add(request):
 
 def _posted(post) -> dict:
     return {
-        "runs": _int(post.get("runs", "")) or 1,
-        "then": _int(post.get("then", "")) or 0,
+        "runs": posted_int(post.get("runs", "")) or 1,
+        "then": posted_int(post.get("then", "")) or 0,
         "waits": post.get("waits") == "1",
         "top": post.get("top", ""),
         "bucketed": post.get("bucketed") == "1",
@@ -328,7 +321,7 @@ def restore(request):
 def order(request):
     """The queue in a new order, from a drag or a row's Move up and Move
     down (`playlist.order`)."""
-    ids = [_int(raw) for raw in request.POST.get("order", "").split(",")]
+    ids = [posted_int(raw) for raw in request.POST.get("order", "").split(",")]
     if not ids or None in ids:
         return service_error(request, "That order names no steps.")
     try:
@@ -408,8 +401,8 @@ def scheduling_lanes(request):
     the partial showed. While unraced heats exist the settings service
     refuses the change (`already-scheduled`), and the partial shows the
     refusal beside the lanes as they were."""
-    count = _int(request.POST.get("lanes", ""))
-    used = [_int(raw) for raw in request.POST.getlist("used")]
+    count = posted_int(request.POST.get("lanes", ""))
+    used = [posted_int(raw) for raw in request.POST.getlist("used")]
     if count is None or not 0 <= count <= MAX_LANES or None in used:
         return _scheduling(request, error="Pick lanes the track has.")
     result = set_lanes_in_use(_event(request), count, used)
