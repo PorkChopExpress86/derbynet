@@ -267,6 +267,15 @@ def htmx_post(page, path: str):
     ) as reply:
         yield
     assert reply.value.ok, reply.value.status
+    htmx_settled(page)
+
+
+def htmx_settled(page):
+    """Wait until htmx has no request in flight and has settled every swap.
+    htmx binds the `hx-*` attributes of swapped-in content only when it
+    settles, 20 ms after the swap, so a control clicked or changed before
+    then makes no request: wait for this after a swap that brings controls
+    the test uses next."""
     page.wait_for_function(
         "!document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')"
     )
