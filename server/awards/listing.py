@@ -241,25 +241,6 @@ def presented(
     return shown
 
 
-def current_recipient(event, key: str) -> int | None:
-    """The racer the award `key` names goes to, or None: one indexed read
-    for a judged award, the standings for a speed award. The presenter's
-    poll keys its signature on it, so a new winner shows (#45)."""
-    parts = key.split("-")
-    if len(parts) < 2:
-        return None
-    if parts[0] == "award":
-        return (
-            Award.objects.filter(event=event, pk=_row_id(parts[1]))
-            .values_list("racer_id", flat=True)
-            .first()
-        )
-    if parts[0] == "speed":
-        found = current_speed_award(event)
-        return found.racer_id if found else None
-    return None
-
-
 def current(event, started: float) -> dict | None:
     """`query=award.current`: the award being presented, or None when no
     award, or no winner, goes with the key. `started` is the request's
