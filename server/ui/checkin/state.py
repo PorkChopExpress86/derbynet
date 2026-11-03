@@ -20,12 +20,12 @@ from django.urls import get_script_prefix
 
 from awards.models import Award
 from core.models import RaceSettings
-from racing.models import HAS_RESULT, FinalRequest, HeatLane, RosterEntry, Round
+from racing.models import HAS_RESULT, FinalRequest, HeatLane, RosterEntry
 from roster.models import Partition, Racer
 from roster.services import car_numbers
 from roster.services.checkin import round_in_progress_for
 from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url
-from ui.responses import car, racer_name
+from ui.responses import car, nocase, racer_name, round_name
 
 THUMBNAIL = "100x100"
 POLL_SECONDS = 10
@@ -51,13 +51,6 @@ _STATE_TEXT = {
     "unpassed": "Scheduled but not passed",
     "unscheduled": "",
 }
-
-
-_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
-
-
-def _nocase(text: str) -> str:
-    return text.translate(_ASCII_LOWER)
 
 
 @dataclass(frozen=True)
@@ -118,7 +111,7 @@ class Filters:
 
 def _sort_key(order: str):
     def name(r):
-        return (_nocase(r.last_name), _nocase(r.first_name), r.pk)
+        return (nocase(r.last_name), nocase(r.first_name), r.pk)
 
     match order:
         case "car":
@@ -180,10 +173,6 @@ class Listing:
     use_xbs: bool
     next_numbers: dict[int, int | None] = field(default_factory=dict)
     signature: str = ""
-
-
-def _round_name(round: Round) -> str:
-    return f"{round.group.name}, Round {round.number}"
 
 
 def _photo(repository: str, folder: str, path: str) -> str:
@@ -284,8 +273,8 @@ def cards_for(event, racers: list[Racer]) -> list[Card]:
                 exclude=r.exclude,
                 no_speed_awards=r.not_eligible_for_speed_awards,
                 round_id=round.pk if round else None,
-                round_name=_round_name(round) if round else "",
-                left_out_of=_round_name(left)
+                round_name=round_name(round) if round else "",
+                left_out_of=round_name(left)
                 if left is not None and r.pk not in scheduled
                 else "",
                 final=final,

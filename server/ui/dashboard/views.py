@@ -53,7 +53,7 @@ from ui.dashboard import presenter
 from ui.dashboard.state import Shown, build, racers_of_heat
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import racer_name, refused, service_error
+from ui.responses import racer_name, refused, round_name, service_error
 from ui.responses import toast_html as _toast
 
 guard = requires_page("dashboard")
@@ -394,10 +394,6 @@ def _round(request, round_id) -> Round:
     )
 
 
-def _round_name(round: Round) -> str:
-    return f"{round.group.name}, Round {round.number}"
-
-
 @require_GET
 @guard
 def round_sheet(request, round_id, kind):
@@ -426,7 +422,7 @@ def round_sheet(request, round_id, kind):
     context = {
         "round": round,
         "card": card,
-        "name": _round_name(round),
+        "name": round_name(round),
         "kind": kind,
         "runs": RUNS_PER_LANE,
         "use_master_sched": live.context["use_master_sched"],
@@ -440,7 +436,7 @@ def round_sheet(request, round_id, kind):
 def round_action(request, round_id, op):
     event = _event(request)
     round = _round(request, round_id)
-    name = _round_name(round)
+    name = round_name(round)
     match op:
         case "schedule":
             try:
@@ -600,7 +596,7 @@ def new_round(request):
         return refused(request, failure)
     count = len(built.qualifiers) + len(built.extras)
     plural = "s" if count != 1 else ""
-    message = f"{_round_name(built.round)} made with {count} racer{plural}."
+    message = f"{round_name(built.round)} made with {count} racer{plural}."
     return updated(request, message, notices=built.concerns)
 
 
@@ -622,7 +618,7 @@ def start_next_round(request):
         round = playlist.start_waiting_step(_event(request))
     except PlaylistFailure as failure:
         return refused(request, failure)
-    return updated(request, f"Racing {_round_name(round)}.")
+    return updated(request, f"Racing {round_name(round)}.")
 
 
 # ----- late racers, final requests, finalist suggestions ----------------------------
@@ -688,7 +684,7 @@ def late_preview(request, round_id, racer_id):
     racer = _racer(request, racer_id)
     context = {
         "round": round,
-        "name": _round_name(round),
+        "name": round_name(round),
         "racer": racer,
         "car": presenter.car(racer.car_number),
     }
@@ -729,7 +725,7 @@ def late_add(request, round_id, racer_id):
     return updated(
         request,
         f"{racer_name(racer.first_name, racer.last_name)} added to"
-        f" {_round_name(round)}.",
+        f" {round_name(round)}.",
     )
 
 
@@ -747,7 +743,7 @@ def roster_add(request, round_id, racer_id):
     return updated(
         request,
         f"{racer_name(racer.first_name, racer.last_name)} is on the roster"
-        f" of {_round_name(round)}.",
+        f" of {round_name(round)}.",
     )
 
 
@@ -797,10 +793,10 @@ def finalist(request, round_id, op, racer_id):
     try:
         if op == "add":
             finals.add_to_final(racer, round)
-            message = f"{name} added to {_round_name(round)}."
+            message = f"{name} added to {round_name(round)}."
         elif op == "remove":
             finals.remove_from_final(racer, round)
-            message = f"{name} taken out of {_round_name(round)}."
+            message = f"{name} taken out of {round_name(round)}."
         else:
             raise Http404
     except FinalsFailure as failure:
@@ -823,7 +819,7 @@ def lanes_sheet(request):
     off = closed | set(lanes.lanes_of(settings.unused_lane_mask))
     open_lanes = [n for n in range(1, settings.lane_count + 1) if n not in off]
     affected = [
-        _round_name(r)
+        round_name(r)
         for r in Round.objects.filter(
             pk__in=[r.pk for r in lanes.rounds_to_close(event)]
         )

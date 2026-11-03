@@ -47,6 +47,19 @@ def racer_name(first: str, last: str) -> str:
     return f"{first} {last}"
 
 
+def round_name(round) -> str:
+    """A round as the manager pages name it: "Scouts, Round 2"."""
+    return f"{round.group.name}, Round {round.number}"
+
+
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def nocase(text: str) -> str:
+    """Lower-cases A to Z only, for sorting names as PHP's pages do."""
+    return text.translate(_ASCII_LOWER)
+
+
 def toast_html(
     request, message: str, level: str = "ok", undo_url: str = "", *, oob=False
 ) -> str:
