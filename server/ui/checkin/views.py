@@ -42,7 +42,7 @@ from ui.responses import (
     closing_sheet,
     in_sheet,
     into_sheet,
-    racer_name,
+    name_of,
     refused,
     service_error,
     toast_html,
@@ -61,10 +61,6 @@ def _racer(request, racer_id) -> Racer:
         pk=racer_id,
         event=_event(request),
     )
-
-
-def _name(racer: Racer) -> str:
-    return racer_name(racer.first_name, racer.last_name)
 
 
 def _toast(request, message: str, level: str = "ok", undo_url: str = "") -> str:
@@ -240,11 +236,11 @@ def pass_racer(request, racer_id):
     from_sheet = _in_sheet(request)
     if not passed:
         undo = reverse("checkin-pass", args=[racer.pk]) + "?passed=1&undo=1"
-        message = f"{_name(racer)} is not passed."
+        message = f"{name_of(racer)} is not passed."
         if from_sheet:
             return sheet_reply(request, _sheet_racer(request, racer), message)
         return toasted(request, message, level="info", undo_url=undo)
-    message = f"{state.car(racer.car_number)} {_name(racer)} passed."
+    message = f"{state.car(racer.car_number)} {name_of(racer)} passed."
     # Undo restores the pass and asks nothing; the card still offers the
     # question when it was never answered.
     undo = request.GET.get("undo") == "1"
@@ -280,13 +276,13 @@ def answer(request, racer_id, choice):
             added = checkin.add_to_round_in_progress(racer, granted(request))
             round = added.round
             message = (
-                f"{state.car(racer.car_number)} {_name(racer)} added to"
+                f"{state.car(racer.car_number)} {name_of(racer)} added to"
                 f" {round.group.name}, Round {round.number}."
             )
         elif choice == "no":
             round = checkin.leave_out_of_round_in_progress(racer, granted(request))
             message = (
-                f"{_name(racer)} stays out of {round.group.name}, Round"
+                f"{name_of(racer)} stays out of {round.group.name}, Round"
                 f" {round.number}. The race coordinator can still add the car."
             )
         else:
@@ -308,7 +304,8 @@ def final_request(request, racer_id):
         return refused(request, failure)
     return toasted(
         request,
-        f"{_name(racer)} asked for a place in the final. The race coordinator decides.",
+        f"{name_of(racer)} asked for a place in the final."
+        " The race coordinator decides.",
     )
 
 
@@ -319,7 +316,7 @@ def xbs(request, racer_id):
     on = php_truthy(request.POST.get("xbs", ""))
     toggle_xbs_award(_event(request), racer, on)
     return toasted(
-        request, f"{_name(racer)}: Exclusively By Scout {'on' if on else 'off'}."
+        request, f"{name_of(racer)}: Exclusively By Scout {'on' if on else 'off'}."
     )
 
 
@@ -453,7 +450,7 @@ def racer_new(request):
         _sheet_racer(
             request,
             racer,
-            notice=f"Added {state.car(racer.car_number)} {_name(racer)}.",
+            notice=f"Added {state.car(racer.car_number)} {name_of(racer)}.",
             warnings=new.warnings,
         ),
     )
@@ -507,7 +504,9 @@ def racer_edit(request, racer_id):
         return sheet_reply(
             request, _sheet_racer(request, racer, notice="Saved.", warnings=warnings)
         )
-    return closed_reply(request, f"Saved {state.car(racer.car_number)} {_name(racer)}.")
+    return closed_reply(
+        request, f"Saved {state.car(racer.car_number)} {name_of(racer)}."
+    )
 
 
 @require_GET
@@ -601,7 +600,7 @@ def racer_delete(request, racer_id):
     except RacerFailure as failure:
         return refused(request, failure)
     return closed_reply(
-        request, f"Deleted {state.car(racer.car_number)} {_name(racer)}."
+        request, f"Deleted {state.car(racer.car_number)} {name_of(racer)}."
     )
 
 
@@ -691,27 +690,32 @@ def photo_sheet(request, racer_id, repo):
     works over plain HTTP; a secure context also offers the live camera."""
     racer = _racer(request, racer_id)
     _repo(request, repo)
+    has_photo = bool(racer.car_photo if repo == "car" else racer.headshot)
     return render(
         request,
         "ui/checkin/sheets/photo.html",
         {
-            "racer": racer,
-            "car": state.car(racer.car_number),
             "repo": repo,
-            "repo_label": REPOS[repo],
-            "has_photo": bool(racer.car_photo if repo == "car" else racer.headshot),
-            **_perms(request),
+            "title": f"{REPOS[repo]} · {state.car(racer.car_number)} {name_of(racer)}",
+            "upload_url": reverse("checkin-upload", args=[racer.pk, repo]),
+            "crop_url": reverse("checkin-crop-sheet", args=[racer.pk, repo])
+            if has_photo and allows(request, Perm.ASSIGN_RACER_IMAGE)
+            else "",
         },
     )
 
 
 def _crop_context(request, racer: Racer, repository: photos.Repository, name: str):
+    repo = repository.name
     return {
-        "racer": racer,
-        "repo": repository.name,
-        "repo_label": REPOS[repository.name],
-        "name": name,
-        "work_url": get_script_prefix() + repository.url(name, photos.WORK),
+        "repo": repo,
+        "title": f"Crop {REPOS[repo].lower()}",
+        "alt": f"{REPOS[repo]} of {name_of(racer)}",
+        "work_url": get_script_prefix()
+        + photos.page_url(repository, name, photos.WORK),
+        "crop_url": reverse("checkin-crop", args=[racer.pk, repo]),
+        "rotate_left_url": reverse("checkin-rotate", args=[racer.pk, repo, "left"]),
+        "rotate_right_url": reverse("checkin-rotate", args=[racer.pk, repo, "right"]),
     }
 
 
@@ -745,7 +749,7 @@ def photo_upload(request, racer_id, repo):
         return refused(request, failure)
     if result.failure is not None:
         return service_error(request, result.failure[1])
-    message = f"{REPOS[repo]} saved for {_name(racer)}."
+    message = f"{REPOS[repo]} saved for {name_of(racer)}."
     if result.warning:
         message += f" {result.warning}"
     if php_truthy(request.POST.get("checkin", "")):

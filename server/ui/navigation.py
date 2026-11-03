@@ -145,6 +145,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         short_label="Photos",
         icon="photos",
         phone_rank={"RaceCrew": 2, "Photo": 1, OTHER_ROLES: 4},
+        view="ui.photos.views.page",
     ),
     NavEntry(
         "car-photos",
@@ -155,6 +156,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         47,
         php="photo-thumbs.php?repo=car",
         icon="car",
+        view="ui.photos.views.page",
     ),
     # During
     NavEntry(

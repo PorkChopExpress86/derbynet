@@ -1,0 +1,13 @@
+{# Tap a racer: the unassigned photos. A tap on one assigns it. #}
+<div x-data x-init="photoSheets.show('photos', '{{ title|escapejs }}')" data-photo-choices="{{ racer.pk }}">
+  {% if pool %}
+  <p class="mb-2 text-sm text-ink-muted">Tap the {{ noun }} to give it to this racer.</p>
+  <ul role="list" class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+    {% for photo in pool %}
+    <li><button type="button" hx-post="{% url 'photos-assign' repo %}" hx-vals='{"racer": "{{ racer.pk }}", "photo": "{{ photo.name|escapejs }}"}' hx-target="#photos-sheet-body" hx-swap="innerHTML" aria-label="Assign {{ photo.name }}" class="block aspect-square w-full overflow-hidden rounded-lg bg-surface-2" data-choice="{{ photo.name }}"><img src="{{ photo.thumbnail }}" alt="" loading="lazy" class="size-full object-cover"></button></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="py-4 text-center text-ink-muted" data-none>No unassigned photos. Upload some, or take one.</p>
+  {% endif %}
+</div>

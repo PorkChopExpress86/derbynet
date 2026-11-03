@@ -566,6 +566,42 @@ def _stored_path(repo: Repository, name: str) -> str:
     )
 
 
+def thumbnail_url(repo: Repository, name: str, render: str = RENDER_THUMBNAIL) -> str:
+    """The `photo.php` URL of a file of the repository at `render`. Its cache
+    breaker is the crop's time when the photo has one, so a new crop shows
+    at once."""
+    return repo.url(_stored_path(repo, name), render)
+
+
+def page_url(repo: Repository, path: str, render: str) -> str:
+    """`repo.url()` for a page that changes the photo while it shows it: the
+    crop sheet and the photo page (#47). PHP's cache breaker counts seconds,
+    so a turn or a crop in the same second as the last change kept the
+    browser's copy, and a crop box drawn on the stale work render landed in
+    the wrong frame. The query adds the file's time in nanoseconds;
+    `photo.php` ignores it, and the browser keys its cache on it. `path` is
+    a racer's column or a file name, `<name>` or `0-cropped/<name>`; any
+    other text gives "" before any file is read."""
+    name = path.rsplit("/", 1)[-1]
+    if (
+        repo.directory is None
+        or not is_valid_name(name)
+        or path not in (name, f"{CROPPED_FOLDER}/{name}")
+    ):
+        return ""
+    url = repo.url(path, render)
+    try:
+        version = (repo.directory / path).stat().st_mtime_ns
+    except OSError:
+        return url
+    return f"{url}?v={version}"
+
+
+def page_thumbnail_url(repo: Repository, name: str) -> str:
+    """`page_url()` of a file of the repository at the list's render."""
+    return page_url(repo, _stored_path(repo, name), RENDER_THUMBNAIL)
+
+
 # ----- photo.upload --------------------------------------------------------------
 
 
@@ -761,6 +797,7 @@ def _find_face(original: Path, image: Image.Image, fmt: str):
         return faces.detect_with_hook(command, str(original))
     # The hook reads the file, so it gets an upright copy when the stored
     # pixels are turned, and its box lands in the frame the crop uses.
+    # FACE_HOOK_COPY keeps it out of the photo page's list.
     temporary = original.with_name(f".{secrets.token_hex(6)}.upright{original.suffix}")
     try:
         with temporary.open("wb") as stream:
@@ -822,7 +859,7 @@ def upload_photo(
                 success = _assign_upload(event, repo, path, selector, result)
         if success:
             result.uploaded = target
-            result.thumbnail = repo.url(_stored_path(repo, target), RENDER_THUMBNAIL)
+            result.thumbnail = thumbnail_url(repo, target)
     return result
 
 
@@ -876,27 +913,61 @@ def _set_photo(event, repo: Repository, racer: Racer, path: str) -> None:
 # ----- photo.assign, photo.crop, photo.rotate, photo.delete ------------------------
 
 
-def assign_photo(event, repo: Repository, racer_id, photo) -> None:
+@dataclass(frozen=True)
+class Assignment:
+    """What `assign_photo` changed, as read under the race-state lock: the
+    racer, and the file name its column held before ("" for none)."""
+
+    racer: Racer
+    previous: str
+
+
+def assign_photo(
+    event, repo: Repository, racer_id, photo, *, restore: bool = False
+) -> Assignment:
     """`photo.assign`: give the racer the photo, by its crop when it has one,
-    or take the racer's photo away when `photo` is empty."""
+    or take the racer's photo away when `photo` is empty.
+
+    With `restore`, the photo page's Undo of an unassign: the racer gets the
+    photo back only while it has none, and a racer that already shows it is
+    left as it is, so the same Undo sent twice changes nothing and an Undo
+    never replaces a photo assigned since (#47). A restore never removes a
+    photo, so it needs one."""
     if not photo:
-        _assign_path(event, repo, racer_id, "")
-        return
+        if restore:
+            raise Refused("nosuchfile", "There is no photo to give back.")
+        return _assign_path(event, repo, racer_id, "")
+    if repo.directory is None:
+        raise Refused("nosuchfile", f"Image {photo} not found.")
     # Held from the crop check until the racer's row commits, so a rotation
     # or delete can't take the crop or the photo away in between.
     with _photo_lock(repo, photo):
         if find_or_make(repo, Label(CROPPED), photo) is None:
             raise Refused("nosuchfile", f"Image {photo} not found.")
-        _assign_path(event, repo, racer_id, _stored_path(repo, photo))
+        return _assign_path(
+            event, repo, racer_id, _stored_path(repo, photo), restore=restore
+        )
 
 
-def _assign_path(event, repo: Repository, racer_id, path: str) -> None:
+def _assign_path(
+    event, repo: Repository, racer_id, path: str, *, restore: bool = False
+) -> Assignment:
     with transaction.atomic():
         lock_race_state(event.id)
         racer = _by_id(Racer.objects.filter(event=event), racer_id)
         if racer is None:
             raise Refused("noracer", "No such racer.")
+        current = getattr(racer, repo.field)
+        found = Assignment(racer, current.rsplit("/", 1)[-1])
+        if restore:
+            if found.previous == path.rsplit("/", 1)[-1]:
+                return found
+            if current:
+                raise Refused(
+                    "assigned", "The racer has another photo now; nothing was undone."
+                )
         _set_photo(event, repo, racer, path)
+        return found
 
 
 @dataclass(frozen=True)
@@ -991,22 +1062,27 @@ def rotate_photo(event, repo: Repository, name: str, degrees: float) -> None:
         _after_commit(tidy)
 
 
-def delete_photo(event, repo: Repository, name) -> None:
+def delete_photo(event, repo: Repository, name) -> bool:
     """`photo.delete`: forget the photo and remove it from every folder of the
     repository, after the racers that showed it lose it. The photo's lock is
-    held throughout, so no render made meanwhile is left behind."""
+    held throughout, so no render made meanwhile is left behind. Returns
+    whether there was such a photo: a file of that name at the top of the
+    folder, or a racer of the event that showed it. A bad name changes
+    nothing; `photo.delete` answers success either way, as PHP does."""
     if repo.directory is None or not is_valid_name(name):
-        return
+        return False
     with _photo_lock(repo, name):
+        existed = repo.file(name).is_file()
         with transaction.atomic():
             lock_race_state(event.id)
-            Racer.objects.filter(
+            showed = Racer.objects.filter(
                 event=event,
                 **{f"{repo.field}__in": [name, f"{CROPPED_FOLDER}/{name}"]},
             ).update(**{repo.field: ""})
             PhotoRotation.objects.filter(directory=repo.key, name=name).delete()
         directory = repo.directory
         _after_commit(lambda: _delete_everywhere(directory, name))
+    return existed or showed > 0
 
 
 def _delete_everywhere(directory: Path, name: str) -> None:
@@ -1027,3 +1103,130 @@ def _delete_everywhere(directory: Path, name: str) -> None:
 
 def cache_breaker() -> int:
     return int(time.time())
+
+
+# ----- the photo page's inventory (#47) -------------------------------------------
+#
+# What `website/photo-thumbs.php` reads from a repository: its files, the
+# directory's trouble, and each racer's stored photo with its `lost_photo`
+# flag. The page builds no path; it shows what this returns.
+
+# `scan_directory()`'s pattern in photo-thumbs.php: the name ends in one of
+# these, with or without a dot, in any case.
+LISTED_PHOTO = re.compile(r"(jpg|jpeg|png|gif|bmp|svg)$", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class DirectoryStatus:
+    """The repository's badge and PHP's diagnostic line.
+
+    `kind` is `ok`, `read-only`, `missing` (no folder set, no such folder,
+    not a folder, or not readable) or `empty`. Only `ok` and `empty` take
+    uploads, as photo-thumbs.php shows its Dropzone form only for a writable
+    directory."""
+
+    kind: str
+    label: str
+    message: str = ""
+
+    @property
+    def writable(self) -> bool:
+        return self.kind in ("ok", "empty")
+
+    @property
+    def needs_fix(self) -> bool:
+        return self.kind in ("read-only", "missing")
+
+
+# The face hook's upright copy (`_find_face`), which lives at the top of the
+# folder only while an autocrop runs.
+FACE_HOOK_COPY = re.compile(r"\.[0-9a-f]{12}\.upright\.")
+
+
+def photo_files(repo: Repository) -> list[str]:
+    """`scan_directory()`: the files at the top of the folder whose name
+    matches `LISTED_PHOTO`, sorted. A hidden name is listed, as PHP lists it
+    (an upload named `.h.jpg` shows in photo-thumbs.php, checked with
+    `testing/docker/php-scratch.sh`); only the face hook's passing copy is
+    left out."""
+    if repo.directory is None:
+        return []
+    try:
+        entries = list(os.scandir(repo.directory))
+    except OSError:
+        return []
+    return sorted(
+        entry.name
+        for entry in entries
+        if LISTED_PHOTO.search(entry.name)
+        and not FACE_HOOK_COPY.match(entry.name)
+        and entry.is_file()
+    )
+
+
+def directory_status(repo: Repository, files: list[str]) -> DirectoryStatus:
+    """The checks photo-thumbs.php makes, in its order. PHP reports them only
+    when the folder lists no photo; the badge shows them always, and a
+    folder that holds photos but is read-only is `read-only`."""
+    if repo.directory is None:
+        return DirectoryStatus("missing", "Missing", "No photo directory is set.")
+    folder = str(repo.directory)
+    if not repo.directory.exists():
+        return DirectoryStatus(
+            "missing", "Missing", f"Directory {folder} does not exist."
+        )
+    if not repo.directory.is_dir():
+        return DirectoryStatus(
+            "missing",
+            "Missing",
+            f"Directory path {folder} exists but is not a directory.",
+        )
+    if not os.access(repo.directory, os.R_OK | os.X_OK):
+        return DirectoryStatus(
+            "missing", "Unreadable", f"Directory {folder} cannot be read."
+        )
+    if not os.access(repo.directory, os.W_OK):
+        return DirectoryStatus(
+            "read-only", "Read-only", f"Directory {folder} is not writable."
+        )
+    if not files:
+        return DirectoryStatus(
+            "empty", "Empty", "There are no photos in the photo directory yet."
+        )
+    return DirectoryStatus("ok", "OK")
+
+
+@dataclass(frozen=True)
+class StoredPhoto:
+    """A racer's photo column: `path` as stored, `name` its file name, and
+    `lost` when the folder has no file of that name (photo-thumbs.php's
+    `lost_photo`)."""
+
+    path: str
+    name: str
+    lost: bool
+
+
+@dataclass(frozen=True)
+class Inventory:
+    status: DirectoryStatus
+    files: tuple[str, ...]
+    # Racer id to its stored photo, for the racers that have one.
+    stored: dict[int, StoredPhoto]
+
+    @property
+    def unassigned(self) -> tuple[str, ...]:
+        """The files no racer of the event shows, in folder order."""
+        taken = {photo.name for photo in self.stored.values()}
+        return tuple(name for name in self.files if name not in taken)
+
+
+def inventory(event, repo: Repository) -> Inventory:
+    files = photo_files(repo)
+    listed = set(files)
+    stored = {}
+    for pk, path in Racer.objects.filter(event=event).values_list("pk", repo.field):
+        if path:
+            name = path.rsplit("/", 1)[-1]
+            stored[pk] = StoredPhoto(path, name, name not in listed)
+    return Inventory(directory_status(repo, files), tuple(files), stored)

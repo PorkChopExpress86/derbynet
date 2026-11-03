@@ -1,0 +1,12 @@
+{# The racers a photo can go to. A tap assigns it. #}
+{% if cards %}
+<ul role="list" class="flex flex-col gap-1" data-racer-options>
+  {% for card in cards %}
+  <li><button type="button" hx-post="{% url 'photos-assign' repo %}" hx-vals='{"racer": "{{ card.id }}", "photo": "{{ photo|escapejs }}"}' hx-target="#photos-sheet-body" hx-swap="innerHTML" class="flex min-h-12 w-full items-center gap-2 rounded-lg border border-line px-3 text-left" data-choice="{{ card.id }}"><span class="font-mono font-semibold">{{ card.car }}</span><span class="min-w-0 flex-1 truncate">{{ card.name }}</span>{% if card.state == "lost" %}<span class="text-xs text-danger-ink">lost photo</span>{% endif %}</button></li>
+  {% endfor %}
+</ul>
+{% elif filters.q %}
+<p class="py-4 text-center text-ink-muted" data-none>No racer without a photo matches.</p>
+{% else %}
+<p class="py-4 text-center text-ink-muted" data-none>Every racer has a photo. Unassign one first.</p>
+{% endif %}

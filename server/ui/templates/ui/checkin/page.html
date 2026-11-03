@@ -1,8 +1,8 @@
 {% extends "ui/base.html" %}
 {% load static ui %}
-{% block head %}<script src="{% static 'ui/checkin.js' %}"></script>{% endblock %}
+{% block head %}<script src="{% static 'ui/photo-sheets.js' %}"></script><script src="{% static 'ui/checkin.js' %}"></script>{% endblock %}
 {% block main %}
-<div data-checkin
+<div data-checkin data-photo-assets
   data-cropper-js="{% static 'ui/vendor/cropper-1.6.2.min.js' %}"
   data-cropper-css="{% static 'ui/vendor/cropper-1.6.2.min.css' %}"
   data-adapter="{% static 'ui/vendor/adapter-9.0.6.js' %}"

@@ -1,0 +1,48 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/photo-sheets.js' %}"></script><script src="{% static 'ui/photos.js' %}"></script>{% endblock %}
+{% block main %}
+<div data-photos="{{ repo }}" data-photo-assets
+  data-cropper-js="{% static 'ui/vendor/cropper-1.6.2.min.js' %}"
+  data-cropper-css="{% static 'ui/vendor/cropper-1.6.2.min.css' %}"
+  data-adapter="{% static 'ui/vendor/adapter-9.0.6.js' %}">
+  {% component "filter_bar" label="Find and sort racers" cls="[@media(max-height:500px)]:static" %}
+  {% include "ui/photos/repos.html" %}
+  <form id="photos-filters" hx-get="{% url 'photos-list' repo %}" hx-target="#photos-list" hx-swap="innerHTML" hx-trigger="input delay:250ms, submit" hx-sync="#photos-list:queue last" class="flex flex-col gap-2 sm:grid sm:grid-cols-2">
+    {% include "ui/components/search_field.html" with id="find" name="q" value=filters.q %}
+    {% include "ui/components/segmented.html" with name="order" legend="Sort by" options=orders selected=filters.order %}
+  </form>
+  {% endcomponent %}
+  {% if listing.status.writable and can_upload %}
+  {# Bulk upload: many files, each downscaled in the browser and sent one at a time, so a weak venue link never times out the whole batch. A failed file keeps its Retry. #}
+  <section x-data="photoUpload('{% url 'photos-upload' repo %}')" aria-label="Upload photos" class="mb-3 rounded-xl border border-line bg-surface p-3" data-upload>
+    <label class="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-field px-4 font-semibold has-focus-visible:outline-3 has-focus-visible:outline-accent">
+      {% include "ui/components/icon.html" with name="plus" cls="size-5" %}<span>Upload photos</span>
+      <input type="file" accept="image/*" multiple class="sr-only" @change="add($event)" data-upload-input>
+    </label>
+    <p x-show="items.length" x-cloak class="mt-2 text-sm text-ink-muted" data-upload-summary x-text="summary()"></p>
+    <ul role="list" class="mt-2 flex flex-col gap-2 empty:hidden" data-upload-items>
+      <template x-for="item in items" :key="item.id">
+        <li class="flex flex-col gap-1 rounded-lg border border-line px-3 py-2" :data-state="item.state" data-upload-item>
+          <div class="flex items-center gap-2">
+            <span class="min-w-0 flex-1 truncate text-sm font-medium" x-text="item.name"></span>
+            <span class="shrink-0 text-xs" :class="item.state === 'failed' ? 'text-danger-ink' : (item.state === 'done' ? 'text-ok-ink' : 'text-ink-muted')" x-text="item.status" data-upload-status></span>
+            <button type="button" x-show="item.state === 'failed'" @click="retry(item)" class="min-h-11 shrink-0 rounded-lg border border-line px-3 text-sm font-semibold" :aria-label="'Retry ' + item.name" data-action="retry">Retry</button>
+          </div>
+          <progress max="100" :value="item.progress" class="h-2 w-full accent-accent" :aria-label="'Upload of ' + item.name"></progress>
+        </li>
+      </template>
+    </ul>
+  </section>
+  {% endif %}
+  {# The list. It does not poll: photo-thumbs.php lists the folder when it opens, and every change here answers with photos-refresh, which lists it again. Refresh lists it on demand, for photos taken at another station. #}
+  <section id="photos-list" aria-label="Photos" hx-get="{% url 'photos-list' repo %}" hx-trigger="photos-refresh from:body" hx-include="#photos-filters" hx-swap="innerHTML" hx-sync="this:queue last">
+  {% include "ui/photos/list.html" %}
+  </section>
+</div>
+{% endblock %}
+{% block sheets %}
+{% component "sheet" name="photos" title="" title_x="$store.photos.title" %}
+  <div id="photos-sheet-body" aria-live="polite"><p class="py-6 text-center text-ink-muted">Loading…</p></div>
+{% endcomponent %}
+{% endblock %}

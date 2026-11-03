@@ -1,0 +1,6 @@
+{# The Racers and Cars control, as links that keep the order, racerid and back (photo-thumbs.php's other-repository button). The list's reply sends it again out of band when the order changes. #}
+<nav id="photos-repos" aria-label="Photo repository"{% if oob %} hx-swap-oob="true"{% endif %} class="flex rounded-xl border border-field bg-surface p-1">
+  {% for link in repo_links %}
+  <a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %} class="flex min-h-11 flex-1 items-center justify-center rounded-lg px-3 text-sm font-medium {% if link.current %}bg-accent text-accent-ink{% else %}text-ink-muted{% endif %}" data-repo-link>{{ link.label }}</a>
+  {% endfor %}
+</nav>

@@ -53,7 +53,7 @@ from ui.dashboard import presenter
 from ui.dashboard.state import Shown, build, racers_of_heat
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import racer_name, refused, round_name, service_error
+from ui.responses import event_racer, racer_name, refused, round_name, service_error
 from ui.responses import toast_html as _toast
 
 guard = requires_page("dashboard")
@@ -624,10 +624,6 @@ def start_next_round(request):
 # ----- late racers, final requests, finalist suggestions ----------------------------
 
 
-def _racer(request, racer_id) -> Racer:
-    return get_object_or_404(Racer, pk=racer_id, event=_event(request))
-
-
 def _grid(
     heats_by_number: dict[int, dict[int, int]],
     cars: dict[int, int],
@@ -681,7 +677,7 @@ def late_preview(request, round_id, racer_id):
     of a round, beside the chart now (D32, D36). The dry run changes nothing
     (Q5)."""
     round = _round(request, round_id)
-    racer = _racer(request, racer_id)
+    racer = event_racer(request, racer_id)
     context = {
         "round": round,
         "name": round_name(round),
@@ -717,7 +713,7 @@ def late_preview(request, round_id, racer_id):
 def late_add(request, round_id, racer_id):
     """Add to schedule: the same reschedule without the dry run (D32)."""
     round = _round(request, round_id)
-    racer = _racer(request, racer_id)
+    racer = event_racer(request, racer_id)
     try:
         reschedule.reschedule(round, racer.pk)
     except RescheduleFailure as failure:
@@ -735,7 +731,7 @@ def roster_add(request, round_id, racer_id):
     """Put a racer refused with `notonroster` on the final's roster first
     (D39)."""
     round = _round(request, round_id)
-    racer = _racer(request, racer_id)
+    racer = event_racer(request, racer_id)
     try:
         finals.add_to_final(racer, round)
     except FinalsFailure as failure:
@@ -751,7 +747,7 @@ def roster_add(request, round_id, racer_id):
 @guard
 def award_settings(request, racer_id):
     """Either award setting of D33 for a racer added late."""
-    racer = _racer(request, racer_id)
+    racer = event_racer(request, racer_id)
     setting = request.GET.get("setting")
     on = php_truthy(request.POST.get("on", ""))
     if setting == "exclude":
@@ -788,7 +784,7 @@ def finalist(request, round_id, op, racer_id):
     """Act on one finalist suggestion (D32). Nothing changes until the race
     coordinator taps one."""
     round = _round(request, round_id)
-    racer = _racer(request, racer_id)
+    racer = event_racer(request, racer_id)
     name = racer_name(racer.first_name, racer.last_name)
     try:
         if op == "add":

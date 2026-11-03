@@ -1,0 +1,8 @@
+{# The confirm sheet for a delete, in place of PHP's confirm(). #}
+<div x-data x-init="photoSheets.show('photos', 'Delete {{ name|escapejs }}?')" data-delete-photo="{{ name }}">
+  <p>The photo leaves the photo folder, with its crop and renders, and any racer who showed it has no photo.</p>
+  <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <button type="button" hx-post="{{ delete_url }}" hx-target="#photos-sheet-body" hx-swap="innerHTML" data-confirm class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Delete 1 photo</button>
+    <button type="button" hx-get="{{ back_url }}" hx-target="#photos-sheet-body" hx-swap="innerHTML" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </div>
+</div>
