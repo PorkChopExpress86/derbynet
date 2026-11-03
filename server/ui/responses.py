@@ -2,6 +2,8 @@
 
 from django.http import Http404, HttpResponse
 from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.models import SiteState
 
@@ -16,6 +18,20 @@ def active_event(request):
             raise Http404("No event is open.")
         found = request._ui_event = state.active_event
     return found
+
+
+def back_url(request, pages: dict[str, str], default: str) -> str:
+    """Where a page's back button returns to. `?back=` names a PHP page of
+    `pages`, by the URL name of its new page, or a path on this server.
+    Anything else returns to the URL name `default`."""
+    back = request.GET.get("back", "")
+    if back in pages:
+        return reverse(pages[back])
+    if back.startswith("/") and url_has_allowed_host_and_scheme(
+        back, allowed_hosts={request.get_host()}
+    ):
+        return back
+    return reverse(default)
 
 
 # The integer columns' range on every database.

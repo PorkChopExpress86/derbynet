@@ -18,7 +18,12 @@ from kiosks.models import Kiosk
 from roster.models import Group, Partition, Racer, Subgroup
 from roster.services import groups
 from roster.services.racers import insert_new_racer, pass_racer
-from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
+from ui.tests.browser.conftest import (
+    assert_accessible,
+    htmx_post,
+    htmx_settled,
+    shoot,
+)
 
 DESIGN = 1
 
@@ -86,6 +91,39 @@ def sheet(page, name):
     return page.locator(f'[data-sheet="{name}"]')
 
 
+# True once htmx has processed every element under `root` (and `root`) that
+# makes a request: htmx 2 sets `initHash` on an element's internal data when
+# it binds the element's `hx-*` attributes.
+BOUND = """root => [root, ...root.querySelectorAll('[hx-get], [hx-post]')]
+  .filter((e) => e.matches('[hx-get], [hx-post]'))
+  .every((e) => (e['htmx-internal-data'] || {}).initHash)"""
+
+
+def bound(page, locator):
+    """Wait until htmx has bound the requests of what `locator` shows. Alpine
+    shows swapped-in content at once, but htmx binds its `hx-*` attributes
+    only when the swap settles, 20 ms later or more under load, and a
+    control used before then sends nothing (#46 CI: the award sheet's "For"
+    select never fetched the partition list). No settling class marks every
+    such swap, so `htmx_settled()` alone does not cover it."""
+    page.wait_for_function(BOUND, arg=locator.element_handle())
+
+
+def ready(page, body):
+    """`body`, a sheet body just loaded, once its controls are bound."""
+    expect(body).to_be_visible()
+    bound(page, body)
+    return body
+
+
+def tap(page, control):
+    """Click a control of a list or board that htmx may have just swapped
+    (a poll, a filter, a reply out of band), once htmx has bound it."""
+    htmx_settled(page)
+    bound(page, control)
+    control.click()
+
+
 def dismiss_toasts(page):
     toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
     while toasts.count():
@@ -114,9 +152,7 @@ def open_editor(page):
 
 def edit_award(page, award):
     page.locator(f'[data-award="{award.pk}"] [data-edit-award]').click()
-    form = sheet(page, "awards").locator("[data-award-sheet]")
-    expect(form).to_be_visible()
-    return form
+    return ready(page, sheet(page, "awards").locator("[data-award-sheet]"))
 
 
 # ----- acceptance: a judge on a phone -----
@@ -131,11 +167,11 @@ def test_a_judge_on_a_phone_assigns_and_removes_an_award(login, event):
     paint = new_award(event, "Best Paint")
     open_judging(page)
 
-    racer_card(page, found["tiger"]).click()
-    racer_sheet = sheet(page, "judging").locator(
-        f'[data-racer-sheet="{found["tiger"].pk}"]'
+    tap(page, racer_card(page, found["tiger"]))
+    racer_sheet = ready(
+        page,
+        sheet(page, "judging").locator(f'[data-racer-sheet="{found["tiger"].pk}"]'),
     )
-    expect(racer_sheet).to_be_visible()
     with htmx_post(page, f"/judging/award/{paint.pk}/assign/"):
         racer_sheet.locator(f'[data-choice="{paint.pk}"] [data-assign]').click()
     expect(sheet(page, "judging")).to_be_hidden()
@@ -173,14 +209,14 @@ def test_the_wrong_subgroup_is_refused_with_a_visible_reason(login, event):
         event, "Lion Paint", group=found["group"], subgroup=subgroup(event, "Lions")
     )
     open_judging(page)
-    racer_card(page, found["tiger"]).click()
+    tap(page, racer_card(page, found["tiger"]))
     choice = sheet(page, "judging").locator(f'[data-choice="{lions.pk}"]')
     expect(choice.locator("[data-reason]")).to_have_text("For Lions only")
     expect(choice.get_by_role("button")).to_be_disabled()
     sheet(page, "judging").get_by_role("button", name="Close").click()
     expect(sheet(page, "judging")).to_be_hidden()
 
-    award_card(page, lions).locator("[data-open-award]").click()
+    tap(page, award_card(page, lions).locator("[data-open-award]"))
     eligible = sheet(page, "judging").locator("[data-eligible]")
     expect(eligible.locator("li")).to_have_count(2)
     expect(eligible).not_to_contain_text("Cal Racer")
@@ -206,8 +242,8 @@ def test_parents_win_a_pack_judged_award_until_the_editor_leaves_them_out(login,
     expect(
         page.locator(f'[data-racer="{found["parent"].pk}"] [data-speed-ineligible]')
     ).to_be_visible()
-    award_card(page, paint).locator("[data-open-award]").click()
-    eligible = sheet(page, "judging").locator("[data-eligible]")
+    tap(page, award_card(page, paint).locator("[data-open-award]"))
+    eligible = ready(page, sheet(page, "judging").locator("[data-eligible]"))
     with htmx_post(page, f"/judging/award/{paint.pk}/assign/"):
         eligible.locator(f'[data-racer="{found["parent"].pk}"] button').click()
     assert winner(paint) == found["parent"].pk
@@ -246,7 +282,7 @@ def test_parents_win_a_pack_judged_award_until_the_editor_leaves_them_out(login,
     assert AwardPartition.objects.filter(award=paint).count() == 2
 
     open_judging(page)
-    award_card(page, paint).locator("[data-open-award]").click()
+    tap(page, award_card(page, paint).locator("[data-open-award]"))
     eligible = sheet(page, "judging").locator("[data-eligible]")
     expect(eligible.locator("li")).to_have_count(4)
     expect(eligible).not_to_contain_text("Pat Racer")
@@ -336,8 +372,7 @@ def test_editor_parity_list_reorder_new_edit_delete(login, event):
     ]
 
     page.locator('[data-action="new-award"]').click()
-    form = sheet(page, "awards").locator('[data-award-sheet="new"]')
-    expect(form).to_be_visible()
+    form = ready(page, sheet(page, "awards").locator('[data-award-sheet="new"]'))
     types = form.get_by_label("Type").locator("option")
     expect(types).to_have_text(
         ["Design General", "Design Trophy", "Other", "Speed General", "Speed Trophy"]
@@ -365,8 +400,7 @@ def test_editor_parity_list_reorder_new_edit_delete(login, event):
 
     edit_award(page, stripes)
     sheet(page, "awards").locator('[data-action="delete"]').click()
-    confirm = sheet(page, "awards").locator("[data-delete-confirm]")
-    expect(confirm).to_be_visible()
+    confirm = ready(page, sheet(page, "awards").locator("[data-delete-confirm]"))
     with htmx_post(page, f"/awards/edit/{stripes.pk}/delete/"):
         confirm.get_by_role("button", name="Delete 1 award").click()
     assert not Award.objects.filter(pk=stripes.pk).exists()
@@ -401,12 +435,18 @@ def test_judging_parity_grid_sort_assign_both_ways_remove_ad_hoc(login, event):
     expect(cars.first).to_have_text("101")
     page.get_by_label("Find a racer by name or car number").fill("20")
     expect(cars).to_have_text(["201", "202"])
-    page.get_by_label("Find a racer by name or car number").fill("")
+    find = page.get_by_label("Find a racer by name or car number")
+    find.fill("")
+    # Leaving the field fires its `change`, which fetches the board again;
+    # leave it here, so that swap is not the one under the next tap.
+    find.blur()
     expect(cars).to_have_count(5)
 
     # Award to racer.
-    award_card(page, spirit).locator("[data-open-award]").click()
-    award_sheet = sheet(page, "judging").locator(f'[data-award-sheet="{spirit.pk}"]')
+    tap(page, award_card(page, spirit).locator("[data-open-award]"))
+    award_sheet = ready(
+        page, sheet(page, "judging").locator(f'[data-award-sheet="{spirit.pk}"]')
+    )
     expect(award_sheet.locator("[data-eligible] li")).to_have_count(2)
     shoot(page, "judging-award-sheet", full_page=False)
     with htmx_post(page, f"/judging/award/{spirit.pk}/assign/"):
@@ -414,9 +454,10 @@ def test_judging_parity_grid_sort_assign_both_ways_remove_ad_hoc(login, event):
     assert winner(spirit) == found["lion2"].pk
 
     # Racer to award, then the ad hoc field.
-    racer_card(page, found["lion"]).click()
-    racer_sheet = sheet(page, "judging").locator(
-        f'[data-racer-sheet="{found["lion"].pk}"]'
+    tap(page, racer_card(page, found["lion"]))
+    racer_sheet = ready(
+        page,
+        sheet(page, "judging").locator(f'[data-racer-sheet="{found["lion"].pk}"]'),
     )
     expect(
         racer_sheet.locator(f'[data-choice="{spirit.pk}"] [data-reason]')
@@ -425,9 +466,10 @@ def test_judging_parity_grid_sort_assign_both_ways_remove_ad_hoc(login, event):
         racer_sheet.locator(f'[data-choice="{paint.pk}"] [data-assign]').click()
     assert winner(paint) == found["lion"].pk
 
-    racer_card(page, found["tiger"]).click()
-    racer_sheet = sheet(page, "judging").locator(
-        f'[data-racer-sheet="{found["tiger"].pk}"]'
+    tap(page, racer_card(page, found["tiger"]))
+    racer_sheet = ready(
+        page,
+        sheet(page, "judging").locator(f'[data-racer-sheet="{found["tiger"].pk}"]'),
     )
     racer_sheet.get_by_label("Ad hoc award").fill("Most Creative")
     with htmx_post(page, f"/judging/racer/{found['tiger'].pk}/adhoc/"):
@@ -439,9 +481,10 @@ def test_judging_parity_grid_sort_assign_both_ways_remove_ad_hoc(login, event):
 
     # Remove from the racer's sheet.
     dismiss_toasts(page)
-    racer_card(page, found["lion"]).click()
-    racer_sheet = sheet(page, "judging").locator(
-        f'[data-racer-sheet="{found["lion"].pk}"]'
+    tap(page, racer_card(page, found["lion"]))
+    racer_sheet = ready(
+        page,
+        sheet(page, "judging").locator(f'[data-racer-sheet="{found["lion"].pk}"]'),
     )
     with htmx_post(page, f"/judging/award/{paint.pk}/remove/"):
         racer_sheet.locator(f'[data-choice="{paint.pk}"] [data-remove]').click()

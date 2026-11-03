@@ -11,6 +11,7 @@ from django.db import models, transaction
 
 from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
+from kiosks import parameters
 from kiosks.madlib import madlib
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from racing.models import PlaylistEntry
@@ -89,14 +90,19 @@ def _sort_key(kiosk: Kiosk):
     return (rank, kiosk.name, kiosk.address, kiosk.last_contact)
 
 
+def listed_kiosks(event, now: datetime) -> list[Kiosk]:
+    """The kiosks heard from in the last 60 s, in `all_kiosks()` order. Reads
+    only: the kiosk dashboard page polls it (#46)."""
+    listed = Kiosk.objects.filter(event=event, last_contact__gt=now - LISTED_FOR)
+    return sorted(listed, key=_sort_key)
+
+
 def all_kiosks(event, now: datetime) -> list[dict]:
     """`all_kiosks()`, which first runs `drop_old_kiosks()`. Each kiosk
     carries its own parameters, where PHP's are always null (C20)."""
     with transaction.atomic():
         Kiosk.objects.filter(event=event, last_contact__lt=now - DROPPED_AFTER).delete()
-        listed = list(
-            Kiosk.objects.filter(event=event, last_contact__gt=now - LISTED_FOR)
-        )
+        listed = listed_kiosks(event, now)
     return [
         {
             "name": kiosk.name,
@@ -108,12 +114,18 @@ def all_kiosks(event, now: datetime) -> list[dict]:
             "age": _epoch(now) - _epoch(kiosk.last_contact),
             "parameters": kiosk.params or NO_PARAMS,
         }
-        for kiosk in sorted(listed, key=_sort_key)
+        for kiosk in listed
     ]
 
 
 def kiosk_pages() -> list[dict]:
     return [{"brief": page, "full": f"kiosks/{page}.kiosk"} for page in BUILT_IN_PAGES]
+
+
+def is_built_in(page: str) -> bool:
+    """A page a kiosk can be given from the pickers: a built-in page, never a
+    `local/kiosks` one (ADR-10, D10)."""
+    return page in {row["full"] for row in kiosk_pages()}
 
 
 def dashboard(event, now: datetime) -> dict:
@@ -287,3 +299,193 @@ def choose_scene(event, scene: Scene | None) -> None:
         else:
             apply_scene(state, scene.pk)
         state.save(update_fields=["current_scene"])
+
+
+# ----- the kiosk dashboard and scene editor pages (#46) ------------------------
+#
+# Each change the pages make is one call here, under the `RaceState` lock, and
+# checks again what the page showed: the kiosk's row still exists, the scene
+# still exists, the kiosk still shows the page its Configure sheet was for. A
+# kiosk silent past the 60 s list window still takes a change, as PHP's
+# `kiosk.assign` and `kiosk.reload` UPDATE its row by address; only one that
+# is gone, dropped after an hour or never seen, is refused.
+
+NAME_LIMIT = 200
+
+
+class KioskFailure(Exception):
+    def __init__(self, description: str):
+        super().__init__(description)
+        self.description = description
+
+
+KIOSK_GONE = "That kiosk is gone. Reload the page."
+SCENE_GONE = "That scene is gone. Reload the page."
+
+
+def _known_kiosk(event, address: str) -> Kiosk:
+    kiosk = Kiosk.objects.filter(event=event, address=address).first()
+    if kiosk is None:
+        raise KioskFailure(KIOSK_GONE)
+    return kiosk
+
+
+def _known_scene(event, scene_id: int) -> Scene:
+    scene = Scene.objects.filter(event=event, pk=scene_id).first()
+    if scene is None:
+        raise KioskFailure(SCENE_GONE)
+    return scene
+
+
+def _name(name: str, what: str) -> str:
+    name = name.strip()
+    if len(name) > NAME_LIMIT:
+        raise KioskFailure(f"That {what} is too long.")
+    return name
+
+
+def _built_in(page: str) -> str:
+    if not is_built_in(page):
+        raise KioskFailure("Pick a page from the list.")
+    return page
+
+
+def scene_kiosk_names(event) -> list[str]:
+    """`all_scene_kiosk_names()`: every kiosk name any scene sets a page for,
+    Main first. Sorted here, so Postgres collation plays no part."""
+    names = set(
+        SceneKiosk.objects.filter(event=event).values_list("kiosk_name", flat=True)
+    )
+    return sorted(names, key=_main_first)
+
+
+def show_scene(event, scene_id: int) -> Scene:
+    """The dashboard's scene switcher: `scene.apply` for a scene of the
+    event. A scene deleted since the page loaded is refused, where
+    `scene.apply` would leave no scene current."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        scene = _known_scene(event, scene_id)
+        apply_scene(state, scene.pk)
+        state.save(update_fields=["current_scene"])
+    return scene
+
+
+def set_kiosk_page(event, address: str, page: str) -> None:
+    """The page picker: `kiosk.assign` with `page`, which drops the kiosk's
+    parameters and leaves no scene current."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        _known_kiosk(event, address)
+        assign(event, address, page=_built_in(page))
+
+
+def identify_kiosk(event, address: str) -> None:
+    """Identify: the kiosk shows its name and address in large type."""
+    set_kiosk_page(event, address, IDENTIFY)
+
+
+def name_kiosk(event, address: str, name: str) -> None:
+    """`kiosk.assign` with `name`. A name the current scene sets a page for
+    takes that page; an empty name leaves the kiosk unnamed."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        _known_kiosk(event, address)
+        assign(event, address, name=_name(name, "name"))
+
+
+def configure_kiosk(event, address: str, page: str, posted: parameters.Posted):
+    """A Configure sheet: `kiosk.assign` with `params`. `page` is the page the
+    sheet was for; a kiosk given another page since is refused."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        if _known_kiosk(event, address).page != page:
+            raise KioskFailure(
+                "That kiosk shows another page now. Open Configure again."
+            )
+        try:
+            text = parameters.encode(event, page, posted)
+        except parameters.ParameterRefused as refused:
+            raise KioskFailure(refused.description) from None
+        assign(event, address, params=text)
+
+
+def reload_kiosk(event, address: str) -> None:
+    """`kiosk.reload` for a listed kiosk."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        _known_kiosk(event, address)
+        request_reload(event, address)
+
+
+def create_scene(event, name: str) -> Scene:
+    """The scene editor's New scene: `scene.add`, refusing a blank name, and
+    a name another scene has in any case, as `scenes.js` does."""
+    name = _name(name, "scene name")
+    if not name:
+        raise KioskFailure("Name the scene.")
+    with transaction.atomic():
+        lock_race_state(event.id)
+        if Scene.objects.filter(event=event, name__iexact=name).exists():
+            raise KioskFailure(f"There is a scene called {name} already.")
+        return add_scene(event, name)
+
+
+def remove_scene(event, scene_id: int) -> bool:
+    """`scene.delete`. False when the scene was gone already, so a second
+    tap changes nothing."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        scene = Scene.objects.filter(event=event, pk=scene_id).first()
+        if scene is None:
+            return False
+        delete_scene(event, scene)
+    return True
+
+
+def set_scene_page(
+    event, scene_id: int, kiosk_name: str, page: str, *, new_name: bool = False
+) -> None:
+    """`scene.setkiosk` from the scene editor: the page kiosks named
+    `kiosk_name` show in the scene, or none, which takes the name out. The
+    page starts with no parameters, the same page again too, as `scenes.js`
+    `on_change_assigned_page` posts no `params`. With `new_name`, a name some
+    scene already has, in any case, is refused, as "Add Kiosk Name" refuses
+    it."""
+    kiosk_name = _name(kiosk_name, "kiosk name")
+    if not kiosk_name:
+        raise KioskFailure("Name the kiosk.")
+    with transaction.atomic():
+        lock_race_state(event.id)
+        scene = _known_scene(event, scene_id)
+        if (
+            new_name
+            and SceneKiosk.objects.filter(
+                event=event, kiosk_name__iexact=kiosk_name
+            ).exists()
+        ):
+            raise KioskFailure(f"There is a kiosk called {kiosk_name} already.")
+        if not page:
+            set_scene_kiosk(scene, kiosk_name, "", None)
+            return
+        set_scene_kiosk(scene, kiosk_name, _built_in(page), None)
+
+
+def configure_scene_kiosk(
+    event, scene_id: int, kiosk_name: str, page: str, posted: parameters.Posted
+) -> None:
+    """A Configure sheet in the scene editor: `scene.setkiosk` with
+    `params`. The scene must still give the name `page`."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        scene = _known_scene(event, scene_id)
+        row = SceneKiosk.objects.filter(scene=scene, kiosk_name=kiosk_name).first()
+        if row is None or row.page != page:
+            raise KioskFailure(
+                "The scene shows another page there now. Open Configure again."
+            )
+        try:
+            text = parameters.encode(event, page, posted)
+        except parameters.ParameterRefused as refused:
+            raise KioskFailure(refused.description) from None
+        set_scene_kiosk(scene, kiosk_name, page, text)

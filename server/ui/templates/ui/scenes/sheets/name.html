@@ -1,0 +1,22 @@
+{# Add kiosk name (#46): a name no scene uses yet, and the page this scene gives it. #}
+<div x-data x-init="sceneSheet.show('Add a kiosk name')" data-add-name-sheet>
+  <form hx-post="{% url 'scenes-name' %}" hx-target="#{{ sheet_body }}" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" class="flex flex-col gap-4">
+    <input type="hidden" name="scene" value="{{ scene_id }}">
+    {% if error %}<p role="alert" data-error class="rounded-lg bg-danger-soft px-3 py-2 text-danger-ink">{{ error }}</p>{% endif %}
+    <div>
+      <label for="sa-name" class="mb-1 block text-sm font-medium">Kiosk name</label>
+      <input id="sa-name" name="name" type="text" maxlength="200" required value="{{ values.name|default:'' }}" data-autofocus autocomplete="off" aria-describedby="sa-help" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+      <p id="sa-help" class="mt-1 text-sm text-ink-muted">Then name a kiosk this on the Kiosk Dashboard.</p>
+    </div>
+    <div>
+      <label for="sa-page" class="mb-1 block text-sm font-medium">Page in this scene</label>
+      <select id="sa-page" name="page" required class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+        {% for p in pages %}<option value="{{ p.full }}"{% if p.full == values.page %} selected{% endif %}>{{ p.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" data-submit class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Add kiosk name</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

@@ -11,6 +11,8 @@ urlpatterns = [
     path("", include("ui.awards.urls")),
     path("", include("ui.judging.urls")),
     path("", include("ui.presenter.urls")),
+    path("", include("ui.kiosks.urls")),
+    path("", include("ui.scenes.urls")),
     *redirects.urlpatterns(),
     path("quickref.pdf", views.quickref, name="quickref"),
     path("components/", views.components, name="components"),

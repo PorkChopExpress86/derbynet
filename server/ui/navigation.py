@@ -179,6 +179,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         46,
         php="kiosk-dashboard.php",
         icon="kiosk",
+        view="ui.kiosks.views.page",
     ),
     NavEntry(
         "judging",
@@ -324,6 +325,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         46,
         php="scenes.php",
         menu=False,
+        view="ui.scenes.views.page",
     ),
     NavEntry(
         "import-roster",

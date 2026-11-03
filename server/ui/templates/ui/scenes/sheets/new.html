@@ -1,0 +1,15 @@
+{# New scene (#46). The page loads again at the new scene. #}
+<div x-data x-init="sceneSheet.show('New scene')" data-new-scene-sheet>
+  <form hx-post="{% url 'scenes-new' %}" hx-target="#{{ sheet_body }}" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" class="flex flex-col gap-4">
+    <input type="hidden" name="back" value="{{ back }}">
+    {% if error %}<p role="alert" data-error class="rounded-lg bg-danger-soft px-3 py-2 text-danger-ink">{{ error }}</p>{% endif %}
+    <div>
+      <label for="sn-name" class="mb-1 block text-sm font-medium">Scene name</label>
+      <input id="sn-name" name="name" type="text" maxlength="200" required value="{{ name }}" data-autofocus autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" data-submit class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Make scene</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,10 @@
+{# Delete scene (#46), confirmed here in place of a dialog. The page loads again at the first scene. #}
+<div x-data x-init="sceneSheet.show('Delete {{ editor.scene_name|escapejs }}?')" data-delete-scene-sheet>
+  <p>The scene {{ editor.scene_name }} is deleted with the pages it gives each kiosk name. The kiosks keep the pages they show now. A playlist step or racing scene that names it names no scene afterwards.</p>
+  <form hx-post="{% url 'scenes-delete' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <input type="hidden" name="scene" value="{{ editor.scene_id }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button type="submit" data-confirm class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Delete 1 scene</button>
+    <button type="button" @click="$store.ui.close()" data-autofocus class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </form>
+</div>
