@@ -106,3 +106,33 @@ def test_sortablejs_loads_only_on_a_page_with_a_sortable_list(page, event, setti
     page.goto("/components/")
     page.wait_for_function("window.Sortable !== undefined")
     assert len(loaded) == 1
+
+
+COVERED = """sheet => [...sheet.querySelectorAll('button')]
+    .filter(b => b.offsetParent !== null)
+    .map(b => {
+        const r = b.getBoundingClientRect();
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        return hit && !b.contains(hit) ? b.textContent.trim() || b.ariaLabel : null;
+    })
+    .filter(Boolean)"""
+
+
+def test_a_toast_leaves_an_open_sheets_buttons_uncovered(gallery):
+    """A toast shown while a sheet is open (an error, or the 8 s of an Undo)
+    sat over a bottom sheet's buttons on a phone, so a tap on Delete or Back
+    hit the toast (#47 retro). A phone's toasts move to the top while a
+    sheet is open, and back to the bottom once it closes."""
+    gallery.locator('[data-demo="confirm"]').click()
+    sheet = gallery.locator('[data-sheet="gallery-confirm"]')
+    expect(sheet).to_be_visible()
+    gallery.evaluate("derbynet.toast('A refusal with a message long enough to wrap')")
+    expect(gallery.locator("#toasts [role=alert]")).to_have_count(1)
+
+    assert sheet.evaluate(COVERED) == []
+
+    gallery.keyboard.press("Escape")
+    expect(sheet).to_be_hidden()
+    toast = gallery.locator("#toasts [role=alert]").bounding_box()
+    assert toast["y"] > gallery.viewport_size["height"] / 2
