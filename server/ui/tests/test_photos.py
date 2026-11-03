@@ -456,3 +456,33 @@ def test_take_photo_assigns_it_and_opens_the_crop_sheet(crew, event, folders):
     assert racer.car_photo == "car.jpg" and not racer.passed_inspection
     assert 'data-crop-sheet="car"' in reply
     assert "/photo.php/car/file/work/car.jpg/" in reply
+
+
+# ----- review of 0a5dd304 -----
+
+
+def test_delete_of_a_bad_or_missing_name_is_refused(crew, event, folders):
+    for query in ("", "?photo=", "?photo=../a.jpg", "?photo=gone.jpg"):
+        reply = post(crew, f"/photos/head/delete/{query}")
+        assert reply.status_code == 422, query
+        assert "deleted" not in reply.content.decode()
+
+
+def test_a_forged_restore_with_no_photo_unassigns_nothing(crew, event, folders):
+    racer = add_racers(event, "Scouts", 1, 101)[0]
+    put(folders / "racers", "a.jpg")
+    Racer.objects.filter(pk=racer.pk).update(headshot="a.jpg")
+    reply = post(crew, f"/photos/head/assign/?racer={racer.pk}&photo=&restore=1")
+    assert reply.status_code == 422
+    racer.refresh_from_db()
+    assert racer.headshot == "a.jpg"
+
+
+def test_unassign_of_an_unknown_racer_is_refused(crew, event, folders):
+    assert post(crew, "/photos/head/racer/999999/unassign/").status_code in (404, 422)
+
+
+def test_a_hidden_photo_is_in_the_pool(crew, event, folders):
+    put(folders / "racers", ".h.jpg")
+    page = html(crew.get("/photos/racers/"))
+    assert re.findall(r'data-pool-photo="([^"]+)"', page) == [".h.jpg"]

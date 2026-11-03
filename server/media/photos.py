@@ -580,13 +580,19 @@ def page_url(repo: Repository, path: str, render: str) -> str:
     browser's copy, and a crop box drawn on the stale work render landed in
     the wrong frame. The query adds the file's time in nanoseconds;
     `photo.php` ignores it, and the browser keys its cache on it. `path` is
-    a racer's column or a file name; with no crop, a file's own name."""
+    a racer's column or a file name, `<name>` or `0-cropped/<name>`; any
+    other text gives "" before any file is read."""
+    name = path.rsplit("/", 1)[-1]
+    if (
+        repo.directory is None
+        or not is_valid_name(name)
+        or path not in (name, f"{CROPPED_FOLDER}/{name}")
+    ):
+        return ""
     url = repo.url(path, render)
-    if not url:
-        return url
     try:
         version = (repo.directory / path).stat().st_mtime_ns
-    except OSError, TypeError:
+    except OSError:
         return url
     return f"{url}?v={version}"
 
@@ -791,6 +797,7 @@ def _find_face(original: Path, image: Image.Image, fmt: str):
         return faces.detect_with_hook(command, str(original))
     # The hook reads the file, so it gets an upright copy when the stored
     # pixels are turned, and its box lands in the frame the crop uses.
+    # FACE_HOOK_COPY keeps it out of the photo page's list.
     temporary = original.with_name(f".{secrets.token_hex(6)}.upright{original.suffix}")
     try:
         with temporary.open("wb") as stream:
@@ -906,19 +913,30 @@ def _set_photo(event, repo: Repository, racer: Racer, path: str) -> None:
 # ----- photo.assign, photo.crop, photo.rotate, photo.delete ------------------------
 
 
+@dataclass(frozen=True)
+class Assignment:
+    """What `assign_photo` changed, as read under the race-state lock: the
+    racer, and the file name its column held before ("" for none)."""
+
+    racer: Racer
+    previous: str
+
+
 def assign_photo(
     event, repo: Repository, racer_id, photo, *, restore: bool = False
-) -> None:
+) -> Assignment:
     """`photo.assign`: give the racer the photo, by its crop when it has one,
     or take the racer's photo away when `photo` is empty.
 
     With `restore`, the photo page's Undo of an unassign: the racer gets the
     photo back only while it has none, and a racer that already shows it is
     left as it is, so the same Undo sent twice changes nothing and an Undo
-    never replaces a photo assigned since (#47)."""
+    never replaces a photo assigned since (#47). A restore never removes a
+    photo, so it needs one."""
     if not photo:
-        _assign_path(event, repo, racer_id, "")
-        return
+        if restore:
+            raise Refused("nosuchfile", "There is no photo to give back.")
+        return _assign_path(event, repo, racer_id, "")
     if repo.directory is None:
         raise Refused("nosuchfile", f"Image {photo} not found.")
     # Held from the crop check until the racer's row commits, so a rotation
@@ -926,26 +944,30 @@ def assign_photo(
     with _photo_lock(repo, photo):
         if find_or_make(repo, Label(CROPPED), photo) is None:
             raise Refused("nosuchfile", f"Image {photo} not found.")
-        _assign_path(event, repo, racer_id, _stored_path(repo, photo), restore=restore)
+        return _assign_path(
+            event, repo, racer_id, _stored_path(repo, photo), restore=restore
+        )
 
 
 def _assign_path(
     event, repo: Repository, racer_id, path: str, *, restore: bool = False
-) -> None:
+) -> Assignment:
     with transaction.atomic():
         lock_race_state(event.id)
         racer = _by_id(Racer.objects.filter(event=event), racer_id)
         if racer is None:
             raise Refused("noracer", "No such racer.")
+        current = getattr(racer, repo.field)
+        found = Assignment(racer, current.rsplit("/", 1)[-1])
         if restore:
-            current = getattr(racer, repo.field)
-            if current.rsplit("/", 1)[-1] == path.rsplit("/", 1)[-1]:
-                return
+            if found.previous == path.rsplit("/", 1)[-1]:
+                return found
             if current:
                 raise Refused(
                     "assigned", "The racer has another photo now; nothing was undone."
                 )
         _set_photo(event, repo, racer, path)
+        return found
 
 
 @dataclass(frozen=True)
@@ -1040,22 +1062,27 @@ def rotate_photo(event, repo: Repository, name: str, degrees: float) -> None:
         _after_commit(tidy)
 
 
-def delete_photo(event, repo: Repository, name) -> None:
+def delete_photo(event, repo: Repository, name) -> bool:
     """`photo.delete`: forget the photo and remove it from every folder of the
     repository, after the racers that showed it lose it. The photo's lock is
-    held throughout, so no render made meanwhile is left behind."""
+    held throughout, so no render made meanwhile is left behind. Returns
+    whether there was such a photo: a file of that name at the top of the
+    folder, or a racer of the event that showed it. A bad name changes
+    nothing; `photo.delete` answers success either way, as PHP does."""
     if repo.directory is None or not is_valid_name(name):
-        return
+        return False
     with _photo_lock(repo, name):
+        existed = repo.file(name).is_file()
         with transaction.atomic():
             lock_race_state(event.id)
-            Racer.objects.filter(
+            showed = Racer.objects.filter(
                 event=event,
                 **{f"{repo.field}__in": [name, f"{CROPPED_FOLDER}/{name}"]},
             ).update(**{repo.field: ""})
             PhotoRotation.objects.filter(directory=repo.key, name=name).delete()
         directory = repo.directory
         _after_commit(lambda: _delete_everywhere(directory, name))
+    return existed or showed > 0
 
 
 def _delete_everywhere(directory: Path, name: str) -> None:
@@ -1111,11 +1138,17 @@ class DirectoryStatus:
         return self.kind in ("read-only", "missing")
 
 
+# The face hook's upright copy (`_find_face`), which lives at the top of the
+# folder only while an autocrop runs.
+FACE_HOOK_COPY = re.compile(r"\.[0-9a-f]{12}\.upright\.")
+
+
 def photo_files(repo: Repository) -> list[str]:
     """`scan_directory()`: the files at the top of the folder whose name
-    matches `LISTED_PHOTO`, sorted. A hidden file is left out: no upload
-    takes a hidden name (`is_upload_name`), and the temporary files written
-    here are hidden."""
+    matches `LISTED_PHOTO`, sorted. A hidden name is listed, as PHP lists it
+    (an upload named `.h.jpg` shows in photo-thumbs.php, checked with
+    `testing/docker/php-scratch.sh`); only the face hook's passing copy is
+    left out."""
     if repo.directory is None:
         return []
     try:
@@ -1126,7 +1159,7 @@ def photo_files(repo: Repository) -> list[str]:
         entry.name
         for entry in entries
         if LISTED_PHOTO.search(entry.name)
-        and not entry.name.startswith(".")
+        and not FACE_HOOK_COPY.match(entry.name)
         and entry.is_file()
     )
 

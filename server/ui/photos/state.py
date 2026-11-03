@@ -146,13 +146,3 @@ def build(event, repo: str, filters: Filters, *, without_photo=False) -> Listing
         pool=[pool_photo(repository, name) for name in found.unassigned],
         total=len(everyone),
     )
-
-
-def card(event, repo: str, racer_id: int) -> RacerCard | None:
-    repository = photos.repository(event, repo)
-    racer = Racer.objects.filter(event=event, pk=racer_id).select_related("group")
-    found = racer.first()
-    if found is None:
-        return None
-    stored = photos.inventory(event, repository).stored.get(found.pk)
-    return _card(found, stored, repository)

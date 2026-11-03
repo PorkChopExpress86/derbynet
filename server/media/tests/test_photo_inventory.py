@@ -3,6 +3,7 @@ directory's diagnostics, each racer's stored photo with its `lost_photo`
 flag, and the unassign Undo's `restore`."""
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -27,8 +28,13 @@ def test_the_listed_files_match_php_scan_directory(event, folders):
     put(folders.head, ".hidden.jpg")
     (folders.head / "0-cropped").mkdir()
     (folders.head / "dir.jpg").mkdir()
+    # The face hook's upright copy, which lives only while autocrop runs.
+    put(folders.head, ".0123456789ab.upright.jpg")
     repo = photos.repository(event, "head")
+    # PHP lists a hidden photo too (checked with php-scratch.sh: an upload
+    # named .h.jpg shows in photo-thumbs.php).
     assert photos.photo_files(repo) == [
+        ".hidden.jpg",
         "a.PNG",
         "b.jpg",
         "c.jpeg",
@@ -172,3 +178,55 @@ def test_a_page_url_of_nothing_is_empty(event, folders):
     repo = photos.repository(event, "head")
     assert photos.page_url(repo, "", photos.WORK) == ""
     assert "?v=" not in photos.page_url(repo, "gone.jpg", photos.WORK)
+
+
+def test_a_racer_with_a_hidden_photo_has_it(event, folders):
+    put(folders.head, ".h.jpg")
+    racer = RacerFactory(group__event=event, headshot=".h.jpg")
+    found = photos.inventory(event, photos.repository(event, "head"))
+    assert found.stored[racer.pk].lost is False
+
+
+def test_restore_with_no_photo_never_unassigns(event, folders):
+    put(folders.head, "a.jpg")
+    racer = RacerFactory(group__event=event, headshot="a.jpg")
+    repo = photos.repository(event, "head")
+    with pytest.raises(photos.Refused):
+        photos.assign_photo(event, repo, str(racer.pk), "", restore=True)
+    assert Racer.objects.get(pk=racer.pk).headshot == "a.jpg"
+
+
+def test_assign_returns_what_it_changed(event, folders):
+    put(folders.head, "a.jpg")
+    racer = RacerFactory(group__event=event, headshot="0-cropped/old.jpg")
+    repo = photos.repository(event, "head")
+    removed = photos.assign_photo(event, repo, str(racer.pk), "")
+    assert (removed.racer.pk, removed.previous) == (racer.pk, "old.jpg")
+    given = photos.assign_photo(event, repo, str(racer.pk), "a.jpg")
+    assert (given.racer.first_name, given.previous) == (racer.first_name, "")
+
+
+def test_delete_reports_a_bad_or_missing_name(event, folders):
+    repo = photos.repository(event, "head")
+    for name in ("", "../a.jpg", "gone.jpg", None):
+        assert photos.delete_photo(event, repo, name) is False
+    put(folders.head, "a.jpg")
+    assert photos.delete_photo(event, repo, "a.jpg") is True
+
+
+def test_page_url_never_stats_a_path_outside_the_folder(event, folders, monkeypatch):
+    put(folders.head, "a.jpg")
+    repo = photos.repository(event, "head")
+    seen = []
+    real = Path.stat
+
+    def stat(self, *args, **kwargs):
+        seen.append(str(self))
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", stat)
+    for path in ("../a.jpg", "racers/../../x.jpg", "0-work/a.jpg", "/etc/passwd"):
+        assert photos.page_url(repo, path, photos.WORK) == ""
+    assert not any(".." in p or p == "/etc/passwd" for p in seen), seen
+    assert "?v=" in photos.page_url(repo, "a.jpg", photos.WORK)
+    assert photos.page_url(repo, "0-cropped/a.jpg", photos.WORK) != ""

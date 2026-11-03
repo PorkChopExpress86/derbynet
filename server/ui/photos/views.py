@@ -29,7 +29,6 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from accounts.permissions import Perm, allows
 from media import photos
 from racing.engine.phpcompat import php_numeric, php_truthy
-from roster.models import Racer
 from ui.navigation import BY_KEY, can_open, requires_page
 from ui.photos import state
 from ui.photos.state import Filters
@@ -256,53 +255,46 @@ def racer_choices_list(request, repo):
 @guard
 def assign(request, repo):
     """Give `racer` the `photo`. The unassign toast's Undo posts here with
-    `restore=1`, which gives the photo back only while the racer has none."""
+    `restore=1`, which gives the photo back only while the racer has none.
+    The toast names the racer the service read under its lock."""
     repository = _repo(request, repo)
     data = request.POST if request.POST else request.GET
-    racer = _racer_or_none(request, data.get("racer", ""))
-    name = _photo_name(request)
     restore = php_truthy(data.get("restore", ""))
     try:
-        photos.assign_photo(
-            _event(request), repository, data.get("racer", ""), name, restore=restore
+        done = photos.assign_photo(
+            _event(request),
+            repository,
+            data.get("racer", ""),
+            _photo_name(request),
+            restore=restore,
         )
     except photos.Refused as failure:
         return refused(request, failure)
-    who = name_of(racer) if racer else "the racer"
-    done = "back for" if restore else "assigned to"
-    message = f"{state.REPO_NOUNS[repo]} {done} {who}."
+    what = "back for" if restore else "assigned to"
+    message = f"{state.REPO_NOUNS[repo]} {what} {name_of(done.racer)}."
     if restore:
         return toasted(request, message)
     return closed_reply(request, message)
 
 
-def _racer_or_none(request, posted) -> Racer | None:
-    try:
-        pk = int(posted)
-    except TypeError, ValueError:
-        return None
-    return Racer.objects.filter(pk=pk, event=_event(request)).first()
-
-
 @require_POST
 @guard
 def unassign(request, repo, racer_id):
-    """Take the racer's photo away, with an Undo that gives it back."""
+    """Take the racer's photo away, with an Undo that gives back the photo
+    the service took."""
     repository = _repo(request, repo)
-    racer = event_racer(request, racer_id)
-    name = getattr(racer, repository.field).rsplit("/", 1)[-1]
     try:
-        photos.assign_photo(_event(request), repository, str(racer.pk), "")
+        done = photos.assign_photo(_event(request), repository, str(racer_id), "")
     except photos.Refused as failure:
         return refused(request, failure)
     undo = ""
-    if name:
+    if done.previous:
         undo = reverse("photos-assign", args=[repo]) + _query(
-            racer=racer.pk, photo=name, restore=1
+            racer=done.racer.pk, photo=done.previous, restore=1
         )
     return toasted(
         request,
-        f"{state.REPO_NOUNS[repo]} taken from {name_of(racer)}.",
+        f"{state.REPO_NOUNS[repo]} taken from {name_of(done.racer)}.",
         level="info",
         undo_url=undo,
     )
@@ -393,7 +385,8 @@ def delete(request, repo):
                 "back_url": reverse("photos-crop-sheet", args=[repo]) + query,
             },
         )
-    photos.delete_photo(_event(request), repository, name)
+    if not photos.delete_photo(_event(request), repository, name):
+        return service_error(request, f"There is no photo named {name}.")
     return closed_reply(request, f"{name} deleted.")
 
 
