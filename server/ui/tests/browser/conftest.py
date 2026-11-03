@@ -205,15 +205,33 @@ def page_errors() -> PageErrors:
 
 
 class InFlight:
-    """The requests a browser context has sent and not yet finished."""
+    """The requests a browser context has sent and not yet finished.
+
+    A navigation ends the old document's htmx and fetch requests, but
+    Playwright then reports neither `requestfinished` nor `requestfailed` for
+    them (seen on a reload right after a click, #188). So when a frame
+    navigates, its XHR and fetch requests leave the set: their replies can no
+    longer reach the page. The new document sends none before it commits."""
 
     TIMEOUT_MS = 10_000
+    SCRIPTED = ("xhr", "fetch")
 
     def __init__(self, context):
         self.requests = set()
         context.on("request", lambda r: self.requests.add(r))
         context.on("requestfinished", lambda r: self.requests.discard(r))
         context.on("requestfailed", lambda r: self.requests.discard(r))
+        context.on("page", self.watch)
+
+    def watch(self, page):
+        page.on("framenavigated", lambda frame: self.navigated(frame))
+
+    def navigated(self, frame):
+        self.requests -= {
+            r
+            for r in self.requests
+            if r.frame == frame and r.resource_type in self.SCRIPTED
+        }
 
     def drain(self, page) -> list[str]:
         """Wait until nothing is in flight; return what still is after the
@@ -248,9 +266,10 @@ def pytest_runtest_call(item):
 @pytest.fixture
 def page(browser, live_server, size, page_errors):
     context = browser.new_context(**SIZES[size], base_url=live_server.url)
+    in_flight = InFlight(context)
     page = context.new_page()
     page.size = size
-    page.in_flight = InFlight(context)
+    page.in_flight = in_flight
     page.on("pageerror", lambda error: page_errors.add(f"pageerror: {error}"))
     page.on(
         "console",
