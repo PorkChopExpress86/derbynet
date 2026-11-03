@@ -1,0 +1,47 @@
+{# The entry sheet (#44): add a round to the playlist, or change a queued step. The same fields as playlist.php's modal, and the operator gate (D12). #}
+<div x-data x-init="playlistPage.show('{% if entry %}Edit{% else %}Add{% endif %} {{ row.name|escapejs }}')" data-entry-sheet>
+  <form hx-post="{{ post_url }}" hx-target="#playlist-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" class="flex flex-col gap-4">
+    {% if not entry %}<input type="hidden" name="group" value="{{ row.group_id }}"><input type="hidden" name="round" value="{{ row.round_number }}">{% endif %}
+    {% if error %}<p role="alert" data-error class="rounded-lg bg-danger-soft px-3 py-2 text-danger-ink">{{ error }}</p>{% endif %}
+    {% if row.cut %}
+    <input type="hidden" name="cut" value="1">
+    <div>
+      <label for="pl-top" class="mb-1 block text-sm font-medium">How many racers go to this final?</label>
+      <input id="pl-top" name="top" type="number" inputmode="numeric" min="1" required value="{{ values.top }}" data-autofocus aria-describedby="pl-top-help" class="h-12 w-28 rounded-xl border border-field bg-surface px-3 text-lg font-semibold tabular-nums">
+      <p id="pl-top-help" class="mt-1 text-sm text-ink-muted">The top racers of the round before it, by their standings. A racer tied with the last one goes too.</p>
+    </div>
+    {% if row.bucket_label %}
+    <fieldset>
+      <legend class="mb-1 text-sm font-medium">Take the top racers from</legend>
+      <div class="flex rounded-xl border border-field bg-surface p-1">
+        <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent"><input type="radio" class="sr-only" name="bucketed" value="0"{% if not values.bucketed %} checked{% endif %}>Overall</label>
+        <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent"><input type="radio" class="sr-only" name="bucketed" value="1"{% if values.bucketed %} checked{% endif %}>{{ row.bucket_label }}</label>
+      </div>
+    </fieldset>
+    {% endif %}
+    {% endif %}
+    <div>
+      <label for="pl-runs" class="mb-1 block text-sm font-medium">Runs per lane</label>
+      <select id="pl-runs" name="runs" {% if not row.cut %}data-autofocus {% endif %}class="h-12 w-28 rounded-xl border border-field bg-surface px-3 text-base">
+        {% for n in playlist.runs_choices %}<option value="{{ n }}"{% if n == values.runs %} selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="pl-then" class="mb-1 block text-sm font-medium">And then</label>
+      <select id="pl-then" name="then" aria-describedby="pl-then-help" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+        <option value="{{ playlist.stop }}"{% if values.then == playlist.stop %} selected{% endif %}>Stop</option>
+        <option value="{{ playlist.next_round }}"{% if values.then == playlist.next_round %} selected{% endif %}>Start next round</option>
+        {% for id, name in playlist.scenes %}<option value="{{ id }}"{% if id == values.then %} selected{% endif %}>{{ name }} scene</option>{% endfor %}
+      </select>
+      <p id="pl-then-help" class="mt-1 text-sm text-ink-muted">A scene shows about 10 seconds after the round ends, the next time a kiosk checks in. If no kiosk is open, the scene does not change.</p>
+    </div>
+    <label class="flex min-h-12 items-center justify-between gap-3">
+      <span><span class="block font-medium">Wait for operator</span><span class="block text-sm text-ink-muted">Hold before this round, while the kiosks show the leaders, until you start it.</span></span>
+      <input type="checkbox" role="switch" name="waits" value="1"{% if values.waits %} checked{% endif %} data-waits class="size-6 shrink-0 accent-accent">
+    </label>
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" data-submit class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">{% if entry %}Save{% else %}Add to playlist{% endif %}</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

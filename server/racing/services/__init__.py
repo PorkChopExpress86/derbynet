@@ -1,11 +1,19 @@
 from django.db import transaction
 
+from core.services import lock_race_state
 from racing.models import PlaylistEntry
 
 
-@transaction.atomic
 def reorder_playlist(event, entry_ids):
-    """Renumber the event's playlist so `entry_ids[i]` gets `seq = i + 1`.
+    """Renumber the event's playlist so `entry_ids[i]` gets `seq = i + 1`,
+    under the `RaceState` lock that every playlist writer takes."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        renumber_playlist(event, entry_ids)
+
+
+def renumber_playlist(event, entry_ids):
+    """`reorder_playlist` for a caller that holds the lock already.
 
     `seq` is unique per event, and SQLite has no deferrable unique constraint,
     so every entry first moves to a seq below `-max(abs(seq))`, which no entry

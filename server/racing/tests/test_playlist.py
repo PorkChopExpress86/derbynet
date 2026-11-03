@@ -54,3 +54,17 @@ def test_reorder_needs_every_entry_of_the_event():
 
     with pytest.raises(ValueError, match="every playlist entry"):
         reorder_playlist(group.event, [first.id])
+
+
+@pytest.mark.parametrize("seqs", [(-5, -1, 1), (-3, -1, 1)])
+def test_reorder_renumbers_negative_seqs_beside_a_positive_one(seqs):
+    """The #87 review asked for seqs (-5, -1, 1). An offset of `max(seq)`
+    rather than `max(abs(seq))` is 1 there, and moves the step at -3 of
+    (-3, -1, 1) onto -3 while it still holds it, so that case fails on
+    the regression. (-5, -1, 1) never collides with three steps."""
+    group = GroupFactory()
+    first, second, third = (PlaylistEntryFactory(group=group, seq=s) for s in seqs)
+
+    reorder_playlist(group.event, [third.id, second.id, first.id])
+
+    assert _playlist(group.event) == [(third.id, 1), (second.id, 2), (first.id, 3)]

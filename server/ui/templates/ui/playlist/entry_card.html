@@ -1,0 +1,32 @@
+{% load ui %}{# One queued step: its round, runs per lane, the cut of a final, what follows it, and whether it waits for the operator (D12). #}
+<li data-id="{{ e.id }}" data-label="{{ e.name }}" data-entry="{{ e.id }}"{% if e.waiting %} data-waiting{% endif %} x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="relative rounded-xl border {% if e.waiting %}border-accent ring-2 ring-accent{% else %}border-line{% endif %} bg-bg">
+  <div class="flex min-h-14 items-center gap-1 pr-1">
+    <button type="button" data-handle aria-label="Drag to reorder {{ e.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>
+    <span class="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-ink-muted" aria-hidden="true">{{ e.position }}</span>
+    <button type="button" hx-get="{% url 'playlist-step' e.id %}" hx-target="#playlist-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="playlistPage.open('Edit {{ e.name|escapejs }}', $event)" aria-haspopup="dialog" data-edit-entry class="min-h-11 min-w-0 flex-1 truncate text-left font-semibold underline-offset-2 hover:underline">{{ e.name }}</button>
+    {% include "ui/playlist/status.html" with status=e.status %}
+    <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ e.name }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
+  </div>
+  <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
+    <button type="button" role="menuitem" @click="menu = false; move($root, -1)" class="min-h-11 px-4 text-left">Move up</button>
+    <button type="button" role="menuitem" @click="menu = false; move($root, 1)" class="min-h-11 px-4 text-left">Move down</button>
+    <button type="button" role="menuitem" hx-get="{% url 'playlist-step' e.id %}" hx-target="#playlist-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="menu = false; playlistPage.open('Edit {{ e.name|escapejs }}', $event)" class="min-h-11 px-4 text-left">Edit</button>
+    <button type="button" role="menuitem" hx-post="{% url 'playlist-remove' e.id %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" @click="menu = false" data-remove class="min-h-11 px-4 text-left text-danger">Remove</button>
+  </div>
+  <dl class="flex flex-wrap gap-x-4 gap-y-1 px-3 pb-2 text-sm" data-details>
+    <div class="flex gap-1"><dt class="text-ink-muted">Runs per lane</dt><dd class="font-medium" data-runs>{{ e.runs|default:"none" }}</dd></div>
+    {% if e.cut or e.bucket_limit %}<div class="flex gap-1"><dt class="text-ink-muted">Racers</dt><dd class="font-medium" data-top>{% if e.bucket_limit %}Top {{ e.bucket_limit }}{% if e.bucketed and e.bucket_label %}, {{ e.bucket_label|lower }}{% endif %}{% else %}<span class="text-danger">Top N not set</span>{% endif %}</dd></div>{% endif %}
+    <div class="flex gap-1"><dt class="text-ink-muted">And then</dt><dd class="font-medium" data-then>{{ e.then_label }}</dd></div>
+  </dl>
+  {% if e.allowed %}<p class="px-3 pb-2 text-sm" data-allowed><span class="text-ink-muted">Also racing, allowed in:</span> {{ e.allowed|join:", " }}</p>{% endif %}
+  <div class="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3 py-1">
+    <span id="{{ e.waits_id }}" class="text-sm font-medium">Wait for operator</span>
+    {% url 'playlist-waits' e.id as waits_url %}{% include "ui/components/switch.html" with checked=e.waits url=waits_url name="waits" labelledby=e.waits_id include="this" sync="this:replace" %}
+  </div>
+  {% if e.waiting %}
+  <div class="flex flex-wrap items-center gap-2 rounded-b-xl bg-accent-soft px-3 py-2" data-waiting-state>
+    <p class="min-w-0 flex-1 text-sm font-semibold">Intermission: waiting for you to start this round.</p>
+    {% if can_race %}<button type="button" hx-post="{% url 'playlist-start-next' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" data-action="start-next" class="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Start this round</button>{% endif %}
+  </div>
+  {% endif %}
+</li>

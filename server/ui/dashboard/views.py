@@ -430,6 +430,7 @@ def round_sheet(request, round_id, kind):
         "kind": kind,
         "runs": RUNS_PER_LANE,
         "use_master_sched": live.context["use_master_sched"],
+        "can_set_up": live.context["can_set_up"],
     }
     return render(request, "ui/dashboard/sheets/round.html", context)
 

@@ -1,0 +1,37 @@
+{# The scheduling partial (#44): how heats are made and which lanes they use, as settings.php sets them. The playlist page and the dashboard's Schedule sheet open it, and the settings page embeds it (#48). Each change answers with this partial again. #}
+<div id="scheduling" data-scheduling class="flex flex-col gap-5">
+  {% if error %}<p role="alert" data-error class="rounded-lg bg-danger-soft px-3 py-2 text-danger-ink">{{ error }}</p>{% endif %}
+  <form hx-post="{% url 'playlist-scheduling-method' %}" hx-trigger="change" hx-target="#scheduling" hx-swap="outerHTML" hx-include="this" hx-sync="this:replace">
+    <fieldset data-method="{{ scheduling.method }}">
+      <legend class="mb-2 font-semibold">Scheduling method</legend>
+      <div class="flex flex-col gap-2">
+        {% for value, label, note in scheduling.methods %}
+        <label class="flex cursor-pointer gap-3 rounded-xl border border-line p-3 has-checked:border-accent has-checked:bg-accent-soft">
+          <input type="radio" id="sched-method-{{ value }}" name="method" value="{{ value }}"{% if value == scheduling.method %} checked{% endif %} class="mt-0.5 size-5 shrink-0 accent-accent">
+          <span><span class="block font-medium">{{ label }}</span><span class="block text-sm text-ink-muted">{{ note }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+  </form>
+  <form hx-post="{% url 'playlist-scheduling-lanes' %}" hx-trigger="change" hx-target="#scheduling" hx-swap="outerHTML" hx-include="this" hx-sync="this:replace">
+    <fieldset aria-describedby="sched-lanes-summary">
+      <legend class="mb-1 font-semibold">Lanes in use</legend>
+      <p id="sched-lanes-summary" class="text-sm" data-usable="{{ scheduling.usable }}"><span class="font-semibold">{{ scheduling.usable }} of {{ scheduling.lane_count }} lane{{ scheduling.lane_count|pluralize }} usable.</span>{% if scheduling.closed %} Lane{{ scheduling.closed|pluralize }} {{ scheduling.closed|join:", " }} {{ scheduling.closed|pluralize:"is,are" }} closed as damaged, from the race dashboard.{% endif %}{% if scheduling.unused %} Lane{{ scheduling.unused|pluralize }} {{ scheduling.unused|join:", " }} {{ scheduling.unused|pluralize:"is,are" }} set aside as unused.{% endif %}</p>
+      {% if scheduling.locked %}<p class="mt-1 text-sm text-warn-ink" data-locked>Heats are left to race, so the lanes cannot change until those schedules are removed.</p>{% endif %}
+      <p class="mt-1 text-sm text-ink-muted">Uncheck a lane to leave it out of new schedules.</p>
+      <input type="hidden" name="lanes" value="{{ scheduling.lane_count }}">
+      <ul role="list" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {% for l in scheduling.lanes %}
+        <li>
+          <label class="flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 has-focus-visible:outline-3 has-focus-visible:outline-accent {% if l.state == 'closed' %}border-danger bg-danger-soft{% elif l.state == 'unused' %}border-line bg-surface-2{% else %}border-ok bg-ok-soft{% endif %}" data-lane="{{ l.lane }}" data-lane-state="{{ l.state }}">
+            <input type="checkbox" role="switch" id="sched-lane-{{ l.lane }}" name="used" value="{{ l.lane }}"{% if not l.off %} checked{% endif %} class="size-5 shrink-0 accent-accent">
+            <span class="font-semibold tabular-nums">Lane {{ l.lane }}</span>
+            <span class="ml-auto text-sm">{% if l.state == "closed" %}Closed{% elif l.state == "unused" %}Off{% else %}In use{% endif %}</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </fieldset>
+  </form>
+</div>

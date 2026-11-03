@@ -9,6 +9,13 @@
     <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
   </div>
 </form>
+{% if can_set_up %}
+{# The scheduling partial of the playlist page (#44): the method and the lanes in use, loaded here on request. #}
+<div class="mt-4 border-t border-line pt-3">
+  <button type="button" hx-get="{% url 'playlist-scheduling' %}" hx-target="#dash-scheduling" hx-swap="innerHTML" hx-include="this" hx-sync="this:replace" aria-controls="dash-scheduling" data-action="scheduling" class="min-h-11 rounded-lg px-1 text-sm font-semibold text-accent underline underline-offset-2">Scheduling method and lanes</button>
+  <div id="dash-scheduling" class="mt-2 empty:hidden"></div>
+</div>
+{% endif %}
 {% else %}
 <form hx-post="{% url 'dashboard-round' round.pk kind %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-confirm-form="{{ kind }}">
   <h3 class="font-semibold">{{ name }}</h3>

@@ -1,0 +1,2 @@
+{# A round's state on a card: racing now, part raced, or raced. #}
+{% if status == "current" %}{% include "ui/components/status_pill.html" with state="ok" text="Racing now" %}{% elif status == "partial" %}{% include "ui/components/status_pill.html" with state="warn" text="Part raced" %}{% elif status == "raced" %}{% include "ui/components/status_pill.html" with state="idle" text="Raced" %}{% endif %}

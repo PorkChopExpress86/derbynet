@@ -1,0 +1,65 @@
+{% load static ui %}{# The rounds playlist (#44): the racing scene, the queue of steps, and the rounds that can be added. Every change answers with this template again, out of band into #playlist-queue. #}
+<div class="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
+<div class="flex flex-col gap-4">
+
+{% if playlist.use_master_sched %}
+<p role="status" data-master-notice class="rounded-xl border border-warn bg-warn-soft px-4 py-3 text-sm text-warn-ink">The master schedule is on, so the playlist does not move on to the next round by itself. Turn the master schedule off in Settings to race from the playlist.</p>
+{% endif %}
+
+<section aria-labelledby="pl-scene-h" class="rounded-2xl border border-line bg-surface p-4" data-section="scene">
+  <h2 id="pl-scene-h" class="text-lg font-semibold"><label for="pl-racing-scene">Racing scene</label></h2>
+  <p class="mt-1 text-sm text-ink-muted">What the kiosks show while a heat is racing.</p>
+  <select id="pl-racing-scene" name="racing_scene" hx-post="{% url 'playlist-scene' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:replace" class="mt-2 h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    <option value="-1"{% if not playlist.racing_scene_id %} selected{% endif %}>(None)</option>
+    {% for id, name in playlist.scenes %}<option value="{{ id }}"{% if id == playlist.racing_scene_id %} selected{% endif %}>{{ name }}</option>{% endfor %}
+  </select>
+  {% if not playlist.racing_scene_id %}<p data-no-scene class="mt-2 text-sm text-warn-ink">It's usually a good idea to set a racing scene if you're using playlists.</p>{% endif %}
+</section>
+
+<section aria-labelledby="pl-queue-h" class="rounded-2xl border border-line bg-surface p-4" data-section="queue">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 id="pl-queue-h" class="text-lg font-semibold">Playlist</h2>
+    {% if can_race and playlist.entries %}<button type="button" hx-post="{% url 'playlist-start' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" data-action="start-playlist" class="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Start playlist</button>{% endif %}
+  </div>
+  {% if playlist.entries %}
+  <p class="mt-1 text-sm text-ink-muted">Rounds race in this order. Tap a round to change it. Drag a handle, or use a row's menu, to reorder.</p>
+  <div x-data="uiSortable('{% url 'playlist-order' %}', 'order')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" class="mt-3">
+    <ol role="list" aria-label="Playlist" x-ref="list" class="flex flex-col gap-3" data-queue>
+      {% for e in playlist.entries %}{% include "ui/playlist/entry_card.html" %}{% endfor %}
+    </ol>
+    <p class="sr-only" aria-live="polite" x-text="status"></p>
+  </div>
+  {% else %}
+  <p class="mt-2 text-ink-muted" data-empty>No rounds yet. Add them from the rounds below, in the order they race.</p>
+  {% endif %}
+</section>
+</div>
+
+<div class="flex flex-col gap-4">
+<section aria-labelledby="pl-avail-h" class="rounded-2xl border border-line bg-surface p-4" data-section="available">
+  <h2 id="pl-avail-h" class="text-lg font-semibold">Rounds to add</h2>
+  {% if playlist.available %}
+  <p class="mt-1 text-sm text-ink-muted">Tap a round to add it to the end of the playlist.</p>
+  <ul role="list" class="mt-3 flex flex-col gap-2" data-available>
+    {% for r in playlist.available %}
+    <li{% if r.gap_before %} class="mt-2 border-t border-line pt-3"{% endif %}>
+      <button type="button" hx-get="{% url 'playlist-add' %}?group={{ r.group_id }}&amp;round={{ r.round_number }}" hx-target="#playlist-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="playlistPage.open('Add {{ r.name|escapejs }}', $event)" aria-haspopup="dialog" aria-label="Add {{ r.name }}{% if r.cut %}, a follow-on round{% endif %}" data-add-round="{{ r.group_id }}-{{ r.round_number }}" class="flex min-h-12 w-full items-center gap-2 rounded-xl border border-line px-3 text-left">
+        {% include "ui/components/icon.html" with name="plus" cls="size-5 shrink-0 text-accent" %}
+        <span class="min-w-0 flex-1 truncate font-medium">{{ r.name }}</span>
+        {% if r.status %}{% include "ui/playlist/status.html" with status=r.status %}{% elif r.cut %}<span class="text-xs text-ink-muted">Follow-on</span>{% endif %}
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-2 text-ink-muted">Every round is in the playlist.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="pl-sched-h" class="rounded-2xl border border-line bg-surface p-4" data-section="scheduling">
+  <h2 id="pl-sched-h" class="text-lg font-semibold">Scheduling</h2>
+  <p class="mt-1 text-sm text-ink-muted">How heats are made, and which lanes they use.</p>
+  <button type="button" hx-get="{% url 'playlist-scheduling' %}" hx-target="#playlist-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="playlistPage.open('Scheduling', $event)" aria-haspopup="dialog" data-action="scheduling" class="mt-3 min-h-11 rounded-xl border border-line px-4 font-semibold">Scheduling method and lanes</button>
+</section>
+</div>
+</div>
