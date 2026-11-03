@@ -1,6 +1,6 @@
 {% load static ui %}{# The rounds playlist (#44): the racing scene, the queue of steps, and the rounds that can be added. Every change answers with this template again, out of band into #playlist-queue. #}
-<div class="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
-<div class="flex flex-col gap-4">
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
+<div class="flex min-w-0 flex-col gap-4">
 
 {% if playlist.use_master_sched %}
 <p role="status" data-master-notice class="rounded-xl border border-warn bg-warn-soft px-4 py-3 text-sm text-warn-ink">The master schedule is on, so the playlist does not move on to the next round by itself. Turn the master schedule off in Settings to race from the playlist.</p>
@@ -35,7 +35,7 @@
 </section>
 </div>
 
-<div class="flex flex-col gap-4">
+<div class="flex min-w-0 flex-col gap-4">
 <section aria-labelledby="pl-avail-h" class="rounded-2xl border border-line bg-surface p-4" data-section="available">
   <h2 id="pl-avail-h" class="text-lg font-semibold">Rounds to add</h2>
   {% if playlist.available %}

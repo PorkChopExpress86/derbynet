@@ -169,7 +169,11 @@ def build(event) -> Playlist:
                 then_label=then_label(then, scene_names),
                 waits=step.waits_for_operator,
                 waiting=state.waiting_entry_id == step.pk,
-                status=_status(
+                # The waiting round's first heat is selected while the
+                # intermission holds racing off: it shows as waiting.
+                status=""
+                if state.waiting_entry_id == step.pk
+                else _status(
                     counts.get((step.group_id, step.round_number)),
                     state.current_round_id,
                 ),

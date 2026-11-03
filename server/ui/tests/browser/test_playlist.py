@@ -150,10 +150,17 @@ def test_the_owners_race_day(login, event, playwright, live_server):
             waiting = page.locator("[data-queue] > li[data-waiting]")
             expect(waiting).to_have_count(1)
             expect(waiting).to_contain_text(name)
+            expect(waiting).not_to_contain_text("Racing now")
+            # Clear of the bottom nav, as the race coordinator scrolls to it.
+            waiting.evaluate("e => e.scrollIntoView({block: 'center'})")
             if name == expected[0]:
-                shoot(page, "playlist-intermission")
+                shoot(page, "playlist-intermission", full_page=False)
+            btn = waiting.get_by_role("button", name="Start this round")
+            # A waiting card with its pill never widens the page past 390.
+            width = page.evaluate("document.documentElement.scrollWidth")
+            assert width <= page.viewport_size["width"], width
             with htmx_post(page, "/playlist/start-next/"):
-                waiting.get_by_role("button", name="Start this round").click()
+                btn.click()
             state = RaceState.objects.get(event=event)
             assert state.racing and state.waiting_entry is None
             round = Round.objects.select_related("group").get(pk=state.current_round_id)

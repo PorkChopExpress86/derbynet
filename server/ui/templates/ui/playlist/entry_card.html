@@ -4,7 +4,7 @@
     <button type="button" data-handle aria-label="Drag to reorder {{ e.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>
     <span class="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-ink-muted" aria-hidden="true">{{ e.position }}</span>
     <button type="button" hx-get="{% url 'playlist-step' e.id %}" hx-target="#playlist-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="playlistPage.open('Edit {{ e.name|escapejs }}', $event)" aria-haspopup="dialog" data-edit-entry class="min-h-11 min-w-0 flex-1 truncate text-left font-semibold underline-offset-2 hover:underline">{{ e.name }}</button>
-    {% include "ui/playlist/status.html" with status=e.status %}
+    {% if e.waiting %}{% include "ui/components/status_pill.html" with state="warn" text="Waiting" %}{% else %}{% include "ui/playlist/status.html" with status=e.status %}{% endif %}
     <button type="button" data-row-menu aria-haspopup="menu" :aria-expanded="menu.toString()" aria-expanded="false" @click="menu = !menu" aria-label="Actions for {{ e.name }}" class="grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-2">{% include "ui/components/icon.html" with name="kebab" cls="size-5" %}</button>
   </div>
   <div x-cloak x-show="menu" @click.outside="menu = false" role="menu" class="absolute right-1 top-12 z-20 flex w-44 flex-col rounded-xl border border-line bg-surface py-1 shadow-lg">
