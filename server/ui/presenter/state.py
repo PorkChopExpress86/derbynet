@@ -3,12 +3,14 @@ its filter choices (`awards.presentation`), the award being presented as
 `query=award.current` gives it, and whether any kiosk shows award
 presentations. Reads only.
 
-The 1 s poll reads `RaceState` and the award's recipient, and answers 204
-while the key, the reveal flag and the recipient hold: a judged award is
-one more indexed read, a speed award the standings. Only a change renders
-the award.
+The 1 s poll reads the award as `query=award.current` gives it and answers
+204 while the key, the reveal flag and those fields hold, so a new winner, a
+renamed racer or a new photo shows (#45 retro: a signature of the key, flag
+and recipient missed the names).
 """
 
+import hashlib
+import json
 import time
 from dataclasses import dataclass
 
@@ -41,18 +43,16 @@ class Current:
         return get_script_prefix() + found if found else ""
 
 
-def signature(event) -> tuple[str, bool, str]:
+def current(event) -> Current:
     key, reveal = RaceState.objects.filter(event=event).values_list(
         "current_award_key", "reveal_current_award"
     )[0]
-    recipient = listing.current_recipient(event, key) if key else None
-    return key, reveal, f"{reveal:d}-{recipient or 0}-{key}"
-
-
-def current(event) -> Current:
-    key, reveal, sig = signature(event)
     try:
         shown = listing.current(event, time.monotonic()) if key else None
     except listing.UnrecognizedKey:
         shown = None
+    if shown:
+        shown.pop("duration", None)
+    material = json.dumps([key, reveal, shown], sort_keys=True, default=str)
+    sig = hashlib.sha256(material.encode()).hexdigest()[:20]
     return Current(key, reveal, sig, shown)

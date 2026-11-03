@@ -173,6 +173,42 @@ document.addEventListener('DOMContentLoaded', () => {
   }).observe(sheets, { childList: true });
 });
 
+// A poll's swap can remove a control while its request is out, such as a
+// check-in card's Passed switch. htmx then fires the reply's events on the
+// detached control, so nothing listening on the page hears them: the list's
+// `checkin-refresh` never comes and the card shows the old state (#45 retro).
+// Refire the reply's HX-Trigger events and its failure on the body.
+document.addEventListener('htmx:beforeRequest', (start) => {
+  const source = start.detail.elt;
+  const xhr = start.detail.xhr;
+  const detached = (e) => e.detail.xhr === xhr && !source.isConnected;
+  const onLoad = (e) => {
+    if (!detached(e)) return;
+    const header = xhr.getResponseHeader('HX-Trigger');
+    if (!header) return;
+    if (header.trim().startsWith('{')) {
+      for (const [name, value] of Object.entries(JSON.parse(header))) {
+        htmx.trigger(document.body, name, typeof value === 'object' ? value : { value });
+      }
+    } else {
+      for (const name of header.split(',')) htmx.trigger(document.body, name.trim());
+    }
+  };
+  const onFailure = (e) => {
+    if (detached(e)) document.dispatchEvent(new CustomEvent(e.type, { detail: e.detail }));
+  };
+  const types = ['htmx:sendError', 'htmx:responseError'];
+  const done = (e) => {
+    if (e.detail.xhr !== xhr) return;
+    source.removeEventListener('htmx:beforeOnLoad', onLoad);
+    for (const type of types) source.removeEventListener(type, onFailure);
+    source.removeEventListener('htmx:afterRequest', done);
+  };
+  source.addEventListener('htmx:beforeOnLoad', onLoad);
+  for (const type of types) source.addEventListener(type, onFailure);
+  source.addEventListener('htmx:afterRequest', done);
+});
+
 // A network failure or a 5xx has no server toast to swap in.
 document.addEventListener('htmx:sendError', () => {
   derbynet.toast('The server did not answer. Check the connection and try again.');

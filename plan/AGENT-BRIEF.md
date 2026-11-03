@@ -27,6 +27,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 - A value the page sends back to the server, such as an Undo link's query or a hidden field, is client input. The service checks it as it checks a new request, and the same request sent twice changes nothing the second time. #44's Undo stored a forged `runs=0` and restored a step twice.
 - Each rule lives in its service, and a view or a page's `state.py` calls it. `server/ui/tests/test_rules_in_services.py` flags a lane mask or a service limit copied into one.
 - `server/ui/tests/test_query_growth.py` reads each page and poll at two sizes of race day and fails when the query count grows. A new page adds its URLs there.
+- A poll that answers 204 signs everything it renders. `server/ui/tests/test_poll_signatures.py` changes each stored field in turn and fails a poll that still answers 204 when its rendering changed. #45's presenter signed the award's key and winner, not the names it shows.
 
 ## Evidence
 

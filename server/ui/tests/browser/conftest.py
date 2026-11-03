@@ -17,7 +17,10 @@ viewport; each `shoot()` runs it, and so does the end of every test (#44
 retro: a phone page scrolled 407 px sideways, seen only in a screenshot).
 
 After a control posts, wrap the click in `with htmx_post(page, path):` before
-reading the database: it waits for the POST's reply and htmx's swap.
+reading the database: it waits for the POST's reply and htmx's swap. When the
+test body returns, the harness waits for every request the page still has in
+flight before any fixture tears down (#45 retro), so a late reply never meets
+a flushed database or `settings` already put back.
 `wait_for_load_state("networkidle")` waits for a page load only, and returns
 at once after an htmx request.
 """
@@ -201,11 +204,72 @@ def page_errors() -> PageErrors:
     return PageErrors()
 
 
+class InFlight:
+    """The requests a browser context has sent and not yet finished.
+
+    A navigation ends the old document's htmx and fetch requests, but
+    Playwright then reports neither `requestfinished` nor `requestfailed` for
+    them (seen on a reload right after a click, #188). So when a frame
+    navigates, its XHR and fetch requests leave the set: their replies can no
+    longer reach the page. The new document sends none before it commits."""
+
+    TIMEOUT_MS = 10_000
+    SCRIPTED = ("xhr", "fetch")
+
+    def __init__(self, context):
+        self.requests = set()
+        context.on("request", lambda r: self.requests.add(r))
+        context.on("requestfinished", lambda r: self.requests.discard(r))
+        context.on("requestfailed", lambda r: self.requests.discard(r))
+        context.on("page", self.watch)
+
+    def watch(self, page):
+        page.on("framenavigated", lambda frame: self.navigated(frame))
+
+    def navigated(self, frame):
+        self.requests -= {
+            r
+            for r in self.requests
+            if r.frame == frame and r.resource_type in self.SCRIPTED
+        }
+
+    def drain(self, page) -> list[str]:
+        """Wait until nothing is in flight; return what still is after the
+        timeout. Playwright delivers the events only inside its own calls,
+        hence the short waits."""
+        waited = 0
+        while self.requests and waited < self.TIMEOUT_MS and not page.is_closed():
+            page.wait_for_timeout(50)
+            waited += 50
+        return sorted(f"{r.method} {r.url}" for r in self.requests)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item):
+    """After the test body and before any fixture's teardown, wait for the
+    page's requests in flight. A test that ends on a click, or a poll that
+    happens to be out, would otherwise get its reply after `settings` turned
+    the test endpoints off (a 404) or the database was flushed."""
+    page = item.funcargs.get("page")
+    in_flight = getattr(page, "in_flight", None)
+    try:
+        result = yield
+    except BaseException:
+        if in_flight is not None:
+            in_flight.drain(page)
+        raise
+    if in_flight is not None and (stuck := in_flight.drain(page)):
+        raise AssertionError(f"still in flight after 10 s: {stuck}")
+    return result
+
+
 @pytest.fixture
 def page(browser, live_server, size, page_errors):
     context = browser.new_context(**SIZES[size], base_url=live_server.url)
+    in_flight = InFlight(context)
     page = context.new_page()
     page.size = size
+    page.in_flight = in_flight
     page.on("pageerror", lambda error: page_errors.add(f"pageerror: {error}"))
     page.on(
         "console",

@@ -21,6 +21,7 @@ dev = [
     "hypothesis>=6.170.11",
     "pytest>=8.4",
     "pytest-django>=4.11",
+    "pytest-repeat>=0.9.4",
     "pytest-xdist>=3.8",
     "ruff>=0.14",
 ]

@@ -60,12 +60,14 @@ def page(request):
 @require_GET
 @guard
 def current(request):
-    """The 1 s poll of the award being presented. 204 while the key, the
-    reveal flag and the recipient the page sent still hold."""
-    *_, sig = state.signature(_event(request))
-    if request.GET.get("sig") == sig:
+    """The 1 s poll of the award being presented. 204 while what it shows
+    is what the page sent the signature of."""
+    found = state.current(_event(request))
+    if request.GET.get("sig") == found.signature:
         return HttpResponse(status=204)
-    return HttpResponse(_current_html(request))
+    return HttpResponse(
+        render_to_string("ui/presenter/current.html", {"current": found}, request)
+    )
 
 
 @require_POST

@@ -364,6 +364,30 @@ def test_a_pass_on_one_station_shows_on_another_within_12_s(
     other.close()
 
 
+def test_a_pass_whose_card_a_poll_replaced_still_refreshes_the_list(login, event):
+    """A poll's swap can replace the card while its switch's POST is out. The
+    reply's checkin-refresh must still reach the list, or the card shows
+    "not passed" until the next poll, 10 s later (#45 retro). The test stands
+    in for the poll by swapping the card for a copy right after the click."""
+    racer = add_racers(event, "Scouts", 1, 101, passed=False)[0]
+    page = login("RaceCrew")
+    phone_only(page)
+    open_checkin(page)
+    expect(card(page, racer)).to_have_attribute("data-passed", "0")
+    page.evaluate("derbynet.pollable = () => false")  # only the refresh may fetch
+
+    with page.expect_response(f"**/checkin/racer/{racer.pk}/pass/") as reply:
+        card(page, racer).evaluate(
+            """(li) => {
+                li.querySelector('[role=switch]').click();
+                li.replaceWith(li.cloneNode(true));
+            }"""
+        )
+
+    assert reply.value.ok
+    expect(card(page, racer)).to_have_attribute("data-passed", "1", timeout=3_000)
+
+
 def test_unpass_then_undo_leaves_the_racer_passed(login, event):
     """No confirm() dialog: the page fixture fails on any dialog."""
     racer = add_racers(event, "Scouts", 1, 101)[0]

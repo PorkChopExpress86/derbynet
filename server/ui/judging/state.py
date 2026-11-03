@@ -24,18 +24,12 @@ from core.models import RaceSettings
 from roster.models import Group, Racer
 from roster.services.groups import Labels, labels
 from roster.services.racers import CAR_PHOTOS, photo_url
-from ui.responses import car, racer_name
+from ui.responses import car, nocase, racer_name
 
 POLL_SECONDS = 30
 # `RENDER_JUDGING` in `website/inc/photo-config.inc`.
 RENDER_JUDGING = "200x200"
 ORDERS = (("car", "Car"), ("name", "Name"), ("class", "Group"))
-
-_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
-
-
-def _nocase(text: str) -> str:
-    return text.translate(_ASCII_LOWER)
 
 
 @dataclass(frozen=True)
@@ -188,7 +182,7 @@ class _Event:
 
 def _sorted(racers: list[Racer], order: str) -> list[Racer]:
     def name(r):
-        return (_nocase(r.last_name), _nocase(r.first_name), r.pk)
+        return (nocase(r.last_name), nocase(r.first_name), r.pk)
 
     if order == "name":
         return sorted(racers, key=name)

@@ -8,8 +8,6 @@ import json
 import re
 
 import pytest
-from django.db import connection
-from django.test.utils import CaptureQueriesContext
 
 from awards import editing
 from awards.listing import AD_HOC
@@ -366,22 +364,21 @@ def test_the_no_kiosk_warning_shows_until_a_kiosk_shows_awards(coordinator, even
     assert "alert(" not in page
 
 
-def test_the_current_poll_reads_two_rows_while_it_holds(coordinator, event, pack):
+def test_the_current_poll_shows_a_renamed_winner(coordinator, event, pack):
+    """The signature covers every field the award shows, not only its key,
+    reveal flag and winner (#45 retro)."""
     paint = award(event)
     editing.assign_award(event, paint.pk, pack["lion"].pk)
     RaceState.objects.filter(event=event).update(current_award_key=f"award-{paint.pk}")
     shown = html(get(coordinator, "/awards/present/current/"))
-    assert "Best Paint" in shown and "Lion Racer" in shown
     sig = re.search(r'name="sig" value="([^"]+)"', shown).group(1)
-    with CaptureQueriesContext(connection) as seen:
-        assert (
-            get(coordinator, "/awards/present/current/", {"sig": sig}).status_code
-            == 204
-        )
-    award_reads = [q["sql"] for q in seen if "awards_" in q["sql"]]
-    roster_reads = [q["sql"] for q in seen if "roster_" in q["sql"]]
-    state_reads = [q["sql"] for q in seen if "core_racestate" in q["sql"]]
-    assert (len(award_reads), roster_reads, len(state_reads)) == (1, [], 1)
+    assert get(coordinator, "/awards/present/current/", {"sig": sig}).status_code == 204
+
+    Racer.objects.filter(pk=pack["lion"].pk).update(first_name="Leo")
+
+    renamed = get(coordinator, "/awards/present/current/", {"sig": sig})
+    assert renamed.status_code == 200
+    assert "Leo Racer" in html(renamed)
 
 
 def test_a_forged_key_is_refused(coordinator, event):
