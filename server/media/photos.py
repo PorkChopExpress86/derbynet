@@ -216,7 +216,14 @@ class Repository:
     field: str
 
     def file(self, name: str, folder: str | None = None) -> Path:
+        """The path of `name`, in `folder` of the repository when given. The
+        only join with the directory (`media/tests/test_repository_paths.py`),
+        so a name from a request or a racer's column never leaves it."""
         assert self.directory is not None
+        if not is_valid_name(name) or (
+            folder is not None and not is_valid_name(folder)
+        ):
+            raise ValueError(f"not a file name of the repository: {folder}/{name}")
         return self.directory / folder / name if folder else self.directory / name
 
     @property
@@ -590,8 +597,9 @@ def page_url(repo: Repository, path: str, render: str) -> str:
     ):
         return ""
     url = repo.url(path, render)
+    folder = CROPPED_FOLDER if path != name else None
     try:
-        version = (repo.directory / path).stat().st_mtime_ns
+        version = repo.file(name, folder).stat().st_mtime_ns
     except OSError:
         return url
     return f"{url}?v={version}"

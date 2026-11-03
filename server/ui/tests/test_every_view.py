@@ -5,15 +5,20 @@ covered the day its URL exists (#41 retro):
   `no_db_writes`), so page, sheet and poll views only read;
 - no request answers 500, whatever junk its parameters carry. The parameter
   names come from the string constants in the view's module, so a view that
-  parses a new parameter is fuzzed with it too.
+  parses a new parameter is fuzzed with it too;
+- a junk POST that changes nothing stored answers no success toast (#47
+  retro): #47's Delete said "deleted" for a name that named no photo.
 """
 
 import ast
 import importlib
 import inspect
 import re
+from contextlib import contextmanager
+from itertools import product
 
 import pytest
+from django.db import connections
 from django.test import Client
 from django.urls import URLPattern, URLResolver, get_resolver
 
@@ -23,7 +28,7 @@ from core.models import RaceState
 from racing.models import PlaylistEntry
 from roster.models import Partition, Racer
 from roster.services.car_numbers import add_range
-from ui.tests.db import no_db_writes
+from ui.tests.db import WRITE, no_db_writes
 from ui.tests.race import race_setup, scheduled
 from ui.tests.roles import PASSWORDS
 from ui.tests.sessions import no_session_writes
@@ -51,14 +56,8 @@ ROUTES = sorted({route: view for route, view in ui_patterns()}.items())
 def module_names(view) -> list[str]:
     """Every short lowercase string constant in the view's module, and in
     the modules it imports from `ui`: the parameter names it can read."""
-    module = importlib.import_module(view.__module__)
-    sources = [module]
-    for value in vars(module).values():
-        home = inspect.getmodule(value)
-        if home and home.__name__.startswith("ui.") and home not in sources:
-            sources.append(home)
     names = set()
-    for source in sources:
+    for source in _sources(view):
         for node in ast.walk(ast.parse(inspect.getsource(source))):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 if NAME.match(node.value):
@@ -68,10 +67,10 @@ def module_names(view) -> list[str]:
     return sorted(names)
 
 
-def fill(route: str, ids: dict[str, int], word: str) -> str:
+def fill(route: str, ids: dict[str, int], words: dict[str, str]) -> str:
     def value(match):
         kind, name = match.group(1), match.group(2)
-        return str(ids.get(name, 999999)) if kind == "int" else word
+        return str(ids.get(name, 999999)) if kind == "int" else words[name]
 
     return "/" + re.sub(r"<(\w+):(\w+)>", value, route)
 
@@ -114,11 +113,45 @@ def coordinator(event):
     return client
 
 
-def words_for(route: str, view) -> list[str]:
-    """Values for a route's string arguments: junk, and each string the view
-    compares with, so the view gets past its own dispatch."""
-    if "<str:" not in route:
-        return ["zzz"]
+def _sources(view) -> list:
+    """The view's module and the `ui` modules it imports from."""
+    module = importlib.import_module(view.__module__)
+    sources = [module]
+    for value in vars(module).values():
+        home = inspect.getmodule(value)
+        if home and home.__name__.startswith("ui.") and home not in sources:
+            sources.append(home)
+    return sources
+
+
+def dispatch_keys(view) -> set[str]:
+    """The string keys of the module-level dicts in the view's module and its
+    `ui` imports, such as `REPOS = {"head": ..., "car": ...}`: the values a
+    view checks a route argument against with `in` (#47 retro, where every
+    photos URL was a 404 here)."""
+    keys = set()
+    for source in _sources(view):
+        for node in ast.parse(inspect.getsource(source)).body:
+            if isinstance(node, ast.Assign | ast.AnnAssign) and isinstance(
+                node.value, ast.Dict
+            ):
+                keys |= {
+                    k.value
+                    for k in node.value.keys
+                    if isinstance(k, ast.Constant)
+                    and isinstance(k.value, str)
+                    and NAME.match(k.value)
+                }
+    return keys
+
+
+def words_for(route: str, view) -> list[dict[str, str]]:
+    """Values for a route's string arguments: junk, each string the view
+    compares with, and its module's dispatch keys, so the view gets past its
+    own dispatch. Every combination, when a route has several."""
+    args = re.findall(r"<str:(\w+)>", route)
+    if not args:
+        return [{}]
     tree = ast.parse(inspect.getsource(view))
     found = {
         node.value
@@ -127,7 +160,11 @@ def words_for(route: str, view) -> list[str]:
         and isinstance(node.value, str)
         and NAME.match(node.value)
     }
-    return ["zzz", *sorted(found)]
+    words = ["zzz", *sorted(found | dispatch_keys(view))]
+    return [
+        dict(zip(args, combo, strict=True))
+        for combo in product(words, repeat=len(args))
+    ]
 
 
 @pytest.mark.parametrize(("route", "view"), ROUTES, ids=[r for r, _ in ROUTES])
@@ -162,3 +199,43 @@ def test_junk_parameters_never_answer_500(coordinator, race, route, view):
                     junk,
                     response.content[:300],
                 )
+
+
+@contextmanager
+def counted_writes():
+    """The database writes the requests inside make, the session's left out."""
+    writes = []
+
+    def count(execute, sql, params, many, context):
+        if WRITE.match(sql) and "django_session" not in sql:
+            writes.append(sql)
+        return execute(sql, params, many, context)
+
+    with connections["default"].execute_wrapper(count):
+        yield writes
+
+
+OK_TOAST = b'data-toast="ok"'
+# route -> what the view changes instead of a stored row.
+CHANGES_ELSEWHERE = {
+    "dashboard/replay/test/": "it reads no parameter and sends replay.test to"
+    " the replay app",
+}
+
+
+@pytest.mark.parametrize(("route", "view"), ROUTES, ids=[r for r, _ in ROUTES])
+def test_a_junk_post_that_changes_nothing_claims_no_success(
+    coordinator, race, route, view
+):
+    if route in CHANGES_ELSEWHERE:
+        return
+    names = module_names(view)
+    for word in words_for(route, view):
+        url = fill(route, race, word)
+        for junk in JUNK:
+            with counted_writes() as writes:
+                response = coordinator.post(
+                    url, dict.fromkeys(names, junk), HTTP_HX_REQUEST="true"
+                )
+            claims = response.status_code < 300 and OK_TOAST in response.content
+            assert not (claims and not writes), (url, junk, response.content[:300])
