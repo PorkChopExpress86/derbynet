@@ -14,7 +14,12 @@ from racing.models import HeatLane, PlaylistEntry, Round
 from racing.tests.factories import PlaylistEntryFactory
 from roster.models import Group, Partition, Subgroup
 from roster.services import groups
-from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
+from ui.tests.browser.conftest import (
+    assert_accessible,
+    htmx_post,
+    no_sideways_scroll,
+    shoot,
+)
 from ui.tests.race import add_racers, race_setup, scheduled
 
 
@@ -36,11 +41,6 @@ def open_groups(page):
 
 def sheet(page):
     return page.locator('[data-sheet="groups"]')
-
-
-def no_sideways_scroll(page):
-    width = page.evaluate("document.documentElement.scrollWidth")
-    assert width <= page.viewport_size["width"], width
 
 
 def dismiss_toasts(page):

@@ -201,12 +201,10 @@ def _photo(repository: str, folder: str, path: str) -> str:
 
 def _round_1_over(event) -> set[int]:
     """The groups whose round 1 has a chart with no unraced heat left."""
-    over = set()
-    for round in Round.objects.filter(event=event, number=1):
-        lanes = HeatLane.objects.filter(round=round)
-        if lanes.exists() and not lanes.exclude(HAS_RESULT).exists():
-            over.add(round.group_id)
-    return over
+    lanes = HeatLane.objects.filter(event=event, round__number=1)
+    charted = dict(lanes.values_list("round_id", "round__group_id"))
+    unraced = set(lanes.exclude(HAS_RESULT).values_list("round_id", flat=True))
+    return {group for round, group in charted.items() if round not in unraced}
 
 
 def cards_for(event, racers: list[Racer]) -> list[Card]:

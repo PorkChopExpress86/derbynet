@@ -24,6 +24,9 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## UI pages
 
 - htmx inheritance is off (`server/ui/templates/ui/base.html`), so each element that makes a request names its own `hx-target`, `hx-swap`, `hx-sync` and `hx-include`. `server/ui/tests/test_htmx.py` checks the page-wide htmx rules.
+- A value the page sends back to the server, such as an Undo link's query or a hidden field, is client input. The service checks it as it checks a new request, and the same request sent twice changes nothing the second time. #44's Undo stored a forged `runs=0` and restored a step twice.
+- Each rule lives in its service, and a view or a page's `state.py` calls it. `server/ui/tests/test_rules_in_services.py` flags a lane mask or a service limit copied into one.
+- `server/ui/tests/test_query_growth.py` reads each page and poll at two sizes of race day and fails when the query count grows. A new page adds its URLs there.
 
 ## Evidence
 

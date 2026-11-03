@@ -820,12 +820,8 @@ def lanes_sheet(request):
     settings = RaceSettings.objects.get(event=event)
     polled = lanes.poll_lanes(event)
     closed = {row["lane"] for row in polled["closed-lanes"]}
-    unused = settings.unused_lane_mask
-    open_lanes = [
-        n
-        for n in range(1, settings.lane_count + 1)
-        if n not in closed and not unused & (1 << (n - 1))
-    ]
+    off = closed | set(lanes.lanes_of(settings.unused_lane_mask))
+    open_lanes = [n for n in range(1, settings.lane_count + 1) if n not in off]
     affected = [
         _round_name(r)
         for r in Round.objects.filter(
