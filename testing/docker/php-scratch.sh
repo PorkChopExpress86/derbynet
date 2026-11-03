@@ -7,7 +7,8 @@
 # Usage: testing/docker/php-scratch.sh [--no-event] <script> [argument ...]
 #
 # <script> is a path under testing/, such as test-points-racing.sh.  The base
-# URL, http://localhost, is its first argument, followed by any others.
+# URL, http://localhost, is its first argument, followed by any others.  It
+# runs under bash, so a new script needs no execute bit.
 #
 # A fresh PHP server has no event, so every login fails until setup.nodata
 # creates one.  The script does that first (ez-new=testdb), unless --no-event
@@ -72,5 +73,5 @@ fi
 
 SCRIPT="$1"
 shift
-harness_run bash -c 'set -e -o pipefail; cd /derbynet && testing/"$0" http://localhost "$@"' \
+harness_run bash -c 'set -e -o pipefail; cd /derbynet && bash testing/"$0" http://localhost "$@"' \
        "$SCRIPT" "$@"

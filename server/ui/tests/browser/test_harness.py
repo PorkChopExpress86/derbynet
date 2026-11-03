@@ -24,3 +24,21 @@ def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
     with page.expect_console_message(lambda m: m.text == "htmx:sendAbort"):
         page.evaluate("() => htmx.trigger('#slow', 'htmx:abort')")
     assert page_errors.aborts == 1
+
+
+def test_a_navigation_drops_an_image_still_loading(page, event):
+    """Playwright reports no end for an image request a navigation cut off,
+    so the drain after the test waited 10 s on it and failed (#47 retro,
+    a thumbnail left loading by a link to another page)."""
+    page.route("**/held-image.png", lambda route: None)
+    page.goto("/login/")
+    with page.expect_request("**/held-image.png"):
+        page.evaluate(
+            """() => {
+              const img = document.createElement('img');
+              img.src = '/held-image.png';
+              document.body.append(img);
+            }"""
+        )
+    page.goto("/login/")
+    assert not [r for r in page.in_flight.requests if "held-image" in r.url]

@@ -227,14 +227,15 @@ def page_errors() -> PageErrors:
 class InFlight:
     """The requests a browser context has sent and not yet finished.
 
-    A navigation ends the old document's htmx and fetch requests, but
-    Playwright then reports neither `requestfinished` nor `requestfailed` for
-    them (seen on a reload right after a click, #188). So when a frame
-    navigates, its XHR and fetch requests leave the set: their replies can no
-    longer reach the page. The new document sends none before it commits."""
+    A navigation ends the old document's htmx and fetch requests and its
+    image loads, but Playwright then reports neither `requestfinished` nor
+    `requestfailed` for them (seen on a reload right after a click, #188,
+    and for a thumbnail left loading by a link, #47). So when a frame
+    navigates, those requests leave the set: their replies can no longer
+    reach the page. The new document sends none before it commits."""
 
     TIMEOUT_MS = 10_000
-    SCRIPTED = ("xhr", "fetch")
+    ORPHANED = ("xhr", "fetch", "image")
 
     def __init__(self, context):
         self.requests = set()
@@ -250,7 +251,7 @@ class InFlight:
         self.requests -= {
             r
             for r in self.requests
-            if r.frame == frame and r.resource_type in self.SCRIPTED
+            if r.frame == frame and r.resource_type in self.ORPHANED
         }
 
     def drain(self, page) -> list[str]:
