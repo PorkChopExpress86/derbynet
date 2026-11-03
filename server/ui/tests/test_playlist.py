@@ -108,17 +108,38 @@ def test_playlist_php_moves_to_the_page_with_its_query(client, event):
 @pytest.mark.parametrize(
     ("back", "url"),
     [
+        (None, "/dashboard/"),
+        ("index.php", "/"),
         ("setup.php", "/setup/"),
+        ("checkin.php", "/checkin/"),
+        ("kiosk-dashboard.php", "/kiosks/"),
         ("coordinator.php", "/dashboard/"),
-        ("/groups/", "/groups/"),
-        ("https://example.com/", "/dashboard/"),
-        ("//example.com/", "/dashboard/"),
-        ("", "/dashboard/"),
     ],
 )
 def test_the_back_button_returns_to_the_calling_page(coordinator, back, url):
-    page = html(coordinator.get("/playlist/", {"back": back}))
+    """`playlist.php` passes `back`, or coordinator.php, to `make_banner()`
+    (`templates/banner.inc`), which draws a button for its five pages."""
+    query = {} if back is None else {"back": back}
+    page = html(coordinator.get("/playlist/", query))
     assert f'<a href="{url}" aria-label="Back"' in page
+
+
+@pytest.mark.parametrize(
+    "back",
+    [
+        "",
+        "racers.php",
+        "/groups/",
+        "/racers.php",
+        "https://example.com/",
+        "//example.com/",
+    ],
+)
+def test_any_other_back_shows_no_back_button(coordinator, back):
+    """PHP checked with `php-scratch.sh`: playlist.php?back=racers.php and
+    ?back=/racers.php draw no back button."""
+    page = html(coordinator.get("/playlist/", {"back": back}))
+    assert 'aria-label="Back"' not in page
 
 
 def test_the_page_reads_and_writes_nothing_on_get(coordinator, race_day):
