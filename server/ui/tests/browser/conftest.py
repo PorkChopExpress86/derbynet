@@ -12,7 +12,9 @@ request for a static file, unless the test expects that error with
 `page_errors.allow(pattern)`. `shoot(page, name)` saves a screenshot under
 `DERBYNET_SCREENSHOT_DIR` (default `server/var/screenshots`), which CI
 uploads, and `assert_accessible(page)` runs axe-core and fails on a serious or
-critical violation.
+critical violation. `no_sideways_scroll(page)` fails a page wider than its
+viewport; each `shoot()` runs it, and so does the end of every test (#44
+retro: a phone page scrolled 407 px sideways, seen only in a screenshot).
 
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap.
@@ -224,7 +226,11 @@ def page(browser, live_server, size, page_errors):
     # PHP's pages used alert() and confirm(). No new page may.
     page.on("dialog", lambda dialog: page_errors.add(f"dialog: {dialog.message}"))
     yield page
-    context.close()
+    try:
+        if page.url.startswith("http"):
+            no_sideways_scroll(page)
+    finally:
+        context.close()
     assert page_errors.final() == []
 
 
@@ -268,10 +274,17 @@ def htmx_post(page, path: str):
 
 def shoot(page, name: str, full_page: bool = True) -> Path:
     """`full_page=False` for an open sheet, which is fixed to the screen."""
+    no_sideways_scroll(page)
     path = SCREENSHOTS / f"{name}-{page.size}.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=path, full_page=full_page)
     return path
+
+
+def no_sideways_scroll(page):
+    width = page.evaluate("document.documentElement.scrollWidth")
+    viewport = page.viewport_size["width"]
+    assert width <= viewport, f"{page.url} is {width} px wide in {viewport} px"
 
 
 def axe_violations(page) -> list[dict]:

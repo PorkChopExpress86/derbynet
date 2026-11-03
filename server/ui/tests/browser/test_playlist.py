@@ -196,8 +196,6 @@ def test_the_waiting_card_on_the_playlist_page(login, event):
     # Clear of the bottom nav, as the race coordinator scrolls to it.
     waiting.evaluate("e => e.scrollIntoView({block: 'center'})")
     shoot(page, "playlist-intermission", full_page=False)
-    width = page.evaluate("document.documentElement.scrollWidth")
-    assert width <= page.viewport_size["width"], width
     with htmx_post(page, "/playlist/start-next/"):
         waiting.get_by_role("button", name="Start this round").click()
     state = RaceState.objects.get(event=event)

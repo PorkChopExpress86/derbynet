@@ -22,6 +22,7 @@ from ui.tests.browser.conftest import (
     SIZES,
     assert_accessible,
     log_in,
+    no_sideways_scroll,
     shoot,
 )
 from ui.tests.race import add_racers, chart, race_setup, run_heat, scheduled
@@ -73,11 +74,6 @@ def dismiss_toasts(page):
     toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
     while toasts.count():
         toasts.first.click()
-
-
-def no_sideways_scroll(page):
-    width = page.evaluate("document.documentElement.scrollWidth")
-    assert width <= page.viewport_size["width"], width
 
 
 def take_photo(page, path, button="Capture only"):
