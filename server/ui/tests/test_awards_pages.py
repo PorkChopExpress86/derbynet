@@ -366,9 +366,7 @@ def test_the_no_kiosk_warning_shows_until_a_kiosk_shows_awards(coordinator, even
     assert "alert(" not in page
 
 
-def test_the_current_poll_reads_race_state_alone_while_it_holds(
-    coordinator, event, pack
-):
+def test_the_current_poll_reads_two_rows_while_it_holds(coordinator, event, pack):
     paint = award(event)
     editing.assign_award(event, paint.pk, pack["lion"].pk)
     RaceState.objects.filter(event=event).update(current_award_key=f"award-{paint.pk}")
@@ -380,11 +378,10 @@ def test_the_current_poll_reads_race_state_alone_while_it_holds(
             get(coordinator, "/awards/present/current/", {"sig": sig}).status_code
             == 204
         )
-    award_reads = [
-        q["sql"] for q in seen if "awards_" in q["sql"] or "roster_" in q["sql"]
-    ]
+    award_reads = [q["sql"] for q in seen if "awards_" in q["sql"]]
+    roster_reads = [q["sql"] for q in seen if "roster_" in q["sql"]]
     state_reads = [q["sql"] for q in seen if "core_racestate" in q["sql"]]
-    assert (award_reads, len(state_reads)) == ([], 1)
+    assert (len(award_reads), roster_reads, len(state_reads)) == (1, [], 1)
 
 
 def test_a_forged_key_is_refused(coordinator, event):
@@ -462,3 +459,48 @@ def test_a_racer_card_shows_the_car_photo(coordinator, event, pack):
     page = html(coordinator.get("/judging/"))
     card = re.search(rf'data-racer="{pack["lion"].pk}".*?</li>', page, re.S).group(0)
     assert re.search(r'<img src="/photo\.php/car/file/200x200/lion\.jpg/\d+"', card)
+
+
+# ----- review of #45 -----
+
+
+def test_the_current_poll_shows_a_new_winner_of_the_award_presented(
+    coordinator, event, pack
+):
+    """PHP redraws award.current every second, so a judge reassigning the
+    award being presented shows before the presenter taps Reveal."""
+    paint = award(event)
+    editing.assign_award(event, paint.pk, pack["lion"].pk)
+    RaceState.objects.filter(event=event).update(current_award_key=f"award-{paint.pk}")
+    shown = html(get(coordinator, "/awards/present/current/"))
+    sig = re.search(r'name="sig" value="([^"]+)"', shown).group(1)
+    editing.remove_winner(event, paint.pk)
+    editing.assign_award(event, paint.pk, pack["tiger"].pk)
+    again = get(coordinator, "/awards/present/current/", {"sig": sig})
+    assert again.status_code == 200
+    assert "Tiger Racer" in html(again)
+
+
+def test_the_current_poll_waits_while_a_field_has_focus(coordinator, event):
+    page = html(coordinator.get("/awards/present/"))
+    poll = re.search(r'<div id="presenter-current"[^>]*>', page).group(0)
+    assert "derbynet.pollable(this)" in poll
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"type": "zzz", "scope": "all"},
+        {"type": "99", "scope": "all"},
+        {"type": "", "scope": "zzz"},
+        {"type": "", "scope": "g999999"},
+    ],
+)
+def test_next_refuses_a_filter_the_page_does_not_offer(
+    coordinator, event, pack, fields
+):
+    award(event)
+    response = post(coordinator, "/awards/present/next/", fields)
+    assert response.status_code == 422
+    assert 'data-toast="error"' in html(response)
+    assert RaceState.objects.get(event=event).current_award_key == ""

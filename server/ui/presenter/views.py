@@ -20,17 +20,9 @@ from core.settings_form import PackStandingsRefused, set_pack_standings
 from ui.navigation import requires_page
 from ui.presenter import state
 from ui.responses import active_event as _event
-from ui.responses import refused, service_error
+from ui.responses import posted_int, refused, service_error
 
 guard = requires_page("awards-presentation")
-
-
-def _type(value) -> int | None:
-    try:
-        n = int(str(value).strip())
-    except TypeError, ValueError:
-        return None
-    return n if 0 < n < 2**31 else None
 
 
 def _current_html(request) -> str:
@@ -68,8 +60,8 @@ def page(request):
 @require_GET
 @guard
 def current(request):
-    """The 1 s poll of the award being presented. 204 while the key and the
-    reveal flag the page sent still hold: one read of `RaceState`."""
+    """The 1 s poll of the award being presented. 204 while the key, the
+    reveal flag and the recipient the page sent still hold."""
     *_, sig = state.signature(_event(request))
     if request.GET.get("sig") == sig:
         return HttpResponse(status=204)
@@ -93,10 +85,12 @@ def next_award(request):
     """Next: the award after the one presented, in the list as the type and
     group filters show it."""
     scope = request.POST.get("scope", presentation.ALL)
+    posted_type = request.POST.get("type", "").strip()
+    award_type = posted_int(posted_type, positive=True) if posted_type else None
+    if posted_type and award_type is None:
+        return service_error(request, "Pick a type from the list.")
     try:
-        presentation.present_next(
-            _event(request), _type(request.POST.get("type", "")), scope
-        )
+        presentation.present_next(_event(request), award_type, scope)
     except AwardFailure as failure:
         return refused(request, failure)
     return _shown(request)

@@ -18,8 +18,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from awards.models import Award, AwardPartition
-from awards.services import _Places
-from roster.models import GroupConstituent, GroupConstituentSubgroup, Racer
+from awards.services import Places
+from roster.models import Racer
 
 INELIGIBLE = "ineligible"
 WRONG_CLASS = "wrong-class"
@@ -48,43 +48,21 @@ LEFT_OUT = Refusal(NOT_IN_LIST, "Racer not eligible for this award")
 
 
 class Eligibility:
-    """The event's aggregates and award partition lists, read once.
+    """The event's places, aggregates included (`Places`), and its award
+    partition lists, read once.
 
     `refusal(award, racer)` answers in PHP's order: `exclude`, then the
     group, then the subgroup, then the partition list."""
 
     def __init__(self, event_id):
         self.event_id = event_id
-        self.places = _Places.read(event_id)
-        self._constituents: dict[int, list[int]] = {}
-        for aggregate, constituent in GroupConstituent.objects.filter(
-            event_id=event_id
-        ).values_list("aggregate_id", "constituent_id"):
-            self._constituents.setdefault(aggregate, []).append(constituent)
-        self._filters: dict[int, set[int]] = {}
-        for aggregate, subgroup in GroupConstituentSubgroup.objects.filter(
-            event_id=event_id
-        ).values_list("aggregate_id", "subgroup_id"):
-            self._filters.setdefault(aggregate, set()).add(subgroup)
+        self.places = Places.read(event_id)
         self._stored: dict[int, set[int]] = {}
         for award_id, partition_id in AwardPartition.objects.filter(
             event_id=event_id, award__isnull=False
         ).values_list("award_id", "partition_id"):
             self._stored.setdefault(award_id, set()).add(partition_id)
         self._lists: dict[int, set[int]] = {}
-
-    def _is_aggregate(self, group_id: int) -> bool:
-        return group_id in self._constituents or group_id in self._filters
-
-    def _members(self, group_id: int) -> set[int]:
-        """An aggregate's groups, through aggregates of aggregates."""
-        members, todo = set(), [group_id]
-        while todo:
-            for constituent in self._constituents.get(todo.pop(), ()):
-                if constituent not in members:
-                    members.add(constituent)
-                    todo.append(constituent)
-        return members
 
     def partitions(self, award: Award) -> set[int]:
         """The partitions the award can go to: its stored list, or every
@@ -106,9 +84,9 @@ class Eligibility:
         subgroup_ok = (
             award.subgroup_id is None or award.subgroup_id == racer.subgroup_id
         )
-        if award.group_id is not None and self._is_aggregate(award.group_id):
-            group_ok = group_ok or racer.group_id in self._members(award.group_id)
-            only = self._filters.get(award.group_id)
+        if award.group_id is not None and self.places.is_aggregate(award.group_id):
+            group_ok = group_ok or racer.group_id in self.places.members(award.group_id)
+            only = self.places.subgroup_filters.get(award.group_id)
             subgroup_ok = not only or racer.subgroup_id in only
         if racer.exclude:
             return EXCLUDED

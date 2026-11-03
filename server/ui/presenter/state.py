@@ -3,8 +3,10 @@ its filter choices (`awards.presentation`), the award being presented as
 `query=award.current` gives it, and whether any kiosk shows award
 presentations. Reads only.
 
-The 1 s poll reads `RaceState` alone, one indexed read, and answers 204
-while the key and the reveal flag hold; only a change reads the award.
+The 1 s poll reads `RaceState` and the award's recipient, and answers 204
+while the key, the reveal flag and the recipient hold: a judged award is
+one more indexed read, a speed award the standings. Only a change renders
+the award.
 """
 
 import time
@@ -14,7 +16,7 @@ from django.urls import get_script_prefix
 
 from awards import listing
 from core.models import RaceState
-from ui.checkin.state import car
+from ui.responses import car
 
 POLL_SECONDS = 1
 
@@ -43,7 +45,8 @@ def signature(event) -> tuple[str, bool, str]:
     key, reveal = RaceState.objects.filter(event=event).values_list(
         "current_award_key", "reveal_current_award"
     )[0]
-    return key, reveal, f"{reveal:d}{key}"
+    recipient = listing.current_recipient(event, key) if key else None
+    return key, reveal, f"{reveal:d}-{recipient or 0}-{key}"
 
 
 def current(event) -> Current:

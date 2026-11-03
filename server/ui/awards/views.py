@@ -21,7 +21,14 @@ from awards.services import award_partition_choice
 from ui.awards import state
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import closing_sheet, in_sheet, refused, service_error, toast_html
+from ui.responses import (
+    closing_sheet,
+    in_sheet,
+    posted_int,
+    refused,
+    service_error,
+    toast_html,
+)
 
 guard = requires_page("awards-editor")
 
@@ -29,14 +36,6 @@ SHEET_BODY = "awards-sheet-body"
 
 
 # ----- parsing -----
-
-
-def _int(value) -> int | None:
-    try:
-        n = int(str(value).strip())
-    except TypeError, ValueError:
-        return None
-    return n if 0 < n < 2**31 else None
 
 
 def _scope(posted) -> tuple[int | None, int | None]:
@@ -57,7 +56,7 @@ def _partitions(post) -> list[int] | None:
     checks under its lock."""
     if post.get("scope", "all") != "some":
         return None
-    picked = [_int(raw) for raw in post.getlist("partition")]
+    picked = [posted_int(raw, positive=True) for raw in post.getlist("partition")]
     if None in picked:
         raise ValueError("Pick only partitions this award draws from.")
     return list(dict.fromkeys(picked))
@@ -120,7 +119,7 @@ def _sheet(request, *, award, values, error="", scope=(None, None)):
 def _posted_values(post) -> dict:
     return {
         "name": post.get("name", ""),
-        "awardtypeid": _int(post.get("awardtypeid", "")),
+        "awardtypeid": posted_int(post.get("awardtypeid", ""), positive=True),
         "scope": post.get("class_and_rank", "0,0"),
     }
 
@@ -132,7 +131,9 @@ def _save(request, award: Award | None):
             _event(request),
             award.pk if award else None,
             name=request.POST.get("name", ""),
-            award_type_id=_int(request.POST.get("awardtypeid", "")),
+            award_type_id=posted_int(
+                request.POST.get("awardtypeid", ""), positive=True
+            ),
             group_id=scope[0],
             subgroup_id=scope[1],
             partition_ids=_partitions(request.POST),
@@ -203,7 +204,8 @@ def partitions(request):
     except ValueError:
         scope = (None, None)
     award = Award.objects.filter(
-        event=_event(request), pk=_int(request.GET.get("award", ""))
+        event=_event(request),
+        pk=posted_int(request.GET.get("award", ""), positive=True),
     ).first()
     editor = state.build(_event(request))
     return render(
@@ -244,7 +246,10 @@ def award_delete(request, award_id):
 def order(request):
     """The list in a new order, from a drag or a row's Move up and Move down
     (`award.order`)."""
-    ids = [_int(raw) for raw in request.POST.get("order", "").split(",")]
+    ids = [
+        posted_int(raw, positive=True)
+        for raw in request.POST.get("order", "").split(",")
+    ]
     if not ids or None in ids:
         return service_error(request, "That order names no awards.")
     try:

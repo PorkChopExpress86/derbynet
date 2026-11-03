@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from django.utils import timezone
 
+from awards.listing import sort_key
 from awards.models import Award
 from core.models import Event, RaceSettings
 from racing.engine.standings.oracle import FULL_FIELD, round_key, round_subgroup_key
@@ -305,9 +306,7 @@ def awards(event: Event, layout: Layout, snapshot) -> list:
     judged = Award.objects.filter(event=event).select_related(
         "award_type", "racer", "group", "subgroup"
     )
-    for award in sorted(
-        judged, key=lambda a: (a.sort, a.award_type.name, a.name, a.pk)
-    ):
+    for award in sorted(judged, key=sort_key):
         rows.append(
             _award_line(
                 layout,

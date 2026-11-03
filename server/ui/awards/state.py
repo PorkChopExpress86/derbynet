@@ -7,7 +7,7 @@ database, and the award types come from a data migration, not a page load
 from dataclasses import dataclass, field
 
 from awards.eligibility import Eligibility
-from awards.listing import AD_HOC
+from awards.listing import AD_HOC, scope_label, sort_key
 from awards.models import Award, AwardType
 from core.models import RaceSettings
 from core.setup_details import plural
@@ -50,23 +50,11 @@ def build(event) -> Editor:
         Subgroup.objects.filter(event=event),
         key=lambda s: (s.sort_order, s.name, s.pk),
     )
-    group_names = {g.pk: g.name for g in groups}
-    subgroup_names = {s.pk: s.name for s in subgroups}
     partition_names = dict(
         Partition.objects.filter(event=event).values_list("pk", "name")
     )
     partitions_label = plural(found_labels.partition)
     eligibility = Eligibility(event.id)
-
-    def scope(award) -> str:
-        if award.subgroup_id:
-            return (
-                f"{group_names.get(award.group_id, '')} · "
-                f"{subgroup_names.get(award.subgroup_id, '')}"
-            )
-        if award.group_id:
-            return group_names.get(award.group_id, "")
-        return found_labels.supergroup
 
     def partitions(award) -> str:
         if not eligibility.narrowed(award):
@@ -77,8 +65,8 @@ def build(event) -> Editor:
     awards = sorted(
         Award.objects.filter(event=event)
         .exclude(award_type_id=AD_HOC)
-        .select_related("award_type"),
-        key=lambda a: (a.sort, a.award_type.name, a.name, a.pk),
+        .select_related("award_type", "group", "subgroup"),
+        key=sort_key,
     )
     scopes = [(scope_value(None, None), found_labels.supergroup, False)]
     for g in groups:
@@ -91,7 +79,13 @@ def build(event) -> Editor:
             ]
     return Editor(
         awards=[
-            Card(a.pk, a.name, a.award_type.name, scope(a), partitions(a))
+            Card(
+                a.pk,
+                a.name,
+                a.award_type.name,
+                scope_label(a, found_labels.supergroup),
+                partitions(a),
+            )
             for a in awards
         ],
         labels=found_labels,

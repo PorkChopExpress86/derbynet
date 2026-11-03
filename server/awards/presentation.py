@@ -17,8 +17,8 @@ from dataclasses import dataclass, field
 
 from django.db import transaction
 
-from awards.editing import AwardFailure
-from awards.listing import AD_HOC
+from awards.editing import AwardFailure, present
+from awards.listing import AD_HOC, sort_key
 from awards.models import Award, AwardType
 from core import race_settings
 from core.models import RaceSettings, RaceState
@@ -80,7 +80,7 @@ class Listed:
             return str(self.group_id) == scope[1:]
         if scope.startswith("s"):
             return str(self.subgroup_id) == scope[1:]
-        return True
+        return scope == ALL
 
 
 @dataclass
@@ -175,7 +175,7 @@ def presentation(event) -> Presentation:
     ]
     judged = sorted(
         Award.objects.filter(event=event).select_related("award_type", "racer"),
-        key=lambda a: (a.sort, a.award_type.name, a.name, a.pk),
+        key=sort_key,
     )
     rows += [
         listed(
@@ -226,10 +226,6 @@ def award_kiosks(event) -> int:
     return Kiosk.objects.filter(event=event, page__iregex=AWARD_KIOSK_PAGE).count()
 
 
-def _set(event, **fields) -> None:
-    RaceState.objects.filter(event=event).update(**fields)
-
-
 def present_award(event, key: str) -> Listed:
     """Tap an award: the kiosks show it, hidden until Reveal, as
     `on_choose_award()` posts `key` with `reveal=0`. A key that is no
@@ -239,7 +235,7 @@ def present_award(event, key: str) -> Listed:
         found = next((a for a in presentation(event).awards if a.key == key), None)
         if found is None:
             raise AwardFailure("gone", "That award is no longer on the list.")
-        _set(event, current_award_key=key, reveal_current_award=False)
+        present(event, key=key, reveal=False)
     return found
 
 
@@ -248,7 +244,12 @@ def present_next(event, award_type: int | None, scope: str) -> Listed:
     or the first when the one presented is not in it."""
     with transaction.atomic():
         lock_race_state(event.id)
-        shown = presentation(event).filtered(award_type, scope)
+        listed = presentation(event)
+        if award_type is not None and award_type not in dict(listed.types):
+            raise AwardFailure("filter", "Pick a type from the list.")
+        if scope not in {value for value, _, _ in listed.scopes}:
+            raise AwardFailure("filter", "Pick who the awards are for from the list.")
+        shown = listed.filtered(award_type, scope)
         if not shown:
             raise AwardFailure("none", "No award matches these filters.")
         current = RaceState.objects.get(event=event).current_award_key
@@ -256,21 +257,17 @@ def present_next(event, award_type: int | None, scope: str) -> Listed:
         at = keys.index(current) + 1 if current in keys else 0
         if at >= len(shown):
             raise AwardFailure("last", "That was the last award in the list.")
-        _set(event, current_award_key=shown[at].key, reveal_current_award=False)
+        present(event, key=shown[at].key, reveal=False)
     return shown[at]
 
 
 def reveal(event, on: bool) -> None:
     """The Reveal switch, as `on_reveal()` posts `reveal` alone."""
-    with transaction.atomic():
-        lock_race_state(event.id)
-        _set(event, reveal_current_award=on)
+    present(event, reveal=on)
 
 
 def clear(event) -> None:
     """Clear: no award on the kiosks, as `on_clear_awards()` posts an empty
     `key` with `reveal=0`. The award kiosk no longer clears it when it loads
     (#52), so this is the way to blank it."""
-    with transaction.atomic():
-        lock_race_state(event.id)
-        _set(event, current_award_key="", reveal_current_award=False)
+    present(event, key="", reveal=False)

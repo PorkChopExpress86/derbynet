@@ -18,14 +18,13 @@ from django.urls import get_script_prefix
 
 from awards.editing import refusal_text
 from awards.eligibility import Eligibility
-from awards.listing import AD_HOC
+from awards.listing import AD_HOC, sort_key
 from awards.models import Award
 from core.models import RaceSettings
 from roster.models import Group, Racer
 from roster.services.groups import Labels, labels
 from roster.services.racers import CAR_PHOTOS, photo_url
-from ui.checkin.state import car
-from ui.responses import racer_name
+from ui.responses import car, racer_name
 
 POLL_SECONDS = 30
 # `RENDER_JUDGING` in `website/inc/photo-config.inc`.
@@ -137,7 +136,7 @@ class _Event:
             Award.objects.filter(event=event).select_related(
                 "award_type", "racer", "group", "subgroup"
             ),
-            key=lambda a: (a.sort, a.award_type.name, a.name, a.pk),
+            key=sort_key,
         )
         self.held: dict[int, list[str]] = {}
         self.ad_hoc: dict[int, str] = {}

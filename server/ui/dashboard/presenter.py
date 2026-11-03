@@ -14,7 +14,7 @@ round card offers, the Re-Run label, and the master schedule's totals.
 import re
 from dataclasses import dataclass, field
 
-from ui.responses import racer_name
+from ui.responses import car, racer_name
 
 CATEGORIES = (
     ("now-racing", "Now racing"),
@@ -33,14 +33,6 @@ def strip_seconds(message: str) -> str:
     """A timer or replay message without PHP's "(12 sec.)", which the page
     counts up itself."""
     return _SECONDS.sub("", message)
-
-
-def car(number) -> str:
-    """A car number padded to three digits (D47)."""
-    try:
-        return f"{int(number):03d}"
-    except TypeError, ValueError:
-        return str(number or "")
 
 
 @dataclass(frozen=True)

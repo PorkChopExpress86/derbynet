@@ -34,6 +34,7 @@ from ui.responses import (
     closing_sheet,
     in_sheet,
     into_sheet,
+    posted_int,
     refused,
     service_error,
     toast_html,
@@ -86,20 +87,13 @@ def _sheet(request, template: str, context: dict) -> str:
 # ----- parsing -----
 
 
-def _int(value) -> int | None:
-    try:
-        return int(str(value).strip())
-    except TypeError, ValueError:
-        return None
-
-
 def _trophies(posted: str | None):
     """A posted trophy count of a group, subgroup or aggregate: "-1" or
     blank is the setting's default, None here; 0 to `MAX_UNIT_TROPHIES` is
     that count; anything else is not a choice."""
     if posted is None or posted.strip() in ("", DEFAULT_TROPHIES):
         return None
-    n = _int(posted)
+    n = posted_int(posted)
     if n is None or n not in state.TROPHY_CHOICES:
         raise ValueError(TROPHIES_MESSAGE)
     return n
@@ -108,7 +102,7 @@ def _trophies(posted: str | None):
 def _ids(posted: str) -> list[int]:
     found = []
     for raw in posted.split(","):
-        n = _int(raw)
+        n = posted_int(raw)
         if n is not None and n not in found:
             found.append(n)
     return found
@@ -121,7 +115,7 @@ def _award_partitions(post) -> list[int]:
     lock. Raises ValueError with what to tell the manager."""
     if post.get("scope", "all") != "some":
         return []
-    picked = [_int(raw) for raw in post.getlist("partition")]
+    picked = [posted_int(raw) for raw in post.getlist("partition")]
     if not picked:
         raise ValueError("Check at least one, or pick all of them.")
     if None in picked:
@@ -219,7 +213,7 @@ def setting(request):
             post[key] = request.POST[key]
     for key in COUNT_SETTINGS:
         if key in request.POST:
-            n = _int(request.POST[key])
+            n = posted_int(request.POST[key])
             if n is None or not 0 <= n <= state.MAX_DEFAULT_TROPHIES:
                 return service_error(
                     request,
@@ -566,7 +560,7 @@ def subgroup_move(request, subgroup_id):
             },
         )
     target = request.POST.get("group", "")
-    group_id = None if target == NEW_GROUP else (_int(target) or 0)
+    group_id = None if target == NEW_GROUP else (posted_int(target) or 0)
     try:
         subgroup = groups.move_subgroup_to(event, subgroup.pk, group_id)
     except GroupFailure as failure:
@@ -696,7 +690,7 @@ def partition_delete(request, partition_id):
 
 
 def _number(posted: str) -> int | None:
-    n = _int(posted)
+    n = posted_int(posted)
     return n if n is not None and 0 <= n <= LARGEST_NUMBER else None
 
 

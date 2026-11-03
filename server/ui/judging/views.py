@@ -27,19 +27,11 @@ from ui.judging import state
 from ui.judging.state import Filters
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import in_sheet, refused, service_error, toast_html
+from ui.responses import in_sheet, posted_int, refused, service_error, toast_html
 
 guard = requires_page("judging")
 
 SHEET_BODY = "judging-sheet-body"
-
-
-def _int(value) -> int | None:
-    try:
-        n = int(str(value).strip())
-    except TypeError, ValueError:
-        return None
-    return n if 0 < n < 2**31 else None
 
 
 def _reply(request, message: str, *, level="ok", undo_url="") -> HttpResponse:
@@ -121,7 +113,7 @@ def award(request, award_id):
 def assign(request, award_id):
     """Give the award to the posted racer (`award.winner`). The service
     refuses an award with another winner and a racer who cannot win it."""
-    racer_id = _int(request.POST.get("racer", ""))
+    racer_id = posted_int(request.POST.get("racer", ""), positive=True)
     if racer_id is None:
         return service_error(request, "Pick a racer.")
     try:
@@ -159,7 +151,7 @@ def remove(request, award_id):
 def restore(request, award_id):
     """Undo a removal: the award goes back to the racer, checked as a new
     assignment is, so a second Undo changes nothing."""
-    racer_id = _int(request.GET.get("racer", ""))
+    racer_id = posted_int(request.GET.get("racer", ""), positive=True)
     if racer_id is None:
         return service_error(request, "That award cannot go back. Assign it again.")
     try:
