@@ -39,3 +39,35 @@ def test_no_reply_replaces_an_element_a_trigger_listens_to():
             if re.search(rf"hx-target=\"#{name}\"[^>]*hx-swap=\"outerHTML", text):
                 swapped.append((path.name, f"outerHTML of #{name}"))
     assert swapped == []
+
+
+def _polled_regions(templates) -> set[str]:
+    regions = set()
+    for path in templates:
+        for tag in re.findall(
+            r"<\w[^<>]*\bhx-trigger=\"[^\"]*\bevery\b[^<>]*>", path.read_text()
+        ):
+            found = re.search(r"\bid=\"([\w-]+)\"", tag)
+            if found:
+                regions.add(found.group(1))
+    return regions
+
+
+def test_no_control_queues_behind_a_poll():
+    """A control that syncs on a polled region with `queue` waits behind the
+    poll; when the poll's reply replaces the control, htmx sends nothing for
+    the detached element and the tap is lost (#46's kiosk board). Such a
+    control syncs with `replace`, as #41's `#live` does. Only a request that
+    loads the region itself, such as a filter form, may queue on it."""
+    templates = list((UI / "templates").rglob("*.html"))
+    regions = _polled_regions(templates)
+    assert {"kiosk-board", "checkin-list"} <= regions, "is the poll pattern stale?"
+    queued = []
+    for path in templates:
+        for tag in re.findall(
+            r"<\w[^<>]*\bhx-sync=\"#[\w-]+:queue[^<>]*>", path.read_text()
+        ):
+            region = re.search(r"hx-sync=\"#([\w-]+):", tag).group(1)
+            if region in regions and f'hx-target="#{region}"' not in tag:
+                queued.append((path.name, tag))
+    assert queued == []
