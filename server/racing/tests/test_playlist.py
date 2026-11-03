@@ -1,7 +1,7 @@
 import pytest
 
 from racing.models import PlaylistEntry
-from racing.services import reorder_playlist
+from racing.services.playlist import PlaylistFailure, reorder_steps
 from racing.tests.factories import PlaylistEntryFactory
 from roster.tests.factories import GroupFactory
 
@@ -22,7 +22,7 @@ def test_reversing_a_three_step_playlist_renumbers_it_in_the_new_order():
         PlaylistEntryFactory(group=group, seq=seq) for seq in (1, 2, 3)
     )
 
-    reorder_playlist(group.event, [third.id, second.id, first.id])
+    reorder_steps(group.event, [third.id, second.id, first.id])
 
     assert _playlist(group.event) == [(third.id, 1), (second.id, 2), (first.id, 3)]
 
@@ -33,7 +33,7 @@ def test_reorder_renumbers_a_playlist_that_holds_negative_seqs():
         PlaylistEntryFactory(group=group, seq=seq) for seq in (-1, -2, 5)
     )
 
-    reorder_playlist(group.event, [third.id, first.id, second.id])
+    reorder_steps(group.event, [third.id, first.id, second.id])
 
     assert _playlist(group.event) == [(third.id, 1), (first.id, 2), (second.id, 3)]
 
@@ -43,7 +43,7 @@ def test_reorder_leaves_another_events_playlist_alone():
     mine = [PlaylistEntryFactory(group=group, seq=seq) for seq in (1, 2)]
     theirs = [PlaylistEntryFactory(group=other, seq=seq) for seq in (1, 2)]
 
-    reorder_playlist(group.event, [mine[1].id, mine[0].id])
+    reorder_steps(group.event, [mine[1].id, mine[0].id])
 
     assert _playlist(other.event) == [(theirs[0].id, 1), (theirs[1].id, 2)]
 
@@ -52,5 +52,19 @@ def test_reorder_needs_every_entry_of_the_event():
     group = GroupFactory()
     first, _ = (PlaylistEntryFactory(group=group, seq=seq) for seq in (1, 2))
 
-    with pytest.raises(ValueError, match="every playlist entry"):
-        reorder_playlist(group.event, [first.id])
+    with pytest.raises(PlaylistFailure, match="stale-order"):
+        reorder_steps(group.event, [first.id])
+
+
+@pytest.mark.parametrize("seqs", [(-5, -1, 1), (-3, -1, 1)])
+def test_reorder_renumbers_negative_seqs_beside_a_positive_one(seqs):
+    """The #87 review asked for seqs (-5, -1, 1). An offset of `max(seq)`
+    rather than `max(abs(seq))` is 1 there, and moves the step at -3 of
+    (-3, -1, 1) onto -3 while it still holds it, so that case fails on
+    the regression. (-5, -1, 1) never collides with three steps."""
+    group = GroupFactory()
+    first, second, third = (PlaylistEntryFactory(group=group, seq=s) for s in seqs)
+
+    reorder_steps(group.event, [third.id, second.id, first.id])
+
+    assert _playlist(group.event) == [(third.id, 1), (second.id, 2), (first.id, 3)]

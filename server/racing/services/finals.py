@@ -232,6 +232,51 @@ def allowed_racers(round: Round) -> tuple[Racer, ...]:
     )
 
 
+def allowed_for_steps(event_id: int, steps) -> dict[tuple[int, int], tuple]:
+    """For each queued playlist step, its group's id and round number, the
+    racers its round will take in beside its qualifiers (D32, D44), for its
+    card on the playlist page: those of the round once it is made, and
+    before that, the racers allowed into the group's final, or into an
+    aggregate's first round drawn from their group, who have no other round
+    to go to yet. With no allowed request, as on most race days, it reads
+    one query."""
+    requests = [
+        r
+        for r in FinalRequest.objects.filter(
+            event_id=event_id, state=FinalRequest.State.ALLOWED
+        )
+        .select_related("racer")
+        .order_by("decided_at", "id")
+        if _applies(r)
+    ]
+    found = {key: () for key in steps}
+    if not requests:
+        return found
+    for group_id, round_number in found:
+        round = Round.objects.filter(group_id=group_id, number=round_number).first()
+        if round is not None:
+            found[group_id, round_number] = allowed_racers(round)
+            continue
+        if round_number == FINAL_ROUND:
+            groups = {group_id}
+        elif round_number == 1:
+            groups = set(
+                GroupConstituent.objects.filter(aggregate_id=group_id).values_list(
+                    "constituent_id", flat=True
+                )
+            )
+        else:
+            continue
+        found[group_id, round_number] = tuple(
+            r.racer
+            for r in requests
+            if r.placed_round_id is None
+            and r.racer.group_id in groups
+            and next_round_of(r.racer) is None
+        )
+    return found
+
+
 def place_allowed_racers(round: Round, racer_ids) -> None:
     """Spend the allowed requests of the racers just written to the round's
     roster on that round, so no later round takes them again. The roster

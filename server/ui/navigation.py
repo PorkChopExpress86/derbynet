@@ -311,6 +311,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         44,
         php="playlist.php",
         menu=False,
+        view="ui.playlist.views.page",
     ),
     NavEntry(
         "scenes",

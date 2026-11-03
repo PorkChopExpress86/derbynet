@@ -1,0 +1,15 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/playlist.js' %}"></script>{% endblock %}
+{% block main %}
+{# The playlist loads once and is never polled, as playlist.php. Every change answers with the queue again, out of band (#44). #}
+<div id="playlist-queue" data-playlist>
+{% include "ui/playlist/queue.html" %}
+</div>
+{% endblock %}
+{% block sheets %}
+{# One sheet for the entry form and the scheduling partial. Its body loads when a control opens it. #}
+{% component "sheet" name="playlist" title="" title_x="$store.playlist.title" %}
+  <div id="playlist-sheet-body" aria-live="polite"><p class="py-6 text-center text-ink-muted">Loading…</p></div>
+{% endcomponent %}
+{% endblock %}

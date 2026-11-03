@@ -7,6 +7,7 @@ urlpatterns = [
     path("", include("ui.dashboard.urls")),
     path("", include("ui.checkin.urls")),
     path("", include("ui.groups.urls")),
+    path("", include("ui.playlist.urls")),
     *redirects.urlpatterns(),
     path("quickref.pdf", views.quickref, name="quickref"),
     path("components/", views.components, name="components"),

@@ -60,11 +60,13 @@ class LanesFailure(Exception):
         self.description = description
 
 
-def _mask(lanes: Iterable[int]) -> int:
+def mask_of(lanes: Iterable[int]) -> int:
+    """The `unused-lane-mask` bits of lane numbers from 1."""
     return sum(1 << (lane - 1) for lane in set(lanes))
 
 
-def _lanes(mask: int) -> list[int]:
+def lanes_of(mask: int) -> list[int]:
+    """The lane numbers, from 1, of an `unused-lane-mask`."""
     return [bit + 1 for bit in range(mask.bit_length()) if mask & (1 << bit)]
 
 
@@ -81,7 +83,7 @@ def _new_lanes(settings: RaceSettings, lanes: set[int]) -> int:
     if not lanes:
         raise LanesFailure(Failure.NO_LANES, "Choose a lane to close.")
     _check_range(settings, lanes)
-    new = _mask(lanes) & ~settings.unused_lane_mask
+    new = mask_of(lanes) & ~settings.unused_lane_mask
     if not new:
         raise LanesFailure(Failure.ALREADY_CLOSED, "Those lanes are already closed.")
     closed = settings.unused_lane_mask | new
@@ -214,7 +216,7 @@ def reopen_lanes(
     with transaction.atomic():
         lock_race_state(event.id)
         _check_range(RaceSettings.objects.get(event=event), lanes)
-        mask = _mask(lanes)
+        mask = mask_of(lanes)
         closures = list(
             LaneClosure.objects.filter(event=event, reopened_at__isnull=True).order_by(
                 "id"
@@ -263,7 +265,7 @@ def poll_lanes(event: Event) -> dict:
     for closure in LaneClosure.objects.filter(
         event=event, reopened_at__isnull=True
     ).order_by("id"):
-        for lane in _lanes(closure.mask):
+        for lane in lanes_of(closure.mask):
             later = bool(unused & (1 << (lane - 1)))
             racing = closure.round_id in to_run
             if not (later or racing):

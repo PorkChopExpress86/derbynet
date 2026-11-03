@@ -18,6 +18,7 @@ from django.test import Client
 from django.urls import URLPattern, URLResolver, get_resolver
 
 from core.models import RaceState
+from racing.models import PlaylistEntry
 from roster.models import Partition, Racer
 from roster.services.car_numbers import add_range
 from ui.tests.db import no_db_writes
@@ -79,7 +80,11 @@ def race(event):
     scheduled(wolves)
     partition = Partition.objects.filter(event=event).first()
     car_range = add_range(partition, 100, 199)
+    step = PlaylistEntry.objects.create(
+        event=event, seq=1, group=wolves.group, round_number=2, bucket_limit=4
+    )
     return {
+        "entry_id": step.pk,
         "round_id": wolves.pk,
         "racer_id": Racer.objects.filter(event=event).first().pk,
         "lane": 1,
