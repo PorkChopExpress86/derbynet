@@ -21,6 +21,7 @@ import pytest
 from django.apps import apps
 from django.db import IntegrityError, models, transaction
 from django.test import Client
+from django.utils import timezone
 
 from core.models import Event
 from ui.tests.roles import PASSWORDS
@@ -148,3 +149,40 @@ def test_a_204_means_the_poll_would_render_the_same(coordinator, event, url):
             pass
     assert stale == [], stale
     assert shown > 0, "no change showed: the test checks nothing"
+
+
+def _heartbeats(event):
+    """Every row of the event with a `last_contact`: a kiosk, the timer and
+    the replay app write it every few seconds while nothing else changes."""
+    for model in apps.get_models():
+        if model._meta.app_label in APPS and "last_contact" in {
+            f.name for f in model._meta.concrete_fields
+        }:
+            yield model.objects.filter(event=event)
+
+
+# Polls that answer 200 at a heartbeat on purpose, with the reason. The race
+# dashboard shows the seconds since the timer's and the replay app's last call
+# at every age, as PHP's coordinator page does, so a call resets the count
+# (`ui.dashboard.state._material`). Its controls sync with `#live:replace`.
+SWAPS_AT_A_HEARTBEAT = {"/dashboard/live/"}
+
+
+@pytest.mark.parametrize("url", POLLS)
+def test_a_heartbeat_leaves_the_poll_at_204(coordinator, event, url):
+    """A poll that answers 200 at every heartbeat swaps its region every few
+    seconds, which costs a tap that lands mid-swap (#46's kiosk board signed
+    each kiosk's contact time). A device checking in on time changes nothing
+    the poll shows, so the old signature still answers 204."""
+    race_day(event, [("G1", 3)], race=True)
+    rows = list(_heartbeats(event))
+    assert any(r.exists() for r in rows), "no heartbeat row: the test checks nothing"
+    now = timezone.now()
+    for r in rows:
+        r.update(last_contact=now - datetime.timedelta(seconds=2))
+    status, _, sig = _render(coordinator, url)
+    assert status == 200
+    for r in rows:
+        r.update(last_contact=now)
+    expected = 200 if url in SWAPS_AT_A_HEARTBEAT else 204
+    assert _render(coordinator, url, sig)[0] == expected

@@ -18,6 +18,24 @@ def test_inheritance_is_off(client, db):
     assert json.loads(html.unescape(meta.group(1)))["disableInheritance"] is True
 
 
+def test_a_swap_settles_at_once(client, db):
+    """htmx binds the hx-* attributes of swapped-in content when the swap
+    settles, and Alpine shows that content before then. With htmx's default
+    20 ms settle, more under load, a control used in between sent nothing:
+    #45's award sheet select in CI, and every browser test that taps after a
+    swap when the settle is slowed to 1.5 s (#46 retro: 61 of 248 failed).
+    A `settle:` modifier on an element brings the gap back."""
+    page = client.get("/login/").content.decode()
+    meta = re.search(r"<meta name=\"htmx-config\" content='([^']+)'>", page)
+    assert json.loads(html.unescape(meta.group(1)))["defaultSettleDelay"] == 0
+    settles = [
+        p.name
+        for p in (UI / "templates").rglob("*.html")
+        if re.search(r"hx-swap=\"[^\"]*\bsettle:", p.read_text())
+    ]
+    assert settles == []
+
+
 def test_no_reply_replaces_an_element_a_trigger_listens_to():
     """`hx-trigger="... from:#x"` listens on the element #x was when htmx
     processed the trigger. A reply that swaps #x itself (out of band, or as an
@@ -39,3 +57,35 @@ def test_no_reply_replaces_an_element_a_trigger_listens_to():
             if re.search(rf"hx-target=\"#{name}\"[^>]*hx-swap=\"outerHTML", text):
                 swapped.append((path.name, f"outerHTML of #{name}"))
     assert swapped == []
+
+
+def _polled_regions(templates) -> set[str]:
+    regions = set()
+    for path in templates:
+        for tag in re.findall(
+            r"<\w[^<>]*\bhx-trigger=\"[^\"]*\bevery\b[^<>]*>", path.read_text()
+        ):
+            found = re.search(r"\bid=\"([\w-]+)\"", tag)
+            if found:
+                regions.add(found.group(1))
+    return regions
+
+
+def test_no_control_queues_behind_a_poll():
+    """A control that syncs on a polled region with `queue` waits behind the
+    poll; when the poll's reply replaces the control, htmx sends nothing for
+    the detached element and the tap is lost (#46's kiosk board). Such a
+    control syncs with `replace`, as #41's `#live` does. Only a request that
+    loads the region itself, such as a filter form, may queue on it."""
+    templates = list((UI / "templates").rglob("*.html"))
+    regions = _polled_regions(templates)
+    assert {"kiosk-board", "checkin-list"} <= regions, "is the poll pattern stale?"
+    queued = []
+    for path in templates:
+        for tag in re.findall(
+            r"<\w[^<>]*\bhx-sync=\"#[\w-]+:queue[^<>]*>", path.read_text()
+        ):
+            region = re.search(r"hx-sync=\"#([\w-]+):", tag).group(1)
+            if region in regions and f'hx-target="#{region}"' not in tag:
+                queued.append((path.name, tag))
+    assert queued == []

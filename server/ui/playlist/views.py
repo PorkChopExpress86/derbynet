@@ -27,7 +27,7 @@ from ui.navigation import requires_page
 from ui.playlist import state
 from ui.responses import active_event as _event
 from ui.responses import (
-    back_url,
+    banner_back,
     closing_sheet,
     in_sheet,
     posted_int,
@@ -40,9 +40,6 @@ guard = requires_page("playlist")
 
 SHEET_BODY = "playlist-sheet-body"
 SETTINGS_WRITE = {"action": "settings.write"}
-# `playlist.php`'s back button, by the PHP page a link names in `back`;
-# anything else returns to the race dashboard, as `playlist.php` does.
-BACK_PAGES = {"setup.php": "setup", "coordinator.php": "dashboard"}
 MAX_LANES = 31
 
 
@@ -102,7 +99,7 @@ def page(request):
         {
             "playlist": state.build(_event(request)),
             "can_race": allows(request, Perm.CONTROL_RACE),
-            "back_url": back_url(request, BACK_PAGES, "dashboard"),
+            "back_url": banner_back(request, "coordinator.php"),
             "page_title": "Rounds Playlist",
         },
     )
