@@ -1,0 +1,29 @@
+{# The kiosk names of the scene shown (#46): each with a thumbnail of the page this scene gives it, a page picker and a Configure sheet. Each change answers with this template again, out of band into #scene-entries. #}
+{% if editor.entries %}
+<ul role="list" aria-label="Kiosk names in {{ editor.scene_name }}" class="grid grid-cols-1 gap-3 lg:grid-cols-2" data-entries>
+  {% for e in editor.entries %}
+  <li data-entry="{{ e.kiosk_name }}" class="flex flex-col rounded-xl border border-line bg-bg">
+    <div class="flex gap-3 p-3">
+      {% if e.page %}{% include "ui/kiosks/thumbnail.html" with brief=e.page.brief cls="w-28 shrink-0 sm:w-36" %}{% else %}<div aria-hidden="true" class="aspect-video w-28 shrink-0 rounded-lg border border-dashed border-line sm:w-36"></div>{% endif %}
+      <div class="min-w-0 flex-1">
+        <h3 class="truncate text-lg font-semibold">{{ e.kiosk_name }}</h3>
+        {% if e.page %}
+        <p class="truncate text-sm font-medium" data-page="{{ e.page.full }}">{{ e.page.label }}{% if e.page.custom %} <span class="text-ink-muted">(for {{ e.page.custom }})</span>{% endif %}</p>
+        {% if e.summary %}<p class="truncate text-sm text-ink-muted" data-summary>{{ e.summary }}</p>{% endif %}
+        {% else %}
+        <p class="text-sm text-ink-muted" data-page="">No page in this scene</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="mt-auto flex flex-wrap gap-2 border-t border-line p-2">
+      <button type="button" hx-get="{% url 'scenes-page' %}?scene={{ editor.scene_id }}&amp;name={{ e.kiosk_name|urlencode }}" hx-target="#scenes-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="sceneSheet.open('Page for {{ e.kiosk_name|escapejs }}', $event)" aria-haspopup="dialog" data-action="page" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Page</button>
+      {% if e.page.configurable %}
+      <button type="button" hx-get="{% url 'scenes-configure' %}?scene={{ editor.scene_id }}&amp;name={{ e.kiosk_name|urlencode }}" hx-target="#scenes-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="sceneSheet.open('Configure {{ e.page.label|escapejs }}', $event)" aria-haspopup="dialog" data-action="configure" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Configure</button>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-ink-muted" data-no-entries>No kiosk names yet. Add one, then give it a page.</p>
+{% endif %}

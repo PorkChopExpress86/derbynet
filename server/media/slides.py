@@ -130,6 +130,28 @@ def next_slides(event, current: str, subdir: str) -> list[str]:
     return sorted(name for folder in folders for name in _slides_after(folder, current))
 
 
+def slide_subdirs(event) -> list[str]:
+    """`find_alternate_slides_directories()`: the folders in the event's
+    slides folder, then the config folder's, that a slideshow kiosk can show
+    instead of the slides themselves. Hidden folders, and names a slide URL
+    cannot carry, are left out; a name in both is listed once."""
+    found: list[str] = []
+    for folder in (
+        event_dir(event.slug) / "slides",
+        django_settings.CONFIG_DIR / "slides",
+    ):
+        try:
+            names = sorted(e.name for e in os.scandir(folder) if e.is_dir())
+        except OSError:
+            continue
+        found += [
+            n
+            for n in names
+            if not n.startswith(".") and is_acceptable_name(n) and n not in found
+        ]
+    return found
+
+
 class BadClassIds(ValueError):
     pass
 

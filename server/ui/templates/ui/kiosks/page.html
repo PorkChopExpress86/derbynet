@@ -1,0 +1,25 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/kiosks.js' %}"></script>{% endblock %}
+{% block main %}
+<div x-data="kioskDashboard({{ server_now }}, {{ quiet_seconds }})" data-kiosk-dashboard>
+  {% if not can_control %}
+  <p role="status" data-view-only class="mb-3 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm">You can see the kiosks. Changing them needs a role with race control.</p>
+  {% endif %}
+  {# The board polls every 2 s and waits while a sheet is open. Its signature is the hidden #kiosks-sig inside it. #}
+  <div id="kiosk-board" hx-get="{% url 'kiosks-board' %}" hx-trigger="every {{ poll_seconds }}s [derbynet.pollable(this)]" hx-include="#kiosks-sig" hx-swap="innerHTML" hx-sync="this:drop" @htmx:after-settle="tick()">
+  {{ board_html|safe }}
+  </div>
+  <div class="mt-4 flex flex-wrap gap-2">
+    {% if can_edit_scenes %}<a href="{% url 'scenes' %}" data-action="scene-editor" class="inline-flex min-h-11 items-center rounded-xl border border-line bg-surface px-4 font-semibold">Scene editor</a>{% endif %}
+    {# Desktop only, as a TV's computer opens the kiosk page itself. #}
+    <button type="button" @click="newWindow('{{ kiosk_url|escapejs }}')" data-action="new-kiosk-window" class="hidden min-h-11 items-center rounded-xl border border-line bg-surface px-4 font-semibold lg:inline-flex">New kiosk window</button>
+  </div>
+</div>
+{% endblock %}
+{% block sheets %}
+{# One sheet for a kiosk's page picker, name and Configure form. Its body loads when a control opens it. #}
+{% component "sheet" name="kiosks" title="" title_x="$store.kioskSheet.title" %}
+  <div id="kiosks-sheet-body" aria-live="polite"><p class="py-6 text-center text-ink-muted">Loading…</p></div>
+{% endcomponent %}
+{% endblock %}

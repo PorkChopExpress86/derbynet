@@ -16,11 +16,13 @@ from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 
 from awards.editing import set_ad_hoc_award, set_winner
 from awards.models import Award
 from awards.services import set_partition_list
 from core.models import RaceState
+from kiosks.models import Kiosk, Scene, SceneKiosk
 from racing.models import PlaylistEntry
 from roster.models import Racer
 from ui.tests.race import race_setup, run_heat, scheduled
@@ -42,6 +44,9 @@ URLS = [
     "/judging/board/",
     "/awards/present/",
     "/awards/present/current/",
+    "/kiosks/",
+    "/kiosks/board/",
+    "/kiosks/scenes/",
 ]
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 # An element whose hx-get names a URL and whose trigger polls.
@@ -62,9 +67,11 @@ def test_every_polled_url_is_measured():
 
 def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
     """Groups of passed racers, each round 1 scheduled, rounds 1 and 2 of
-    each group queued, and each group's judged award, narrowed to its
-    partition and given to its first racer. With `race`, the first round
-    races a heat, and the kiosk presents the first award."""
+    each group queued, each group's judged award, narrowed to its partition
+    and given to its first racer, and each group's kiosk, checking in and
+    named in the first scene, showing please-check-in for its group. With
+    `race`, the first round races a heat, and the kiosk presents the first
+    award."""
     rounds = list(race_setup(event, groups=groups).values())
     for round in rounds:
         award = Award.objects.create(
@@ -78,6 +85,19 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
         set_partition_list(event, [racers[0].partition], award=award)
         set_winner(event, award, racers[0])
         set_ad_hoc_award(event, racers[1], f"Shiniest {round.group.name}")
+        name = f"TV {round.group.name}"
+        Kiosk.objects.create(
+            event=event,
+            address=f"10.0.0.{round.group.pk}",
+            name=name,
+            page="kiosks/please-check-in.kiosk",
+            params=f'{{"classids":[{round.group.pk}]}}',
+            last_contact=timezone.now(),
+        )
+        first_scene = Scene.objects.filter(event=event).order_by("sort_order").first()
+        SceneKiosk.objects.create(
+            event=event, scene=first_scene, kiosk_name=name, page="kiosks/flag.kiosk"
+        )
         if race and round is rounds[0]:
             RaceState.objects.filter(event=event).update(
                 current_award_key=f"award-{award.pk}"

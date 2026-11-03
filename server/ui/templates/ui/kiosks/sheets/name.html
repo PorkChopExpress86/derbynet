@@ -1,0 +1,23 @@
+{# Name a kiosk (#46), with chips for the names the scenes use. A named kiosk takes the current scene's page for its name. #}
+<div x-data x-init="kioskSheet.show('Name {{ label|escapejs }}')" data-name-sheet>
+  <form hx-post="{% url 'kiosks-name' %}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="#kiosk-board:queue all" class="flex flex-col gap-4">
+    <input type="hidden" name="address" value="{{ kiosk.address }}">
+    <div>
+      <label for="kn-name" class="mb-1 block text-sm font-medium">Name for this kiosk</label>
+      <input id="kn-name" name="name" type="text" maxlength="200" value="{{ kiosk.name }}" x-ref="name" data-autofocus autocomplete="off" aria-describedby="kn-help" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+      <p id="kn-help" class="mt-1 text-sm text-ink-muted">Scenes give each kiosk a page by its name. Leave it empty to unname the kiosk.</p>
+    </div>
+    {% if names %}
+    <fieldset>
+      <legend class="mb-1 text-sm font-medium">Names the scenes use</legend>
+      <div class="flex flex-wrap gap-2" data-name-chips>
+        {% for n in names %}<button type="button" @click="$refs.name.value = $el.dataset.value; $refs.name.focus()" data-value="{{ n }}" class="min-h-11 rounded-full border border-line px-4 text-sm font-medium">{{ n }}</button>{% endfor %}
+      </div>
+    </fieldset>
+    {% endif %}
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      <button type="submit" data-submit class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save name</button>
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,60 @@
+{% load ui %}{# The kiosk board (#46): the scene switcher, the named-kiosk warning and a card per kiosk heard from in the last 60 s. Polled every 2 s; each change answers with it again, out of band into #kiosk-board. The switcher marks RaceState.current_scene, the scene applied last (C19). Controls show only with CONTROL_RACE, the permission their services need (C37). #}
+<section aria-labelledby="ks-scenes-h" class="sticky top-14 z-10 -mx-4 border-b border-line bg-bg/95 px-4 pb-3 pt-2 backdrop-blur [@media(max-height:500px)]:static" data-switcher>
+  <h2 id="ks-scenes-h" class="mb-2 text-sm font-semibold text-ink-muted">Scene</h2>
+  {% if board.scenes %}
+  <div role="group" aria-labelledby="ks-scenes-h" class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+    {% for id, name in board.scenes %}
+    {% if can_control %}
+    <button type="button" name="scene" value="{{ id }}" hx-post="{% url 'kiosks-scene' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:queue all" aria-pressed="{% if id == board.current_scene_id %}true{% else %}false{% endif %}" data-scene="{{ id }}" class="min-h-12 truncate rounded-xl border px-2 text-sm font-semibold aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink border-line bg-surface">{{ name }}</button>
+    {% else %}
+    <span data-scene="{{ id }}"{% if id == board.current_scene_id %} aria-current="true"{% endif %} class="flex min-h-12 items-center justify-center truncate rounded-xl border px-2 text-sm font-semibold {% if id == board.current_scene_id %}border-accent bg-accent text-accent-ink{% else %}border-line bg-surface text-ink-muted{% endif %}">{{ name }}</span>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm text-ink-muted">There are no scenes yet.</p>
+  {% endif %}
+  {% if not board.current_scene_id %}<p class="mt-2 text-sm text-ink-muted" data-no-scene>No scene is on. A page given to one kiosk by hand turns the scene off.</p>{% endif %}
+</section>
+
+{% if board.kiosks and board.unnamed %}
+<p role="status" data-named-warning class="mt-3 flex items-start gap-2 rounded-xl border border-warn bg-warn-soft px-4 py-3 text-sm text-warn-ink">{% include "ui/components/icon.html" with name="warn" cls="mt-0.5 size-4 shrink-0" %}<span>{{ board.named }} named kiosk{{ board.named|pluralize }} out of {{ board.kiosks|length }}. A scene changes only named kiosks.</span></p>
+{% elif board.kiosks %}
+<p class="mt-3 text-sm text-ink-muted" data-named-count>{{ board.named }} named kiosk{{ board.named|pluralize }}</p>
+{% endif %}
+
+{% if board.kiosks %}
+<ul role="list" aria-label="Kiosks" class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2" data-kiosks>
+  {% for k in board.kiosks %}
+  <li data-kiosk="{{ k.address }}" class="flex flex-col rounded-2xl border border-line bg-surface">
+    <div class="flex gap-3 p-3">
+      {% include "ui/kiosks/thumbnail.html" with brief=k.page.brief cls="w-28 shrink-0 sm:w-36" %}
+      <div class="min-w-0 flex-1">
+        <h3 class="truncate text-lg font-semibold" data-name>{% if k.name %}{{ k.name }}{% else %}<span class="text-ink-muted">No name</span>{% endif %}</h3>
+        <p class="truncate text-sm text-ink-muted" data-madlib>{{ k.madlib }}</p>
+        <p class="mt-1 truncate text-sm font-medium" data-page="{{ k.page.full }}">{{ k.page.label }}{% if k.page.custom %} <span class="text-ink-muted">(for {{ k.page.custom }})</span>{% endif %}</p>
+        {% if k.summary %}<p class="truncate text-sm text-ink-muted" data-summary>{{ k.summary }}</p>{% endif %}
+        <p class="text-sm text-warn-ink" data-last-contact="{{ k.last_contact }}" hidden></p>
+        {% if k.reload %}<p class="mt-1">{% include "ui/components/status_pill.html" with state="warn" text="Reloading" %}</p>{% endif %}
+      </div>
+    </div>
+    {% if can_control %}
+    <div class="mt-auto flex flex-wrap gap-2 border-t border-line p-2">
+      <button type="button" hx-get="{% url 'kiosks-page' %}?address={{ k.address|urlencode }}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="kioskSheet.open('Page for {{ k.name|default:k.madlib|escapejs }}', $event)" aria-haspopup="dialog" data-action="page" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Page</button>
+      <button type="button" hx-get="{% url 'kiosks-name' %}?address={{ k.address|urlencode }}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="kioskSheet.open('Name {{ k.name|default:k.madlib|escapejs }}', $event)" aria-haspopup="dialog" data-action="name" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Name</button>
+      {% if k.page.configurable %}
+      <button type="button" hx-get="{% url 'kiosks-configure' %}?address={{ k.address|urlencode }}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="kioskSheet.open('Configure {{ k.page.label|escapejs }}', $event)" aria-haspopup="dialog" data-action="configure" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Configure</button>
+      {% endif %}
+      <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-reload' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:queue all" data-action="reload" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Reload</button>
+      <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-identify' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:queue all" data-action="identify" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Identify</button>
+    </div>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="mt-4 rounded-2xl border border-dashed border-line p-6 text-center" data-empty>
+  <p class="font-semibold">No kiosks are checking in.</p>
+  <p class="mt-1 text-sm text-ink-muted">Open the kiosk page on each TV's computer. A kiosk shows here once it checks in, and drops off after a minute of silence.</p>
+</div>
+{% endif %}

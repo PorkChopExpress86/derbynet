@@ -1,0 +1,17 @@
+{# The page picker (#46): tap a page and the kiosk shows it. Each page has a thumbnail of its type. #}
+<div x-data x-init="kioskSheet.show('Page for {{ label|escapejs }}')" data-page-sheet>
+  <form hx-post="{% url 'kiosks-page' %}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="#kiosk-board:queue all">
+    <input type="hidden" name="address" value="{{ kiosk.address }}">
+    <p class="mb-3 text-sm text-ink-muted">The kiosk shows the page you tap at its next check-in. A page given by hand turns the scene off.</p>
+    <ul role="list" class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {% for p in pages %}
+      <li>
+        <button type="submit" name="page" value="{{ p.full }}" data-page-choice="{{ p.brief }}"{% if p.full == shown.full %} aria-current="true"{% endif %} class="flex w-full flex-col gap-1 rounded-xl border p-1.5 text-left text-sm font-medium {% if p.full == shown.full %}border-accent ring-2 ring-accent{% else %}border-line{% endif %}">
+          {% include "ui/kiosks/thumbnail.html" with brief=p.brief cls="w-full" %}
+          <span class="px-1">{{ p.label }}</span>
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+  </form>
+</div>

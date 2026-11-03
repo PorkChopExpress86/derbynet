@@ -1,0 +1,65 @@
+{# A Configure sheet (#46), for a kiosk on the dashboard or a kiosk name in a scene: the fields of kiosk-parameters.inc for the page, showing the parameters stored (C20). Pass label, form, hidden, post_url, sheet_body, sheet_js and sync. #}
+<div x-data x-init="{{ sheet_js }}.show('Configure {{ form.page.label|escapejs }}')" data-configure-sheet="{{ form.page.brief }}">
+  <form hx-post="{{ post_url }}" hx-target="#{{ sheet_body }}" hx-swap="innerHTML" hx-include="this" hx-sync="{{ sync }}" class="flex flex-col gap-4">
+    {% for name, value in hidden.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+    <p class="text-sm text-ink-muted">For {{ label }}.</p>
+    {% if form.page.brief == "slideshow" or form.page.brief == "qrcode" %}
+    <div>
+      <label for="kc-title" class="mb-1 block text-sm font-medium">{% if form.page.brief == "qrcode" %}Page title{% else %}Title text{% endif %}</label>
+      <input id="kc-title" name="title" type="text" maxlength="500" value="{{ form.title }}" data-autofocus autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+    </div>
+    {% endif %}
+    {% if form.page.brief == "slideshow" and form.choices.subdirs %}
+    <div>
+      <label for="kc-subdir" class="mb-1 block text-sm font-medium">Slides</label>
+      <select id="kc-subdir" name="subdir" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+        <option value=""{% if not form.subdir %} selected{% endif %}>(Default slideshow)</option>
+        {% for sub in form.choices.subdirs %}<option value="{{ sub }}"{% if sub == form.subdir %} selected{% endif %}>{{ sub }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if form.page.brief == "slideshow" or form.page.brief == "please-check-in" %}
+    <fieldset>
+      <legend class="mb-1 text-sm font-medium">Classes</legend>
+      {% if form.choices.groups %}
+      <div class="flex flex-col" data-classes>
+        {% for id, name, checked in form.classes %}
+        <label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="classids" value="{{ id }}"{% if checked %} checked{% endif %}{% if forloop.first and form.page.brief == "please-check-in" %} data-autofocus{% endif %} class="size-5 accent-accent">{{ name }}</label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-ink-muted">There are no classes yet.</p>
+      {% endif %}
+    </fieldset>
+    {% endif %}
+    {% if form.page.brief == "standings" %}
+    <div>
+      <label for="kc-key" class="mb-1 block text-sm font-medium">Show standings for</label>
+      {% if form.choices.standings %}
+      <select id="kc-key" name="key" data-autofocus class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+        {% for key, name in form.choices.standings %}<option value="{{ key }}"{% if key == form.key %} selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+      {% else %}
+      <p class="text-sm text-ink-muted">No round has finished, so there are no standings to pick yet.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if form.page.brief == "award-presentations" %}
+    <label class="flex min-h-12 items-center justify-between gap-3">
+      <span class="font-medium">Confetti</span>
+      <input type="checkbox" role="switch" name="confetti" value="1"{% if form.confetti %} checked{% endif %} data-autofocus class="size-6 shrink-0 accent-accent">
+    </label>
+    {% endif %}
+    {% if form.page.brief == "qrcode" %}
+    <div>
+      <label for="kc-content" class="mb-1 block text-sm font-medium">QR code</label>
+      <input id="kc-content" name="content" type="text" maxlength="500" value="{{ form.content }}" autocomplete="off" aria-describedby="kc-content-help" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+      <p id="kc-content-help" class="mt-1 text-sm text-ink-muted">The text or web address the QR code holds.</p>
+    </div>
+    {% endif %}
+    <div class="flex flex-col gap-2 lg:flex-row-reverse">
+      {% if form.page.brief != "standings" or form.choices.standings %}<button type="submit" data-submit class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save</button>{% endif %}
+      <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+    </div>
+  </form>
+</div>

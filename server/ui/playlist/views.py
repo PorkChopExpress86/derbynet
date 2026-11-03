@@ -16,7 +16,6 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from accounts.permissions import Perm, allows
@@ -28,6 +27,7 @@ from ui.navigation import requires_page
 from ui.playlist import state
 from ui.responses import active_event as _event
 from ui.responses import (
+    back_url,
     closing_sheet,
     in_sheet,
     posted_int,
@@ -40,7 +40,8 @@ guard = requires_page("playlist")
 
 SHEET_BODY = "playlist-sheet-body"
 SETTINGS_WRITE = {"action": "settings.write"}
-# `playlist.php`'s back button, by the PHP page a link names in `back`.
+# `playlist.php`'s back button, by the PHP page a link names in `back`;
+# anything else returns to the race dashboard, as `playlist.php` does.
 BACK_PAGES = {"setup.php": "setup", "coordinator.php": "dashboard"}
 MAX_LANES = 31
 
@@ -65,20 +66,6 @@ def _choice(post, *, cut: bool) -> StepChoice:
         then=then,
         waits=post.get("waits") == "1",
     )
-
-
-def back_url(request) -> str:
-    """`?back=` names the page the back button returns to: setup.php and
-    coordinator.php by their new pages, or a path on this server. Anything
-    else returns to the race dashboard, as `playlist.php` does."""
-    back = request.GET.get("back", "")
-    if back in BACK_PAGES:
-        return reverse(BACK_PAGES[back])
-    if back.startswith("/") and url_has_allowed_host_and_scheme(
-        back, allowed_hosts={request.get_host()}
-    ):
-        return back
-    return reverse("dashboard")
 
 
 # ----- replies ---------------------------------------------------------------------
@@ -115,7 +102,7 @@ def page(request):
         {
             "playlist": state.build(_event(request)),
             "can_race": allows(request, Perm.CONTROL_RACE),
-            "back_url": back_url(request),
+            "back_url": back_url(request, BACK_PAGES, "dashboard"),
             "page_title": "Rounds Playlist",
         },
     )
