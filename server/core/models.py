@@ -247,8 +247,30 @@ class RaceState(PerEvent):
     fake_racers = models.BooleanField(default=False)
 
 
+class KeyOrder(models.JSONField):
+    """The keys of the row's `request`, in the order they came. Postgres's
+    jsonb sorts an object's keys, and the Retrospective page prints a
+    `settings.write` or a `rank.edit` in the order sent, as PHP's
+    `history.php` does. Filled at every insert, `bulk_create` too."""
+
+    def pre_save(self, model_instance, add):
+        request = model_instance.request
+        keys = list(request) if isinstance(request, dict) else []
+        setattr(model_instance, self.attname, keys)
+        return keys
+
+
 class ActionLog(EventScoped):
     """One received legacy action, kept verbatim for the Retrospective page."""
 
     received = models.DateTimeField(default=timezone.now)
     request = models.JSONField()
+    request_keys = KeyOrder(default=list, editable=False)
+
+
+def in_order(request, keys):
+    """`request` with its keys in `keys`' order, any others after."""
+    if not isinstance(request, dict) or not keys:
+        return request
+    ordered = {k: request[k] for k in keys if k in request}
+    return ordered | {k: v for k, v in request.items() if k not in ordered}

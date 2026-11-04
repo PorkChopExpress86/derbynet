@@ -14,7 +14,7 @@ shows the raw id with the marker where it has no name, never another row's.
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
-from core.models import ActionLog
+from core.models import ActionLog, in_order
 from transfer.models import LegacyId
 
 # The request keys that hold an id, by the model of the row they name.
@@ -105,9 +105,10 @@ def resolved_log(event) -> Iterator[tuple[object, dict]]:
     rows = (
         ActionLog.objects.filter(event=event)
         .order_by("received", "pk")
-        .values_list("pk", "received", "request")
+        .values_list("pk", "received", "request", "request_keys")
     )
-    for pk, received, request in rows.iterator():
+    for pk, received, request, keys in rows.iterator():
+        request = in_order(request, keys)
         if pk in imported and isinstance(request, Mapping):
             request = resolve_request(request, maps)
         yield received, request
