@@ -299,6 +299,29 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Differences from PHP that wait on a quirk id or an owner decision, by the
+# PHP page's name. The ticket's "## Still open" names each, and an entry moves
+# to `ROUTE_DIVERGENCES` once it has an id.
+UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {
+    "timer.php": (
+        "a browser without Web Serial is sent to /timer/no-serial/ before any"
+        " timer script runs (#50 scope); PHP shows its own dialog over the page.",
+    ),
+    "timer-test.php": (
+        "split into the status page /timer/ and the test page /timer/test/ (#50"
+        " scope).",
+        "a lane toggle names the lane's end state and stages a new test heat at"
+        " every change (timer.set_test_lane); after a second tt-mask change PHP"
+        " leaves the timer on the heat it already staged, so the timer never"
+        " hears of the change (php-scratch.sh, 2026-11-04;"
+        " racing/tests/test_timer_test_lanes.py).",
+        "the log tail stops while the page is hidden (#50 risks).",
+    ),
+}
+
+# The PHP pages whose replacement behaves as PHP's does, layout aside.
+LIKE_PHP: frozenset[str] = frozenset()
+
 
 def action(
     name: str,

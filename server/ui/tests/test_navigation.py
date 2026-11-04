@@ -8,6 +8,7 @@ from django.test import Client
 from django.urls import reverse
 
 from accounts.permissions import Access, Perm
+from legacy_api.registry import LIKE_PHP, ROUTE_DIVERGENCES, UNDECIDED_DIVERGENCES
 from ui import navigation
 from ui.navigation import ENTRIES, NavEntry
 from ui.tests.roles import ROLE_NAV, ROLES
@@ -115,6 +116,46 @@ CONTEXT_PAGES = {
 
 def test_every_page_of_the_spec_has_an_entry():
     assert CONTEXT_PAGES <= {e.php for e in ENTRIES}
+
+
+# The pages built before the #50 retro, whose differences from PHP are in
+# code comments and READMEs. A page leaves this set once its PHP page is in
+# ROUTE_DIVERGENCES, UNDECIDED_DIVERGENCES or LIKE_PHP; none joins it.
+BUILT_BEFORE_THE_CHECK = {
+    "index.php", "login.php", "checkin.php", "photo-thumbs.php?repo=head",
+    "photo-thumbs.php?repo=car", "coordinator.php", "kiosk-dashboard.php",
+    "judging.php", "racer-results.php", "awards-presentation.php",
+    "standings.php", "export.php", "history.php", "racing-groups.php",
+    "playlist.php", "scenes.php", "import-roster.php", "import-awards.php",
+    "import-results.php", "awards-editor.php", "fake-timer.php",
+}  # fmt: skip
+
+
+def unrecorded(entries) -> list[str]:
+    recorded = set(ROUTE_DIVERGENCES) | set(UNDECIDED_DIVERGENCES) | LIKE_PHP
+    return [
+        e.php
+        for e in entries
+        if e.php and e.view and e.php not in recorded | BUILT_BEFORE_THE_CHECK
+    ]
+
+
+def test_every_built_page_records_how_it_differs_from_php():
+    """#49's and #50's reviews each found five differences from the PHP page
+    that the page's ticket listed nowhere. Building a page names its
+    differences, or says it has none, in legacy_api/registry.py."""
+    assert unrecorded(ENTRIES) == []
+
+
+def test_a_new_page_with_no_record_fails_and_the_old_list_only_shrinks():
+    replay = navigation.entry("replay")
+    built = NavEntry(**{**vars(replay), "view": "ui.replay.views.page"})
+    assert unrecorded([built]) == ["replay.php"]
+    by_php = {e.php: e for e in ENTRIES}
+    assert all(by_php[php].view for php in BUILT_BEFORE_THE_CHECK)
+    recorded = set(ROUTE_DIVERGENCES) | set(UNDECIDED_DIVERGENCES) | LIKE_PHP
+    assert BUILT_BEFORE_THE_CHECK & recorded == set()
+    assert all(texts for texts in UNDECIDED_DIVERGENCES.values())
 
 
 # #15's page gates, with the page gate winning where index.php's link differed.
