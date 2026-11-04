@@ -1,0 +1,48 @@
+{% extends "ui/base.html" %}
+{% block main %}
+<div class="flex flex-col gap-4" data-history>
+  <section aria-labelledby="hi-bias-h" class="rounded-2xl border border-line bg-surface p-4" data-section="lane-bias">
+    <h2 id="hi-bias-h" class="text-lg font-semibold">Lane bias</h2>
+    {% if retro.bias %}
+    <p class="mt-1 {% if retro.bias.biased %}font-semibold text-danger-ink{% endif %}" data-bias-summary>{{ retro.bias.summary }}</p>
+    <details class="mt-2" data-bias-details>
+      <summary class="flex min-h-11 cursor-pointer items-center font-semibold">Details</summary>
+      <ul role="list" class="mt-2 flex flex-col gap-1" aria-label="Lanes">
+        {% for l in retro.bias.lanes %}
+        <li class="flex flex-wrap gap-x-3 rounded-lg bg-surface-2 px-3 py-2 text-sm" data-lane="{{ l.lane }}"><span class="font-semibold">Lane {{ l.lane }}</span> <span>{{ l.runs }}</span> <span>{{ l.dnfs }}</span> <span class="font-mono">{{ l.mean }}</span> <span class="font-mono">{{ l.variance }}</span></li>
+        {% endfor %}
+      </ul>
+      <p class="mt-2 text-sm" data-f>{{ retro.bias.f_line }}</p>
+      <p class="text-sm" data-critical>{{ retro.bias.critical_line }}</p>
+    </details>
+    {% else %}
+    <p class="mt-1 text-ink-muted" data-bias-summary>There isn't enough evidence to assess lane bias.</p>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="hi-time-h" data-section="timeline">
+    <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="hi-time-h" class="text-lg font-semibold">Events timeline</h2>
+      {% if can_debug %}<a href="{% url 'history' %}{% if not retro.debug %}?debug{% endif %}" class="flex min-h-11 items-center text-sm font-semibold underline underline-offset-2" data-debug-link>{% if retro.debug %}Hide debug view{% else %}Debug view{% endif %}</a>{% endif %}
+    </div>
+    {% if retro.hours %}
+    {% for hour in retro.hours %}
+    <section aria-label="{{ hour.label }}" class="mb-4" data-hour>
+      <h3 class="sticky top-14 z-10 bg-bg py-1 text-sm font-semibold text-ink-muted">{{ hour.label }}</h3>
+      <ol role="list" class="flex flex-col gap-2 border-l-2 border-line pl-3">
+        {% for e in hour.events %}
+        <li class="rounded-xl border border-line bg-surface p-3" data-event>
+          <p class="flex flex-wrap gap-x-2 text-sm text-ink-muted"><time data-time>{{ e.time }}</time>{% if e.heat %}<span data-heat>{{ e.heat }}</span>{% endif %}</p>
+          <p class="mt-1 break-words" data-sentence>{% if e.sentence %}{{ e.sentence }}{% else %}<span class="text-ink-muted">No sentence</span>{% endif %}</p>
+          {% if retro.debug %}<pre class="mt-2 overflow-x-auto rounded-lg bg-surface-2 p-2 text-xs" data-request>{{ e.request }}</pre>{% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endfor %}
+    {% else %}
+    <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>Nothing has happened yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

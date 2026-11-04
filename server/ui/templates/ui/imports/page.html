@@ -1,0 +1,86 @@
+{% extends "ui/base.html" %}
+{% load static %}
+{% block head %}<script src="{% static 'ui/vendor/xlsx-0.13.5.full.min.js' %}"></script><script src="{% static 'ui/import.js' %}"></script>{% endblock %}
+{% block main %}
+{{ config|json_script:"import-config" }}
+<div x-data="importer(JSON.parse(document.getElementById('import-config').textContent))" class="flex flex-col gap-4" data-import="{{ kind }}">
+  <nav aria-label="What to import" class="flex rounded-xl border border-field bg-surface p-1 sm:max-w-md">
+    {% for value, label, url_name in kinds %}
+    <a href="{% url url_name %}" class="flex min-h-11 flex-1 items-center justify-center rounded-lg px-3 text-sm font-medium {% if value == kind %}bg-accent text-accent-ink{% else %}text-ink-muted{% endif %}"{% if value == kind %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  <section aria-labelledby="im-file-h" class="rounded-2xl border border-line bg-surface p-4" data-step="file">
+    <h2 id="im-file-h" class="text-lg font-semibold">1. Choose a file</h2>
+    <p class="mt-1 text-sm text-ink-muted">{% if kind == "results" %}A results sheet exported from another DerbyNet race, as .csv, .xlsx or .ods.{% else %}A spreadsheet or .csv file, one {% if kind == "roster" %}racer{% else %}award{% endif %} per row.{% endif %}</p>
+    <label class="mt-3 flex min-h-14 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-field px-4 text-center font-semibold has-focus-visible:outline-3 has-focus-visible:outline-accent">
+      <input type="file" accept=".csv,.txt,.xlsx,.xls,.ods,text/csv" class="sr-only" @change="pick($event)" data-file>
+      <span x-text="fileName || 'Choose a file'">Choose a file</span>
+    </label>
+    <p x-show="error" x-cloak role="alert" class="mt-2 font-semibold text-danger-ink" x-text="error" data-file-error></p>
+    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <label class="flex flex-col gap-1 text-sm font-medium">Encoding
+        <select x-model="encoding" @change="setEncoding()" class="min-h-11 rounded-xl border border-field bg-surface px-3 text-base" data-encoding>
+          <template x-for="[value, name] in IMPORT_CODEPAGES"><option :value="value" :disabled="!value" x-text="name" :selected="value === encoding"></option></template>
+        </select>
+      </label>
+      <label x-show="sheets.length" x-cloak class="flex flex-col gap-1 text-sm font-medium">Sheet
+        <select x-model.number="sheet" @change="setSheet()" class="min-h-11 rounded-xl border border-field bg-surface px-3 text-base" data-worksheet>
+          <template x-for="(name, i) in sheets"><option :value="i" x-text="name" :selected="i === sheet"></option></template>
+        </select>
+      </label>
+    </div>
+    <div x-show="table.length" x-cloak class="mt-3 flex items-center justify-between gap-3">
+      <span id="im-header-label" class="font-medium">The first row names the columns</span>
+      <button type="button" role="switch" :aria-checked="header.toString()" aria-checked="true" aria-labelledby="im-header-label" @click="setHeader()" class="group grid h-11 w-16 shrink-0 place-items-center rounded-full" data-header>
+        <span class="relative block h-7 w-12 rounded-full bg-switch-off group-aria-checked:bg-ok motion-safe:transition-colors"><span class="absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow group-aria-checked:translate-x-5 motion-safe:transition-transform"></span></span>
+      </button>
+    </div>
+  </section>
+
+  <section x-show="table.length" x-cloak aria-labelledby="im-map-h" class="rounded-2xl border border-line bg-surface p-4" data-step="map">
+    <h2 id="im-map-h" class="text-lg font-semibold">2. Match the columns</h2>
+    <p class="mt-1 text-sm text-ink-muted">{% if kind == "results" %}The columns of a DerbyNet export, in order. Change one if your file differs.{% else %}Pick the field each column holds. Leave a column at “Skip” to leave it out.{% endif %}</p>
+    <ul role="list" class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <template x-for="col in columns" :key="col">
+        <li class="flex flex-col gap-1 rounded-xl bg-surface-2 p-3">
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="truncate font-semibold" x-text="header ? (table[0][col] || 'Column ' + (col + 1)) : 'Column ' + (col + 1)"></span>
+            <span class="truncate text-ink-muted" x-text="(body[0] || [])[col] || ''"></span>
+            <select @change="choose(col, $event.target.value)" class="min-h-11 rounded-xl border border-field bg-surface px-3 text-base" :data-column="col">
+              <option value="" :selected="!mapping[col]">Skip</option>
+              <template x-for="[f, label] in config.fields"><option :value="f" x-text="label" :selected="mapping[col] === f"></option></template>
+            </select>
+          </label>
+        </li>
+      </template>
+    </ul>
+    <p x-show="unmet.length" role="status" class="mt-3 text-warn-ink" data-unmet>Still to match: <span x-text="unmet.map((f) => labelOf[f]).join(', ')"></span>{% if kind == "roster" %} (or First &amp; Last Name){% endif %}.</p>
+    <p x-show="duplicated.length" role="status" class="mt-3 text-warn-ink" data-duplicated>Two columns hold <span x-text="duplicated.map((f) => labelOf[f]).join(', ')"></span>.</p>
+  </section>
+
+  <section x-show="table.length" x-cloak aria-labelledby="im-check-h" class="rounded-2xl border border-line bg-surface p-4" data-step="preview">
+    <h2 id="im-check-h" class="text-lg font-semibold">3. Check and import</h2>
+    <p class="mt-1 text-sm text-ink-muted"><span x-text="body.length"></span> rows. The first <span x-text="Math.min(body.length, config.previewRows)"></span>:</p>
+    <div class="mt-2 overflow-x-auto rounded-xl border border-line">
+      <table class="min-w-full text-sm" data-preview-table>
+        <thead class="bg-surface-2 text-left"><tr><th scope="col" class="px-2 py-1">Row</th><template x-for="f in mapped"><th scope="col" class="px-2 py-1" x-text="labelOf[f]"></th></template></tr></thead>
+        <tbody>
+          <template x-for="r in rows.slice(0, config.previewRows)" :key="r.row">
+            <tr class="border-t border-line"><td class="px-2 py-1 font-mono text-ink-muted" x-text="r.row"></td><template x-for="f in mapped"><td class="px-2 py-1" x-text="r.fields[f]"></td></template></tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <form id="import-form" class="mt-3 flex flex-col gap-3" @submit.prevent>
+      <input type="hidden" name="rows" :value="rowsJson">
+      <div class="flex flex-wrap gap-2">
+        <button type="button" :disabled="!ready" hx-post="{% url 'import-preview' kind %}" hx-target="#import-summary" hx-swap="innerHTML" hx-include="#import-form" hx-sync="#import-form:replace" class="min-h-11 rounded-xl border border-line px-4 font-semibold disabled:opacity-50" data-action="preview">Preview</button>
+        <button type="button" :disabled="!ready" hx-post="{% url 'import-run' kind %}" hx-target="#import-outcome" hx-swap="innerHTML" hx-include="#import-form" hx-sync="#import-form:drop" class="min-h-11 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink disabled:opacity-50 sm:flex-none" data-action="import">Import</button>
+      </div>
+      <div id="import-summary" aria-live="polite"></div>
+    </form>
+    <div id="import-outcome" aria-live="polite" class="mt-3"></div>
+  </section>
+</div>
+{% endblock %}

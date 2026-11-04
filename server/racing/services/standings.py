@@ -7,7 +7,11 @@ from django.db.models import Exists, OuterRef
 from awards.models import AwardPartition
 from core.models import FullFieldRule, RaceSettings, RaceState
 from racing.engine.standings import oracle
-from racing.engine.standings.closed_lanes import HeatResult, counted_results
+from racing.engine.standings.closed_lanes import (
+    HeatResult,
+    counted_results,
+    in_closed_lane,
+)
 from racing.engine.standings.eligibility import AwardSettings, AwardUnit
 from racing.engine.standings.scoring import Scoring
 from racing.engine.standings.speed_awards import (
@@ -28,9 +32,24 @@ from roster.models import (
 
 
 @dataclass(frozen=True)
+class HeatTime:
+    """One heat of a racer in a round, as the standings read it. `dropped`
+    is a result in a lane closed for its round, which the standings leave
+    out (D37); `finish_place` is the stored place."""
+
+    heat: int
+    lane: int
+    finish_time: float | None
+    finish_place: int | None
+    dropped: bool
+
+
+@dataclass(frozen=True)
 class _Inputs:
     event: oracle.Event
     trophies: TrophySettings
+    # `{(round id, racer id): heats}` of every entered racer's results.
+    heat_times: MappingProxyType = MappingProxyType({})
 
 
 class Snapshot:
@@ -41,6 +60,11 @@ class Snapshot:
     @cached_property
     def speed_awards(self) -> SpeedAwards:
         return speed_awards(self.standings, self.inputs.trophies)
+
+    def heat_times(self, round_id: int, racer_id: int) -> tuple[HeatTime, ...]:
+        """The racer's results in the round, in heat order, those dropped by
+        a closed lane marked (D37, #108)."""
+        return self.inputs.heat_times.get((round_id, racer_id), ())
 
 
 def standings_snapshot(event) -> Snapshot:
@@ -180,6 +204,14 @@ def _read(event) -> _Inputs:
             "entered",
         )
     )
+    rows = list(rows)
+    heat_times: dict[tuple[int, int], list[HeatTime]] = {}
+    for row in sorted(rows, key=lambda r: r[:3]):
+        if row[6]:
+            result = HeatResult(*row[:5])
+            heat_times.setdefault((row[0], row[5]), []).append(
+                HeatTime(*row[1:5], dropped=in_closed_lane(result, closed))
+            )
     # A closed lane's results still place the other cars of its heat
     # before they move up, so they are read whether entered or not.
     results = tuple(
@@ -213,6 +245,7 @@ def _read(event) -> _Inputs:
             n_subgroup=settings.n_rank_trophies,
             one_trophy_per=settings.one_trophy_per,
         ),
+        heat_times=MappingProxyType({k: tuple(v) for k, v in heat_times.items()}),
     )
 
 

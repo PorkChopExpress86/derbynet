@@ -1,0 +1,42 @@
+{% load ui %}{# The ranked list of one standings presentation. A racer who cannot win its speed awards is listed in score order with no place (D33, D35); a time a closed lane dropped is struck through (D37). #}
+{% if not standings.catalog %}
+<p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No standings yet. They show once a round has results.</p>
+{% else %}
+<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+  <h2 class="text-lg font-semibold" data-title>{{ standings.title }}</h2>
+  <p class="text-sm text-ink-muted" data-scoring>{{ standings.heading }}</p>
+</div>
+{% if standings.cards %}
+<ol role="list" aria-label="Standings for {{ standings.title }}" class="flex flex-col gap-2" data-cards>
+  {% for c in standings.cards %}
+  <li class="flex min-w-0 gap-3 rounded-xl border border-line bg-surface p-3{% if c.not_eligible %} border-dashed{% endif %}" data-racer="{{ c.racer_id }}"{% if c.not_eligible %} data-not-eligible{% endif %}>
+    <span class="grid size-11 shrink-0 place-items-center rounded-full {% if c.place %}bg-accent text-accent-ink{% else %}bg-surface-2 text-ink-muted{% endif %} font-mono text-lg font-semibold" data-place>{% if c.place %}{{ c.place }}{% else %}<span aria-hidden="true">–</span><span class="sr-only">No place</span>{% endif %}</span>
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-baseline gap-x-2">
+        <span class="font-mono font-semibold" data-car>{{ c.car_number|car }}</span>
+        <span class="truncate font-semibold" data-name>{{ c.name }}</span>
+        {% if c.car_name %}<span class="truncate text-sm text-ink-muted" data-car-name>{{ c.car_name }}</span>{% endif %}
+      </div>
+      {% if standings.use_groups or standings.use_subgroups %}<p class="truncate text-sm text-ink-muted" data-group>{% if standings.use_groups %}{{ c.group }}{% endif %}{% if standings.use_groups and standings.use_subgroups %} · {% endif %}{% if standings.use_subgroups %}{{ c.subgroup }}{% endif %}</p>{% endif %}
+      {% if c.not_eligible %}<p class="mt-1"><span class="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn-ink" data-why>Not eligible: {{ c.not_eligible }}</span></p>{% endif %}
+      <dl class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <div class="flex gap-1"><dt class="text-ink-muted">{{ standings.score_label }}</dt><dd class="font-mono font-semibold" data-score>{{ c.score }}</dd></div>
+        <div class="flex gap-1"><dt class="text-ink-muted">Best</dt><dd class="font-mono" data-best>{{ c.best }}</dd></div>
+        <div class="flex gap-1"><dt class="text-ink-muted">Worst</dt><dd class="font-mono" data-worst>{{ c.worst }}</dd></div>
+        <div class="flex gap-1"><dt class="text-ink-muted">Heats</dt><dd class="font-mono" data-heats>{{ c.heats }}</dd></div>
+      </dl>
+      {% if c.times %}
+      <ul role="list" aria-label="Heats of {{ c.name }}" class="mt-2 flex flex-wrap gap-1">
+        {% for t in c.times %}
+        <li class="rounded-lg px-2 py-0.5 font-mono text-sm {% if t.dropped %}bg-surface-2 text-ink-muted line-through{% else %}bg-surface-2{% endif %}" title="Heat {{ t.heat }}, lane {{ t.lane }}{% if t.dropped %}, dropped: the lane was closed{% endif %}" data-time{% if t.dropped %} data-dropped{% endif %}>{% if t.dnf %}DNF {% endif %}{{ t.shown }}{% if t.dropped %}<span class="sr-only"> (dropped, lane {{ t.lane }} closed)</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No racer has a result here yet.</p>
+{% endif %}
+{% endif %}

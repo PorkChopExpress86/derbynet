@@ -1,0 +1,21 @@
+{# The outcome of an import: all rows imported, or none, with each row's error beside it. #}
+{% if outcome.ok %}
+<div role="status" class="rounded-xl border border-ok bg-ok-soft p-3 text-ok-ink" data-imported="{{ outcome.imported }}">
+  <p class="font-semibold">Imported {{ outcome.imported }} {% if kind == "roster" %}racer{{ outcome.imported|pluralize }}{% elif kind == "awards" %}award{{ outcome.imported|pluralize }}{% else %}result{{ outcome.imported|pluralize }}{% endif %}.</p>
+  {% if kind == "roster" %}<a href="{% url 'checkin' %}" class="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-2">Go to check-in</a>{% elif kind == "awards" %}<a href="{% url 'awards-editor' %}" class="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-2">Go to the awards editor</a>{% else %}<a href="{% url 'standings' %}" class="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-2">See the standings</a>{% endif %}
+</div>
+{% else %}
+<div role="alert" class="rounded-xl border border-danger bg-danger-soft p-3 text-danger-ink" data-failed="{{ outcome.errors|length }}">
+  <p class="font-semibold">Nothing was imported: {{ outcome.errors|length }} row{{ outcome.errors|length|pluralize }} need{{ outcome.errors|length|pluralize:"s," }} fixing. Fix the file and import it again.</p>
+  {% for message in general %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
+<ol role="list" class="mt-2 flex flex-col gap-1" aria-label="Rows" data-row-outcomes>
+  {% for number, error, warnings in rows %}
+  <li class="flex flex-wrap gap-x-2 rounded-lg px-2 py-1 text-sm {% if error %}bg-danger-soft text-danger-ink{% else %}bg-surface-2{% endif %}" data-row="{{ number }}"{% if error %} data-error{% endif %}>
+    <span class="font-mono">Row {{ number }}</span>
+    {% if error %}<span data-message>{{ error }}</span>{% elif outcome.ok %}<span>OK</span>{% else %}<span class="text-ink-muted">Not imported</span>{% endif %}
+    {% for w in warnings %}<span class="text-warn-ink" data-warning>{{ w }}</span>{% endfor %}
+  </li>
+  {% endfor %}
+</ol>

@@ -1,0 +1,17 @@
+{% extends "ui/base.html" %}
+{% block main %}
+<div data-standings>
+  {% if standings.catalog %}
+  <form class="mb-4 flex flex-col gap-1 sm:max-w-md" action="{% url 'standings' %}" method="get">
+    <label for="standings-view" class="text-sm font-medium text-ink-muted">Standings for</label>
+    <select id="standings-view" name="view" hx-get="{% url 'standings-list' %}" hx-trigger="change" hx-target="#standings-list" hx-swap="innerHTML" hx-include="this" hx-sync="this:replace" class="min-h-11 rounded-xl border border-field bg-surface px-3 text-base">
+      {% for key, name in standings.catalog %}<option value="{{ key }}"{% if key == standings.selected %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit" class="mt-2 min-h-11 rounded-xl border border-line px-4 font-semibold">Show</button></noscript>
+  </form>
+  {% endif %}
+  <div id="standings-list" aria-live="polite">
+  {% include "ui/standings/list.html" %}
+  </div>
+</div>
+{% endblock %}

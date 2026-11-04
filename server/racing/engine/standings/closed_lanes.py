@@ -22,7 +22,8 @@ class HeatResult:
     key: object = None
 
 
-def _closed(result: HeatResult, closed: Mapping[int, int]) -> bool:
+def in_closed_lane(result: HeatResult, closed: Mapping[int, int]) -> bool:
+    """The result is in a lane closed for its round, so it is dropped."""
     return bool(closed.get(result.round_id, 0) & (1 << (result.lane - 1)))
 
 
@@ -38,13 +39,13 @@ def counted_results(
         return results
     ahead: dict[tuple[int, int], list[int]] = {}
     for result in results:
-        if _closed(result, closed) and result.finish_place is not None:
+        if in_closed_lane(result, closed) and result.finish_place is not None:
             ahead.setdefault((result.round_id, result.heat), []).append(
                 result.finish_place
             )
     counted = []
     for result in results:
-        if _closed(result, closed):
+        if in_closed_lane(result, closed):
             continue
         dropped = ahead.get((result.round_id, result.heat), ())
         place = result.finish_place

@@ -228,6 +228,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         short_label="Results",
         icon="results",
         phone_rank={ANONYMOUS_ROLE: 1, OTHER_ROLES: 6},
+        view="ui.results.views.page",
     ),
     # After
     NavEntry(
@@ -251,6 +252,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         php="standings.php",
         icon="standings",
         phone_rank={"RaceCoordinator": 3, OTHER_ROLES: 3},
+        view="ui.standings.views.page",
     ),
     NavEntry(
         "export",
@@ -261,6 +263,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         49,
         php="export.php",
         icon="export",
+        view="ui.exports.views.page",
     ),
     NavEntry(
         "history",
@@ -271,6 +274,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         49,
         php="history.php",
         icon="history",
+        view="ui.history.views.page",
     ),
     # Other
     NavEntry(
@@ -338,6 +342,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         49,
         php="import-roster.php",
         menu=False,
+        view="ui.imports.views.roster_page",
     ),
     NavEntry(
         "import-awards",
@@ -348,6 +353,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         49,
         php="import-awards.php",
         menu=False,
+        view="ui.imports.views.awards_page",
     ),
     NavEntry(
         "import-results",
@@ -358,6 +364,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         49,
         php="import-results.php",
         menu=False,
+        view="ui.imports.views.results_page",
     ),
     NavEntry(
         "awards-editor",
