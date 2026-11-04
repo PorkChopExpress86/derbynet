@@ -20,7 +20,8 @@ adds `0-rotated` for the original of a turned photo.
 
 A render is made on first request under a per-file lock, and only for the
 labels in `ALLOWED_BOXES`. Any other size gets the allowed render nearest to
-it, so a client cannot create folders. Sizes truncate as PHP's do: 921x299
+it, so a client cannot create folders. Sizes truncate as PHP's do
+(`(int)` at `website/inc/photo-config.inc:342` and `:345`): 921x299
 becomes 200x64 at `200x200`.
 
 A file is written before the transaction that refers to it, and removed only
@@ -1076,7 +1077,8 @@ def delete_photo(event, repo: Repository, name) -> bool:
     held throughout, so no render made meanwhile is left behind. Returns
     whether there was such a photo: a file of that name at the top of the
     folder, or a racer of the event that showed it. A bad name changes
-    nothing; `photo.delete` answers success either way, as PHP does."""
+    nothing; `photo.delete` answers success either way, as PHP does
+    (`website/ajax/action.photo.delete.inc:58`)."""
     if repo.directory is None or not is_valid_name(name):
         return False
     with _photo_lock(repo, name):
@@ -1131,7 +1133,7 @@ class DirectoryStatus:
     `kind` is `ok`, `read-only`, `missing` (no folder set, no such folder,
     not a folder, or not readable) or `empty`. Only `ok` and `empty` take
     uploads, as photo-thumbs.php shows its Dropzone form only for a writable
-    directory."""
+    directory (`website/photo-thumbs.php:114` to `:124`)."""
 
     kind: str
     label: str

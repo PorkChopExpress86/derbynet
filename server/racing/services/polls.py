@@ -678,7 +678,8 @@ def _precision(run: Running, args: PollArgs) -> dict:
 
 
 def _race_structure(run: Running, args: PollArgs) -> dict:
-    """Four top-level keys, as PHP writes them."""
+    """Four top-level keys, as PHP writes them
+    (`test_poll_answers_what_php_sent_after_every_step`)."""
     names = labels(run.settings)
     return {
         "use-subgroups": run.settings.use_subgroups,

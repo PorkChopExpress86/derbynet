@@ -3,7 +3,8 @@ racer cards with their photo state, and the pool of unassigned photos.
 
 Reads only. The files, the directory checks and the `lost_photo` flag come
 from `media.photos.inventory()`, so no path is built here. Nothing polls:
-the page lists the repository when it opens, as `photo-thumbs.php` does, and
+the page lists the repository when it opens, as `photo-thumbs.php` does
+(`website/photo-thumbs.php:154`; `photo-thumbs.js` sets no polling timer), and
 every change answers with `photos-refresh`, which lists it again.
 """
 

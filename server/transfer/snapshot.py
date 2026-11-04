@@ -9,7 +9,8 @@ knows and never builds SQL from the file, and replaces the active event.
 The new event keeps the old one's four folder settings, and its files move
 to those folders (#134, `transfer.legacy.folders`).
 
-A snapshot omits `ntrophies`, `note` and `checkin_time`, as PHP's does.
+A snapshot omits `ntrophies`, `note` and `checkin_time`, as PHP's does
+(`website/inc/export-schema.inc:39` to `:80` lists no such column).
 Round trips lose them, and everything Django keeps that the legacy schema
 has no column for (lane closures, allowed racers, the timer audit).
 """

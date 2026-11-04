@@ -106,7 +106,9 @@ def _query(**values) -> str:
 def legacy_page(request):
     """`photo-thumbs.php`: a 301 to the repository's page, keeping the rest of
     the query (`order`, `racerid`, `back`). `repo=car` is the car photos;
-    anything else is the racer photos, where PHP fails on an unknown name."""
+    anything else is the racer photos, where PHP fails on an unknown name:
+    `photo_repository()` returns nothing for it (`website/inc/photo-config.inc:527`
+    to `:533`) and `website/photo-thumbs.php:14` goes on to use it."""
     query = request.GET.copy()
     repo = query.pop("repo", ["head"])[-1]
     target = reverse(state.REPOS["car" if repo == "car" else "head"])

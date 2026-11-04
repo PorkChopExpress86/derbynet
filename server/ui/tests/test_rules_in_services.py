@@ -10,7 +10,11 @@ lint in `ui/*/views.py` and `ui/*/state.py`:
   imported from a service module, such as `MAX_RUNS_PER_LANE`, or from the
   racing engine, such as D42's `DID_NOT_FINISH`: the service checks its own
   limit, and the view catches its failure or reads the service's answer
-  (#49's review found the DNF rule copied into the standings state).
+  (#49's review found the DNF rule copied into the standings state);
+- a comparison of a stored count, `....objects....count()`, with a number:
+  a rule over stored rows such as `use_groups()` (more than one group) is
+  the service's. #49 found it computed in the standings state, in results by
+  racer and in the judging page's state.
 
 A copied lookup table such as the method map has no fixed shape; the review
 still looks for it.
@@ -49,6 +53,16 @@ def offenders(source: str, filename: str = "views.py") -> list[str]:
                     f"{filename}:{node.lineno} {ast.unparse(node)}: "
                     f"the service checks {name}"
                 )
+        if isinstance(node, ast.Compare) and any(
+            isinstance(side, ast.Call)
+            and ast.unparse(side.func).endswith(".count")
+            and ".objects." in ast.unparse(side)
+            for side in [node.left, *node.comparators]
+        ):
+            found.append(
+                f"{filename}:{node.lineno} {ast.unparse(node)}: a rule over stored"
+                " rows; call the service that owns it"
+            )
     return found
 
 
@@ -97,6 +111,13 @@ def _dnf(time):
     return time is not None and time >= DID_NOT_FINISH
 """
 
+STORED_COUNT = """
+from roster.models import Group
+
+def build(event):
+    return Group.objects.filter(event=event).count() > 1
+"""
+
 LOCAL_PARSE_BOUND = """
 MAX_LANES = 31
 
@@ -108,8 +129,8 @@ def scheduling_lanes(request):
 
 @pytest.mark.parametrize(
     "source",
-    [LANE_MASK, SERVICE_LIMIT, ENGINE_LIMIT],
-    ids=["lane-mask", "service-limit", "engine-limit"],
+    [LANE_MASK, SERVICE_LIMIT, ENGINE_LIMIT, STORED_COUNT],
+    ids=["lane-mask", "service-limit", "engine-limit", "stored-count"],
 )
 def test_a_copied_rule_is_flagged(source):
     assert len(offenders(source)) == 1

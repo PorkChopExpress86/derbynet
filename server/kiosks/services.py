@@ -420,7 +420,8 @@ def reload_kiosk(event, address: str) -> None:
 
 def create_scene(event, name: str) -> Scene:
     """The scene editor's New scene: `scene.add`, refusing a blank name, and
-    a name another scene has in any case, as `scenes.js` does."""
+    a name another scene has in any case, as `scenes.js` does
+    (`website/js/scenes.js:109` to `:113`)."""
     name = _name(name, "scene name")
     if not name:
         raise KioskFailure("Name the scene.")

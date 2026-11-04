@@ -45,8 +45,9 @@ def preferred_urls(request, use_https: bool = False) -> list[str]:
     `config-url` wins when it exists. Otherwise each host address makes a URL,
     with the request's port and the server's URL prefix. Behind a proxy the
     `Host` header names the server instead, as PHP reads `HTTP_HOST` when
-    `X-Forwarded-For` is set. A host with no address other than loopback also
-    falls back to `Host`. `use_https` forces the `https` scheme.
+    `X-Forwarded-For` is set (`website/inc/locked.inc:47` to `:48`). A host
+    with no address other than loopback also falls back to `Host`.
+    `use_https` forces the `https` scheme.
     """
     if (configured := _config_url()) is not None:
         return [configured]

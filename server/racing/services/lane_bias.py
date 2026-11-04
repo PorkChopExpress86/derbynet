@@ -5,7 +5,8 @@ from racing.models import HAS_RESULT, HeatLane
 
 def lane_bias(event: Event) -> LaneBias | None:
     """The test over every heat result of the event on lanes 1 to
-    `lane_count`, leaving out times that are missing or 0, as PHP does."""
+    `lane_count`, leaving out times that are missing or 0, as PHP does
+    (`website/inc/lane-bias.inc:11` to `:20`)."""
     nlanes = RaceSettings.objects.get(event=event).lane_count
     times_by_lane = [[] for _ in range(nlanes)]
     rows = (

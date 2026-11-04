@@ -10,12 +10,13 @@ rest edits a copy (`foreach ($workbook as $w)`, `:49` to `:54`), so a group
 name holding another of those characters, or two titles alike, failed
 PHP's export. Here each such character, and `:`, which Excel and openpyxl
 refuse, becomes `-`, a name is cut to 31
-characters, and a repeated name takes a number (proposed #64 row C51, #49).
+characters, and a repeated name takes a number (C51, #49).
 PHP also offers `.xls`; `.xlsx` opens wherever `.xls` did, so the port drops
 it, as #49 plans (Risks and notes).
 
 A cell keeps the type the workbook gives it: a number stays a number, text
-stays text (so a car name "111" is text, as `export-json.php` sends it), and
+stays text (so a car name "111" is text, as `export-json.php` sends it in
+the golden capture `test_export_files` reads), and
 a missing value is an empty cell.
 """
 

@@ -1,7 +1,8 @@
 """The awards editor (#45): `awards-editor.php` and `awards-editor.js`, over
 the award services of #33 and the partition lists of #26 (D35, D38).
 
-The page loads once and never polls, as PHP's does not. Every change
+The page loads once and never polls, as PHP's does not
+(`website/js/awards-editor.js` sets no timer). Every change
 answers with the award list again, out of band, and a toast; the sheet's
 form gets a body that closes the sheet, or the form again with the refusal
 in it. Each view parses the posted text and makes one service call, which

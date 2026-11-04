@@ -203,7 +203,8 @@ def _pack_trophies(event: Event) -> bool:
 def apply_group_form(event: Event, post: Mapping) -> FormResult:
     """A field of the racing groups editor (#43): `apply_form`, and a pack
     trophy count above zero turns "Don't calculate" pack standings back to
-    "Calculate normally", as `racing-groups.js` does, since pack trophies
+    "Calculate normally", as `racing-groups.js` does
+    (`website/js/racing-groups.js:90` to `:92`), since pack trophies
     need the pack standings. `set_pack_standings` holds the other half of
     that rule."""
     result = apply_form(event, post)

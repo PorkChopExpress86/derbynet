@@ -15,7 +15,7 @@ logged request, those with no sentence too (`entries(every_row=True)`).
 
 Two differences from PHP, both in text PHP printed unescaped: a
 `settings.write` key or a non-text value, and a lane key of `result.write`
-or `timer-message`, are escaped (proposed #64 row S38, #49: PHP printed
+or `timer-message`, are escaped (S38, #49: PHP printed
 `<i>key</i>` as markup, run with `testing/docker/php-scratch.sh`). No
 PHP-written log in the fixtures has such a key, so their text is PHP's.
 
@@ -614,7 +614,8 @@ def entries(
 
 
 def history(event, *, every_row: bool = False) -> list[Entry]:
-    """The event's history from its action log, as `history.php` reads it,
+    """The event's history from its action log, as `history.php` reads it
+    (`website/history.php:138`),
     with an imported row's legacy ids resolved (`transfer.action_log`)."""
     from transfer.action_log import resolved_log
 

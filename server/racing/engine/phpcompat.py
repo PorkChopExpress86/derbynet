@@ -109,7 +109,7 @@ def php_compare(value: int | str, other: int) -> int:
 def php_arithmetic_operand(text: str) -> int | float:
     """The number PHP 8 takes from a string in arithmetic: the leading
     number of a numeric or leading-numeric string. Other text raises
-    `TypeError`, as PHP does."""
+    `TypeError`, as PHP does (`speed-x1` in `test_current_award_keys`)."""
     match = _NUMBER.match(text)
     if not match:
         raise TypeError(f"Unsupported operand types: string, {text!r}")

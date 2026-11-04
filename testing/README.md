@@ -53,6 +53,12 @@ up itself, such as `exercise-one-database.sh`. A fresh PHP server has no event,
 so a script that logs in first fails with `parse error: Invalid numeric literal`
 until `setup.nodata` has created one.
 
+The script names its server and volume after its own process and only reads
+the images, so a run may read the images another run built: pass that run's
+`DERBYNET_TEST_PREFIX`. Build your own only when none exist. To ask PHP one
+language question, such as how it prints a float, run its interpreter from
+the server image: `docker run --rm --entrypoint php <prefix>-server -r 'echo 3.0;'`.
+
 A server database can't be reused: setup (`ez-new=testdb`) fails with
 `already_exists` the second time, so each run needs a fresh data volume.  The
 script always makes one.

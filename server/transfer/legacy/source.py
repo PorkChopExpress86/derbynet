@@ -1,7 +1,8 @@
 """Reading a legacy DerbyNet database: a SQLite file or a `snapshot.get` file.
 
 Both become a `Source`: every table as a list of row dicts, with table and
-column names in lower case, as PHP reads them through `PDO::CASE_LOWER`.
+column names in lower case, as PHP reads them through `PDO::CASE_LOWER`
+(`website/inc/write-config-files.inc:39`).
 """
 
 import json

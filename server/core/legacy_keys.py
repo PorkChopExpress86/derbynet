@@ -40,7 +40,10 @@ class Codec:
 
 
 def _number(value):
-    """Format a number as PHP writes it: `3`, not `3.0`."""
+    """Format a number as PHP writes it: `3`, not `3.0` (run with
+    `php -r 'echo 3.0;'` under PHP 8.3). PHP prints 14 significant digits
+    where `repr` prints the shortest exact form, so the two agree for a
+    timer's 3 or 4 decimals and differ for a sum such as 0.1 + 0.2."""
     return str(int(value)) if float(value).is_integer() else repr(float(value))
 
 

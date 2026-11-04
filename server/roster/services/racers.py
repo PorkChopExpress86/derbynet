@@ -405,7 +405,8 @@ def _move_round_1_entry(racer: Racer, old_group_id: int) -> None:
 def delete_racer(event, racer: Racer | None, posted_id) -> None:
     """`racer.delete`: refused for a racer with heats (`scheduled`) or in
     more than one round (`rosters`). The history gets `racer.*delete` with
-    the posted id, as PHP writes it whether or not the delete happened."""
+    the posted id, as PHP writes it whether or not the delete happened:
+    `website/action.php:88` records every action before its handler runs."""
     try:
         with transaction.atomic():
             lock_race_state(event.id)

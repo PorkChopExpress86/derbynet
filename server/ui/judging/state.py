@@ -21,8 +21,8 @@ from awards.eligibility import Eligibility
 from awards.listing import AD_HOC, sort_key
 from awards.models import Award
 from core.models import RaceSettings
-from roster.models import Group, Racer
-from roster.services.groups import Labels, labels
+from roster.models import Racer
+from roster.services.groups import Labels, labels, use_groups
 from roster.services.racers import CAR_PHOTOS, photo_url
 from ui.responses import car, nocase, racer_name
 
@@ -199,7 +199,7 @@ def build(event, filters: Filters) -> Board:
         racers=racers,
         shown=[c for c in racers if filters.matches(c)],
         labels=found.labels,
-        use_groups=Group.objects.filter(event=event).count() > 1,
+        use_groups=use_groups(event),
         use_subgroups=found.settings.use_subgroups,
         filters=filters,
     )

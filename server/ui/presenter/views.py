@@ -121,7 +121,8 @@ def clear(request):
 @guard
 def calc_rule(request):
     """The pack standings source (`award.calc-rule`). The speed awards
-    change with it, so the page loads again, as PHP's does."""
+    change with it, so the page loads again, as PHP's does
+    (`website/js/awards-presentation.js:89` to `:92`)."""
     try:
         set_pack_standings(_event(request), request.POST.get("full-field-calc", ""))
     except PackStandingsRefused as failure:

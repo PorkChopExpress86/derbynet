@@ -100,7 +100,8 @@ def has_ranges(partition: Partition) -> bool:
 
 def outside_ranges(partition: Partition, number: int) -> bool:
     """True when the partition has ranges and none holds `number`. A
-    partition with no range accepts any number, as PHP does."""
+    partition with no range accepts any number, as every partition does in
+    PHP, which has no ranges (D48)."""
     ranges = CarRange.objects.filter(partition=partition)
     return (
         ranges.exists()
