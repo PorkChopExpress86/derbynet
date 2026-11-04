@@ -125,8 +125,22 @@ def test_every_poll_that_answers_204_is_checked(coordinator, event):
     assert answering == set(POLLS)
 
 
+@pytest.fixture
+def frozen_clock(monkeypatch):
+    """The clock stops, so only the stored field the test changes moves the
+    rendering. The kiosk board shows a kiosk as quiet 5 s after its last
+    contact: a run past 5 s on a busy machine crossed it between a 204 and
+    the render after it, and blamed whichever field was changed then (8 of
+    25 on Postgres under load)."""
+    frozen = timezone.now()
+    monkeypatch.setattr(timezone, "now", lambda: frozen)
+    return frozen
+
+
 @pytest.mark.parametrize("url", POLLS)
-def test_a_204_means_the_poll_would_render_the_same(coordinator, event, url):
+def test_a_204_means_the_poll_would_render_the_same(
+    coordinator, event, url, frozen_clock
+):
     race_day(event, [("G1", 3), ("G2", 3)], race=True)
     status, before, sig = _render(coordinator, url)
     assert status == 200

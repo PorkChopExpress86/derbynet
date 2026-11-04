@@ -18,7 +18,6 @@ import pytest
 
 from core.models import ActionLog, SiteState
 from legacy_api.history_formatter import entries
-from legacy_api.tests.test_history_formatter import same_settings
 from roster.models import Racer
 from transfer.action_log import Unmapped, resolve_request
 from transfer.models import LegacyId
@@ -49,19 +48,6 @@ def sentences(html: str) -> list[str]:
     return re.findall(r"data-sentence>(.*?)</p>", html, re.S)
 
 
-def key_order_free(sentence: str) -> str:
-    """Postgres keeps a JSON request in its own key order, so a request the
-    history prints whole (`rank.edit`) and the settings of a
-    `settings.write` come back sorted, where SQLite and PHP keep the order
-    sent."""
-    sentence = same_settings(sentence)
-    head, found, rest = sentence.partition("Rank.edit ")
-    if not found:
-        return sentence
-    request = json.loads(html_text.unescape(rest).replace("\\/", "/"))
-    return head + found + json.dumps(request, sort_keys=True)
-
-
 @pytest.fixture
 def imported(tmp_path, event):
     """v10 imported beside an event whose rows took the low ids, so every
@@ -87,9 +73,7 @@ def test_the_timeline_of_an_imported_event_reads_as_php_printed_it(login, import
 
     html = login("RaceCoordinator").get("/history/").content.decode()
 
-    assert [key_order_free(s) for s in sentences(html)] == [
-        key_order_free(s) for s in expected
-    ]
+    assert sentences(html) == expected
 
 
 def test_an_action_after_the_import_names_the_racer_the_log_created(login, imported):
