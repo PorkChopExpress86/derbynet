@@ -159,9 +159,6 @@ def test_a_check_in_car_photo_shows_assigned_and_crops_and_turns(login, event, f
         "button", name="Keep as is"
     ).click()
     expect(checkin_card(page, racer).locator('[data-thumb="car"]')).to_be_visible()
-    # Leave once the page's images have loaded: a navigation orphans an image
-    # request, which the harness would wait on.
-    page.wait_for_function("[...document.images].every((i) => i.complete)")
     racer.refresh_from_db()
     assert racer.car_photo == "Car-1637.jpg" and racer.passed_inspection
 

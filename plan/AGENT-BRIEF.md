@@ -13,7 +13,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## Django handlers
 
 - A handler under `server/legacy_api/handlers/` is a thin adapter. It parses `ctx.args`, calls a service, and encodes the result. The guard in `server/legacy_api/tests/test_registry.py` fails a handler that writes through the ORM.
-- A service that changes roster, inspection, lane, or result data takes `core.services.lock_race_state(event_id)` first inside `transaction.atomic()`. A handler or a `ui` view never reads race state before a service call and acts on it after: the service reads it again under the lock. `server/ui/tests/test_read_then_act.py` flags a view that refuses on what it read.
+- A service that changes roster, inspection, lane, or result data takes `core.services.lock_race_state(event_id)` first inside `transaction.atomic()`. A handler or a `ui` view never reads race state before a service call and acts on it after: the service reads it again under the lock. `server/ui/tests/test_read_then_act.py` flags a view that refuses on what it read, or answers with a row it read and never handed to the service; build the toast and the Undo from what the service returns.
 - One user action is one service call, so all its writes commit or roll back together. #42's review found a racer saved in one transaction and its award settings in a second.
 - A record that must survive a refusal is written after the atomic block, because the rollback removes it.
 - Every endpoint needs a `LEAK_REQUESTS` entry in `server/legacy_api/tests/test_event_leak.py`.
@@ -24,7 +24,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 ## UI pages
 
 - htmx inheritance is off (`server/ui/templates/ui/base.html`), so each element that makes a request names its own `hx-target`, `hx-swap`, `hx-sync` and `hx-include`. `server/ui/tests/test_htmx.py` checks the page-wide htmx rules.
-- A value the page sends back to the server, such as an Undo link's query or a hidden field, is client input. The service checks it as it checks a new request, and the same request sent twice changes nothing the second time. #44's Undo stored a forged `runs=0` and restored a step twice.
+- A value the page sends back to the server, such as an Undo link's query or a hidden field, is client input. The service checks it as it checks a new request, and the same request sent twice changes nothing the second time. #44's Undo stored a forged `runs=0` and restored a step twice. `server/ui/tests/test_undo_links.py` replays and alters each Undo link a view offers; a new Undo adds its scenario there.
 - Each rule lives in its service, and a view or a page's `state.py` calls it. `server/ui/tests/test_rules_in_services.py` flags a lane mask or a service limit copied into one.
 - `server/ui/tests/test_query_growth.py` reads each page and poll at two sizes of race day and fails when the query count grows. A new page adds its URLs there.
 - A poll that answers 204 signs everything it renders. `server/ui/tests/test_poll_signatures.py` changes each stored field in turn and fails a poll that still answers 204 when its rendering changed. #45's presenter signed the award's key and winner, not the names it shows.

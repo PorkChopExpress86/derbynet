@@ -28,7 +28,8 @@
   </div>
   {# The sheet container. Sheets teleport here from wherever a page defines them. #}
   <div id="sheets">{% include "ui/shell/more_drawer.html" %}{% block sheets %}{% endblock %}</div>
-  <div id="toasts" aria-live="polite" class="pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 {% if shell.bottom_nav is None %}bottom-4{% else %}bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:bottom-6{% endif %}"></div>
+  {# While a sheet is open, toasts move to the top of a phone's screen: at the bottom they covered a bottom sheet's buttons for the 8 s an info toast stays, and until closed for an error (#47 retro, test_toasts). #}
+  <div id="toasts" aria-live="polite" :class="$store.ui.sheet !== null ? 'max-lg:top-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bottom-auto' : ''" class="pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 {% if shell.bottom_nav is None %}bottom-4{% else %}bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:bottom-6{% endif %}"></div>
   <template id="toast-template">{% include "ui/components/toast.html" with level="error" message="" %}</template>
 </body>
 </html>
