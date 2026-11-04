@@ -68,6 +68,7 @@ body.kiosk-page {
   flex: 1;
   min-height: 0;
   position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 2vh 2.5vw;
@@ -84,9 +85,9 @@ body.kiosk-page {
   gap: 2vh;
 }
 .k-center img { max-width: 90%; max-height: 70vh; object-fit: contain; }
-.k-title { margin: 0; font-size: clamp(2rem, 9vh, 8rem); font-weight: 800; line-height: 1.05; }
-.k-subtitle { margin: 0; font-size: clamp(1.25rem, 4.5vh, 4rem); color: var(--k-muted); }
-.k-big { font-size: clamp(1.5rem, 6vh, 5.5rem); font-weight: 700; margin: 0; }
+.k-title { margin: 0; font-size: clamp(1.75rem, min(9vh, 11vw), 8rem); font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
+.k-subtitle { margin: 0; font-size: clamp(1rem, min(4.5vh, 5.5vw), 4rem); color: var(--k-muted); overflow-wrap: anywhere; }
+.k-big { font-size: clamp(1.25rem, min(6vh, 7.5vw), 5.5rem); font-weight: 700; margin: 0; overflow-wrap: anywhere; }
 
 .k-enter { animation: k-rise 700ms cubic-bezier(.2,.8,.2,1) both; }
 .k-enter-2 { animation: k-rise 700ms 200ms cubic-bezier(.2,.8,.2,1) both; }
@@ -147,17 +148,19 @@ body.kiosk-page {
   border-radius: 2vh;
   background: var(--k-bg-2);
   border: 0.4vh solid var(--k-accent);
-  font-size: clamp(1.5rem, 6vh, 5rem);
+  font-size: clamp(1.25rem, min(6vh, 8vw), 5rem);
   font-weight: 800;
+  text-align: center;
   animation: k-pop 400ms both;
 }
-.k-overlay svg { width: clamp(4rem, 18vh, 14rem); height: auto; }
+.k-overlay svg { width: clamp(3rem, min(18vh, 25vw), 14rem); height: auto; }
 
 /* ----- now racing ---------------------------------------------------------- */
 .k-board {
   flex: 1;
   min-height: 0;
   display: grid;
+  grid-template-rows: auto;
   grid-auto-rows: minmax(0, 1fr);
   gap: 1vh;
 }
@@ -228,8 +231,11 @@ body.kiosk-page {
 .k-deck tr.k-current td { background: #24407a; }
 .k-deck tr.k-current th { color: var(--k-accent); }
 .k-deck tr.k-next th { color: var(--k-ok); }
-.k-deck tr.k-current th::before { content: "Now racing · "; }
-.k-deck tr.k-next th::before { content: "Next · "; }
+.k-deck col.k-master { width: 6vw; }
+.k-deck col.k-label { width: 9vw; }
+.k-deck col.k-label.k-wide { width: 14vw; }
+.k-deck tr.k-current th { box-shadow: inset .6vw 0 0 var(--k-accent); }
+.k-deck tr.k-next th { box-shadow: inset .6vw 0 0 var(--k-ok); }
 .k-modal { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(0,0,0,.8); animation: k-fade 200ms both; }
 .k-modal img { max-width: 90vw; max-height: 80vh; }
 .k-modal button { margin-top: 2vh; font: inherit; padding: 1vh 2vw; border-radius: 1vh; border: 0; background: var(--k-accent); color: var(--k-accent-ink); font-weight: 700; }
@@ -251,19 +257,20 @@ body.kiosk-page {
 .k-row .k-score { font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
 
 /* ----- please check in ------------------------------------------------------- */
-.k-heading { margin: 0 0 1.5vh; font-size: 4vh; color: var(--k-accent); text-align: center; }
-.k-wanted { flex: 1; min-height: 0; column-gap: 3vw; column-fill: auto; font-size: var(--wanted-font, 2.6vh); }
+.k-heading { margin: 0 0 1.5vh; font-size: min(4vh, 5vw); color: var(--k-accent); text-align: center; }
+.k-check-in { justify-content: flex-start; }
+.k-wanted { flex: 1; min-height: 0; align-self: stretch; overflow: hidden; column-gap: 3vw; font-size: var(--wanted-font, 2.6vh); }
 .k-wanted section { break-inside: avoid; margin-bottom: 2vh; }
 .k-wanted h2 { margin: 0 0 .6vh; padding: .4vh 1vw; border-radius: .8vh; background: var(--k-accent); color: var(--k-accent-ink); font-size: 1.3em; text-align: center; }
 .k-wanted ul { list-style: none; margin: 0; padding: 0; }
-.k-wanted li { padding: .2vh 1vw; animation: k-fade 400ms both; }
+.k-wanted li { padding: .2vh 1vw; overflow-wrap: anywhere; animation: k-fade 400ms both; }
 
 /* ----- awards ---------------------------------------------------------------- */
 .k-award { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2vh; }
-.k-award .k-award-name { margin: 0; font-size: clamp(2rem, 8vh, 7rem); font-weight: 850; color: var(--k-accent); }
+.k-award .k-award-name { margin: 0; font-size: clamp(1.5rem, min(8vh, 10vw), 7rem); font-weight: 850; color: var(--k-accent); overflow-wrap: anywhere; }
 .k-award .k-reveal { display: flex; flex-direction: column; align-items: center; gap: 1vh; }
 .k-award .k-reveal.k-shown { animation: k-rise 1000ms cubic-bezier(.2,.8,.2,1) both; }
-.k-award .k-recipient { font-size: 7vh; font-weight: 800; margin: 0; }
+.k-award .k-recipient { font-size: min(7vh, 9vw); font-weight: 800; margin: 0; overflow-wrap: anywhere; }
 .k-award .k-carno { font-size: 5vh; color: var(--k-muted); margin: 0; }
 .k-award .k-detail { font-size: 3.5vh; color: var(--k-muted); margin: 0; }
 .k-award .k-photos { flex: 1; min-height: 0; display: flex; gap: 2vw; justify-content: center; }
@@ -280,7 +287,7 @@ body.kiosk-page {
 
 /* ----- scale MPH ------------------------------------------------------------- */
 .k-scale { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-.k-scale p { margin: .6vh 0; text-align: center; font-size: clamp(1rem, 4vw, 4.5vh); line-height: 1.1; position: relative; z-index: 1; }
+.k-scale p { margin: .6vh 0; text-align: center; font-size: clamp(.9rem, min(4vw, 4.5vh), 4rem); line-height: 1.1; position: relative; z-index: 1; }
 .k-scale .k-calc { font-size: 1.25em; font-weight: 900; color: var(--k-accent); font-variant-numeric: tabular-nums; }
 .k-scale img { position: absolute; bottom: 45%; left: 45vw; max-width: 10vw; z-index: 0; opacity: .55; }
 
@@ -295,6 +302,8 @@ body.kiosk-page {
 
 /* ----- results by racer ------------------------------------------------------ */
 .k-results { flex: 1; min-height: 0; overflow: hidden; }
+/* #49's rounds are sized in rem for a phone; on a TV the root font grows. */
+:root:has([data-results]) { font-size: clamp(16px, 1.9vh, 30px); }
 .k-results > section { will-change: transform; }
 
 /* ----- fullscreen.php -------------------------------------------------------- */
@@ -306,8 +315,13 @@ body.kiosk-page {
 @media (max-width: 640px) {
   .k-head, .k-lane { grid-template-columns: 10vw 14vw minmax(0, 1fr) 22vw 14vw; }
   .k-head .k-speed, .k-lane .k-speed { display: none; }
+  .k-head { font-size: 2.6vw; letter-spacing: .02em; padding: 0 1vw; }
   .k-points .k-head, .k-points .k-lane { grid-template-columns: 10vw 14vw minmax(0, 1fr) 14vw; }
   .k-lane { background: linear-gradient(90deg, var(--lane) 0 10vw, var(--k-surface) 10vw); font-size: clamp(.9rem, var(--row-font, 4vw), 2rem); }
   .k-row { grid-template-columns: 5vh 16vw minmax(0, 1fr) auto; font-size: 2.2vh; }
   .k-row .k-place { width: 4.5vh; height: 4.5vh; }
+  .k-deck col.k-label { width: 15vw; }
+  .k-deck col.k-label.k-wide { width: 24vw; }
+  .k-deck col.k-master { width: 10vw; }
+  .k-deck th, .k-deck td { font-size: 3.6vw; }
 }

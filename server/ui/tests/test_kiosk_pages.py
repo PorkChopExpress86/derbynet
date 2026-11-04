@@ -399,3 +399,48 @@ def test_a_preview_writes_neither_the_session_nor_the_database(event, raced):
     for key in PAGES:
         with no_session_writes(), no_db_writes():
             body(client.get("/kiosk.php", {"page": key}))
+
+
+# ----- on deck -------------------------------------------------------------------
+
+
+def test_d34_the_on_deck_report_keeps_the_staged_heat_through_a_reschedule(event):
+    """Heat 3 running and heat 4 staged; a reschedule fits a late racer into
+    the round. The on-deck report, the poll the on-deck kiosk draws, shows
+    heats 3 and 4 with the same cars in the same lanes, after the reload the
+    reschedule asks of the kiosks."""
+    from racing.engine.scheduling.adjuster import NodeBudget
+    from racing.services.reschedule import reschedule
+    from racing.services.tests.test_reschedule import (
+        UNLIMITED,
+        late_racer,
+        make_current,
+        new_round,
+        race,
+    )
+
+    round = new_round(range(101, 111), event=event)
+    race(round, 1, 2)
+    make_current(round, 3)
+    Kiosk.objects.create(event=event, address="tv", page="kiosks/ondeck.kiosk")
+    client = Client()
+
+    def on_deck(heats=(3, 4)) -> dict:
+        reply = client.get(
+            "/action.php", {"query": "poll", "values": "ondeck,current-heat"}
+        ).json()
+        assert reply["current-heat"]["heat"] == 3
+        found = {}
+        for cell in reply["ondeck"]["chart"]:
+            if cell["roundid"] == round.pk and cell["heat"] in heats:
+                found.setdefault(cell["heat"], []).append(
+                    (cell["lane"], cell["carnumber"])
+                )
+        return found
+
+    before = on_deck()
+    reschedule(round, late_racer(round, 120).id, budget=NodeBudget(UNLIMITED))
+    body(client.get("/kiosk.php", {"address": "tv"}))
+
+    assert on_deck() == before
+    assert sorted(before) == [3, 4] and all(len(v) == 4 for v in before.values())

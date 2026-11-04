@@ -12,10 +12,12 @@
   function fit() {
     var list = root.querySelector('[data-wanted]');
     if (!list) return;
-    var room = window.innerHeight - list.getBoundingClientRect().top - 16;
     var base = Math.max(12, window.innerHeight * 0.026);
-    var fits = function () { return list.scrollHeight <= room + 1; };
-    list.style.height = 'auto';
+    // The list's height is the screen's; what does not fit spills into
+    // columns past its right edge.
+    var fits = function () {
+      return list.scrollWidth <= list.clientWidth + 1 && list.scrollHeight <= list.clientHeight + 1;
+    };
     list.style.setProperty('--wanted-font', base + 'px');
     var columns = 1;
     for (; columns < 4; ++columns) {
@@ -28,7 +30,6 @@
       if (fits()) break;
     }
     if (!fits()) list.style.setProperty('--wanted-font', base + 'px');
-    list.style.height = room + 'px';
   }
 
   function refresh() {

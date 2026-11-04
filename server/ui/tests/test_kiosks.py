@@ -163,6 +163,28 @@ def test_a_scene_that_is_gone_is_refused(coordinator, event):
     assert reply.status_code == 422
 
 
+def test_preview_opens_the_kiosks_page_and_registers_nothing(presenter, event):
+    """#46 left Preview out until #52's preview had no side effects."""
+    import html as markup
+
+    kiosk(
+        event,
+        "a",
+        name="Main",
+        page="kiosks/qrcode.kiosk",
+        params='{"title":"Hello","content":"x"}',
+    )
+    page = presenter.get("/kiosks/").content.decode()
+    link = re.search(r'<a href="([^"]+)"[^>]*data-action="preview"', page).group(1)
+    before = list(Kiosk.objects.values_list("address", "last_contact"))
+
+    shown = presenter.get(markup.unescape(link)).content.decode()
+
+    assert 'data-page="kiosks/qrcode.kiosk"' in shown
+    assert ">Hello<" in shown
+    assert list(Kiosk.objects.values_list("address", "last_contact")) == before
+
+
 def test_a_presenter_sees_the_kiosks_and_no_control(presenter, event):
     """C37: the page needs PRESENT_AWARDS and every control CONTROL_RACE, so
     a presenter gets the board with no control, where PHP showed controls

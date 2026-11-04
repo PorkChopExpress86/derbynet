@@ -35,8 +35,8 @@
     (data.rounds || []).forEach(function (r) { names[r.roundid] = r.name; });
     var body = document.createElement('tbody');
     var cols = document.createElement('colgroup');
-    if (interleaved) cols.appendChild(cell('col')).style.width = '6vw';
-    cols.appendChild(cell('col')).style.width = interleaved ? '14vw' : '9vw';
+    if (interleaved) cols.appendChild(cell('col', null, 'k-master'));
+    cols.appendChild(cell('col', null, interleaved ? 'k-label k-wide' : 'k-label'));
     var row = null;
     var lane = 0;
     var roundid = 0;
