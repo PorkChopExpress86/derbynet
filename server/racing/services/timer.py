@@ -771,6 +771,40 @@ def set_test_mask(event: Event, mask: int) -> None:
     _test_change(event, change)
 
 
+def set_test_lane(event: Event, lane: int, occupied: bool) -> bool:
+    """The timer test page's lane toggle (#50): `lane` in the test
+    (`occupied`) or out of it, then a new test heat, as `set_test_mask`
+    does for `timer-test.js`'s whole mask, and starts the test if it is
+    off. It names the state the lane ends in, not a flip, so the same
+    toggle sent twice is one change. False, with nothing written, for a
+    lane the track does not have. Bits past the lane count, left when the
+    count went down, are cleared, as `timer-test.js` clears them on its
+    page."""
+    from racing.services.lanes import mask_of
+
+    with transaction.atomic():
+        race = lock_race_state(event.id)
+        row = TimerStatus.objects.select_for_update().get(event=event)
+        lanes = max(RaceSettings.objects.get(event=event).lane_count or 0, 1)
+        if not 1 <= lane <= lanes:
+            return False
+        bit = mask_of([lane])
+        mask = row.test_lane_mask & mask_of(range(1, lanes + 1))
+        mask = mask & ~bit if occupied else mask | bit
+        if mask == row.test_lane_mask:
+            return True
+        row.test_lane_mask = mask
+        # The next test heat, so the timer gets the new mask: its heat number
+        # differs from the one staged. `set_test_mask` ends the test and
+        # starts it twice, which after a second change lands on the heat
+        # already staged, so the timer never hears of the change.
+        _test_start(race, row)
+        row.save(
+            update_fields=["test_saved_round", "test_saved_heat", "test_lane_mask"]
+        )
+    return True
+
+
 # ----- the timer log (timer-logging.inc, post-timer-log.php) -----
 
 _LOG_NAME = re.compile(r"timer-\d{8}-\d{4}-\d{2}\.log")

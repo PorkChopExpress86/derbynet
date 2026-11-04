@@ -435,6 +435,19 @@ Each test that takes `page` runs on a phone (390x844, touch) and a desktop (1280
 - `ui/imports/` is one page per kind (roster, awards, results). The browser reads the file with SheetJS 0.13.5, PHP's own build, loaded only there, with PHP's encoding select, worksheet select and header row switch; a results file is read with `raw` so its completion times stay text. Columns map to fields by a select each, filled in from header names. `transfer.batch_import` previews the rows (new partitions with case ignored, D34; repeated car numbers; missing required fields) and imports them through the per-row services of `racer.import`, `award.import` and `result.import`, each row in a savepoint of one transaction: any failing row rolls the whole file back, and every row's error is listed (D69, a deliberate difference from PHP). The legacy endpoints keep PHP's row by row. A committed import records the page's token in the history, so the same request sent twice imports once. A results file's columns are matched by header name, such as `FinishTime` and `Scale MPH`, and a file whose header names none is read in PHP's fixed order (D71), which matches neither PHP's own export nor `derbynet-results-sample.csv`. The preview lists car numbers the file repeats, and apart from them the numbers a racer already has.
 - `ui/exports/` downloads `export_all()` as `.xlsx` (openpyxl), `.ods` (written by hand) or one sheet as `.csv`, from `racing.services.workbook_files`, and links `export-json.php`. PHP's `.xls` is dropped, as #49 plans. Sheet names lose `: \ / ? * [ ]`, are cut to 31 characters and numbered when repeated: PHP's cleaning loop edits a copy, so SheetJS refused such an export (proposed #64 row C51).
 
+## The browser timer and the timer pages (#50)
+
+`/timer.php` serves the in-browser Web Serial timer unchanged. Build its generated files once per checkout, and after a change to `templates/timer.html`, `templates/timer-profiles.js` or `timer/`:
+
+```sh
+uv run python manage.py build_timer          # template, scripts, CSS and profiles.js
+uv run python manage.py build_timer --check  # exits 1 if the committed template is stale; CI runs this
+```
+
+The command writes the Django template `ui/templates/ui/timer/browser.html` from `templates/timer.html` (committed), copies `timer/derbynet-timer/src` into `ui/static/timer/js/timer/` and `css/timer.css`, and fills `profiles.js` from `org.jeffpiazza.derby.profiles.AllProfiles` (both gitignored). It compiles the timer's Java sources with `javac`, with no Ant; a host with no JDK runs that step in a pinned JDK container through docker, and `--no-profiles` skips it. The ui CI job runs the build before the browser tests, so nothing runs Java at request time. jQuery, `mobile.js`, `modal.js`, `ajax-setup.js`, `global.css`, `mobile.css` and the images the page loads are committed copies under `ui/static/timer/`, served at the relative paths the page uses (`js/`, `css/`, `img/`), so the timer outlives `website/`.
+
+The page needs `TIMER_MESSAGE` (D5) and shows its Timer settings button only with `CONTROL_RACE` (D53). A browser without Web Serial goes to `/timer/no-serial/`, which says to use desktop Chrome or Edge and links to the `https` address when the page is not a secure context. The timer status page (`/timer/`), the timer test (`/timer/test/`) and the fake timer (`/timer/fake/`) are in `ui/timer/`.
+
 ## Settings
 
 `derbynet/settings.py` reads every install-level setting from the environment.

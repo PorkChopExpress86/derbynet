@@ -1,0 +1,31 @@
+{# The timer test's controls and its test heat (#50), polled every 500 ms and signed. Simulate racing is timer.test test-mode; the lane count and reverse lanes are settings.write; a lane toggle sets that lane in or out of the test's lane mask, tt-mask. #}
+<div class="flex flex-col gap-4" data-test-running="{{ test.running|yesno:'true,false' }}">
+  <div class="flex items-center justify-between gap-3">
+    <span id="tt-mode" class="font-medium">Simulate racing</span>
+    {% url 'timer-test-mode' as mode_url %}{% include "ui/components/switch.html" with labelledby="tt-mode" checked=test.running name="test-mode" url=mode_url sync="#timer-test-live:replace" %}
+  </div>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <form hx-post="{% url 'timer-test-lanes' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#timer-test-live:replace" data-lane-count-form>
+      {% include "ui/components/stepper.html" with id="tt-lanes" name="n-lanes" label="Lanes on the track" value=test.lane_count min=0 max=20 %}
+    </form>
+    <div class="flex items-center gap-2">
+      <span id="tt-reverse" class="text-sm font-medium">Number lanes in reverse</span>
+      {% url 'timer-test-reverse' as reverse_url %}{% include "ui/components/switch.html" with labelledby="tt-reverse" checked=test.reverse_lanes name="reverse-lanes" url=reverse_url sync="#timer-test-live:replace" %}
+    </div>
+  </div>
+  <table class="w-full text-left text-sm" data-test-lanes data-heat="{{ test.heat }}">
+    <thead><tr class="text-ink-muted"><th scope="col" class="py-1 font-medium">Lane</th><th scope="col" class="py-1 font-medium">Car</th><th scope="col" class="py-1 text-right font-medium">Time</th><th scope="col" class="py-1 text-right font-medium">Place</th></tr></thead>
+    <tbody class="divide-y divide-line">
+      {% for l in test.lanes %}
+      <tr data-lane="{{ l.lane }}">
+        <th scope="row" class="py-1 text-base font-semibold">{{ l.lane }}</th>
+        <td class="py-1">
+          <button type="button" name="occupied" value="{{ l.occupied|yesno:'0,1' }}" hx-post="{% url 'timer-test-lane' %}" hx-vals='{"lane": "{{ l.lane }}"}' hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#timer-test-live:replace" aria-pressed="{{ l.occupied|yesno:'true,false' }}" aria-label="Car in lane {{ l.lane }}" data-lane-toggle="{{ l.lane }}" class="min-h-11 min-w-24 rounded-lg border px-3 text-sm font-semibold aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink border-line bg-surface">{% if l.occupied %}Car{% else %}Empty{% endif %}</button>
+        </td>
+        <td class="py-1 text-right font-mono tabular-nums" data-time>{% if l.time is not None %}{{ l.time }}{% endif %}</td>
+        <td class="py-1 text-right tabular-nums" data-place>{% if l.place is not None %}{{ l.place }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

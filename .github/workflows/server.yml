@@ -14,11 +14,19 @@ on:
     paths:
       - server/**
       - website/inc/generators/**
+      - templates/timer.html
+      - templates/timer-profiles.js
+      - timer/derbynet-timer/src/**
+      - timer/src/**
       - .github/workflows/server.yml
   pull_request:
     paths:
       - server/**
       - website/inc/generators/**
+      - templates/timer.html
+      - templates/timer-profiles.js
+      - timer/derbynet-timer/src/**
+      - timer/src/**
       - .github/workflows/server.yml
   workflow_dispatch:
 
@@ -59,6 +67,9 @@ jobs:
 
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Check the browser timer template matches templates/timer.html
+        run: uv run python manage.py build_timer --check
 
   # The manager UI (#40). The CSS build runs in a bare Python container with
   # no network and no Node, from the checkout and the pinned Tailwind CLI, and
@@ -116,6 +127,12 @@ jobs:
 
       - name: Install Chromium
         run: uv run playwright install --with-deps chromium
+
+      # The browser timer's scripts and profiles.js for /timer.php (#50).
+      # The runner's JDK compiles the timer's Java sources for AllProfiles;
+      # no Ant.
+      - name: Build the browser timer
+        run: uv run python manage.py build_timer
 
       # One pytest-xdist worker per core, each with its own live server and
       # test database: one worker took about 14 minutes on SQLite and 20 on

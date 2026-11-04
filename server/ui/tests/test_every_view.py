@@ -150,7 +150,7 @@ def words_for(route: str, view) -> list[dict[str, str]]:
     """Values for a route's string arguments: junk, each string the view
     compares with, and its module's dispatch keys, so the view gets past its
     own dispatch. Every combination, when a route has several."""
-    args = re.findall(r"<str:(\w+)>", route)
+    args = re.findall(r"<(?:str|path):(\w+)>", route)
     if not args:
         return [{}]
     # A wrapper a decorator defines inside a function is indented.

@@ -1,0 +1,10 @@
+{% extends "ui/base.html" %}
+{% block main %}
+{# The browser timer needs the Web Serial API (#50). timer.php sends a browser without it here before any timer script runs. #}
+<section x-data="{ secure: window.isSecureContext, https: 'https://' + location.host + '{{ timer_url|escapejs }}' }" class="mx-auto flex max-w-xl flex-col gap-3 rounded-2xl border border-line bg-surface p-4" data-no-serial>
+  <h2 class="text-lg font-semibold">This browser cannot connect a timer</h2>
+  <p>Connecting a timer needs the Web Serial API, which only <b>Chrome</b> and <b>Edge</b> on a desktop or laptop computer have. Open this page in one of them on the computer the timer is plugged into.</p>
+  <p x-show="!secure" x-cloak data-not-secure>Web Serial also needs a secure connection. This page came over plain HTTP, which works only on the server's own computer (localhost). Try <a :href="https" x-text="https" class="break-all font-semibold text-accent underline underline-offset-2"></a> instead.</p>
+  <p class="text-sm text-ink-muted">To test DerbyNet without a timer, use the <a href="{% url 'fake-timer' %}" class="font-semibold text-accent underline underline-offset-2">fake timer</a>.</p>
+</section>
+{% endblock %}
