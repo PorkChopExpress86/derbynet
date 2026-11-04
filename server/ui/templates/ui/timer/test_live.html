@@ -6,7 +6,7 @@
   </div>
   <div class="flex flex-wrap items-end justify-between gap-3">
     <form hx-post="{% url 'timer-test-lanes' %}" hx-trigger="change" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#timer-test-live:replace" data-lane-count-form>
-      {% include "ui/components/stepper.html" with id="tt-lanes" name="n-lanes" label="Lanes on the track" value=test.lane_count min=0 max=20 %}
+      {% include "ui/components/stepper.html" with id="tt-lanes" name="n-lanes" label="Lanes on the track" value=test.lane_count min=lanes_min max=lanes_max %}
     </form>
     <div class="flex items-center gap-2">
       <span id="tt-reverse" class="text-sm font-medium">Number lanes in reverse</span>

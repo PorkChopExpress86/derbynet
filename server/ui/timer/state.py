@@ -16,8 +16,8 @@ from racing.services import polls, timer
 from racing.services.lanes import lanes_of
 from ui.dashboard.presenter import pill_state, strip_seconds
 
-# The status card's poll, and the test card's, which PHP's page polls every
-# 500 ms.
+# The status card's poll, and the test card's, which `timer-test.js:326`
+# polls every 500 ms.
 STATUS_POLL_SECONDS = 2
 TEST_POLL_MS = 500
 
@@ -95,7 +95,8 @@ class Test:
 
 def test(event) -> Test:
     """`poll.timer.test`'s `tt` and current heat, by lane. A track with no
-    lane count shows one lane, as `timer-test.js` does."""
+    lane count shows one lane, as `timer-test.js:12` and `:197` draw one
+    (test_a_track_with_no_lane_count_shows_one_lane)."""
     settings = RaceSettings.objects.get(event=event)
     race = RaceState.objects.get(event=event)
     found = polls.timer_test(event)

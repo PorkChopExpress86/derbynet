@@ -17,9 +17,10 @@ fake timer, and the browser timer at `/timer.php`.
 - Fake timer (`/timer/fake/`) is `fake-timer.php` for a phone. Its script,
   `ui/fake-timer.js`, posts the same `timer-message` messages to
   `/action.php`, so it still tests the legacy protocol.
-- `/timer.php` serves the browser timer unchanged from
-  `templates/timer.html` (`ui.timer_build`), with its scripts, styles and
-  images at the relative paths it loads them from.
+- `/timer.php` serves the browser timer from `templates/timer.html`
+  (`ui.timer_build`), its scripts unchanged, at the relative paths it loads
+  them from. The template differs from PHP's `timer.php` where the README's
+  "The browser timer" section lists.
 
 Every timer control needs CONTROL_RACE, as #15 hardened `timer.assign-*`,
 `timer.test`, `timer.log` and `timer.settings` (S21); the status and test
@@ -217,7 +218,15 @@ def assign_flag(request):
 
 def test_html(request) -> tuple[str, str]:
     found = state.test(_event(request))
-    html = render_to_string("ui/timer/test_live.html", {"test": found}, request)
+    html = render_to_string(
+        "ui/timer/test_live.html",
+        {
+            "test": found,
+            "lanes_min": timer.TEST_PAGE_LANES[0],
+            "lanes_max": timer.TEST_PAGE_LANES[1],
+        },
+        request,
+    )
     return _signed(html, "timer-test-sig")
 
 
@@ -284,7 +293,7 @@ def test_lane(request):
 @test_guard
 def test_lane_count(request):
     lanes = posted_int(request.POST.get("n-lanes", ""))
-    if lanes is None or lanes < 0:
+    if lanes is None:
         return service_error(request, "Type the number of lanes.")
     result = settings_form.apply_form(
         _event(request), settings_form.SETTINGS_WRITE | {"n-lanes": str(lanes)}
@@ -322,7 +331,9 @@ def fake_page(request):
         request,
         "ui/timer/fake.html",
         {
-            "lane_count": min(max(settings.lane_count or 4, 2), 8),
+            "lane_count": settings.lane_count or 0,
+            "lanes_min": timer.FAKE_TIMER_LANES[0],
+            "lanes_max": timer.FAKE_TIMER_LANES[1],
             "action_url": reverse("action-php"),
             "home_url": reverse("home"),
             "page_title": "Fake Timer",

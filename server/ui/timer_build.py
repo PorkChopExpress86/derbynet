@@ -12,8 +12,10 @@ build them for PHP.
   `javac`, with no Ant and no jar, or runs both in a JDK container when the
   host has no JDK.
 
-The copied scripts and `profiles.js` are not committed (`.gitignore`). CI and
-packaging run `manage.py build_timer`, so nothing runs Java at request time.
+The copied scripts and `profiles.js` are not committed (`.gitignore`). The ui
+CI job runs `manage.py build_timer` before the browser tests. No Django image
+exists yet; the image ticket (#58) has to run it too, so nothing runs Java at
+request time.
 The legacy files the page also loads, jQuery, `mobile.js`, `modal.js`,
 `ajax-setup.js`, `global.css`, `mobile.css` and the images, are committed
 copies under `ui/static/timer/`, so the page keeps working once `website/`
@@ -62,7 +64,8 @@ HEADER = (
     "Do not edit: run `manage.py build_timer`. #}"
 )
 # Sent to the unsupported-browser page before any timer script runs, so a
-# browser without Web Serial never shows a broken timer.
+# browser without Web Serial never shows a broken timer. #50's scope asks
+# for it; PHP shows its own dialog over the page. No #64 or decision id yet.
 SERIAL_GUARD = (
     '<script type="text/javascript">\n'
     "if (!('serial' in navigator)) "

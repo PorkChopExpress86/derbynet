@@ -8,10 +8,12 @@ document.addEventListener('alpine:init', () => {
   // heartbeat never changes the polled card and its poll answers 204. The
   // server's clock at page load sets the offset from this device's clock.
   //
-  // With a log URL, the timer log tails as timer-test.js tails it: read from
-  // the last size seen, again after 50 ms when data came and after twice the
-  // wait, up to 1 s, when none did. It stops while the page is hidden, since
-  // several managers watching it each poll the server.
+  // With a log URL, the timer log tails as poll_for_timer_log() in
+  // website/js/timer-test.js:332-366 does: read from the last size seen,
+  // from 0 at once; again after 50 ms when data came, and after
+  // twice the wait, up to 1 s, when none did (browser test
+  // test_the_log_tail_backs_off). Unlike PHP it stops while the page is
+  // hidden, as #50's risks ask, since every manager watching it polls.
   Alpine.data('timerStatus', (serverNow, contact, logUrl) => ({
     offset: serverNow - Date.now() / 1000,
     contact,
@@ -65,12 +67,11 @@ document.addEventListener('alpine:init', () => {
       }
       setTimeout(() => this.readLog(), this.wait);
     },
-    // The log keeps its last 200,000 characters, so a long race day does not
-    // fill a phone's memory.
+    // The whole log stays on the page, as in PHP.
     append(text) {
       const log = this.$refs.log;
       const atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
-      log.textContent = (log.textContent + text).slice(-200000);
+      log.append(document.createTextNode(text));
       if (atEnd) log.scrollTop = log.scrollHeight;
     },
   }));

@@ -48,6 +48,12 @@ MAX_LANES = 32767
 """The largest lane count the settings hold; a timer reporting more is
 ignored."""
 MAX_TEST_MASK = 2**31 - 1
+# The lane count fields of the timer pages (#50), as the PHP pages bound
+# them: timer-test.php's n-lanes field (min 0, max 20) and fake-timer.php's
+# lane-count field (min 2, max 8). Only the fields use them: PHP's
+# settings.write and IDENTIFIED take any count, and so do these.
+TEST_PAGE_LANES = (0, 20)
+FAKE_TIMER_LANES = (2, 8)
 """The largest lane mask the timer test's column holds."""
 
 
@@ -773,13 +779,19 @@ def set_test_mask(event: Event, mask: int) -> None:
 
 def set_test_lane(event: Event, lane: int, occupied: bool) -> bool:
     """The timer test page's lane toggle (#50): `lane` in the test
-    (`occupied`) or out of it, then a new test heat, as `set_test_mask`
-    does for `timer-test.js`'s whole mask, and starts the test if it is
-    off. It names the state the lane ends in, not a flip, so the same
-    toggle sent twice is one change. False, with nothing written, for a
-    lane the track does not have. Bits past the lane count, left when the
-    count went down, are cleared, as `timer-test.js` clears them on its
-    page."""
+    (`occupied`) or out of it, and the test started if it is off. It names
+    the state the lane ends in, not a flip, so the same toggle sent twice is
+    one change. False, with nothing written, for a lane the track does not
+    have (one lane when the count is 0). Bits past the lane count, left when
+    the count went down, are cleared here; `timer-test.js:27` clears them
+    only in its page's field and never posts them.
+
+    Every change stages a new test heat. PHP's `tt-mask`, which
+    `set_test_mask` keeps for the legacy endpoint, ends the test and starts
+    it twice, so a second change lands on the heat already staged and the
+    timer never hears of it (php-scratch.sh, 2026-11-04;
+    `racing/tests/test_timer_test_lanes.py`). That PHP defect has no #64 row
+    yet; the #50 report proposes one."""
     from racing.services.lanes import mask_of
 
     with transaction.atomic():
@@ -794,10 +806,9 @@ def set_test_lane(event: Event, lane: int, occupied: bool) -> bool:
         if mask == row.test_lane_mask:
             return True
         row.test_lane_mask = mask
-        # The next test heat, so the timer gets the new mask: its heat number
-        # differs from the one staged. `set_test_mask` ends the test and
-        # starts it twice, which after a second change lands on the heat
-        # already staged, so the timer never hears of the change.
+        # The next test heat: its number differs from the one staged, so
+        # the next message sends `<abort/>` and a `<heat-ready>` with the
+        # new mask.
         _test_start(race, row)
         row.save(
             update_fields=["test_saved_round", "test_saved_heat", "test_lane_mask"]

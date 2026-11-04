@@ -528,3 +528,10 @@ def test_build_timer_without_profiles_writes_the_template_and_copies(
     assert timer_build.check_template()
     assert (tmp_path / "assets" / "js" / "timer" / "main.js").exists()
     assert "profiles.js" not in out.getvalue()
+
+
+def test_a_track_with_no_lane_count_shows_one_lane(event):
+    from ui.timer import state
+
+    RaceSettings.objects.filter(event=event).update(lane_count=0)
+    assert [lane.lane for lane in state.test(event).lanes] == [1]

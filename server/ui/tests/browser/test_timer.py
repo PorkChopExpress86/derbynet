@@ -376,3 +376,74 @@ def test_timer_test_parity_simulate_lanes_and_results(login, event):
     with htmx_post(page, "/timer/test/mode/"):
         live.get_by_role("switch", name="Simulate racing").click()
     assert not RaceState.objects.get(event=event).timer_test
+
+
+def test_identified_waits_for_hello(login, event, page_errors):
+    """PHP's send_hello() sends IDENTIFIED from HELLO's success callback, so a
+    HELLO that fails sends no IDENTIFIED."""
+    page = login("RaceCoordinator")
+    phone_only(page)
+    page_errors.allow(r"request failed: \S*/action.php net::ERR_FAILED$")
+    page_errors.allow(r"^console: Failed to load resource: net::ERR_FAILED$")
+    sent = []
+
+    def route(route):
+        body = route.request.post_data or ""
+        sent.append(body)
+        if "message=HELLO" in body:
+            route.abort()
+        else:
+            route.continue_()
+
+    page.route("**/action.php", route)
+    page.goto("/timer/fake/")
+    for _ in range(30):
+        if sum("HEARTBEAT" in b for b in sent) >= 2:
+            break
+        page.wait_for_timeout(100)
+    assert any("message=HELLO" in b for b in sent)
+    assert not any("IDENTIFIED" in b for b in sent), sent
+    page.goto("/timer/")
+
+
+def test_the_log_tail_backs_off(login, event):
+    """timer-test.js:345-354: 50 ms after data, then twice the wait up to 1 s;
+    each read starts at the last size seen. The whole log stays on the
+    page, as in PHP."""
+    page = login("RaceCoordinator")
+    phone_only(page)
+    reads = []
+    big = "x" * 210_000 + "\n"
+
+    def route(route):
+        seek = int(route.request.url.split("seek=")[1])
+        reads.append((seek, page.evaluate("performance.now()")))
+        if len(reads) <= 2:
+            data = big if len(reads) == 1 else "end of log\n"
+            route.fulfill(json={"found": True, "size": seek + len(data), "data": data})
+        else:
+            route.fulfill(json={"found": True, "size": seek})
+
+    page.route("**/timer/log/?*", route)
+    open_status(page)
+    for _ in range(60):
+        if len(reads) >= 8:
+            break
+        page.wait_for_timeout(100)
+    page.unroute("**/timer/log/?*")
+    seeks = [s for s, _ in reads]
+    assert seeks[:3] == [0, len(big), len(big) + 11]
+    gaps = [round(b - a) for (_, a), (_, b) in zip(reads, reads[1:], strict=False)]
+    # 50 ms after each of the two reads with data, then twice the wait each
+    # time, up to 1 s. The first gap also holds drawing 210 KB of log.
+    assert gaps[0] >= 40, gaps
+    gaps = gaps[1:]
+    expected = [50, 100, 200, 400, 800, 1000]
+    assert len(gaps) >= len(expected), gaps
+    # A loaded machine only adds delay, so each wait is a floor; the cap
+    # shows as the step after 800 ms staying well short of 1600 ms.
+    for gap, want in zip(gaps, expected, strict=False):
+        assert gap >= want - 10, (gaps, expected)
+    assert gaps[5] < 1400, gaps
+    text = page.locator("[data-log-text]").text_content()
+    assert text == big + "end of log\n"

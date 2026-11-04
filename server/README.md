@@ -437,16 +437,25 @@ Each test that takes `page` runs on a phone (390x844, touch) and a desktop (1280
 
 ## The browser timer and the timer pages (#50)
 
-`/timer.php` serves the in-browser Web Serial timer unchanged. Build its generated files once per checkout, and after a change to `templates/timer.html`, `templates/timer-profiles.js` or `timer/`:
+`/timer.php` serves the in-browser Web Serial timer. Its scripts and CSS are the timer's own, unchanged; the page differs from PHP's `timer.php` only as listed below. Build its generated files once per checkout, and after a change to `templates/timer.html`, `templates/timer-profiles.js` or `timer/`:
 
 ```sh
 uv run python manage.py build_timer          # template, scripts, CSS and profiles.js
 uv run python manage.py build_timer --check  # exits 1 if the committed template is stale; CI runs this
 ```
 
-The command writes the Django template `ui/templates/ui/timer/browser.html` from `templates/timer.html` (committed), copies `timer/derbynet-timer/src` into `ui/static/timer/js/timer/` and `css/timer.css`, and fills `profiles.js` from `org.jeffpiazza.derby.profiles.AllProfiles` (both gitignored). It compiles the timer's Java sources with `javac`, with no Ant; a host with no JDK runs that step in a pinned JDK container through docker, and `--no-profiles` skips it. The ui CI job runs the build before the browser tests, so nothing runs Java at request time. jQuery, `mobile.js`, `modal.js`, `ajax-setup.js`, `global.css`, `mobile.css` and the images the page loads are committed copies under `ui/static/timer/`, served at the relative paths the page uses (`js/`, `css/`, `img/`), so the timer outlives `website/`.
+The command writes the Django template `ui/templates/ui/timer/browser.html` from `templates/timer.html` (committed), copies `timer/derbynet-timer/src` into `ui/static/timer/js/timer/` and `css/timer.css`, and fills `profiles.js` from `org.jeffpiazza.derby.profiles.AllProfiles` (both gitignored). It compiles the timer's Java sources with `javac`, with no Ant; a host with no JDK runs that step in a pinned JDK container through docker, and `--no-profiles` skips it. The ui CI job runs the build before the browser tests. No Django image exists yet; the image ticket (#58) must run it as well, so nothing runs Java at request time. jQuery, `mobile.js`, `modal.js`, `ajax-setup.js`, `global.css`, `mobile.css` and the images the page loads are committed copies under `ui/static/timer/`, served at the relative paths the page uses (`js/`, `css/`, `img/`), so the timer outlives `website/`.
 
-The page needs `TIMER_MESSAGE` (D5) and shows its Timer settings button only with `CONTROL_RACE` (D53). A browser without Web Serial goes to `/timer/no-serial/`, which says to use desktop Chrome or Edge and links to the `https` address when the page is not a secure context. The timer status page (`/timer/`), the timer test (`/timer/test/`) and the fake timer (`/timer/fake/`) are in `ui/timer/`.
+How the page and the timer pages differ from PHP:
+
+- `/timer.php` needs `TIMER_MESSAGE` (D5; PHP needs `SET_UP`) and shows its Timer settings button only with `CONTROL_RACE` (D53). Both are in `ROUTE_DIVERGENCES`.
+- A guard added at the top of the template sends a browser without Web Serial to `/timer/no-serial/`, which says to use desktop Chrome or Edge and, when the page is no secure context, links to its `https` address. PHP's page shows its own "no Web Serial" dialog over a broken page. #50's scope asks for this page; it has no #64 or decision id yet.
+- `timer-test.php` is split in two, as #50's scope lists them: the timer status page (`/timer/`: state, details, settings sheet, remote logging, log tail, Start Race, refused results) and the timer test (`/timer/test/`), where `timer-test.php` redirects. Both need `CONTROL_RACE` (S21).
+- A lane toggle on the timer test posts the lane and its end state, not the whole mask, and stages a new test heat at every change (`racing.services.timer.set_test_lane`). PHP's `tt-mask`, which the legacy endpoint keeps, lands on the heat already staged after a second change, so the timer never hears of it (`racing/tests/test_timer_test_lanes.py`). That PHP defect has no #64 row yet.
+- The log tail stops while the page is hidden (#50's risks); PHP polls on.
+- The fake timer's script is `ui/static/ui/fake-timer.js`, a port of `website/js/fake-timer.js` with the same messages and timings: the PHP file posts to the relative `action.php`, which from `/timer/fake/` misses the server, and drives the PHP page's jQuery table.
+
+The pages are in `ui/timer/`.
 
 ## Settings
 

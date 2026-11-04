@@ -13,12 +13,12 @@
   <section aria-labelledby="ft-h" class="rounded-2xl border border-line bg-surface p-4">
     <h2 id="ft-h" class="sr-only">Fake timer</h2>
     <div class="flex flex-wrap items-end justify-between gap-3">
-      <div x-data="uiStepper({{ lane_count }}, 2, 8)" @change="lanes = Number($refs.input.value) || 2; reset()">
+      <div x-data="uiStepper({{ lane_count }}, {{ lanes_min }}, {{ lanes_max }})" @change="lanes = Number($refs.input.value) || 0; reset()">
         <label for="ft-lanes" class="block text-sm font-medium">Lanes on the track</label>
         <div class="mt-1 flex items-center gap-2">
-          <button type="button" @click="step(-1)" :disabled="value <= 2" aria-label="Fewer: Lanes on the track" class="grid size-12 place-items-center rounded-xl border border-field bg-surface disabled:opacity-40">{% include "ui/components/icon.html" with name="minus" %}</button>
-          <input id="ft-lanes" x-ref="input" x-model.number="value" type="number" inputmode="numeric" min="2" max="8" value="{{ lane_count }}" data-lane-count class="h-12 w-20 rounded-xl border border-field bg-surface text-center text-lg font-semibold tabular-nums">
-          <button type="button" @click="step(1)" :disabled="value >= 8" aria-label="More: Lanes on the track" class="grid size-12 place-items-center rounded-xl border border-field bg-surface disabled:opacity-40">{% include "ui/components/icon.html" with name="plus" %}</button>
+          <button type="button" @click="step(-1)" :disabled="value <= {{ lanes_min }}" aria-label="Fewer: Lanes on the track" class="grid size-12 place-items-center rounded-xl border border-field bg-surface disabled:opacity-40">{% include "ui/components/icon.html" with name="minus" %}</button>
+          <input id="ft-lanes" x-ref="input" x-model.number="value" type="number" inputmode="numeric" min="{{ lanes_min }}" max="{{ lanes_max }}" value="{{ lane_count }}" data-lane-count class="h-12 w-20 rounded-xl border border-field bg-surface text-center text-lg font-semibold tabular-nums">
+          <button type="button" @click="step(1)" :disabled="value >= {{ lanes_max }}" aria-label="More: Lanes on the track" class="grid size-12 place-items-center rounded-xl border border-field bg-surface disabled:opacity-40">{% include "ui/components/icon.html" with name="plus" %}</button>
         </div>
       </div>
       <div class="flex items-center gap-2">

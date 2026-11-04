@@ -1,13 +1,17 @@
-// The fake timer (#50): website/js/fake-timer.js for the phone page. It posts
-// the same timer-message messages to action.php from this session: HELLO,
-// IDENTIFIED with the lane count, a HEARTBEAT every second, STARTED and
-// FINISHED with each lane's time, so it still tests the legacy protocol.
+// The fake timer (#50): a port of website/js/fake-timer.js for the phone
+// page. The PHP file cannot be served as it is: it posts to the relative
+// `action.php`, which from /timer/fake/ is /timer/fake/action.php, and it
+// drives the PHP page's jQuery table. This port keeps its messages, fields
+// and timings: HELLO, then IDENTIFIED only once HELLO succeeds, with the lane
+// count, `FakeTimer` and `Fake Timer`; a HEARTBEAT with confirmed=1 every
+// second; STARTED with confirmed=1; FINISHED with each lane's text; heat-ready
+// acted on after 1 s; auto mode starting 5 s after it and stopping each lane
+// at 2.8 to 3.8 s. The browser tests in test_timer.py drive it.
 // Loaded before Alpine, so the component registers on `alpine:init`.
 'use strict';
 
 document.addEventListener('alpine:init', () => {
-  // Each lane: running 0 masked off, 1 running, 2 stopped, as the PHP page's
-  // td[data-running].
+  // Each lane: running 0 masked off, 1 running, 2 stopped.
   Alpine.data('fakeTimer', (actionUrl, homeUrl, laneCount) => ({
     lanes: laneCount,
     times: [],
@@ -25,7 +29,7 @@ document.addEventListener('alpine:init', () => {
 
     init() {
       this.reset();
-      this.send({ message: 'HELLO' }).then(() => this.send({
+      this.send({ message: 'HELLO' }).then((ok) => ok && this.send({
         message: 'IDENTIFIED',
         lane_count: String(this.lanes),
         timer: 'FakeTimer',
@@ -40,22 +44,26 @@ document.addEventListener('alpine:init', () => {
       this.pendingHeat = null;
     },
 
+    // True when the reply came, as jQuery's `success` callback runs: only
+    // then does PHP's send_hello() send IDENTIFIED.
     async send(fields) {
       const body = new URLSearchParams({ action: 'timer-message', ...fields });
       let reply;
       try {
         reply = await fetch(actionUrl, { method: 'POST', body, credentials: 'same-origin' });
       } catch (e) {
-        return;
+        return false;
       }
+      if (!reply.ok) return false;
       const text = await reply.text();
       if ((reply.headers.get('Content-Type') || '').includes('json')) {
         let data = {};
         try { data = JSON.parse(text); } catch (e) { /* not JSON */ }
         if (data.cease) window.location.href = homeUrl;
-        return;
+        return false;
       }
       this.process(new DOMParser().parseFromString(text, 'text/xml'));
+      return true;
     },
 
     // <heat-ready lane-mask= class= round= roundid= heat=/> and <abort/>.
