@@ -1,0 +1,8 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Standings{% endblock %}
+{% block banner_title %}Standings{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-standings.js' %}"></script>{% endblock %}
+{% block main %}
+{# The rows reveal from the last up, one every 1.5 s, then scroll one row every 2 s if they overflow (standings-kiosk.js). With no key, the first catalog entry shows after 5 s. A changed key fetches kiosk/standings/. #}
+<div class="k-standings" data-standings data-url="{% url 'kiosk-standings' %}" data-key="{{ params.key }}">{% include "kiosk/standings_list.html" %}</div>
+{% endblock %}

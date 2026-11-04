@@ -293,6 +293,30 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         "S21: a 301 to /timer/test/, which needs CONTROL_RACE; PHP's page is"
         " anonymous.",
     ),
+    "kiosk.php": (
+        "D10: the 15 pages are rebuilt (ADR-10) behind a registry keyed by the"
+        " legacy page string; any other page string, a local/kiosks/ page or"
+        " a path such as ../settings.php, renders identify.kiosk, where PHP"
+        " requires the file named.",
+        "S28: grants no permission; PHP ORs PRESENT_AWARDS into every"
+        " visitor's session, and the award kiosk no longer clears the current"
+        " award on load.",
+        "S12: please-check-in reads classids as whole numbers and drops any"
+        " other list; PHP implodes the parameter into its SQL.",
+        "C34: the award kiosk plays confetti.webm only; PHP also names"
+        " confetti.mov, which is not in the repository.",
+        "D33, D35, D37: the standings kiosk lists racers not eligible for its"
+        " speed awards marked with no place, and a time a closed lane dropped"
+        " struck through, from #49's standings list; PHP leaves them out with"
+        " a footnote.",
+    ),
+    "ondeck.php": (
+        "D10: rebuilt (ADR-10); the running heat glides near the top where"
+        " PHP animates Just Finished and Now Staging across the rows.",
+    ),
+    "slideshow.php": (
+        "D10: rebuilt (ADR-10); each slide fades in over the one before.",
+    ),
     "photo.php/info": (
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",
@@ -303,6 +327,15 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
 # PHP page's name. The ticket's "## Still open" names each, and an entry moves
 # to `ROUTE_DIVERGENCES` once it has an id.
 UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {
+    "ondeck.php": (
+        "the lane count is the race's lane count; PHP's page counts the lanes"
+        " of the results (get_lane_count_from_results) (#52).",
+    ),
+    "fullscreen.php": (
+        "asks for full screen with the browser's Fullscreen API; PHP loads"
+        " screenfull.min.js, which has no released minified build to vendor"
+        " (#52).",
+    ),
     "timer.php": (
         "a browser without Web Serial is sent to /timer/no-serial/ before any"
         " timer script runs (#50 scope); PHP shows its own dialog over the page.",

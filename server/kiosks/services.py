@@ -11,33 +11,13 @@ from django.db import models, transaction
 
 from core.models import RaceSettings, RaceState
 from core.services import lock_race_state
-from kiosks import parameters
+from kiosks import pages, parameters
 from kiosks.madlib import madlib
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from racing.models import PlaylistEntry
 
-IDENTIFY = "kiosks/identify.kiosk"
-NO_PARAMS = "{}"
-
-# The pages `all_kiosk_pages()` lists, sorted as PHP's `sort()` sorts them.
-# Django shows only the built-in pages (ADR-10), so no `local/kiosks` page.
-BUILT_IN_PAGES = (
-    "award-presentations",
-    "derbynet",
-    "flag",
-    "identify",
-    "now-racing",
-    "now-racing-columnar",
-    "now-racing-columnar-reversed",
-    "ondeck",
-    "please-check-in",
-    "qrcode",
-    "results-by-racer",
-    "scale-MPH",
-    "slideshow",
-    "standings",
-    "welcome",
-)
+IDENTIFY = pages.IDENTIFY
+NO_PARAMS = pages.NO_PARAMS
 
 LISTED_FOR = timedelta(seconds=60)
 """`all_kiosks()` lists a kiosk heard from in the last 60 s."""
@@ -72,14 +52,12 @@ def kiosk_setting(event, address: str, now: datetime) -> dict:
         Kiosk.objects.filter(pk=kiosk.pk).update(
             last_contact=now, reload_requested=False
         )
-    if created or not kiosk.page:
-        return {"page": IDENTIFY, "parameters": NO_PARAMS, "reload": False}
-    return {
-        "page": kiosk.page,
-        "name": kiosk.name,
-        "reload": reload,
-        "parameters": kiosk.params or NO_PARAMS,
-    }
+    return pages.setting(
+        kiosk.page,
+        kiosk.params,
+        name=None if created else kiosk.name,
+        reload=reload,
+    )
 
 
 def _sort_key(kiosk: Kiosk):
@@ -119,13 +97,13 @@ def all_kiosks(event, now: datetime) -> list[dict]:
 
 
 def kiosk_pages() -> list[dict]:
-    return [{"brief": page, "full": f"kiosks/{page}.kiosk"} for page in BUILT_IN_PAGES]
+    return [{"brief": page.name, "full": page.key} for page in pages.PAGES.values()]
 
 
 def is_built_in(page: str) -> bool:
     """A page a kiosk can be given from the pickers: a built-in page, never a
     `local/kiosks` one (ADR-10, D10)."""
-    return page in {row["full"] for row in kiosk_pages()}
+    return pages.is_built_in(page)
 
 
 def dashboard(event, now: datetime) -> dict:

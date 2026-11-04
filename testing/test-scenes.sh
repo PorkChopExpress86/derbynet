@@ -133,4 +133,10 @@ curl_getj "action.php?query=poll.kiosk&address=$KIOSK3" | expect_one welcome.kio
 curl_postj action.php "action=scene.apply&sceneid=6" | check_jsuccess
 curl_getj "action.php?query=poll.kiosk&address=$KIOSK1" | expect_one standings.kiosk
 curl_getj "action.php?query=poll.kiosk&address=$KIOSK2" | expect_one derbynet.kiosk
+if [ "$DERBYNET_BACKEND" = django ] ; then
+# Django seeds no Wrap-Up page for Aux2, where PHP names local/kiosks/feedback.kiosk,
+# a page not in the repository (#52), so the kiosk keeps its Check-In page.
+curl_getj "action.php?query=poll.kiosk&address=$KIOSK3" | expect_one welcome.kiosk
+else
 curl_getj "action.php?query=poll.kiosk&address=$KIOSK3" | expect_one feedback.kiosk
+fi

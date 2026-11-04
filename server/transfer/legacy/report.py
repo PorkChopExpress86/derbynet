@@ -16,7 +16,7 @@ class Kind(StrEnum):
     BAD_VALUE = "bad-value"
     DROPPED_KEY = "dropped-key"
     CONSTITUENT_MISMATCH = "constituent-mismatch"
-    LOCAL_KIOSK_PAGE = "local-kiosk-page"
+    UNKNOWN_KIOSK_PAGE = "unknown-kiosk-page"
     UNPARSED_ACTION = "unparsed-action"
     PHOTO_PATH = "photo-path"
     MISSING_PHOTO = "missing-photo"

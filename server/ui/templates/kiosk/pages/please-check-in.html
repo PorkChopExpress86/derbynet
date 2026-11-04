@@ -1,0 +1,8 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Please Check In{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-check-in.js' %}"></script>{% endblock %}
+{% block banner_title %}{% if waiting %}Please Check In{% else %}All Racers Have Checked In{% endif %}{% endblock %}
+{% block main %}
+{# The list refreshes every 30 s, where PHP reloaded the page, from kiosk/check-in/ with this kiosk's parameters. #}
+<div class="k-center" data-check-in data-url="{% url 'kiosk-check-in' %}">{% include "kiosk/check_in_list.html" %}</div>
+{% endblock %}

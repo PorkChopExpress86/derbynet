@@ -1,0 +1,26 @@
+{% load static %}<!doctype html>
+{# The kiosk pages (#52): full-screen TV pages, built in only (D10). kiosk.js runs the kiosk poll, the page's content poll and kioskNudge(), the one entry point #56's push stream calls (D21, ADR-15). #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ page.name }}{% endblock %} · DerbyNet</title>
+  <link rel="stylesheet" href="{% static 'ui/kiosk.css' %}">
+  {% block head %}{% endblock %}
+  {{ kiosk_config|json_script:"kiosk-config" }}
+  <script src="{% static 'ui/kiosk.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</head>
+<body class="kiosk-page" data-page="{{ page.key }}"{% if kiosk.standalone %} data-standalone{% endif %}>
+  {% block banner %}
+  <header class="k-banner">
+    <img src="{% static 'ui/kiosk/derbynet-300.png' %}" alt="">
+    <h1 data-banner-title>{% block banner_title %}{% endblock %}</h1>
+    {% if kiosk.standalone %}<a href="{% url 'home' %}">Home</a>{% else %}<span class="k-name" data-kiosk-name>{{ kiosk.name }}</span>{% endif %}
+  </header>
+  {% endblock %}
+  <main class="k-main">{% block main %}{% endblock %}</main>
+  {# Lost contact with the server, as inc/ajax-failure.inc shows it. #}
+  <div id="ajax-failure" class="k-failure" role="status" hidden>Lost contact with the server: <span data-ajax-status></span>. Trying again.</div>
+</body>
+</html>

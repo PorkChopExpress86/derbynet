@@ -1,0 +1,19 @@
+{% load static %}<!doctype html>
+{# fullscreen.php (#52): a URL, kiosk.php by default, in a full-window frame, after asking the browser to go full screen. The native Fullscreen API stands in for screenfull.min.js, which has no released minified build to vendor. #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fullscreen Kiosk · DerbyNet</title>
+  <link rel="stylesheet" href="{% static 'ui/kiosk.css' %}">
+  <script src="{% static 'ui/kiosk-fullscreen.js' %}"></script>
+</head>
+<body class="kiosk-page">
+  <iframe class="k-full" title="Kiosk" data-interior hidden></iframe>
+  <form class="k-setup" data-setup>
+    <label for="inner_url">URL:</label>
+    <input type="text" id="inner_url" name="inner_url" value="{{ kiosk_url }}">
+    <button type="submit">Proceed</button>
+  </form>
+</body>
+</html>

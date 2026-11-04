@@ -1,0 +1,9 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Results by Racer{% endblock %}
+{% block banner_title %}Results by Racer{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'ui/app.css' %}">{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-results.js' %}"></script>{% endblock %}
+{% block main %}
+{# The rounds of #49's results page, polled every second from results/rounds/, which answers 204 while they are unchanged. The list scrolls up in a loop when it overflows, and a new round shows on the next poll. #}
+<div class="k-results" data-results data-url="{% url 'results-rounds' %}"><section data-rounds>{{ rounds_html }}</section></div>
+{% endblock %}

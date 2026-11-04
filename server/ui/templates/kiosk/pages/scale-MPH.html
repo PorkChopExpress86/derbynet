@@ -1,0 +1,15 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Scale Miles Per Hour{% endblock %}
+{% block banner_title %}Scale Miles Per Hour{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-simple.js' %}"></script>{% endblock %}
+{% block main %}
+<div class="k-scale" data-scale data-track-length="{{ track.length }}">
+  <img src="{% static 'ui/kiosk/car-4000.png' %}" alt="" data-car>
+  <p>If a 7-inch pinewood derby car</p>
+  <p>were scaled up 25x (to about 14.5 feet),</p>
+  <p>then the {{ track.length }}-foot track</p>
+  <p>would be the equivalent of <span class="k-calc">{{ track.feet }}</span> feet long.</p>
+  <p>Covering that distance in <span class="k-calc" data-time>3.0</span> seconds</p>
+  <p>would be an average speed of <span class="k-calc" data-speed>{{ track.mph }}</span> MPH.</p>
+</div>
+{% endblock %}

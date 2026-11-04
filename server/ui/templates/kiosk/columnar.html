@@ -1,0 +1,28 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Now Racing{% endblock %}
+{% block banner_title %}Racing{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-now-racing.js' %}"></script>{% endblock %}
+{% block main %}
+{# One column per lane with the racer's and the car's photos, and the best heat times along the bottom (columnar-now-racing.inc). The reversed page puts the last lane first. #}
+{% if lanes %}
+<div class="k-columns" data-now-racing data-layout="columns" data-linger-ms="{{ linger_ms }}">
+  {% for l in lanes %}
+  <div class="k-column" data-lane="{{ l.lane }}" data-color="{{ l.color }}">
+    <div class="k-lane-no">{{ l.lane }}</div>
+    <div class="k-entry" data-entry>
+      <div class="k-time" data-time></div>
+      <div class="k-place" data-place></div>
+      <span data-photo></span>
+      <div class="k-racer" data-name></div>
+      <span data-car-photo></span>
+      <div class="k-car" data-car></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<div class="k-best" data-best><span>Best heat times</span></div>
+{% else %}
+<div class="k-center" data-no-lanes><p class="k-big">The number of lanes is not set yet.</p></div>
+{% endif %}
+{% include "kiosk/overlays.html" %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Racers On Deck{% endblock %}
+{% block banner_title %}Racers On Deck{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-ondeck.js' %}"></script>{% endblock %}
+{% block main %}
+{# query=poll for ondeck, rounds, current-heat and current-reschedule every second (ondeck.js). The chart scrolls to keep the running heat in view; with show-cars-on-deck each car's photo shows, and a tap opens it large. #}
+<div class="k-deck" data-ondeck data-lanes="{{ lanes|length }}" data-photos="{{ show_car_photos|yesno:'1,' }}" data-photo-base="{% url 'photo-php' 'car/file' %}" data-colors="{% for l in lanes %}{{ l.color }}{% if not forloop.last %},{% endif %}{% endfor %}"><table data-chart aria-label="Heats on deck"></table></div>
+<div class="k-modal" data-modal hidden><div><img alt="" data-modal-img><br><button type="button" data-modal-close>Close</button></div></div>
+{% endblock %}

@@ -426,7 +426,9 @@ def test_kiosk_pages_split_into_page_params_and_reload(tmp_path):
     assert kiosks["fixture-kiosk-3"].page == "kiosks/standings.kiosk"
     assert kiosks["fixture-kiosk-3"].reload_requested
     assert not kiosks["fixture-kiosk-1"].reload_requested
-    local = _findings(report, "local-kiosk-page")
+    assert kiosks["fixture-kiosk-2"].page == "kiosks/identify.kiosk"
+    assert kiosks["fixture-kiosk-2"].params == ""
+    local = _findings(report, "unknown-kiosk-page")
     assert {(f["table"], f["legacy_id"]) for f in local} == {
         ("kiosks", "fixture-kiosk-2"),
         ("scenekiosk", 14),

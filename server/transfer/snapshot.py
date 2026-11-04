@@ -24,6 +24,7 @@ from django.utils import timezone
 from awards.models import Award, AwardType, BallotAward, Vote, Voter
 from core import race_settings
 from core.models import Event
+from kiosks import pages
 from kiosks.models import Scene, SceneKiosk
 from legacy_api.encoding import encode_php_json
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round
@@ -274,7 +275,7 @@ def tables(
                     n,
                     ids(Scene, k.scene_id),
                     k.kiosk_name,
-                    k.page + (f"#{k.params}" if k.params else ""),
+                    pages.legacy_string(k.page, k.params),
                 ]
                 for n, k in enumerate(
                     SceneKiosk.objects.filter(**mine).order_by("pk"), 1

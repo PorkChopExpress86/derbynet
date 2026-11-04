@@ -1,0 +1,313 @@
+/* The kiosk display pages (#52): TVs and projectors, read from across a room.
+   Rebuilt, not kept as PHP drew them (D10, ADR-10). Motion is CSS keyframes
+   and the Web Animations API, as #71's spike found smooth; no page uses View
+   Transitions. Sizes follow the viewport, so a page fits 1920x1080, 1280x800
+   and a 390x844 phone with no scrollbar. */
+
+:root {
+  --k-bg: #0b1730;
+  --k-bg-2: #13244a;
+  --k-surface: #1b2f5c;
+  --k-line: #2f4a85;
+  --k-ink: #f5f7fb;
+  --k-muted: #b7c3dc;
+  --k-accent: #ffd23f;
+  --k-accent-ink: #1a1300;
+  --k-ok: #3ddc84;
+  --k-warn: #ffb020;
+  --k-danger: #ff5a5f;
+  --k-gold: #ffd23f;
+  --k-silver: #d9dee8;
+  --k-bronze: #e39b5b;
+  --k-banner: clamp(2.75rem, 8vh, 6rem);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body.kiosk-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, var(--k-bg-2), var(--k-bg) 70%);
+  color: var(--k-ink);
+  font: 400 clamp(1rem, 2.2vh, 2rem)/1.25 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+[hidden] { display: none !important; }
+
+.k-banner {
+  flex: none;
+  height: var(--k-banner);
+  display: flex;
+  align-items: center;
+  gap: 1.5vw;
+  padding: 0 2.5vw;
+  background: linear-gradient(90deg, #08122a, #142a57);
+  border-bottom: 0.4vh solid var(--k-accent);
+}
+.k-banner img { height: 70%; width: auto; }
+.k-banner h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: calc(var(--k-banner) * 0.48);
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.k-banner .k-name { color: var(--k-muted); font-size: calc(var(--k-banner) * 0.3); white-space: nowrap; }
+.k-banner a { color: var(--k-accent); font-size: calc(var(--k-banner) * 0.3); }
+
+.k-main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 2vh 2.5vw;
+}
+
+.k-center {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2vh;
+}
+.k-center img { max-width: 90%; max-height: 70vh; object-fit: contain; }
+.k-title { margin: 0; font-size: clamp(2rem, 9vh, 8rem); font-weight: 800; line-height: 1.05; }
+.k-subtitle { margin: 0; font-size: clamp(1.25rem, 4.5vh, 4rem); color: var(--k-muted); }
+.k-big { font-size: clamp(1.5rem, 6vh, 5.5rem); font-weight: 700; margin: 0; }
+
+.k-enter { animation: k-rise 700ms cubic-bezier(.2,.8,.2,1) both; }
+.k-enter-2 { animation: k-rise 700ms 200ms cubic-bezier(.2,.8,.2,1) both; }
+.k-enter-3 { animation: k-rise 700ms 400ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes k-rise { from { opacity: 0; transform: translateY(4vh) scale(.98); } }
+@keyframes k-fade { from { opacity: 0; } }
+@keyframes k-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes k-slide-in { from { transform: translateX(-12vw); opacity: 0; } }
+@keyframes k-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 210, 63, 0); } 50% { box-shadow: 0 0 3vh 0.5vh rgba(255, 210, 63, .55); } }
+@keyframes k-wave { 0%, 100% { transform: perspective(60vw) rotateY(0); } 50% { transform: perspective(60vw) rotateY(-6deg) skewY(1deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+}
+
+/* Lost contact with the server (inc/ajax-failure.inc). */
+.k-failure {
+  position: fixed;
+  left: 50%;
+  bottom: 3vh;
+  transform: translateX(-50%);
+  z-index: 50;
+  max-width: 90vw;
+  padding: 1.2vh 2vw;
+  border-radius: 1vh;
+  background: var(--k-danger);
+  color: #fff;
+  font-weight: 700;
+  animation: k-fade 300ms both;
+}
+
+/* Lane colors, the classes of css/lane-colors.css. */
+[data-color="blue"] { --lane: #0000cc; --lane-ink: #fff; }
+[data-color="green"] { --lane: #00c000; --lane-ink: #04230a; }
+[data-color="orange"] { --lane: #ff8c00; --lane-ink: #2b1500; }
+[data-color="pink"] { --lane: #fbc6cf; --lane-ink: #3a0a12; }
+[data-color="purple"] { --lane: #800080; --lane-ink: #fff; }
+[data-color="red"] { --lane: #f00000; --lane-ink: #fff; }
+[data-color="yellow"] { --lane: #f8f800; --lane-ink: #222; }
+[data-color="none"] { --lane: var(--k-surface); --lane-ink: var(--k-ink); }
+
+/* Overlays: paused, check the timer, schedule adjustment (now-racing-overlay.js). */
+.k-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 10, 25, .62);
+  animation: k-fade 200ms both;
+}
+.k-overlay div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2vh;
+  padding: 4vh 5vw;
+  border-radius: 2vh;
+  background: var(--k-bg-2);
+  border: 0.4vh solid var(--k-accent);
+  font-size: clamp(1.5rem, 6vh, 5rem);
+  font-weight: 800;
+  animation: k-pop 400ms both;
+}
+.k-overlay svg { width: clamp(4rem, 18vh, 14rem); height: auto; }
+
+/* ----- now racing ---------------------------------------------------------- */
+.k-board {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 1vh;
+}
+.k-head, .k-lane {
+  display: grid;
+  grid-template-columns: 7vw 9vw minmax(0, 1fr) 13vw 13vw 9vw;
+  align-items: center;
+  gap: 1vw;
+}
+.k-points .k-head, .k-points .k-lane { grid-template-columns: 7vw 9vw minmax(0, 1fr) 9vw; }
+.k-head { color: var(--k-muted); font-size: clamp(.9rem, 2.4vh, 2rem); text-transform: uppercase; letter-spacing: .08em; padding: 0 1vw; }
+.k-lane {
+  position: relative;
+  min-height: 0;
+  padding: 0 1vw;
+  border-radius: 1.2vh;
+  background: linear-gradient(90deg, var(--lane) 0 7vw, var(--k-surface) 7vw);
+  overflow: hidden;
+  font-size: clamp(1rem, var(--row-font, 5vh), 6rem);
+}
+.k-lane > * { min-width: 0; }
+.k-lane .k-lane-no { color: var(--lane-ink); font-weight: 800; text-align: center; }
+.k-lane .k-car { font-weight: 800; font-variant-numeric: tabular-nums; }
+.k-lane .k-who { display: flex; align-items: center; gap: 1vw; min-width: 0; }
+.k-lane .k-who img { height: calc(var(--row-h, 10vh) * .8); width: auto; border-radius: .8vh; }
+.k-lane .k-names { min-width: 0; }
+.k-lane .k-racer { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
+.k-lane .k-carname, .k-lane .k-note { font-size: .5em; color: var(--k-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-lane .k-time, .k-lane .k-speed { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.k-lane .k-speed { color: var(--k-muted); }
+.k-lane .k-place { text-align: center; font-weight: 900; }
+.k-lane.k-new { animation: k-slide-in 500ms cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 90ms); }
+.k-lane .k-time.k-shown, .k-lane .k-speed.k-shown { animation: k-fade 400ms both; }
+.k-lane .k-place.k-shown { animation: k-pop 450ms both; }
+.k-lane.k-p1 { animation: k-glow 1.6s ease-in-out 2; }
+.k-lane.k-p1 .k-place { color: var(--k-gold); }
+.k-lane.k-p2 .k-place { color: var(--k-silver); }
+.k-lane.k-p3 .k-place { color: var(--k-bronze); }
+.k-test { flex: 1; display: grid; place-items: center; font-size: 6vh; font-weight: 800; color: var(--k-accent); }
+
+/* Columnar: one column per lane, racer and car photos. */
+.k-columns { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 1vw; }
+.k-column { min-height: 0; display: flex; flex-direction: column; border-radius: 1.2vh; overflow: hidden; background: var(--k-surface); }
+.k-column .k-lane-no { flex: none; text-align: center; background: var(--lane); color: var(--lane-ink); font-size: 5vh; font-weight: 800; }
+.k-column .k-entry { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1vh; padding: 1vh .5vw; text-align: center; }
+.k-column .k-entry.k-new { animation: k-rise 600ms cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 90ms); }
+.k-column .k-time { font-size: 5vh; font-weight: 800; font-variant-numeric: tabular-nums; min-height: 6vh; }
+.k-column .k-place { font-size: 4vh; font-weight: 900; color: var(--k-accent); min-height: 5vh; }
+.k-column img { max-width: 100%; max-height: 30vh; object-fit: contain; border-radius: .8vh; }
+.k-column .k-racer { font-size: 3vh; font-weight: 700; overflow-wrap: anywhere; }
+.k-column .k-car { font-size: 4vh; font-weight: 800; }
+.k-best { flex: none; display: flex; gap: 1vw; align-items: center; margin-top: 1vh; min-height: 7vh; overflow: hidden; }
+.k-best > span { color: var(--k-muted); white-space: nowrap; }
+.k-best div { display: flex; gap: .6vw; align-items: baseline; padding: .6vh 1vw; border-radius: 1vh; background: var(--k-surface); white-space: nowrap; animation: k-pop 400ms both; }
+.k-best b { font-variant-numeric: tabular-nums; }
+
+/* ----- on deck --------------------------------------------------------------- */
+.k-deck { flex: 1; min-height: 0; overflow: hidden; }
+.k-deck table { width: 100%; border-collapse: separate; border-spacing: 0 .8vh; table-layout: fixed; }
+.k-deck th { text-align: left; padding: 0 1vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--k-muted); font-weight: 600; }
+.k-deck th.k-divider { color: var(--k-accent); font-size: 1.2em; padding-top: 1vh; }
+.k-deck td { padding: .8vh .6vw; background: var(--k-surface); border-top: .5vh solid var(--lane, var(--k-line)); vertical-align: top; overflow: hidden; }
+.k-deck td .k-car { font-weight: 800; }
+.k-deck td .k-racer { font-size: .8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-deck td .k-time { font-size: .8em; color: var(--k-muted); }
+.k-deck td img { max-width: 100%; max-height: 22vh; border-radius: .6vh; cursor: zoom-in; }
+.k-deck td.k-bye { color: var(--k-muted); font-style: italic; }
+.k-deck tr.k-current td { background: #24407a; }
+.k-deck tr.k-current th { color: var(--k-accent); }
+.k-deck tr.k-next th { color: var(--k-ok); }
+.k-deck tr.k-current th::before { content: "Now racing · "; }
+.k-deck tr.k-next th::before { content: "Next · "; }
+.k-modal { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(0,0,0,.8); animation: k-fade 200ms both; }
+.k-modal img { max-width: 90vw; max-height: 80vh; }
+.k-modal button { margin-top: 2vh; font: inherit; padding: 1vh 2vw; border-radius: 1vh; border: 0; background: var(--k-accent); color: var(--k-accent-ink); font-weight: 700; }
+
+/* ----- standings ------------------------------------------------------------- */
+.k-standings { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1vh; }
+.k-standings h2 { margin: 0; font-size: 5vh; }
+.k-standings p { margin: 0; color: var(--k-muted); }
+.k-rows { flex: 1; min-height: 0; overflow: hidden; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .8vh; }
+.k-row { flex: none; display: grid; grid-template-columns: 8vh 10vw minmax(0, 1fr) auto; align-items: center; gap: 1.5vw; padding: .8vh 1.5vw; border-radius: 1.2vh; background: var(--k-surface); font-size: 3.6vh; }
+.k-row .k-place { display: grid; place-items: center; width: 7vh; height: 7vh; border-radius: 50%; background: var(--k-accent); color: var(--k-accent-ink); font-weight: 900; }
+.k-row[data-not-eligible] { border: .3vh dashed var(--k-line); background: transparent; }
+.k-row[data-not-eligible] .k-place { background: var(--k-bg-2); color: var(--k-muted); }
+.k-row .k-who { min-width: 0; }
+.k-row .k-who div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-row .k-why { font-size: .6em; color: var(--k-warn); }
+.k-row .k-times { font-size: .55em; color: var(--k-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-row .k-times s { color: #7d8aa6; }
+.k-row .k-score { font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ----- please check in ------------------------------------------------------- */
+.k-heading { margin: 0 0 1.5vh; font-size: 4vh; color: var(--k-accent); text-align: center; }
+.k-wanted { flex: 1; min-height: 0; column-gap: 3vw; column-fill: auto; font-size: var(--wanted-font, 2.6vh); }
+.k-wanted section { break-inside: avoid; margin-bottom: 2vh; }
+.k-wanted h2 { margin: 0 0 .6vh; padding: .4vh 1vw; border-radius: .8vh; background: var(--k-accent); color: var(--k-accent-ink); font-size: 1.3em; text-align: center; }
+.k-wanted ul { list-style: none; margin: 0; padding: 0; }
+.k-wanted li { padding: .2vh 1vw; animation: k-fade 400ms both; }
+
+/* ----- awards ---------------------------------------------------------------- */
+.k-award { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2vh; }
+.k-award .k-award-name { margin: 0; font-size: clamp(2rem, 8vh, 7rem); font-weight: 850; color: var(--k-accent); }
+.k-award .k-reveal { display: flex; flex-direction: column; align-items: center; gap: 1vh; }
+.k-award .k-reveal.k-shown { animation: k-rise 1000ms cubic-bezier(.2,.8,.2,1) both; }
+.k-award .k-recipient { font-size: 7vh; font-weight: 800; margin: 0; }
+.k-award .k-carno { font-size: 5vh; color: var(--k-muted); margin: 0; }
+.k-award .k-detail { font-size: 3.5vh; color: var(--k-muted); margin: 0; }
+.k-award .k-photos { flex: 1; min-height: 0; display: flex; gap: 2vw; justify-content: center; }
+.k-award .k-photos img { max-height: 100%; max-width: 44vw; object-fit: contain; border-radius: 1.5vh; }
+.k-award video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 5; mix-blend-mode: screen; }
+
+/* ----- slideshow ------------------------------------------------------------- */
+.k-slides { flex: 1; min-height: 0; position: relative; }
+.k-slide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vh; animation: k-fade 1200ms both; }
+.k-slide img.k-photo { max-width: 100%; min-height: 0; flex: 0 1 auto; max-height: 88%; object-fit: contain; }
+.k-slide img.k-inset { position: absolute; right: 2vw; bottom: 2vh; max-width: 20vw; max-height: 25vh; border-radius: 1vh; }
+.k-slide .k-caption { margin: 0; font-size: 4.5vh; font-weight: 700; text-align: center; }
+.k-slide .k-maintitle { position: absolute; left: 0; right: 0; bottom: 4vh; margin: 0; text-align: center; font-size: 7vh; font-weight: 850; text-shadow: 0 .4vh 1.5vh #000; }
+
+/* ----- scale MPH ------------------------------------------------------------- */
+.k-scale { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+.k-scale p { margin: .6vh 0; text-align: center; font-size: clamp(1rem, 4vw, 4.5vh); line-height: 1.1; position: relative; z-index: 1; }
+.k-scale .k-calc { font-size: 1.25em; font-weight: 900; color: var(--k-accent); font-variant-numeric: tabular-nums; }
+.k-scale img { position: absolute; bottom: 45%; left: 45vw; max-width: 10vw; z-index: 0; opacity: .55; }
+
+/* ----- flag ----------------------------------------------------------------- */
+.k-flag img { animation: k-wave 4s ease-in-out infinite; transform-origin: left center; }
+
+/* ----- qrcode ---------------------------------------------------------------- */
+.k-qr { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; }
+.k-qr h2 { margin: 0; font-size: clamp(1.5rem, 7vh, 6rem); text-align: center; }
+.k-qr [data-qr] { background: #fff; padding: 2vh; border-radius: 2vh; }
+.k-qr [data-qr] svg, .k-qr [data-qr] img { display: block; width: min(80vw, 70vh); height: auto; }
+
+/* ----- results by racer ------------------------------------------------------ */
+.k-results { flex: 1; min-height: 0; overflow: hidden; }
+.k-results > section { will-change: transform; }
+
+/* ----- fullscreen.php -------------------------------------------------------- */
+.k-full { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+.k-setup { display: flex; flex-wrap: wrap; gap: 1vw; align-items: center; justify-content: center; padding: 10vh 4vw; }
+.k-setup input[type="text"] { flex: 1 1 30rem; min-width: 0; font: inherit; padding: 1vh 1vw; border-radius: 1vh; border: 1px solid var(--k-line); background: var(--k-surface); color: var(--k-ink); }
+.k-setup button { font: inherit; padding: 1vh 2vw; border-radius: 1vh; border: 0; background: var(--k-accent); color: var(--k-accent-ink); font-weight: 700; }
+
+@media (max-width: 640px) {
+  .k-head, .k-lane { grid-template-columns: 10vw 14vw minmax(0, 1fr) 22vw 14vw; }
+  .k-head .k-speed, .k-lane .k-speed { display: none; }
+  .k-points .k-head, .k-points .k-lane { grid-template-columns: 10vw 14vw minmax(0, 1fr) 14vw; }
+  .k-lane { background: linear-gradient(90deg, var(--lane) 0 10vw, var(--k-surface) 10vw); font-size: clamp(.9rem, var(--row-font, 4vw), 2rem); }
+  .k-row { grid-template-columns: 5vh 16vw minmax(0, 1fr) auto; font-size: 2.2vh; }
+  .k-row .k-place { width: 4.5vh; height: 4.5vh; }
+}

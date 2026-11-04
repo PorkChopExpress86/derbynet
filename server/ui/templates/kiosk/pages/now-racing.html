@@ -1,0 +1,25 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Now Racing{% endblock %}
+{% block banner_title %}Racing{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-now-racing.js' %}"></script>{% endblock %}
+{% block main %}
+{# query=poll for current-heat, heat-results, precision, racers, timer-trouble and current-reschedule, 500 ms after each reply, with a 15 s watchdog (now-racing-poller.js). A new lineup slides in, results land by place, and the board holds for now-racing-linger-ms before the next lineup. Under use-points the time and speed columns are gone. #}
+{% if lanes %}
+<div class="k-board{% if use_points %} k-points{% endif %}" data-now-racing data-layout="rows" data-linger-ms="{{ linger_ms }}" data-use-points="{{ use_points|yesno:'1,' }}">
+  <div class="k-head" aria-hidden="true"><span>Lane</span><span>Car</span><span>Racer</span>{% if not use_points %}<span class="k-time">Time</span><span class="k-speed">Scale MPH</span>{% endif %}<span class="k-place">Place</span></div>
+  {% for l in lanes %}
+  <div class="k-lane" data-lane="{{ l.lane }}" data-color="{{ l.color }}">
+    <span class="k-lane-no">{{ l.lane }}</span>
+    <span class="k-car" data-car></span>
+    <div class="k-who"><span data-photo></span><div class="k-names"><div class="k-racer" data-name></div><div class="k-carname" data-carname></div><div class="k-note" data-note></div></div></div>
+    {% if not use_points %}<span class="k-time" data-time></span><span class="k-speed" data-speed></span>{% endif %}
+    <span class="k-place" data-place></span>
+  </div>
+  {% endfor %}
+  <div class="k-test" data-timer-test hidden>Timer testing</div>
+</div>
+{% else %}
+<div class="k-center" data-no-lanes><p class="k-big">The number of lanes is not set yet.</p></div>
+{% endif %}
+{% include "kiosk/overlays.html" %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Slideshow{% endblock %}
+{% block banner %}{% if kiosk.standalone %}{{ block.super }}{% endif %}{% endblock %}
+{% block banner_title %}Slideshow{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-slideshow.js' %}"></script>{% endblock %}
+{% block main %}
+{# slide.next every 10 s: the title slide, the slides, the subdir's slides, then the racers with photos, as slideshow.js shows them. #}
+<div class="k-slides" data-slides data-title-slide="{% url 'slide-php' 'title' %}"></div>
+{% endblock %}

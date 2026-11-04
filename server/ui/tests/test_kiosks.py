@@ -14,6 +14,7 @@ from awards.models import Award
 from core.models import RaceState
 from kiosks import services
 from kiosks.models import Kiosk, Scene, SceneKiosk
+from kiosks.pages import PAGES
 from roster.models import Group
 from ui.kiosks import state
 
@@ -62,11 +63,11 @@ def presenter(event):
 
 
 def test_every_built_in_page_has_a_label_and_its_own_thumbnail():
-    assert set(state.PAGE_LABELS) == set(services.BUILT_IN_PAGES)
+    assert set(state.PAGE_LABELS) == {p.name for p in PAGES.values()}
     fallback = render_to_string("ui/kiosks/thumbnail.html", {"brief": "?"})
     drawn = {
         brief: render_to_string("ui/kiosks/thumbnail.html", {"brief": brief})
-        for brief in services.BUILT_IN_PAGES
+        for brief in (p.name for p in PAGES.values())
     }
     others = {b: svg for b, svg in drawn.items() if b != "identify"}
     assert all(svg != fallback for svg in others.values())
@@ -189,7 +190,7 @@ def test_a_presenter_sees_the_kiosks_and_no_control(presenter, event):
 def test_the_page_picker_names_and_identify(coordinator, event):
     kiosk(event, "tv 1")
     sheet = coordinator.get("/kiosks/page/", {"address": "tv 1"}).content.decode()
-    assert sheet.count("data-page-choice=") == len(services.BUILT_IN_PAGES)
+    assert sheet.count("data-page-choice=") == len(PAGES)
     coordinator.post(
         "/kiosks/page/",
         {"address": "tv 1", "page": "kiosks/welcome.kiosk"},
@@ -279,12 +280,20 @@ def test_opening_the_scene_editor_does_not_change_the_award_on_the_kiosk(
 
 
 def test_the_editor_lists_every_kiosk_name_with_the_scenes_page(coordinator, event):
+    # `scene.setkiosk` still stores any page string, as PHP's does.
+    wrap_up = scene(event, "Wrap-Up")
+    SceneKiosk.objects.create(
+        event=event,
+        scene=wrap_up,
+        kiosk_name="Aux2",
+        page="local/kiosks/feedback.kiosk",
+    )
     html = coordinator.get(
         "/kiosks/scenes/", {"scene": scene(event, "Wrap-Up").pk}
     ).content.decode()
     assert re.findall(r'data-entry="([^"]+)"', html) == ["Main", "Aux1", "Aux2"]
     assert 'data-page="kiosks/standings.kiosk">Standings' in html
-    # An imported local page shows as the page a kiosk shows for it (D10).
+    # A page outside the registry shows as the page a kiosk shows for it (D10).
     assert 'data-page="local/kiosks/feedback.kiosk">Identify' in html
     welcome = coordinator.get(
         "/kiosks/scenes/", {"scene": scene(event, "Welcome").pk}

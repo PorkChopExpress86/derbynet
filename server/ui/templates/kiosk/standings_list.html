@@ -1,0 +1,23 @@
+{% load ui %}{# One standings presentation, from ui.standings.state (#49): a racer who cannot win its speed awards is listed in score order, marked, with no place (D33, D35); a time a closed lane dropped is struck through (D37). The rows start hidden; kiosk-standings.js reveals them. #}
+{% if not standings.catalog %}
+<p class="k-big" data-empty>No standings yet.</p>
+{% else %}
+<div data-shown-key="{{ standings.selected }}">
+  <h2 data-title>{{ standings.title }}</h2>
+  <p data-scoring>{{ standings.heading }}</p>
+</div>
+<ol class="k-rows" data-rows aria-label="Standings for {{ standings.title }}">
+  {% for c in standings.cards %}
+  <li class="k-row" data-racer="{{ c.racer_id }}"{% if c.not_eligible %} data-not-eligible{% endif %} hidden>
+    <span class="k-place" data-place>{% if c.place %}{{ c.place }}{% else %}<span aria-hidden="true">–</span><span hidden>No place</span>{% endif %}</span>
+    <span data-car>{{ c.car_number|car }}</span>
+    <div class="k-who">
+      <div data-name>{{ c.name }}{% if standings.use_groups %} · {{ c.group }}{% endif %}</div>
+      {% if c.not_eligible %}<div class="k-why" data-why>Not eligible: {{ c.not_eligible }}</div>{% endif %}
+      {% if c.times %}<div class="k-times">{% for t in c.times %}{% if t.dropped %}<s title="Heat {{ t.heat }}, lane {{ t.lane }}, dropped: the lane was closed" data-time data-dropped>{{ t.shown }}</s>{% else %}<span data-time>{% if t.dnf %}DNF {% endif %}{{ t.shown }}</span>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+    </div>
+    <span class="k-score" data-score>{{ c.score }}</span>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
