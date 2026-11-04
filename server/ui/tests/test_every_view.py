@@ -14,6 +14,7 @@ import ast
 import importlib
 import inspect
 import re
+import textwrap
 from contextlib import contextmanager
 from itertools import product
 
@@ -152,7 +153,8 @@ def words_for(route: str, view) -> list[dict[str, str]]:
     args = re.findall(r"<str:(\w+)>", route)
     if not args:
         return [{}]
-    tree = ast.parse(inspect.getsource(view))
+    # A wrapper a decorator defines inside a function is indented.
+    tree = ast.parse(textwrap.dedent(inspect.getsource(view)))
     found = {
         node.value
         for node in ast.walk(tree)
@@ -165,6 +167,20 @@ def words_for(route: str, view) -> list[dict[str, str]]:
         dict(zip(args, combo, strict=True))
         for combo in product(words, repeat=len(args))
     ]
+
+
+def _guard(view):
+    def guarded(request, kind):
+        return view(request, kind)
+
+    return guarded
+
+
+def test_a_view_wrapped_inside_a_function_is_read():
+    """#49's import views returned a wrapper defined inside a decorator,
+    whose source is indented: `ast.parse` raised IndentationError."""
+    view = _guard(lambda request, kind: None)
+    assert {"kind": "zzz"} in words_for("<str:kind>/", view)
 
 
 @pytest.mark.parametrize(("route", "view"), ROUTES, ids=[r for r, _ in ROUTES])
