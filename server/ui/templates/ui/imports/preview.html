@@ -1,0 +1,37 @@
+{# The summary of the rows the page would import. Writes nothing. A roster with new partitions offers to rename the labels, which Import saves with the racers. #}
+<div class="rounded-xl bg-surface-2 p-3" data-summary>
+  <p class="font-semibold" data-rows>{{ summary.rows }} {% if kind == "roster" %}racer{{ summary.rows|pluralize }}{% elif kind == "awards" %}award{{ summary.rows|pluralize }}{% else %}result{{ summary.rows|pluralize }}{% endif %} to import.</p>
+  {% if kind == "roster" %}
+  <p class="mt-1" data-new-partitions>{% if summary.new_partitions %}{{ summary.new_partitions|length }} new {{ labels.partition_label|lower }}{{ summary.new_partitions|length|pluralize }}: {{ summary.new_partitions|join:", " }}.{% else %}No new {{ labels.partition_label|lower }}.{% endif %}</p>
+  {% if summary.existing_partitions %}<p class="mt-1 text-sm text-ink-muted" data-existing-partitions>Already set up: {{ summary.existing_partitions|join:", " }}.</p>{% endif %}
+  {% if summary.new_partitions %}
+  <fieldset class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2" data-relabel>
+    <legend class="mb-1 text-sm font-medium">What to call them</legend>
+    <label class="flex flex-col gap-1 text-sm">The whole roster is a
+      <input type="text" name="supergroup-label" value="{{ labels.supergroup_label }}" maxlength="100" class="min-h-11 rounded-xl border border-field bg-surface px-3 text-base" data-label="supergroup-label">
+    </label>
+    <label class="flex flex-col gap-1 text-sm">and each sub-division is a
+      <input type="text" name="partition-label" value="{{ labels.partition_label }}" maxlength="100" class="min-h-11 rounded-xl border border-field bg-surface px-3 text-base" data-label="partition-label">
+    </label>
+  </fieldset>
+  {% endif %}
+  {% endif %}
+  {% if summary.duplicate_cars %}
+  <div class="mt-2 text-warn-ink" data-duplicate-cars>
+    <p class="font-semibold">Car numbers the file repeats:</p>
+    <ul role="list" class="text-sm">{% for car, numbers in summary.duplicate_cars.items %}<li>{{ car }}: row{{ numbers|pluralize }} {{ numbers|join:", " }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if summary.taken_cars %}
+  <div class="mt-2 text-sm text-ink-muted" data-taken-cars>
+    <p class="font-medium">Car numbers a racer already has (they import, with a warning):</p>
+    <ul role="list">{% for car, numbers in summary.taken_cars.items %}<li>{{ car }}: row{{ numbers|pluralize }} {{ numbers|join:", " }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if summary.missing %}
+  <div class="mt-2 text-danger-ink" data-missing>
+    <p class="font-semibold">Rows missing a required field:</p>
+    <ul role="list" class="text-sm">{% for e in summary.missing %}<li>Row {{ e.number }}: {{ e.message }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</div>

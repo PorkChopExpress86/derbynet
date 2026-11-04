@@ -88,3 +88,50 @@ def run_heat(event, times=None) -> None:
 def current(event) -> tuple[int | None, int | None, bool]:
     state = RaceState.objects.get(event=event)
     return state.current_round_id, state.current_heat, state.racing
+
+
+def race_round(event, before_heat=None) -> int:
+    """Every heat of the current round through the timer, a lower car
+    always faster. `before_heat(n)` runs before heat n. Returns the heats."""
+    round_id = RaceState.objects.get(event=event).current_round_id
+    n = 0
+    while True:
+        state = RaceState.objects.get(event=event)
+        if not state.racing or state.current_round_id != round_id:
+            return n
+        n += 1
+        if before_heat is not None:
+            before_heat(n)
+        recorded = results.record_timer_result(event, car_times(event))
+        assert recorded.failure is None, recorded.failure
+
+
+def standings_day(event, close_lane_3=False) -> dict:
+    """Three groups by partition, Lions (101 up), Tigers (201 up) and Parents
+    (301 up), four racers each, each round 1 raced. Lions 102 is not
+    eligible for any award and Tigers 202 not for speed awards (D33); the
+    pack's speed awards leave out Parents (D35). With `close_lane_3`, lane 3
+    closes before the Lions' third heat (D37)."""
+    from awards.services import set_partition_list
+    from racing.services import lanes
+    from roster.models import Partition
+    from roster.services.racers import set_award_settings
+
+    rounds = race_setup(event, groups=(("Lions", 4), ("Tigers", 4), ("Parents", 4)))
+    racers = {r.car_number: r for r in Racer.objects.filter(event=event)}
+    set_award_settings(racers[102], exclude=True)
+    set_award_settings(racers[202], no_speed_awards=True)
+    set_partition_list(
+        event, Partition.objects.filter(event=event).exclude(name="Parents")
+    )
+    for name, round in rounds.items():
+        scheduled(round)
+        close = None
+        if close_lane_3 and name == "Lions":
+
+            def close(n):
+                if n == 3:
+                    lanes.close_lanes(event, [3])
+
+        race_round(event, close)
+    return {"rounds": rounds, "racers": racers}

@@ -1,0 +1,15 @@
+{% extends "ui/base.html" %}
+{% load ui %}
+{% block main %}
+<div data-results>
+  {% if racer_id %}
+  <div class="mb-3 flex flex-wrap gap-2">
+    <a href="{% url 'racer-results' %}" class="flex min-h-11 items-center rounded-xl border border-line bg-surface px-4 font-semibold" data-all-racers>View all racers</a>
+  </div>
+  {% endif %}
+  {# The rounds, polled every second as results-by-racer-update.js polls poll.results. The server answers 204 while the signature of what they show holds. #}
+  <section id="results-rounds" aria-label="Results by racer" aria-live="polite" hx-get="{% url 'results-rounds' %}{% if racer_id %}?racerid={{ racer_id }}{% endif %}" hx-trigger="every {{ poll_seconds }}s [derbynet.pollable(this)]" hx-include="#results-sig" hx-swap="innerHTML" hx-sync="this:drop">
+  {{ rounds_html }}
+  </section>
+</div>
+{% endblock %}

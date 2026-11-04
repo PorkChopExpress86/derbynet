@@ -55,6 +55,14 @@ def racer_name(racer) -> str:
     return name(racer.first_name, racer.last_name)
 
 
+@register.filter(name="car")
+def car_filter(number) -> str:
+    """`{{ number|car }}`: a car number padded to three digits (D47)."""
+    from ui.responses import car
+
+    return car(number)
+
+
 @register.simple_tag
 def poll_trigger(seconds):
     return format_html('hx-trigger="every {}s [derbynet.pollable(this)]"', seconds)

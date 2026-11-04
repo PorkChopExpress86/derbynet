@@ -51,6 +51,15 @@ URLS = [
     "/photos/cars/",
     "/photos/head/list/",
     "/photos/car/racers/?photo=a.jpg",
+    "/results/",
+    "/results/rounds/",
+    "/standings/",
+    "/standings/list/",
+    "/history/",
+    "/export/",
+    "/import/roster/",
+    "/import/awards/",
+    "/import/results/",
 ]
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 # An element whose hx-get names a URL and whose trigger polls.

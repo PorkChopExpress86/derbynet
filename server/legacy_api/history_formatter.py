@@ -9,8 +9,21 @@ another ticket breaks the history of imported events.
 
 PHP's tables return copies, so an `edit` action changes nothing the tables
 keep, and `partition.*structure` leaves bare ids behind. Those effects are
-kept, since the text for imported rows must match PHP's. PHP's debug mode,
-which prints a row for every action that has no sentence, is not ported.
+kept, since the text for imported rows must match PHP's. PHP's debug mode
+prints its tables' model; the Retrospective's `?debug` instead lists every
+logged request, those with no sentence too (`entries(every_row=True)`).
+
+Two differences from PHP, both in text PHP printed unescaped: a
+`settings.write` key or a non-text value, and a lane key of `result.write`
+or `timer-message`, are escaped (proposed #64 row S38, #49: PHP printed
+`<i>key</i>` as markup, run with `testing/docker/php-scratch.sh`). No
+PHP-written log in the fixtures has such a key, so their text is PHP's.
+
+`history(event)` reads the log through `transfer.action_log`, which resolves
+an imported row's legacy ids to the event's new ids (#49). A legacy id with
+no new row arrives as an `Unmapped` marker: the tables keep the rows the log
+creates under it apart from every new id, and a lookup that finds none
+names the raw id with the marker, never another row.
 """
 
 import json
@@ -19,6 +32,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from legacy_api.xml import php_escape
+from transfer.action_log import Unmapped
 
 _NUMBER = re.compile(r"\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*")
 
@@ -67,14 +81,23 @@ def _id(value) -> int:
 
 
 class _Table:
-    """`SimulatedSqliteTable`: rows numbered from 1 by id, with holes."""
+    """`SimulatedSqliteTable`: rows numbered from 1 by id, with holes. Rows
+    created under an `Unmapped` id are kept apart, in `unmapped`; a lookup
+    of an unmapped id that finds no row answers `name_column` set to the
+    marker."""
 
-    def __init__(self, id_column: str):
+    def __init__(self, id_column: str, name_column: str = ""):
         self.id_column = id_column
+        self.name_column = name_column
         self.entries: list[dict | None] = []
+        self.unmapped: dict[Unmapped, dict] = {}
 
     def insert_with_id(self, row: dict) -> dict:
-        index = _id(row.get(self.id_column))
+        key = row.get(self.id_column)
+        if isinstance(key, Unmapped):
+            self.unmapped[key] = row
+            return row
+        index = _id(key)
         if len(self.entries) + 1 <= index:
             while len(self.entries) + 1 < index:
                 self.entries.append(None)
@@ -84,6 +107,11 @@ class _Table:
         return row
 
     def get(self, id_) -> dict | None:
+        if isinstance(id_, Unmapped):
+            row = self.unmapped.get(id_)
+            if row is not None:
+                return dict(row)
+            return {self.name_column: str(id_)} if self.name_column else None
         number = _number(id_)
         if number is not None and 0 < number <= len(self.entries):
             row = self.entries[int(number) - 1]
@@ -91,17 +119,22 @@ class _Table:
         return None
 
     def get_or_error(self, id_) -> dict | None:
+        if isinstance(id_, Unmapped):
+            return self.get(id_)
         number = _id(id_)
         row = self.get(number) if number > 0 else None
         return row or None
 
     def find(self, column: str, value) -> dict | None:
-        for row in self.entries:
+        for row in [*self.entries, *self.unmapped.values()]:
             if row and _equal(row.get(column), value):
                 return dict(row)
         return None
 
     def delete(self, id_) -> None:
+        if isinstance(id_, Unmapped):
+            self.unmapped.pop(id_, None)
+            return
         number = _number(id_)
         if number is None or number <= 0:
             return
@@ -112,6 +145,7 @@ class _Table:
 
     def clear(self) -> None:
         self.entries = []
+        self.unmapped = {}
 
 
 @dataclass(frozen=True)
@@ -121,14 +155,16 @@ class Entry:
     heat: str
     received: object
     sentence: str
+    # The request as the formatter read it, for the debug view.
+    request: Mapping | None = None
 
 
 class HistoryFormatter:
     def __init__(self):
-        self.racers = _Table("racerid")
-        self.classes = _Table("classid")
-        self.ranks = _Table("rankid")
-        self.partitions = _Table("partitionid")
+        self.racers = _Table("racerid", "lastname")
+        self.classes = _Table("classid", "class")
+        self.ranks = _Table("rankid", "rank")
+        self.partitions = _Table("partitionid", "name")
         self.rounds = _Table("roundid")
         self.settings: dict = {}
         self.round_id = None
@@ -140,8 +176,10 @@ class HistoryFormatter:
 
     def set_action(self, request: Mapping) -> None:
         """PHP json-decodes the stored text and escapes each top-level string."""
+        # An imported request prints as it was logged, legacy ids and all.
+        logged = getattr(request, "original", request)
         self.action_string = php_escape(
-            json.dumps(request, separators=(",", ":")).replace("/", "\\/")
+            json.dumps(logged, separators=(",", ":"), default=str).replace("/", "\\/")
         )
         self.action = {
             key: php_escape(value) if isinstance(value, str) else value
@@ -209,10 +247,10 @@ class HistoryFormatter:
         any_times = False
         for key, value in self.action.items():
             if key.startswith("lane"):
-                message += f" {key}: {_s(value)}s"
+                message += f" {php_escape(key)}: {_s(value)}s"
                 any_times = True
             elif not any_times and key.startswith("place"):
-                message += f" lane{key[5:]}: #{_s(value)}"
+                message += f" lane{php_escape(key[5:])}: #{_s(value)}"
         return message
 
     # ----- the sentence -----
@@ -479,7 +517,13 @@ class HistoryFormatter:
         for key, value in self.action.items():
             if key != "action" and not key.endswith("-checkbox"):
                 self.settings[key] = value
-                message += f" <b>{key}</b>: " + json.dumps(value)
+                # The page shows the sentence as HTML. A string value is
+                # escaped already (`set_action`); a key, or a list's text,
+                # is escaped here, which changes nothing PHP's suites write.
+                shown = json.dumps(value)
+                if not isinstance(value, str):
+                    shown = php_escape(shown)
+                message += f" <b>{php_escape(key)}</b>: " + shown
         return message
 
     def _do_timer_overdue(self):
@@ -549,26 +593,29 @@ HANDLERS = {
 }
 
 
-def entries(rows: Iterable[tuple[object, Mapping]]) -> list[Entry]:
+def entries(
+    rows: Iterable[tuple[object, Mapping]], *, every_row: bool = False
+) -> list[Entry]:
     """The history of `(received, request)` rows, oldest first: every row that
-    has a sentence, with the heat the timer or the scorer was on."""
+    has a sentence, with the heat the timer or the scorer was on. With
+    `every_row`, the rows with no sentence too, each with its request, for
+    the debug view."""
     formatter = HistoryFormatter()
     found = []
     for received, request in rows:
         formatter.set_action(request)
         heat = formatter.current_heat_string()
         sentence = formatter.process()
-        if sentence:
+        if every_row:
+            found.append(Entry(heat, received, sentence, request))
+        elif sentence:
             found.append(Entry(heat, received, sentence))
     return found
 
 
-def history(event) -> list[Entry]:
-    """The event's history from its action log, as `history.php` reads it."""
-    from core.models import ActionLog
+def history(event, *, every_row: bool = False) -> list[Entry]:
+    """The event's history from its action log, as `history.php` reads it,
+    with an imported row's legacy ids resolved (`transfer.action_log`)."""
+    from transfer.action_log import resolved_log
 
-    return entries(
-        ActionLog.objects.filter(event=event)
-        .order_by("received", "pk")
-        .values_list("received", "request")
-    )
+    return entries(resolved_log(event), every_row=every_row)

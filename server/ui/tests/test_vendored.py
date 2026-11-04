@@ -14,7 +14,7 @@ VENDORED = [
 
 
 def test_every_vendored_file_is_listed_with_its_checksum():
-    assert len(VENDORED) == 8
+    assert len(VENDORED) == 9
     for path in VENDORED:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         assert path.name in MANIFEST, path.name
