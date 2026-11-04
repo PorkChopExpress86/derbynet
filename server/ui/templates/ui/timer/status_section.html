@@ -1,0 +1,11 @@
+{% load ui %}{# The polled status card with the contact age, on the status and test pages (#50). #}
+<section aria-labelledby="ts-h" class="rounded-2xl border border-line bg-surface p-4">
+  <div class="mb-2 flex items-baseline justify-between gap-2">
+    <h2 id="ts-h" class="text-lg font-semibold">Timer status</h2>
+    <span class="text-sm text-ink-muted" data-contact-age x-text="ageText()"></span>
+  </div>
+  <div id="timer-status" hx-get="{% url 'timer-status' %}" {% poll_trigger poll_seconds %} hx-include="#timer-sig" hx-swap="innerHTML" hx-sync="this:drop" @htmx:after-request="heard($event)">
+  {{ status_html|safe }}
+  </div>
+</section>
+

@@ -37,6 +37,8 @@ POLLS = [
     "/awards/present/current/",
     "/kiosks/board/",
     "/results/rounds/",
+    "/timer/status/",
+    "/timer/test/live/",
 ]
 APPS = ("core", "roster", "racing", "awards", "kiosks")
 SIG = re.compile(r'<input type="hidden"(?: id="[\w-]+")? name="sig" value="([^"]*)">')

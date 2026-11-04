@@ -56,6 +56,9 @@ QUIRK_DECISIONS = {
     # car number must be a whole number.
     "R1": "fix",
     "R2": "fix",
+    # Rows of #64 that the #32 timer endpoints and the #50 timer pages fix,
+    # as #15's table hardens them.
+    "S21": "fix",
     # Rows of #64 that a #31 endpoint fixes. The owner accepted C23 in D67.
     "C23": "fix",
     "C24": "fix",

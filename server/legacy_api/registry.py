@@ -283,6 +283,16 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " its side renders upright; PHP renders the stored pixels and drops the"
         " tag.",
     ),
+    "timer.php": (
+        "D5: needs TIMER_MESSAGE, the Timer role's one permission; PHP's page"
+        " needs SET_UP.",
+        "D53: the Timer settings button shows only to a session with"
+        " CONTROL_RACE, which timer.settings needs.",
+    ),
+    "timer-test.php": (
+        "S21: a 301 to /timer/test/, which needs CONTROL_RACE; PHP's page is"
+        " anonymous.",
+    ),
     "photo.php/info": (
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",

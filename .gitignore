@@ -37,6 +37,10 @@ website/local/
 website/timer.php
 website/js/timer/*
 
+# The browser timer's copies for Django, which manage.py build_timer writes (#50)
+server/ui/static/timer/js/timer/
+server/ui/static/timer/css/timer.css
+
 dist/
 adapter-webrtc/
 .idea

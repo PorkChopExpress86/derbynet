@@ -39,8 +39,9 @@ var all_uris = [
   "racing-groups.php",
   "settings.php",
   "setup.php",
-  "standings.php",
-  "timer.php"
+  "standings.php"
+  // timer.php: server/ui/tests/browser/test_timer.py loads it in Chromium and
+  // fails on any request that does not load (#50).
 ];
 
 puppeteer.launch({devtools: debugging}).then(async browser => {

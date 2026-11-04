@@ -1,0 +1,17 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{% block head %}<script src="{% static 'ui/timer.js' %}"></script>{% endblock %}
+{% block main %}
+<div x-data="timerStatus({{ server_now }}, {{ status.contact|default_if_none:'null' }}, '')" class="flex flex-col gap-4" data-timer-test-page>
+  {% include "ui/timer/status_section.html" %}
+  <section aria-labelledby="tt-h" class="rounded-2xl border border-line bg-surface p-4">
+    <h2 id="tt-h" class="text-lg font-semibold">Timer test</h2>
+    <p class="mt-1 text-sm text-ink-muted">Simulated racing sends the timer a test heat, so you can race cars down the track without a schedule. Tap a lane to leave it empty or put a car in it.</p>
+    {# The test heat, polled every 500 ms as timer-test.js polls poll.timer.test. Each control syncs on it with replace, so a tap never waits behind a poll. #}
+    <div id="timer-test-live" hx-get="{% url 'timer-test-live' %}" hx-trigger="every {{ poll_ms }}ms [derbynet.pollable(this)]" hx-include="#timer-test-sig" hx-swap="innerHTML" hx-sync="this:drop" class="mt-3">
+    {{ test_html|safe }}
+    </div>
+  </section>
+  <a href="{% url 'timer' %}" class="inline-flex min-h-12 items-center justify-center self-start rounded-xl border border-line bg-surface px-4 font-semibold" data-action="timer-status-page">Timer settings and log</a>
+</div>
+{% endblock %}

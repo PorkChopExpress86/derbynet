@@ -1,0 +1,191 @@
+{# Generated from templates/timer.html by ui/timer_build.py (#50). Do not edit: run `manage.py build_timer`. #}<!DOCTYPE html>
+<html lang="en" xml:lang="en" xmlns= "http://www.w3.org/1999/xhtml">
+<meta charset="UTF-8"/>
+<meta name="google" content="notranslate"/>
+<meta http-equiv="Content-Language" content="en"/>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+<script type="text/javascript">
+if (!('serial' in navigator)) { window.location.replace('{{ no_serial_url|escapejs }}'); }
+</script>
+<title>Timer</title>
+<link rel="stylesheet" type="text/css" href="css/global.css"/>
+<link rel="stylesheet" type="text/css" href="css/mobile.css"/>
+<link rel="stylesheet" type="text/css" href="css/timer.css"/>
+<script type="text/javascript" src="js/jquery.js"></script>
+<script type="text/javascript" src="js/jquery-ui.min.js"></script>
+<script type="text/javascript" src="js/mobile.js"></script>
+<script type="text/javascript" src="js/ajax-setup.js"></script>
+<script type="text/javascript" src="js/modal.js"></script>
+
+<script type="text/javascript">
+var g_version = {branch: "{{ version.branch|escapejs }}",
+                 revision: {{ version.revision }},
+                 date: "{{ version.date|escapejs }}"};
+var g_page_loaded;
+$(function() { g_page_loaded = Date.now(); });
+</script>
+<script type="text/javascript" src="js/timer/port_wrapper.js"></script>
+<script type="text/javascript" src="js/timer/ports.js"></script>
+<script type="text/javascript" src="js/timer/profiles.js"></script>
+<script type="text/javascript" src="js/timer/detector.js"></script>
+<script type="text/javascript" src="js/timer/events.js"></script>
+<script type="text/javascript" src="js/timer/result.js"></script>
+<script type="text/javascript" src="js/timer/state_machine.js"></script>
+<script type="text/javascript" src="js/timer/timer_proxy.js"></script>
+<script type="text/javascript" src="js/timer/flags.js"></script>
+<script type="text/javascript" src="js/timer/role_finder.js"></script>
+<script type="text/javascript" src="js/timer/host_poller.js"></script>
+<script type="text/javascript" src="js/timer/logger.js"></script>
+<script type="text/javascript" src="js/timer/prober.js"></script>
+<script type="text/javascript" src="js/timer/remote_start.js"></script>
+<script type="text/javascript" src="js/timer/runtime_conditions.js"></script>
+<script type="text/javascript" src="js/timer/gui.js"></script>
+<script type="text/javascript" src="js/timer/main.js"></script>
+<script type="text/javascript">
+
+if (!g_standalone) {
+  $(window).bind("beforeunload", function(event) {
+    if (g_timer_proxy) {
+      // Chrome ignores the prompt and substitutes its own generic message.  Gee, thanks.
+      show_modal("#leaving_modal");
+      setTimeout(function() { close_modal("#leaving_modal"); }, 10000);
+      var prompt =
+          "Leaving this page will disconnect the timer.  Are you sure you want to exit?";
+      event.preventDefault();
+      event.returnValue = prompt;
+      return prompt;
+    }
+  });
+}
+</script>
+</head>
+<body>
+<div id="standalone-banner" class="banner">
+  <div class="banner_title">Timer</div>
+  <img class="logo" src="img/derbynet.png"/>
+</div>
+
+
+<div id="main-container">
+
+  <div id="middle-container">
+    <div id="host-side" class="hidden host">
+      <form id="host-side-form">
+        <label for="host-url">Server URL</label>
+        <input id="host-url" type="text"/>
+
+        <label for="role-select">Role</label>
+        <select id="role-select"></select>
+
+        <label for="host-password">Password</label>
+        <input id="host-password" type="password"/>
+      </form>
+    </div><!-- host-side No gap between inline-block elements
+
+  --><div id="serial-side" class="serial">
+
+    <div id="ports-div" class="scanlist-div">
+      <ul id="ports-list" class="mlistview scanlist">
+      </ul>
+      <div class="block_buttons">
+        <input id="port-button" type="button" class="mini"
+               value="New Port" onclick="on_new_port_click()"/>
+      </div>
+    </div>
+
+    <div id="profiles-div" class="scanlist-div">
+      <ul id="profiles-list" class="mlistview scanlist">
+      </ul>
+    </div>
+    
+  </div><!-- serial-side -->
+  </div><!-- middle-container -->    
+
+  <div id="lower-container">
+    <div id="racing-div" class="hidden">
+      <div id="racing-round"></div>
+      <div id="racing-lanes"></div>
+      <div id="last-reported-round"></div>
+      <div id="last-reported-lanes"></div>
+    </div>
+
+    <div id="connect-button-div" class="block_buttons host hidden">
+      <input id="connect-button" type="submit" form="host-side-form" value="Connect"/>
+    </div><!-- No gap between inline-block elements
+
+  --><div id="probe-buttons-div" class="block_buttons serial">
+      <input id="probe-button" type="button" value="Scan" onclick="on_scan_click()"/>
+{% if can_set_timer %}
+      <img id="timer-settings-button" src="img/gear_icon.png"
+             onclick="handle_timer_settings_button()"/>
+{% endif %}
+    </div>
+
+  <div id="status-container">
+    <div class="host status hidden">
+      <img id="host-status" src="img/status/trouble.png"/>
+    </div><!-- No gap between inline-block elements
+
+    --><div class="serial status">
+      <img id="serial-status" src="img/status/unknown.png"/>
+    </div>  
+  </div><!-- status-container -->
+
+  </div><!-- lower-container -->
+
+</div><!-- main-container -->
+
+<div id="messages">
+</div>
+
+<div id="need-gesture-modal" class="modal_dialog hidden block_buttons">
+  <p>Please click to start scanning serial ports:</p>
+  <input id="gesture-button" type="button" class="mini"
+      value="Start Scanning" onclick="on_gesture_click()"/>
+</div>
+
+<div id="timer-settings-modal" class="modal_dialog hidden block_buttons">
+  <h3>Timer Settings</h3>
+  <div id="timer-settings-details">
+    <table id="timer-settings-table">
+    </table>
+  </div>
+  <input id="gesture-button" type="button" class="mini"
+      value="Close" onclick='close_modal("#timer-settings-modal");'/>
+</div>
+
+<div id="no-serial-api-modal" class="modal_dialog hidden block_buttons">
+    <div id="no-serial-api" class='hidden'>
+        <p>Communicating with your timer
+           requires browser support for the
+           <br/><b>Web Serial API</b>.</p>
+        <p>Please try a different browser.</p>
+        <p>(A recent version of
+           <br/><b>Chrome</b>,
+           <b>Edge</b>, or <b>Opera</b><br/>
+           browser is recommended.)</p>
+    </div>
+    <div id="no-serial-api-http" class='hidden'>
+        <p>Communicating with your timer
+           requires browser support for the
+          <br/><b>Web Serial API</b>.</p>
+        <p>Most browsers that support the API
+           require a "secure context;" <br/>
+           please try visiting <a></a> instead.</p>
+    </div>
+</div>
+
+<div id="competing-modal" class="modal_dialog hidden block_buttons">
+  <p>Please close this window.</p>
+  <p>Another timer interface is running and competing with this window.</p>
+</div>
+
+<div id="leaving_modal" class="modal_dialog hidden">
+  <p>
+  NOTE: Closing this window or tab will disconnect the timer from the server.
+  </p>
+</div>
+
+</body>
+</html>

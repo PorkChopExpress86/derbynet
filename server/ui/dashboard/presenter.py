@@ -258,7 +258,7 @@ def rerun(payload: dict) -> tuple[str, str]:
     return "available", "Re-Run Previous"
 
 
-def _pill_state(icon: str) -> str:
+def pill_state(icon: str) -> str:
     if icon.endswith("ok.png"):
         return "ok"
     if icon.endswith("trouble.png"):
@@ -448,13 +448,13 @@ def present(payload: dict, extras: Extras | None = None) -> dict:
         "timer": {
             "monitored": extras.warn_no_timer,
             "text": strip_seconds(timer["message"]),
-            "state": _pill_state(timer["icon"]),
+            "state": pill_state(timer["icon"]),
             "age": extras.timer_age,
             "lanes": lanes,
         },
         "replay": {
             "text": strip_seconds(replay["message"]),
-            "state": _pill_state(replay["icon"]),
+            "state": pill_state(replay["icon"]),
             "age": extras.replay_age,
             "connected": replay.get("connected", False),
         },

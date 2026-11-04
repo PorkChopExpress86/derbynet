@@ -1,0 +1,57 @@
+{# The timer settings sheet (#50): timer-test.js's Timer Settings dialog over query=timer.settings. A port or device choice and each flag go to the timer with its next message (timer.assign-port, timer.assign-device, timer.assign-flag); the timer then reports its settings again. #}
+<div class="flex flex-col gap-4" data-timer-settings>
+  {% if not ports and not devices and not flags %}
+  <p class="py-4 text-center text-ink-muted" data-no-settings>The timer has not reported its settings. They show once a timer connects.</p>
+  {% endif %}
+  {% if ports %}
+  <div>
+    <label for="tset-port" class="mb-1 block text-sm font-medium">Port</label>
+    <select id="tset-port" name="port" hx-post="{% url 'timer-assign-port' %}" hx-trigger="change" hx-target="#timer-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" data-autofocus class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+      <option value="" selected>Auto port</option>
+      {% for p in ports %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% if devices %}
+  <div>
+    <label for="tset-device" class="mb-1 block text-sm font-medium">Device</label>
+    <select id="tset-device" name="device" hx-post="{% url 'timer-assign-device' %}" hx-trigger="change" hx-target="#timer-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+      <option value="" selected>Auto device</option>
+      {% for d in devices %}<option value="{{ d.name }}">{{ d.description|default:d.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% if flags %}
+  <ul role="list" aria-label="Timer flags" class="flex flex-col divide-y divide-line" data-flags>
+    {% for f in flags %}
+    <li class="py-3" data-flag="{{ f.name }}" data-kind="{{ f.kind }}">
+      {% if f.kind == "bool" %}
+      <div class="flex items-center gap-3">
+        <div class="min-w-0 flex-1">
+          <p id="tflag-{{ forloop.counter }}" class="break-words font-medium">{{ f.name }}</p>
+          {% if f.description %}<p class="text-sm text-ink-muted">{{ f.description }}</p>{% endif %}
+        </div>
+        <div id="tflag-{{ forloop.counter }}-fields" hidden><input type="hidden" name="flag" value="{{ f.name }}"><input type="hidden" name="kind" value="bool"></div>
+        {% url 'timer-assign-flag' as flag_url %}{% with n=forloop.counter|stringformat:"s" %}{% with fields="#tflag-"|add:n|add:"-fields" labelled="tflag-"|add:n %}{% include "ui/components/switch.html" with labelledby=labelled checked=f.on name="value" url=flag_url include=fields sync="this:drop" %}{% endwith %}{% endwith %}
+      </div>
+      {% elif f.kind == "text" %}
+      <form x-data="{ original: '{{ f.value|escapejs }}', value: '{{ f.value|escapejs }}' }" hx-post="{% url 'timer-assign-flag' %}" hx-target="#timer-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop">
+        <label for="tflag-{{ forloop.counter }}" class="block break-words font-medium">{{ f.name }}</label>
+        {% if f.description %}<p class="text-sm text-ink-muted">{{ f.description }}</p>{% endif %}
+        <input type="hidden" name="flag" value="{{ f.name }}">
+        <input id="tflag-{{ forloop.counter }}" name="value" type="text" {% if f.type != "string" %}inputmode="numeric"{% endif %} x-model="value" value="{{ f.value }}" autocomplete="off" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
+        <div x-show="value !== original" x-cloak class="mt-2 flex gap-2">
+          <button type="submit" data-action="save-flag" class="min-h-11 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save</button>
+          <button type="button" @click="value = original" data-action="cancel-flag" class="min-h-11 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+        </div>
+      </form>
+      {% else %}
+      <p class="break-words font-medium">{{ f.name }}</p>
+      {% if f.description %}<p class="text-sm text-ink-muted">{{ f.description }}</p>{% endif %}
+      <p class="text-sm">{{ f.value }}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>

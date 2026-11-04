@@ -435,6 +435,28 @@ Each test that takes `page` runs on a phone (390x844, touch) and a desktop (1280
 - `ui/imports/` is one page per kind (roster, awards, results). The browser reads the file with SheetJS 0.13.5, PHP's own build, loaded only there, with PHP's encoding select, worksheet select and header row switch; a results file is read with `raw` so its completion times stay text. Columns map to fields by a select each, filled in from header names. `transfer.batch_import` previews the rows (new partitions with case ignored, D34; repeated car numbers; missing required fields) and imports them through the per-row services of `racer.import`, `award.import` and `result.import`, each row in a savepoint of one transaction: any failing row rolls the whole file back, and every row's error is listed (D69, a deliberate difference from PHP). The legacy endpoints keep PHP's row by row. A committed import records the page's token in the history, so the same request sent twice imports once. A results file's columns are matched by header name, such as `FinishTime` and `Scale MPH`, and a file whose header names none is read in PHP's fixed order (D71), which matches neither PHP's own export nor `derbynet-results-sample.csv`. The preview lists car numbers the file repeats, and apart from them the numbers a racer already has.
 - `ui/exports/` downloads `export_all()` as `.xlsx` (openpyxl), `.ods` (written by hand) or one sheet as `.csv`, from `racing.services.workbook_files`, and links `export-json.php`. PHP's `.xls` is dropped, as #49 plans. Sheet names lose `: \ / ? * [ ]`, are cut to 31 characters and numbered when repeated: PHP's cleaning loop edits a copy, so SheetJS refused such an export (proposed #64 row C51).
 
+## The browser timer and the timer pages (#50)
+
+`/timer.php` serves the in-browser Web Serial timer. Its scripts and CSS are the timer's own, unchanged; the page differs from PHP's `timer.php` only as listed below. Build its generated files once per checkout, and after a change to `templates/timer.html`, `templates/timer-profiles.js` or `timer/`:
+
+```sh
+uv run python manage.py build_timer          # template, scripts, CSS and profiles.js
+uv run python manage.py build_timer --check  # exits 1 if the committed template is stale; CI runs this
+```
+
+The command writes the Django template `ui/templates/ui/timer/browser.html` from `templates/timer.html` (committed), copies `timer/derbynet-timer/src` into `ui/static/timer/js/timer/` and `css/timer.css`, and fills `profiles.js` from `org.jeffpiazza.derby.profiles.AllProfiles` (both gitignored). It compiles the timer's Java sources with `javac`, with no Ant; a host with no JDK runs that step in a pinned JDK container through docker, and `--no-profiles` skips it. The ui CI job runs the build before the browser tests. No Django image exists yet; the image ticket (#58) must run it as well, so nothing runs Java at request time. jQuery, `mobile.js`, `modal.js`, `ajax-setup.js`, `global.css`, `mobile.css` and the images the page loads are committed copies under `ui/static/timer/`, served at the relative paths the page uses (`js/`, `css/`, `img/`), so the timer outlives `website/`.
+
+How the page and the timer pages differ from PHP:
+
+- `/timer.php` needs `TIMER_MESSAGE` (D5; PHP needs `SET_UP`) and shows its Timer settings button only with `CONTROL_RACE` (D53). Both are in `ROUTE_DIVERGENCES`.
+- A guard added at the top of the template sends a browser without Web Serial to `/timer/no-serial/`, which says to use desktop Chrome or Edge and, when the page is no secure context, links to its `https` address. PHP's page shows its own "no Web Serial" dialog over a broken page. #50's scope asks for this page; it has no #64 or decision id yet.
+- `timer-test.php` is split in two, as #50's scope lists them: the timer status page (`/timer/`: state, details, settings sheet, remote logging, log tail, Start Race, refused results) and the timer test (`/timer/test/`), where `timer-test.php` redirects. Both need `CONTROL_RACE` (S21).
+- A lane toggle on the timer test posts the lane and its end state, not the whole mask, and stages a new test heat at every change (`racing.services.timer.set_test_lane`). PHP's `tt-mask`, which the legacy endpoint keeps, lands on the heat already staged after a second change, so the timer never hears of it (`racing/tests/test_timer_test_lanes.py`). That PHP defect has no #64 row yet.
+- The log tail stops while the page is hidden (#50's risks); PHP polls on.
+- The fake timer's script is `ui/static/ui/fake-timer.js`, a port of `website/js/fake-timer.js` with the same messages and timings: the PHP file posts to the relative `action.php`, which from `/timer/fake/` misses the server, and drives the PHP page's jQuery table.
+
+The pages are in `ui/timer/`.
+
 ## Settings
 
 `derbynet/settings.py` reads every install-level setting from the environment.

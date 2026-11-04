@@ -16,14 +16,14 @@ window.dashboard = {
   // as `open_timer_window()` in website/js/timer-alive.js does. The timer
   // page answers on BroadcastChannel `timer-alive` (#50).
   lastHeard: 0,
-  openTimer() {
+  openTimer(url) {
     if (Date.now() - this.lastHeard < 1500) {
       const focus = new BroadcastChannel('timer-focus');
       focus.postMessage({ focus: true });
       focus.close();
       return;
     }
-    window.open('timer.php', 'timer3', 'menubar=off,toolbar=off,height=800,width=400,location=off');
+    window.open(url, 'timer3', 'menubar=off,toolbar=off,height=800,width=400,location=off');
   },
 };
 

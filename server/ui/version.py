@@ -33,3 +33,24 @@ def build_version() -> str:
         return "dev"
     branch = "dev" if branch == "master" else branch
     return f"{branch} {commit}"
+
+
+@cache
+def timer_version() -> dict:
+    """The browser timer's `g_version`, which `build.xml` fills from
+    `release-series`, `git-rev-count` and `TODAY`: the build version, the
+    commit count (0 when unknown, so the page's script still parses), and
+    the date of the commit. An image build sets `DERBYNET_REV_COUNT` and
+    `DERBYNET_BUILD_DATE`."""
+    revision = os.environ.get("DERBYNET_REV_COUNT", "").strip()
+    date = os.environ.get("DERBYNET_BUILD_DATE", "").strip()
+    try:
+        revision = revision or _git("rev-list", "--count", "HEAD")
+        date = date or _git("log", "-1", "--format=%cs")
+    except OSError, subprocess.SubprocessError:
+        pass
+    return {
+        "branch": build_version(),
+        "revision": int(revision) if revision.isdigit() else 0,
+        "date": date,
+    }

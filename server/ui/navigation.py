@@ -396,6 +396,19 @@ ENTRIES: tuple[NavEntry, ...] = (
         50,
         php="fake-timer.php",
         menu=False,
+        view="ui.timer.views.fake_page",
+    ),
+    # The timer status page: the summary half of timer-test.php, which the
+    # race dashboard's "Timer status" link opens on a phone (#50).
+    NavEntry(
+        "timer",
+        "Timer",
+        "timer/",
+        Perm.CONTROL_RACE,
+        DURING,
+        50,
+        menu=False,
+        view="ui.timer.views.page",
     ),
     NavEntry(
         "timer-test",
@@ -406,6 +419,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         50,
         php="timer-test.php",
         menu=False,
+        view="ui.timer.views.test_page",
     ),
     # Replay is a kiosk page that #53 ports. The entry is here only for the
     # Photo role's bottom nav (D20), and needs CONTROL_RACE (D16). The login

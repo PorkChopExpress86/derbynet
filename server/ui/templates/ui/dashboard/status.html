@@ -23,10 +23,10 @@
     <button type="button" hx-get="{% url 'dashboard-replay-settings-sheet' %}" hx-target="#dash-sheet-body" hx-swap="innerHTML" hx-include="#shown-heat" hx-sync="#live:replace" @click="dashboard.open('Replay settings', $event)" aria-haspopup="dialog" data-action="replay-settings" class="min-h-11 rounded-lg border border-line px-3 text-sm font-medium">Replay settings</button>
     {% endif %}
     {% if timer.monitored %}
-    {# Desktop: open or focus the browser timer, as timer-alive.js does. Phone: the timer status page (#50). #}
-    <button type="button" @click="dashboard.openTimer()" data-action="timer" class="hidden min-h-11 rounded-lg border border-line px-3 text-sm font-medium lg:inline-block">Timer</button>
+    {# Desktop: open or focus the browser timer, as timer-alive.js does. Phone: the timer status page (#50). The URL is absolute: a relative timer.php opened /dashboard/timer.php. #}
+    <button type="button" @click="dashboard.openTimer('{% url 'timer-php' %}')" data-action="timer" class="hidden min-h-11 rounded-lg border border-line px-3 text-sm font-medium lg:inline-block">Timer</button>
     <a href="{% url 'timer-test' %}" data-action="timer-test" class="hidden min-h-11 items-center rounded-lg border border-line px-3 text-sm font-medium lg:inline-flex">Test</a>
-    <a href="{% url 'timer-test' %}" data-action="timer-status" class="inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-sm font-medium lg:hidden">Timer status</a>
+    <a href="{% url 'timer' %}" data-action="timer-status" class="inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-sm font-medium lg:hidden">Timer status</a>
     {% endif %}
   </div>
 </div>

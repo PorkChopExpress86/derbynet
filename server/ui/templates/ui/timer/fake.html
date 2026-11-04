@@ -1,0 +1,48 @@
+{% extends "ui/base.html" %}
+{% load static %}
+{% block head %}<script src="{% static 'ui/fake-timer.js' %}"></script>{% endblock %}
+{% block main %}
+{# fake-timer.php for a phone (#50). ui/fake-timer.js posts the legacy timer-message messages to action.php from this session, as js/fake-timer.js does. #}
+<div x-data="fakeTimer('{{ action_url|escapejs }}', '{{ home_url|escapejs }}', {{ lane_count }})" class="flex flex-col gap-4" data-fake-timer>
+  <section class="rounded-2xl border border-line bg-surface p-4 text-sm">
+    <p>This page acts as a timer connected to the server, so you can try DerbyNet without a real timer.</p>
+    <p class="mt-2">It works <b>only while this page is open</b>, and <b>only while racing or simulated racing is on</b>, from the <a href="{% url 'dashboard' %}" target="_blank" class="font-semibold text-accent underline underline-offset-2">race dashboard</a> or the <a href="{% url 'timer-test' %}" target="_blank" class="font-semibold text-accent underline underline-offset-2">timer test</a>.</p>
+    <p class="mt-2">Connect and test your real timer before race day.</p>
+  </section>
+
+  <section aria-labelledby="ft-h" class="rounded-2xl border border-line bg-surface p-4">
+    <h2 id="ft-h" class="sr-only">Fake timer</h2>
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div x-data="uiStepper({{ lane_count }}, {{ lanes_min }}, {{ lanes_max }})" @change="lanes = Number($refs.input.value) || 0; reset()">
+        <label for="ft-lanes" class="block text-sm font-medium">Lanes on the track</label>
+        <div class="mt-1 flex items-center gap-2">
+          <button type="button" @click="step(-1)" :disabled="value <= {{ lanes_min }}" aria-label="Fewer: Lanes on the track" class="grid size-12 place-items-center rounded-xl border border-field bg-surface disabled:opacity-40">{% include "ui/components/icon.html" with name="minus" %}</button>
+          <input id="ft-lanes" x-ref="input" x-model.number="value" type="number" inputmode="numeric" min="{{ lanes_min }}" max="{{ lanes_max }}" value="{{ lane_count }}" data-lane-count class="h-12 w-20 rounded-xl border border-field bg-surface text-center text-lg font-semibold tabular-nums">
+          <button type="button" @click="step(1)" :disabled="value >= {{ lanes_max }}" aria-label="More: Lanes on the track" class="grid size-12 place-items-center rounded-xl border border-field bg-surface disabled:opacity-40">{% include "ui/components/icon.html" with name="plus" %}</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="ft-auto" class="text-sm font-medium">Auto mode</span>
+        <button type="button" role="switch" :aria-checked="auto.toString()" aria-checked="false" aria-labelledby="ft-auto" @click="toggleAuto()" data-auto-mode class="group grid h-11 w-16 shrink-0 place-items-center rounded-full">
+          <span class="relative block h-7 w-12 rounded-full bg-switch-off group-aria-checked:bg-ok motion-safe:transition-colors"><span class="absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow group-aria-checked:translate-x-5 motion-safe:transition-transform"></span></span>
+        </button>
+      </div>
+    </div>
+    <p class="mt-2 text-xs text-ink-muted">Auto mode acts as a quick race crew: it starts each heat a few seconds after the server sets it ready, and the cars finish at random times.</p>
+
+    <p class="mt-4 text-center text-xl" role="status" aria-live="polite" data-summary x-text="summary"></p>
+
+    <button type="button" @click="start()" :disabled="!ready || running" data-action="start" class="mt-3 min-h-14 w-full rounded-xl bg-accent px-4 text-lg font-semibold text-accent-ink disabled:opacity-40">Start</button>
+
+    <ul role="list" class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" data-lanes>
+      <template x-for="(lane, i) in times" :key="i">
+        <li class="flex flex-col items-center gap-1 rounded-xl border border-line p-2" :data-lane="i + 1" :data-running="lane.running">
+          <span class="text-sm text-ink-muted" x-text="'Lane ' + (i + 1)"></span>
+          <span class="font-mono text-2xl tabular-nums" x-text="lane.text" data-time></span>
+          <button type="button" @click="stopNow(i)" :disabled="lane.running !== 1 || !running" :aria-label="'Stop lane ' + (i + 1)" data-action="stop" class="min-h-11 w-full rounded-lg border border-line px-3 text-sm font-semibold disabled:opacity-40">Stop</button>
+        </li>
+      </template>
+    </ul>
+  </section>
+</div>
+{% endblock %}
