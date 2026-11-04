@@ -38,8 +38,9 @@ LEGACY_SCENES = [
         "Wrap-Up",
         "kiosks/standings.kiosk",
         "kiosks/derbynet.kiosk",
-        # PHP seeds `local/kiosks/feedback.kiosk` for Aux2, a page not in the
-        # repository; Django leaves Aux2 out of Wrap-Up (#52).
+        # D10: PHP seeds `local/kiosks/feedback.kiosk` for Aux2, a page not in
+        # the repository; Django loads no custom page and leaves Aux2 out of
+        # Wrap-Up (#52; scene.list's divergences).
         "",
     ),
 ]

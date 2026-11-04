@@ -83,7 +83,12 @@ def kiosk_reload(ctx: LegacyContext) -> None:
 @query(
     "scene.list",
     permission=Access.LOGGED_IN,
-    divergences=("D5: needs a login; PHP lists the scenes to anyone.",),
+    divergences=(
+        "D5: needs a login; PHP lists the scenes to anyone.",
+        "D10: a new event's Wrap-Up scene gives Aux2 no page, so it has two"
+        " kiosks; PHP seeds local/kiosks/feedback.kiosk, a page not in the"
+        " repository (#52).",
+    ),
 )
 def scene_list(ctx: LegacyContext) -> None:
     ctx.put("scenes", services.scene_list(ctx.event))

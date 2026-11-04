@@ -38,7 +38,9 @@ def address_for_current_kiosk(request) -> str:
     """`address_for_current_kiosk()`: the `address` query value, else the
     one this session was given, else the client's address and port, kept in
     the session. WSGI has no client port, so a number from 100 to 200
-    stands in, as PHP's does when `REMOTE_PORT` is unset."""
+    stands in, as kiosks.inc:27-31 does when `REMOTE_PORT` is unset; PHP
+    under nginx has the port (php-scratch.sh, 2026-11-04:
+    `?address=127.0.0.1%2B41734`)."""
     address = request.GET.get("address", "") or request.session.get(ADDRESS_KEY, "")
     if not address:
         port = request.META.get("REMOTE_PORT") or random.randint(100, 200)  # noqa: S311
@@ -125,7 +127,12 @@ def slideshow(request):
 def fullscreen(request):
     """`fullscreen.php`: a URL, `kiosk.php` beside this page by default, in a
     full-window frame, and the browser asked to go full screen."""
-    return render(request, "kiosk/fullscreen.html", {"kiosk_url": reverse("kiosk-php")})
+    # fullscreen.php:24-36: `//` + host + the page's folder + `kiosk.php`, so
+    # /derbynet/fullscreen.php fills //host/derbynet/kiosk.php (checked with
+    # testing/docker/php-scratch.sh, 2026-11-04: //localhost/kiosk.php).
+    folder = request.path.rsplit("/", 1)[0]
+    kiosk_url = f"//{request.get_host()}{folder}/kiosk.php"
+    return render(request, "kiosk/fullscreen.html", {"kiosk_url": kiosk_url})
 
 
 @require_GET

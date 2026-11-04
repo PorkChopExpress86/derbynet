@@ -103,6 +103,7 @@
     video = root.querySelector('[data-confetti]');
     setConfetti(Kiosk.parameters);
     Kiosk.onParameters = setConfetti;
+    // 500 ms after each reply (award-presentations-kiosk.js:47-49).
     Kiosk.poll(poll, 500, 'after');
     Kiosk.start();
   });

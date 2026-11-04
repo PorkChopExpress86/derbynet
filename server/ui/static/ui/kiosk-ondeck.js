@@ -96,7 +96,10 @@
   }
 
   function poll() {
-    return Kiosk.action({query: 'poll', values: 'ondeck,rounds,current-heat,current-reschedule'}).then(draw);
+    return Kiosk.action({query: 'poll', values: 'ondeck,rounds,current-heat,current-reschedule,intermission'}).then(function (data) {
+      Kiosk.intermission(data.intermission);
+      draw(data);
+    });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -113,6 +116,8 @@
       modal.hidden = false;
     });
     modal.querySelector('[data-modal-close]').addEventListener('click', function () { modal.hidden = true; });
+    // Every second (ondeck.js:422 polls on a 1 s interval; this waits 1 s
+    // after each reply, so a slow reply never stacks a second request).
     Kiosk.poll(poll, 1000, 'after');
     Kiosk.start();
   });

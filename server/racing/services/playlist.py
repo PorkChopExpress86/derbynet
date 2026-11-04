@@ -785,3 +785,64 @@ def _renumber(event, entry_ids) -> None:
         PlaylistEntry.objects.filter(id=entry_id).update(seq=-(offset + position))
     for position, entry_id in enumerate(entry_ids, start=1):
         PlaylistEntry.objects.filter(id=entry_id).update(seq=position)
+
+
+# ----- the intermission's leaders (D12) -------------------------------------------
+
+INTERMISSION_LEADERS = 3
+"""The leaders of the ended round that the race dashboard and the racing
+kiosks show while the playlist waits (D12)."""
+
+
+@dataclass(frozen=True)
+class Intermission:
+    """The step the playlist waits on, the round that ended before it, and
+    that round's leaders, best first, as racers."""
+
+    next_group: str
+    next_round: int
+    next_racers: int
+    ended_group: str
+    ended_round: int | None
+    leaders: tuple
+
+
+def intermission(event, state: RaceState | None = None) -> Intermission | None:
+    """The open intermission, or None. Reads only: the dashboard and the
+    kiosk poll call it."""
+    from racing.engine.standings import finalists
+    from racing.services.standings import standings_snapshot
+    from roster.models import Racer
+
+    if state is None:
+        state = RaceState.objects.select_related(
+            "waiting_entry__group", "ended_round__group"
+        ).get(event=event)
+    entry = state.waiting_entry
+    if entry is None:
+        return None
+    upcoming = Round.objects.filter(
+        group_id=entry.group_id, number=entry.round_number
+    ).first()
+    ended = state.ended_round
+    leaders = ()
+    if ended is not None:
+        standings = standings_snapshot(event).standings
+        cut = finalists.from_round(
+            standings,
+            ended.id,
+            ended.group_id,
+            bucketed=False,
+            limit=INTERMISSION_LEADERS,
+        )
+        picked = [f.racer_id for f in cut.finalists][:INTERMISSION_LEADERS]
+        by_id = Racer.objects.in_bulk(picked)
+        leaders = tuple(by_id[pk] for pk in picked if pk in by_id)
+    return Intermission(
+        next_group=entry.group.name,
+        next_round=entry.round_number,
+        next_racers=upcoming.roster.count() if upcoming else 0,
+        ended_group=ended.group.name if ended else "",
+        ended_round=ended.number if ended else None,
+        leaders=leaders,
+    )

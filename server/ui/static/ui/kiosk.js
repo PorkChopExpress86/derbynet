@@ -7,15 +7,17 @@
 //   string differs from the one loaded or a reload was asked for, and
 //   otherwise hands the parameters to the page (`Kiosk.onParameters`).
 //   Preview and standalone pages have no address and no kiosk poll.
-// - A page registers its content poll with `Kiosk.poll(fetch, ms, mode)`,
-//   keeping the interval its PHP page used: `after` queues the next fetch
-//   `ms` after each reply, as now-racing-poller.js does; `every` runs on a
-//   fixed timer.
+// - A page registers its content poll with `Kiosk.poll(fetch, ms, mode)`
+//   with the interval its PHP page polls at, cited where each page calls
+//   it: `after` queues the next fetch `ms` after each reply
+//   (now-racing-poller.js:33-43); `every` runs on a fixed timer.
 // - `kioskNudge()` runs the kiosk poll and every content poll at once. #56
 //   calls it when the push stream says something changed (D21, ADR-15); a
 //   browser with no EventSource keeps the polls above.
 // - Inside replay.php, `replay-started` pauses the page's animations and its
-//   content polls, and `replay-ended` resumes them, as now-racing.js does.
+//   content polls, and `replay-ended` resumes them, as now-racing.js:3-16
+//   suspends its poller and holds its lineup; the other PHP pages ignore the
+//   messages, and only now-racing pages hold their lineup here too.
 (function () {
   'use strict';
 
@@ -51,11 +53,24 @@
     if (banner) banner.hidden = true;
   }
 
+  // A request with no reply in 15 s is given up, so its poll queues the
+  // next one: the watchdog of now-racing-poller.js:76-81, run every 2 s
+  // from now-racing.js:369, queues a request once none has gone out for
+  // 15 s.
+  var GIVE_UP_MS = 15000;
+
+  function get(url, headers) {
+    var abort = new AbortController();
+    var timer = setTimeout(function () { abort.abort(); }, GIVE_UP_MS);
+    return fetch(url, {credentials: 'same-origin', headers: headers || {}, signal: abort.signal})
+      .finally(function () { clearTimeout(timer); });
+  }
+
   // GET action.php with `query`, resolving to the parsed reply. A failure
   // shows the lost-contact banner and rejects.
   Kiosk.action = function (query) {
     var url = config.action + '?' + new URLSearchParams(query).toString();
-    return fetch(url, {credentials: 'same-origin', headers: {Accept: 'application/json'}})
+    return get(url, {Accept: 'application/json'})
       .then(function (response) {
         if (!response.ok) {
           failure(response.status, response.statusText);
@@ -71,7 +86,7 @@
 
   // GET a fragment of this server, as text; 204 resolves to null.
   Kiosk.fragment = function (url) {
-    return fetch(url, {credentials: 'same-origin'}).then(function (response) {
+    return get(url).then(function (response) {
       if (!response.ok) {
         failure(response.status, response.statusText);
         throw new Error('HTTP ' + response.status);
@@ -180,6 +195,39 @@
       }
       var dy = before[i] - el.getBoundingClientRect().top;
       if (dy) el.animate([{transform: 'translateY(' + dy + 'px)'}, {transform: 'none'}], {duration: 500, easing: 'ease-out'});
+    });
+  };
+
+  // The playlist intermission (D12): while the playlist waits for the
+  // operator, a racing page shows the leaders of the round that ended, and
+  // goes back to its own content once the next round starts. `found` is the
+  // poll's `intermission` value, null with none.
+  var shownIntermission = '';
+  Kiosk.intermission = function (found) {
+    var box = document.querySelector('[data-leaders]');
+    if (!box) return;
+    var key = found ? JSON.stringify(found) : '';
+    if (key === shownIntermission) return;
+    shownIntermission = key;
+    box.hidden = !found;
+    if (!found) return;
+    box.querySelector('[data-leaders-title]').textContent =
+      found.ended ? found.ended + ' leaders' : 'Intermission';
+    box.querySelector('[data-leaders-next]').textContent = 'Up next: ' + found.next;
+    var list = box.querySelector('[data-leaders-list]');
+    list.textContent = '';
+    found.leaders.forEach(function (leader, i) {
+      var li = document.createElement('li');
+      li.dataset.place = leader.place;
+      li.style.setProperty('--i', i);
+      var place = document.createElement('b');
+      place.textContent = leader.place;
+      var car = document.createElement('span');
+      car.textContent = leader.carnumber;
+      var name = document.createElement('span');
+      name.textContent = leader.name;
+      li.append(place, car, name);
+      list.appendChild(li);
     });
   };
 

@@ -331,11 +331,6 @@ UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {
         "the lane count is the race's lane count; PHP's page counts the lanes"
         " of the results (get_lane_count_from_results) (#52).",
     ),
-    "fullscreen.php": (
-        "asks for full screen with the browser's Fullscreen API; PHP loads"
-        " screenfull.min.js, which has no released minified build to vendor"
-        " (#52).",
-    ),
     "timer.php": (
         "a browser without Web Serial is sent to /timer/no-serial/ before any"
         " timer script runs (#50 scope); PHP shows its own dialog over the page.",

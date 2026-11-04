@@ -1,7 +1,9 @@
 // Please Check In (#52), rebuilt from please-check-in.kiosk. The list
-// refreshes every 30 s, where PHP reloaded the page, and with the kiosk's
-// `classids` parameter. It takes 1 to 4 columns and the largest font that
-// fits the screen, as PHP's layout code chose them.
+// refreshes every 30 s, where PHP reloaded the page
+// (please-check-in.kiosk:16), and with the kiosk's `classids` parameter. It
+// takes the fewest of 1 to 4 columns that fit, then a font up to twice the
+// base, after please-check-in.kiosk:19-45, which sizes the columns from a
+// 4-column layout and grows the font by up to 2x.
 (function () {
   'use strict';
 
@@ -48,6 +50,7 @@
     root = document.querySelector('[data-check-in]');
     fit();
     window.addEventListener('resize', fit);
+    // Every 30 s (please-check-in.kiosk:16).
     Kiosk.poll(refresh, 30000, 'every');
   });
 }());

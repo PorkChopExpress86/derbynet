@@ -33,6 +33,9 @@ class KioskPage:
     # Shown to anyone, with no login. Every kiosk page is: a kiosk has no
     # login, and standings are public (D5, S29 kept on purpose in #15).
     public: bool = True
+    # A page of the racing scene, which shows the leaders of the round that
+    # ended while the playlist waits for the operator (D12).
+    racing: bool = False
 
     @property
     def name(self) -> str:
@@ -41,9 +44,22 @@ class KioskPage:
         return self.key.removeprefix("kiosks/").removesuffix(".kiosk")
 
 
+# The pages the seeded Racing scene shows, and the other now-racing layouts.
+RACING = {
+    "now-racing",
+    "now-racing-columnar",
+    "now-racing-columnar-reversed",
+    "ondeck",
+    "results-by-racer",
+}
+
+
 def _page(name: str, *parameters: str) -> KioskPage:
     return KioskPage(
-        f"kiosks/{name}.kiosk", f"kiosk/pages/{name}.html", tuple(parameters)
+        f"kiosks/{name}.kiosk",
+        f"kiosk/pages/{name}.html",
+        tuple(parameters),
+        racing=name in RACING,
     )
 
 

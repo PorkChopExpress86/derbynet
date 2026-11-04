@@ -1,11 +1,12 @@
 {% load static %}<!doctype html>
-{# fullscreen.php (#52): a URL, kiosk.php by default, in a full-window frame, after asking the browser to go full screen. The native Fullscreen API stands in for screenfull.min.js, which has no released minified build to vendor. #}
+{# fullscreen.php (#52): a URL, the kiosk.php beside this page by default, in a full-window frame, after screenfull.request() asks the browser to go full screen. screenfull.min.js is website/js's copy, kept as a legacy asset as #50 kept the timer's jQuery. #}
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fullscreen Kiosk · DerbyNet</title>
   <link rel="stylesheet" href="{% static 'ui/kiosk.css' %}">
+  <script src="{% static 'ui/kiosk/screenfull.min.js' %}"></script>
   <script src="{% static 'ui/kiosk-fullscreen.js' %}"></script>
 </head>
 <body class="kiosk-page">

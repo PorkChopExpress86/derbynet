@@ -19,7 +19,16 @@
     {% if kiosk.standalone %}<a href="{% url 'home' %}">Home</a>{% else %}<span class="k-name" data-kiosk-name>{{ kiosk.name }}</span>{% endif %}
   </header>
   {% endblock %}
-  <main class="k-main">{% block main %}{% endblock %}</main>
+  <main class="k-main">{% block main %}{% endblock %}
+    {% if page.racing %}
+    {# The playlist intermission (D12): the leaders of the round that ended, until the operator starts the next round. kiosk.js fills it from the poll's intermission value. #}
+    <section class="k-leaders" data-leaders hidden aria-live="polite">
+      <h2 data-leaders-title></h2>
+      <ol data-leaders-list></ol>
+      <p data-leaders-next></p>
+    </section>
+    {% endif %}
+  </main>
   {# Lost contact with the server, as inc/ajax-failure.inc shows it. #}
   <div id="ajax-failure" class="k-failure" role="status" hidden>Lost contact with the server: <span data-ajax-status></span>. Trying again.</div>
 </body>

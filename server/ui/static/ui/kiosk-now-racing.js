@@ -207,7 +207,7 @@
   function request() {
     var query = {
       query: 'poll',
-      values: (columns ? 'best-times,' : '') + 'current-heat,heat-results,precision,racers,timer-trouble,current-reschedule',
+      values: (columns ? 'best-times,' : '') + 'current-heat,heat-results,precision,racers,timer-trouble,current-reschedule,intermission',
       roundid: shown.roundid,
       heat: shown.heat,
     };
@@ -224,6 +224,7 @@
 
   function poll() {
     return Kiosk.action(request()).then(function (data) {
+      Kiosk.intermission(data.intermission);
       best(data);
       return results(data).then(function () { lineup(data); });
     });
@@ -232,7 +233,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     board = document.querySelector('[data-now-racing]');
     if (!board) {
-      // No lane count yet: try again in 5 s, as PHP reloads.
+      // No lane count yet: reload in 5 s, as now-racing.kiosk:32-41 does.
       setTimeout(function () { location.reload(); }, 5000);
       return;
     }
@@ -244,6 +245,7 @@
       holding = paused;
       if (!paused) lingerUntil = Date.now() + lingerMs;
     };
+    // 500 ms after each reply (now-racing-poller.js:33-43).
     Kiosk.poll(poll, 500, 'after');
     Kiosk.start();
   });

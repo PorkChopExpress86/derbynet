@@ -66,6 +66,7 @@
     box = document.querySelector('[data-slides]');
     titleSlide = box.dataset.titleSlide;
     titleOnly();
+    // Every 10 s (slideshow.js:122).
     Kiosk.poll(poll, 10000, 'every');
   });
 }());

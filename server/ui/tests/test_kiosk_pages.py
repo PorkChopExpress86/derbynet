@@ -201,7 +201,24 @@ def test_the_standalone_pages_and_fullscreen(event, raced):
         assert "data-standalone" in html
     assert Client().get("/ondeck.php")["Location"] == "/ondeck/"
     html = body(Client().get("/fullscreen.php"))
-    assert 'value="/kiosk.php"' in html
+    assert 'value="//testserver/kiosk.php"' in html
+    assert "ui/kiosk/screenfull.min.js" in html
+
+
+def test_fullscreen_fills_the_kiosk_php_beside_it(event):
+    """fullscreen.php:24-36, as php-scratch.sh showed //localhost/kiosk.php."""
+    html = body(Client().get("/derbynet/fullscreen.php"))
+
+    assert 'value="//testserver/derbynet/kiosk.php"' in html
+
+
+def test_screenfull_is_the_legacy_copy():
+    repo = Path(__file__).resolve().parents[3]
+    legacy = repo / "website" / "js" / "screenfull.min.js"
+    copy = repo / "server" / "ui" / "static" / "ui" / "kiosk" / "screenfull.min.js"
+    if legacy.exists():
+        assert copy.read_bytes() == legacy.read_bytes()
+    assert b"screenfull" in copy.read_bytes()
 
 
 # ----- please-check-in ---------------------------------------------------------------
@@ -444,3 +461,57 @@ def test_d34_the_on_deck_report_keeps_the_staged_heat_through_a_reschedule(event
 
     assert on_deck() == before
     assert sorted(before) == [3, 4] and all(len(v) == 4 for v in before.values())
+
+
+# ----- the playlist intermission (D12) ---------------------------------------------
+
+
+def test_d12_the_poll_answers_the_intermission_and_its_leaders(db):
+    """While the playlist waits for the operator, query=poll's intermission
+    value names the round that ended and its three leaders, as the race
+    dashboard shows them; once the next round starts it is null."""
+    from core.models import SiteState
+    from racing.services.playlist import round_ended, start_playlist
+    from racing.services.playlist import start_waiting_step as start
+    from racing.services.rounds import playlist_finalists
+    from racing.tests.test_race_day import race, race_day
+
+    replay = race_day(4, 8)
+    event = replay.event
+    SiteState.objects.update_or_create(pk=1, defaults={"active_event": event})
+    finalists_for = playlist_finalists()
+    round = start_playlist(event, finalists_for)
+    client = Client()
+
+    def intermission():
+        reply = client.get("/action.php", {"query": "poll", "values": "intermission"})
+        return reply.json()["intermission"]
+
+    assert intermission() is None
+    race(round)
+    round_ended(round, finalists_for)
+
+    found = intermission()
+    assert found["ended"] == "Scouts, Round 1"
+    assert found["next"] == "Scouts, Round 2"
+    assert [leader["place"] for leader in found["leaders"]] == [1, 2, 3]
+    dashboard = Client()
+    from ui.tests.roles import PASSWORDS
+
+    password = PASSWORDS["RaceCoordinator"]
+    response = dashboard.post(
+        "/login/", {"name": "RaceCoordinator", "password": password}
+    )
+    assert response.status_code == 302
+    live = dashboard.get("/dashboard/").content.decode()
+    for leader in found["leaders"]:
+        assert str(leader["carnumber"]) in live
+
+    start(event)
+    assert intermission() is None
+
+
+def test_racing_pages_have_the_leaders_panel_and_others_do_not(event):
+    for key, page in PAGES.items():
+        html = body(Client().get("/kiosk.php", {"page": key}))
+        assert ("data-leaders " in html) == page.racing, key
