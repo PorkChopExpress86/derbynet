@@ -49,6 +49,15 @@ window.IMPORT_CODEPAGES = [
   ['10081', 'Macintosh Turkish'],
 ];
 
+// 32 hex digits naming one import. A new file or mapping gets a new one; the
+// server refuses a token it has imported already, so a double tap or a
+// replay imports once. `crypto.randomUUID` needs HTTPS, which a race-day
+// LAN lacks, so this uses `getRandomValues`.
+function importToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 // A header's text with case, spaces and punctuation left out.
 function importKey(text) {
   return String(text).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -67,6 +76,7 @@ document.addEventListener('alpine:init', () => {
     mapping: [],
     // A field chosen by hand, which a header switch then keeps.
     touched: false,
+    token: importToken(),
     error: '',
 
     get width() {
@@ -118,6 +128,10 @@ document.addEventListener('alpine:init', () => {
     get rowsJson() {
       return this.ready ? JSON.stringify(this.rows) : '';
     },
+    // A new token whenever the rows the page would send change.
+    renew() {
+      this.token = importToken();
+    },
 
     pick(event) {
       const file = event.target.files[0];
@@ -167,6 +181,7 @@ document.addEventListener('alpine:init', () => {
       this.table = arrays.map((row) => row.map((v) => (v === unlikely ? '' : String(v))));
       this.touched = false;
       this.autoMap();
+      this.renew();
     },
 
     // Fill in each column's field from its header, or for results the
@@ -206,12 +221,14 @@ document.addEventListener('alpine:init', () => {
     setHeader() {
       this.header = !this.header;
       if (!this.touched) this.autoMap();
+      this.renew();
     },
     choose(col, field) {
       this.touched = true;
       const mapping = this.mapping.slice();
       mapping[col] = field;
       this.mapping = mapping;
+      this.renew();
     },
   }));
 });

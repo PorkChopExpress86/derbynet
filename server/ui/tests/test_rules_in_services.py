@@ -7,8 +7,10 @@ lint in `ui/*/views.py` and `ui/*/state.py`:
 - a bit shift: lane masks go through `racing.services.lanes.mask_of` and
   `lanes_of`;
 - an ordering comparison (`<`, `<=`, `>`, `>=`) with an upper-case constant
-  imported from a service module, such as `MAX_RUNS_PER_LANE`: the service
-  checks its own limit, and the view catches its failure.
+  imported from a service module, such as `MAX_RUNS_PER_LANE`, or from the
+  racing engine, such as D42's `DID_NOT_FINISH`: the service checks its own
+  limit, and the view catches its failure or reads the service's answer
+  (#49's review found the DNF rule copied into the standings state).
 
 A copied lookup table such as the method map has no fixed shape; the review
 still looks for it.
@@ -28,7 +30,9 @@ ORDERING = (ast.Lt, ast.LtE, ast.Gt, ast.GtE)
 
 def offenders(source: str, filename: str = "views.py") -> list[str]:
     tree = ast.parse(source)
-    limits = {name for name in _service_names(tree) if name.isupper()}
+    limits = {
+        name for name in _service_names(tree) | _engine_names(tree) if name.isupper()
+    }
     found = []
     for node in ast.walk(tree):
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.LShift | ast.RShift):
@@ -46,6 +50,16 @@ def offenders(source: str, filename: str = "views.py") -> list[str]:
                     f"the service checks {name}"
                 )
     return found
+
+
+def _engine_names(tree: ast.Module) -> set[str]:
+    return {
+        alias.asname or alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and (node.module or "").startswith("racing.engine")
+        for alias in node.names
+    }
 
 
 @pytest.mark.parametrize("path", FILES, ids=[str(p.relative_to(SERVER)) for p in FILES])
@@ -76,6 +90,13 @@ def _then(then):
     return "next" if then == NEXT_ROUND else "stop"
 """
 
+ENGINE_LIMIT = """
+from racing.engine.results import DID_NOT_FINISH
+
+def _dnf(time):
+    return time is not None and time >= DID_NOT_FINISH
+"""
+
 LOCAL_PARSE_BOUND = """
 MAX_LANES = 31
 
@@ -86,7 +107,9 @@ def scheduling_lanes(request):
 
 
 @pytest.mark.parametrize(
-    "source", [LANE_MASK, SERVICE_LIMIT], ids=["lane-mask", "service-limit"]
+    "source",
+    [LANE_MASK, SERVICE_LIMIT, ENGINE_LIMIT],
+    ids=["lane-mask", "service-limit", "engine-limit"],
 )
 def test_a_copied_rule_is_flagged(source):
     assert len(offenders(source)) == 1

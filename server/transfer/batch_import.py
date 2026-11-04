@@ -9,7 +9,9 @@ row of a file goes to the same per-row service those endpoints use
 of one transaction under the race-state lock. A row that fails is reported
 with its row number and the service's message, the other rows still run so
 every error shows at once, and then the whole file rolls back: a file
-imports all or nothing. The legacy endpoints keep PHP's row by row.
+imports all or nothing (D69, a deliberate difference from PHP). The legacy
+endpoints keep PHP's row by row. A results file's columns are mapped by
+header name in the browser, with PHP's fixed order as the fallback (D71).
 
 `preview_roster()` reads the same rows without writing: how many racers,
 the partitions that would be new (a name that matches an existing
@@ -17,6 +19,7 @@ partition with case ignored joins it, D34), car numbers the file repeats or
 the event has already, and rows missing a required field.
 """
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -24,7 +27,7 @@ from django.db import DatabaseError, transaction
 
 from awards.editing import AwardFailure, import_award
 from core import race_settings
-from core.models import Event, RaceSettings
+from core.models import ActionLog, Event, RaceSettings
 from core.services import lock_race_state
 from racing.services.result_import import ImportFailure, import_result
 from roster.models import Partition, Racer
@@ -99,9 +102,20 @@ class BadRequest(Exception):
     """The rows are not what the page sends."""
 
 
+class ImportedAlready(Exception):
+    """The import's token names an import that committed already."""
+
+
+# The history entry a committed batch import writes, with its token. The
+# history formatter gives it no sentence.
+BATCH_ACTION = "import.batch"
+TOKEN = re.compile(r"[0-9a-f]{32}")
+
+
 def parse_rows(kind: str, data) -> list[Row]:
     """The posted rows, `[{"row": n, "fields": {name: text}}]`, keeping only
-    the fields of `kind`. All-blank rows are left out, as PHP skips them."""
+    the fields of `kind`. All-blank rows are left out, as PHP's page skips
+    them (`website/js/import-csv.js:374` to `:388`)."""
     if kind not in FIELDS:
         raise BadRequest("Unknown import.")
     if not isinstance(data, list) or len(data) > MAX_ROWS:
@@ -189,15 +203,30 @@ def import_rows(
     kind: str,
     rows: Sequence[Row],
     labels: Mapping[str, str] | None = None,
+    *,
+    token: str,
 ) -> Outcome:
     """Import every row in one transaction, or none when any row fails.
     `labels` renames the supergroup and partition labels with the roster,
-    in the same transaction."""
+    in the same transaction.
+
+    `token` names this import: 32 hex digits the page makes for each file
+    and mapping. A committed import records it in the history, so the same
+    request sent twice, by a double tap or a replay, raises `ImportedAlready`
+    the second time and changes nothing. A refused import records nothing,
+    so it can be sent again once fixed."""
+    if not TOKEN.fullmatch(token or ""):
+        raise BadRequest("Reload the page and import the file again.")
     service = ROW_SERVICES[kind]
     outcome = Outcome()
     try:
         with transaction.atomic():
             lock_race_state(event.id)
+            if ActionLog.objects.filter(
+                event=event, request__action=BATCH_ACTION, request__token=token
+            ).exists():
+                raise ImportedAlready
+
             for key, value in (labels or {}).items():
                 if key in LABELS and value.strip():
                     try:
@@ -227,6 +256,15 @@ def import_rows(
                 outcome.warnings += [RowError(row.number, w) for w in warnings]
             if outcome.errors:
                 raise _RollBack
+            ActionLog.objects.create(
+                event=event,
+                request={
+                    "action": BATCH_ACTION,
+                    "kind": kind,
+                    "token": token,
+                    "rows": outcome.imported,
+                },
+            )
     except _RollBack:
         outcome.imported = 0
         outcome.warnings = []
@@ -241,9 +279,10 @@ class Preview:
     rows: int = 0
     existing_partitions: list[str] = field(default_factory=list)
     new_partitions: list[str] = field(default_factory=list)
-    # Car number to the row numbers that name it, for a number the file
-    # repeats or the event has.
+    # Car number to the row numbers that name it: a number the file
+    # repeats, and apart from those, a number a racer of the event has.
     duplicate_cars: dict[str, list[int]] = field(default_factory=dict)
+    taken_cars: dict[str, list[int]] = field(default_factory=dict)
     missing: list[RowError] = field(default_factory=list)
 
 
@@ -277,9 +316,12 @@ def preview(event: Event, kind: str, rows: Sequence[Row]) -> Preview:
         if number:
             by_car.setdefault(number, []).append(row.number)
     found.duplicate_cars = {
+        car: numbers for car, numbers in by_car.items() if len(numbers) > 1
+    }
+    found.taken_cars = {
         car: numbers
         for car, numbers in by_car.items()
-        if len(numbers) > 1 or car in taken
+        if car in taken and len(numbers) == 1
     }
     return found
 

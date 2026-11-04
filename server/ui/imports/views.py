@@ -207,7 +207,18 @@ def _run(request, kind: str):
         return service_error(request, "The file has no rows to import.")
     event = active_event(request)
     labels_posted = _labels(request) if kind == "roster" else {}
-    outcome = batch_import.import_rows(event, kind, rows, labels_posted)
+    try:
+        outcome = batch_import.import_rows(
+            event, kind, rows, labels_posted, token=request.POST.get("token", "")
+        )
+    except batch_import.BadRequest as failure:
+        return service_error(request, str(failure))
+    except batch_import.ImportedAlready:
+        return service_error(
+            request,
+            "This file was imported already. Choose the file again to import it"
+            " once more.",
+        )
     errors = {e.number: e.message for e in outcome.errors}
     warnings: dict[int, list[str]] = {}
     for w in outcome.warnings:

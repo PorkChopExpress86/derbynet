@@ -18,8 +18,14 @@
   {% endif %}
   {% if summary.duplicate_cars %}
   <div class="mt-2 text-warn-ink" data-duplicate-cars>
-    <p class="font-semibold">Repeated car numbers:</p>
+    <p class="font-semibold">Car numbers the file repeats:</p>
     <ul role="list" class="text-sm">{% for car, numbers in summary.duplicate_cars.items %}<li>{{ car }}: row{{ numbers|pluralize }} {{ numbers|join:", " }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if summary.taken_cars %}
+  <div class="mt-2 text-sm text-ink-muted" data-taken-cars>
+    <p class="font-medium">Car numbers a racer already has (they import, with a warning):</p>
+    <ul role="list">{% for car, numbers in summary.taken_cars.items %}<li>{{ car }}: row{{ numbers|pluralize }} {{ numbers|join:", " }}</li>{% endfor %}</ul>
   </div>
   {% endif %}
   {% if summary.missing %}

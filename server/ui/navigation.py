@@ -83,7 +83,7 @@ BEFORE, DURING, AFTER, OTHER = Section
 # Menu entries are in `index.php` order. Permissions are the page gates of
 # #15's "Page permissions": the race dashboard needs CONTROL_RACE (D16),
 # standings, slideshow, on deck, results by racer and about are anonymous (D5,
-# S10, S30), and timer-test needs CONTROL_RACE (S21). Printables are removed
+# D70, S10, S30), and timer-test needs CONTROL_RACE (S21). Printables are removed
 # (D6) and Vote waits for #54 (D7). Phone ranks are the D20 table of #39.
 ENTRIES: tuple[NavEntry, ...] = (
     NavEntry(

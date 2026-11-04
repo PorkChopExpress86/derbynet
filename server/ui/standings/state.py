@@ -14,10 +14,11 @@ beside the times that count (D37, #108). A time of `DID_NOT_FINISH` shows
 from dataclasses import dataclass
 
 from core.models import RaceSettings
-from racing.engine.results import DID_NOT_FINISH
 from racing.engine.standings.ordinals import ordinal
 from racing.services.polls import format_time, mangled_name
+from racing.services.racer_results import heat_text
 from racing.services.standings import standings_snapshot
+from roster.services.groups import use_groups
 
 # The heading of `standings.php`, by points or times, then by `scoring`.
 SCORING = {
@@ -35,8 +36,12 @@ class Time:
     heat: int
     lane: int
     shown: str
-    dropped: bool
     dnf: bool
+    dropped: bool
+
+
+def _heat(settings, heat) -> tuple[str, bool]:
+    return heat_text(settings, heat.finish_time, heat.finish_place)
 
 
 @dataclass(frozen=True)
@@ -95,17 +100,7 @@ def build(event, view: str = "") -> Standings:
         racer = row.racer
         summary = row.summary
         times = tuple(
-            Time(
-                h.heat,
-                h.lane,
-                (ordinal(h.finish_place) if h.finish_place else "--")
-                if points
-                else _time(settings, h.finish_time),
-                h.dropped,
-                not points
-                and h.finish_time is not None
-                and h.finish_time >= DID_NOT_FINISH,
-            )
+            Time(h.heat, h.lane, *_heat(settings, h), h.dropped)
             for h in snapshot.heat_times(row.round.id, racer.id)
         )
         cards.append(
@@ -136,7 +131,7 @@ def build(event, view: str = "") -> Standings:
         title=title,
         cards=tuple(cards),
         use_points=points,
-        use_groups=len(standings.event.groups) > 1,
+        use_groups=use_groups(event),
         use_subgroups=settings.use_subgroups,
         # Under D46 a round scores out of the lanes it raced on, so the label
         # names no count for first place.

@@ -9,6 +9,7 @@ PHP, a file with a failing row imports nothing.
 """
 
 import csv
+import uuid
 from pathlib import Path
 
 import pytest
@@ -20,10 +21,17 @@ from core.tests.factories import EventFactory
 from racing.models import HeatLane, RosterEntry, Round
 from roster.models import Partition, Racer
 from roster.services.racers import insert_new_racer
-from transfer.batch_import import Row, import_rows, parse_rows, preview
+from transfer import batch_import
+from transfer.batch_import import Row, parse_rows, preview
 from ui.tests.roles import PASSWORDS
 
 pytestmark = pytest.mark.django_db
+
+
+def import_rows(*args, **kwargs):
+    """A batch import with a fresh token, as the page sends for each file."""
+    return batch_import.import_rows(*args, token=uuid.uuid4().hex, **kwargs)
+
 
 DATA = Path(__file__).resolve().parents[3] / "testing" / "data"
 
@@ -211,7 +219,8 @@ def test_the_preview_counts_new_partitions_duplicates_and_missing_fields():
 
     assert found.rows == 3
     assert found.new_partitions == ["Bears", "Default"]
-    assert found.duplicate_cars == {"101": [2], "202": [3, 4]}
+    assert found.duplicate_cars == {"202": [3, 4]}
+    assert found.taken_cars == {"101": [2]}
     assert [(e.number, e.message) for e in found.missing] == [
         (4, "Missing required field lastname.")
     ]

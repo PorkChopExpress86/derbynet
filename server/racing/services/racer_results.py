@@ -21,7 +21,7 @@ from racing.engine.results import DID_NOT_FINISH
 from racing.engine.standings.ordinals import ordinal
 from racing.models import HeatLane, RosterEntry, Round
 from racing.services.polls import format_time, mangled_name
-from roster.models import Group
+from roster.services import groups
 from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url
 
 # `RENDER_RACER_RESULTS` in `website/inc/photo-config.inc`.
@@ -65,7 +65,10 @@ class ResultsByRacer:
     lane_count: int
 
 
-def _shown(settings: RaceSettings, finish_time, finish_place) -> tuple[str, bool]:
+def heat_text(settings: RaceSettings, finish_time, finish_place) -> tuple[str, bool]:
+    """How a heat's result reads: the place under points racing, else the
+    time with `finish-formatting`, or "--" with neither; and whether it is a
+    time of `DID_NOT_FINISH` (D42), which a page marks "DNF"."""
     if settings.use_points:
         return (ordinal(finish_place) if finish_place else "--"), False
     if finish_time is None:
@@ -104,7 +107,7 @@ def results_by_racer(event: Event, racer_id: int | None = None) -> ResultsByRace
     racers = {}
     for row in rows:
         racers[row.racer_id] = row.racer
-        shown, dnf = _shown(settings, row.finish_time, row.finish_place)
+        shown, dnf = heat_text(settings, row.finish_time, row.finish_place)
         by_round.setdefault(row.round_id, {}).setdefault(row.racer_id, []).append(
             Heat(row.heat, row.lane, row.pk, shown, dnf)
         )
@@ -143,8 +146,7 @@ def results_by_racer(event: Event, racer_id: int | None = None) -> ResultsByRace
     return ResultsByRacer(
         rounds=tuple(out),
         use_points=settings.use_points,
-        # `use_groups()`: more than one group, rounds or not.
-        use_groups=Group.objects.filter(event=event).count() > 1,
+        use_groups=groups.use_groups(event),
         current_round_id=RaceState.objects.get(event=event).current_round_id,
         lane_count=settings.lane_count,
     )

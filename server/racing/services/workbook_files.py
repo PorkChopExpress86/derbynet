@@ -1,12 +1,18 @@
 """The export files of #49: `export_all()`'s workbook as `.xlsx`, `.ods`, or
 one sheet as `.csv`, built on the server.
 
-PHP's `export.php` builds the files in the browser with SheetJS, which
-refuses a sheet name with `: \\ / ? * [ ]`, past 31 characters, or taken by
-an earlier sheet; PHP's loop that would make names safe edits a copy, so
-such an export fails. Here each such character becomes `-`, a name is cut
-to 31 characters, and a repeated name takes a number. PHP also offers
-`.xls`; `.xlsx` opens wherever `.xls` did, so the port drops it.
+PHP's `export.php` builds the files in the browser with SheetJS 0.13.5,
+which throws on a sheet name holding `\\ / ? * [ ]`, past 31 characters, or
+repeating an earlier sheet's (run under node on `website/js/xlsx.full.min.js`
+for #49). `export_all()` replaces `/` and shortens a long standings title
+(`website/inc/export-all.inc:26` to `:30`), but its loop meant to clean the
+rest edits a copy (`foreach ($workbook as $w)`, `:49` to `:54`), so a group
+name holding another of those characters, or two titles alike, failed
+PHP's export. Here each such character, and `:`, which Excel and openpyxl
+refuse, becomes `-`, a name is cut to 31
+characters, and a repeated name takes a number (proposed #64 row C51, #49).
+PHP also offers `.xls`; `.xlsx` opens wherever `.xls` did, so the port drops
+it, as #49 plans (Risks and notes).
 
 A cell keeps the type the workbook gives it: a number stays a number, text
 stays text (so a car name "111" is text, as `export-json.php` sends it), and

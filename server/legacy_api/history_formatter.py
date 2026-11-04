@@ -9,8 +9,15 @@ another ticket breaks the history of imported events.
 
 PHP's tables return copies, so an `edit` action changes nothing the tables
 keep, and `partition.*structure` leaves bare ids behind. Those effects are
-kept, since the text for imported rows must match PHP's. PHP's debug mode,
-which prints a row for every action that has no sentence, is not ported.
+kept, since the text for imported rows must match PHP's. PHP's debug mode
+prints its tables' model; the Retrospective's `?debug` instead lists every
+logged request, those with no sentence too (`entries(every_row=True)`).
+
+Two differences from PHP, both in text PHP printed unescaped: a
+`settings.write` key or a non-text value, and a lane key of `result.write`
+or `timer-message`, are escaped (proposed #64 row S38, #49: PHP printed
+`<i>key</i>` as markup, run with `testing/docker/php-scratch.sh`). No
+PHP-written log in the fixtures has such a key, so their text is PHP's.
 
 `history(event)` reads the log through `transfer.action_log`, which resolves
 an imported row's legacy ids to the event's new ids (#49). A legacy id with

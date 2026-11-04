@@ -243,3 +243,13 @@ def test_the_debug_view_is_for_set_up(login, event):
 def test_the_retrospective_needs_check_in(login, event):
     assert login("anonymous").get("/history/").status_code == 302
     assert login("Photo").get("/history/").status_code == 302
+
+
+def test_a_dnf_time_shows_dnf_on_the_standings(login, event, day):
+    lions = day["rounds"]["Lions"]
+    lane = HeatLane.objects.filter(round=lions, racer__car_number=104).first()
+    HeatLane.objects.filter(pk=lane.pk).update(finish_time=DID_NOT_FINISH)
+
+    html = standings_list(login("anonymous"), f"st-r{lions.pk}")
+
+    assert re.search(r"data-time>DNF 9\.999<", html)

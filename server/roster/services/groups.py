@@ -137,6 +137,13 @@ def labels(settings: RaceSettings) -> Labels:
     return Labels(settings.supergroup_label, settings.partition_label, group, subgroup)
 
 
+def use_groups(event) -> bool:
+    """`use_groups()` in `website/inc/data.inc`: the event has more than one
+    group, so the pages name each racer's group. `event` is an event or its
+    id."""
+    return Group.objects.filter(event=event).count() > 1
+
+
 def _rule(event_id) -> Rule:
     return Rule(RaceSettings.objects.get(event_id=event_id).group_formation_rule)
 

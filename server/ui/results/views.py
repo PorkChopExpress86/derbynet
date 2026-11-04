@@ -1,10 +1,11 @@
 """Results by racer (#49): `racer-results.php` as one card per racer per
 round, over `racing.services.racer_results`.
 
-The page is public, as kiosk data (#15, D5). `?racerid=` keeps one racer;
+The page is public, as kiosk data (#15, D5, D70). `?racerid=` keeps one racer;
 it is parsed as an integer, where PHP put the raw text into its SQL (S13),
 and anything else shows every racer. The rounds poll every second, as
-`results-by-racer-update.js` polls `poll.results`, and answer 204 while the
+`website/js/results-by-racer-update.js:4` to `:17` polls `poll.results`,
+and answer 204 while the
 signature of what they show holds: a hash of the rendering, so the 204
 covers every name, time and photo (#45 retro).
 """

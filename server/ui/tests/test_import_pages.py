@@ -2,6 +2,7 @@
 
 import json
 import re
+import uuid
 
 import pytest
 
@@ -14,6 +15,8 @@ pytestmark = pytest.mark.django_db
 
 
 def post(client, kind, step, rows, **extra):
+    """The page's post: the rows, and a fresh token unless one is given."""
+    extra.setdefault("token", uuid.uuid4().hex)
     return client.post(
         f"/import/{kind}/{step}/",
         {"rows": json.dumps(rows), **extra},
@@ -98,7 +101,9 @@ def test_awards_import_through_the_page(login, event):
 @pytest.mark.parametrize("body", ["", "{", '{"rows": 1}', "[1]", '[{"row": "2"}]'])
 def test_rows_the_page_never_sends_are_refused(login, event, body):
     reply = login("RaceCoordinator").post(
-        "/import/roster/run/", {"rows": body}, HTTP_HX_REQUEST="true"
+        "/import/roster/run/",
+        {"rows": body, "token": uuid.uuid4().hex},
+        HTTP_HX_REQUEST="true",
     )
     assert reply.status_code == 422
 
@@ -148,3 +153,25 @@ def test_the_old_urls_redirect(client, event, old, new):
 
 def test_print_php_has_no_replacement(client, event):
     assert client.get("/print.php").status_code == 404
+
+
+def test_the_same_import_sent_twice_imports_once(login, event):
+    """A double tap, or a replayed request, sends the same token: the second
+    changes nothing."""
+    client = login("RaceCoordinator")
+    token = "0123456789abcdef0123456789abcdef"
+
+    first = post(client, "roster", "run", ROWS, token=token)
+    second = post(client, "roster", "run", ROWS, token=token)
+
+    assert 'data-imported="2"' in first.content.decode()
+    assert second.status_code == 422
+    assert "imported already" in second.content.decode()
+    assert Racer.objects.filter(event=event).count() == 2
+
+
+def test_an_import_without_a_token_is_refused(login, event):
+    for token in ("", "x" * 32, "0123456789ABCDEF0123456789ABCDEF"):
+        reply = post(login("RaceCoordinator"), "roster", "run", ROWS, token=token)
+        assert reply.status_code == 422
+    assert not Racer.objects.filter(event=event).exists()

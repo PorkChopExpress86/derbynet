@@ -40,7 +40,7 @@
 
   <section x-show="table.length" x-cloak aria-labelledby="im-map-h" class="rounded-2xl border border-line bg-surface p-4" data-step="map">
     <h2 id="im-map-h" class="text-lg font-semibold">2. Match the columns</h2>
-    <p class="mt-1 text-sm text-ink-muted">{% if kind == "results" %}The columns of a DerbyNet export, in order. Change one if your file differs.{% else %}Pick the field each column holds. Leave a column at “Skip” to leave it out.{% endif %}</p>
+    <p class="mt-1 text-sm text-ink-muted">{% if kind == "results" %}Columns named as a DerbyNet export names them, such as FinishTime and Scale MPH, are matched by name. A file with no such names is read in the export's fixed order. Change a column if your file differs.{% else %}Pick the field each column holds. Leave a column at “Skip” to leave it out.{% endif %}</p>
     <ul role="list" class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
       <template x-for="col in columns" :key="col">
         <li class="flex flex-col gap-1 rounded-xl bg-surface-2 p-3">
@@ -74,9 +74,10 @@
     </div>
     <form id="import-form" class="mt-3 flex flex-col gap-3" @submit.prevent>
       <input type="hidden" name="rows" :value="rowsJson">
+      <input type="hidden" name="token" :value="token">
       <div class="flex flex-wrap gap-2">
         <button type="button" :disabled="!ready" hx-post="{% url 'import-preview' kind %}" hx-target="#import-summary" hx-swap="innerHTML" hx-include="#import-form" hx-sync="#import-form:replace" class="min-h-11 rounded-xl border border-line px-4 font-semibold disabled:opacity-50" data-action="preview">Preview</button>
-        <button type="button" :disabled="!ready" hx-post="{% url 'import-run' kind %}" hx-target="#import-outcome" hx-swap="innerHTML" hx-include="#import-form" hx-sync="#import-form:drop" class="min-h-11 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink disabled:opacity-50 sm:flex-none" data-action="import">Import</button>
+        <button type="button" :disabled="!ready" hx-post="{% url 'import-run' kind %}" hx-target="#import-outcome" hx-swap="innerHTML" hx-include="#import-form" hx-sync="#import-form:drop" hx-disabled-elt="this" class="min-h-11 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink disabled:opacity-50 sm:flex-none" data-action="import">Import</button>
       </div>
       <div id="import-summary" aria-live="polite"></div>
     </form>

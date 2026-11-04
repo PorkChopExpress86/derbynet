@@ -4,6 +4,7 @@ screenshots the PR attaches."""
 
 import csv
 import re
+import uuid
 from pathlib import Path
 
 import pytest
@@ -256,7 +257,7 @@ def expected_roster(name: str, encoding: str):
         if cells
     ]
     other = EventFactory()
-    assert import_rows(other, "roster", rows).ok
+    assert import_rows(other, "roster", rows, token=uuid.uuid4().hex).ok
     return racer_rows(other)
 
 
@@ -412,3 +413,23 @@ def test_awards_and_results_import(login, event):
     assert HeatLane.objects.filter(event=event).count() == 200
     assert Round.objects.filter(event=event).exists()
     assert RaceState.objects.get(event=event)
+
+
+def test_a_double_tap_on_import_imports_once(login, event, tmp_path, page_errors):
+    # The third tap is refused with a 422 toast, which the browser logs.
+    page_errors.allow(r"status of 422|/import/roster/run/")
+    path = tmp_path / "roster.csv"
+    path.write_text("First Name,Last Name\nAnn,Able\nBob,Baker\n")
+    page = login("RaceCoordinator")
+    phone_only(page)
+    page.goto("/import/roster/")
+    choose_file(page, path)
+
+    page.get_by_role("button", name="Import").dblclick()
+    htmx_settled(page)
+    expect(page.locator("[data-imported]")).to_contain_text("Imported 2 racers")
+    page.get_by_role("button", name="Import").click()
+    htmx_settled(page)
+
+    expect(page.locator("#toasts")).to_contain_text("imported already")
+    assert Racer.objects.filter(event=event).count() == 2
