@@ -535,3 +535,48 @@ def test_a_track_with_no_lane_count_shows_one_lane(event):
 
     RaceSettings.objects.filter(event=event).update(lane_count=0)
     assert [lane.lane for lane in state.test(event).lanes] == [1]
+
+
+def _workflow_paths(workflow: Path) -> dict[str, list[str]]:
+    """Each trigger's `paths:` list in a workflow's `on:` block."""
+    paths: dict[str, list[str]] = {}
+    trigger = None
+    for line in workflow.read_text().splitlines():
+        if re.match(r"\S", line) and not line.startswith("on:"):
+            if paths:
+                break
+            continue
+        if found := re.match(r"  (\w+):", line):
+            trigger = found[1]
+        elif re.match(r"    paths:", line):
+            paths[trigger] = []
+        elif (found := re.match(r"      - (\S+)", line)) and trigger in paths:
+            paths[trigger].append(found[1])
+    return paths
+
+
+def test_the_server_workflow_runs_when_a_build_timer_input_changes():
+    """`build_timer` reads files outside server/, and the ui job runs it, so
+    the server workflow's path filters name each one, the same for a push and
+    a pull request (#50 retro: a partial edit left the two lists apart)."""
+    paths = _workflow_paths(timer_build.REPO / ".github" / "workflows" / "server.yml")
+    assert set(paths) == {"push", "pull_request"}
+    assert paths["push"] == paths["pull_request"]
+    assert len(set(paths["push"])) == len(paths["push"])
+    inputs = [
+        timer_build.SOURCE_HTML,
+        timer_build.PROFILES_TEMPLATE,
+        timer_build.TIMER_SRC / "js" / "main.js",
+        timer_build.JAVA_SRC / "org",
+        *timer_build.JAVA_LIBS,
+    ]
+    names = [p.relative_to(timer_build.REPO).as_posix() for p in inputs]
+    unfiltered = [
+        name
+        for name in names
+        if not any(
+            name == f or (f.endswith("/**") and name.startswith(f[:-2]))
+            for f in paths["push"]
+        )
+    ]
+    assert unfiltered == []

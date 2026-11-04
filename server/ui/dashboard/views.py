@@ -37,7 +37,7 @@ from racing.services import (
 )
 from racing.services.finals import FinalsFailure
 from racing.services.lanes import LanesFailure
-from racing.services.playlist import PlaylistFailure
+from racing.services.playlist import MAX_RUNS_PER_LANE, PlaylistFailure
 from racing.services.reschedule import RescheduleFailure
 from racing.services.rounds import (
     FollowOn,
@@ -58,7 +58,6 @@ from ui.responses import toast_html as _toast
 
 guard = requires_page("dashboard")
 
-RUNS_PER_LANE = range(1, 7)
 REPLAY_CHOICES = {
     "replay-skipback": [
         ("2500", "2.5"),
@@ -424,7 +423,7 @@ def round_sheet(request, round_id, kind):
         "card": card,
         "name": round_name(round),
         "kind": kind,
-        "runs": RUNS_PER_LANE,
+        "runs_max": MAX_RUNS_PER_LANE,
         "use_master_sched": live.context["use_master_sched"],
         "can_set_up": live.context["can_set_up"],
     }

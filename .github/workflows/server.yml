@@ -18,6 +18,9 @@ on:
       - templates/timer-profiles.js
       - timer/derbynet-timer/src/**
       - timer/src/**
+      - lib/jssc.jar
+      - lib/Java-WebSocket-1.5.2.jar
+      - lib/json-20210307.jar
       - .github/workflows/server.yml
   pull_request:
     paths:
@@ -27,6 +30,9 @@ on:
       - templates/timer-profiles.js
       - timer/derbynet-timer/src/**
       - timer/src/**
+      - lib/jssc.jar
+      - lib/Java-WebSocket-1.5.2.jar
+      - lib/json-20210307.jar
       - .github/workflows/server.yml
   workflow_dispatch:
 

@@ -2,7 +2,7 @@
 {% if kind == "schedule" %}
 <form hx-post="{% url 'dashboard-round' round.pk 'schedule' %}" hx-include="#shown-heat" hx-target="#toasts" hx-swap="beforeend" hx-sync="#live:replace" @htmx:after-request="if ($event.detail.successful) $store.ui.close()" data-schedule-form>
   <p class="text-sm text-ink-muted">{{ name }} · {{ card.passed }} racer{{ card.passed|pluralize }} passed</p>
-  {% include "ui/components/stepper.html" with id="schedule-runs" name="runs" label="Times each racer runs in each lane" value=1 min=1 max=6 cls="mt-3" %}
+  {% include "ui/components/stepper.html" with id="schedule-runs" name="runs" label="Times each racer runs in each lane" value=1 min=1 max=runs_max cls="mt-3" %}
   <div class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
     {% if not use_master_sched %}<button type="submit" name="race" value="1" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink" data-action="schedule-race">Schedule + Race</button>{% endif %}
     <button type="submit" name="race" value="0" class="min-h-12 flex-1 rounded-xl {% if use_master_sched %}bg-accent text-accent-ink{% else %}border border-line{% endif %} px-4 font-semibold" data-action="schedule-only">{% if use_master_sched %}Make Schedule{% else %}Schedule Only{% endif %}</button>
