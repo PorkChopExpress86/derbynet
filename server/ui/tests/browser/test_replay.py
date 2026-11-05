@@ -17,6 +17,7 @@ import pytest
 from playwright.sync_api import expect
 
 from core.models import RaceSettings
+from racing.services import replay
 from ui.tests.browser.conftest import (
     PLAIN_HTTP_HOST,
     assert_accessible,
@@ -153,6 +154,42 @@ def test_a_size_the_camera_cannot_give_says_so_and_opens_its_own(login, event):
         "This camera cannot record at 1280 × 720, 200 fps"
     )
     expect(stream_info(page)).to_have_text(re.compile(r"^\d+x\d+, \d+ fps$"))
+    # A failed open, such as a busy camera, keeps the operator's choice.
+    assert saved_choice(page) == {
+        "deviceId": "stale",
+        "label": "fake_device_0",
+        "width": 1280,
+        "height": 720,
+        "frameRate": 200,
+    }
+
+
+def saved_choice(page) -> dict:
+    return page.evaluate("JSON.parse(localStorage.getItem('derbynet.replay.camera'))")
+
+
+def test_an_unplugged_camera_stays_remembered(login, event):
+    """The page opens another camera meanwhile, and keeps the choice for
+    when the camera is back, until the operator chooses again."""
+    page = login("RaceCoordinator")
+    gone = {
+        "deviceId": "gone",
+        "label": "unplugged",
+        "width": 1280,
+        "height": 720,
+        "frameRate": 15,
+    }
+    page.evaluate(
+        "(c) => localStorage.setItem('derbynet.replay.camera', JSON.stringify(c))",
+        gone,
+    )
+    open_replay(page)
+    expect(page.locator("#device-picker option:checked")).to_have_text("fake_device_0")
+    assert saved_choice(page) == gone
+
+    page.get_by_label("Frame rate").select_option("15")
+    expect(stream_info(page)).to_have_text(re.compile(r", 15 fps$"))
+    assert saved_choice(page)["label"] == "fake_device_0"
 
 
 def test_the_setup_shows_the_replay_settings(login, event):
@@ -168,7 +205,7 @@ def test_the_setup_shows_the_replay_settings(login, event):
         "href", "/settings/#replay"
     )
     expect(page.get_by_label("URL")).to_have_value(
-        re.compile(r"^//[^/]+/kiosk\.php\?address=Lane\+cam$")
+        re.compile(r"^//[^/]+/kiosk\.php\?address=Lane cam$")
     )
 
 
@@ -350,8 +387,11 @@ def test_the_delay_right_click_and_resize(login, event, page_errors):
     proceed(page)
     page.wait_for_timeout(1500)
 
+    page.evaluate("handle_replay_message('START Wolves_Round1_Heat07')")
     page.locator("#click-shield").click(button="right")
     page.wait_for_function("g_last_clip !== null")
+    # C53: PHP's right-click passes no name and uploads undefined.mkv.
+    assert page.evaluate("g_last_clip.root") == "Wolves_Round1_Heat07"
     started = page.evaluate("g_last_clip.finish")
     page.wait_for_function(
         "document.getElementById('replay').dataset.replayState == 'playing'",
@@ -466,3 +506,81 @@ def test_a_message_sent_before_the_websocket_opens_is_sent_once_it_does(login, e
         {"subscriber": "viewer-test", "topics": []},
         {"recipient": "camera-replay", "type": "solicitation"},
     ]
+
+
+@pytest.mark.parametrize(
+    ("skipback", "post_roll", "longest"),
+    [(4000, 2000, 10000), (4000, 2000, 5000), (9000, 3000, 10000), (500, 0, 300)],
+)
+def test_the_page_cuts_a_clip_as_the_service_does(
+    login, event, skipback, post_roll, longest
+):
+    """D18's clip length is computed in racing.services.replay and in
+    replay.js; the two agree."""
+    RaceSettings.objects.filter(event=event).update(
+        replay_skipback_ms=skipback,
+        replay_post_roll_ms=post_roll,
+        replay_max_clip_ms=longest,
+    )
+    page = login("RaceCoordinator")
+    desktop_only(page)
+    page.goto("/replay/")
+    settings = RaceSettings.objects.get(event=event)
+    assert page.evaluate("clip_length_ms()") == replay.clip_length_ms(settings)
+    # A command's skipback replaces the setting's, in both.
+    settings.replay_skipback_ms = 1500
+    page.evaluate("parse_replay_options('REPLAY 1500 1 100')")
+    assert page.evaluate("clip_length_ms()") == replay.clip_length_ms(settings)
+
+
+def test_the_delay_counts_after_the_post_roll(login, event):
+    """replay.php:300-307 waits the operator's delay after it stops
+    recording; recording now stops at the end of the post-roll (D18), so a
+    delay shorter than the post-roll still delays the playback."""
+    fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
+    page = login("RaceCoordinator")
+    desktop_only(page)
+    open_replay(page)
+    page.get_by_label("Delay playback by").fill("0.3")
+    page.evaluate("handle_replay_message('TEST 1000 1 100')")
+    page.wait_for_function("g_last_clip && g_last_clip.played_at")
+    clip = page.evaluate("g_last_clip")
+    assert clip["played_at"] - clip["finish"] >= 800, clip
+
+
+def test_race_starts_names_the_clip_when_it_arrives(login, event):
+    """replay.php:127 and :152-158: the RACE_STARTS timeout replays under the
+    START name it heard with, and an earlier timeout still fires and clears
+    the later one, as on_replay clears g_replay_timeout (replay.php:282-295)."""
+    fast_replays(event, replay_skipback_ms=500, replay_post_roll_ms=200)
+    page = login("RaceCoordinator")
+    desktop_only(page)
+    open_replay(page)
+    sent = page.evaluate(
+        "() => { handle_replay_message('START Wolves_Round1_Heat04');"
+        " handle_replay_message('RACE_STARTS 500 1 100');"
+        " handle_replay_message('START Wolves_Round1_Heat05');"
+        " handle_replay_message('RACE_STARTS 2000 1 100');"
+        " return performance.now(); }"
+    )
+    page.wait_for_function("g_last_clip !== null")
+    clip = page.evaluate("g_last_clip")
+    assert clip["root"] == "Wolves_Round1_Heat04"
+    assert clip["finish"] - sent < 1500, clip
+    page.wait_for_timeout(2500)
+    assert page.evaluate("g_last_clip.finish") == clip["finish"]
+
+
+def test_a_finish_during_a_clip_replays_again(login, event):
+    """replay.php:282-310 has no guard: a second finish stops recording and
+    plays again."""
+    fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
+    page = login("RaceCoordinator")
+    desktop_only(page)
+    open_replay(page)
+    page.evaluate("handle_replay_message('TEST 1000 1 100')")
+    first = page.evaluate("g_last_clip.finish")
+    page.evaluate("handle_replay_message('START Wolves_Round1_Heat06')")
+    page.evaluate("handle_replay_message('TEST 1000 1 100')")
+    assert page.evaluate("g_last_clip.finish") > first
+    assert page.evaluate("g_last_clip.root") == "Wolves_Round1_Heat06"

@@ -117,7 +117,7 @@ function stop_stream(video) {
 
 // The no-camera warning: the browser gives no camera to a page that is not
 // a secure context, so plain http:// links to the https:// address, as
-// replay.php and camera.php do.
+// replay.php:244-247 and camera.php:65-68 do.
 function show_no_camera_warning(warning) {
   warning.hidden = false;
   if (window.location.protocol == 'http:') {

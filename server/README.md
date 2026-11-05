@@ -477,8 +477,10 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`:
 
 - The setup picks the camera, the resolution and the frame rate, opens them as exact constraints, and remembers them in the browser's `localStorage`, matched by id or, in a new session, by label (D9). The camera page remembers its camera too.
 - A clip runs from `replay-skipback` before the finish to the post-roll (`replay_post_roll_ms`) after it, cut to `replay_max_clip_ms` (D18). The setup shows these settings with a link to the settings page.
+- The operator's delay counts from the end of the post-roll, where recording stops (D18).
+- A right-click replay names its clip after the current START, where PHP uploads `undefined.mkv` (C53). The camera sends one offer per solicitation and offers again to a viewer that nags while not connected, and the replay page handles signaling messages one at a time (C54).
 - `g_websocket_url` renders empty, so both pages poll (#56). The websocket path's flush calls `ws.send` (C32).
-- `replay_ice_servers` (default `stun:stun.l.google.com:19302`, PHP's hardcoded server) lists the STUN or TURN URLs, separated by spaces or commas; empty means host candidates only, for a LAN with no internet.
+- `replay_ice_servers` (D76; default `stun:stun.l.google.com:19302`, PHP's hardcoded server) lists the STUN or TURN URLs, separated by spaces or commas; empty means host candidates only, for a LAN with no internet.
 
 ## Settings
 

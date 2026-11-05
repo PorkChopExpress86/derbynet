@@ -19,7 +19,9 @@ function RemoteCamera(viewer_id, ideal, stream_cb) {
   var pc = new RTCPeerConnection(replay_rtc_configuration());
 
   // Messages are handled one at a time: an offer's answer is set before the
-  // next offer is read, as two offers can come in one poll's reply.
+  // next offer is read. PHP handled them at once (viewer-signaling.js:17-55),
+  // and two offers in one poll's reply failed to set the second answer
+  // (#64 C54).
   var handled = Promise.resolve();
   var poller = new MessagePoller(viewer_id, function (msg) {
     handled = handled.then(function () { return on_message(msg); })

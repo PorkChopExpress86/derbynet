@@ -14,7 +14,6 @@ with a 301 to them, query string kept (D20, `ui.redirects`).
 
 from django.shortcuts import render
 from django.urls import reverse
-from django.utils.http import urlencode
 from django.views.decorators.http import require_GET
 
 from core.models import RaceSettings
@@ -35,10 +34,12 @@ def _config(request) -> tuple[RaceSettings, dict]:
 def kiosk_url(request) -> str:
     """The frame's default URL: the kiosk page on this server, with no
     scheme, so an https page frames an https kiosk (replay.php:14-28). An
-    `address` query value is passed on."""
+    `address` query value is appended as given, as replay.php:24-26 does;
+    the template escapes it for the attribute, as PHP's htmlspecialchars()
+    does."""
     url = f"//{request.get_host()}{reverse('kiosk-php')}"
-    if address := request.GET.get("address"):
-        url += "?" + urlencode({"address": address})
+    if "address" in request.GET:
+        url += "?address=" + request.GET["address"]
     return url
 
 

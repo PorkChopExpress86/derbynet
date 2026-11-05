@@ -79,9 +79,9 @@ function ViewClient(recipient, poller) {
       pc.addIceCandidate(candidate).catch(failed);
     } else if (msg.type == 'solicitation') {
       // The viewer nags every 5 s until it connects. PHP's camera logged
-      // the nag as unrecognized, so a viewer that lost its connection never
-      // got a new offer; this one offers again once the last offer is
-      // settled.
+      // the nag as unrecognized (camera-signaling.js:66-77), so a viewer
+      // that lost its connection never got a new offer; this one offers
+      // again once the last offer is settled (#64 C54).
       if (pc.connectionState != 'connected' && pc.signalingState == 'stable') {
         this.read_ideal(msg);
         this.convey_offer();
@@ -97,8 +97,8 @@ function ViewClient(recipient, poller) {
     logrcvd('solicitation');
     this.read_ideal(msg);
     // With a stream, adding its tracks already asked for an offer
-    // (onnegotiationneeded); PHP offered twice, and two offers in one poll
-    // raced at the viewer.
+    // (onnegotiationneeded). PHP offered twice (camera-signaling.js:45-55
+    // and :94), and the two offers raced at the viewer (#64 C54).
     if (senders.length == 0) this.convey_offer();
   };
   this.read_ideal = function (msg) {

@@ -103,7 +103,8 @@ def test_the_kiosk_frame_url_passes_the_address_on(login):
     with_address = client.get("/replay/?address=Lane+cam&debug").content.decode()
 
     assert 'value="//testserver/kiosk.php"' in plain
-    assert 'value="//testserver/kiosk.php?address=Lane+cam"' in with_address
+    # replay.php:24-26 appends the address as given.
+    assert 'value="//testserver/kiosk.php?address=Lane cam"' in with_address
     assert 'id="debug" class="replay-log-panel">' in with_address
 
 

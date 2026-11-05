@@ -2,22 +2,21 @@
 //
 // The page records the camera into a ring of frames, shows a kiosk page in
 // a full-window frame, and replays each heat when the server says it
-// finished. It polls `replay.message` every 250 ms (replay.php:42-61) and
+// finished. It polls `replay.message` every 250 ms (replay.php:54-89) and
 // handles the six commands of racing/services/replay.py:
 //   HELLO; TEST, REPLAY and RACE_STARTS `<skipback> <showings> <rate>`;
 //   START `<class>_Round<n>_Heat<NN>`, which names the next clip; CANCEL.
 // RACE_STARTS replays `skipback` ms after the gate opens unless a REPLAY
 // comes first, and a REPLAY after such a timeout replay is ignored until the
-// next START (replay.php:111-158).
+// next START (replay.php:125-162).
 //
 // The clip window (D18): when the finish arrives, the page keeps recording
 // for the post-roll, then plays from `skipback` before the finish to the
 // post-roll after it, its start cut so it never runs longer than the
 // maximum. PHP stopped recording at the finish and played `skipback` ms.
-// Playback starts the operator's delay after the finish, once the post-roll
-// is recorded. A finish that arrives while a clip is still recording,
-// waiting or playing is ignored, where PHP started a second playback over
-// the first.
+// Playback starts the operator's delay after recording stops, as
+// replay.php:296-307 does; recording now stops at the end of the post-roll.
+// A second finish while a clip plays starts another, as PHP's does.
 //
 // Playback posts `replay-started` and `replay-ended` to the kiosk frame,
 // which pauses the kiosk page meanwhile (ui/static/ui/kiosk.js). With
@@ -96,11 +95,13 @@ function parse_replay_options(cmdline) {
 
 function handle_replay_message(cmdline) {
   logrcvd(cmdline);
+  // The clip's name as the command arrives (replay.php:127).
+  var root = g_video_name_root;
   if (cmdline.startsWith('HELLO')) {
     // Nothing to do.
   } else if (cmdline.startsWith('TEST')) {
     parse_replay_options(cmdline);
-    on_replay();
+    on_replay(root);
   } else if (cmdline.startsWith('START')) {
     g_video_name_root = cmdline.substr(6).trim();
     g_preempted = false;
@@ -108,17 +109,16 @@ function handle_replay_message(cmdline) {
     parse_replay_options(cmdline);
     if (!g_preempted) {
       clearTimeout(g_replay_timeout);
-      on_replay();
+      on_replay(root);
     }
   } else if (cmdline.startsWith('CANCEL')) {
     clearTimeout(g_replay_timeout);
   } else if (cmdline.startsWith('RACE_STARTS')) {
     parse_replay_options(cmdline);
-    clearTimeout(g_replay_timeout);
     g_replay_timeout = setTimeout(function () {
       g_preempted = true;
       logstream('Replay after the RACE_STARTS timeout');
-      on_replay();
+      on_replay(root);
     }, g_replay_options.length);
   } else {
     console.log('Unrecognized replay message: ' + cmdline);
@@ -127,20 +127,17 @@ function handle_replay_message(cmdline) {
 
 // ----- the clip --------------------------------------------------------------
 
-function on_replay() {
+// `root` names the clip. A right-click replay names it after the current
+// START; PHP's passes no name and uploads `undefined.mkv` (#64 C53,
+// replay.php:394).
+function on_replay(root) {
   clearTimeout(g_replay_timeout);
   g_replay_timeout = 0;
   if (!g_recorder) {
     logstream('No camera, so no replay');
     return;
   }
-  var state = replay_el('replay').dataset.replayState;
-  if (state == 'post-roll' || state == 'waiting' || state == 'playing') {
-    logstream('A clip is already under way; this finish is ignored');
-    return;
-  }
-  // Read now: a START may come in before the clip plays.
-  var root = g_video_name_root;
+  if (root === undefined) root = g_video_name_root;
   var upload = g_upload_videos;
   var finish = performance.now();
   var post_roll = g_replay_config.post_roll_ms;
@@ -156,8 +153,7 @@ function on_replay() {
   setTimeout(function () {
     g_recorder.stop_recording();
     set_replay_state('waiting');
-    setTimeout(function () { start_playback(clip, upload); },
-               Math.max(0, delay - post_roll));
+    setTimeout(function () { start_playback(clip, upload); }, delay);
   }, post_roll);
 }
 
@@ -181,6 +177,7 @@ function start_playback(clip, upload) {
   playback.width = window.innerWidth;
   playback.height = window.innerHeight;
 
+  clip.played_at = performance.now();
   set_replay_state('playing');
   announce_to_interior('replay-started');
   replay_el('playback-background').hidden = false;
@@ -279,7 +276,7 @@ function close_camera() {
   g_recorder = null;
 }
 
-function open_remote_camera() {
+function open_remote_camera(remember) {
   replay_el('waiting-for-remote').hidden = false;
   show_stream_info('');
   // No capabilities to read from a camera not yet connected: offer every
@@ -291,13 +288,13 @@ function open_remote_camera() {
               REPLAY_FRAME_RATES.map(function (f) { return [f, f + ' fps']; }),
               g_choice.frameRate || 30);
   var ideal = chosen_size();
-  save_camera_choice(CAMERA_CHOICE_KEY, g_choice = {deviceId: REMOTE, width: ideal.width,
-                                                    height: ideal.height, frameRate: ideal.frameRate});
+  g_choice = {deviceId: REMOTE, width: ideal.width, height: ideal.height, frameRate: ideal.frameRate};
+  if (remember) save_camera_choice(CAMERA_CHOICE_KEY, g_choice);
   var id = make_id_string('viewer-');
   logstream('Viewer id is ' + id);
   g_remote_poller = new RemoteCamera(id, ideal, function (stream) {
     on_stream_ready(stream, ideal.frameRate);
-    // -1x-1 says a stream came before its first frame, as replay.php's does.
+    // -1x-1 says a stream came before its first frame (replay.php:181).
     var size = stream.getVideoTracks()[0].getSettings();
     show_stream_info(size.width ? size.width + 'x' + size.height : '-1x-1');
     g_recorder.on_resize(function (w, h) { show_stream_info(w + 'x' + h); });
@@ -305,8 +302,11 @@ function open_remote_camera() {
 }
 
 // Opens the chosen camera with exact constraints. A camera that cannot
-// give the saved size or rate says so and opens at its own.
-function open_local_camera(device_id, exact) {
+// give the saved size or rate says so and opens at its own. With
+// `remember`, the operator chose this camera or size, and the browser keeps
+// what opened; otherwise the saved choice stays, so one failed or busy open
+// loses nothing.
+function open_local_camera(device_id, exact, remember) {
   var opening = g_open_count;
   var video = {deviceId: {exact: device_id}};
   if (exact && g_choice.width && g_choice.height) {
@@ -334,7 +334,7 @@ function open_local_camera(device_id, exact) {
     fill_constraint_pickers(capabilities, settings);
     g_choice = {deviceId: device_id, label: track.label, width: settings.width, height: settings.height,
                 frameRate: Math.round(settings.frameRate || 0)};
-    save_camera_choice(CAMERA_CHOICE_KEY, g_choice);
+    if (remember) save_camera_choice(CAMERA_CHOICE_KEY, g_choice);
     on_stream_ready(stream, g_choice.frameRate);
     show_stream_info(settings.width + 'x' + settings.height + ', ' + g_choice.frameRate + ' fps');
     // Labels show once the browser has granted a camera.
@@ -345,7 +345,7 @@ function open_local_camera(device_id, exact) {
       camera_error('This camera cannot record at ' + g_choice.width + ' × ' + g_choice.height +
                    ', ' + g_choice.frameRate + ' fps (' + error.name + '). Choose another size.');
       // Not returned: the fallback waits for this request to settle.
-      open_local_camera(device_id, false);
+      open_local_camera(device_id, false, false);
       return;
     }
     camera_error('The camera did not start (' + error.name + ').');
@@ -355,15 +355,16 @@ function open_local_camera(device_id, exact) {
   return handled;
 }
 
-function on_device_selection() {
+// `remember` is true when the operator chose (D9).
+function on_device_selection(remember) {
   close_camera();
   camera_error('');
   var device_id = replay_el('device-picker').value;
   if (device_id == REMOTE) {
-    open_remote_camera();
+    open_remote_camera(remember);
   } else if (device_id) {
     if (device_id != g_choice.deviceId) g_choice = {deviceId: device_id};
-    open_local_camera(device_id, true);
+    open_local_camera(device_id, true, remember);
   }
 }
 
@@ -371,8 +372,7 @@ function on_constraint_selection() {
   var size = chosen_size();
   g_choice = {deviceId: replay_el('device-picker').value, width: size.width,
               height: size.height, frameRate: size.frameRate};
-  save_camera_choice(CAMERA_CHOICE_KEY, g_choice);
-  on_device_selection();
+  on_device_selection(true);
 }
 
 function refresh_device_picker() {
@@ -398,7 +398,8 @@ function build_device_picker() {
     } else {
       picker.value = devices.length ? devices[0].deviceId : REMOTE;
     }
-    on_device_selection();
+    // The first camera this browser opens becomes its choice.
+    on_device_selection(!load_camera_choice(CAMERA_CHOICE_KEY).deviceId);
   });
 }
 
@@ -440,7 +441,7 @@ document.addEventListener('DOMContentLoaded', function () {
     replay_el('recorder-warning').hidden = false;
   }
 
-  replay_el('device-picker').addEventListener('change', on_device_selection);
+  replay_el('device-picker').addEventListener('change', function () { on_device_selection(true); });
   replay_el('resolution-picker').addEventListener('change', on_constraint_selection);
   replay_el('frame-rate-picker').addEventListener('change', on_constraint_selection);
   replay_el('proceed').addEventListener('click', on_proceed);
@@ -453,14 +454,14 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!navigator.mediaDevices) {
     show_no_camera_warning(replay_el('no-camera-warning'));
   } else {
-    // A camera unplugged mid-race brings the setup back, as replay.php's
-    // ondevicechange does through build_device_picker's not-found callback.
+    // A camera unplugged mid-race brings the setup back: replay.php:249-251
+    // passes on_setup as build_device_picker's not-found callback.
     navigator.mediaDevices.ondevicechange = function () {
       var before = replay_el('device-picker').value;
       refresh_device_picker().then(function () {
         if (replay_el('device-picker').value != before) {
           on_setup();
-          on_device_selection();
+          on_device_selection(false);
         }
       });
     };

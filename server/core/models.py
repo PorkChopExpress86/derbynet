@@ -160,9 +160,9 @@ class RaceSettings(PerEvent):
     replay_post_roll_ms = models.PositiveIntegerField(default=2000)
     replay_max_clip_ms = models.PositiveIntegerField(default=10000)
     # The STUN or TURN server URLs the replay page and the remote camera use
-    # for WebRTC, separated by spaces or commas (#53). PHP hardcodes Google's
-    # STUN server; empty means host candidates only, for a LAN with no
-    # internet.
+    # for WebRTC, separated by spaces or commas (D76, #53). PHP hardcodes
+    # Google's STUN server; empty means host candidates only, for a LAN with
+    # no internet.
     replay_ice_servers = models.CharField(
         max_length=500, blank=True, default="stun:stun.l.google.com:19302"
     )
