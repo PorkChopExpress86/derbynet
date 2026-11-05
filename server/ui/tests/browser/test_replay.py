@@ -116,6 +116,21 @@ def test_the_camera_resolution_and_frame_rate_survive_a_reload(login, event):
     }
 
 
+def test_a_quick_change_of_camera_and_size_opens_the_last_choice(login, event):
+    """A camera still opening at its old size made the next request, for a
+    new size, fail as overconstrained (3 runs in 5 before the requests were
+    queued, found by the verify run)."""
+    page = login("RaceCoordinator")
+    open_replay(page)
+
+    page.get_by_label("Camera", exact=True).select_option(label="fake_device_1")
+    page.get_by_label("Resolution").select_option("1280x720")
+
+    expect(stream_info(page)).to_have_text(re.compile(r"^1280x720, "))
+    expect(page.locator("#camera-error")).to_be_hidden()
+    assert track_settings(page)["label"] == "fake_device_1"
+
+
 def test_a_size_the_camera_cannot_give_says_so_and_opens_its_own(login, event):
     page = login("RaceCoordinator")
     page.evaluate(

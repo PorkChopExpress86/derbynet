@@ -266,6 +266,7 @@ function fill_constraint_pickers(capabilities, settings) {
 // Each camera opened counts up, so a camera that opens after the operator
 // has already chosen another is closed again, not shown.
 var g_open_count = 0;
+var g_camera_request = Promise.resolve();
 
 function close_camera() {
   ++g_open_count;
@@ -315,7 +316,14 @@ function open_local_camera(device_id, exact) {
   if (exact && g_choice.frameRate) {
     video.frameRate = {exact: g_choice.frameRate};
   }
-  return navigator.mediaDevices.getUserMedia({video: video, audio: false}).then(function (stream) {
+  // One camera opens at a time: a camera still opening at its old size
+  // makes a second request for a new size fail as overconstrained.
+  var request = g_camera_request.then(function () {
+    if (opening != g_open_count) return null;
+    return navigator.mediaDevices.getUserMedia({video: video, audio: false});
+  });
+  var handled = request.then(function (stream) {
+    if (!stream) return;
     if (opening != g_open_count) {
       stream.getTracks().forEach(function (track) { track.stop(); });
       return;
@@ -336,10 +344,15 @@ function open_local_camera(device_id, exact) {
     if (exact) {
       camera_error('This camera cannot record at ' + g_choice.width + ' × ' + g_choice.height +
                    ', ' + g_choice.frameRate + ' fps (' + error.name + '). Choose another size.');
-      return open_local_camera(device_id, false);
+      // Not returned: the fallback waits for this request to settle.
+      open_local_camera(device_id, false);
+      return;
     }
     camera_error('The camera did not start (' + error.name + ').');
   });
+  // The stream of a stale request is stopped before the next one opens.
+  g_camera_request = handled.catch(function () {});
+  return handled;
 }
 
 function on_device_selection() {
