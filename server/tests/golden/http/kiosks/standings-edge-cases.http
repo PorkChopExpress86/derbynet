@@ -1,0 +1,97 @@
+### 001 standings-kiosk
+request: GET kiosk.php?page=kiosks/standings.kiosk
+status: 200
+content-type: text/html; charset=UTF-8
+set-cookie: PHPSESSID=<value>; path=/
+cache-control: no-store, no-cache, must-revalidate
+length: 5309
+body:
+<!DOCTYPE html><html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<title>Standings</title>
+<script type="text/javascript" src="js/jquery.js"></script>
+<script type="text/javascript" src="js/ajax-setup.js"></script>
+<script type="text/javascript" src="js/kiosk-poller.js"></script>
+<script type="text/javascript">
+</script>
+
+<link rel="stylesheet" type="text/css" href="css/global.css"/>
+<link rel="stylesheet" type="text/css" href="css/kiosks.css"/>
+<style type="text/css">
+body { overflow: hidden; }
+/* This draws a divider line above the very first visible row, useful for scrolling */
+.main_table tr.first_visible {
+  border-top: 3px solid black;
+}
+</style>
+<script type="text/javascript" src="js/standings.js"></script>
+<script type="text/javascript" src="js/standings-kiosk.js"></script>
+<script type="text/javascript">
+  
+var g_class_keys = {"1":"st-r1"};
+var g_rank_keys = {"1":"st-rr1-1"};
+var g_standings_catalog = [{"name":"Pack","key":"st-ff","presentation":"ff"}];
+
+</script>
+</head>
+<body>
+<div class="banner">
+<div class="banner_title">Standings</div>
+<img class="logo" src="img/derbynet.png"/>
+</div>
+<table class="main_table">
+<tr class='headers'><th>Place</th><th>Car Number</th><th>Name</th><th class='col-insuper'>In Pack</th><th class='col-inround'>In Round</th><th>Heats</th><th>Average</th><th>Best</th><th>Worst</th></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' data-first='1' class="st-r1 st-ff "><td class='col0'><div class='inround'>T1</div><div class='insuper'>T1</div></td><td>101</td><td>Ann Lee</td><td class='col-insuper'>T1</td><td class='col-inround'>T1</td><td>2</td><td>3.000</td><td>3.000</td><td>3.000</td></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' class="st-r1 st-ff "><td class='col0'><div class='inround'>T1</div><div class='insuper'>T1</div></td><td>102</td><td>Bob lee</td><td class='col-insuper'>T1</td><td class='col-inround'>T1</td><td>2</td><td>3.000</td><td>3.000</td><td>3.000</td></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' class="st-r1 st-ff "><td class='col0'><div class='inround'>T3</div><div class='insuper'>T3</div></td><td>103</td><td>Cy Moss</td><td class='col-insuper'>T3</td><td class='col-inround'>T3</td><td>2</td><td>3.100</td><td>3.100</td><td>3.100</td></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' class="st-r1 st-ff "><td class='col0'><div class='inround'>T3</div><div class='insuper'>T3</div></td><td>104</td><td>Di Moss</td><td class='col-insuper'>T3</td><td class='col-inround'>T3</td><td>2</td><td>3.100</td><td>3.100</td><td>3.100</td></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' class="st-r1 st-ff "><td class='col0'><div class='inround'>T3</div><div class='insuper'>T3</div></td><td>105</td><td>Ed Moss</td><td class='col-insuper'>T3</td><td class='col-inround'>T3</td><td>2</td><td>3.100</td><td>3.100</td><td>3.100</td></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' class="st-r1 st-ff "><td class='col0'><div class='inround'>6</div><div class='insuper'>6</div></td><td>106</td><td>Flo Nye</td><td class='col-insuper'>6</td><td class='col-inround'>6</td><td>2</td><td>3.200</td><td>3.200</td><td>3.200</td></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' class="st-r1 st-ff "><td class='col0'><div class='inround'>7</div><div class='insuper'>7</div></td><td>107</td><td>Gus Oak</td><td class='col-insuper'>7</td><td class='col-inround'>7</td><td>2</td><td>3.300</td><td>3.300</td><td>3.300</td></tr>
+<tr data-roundid='1' data-rankid='1' data-for-supergroup='' class="st-r1 st-ff "><td class='col0'><div class='inround'>8</div><div class='insuper'>8</div></td><td>108</td><td>Hal Pine</td><td class='col-insuper'>8</td><td class='col-inround'>8</td><td>2</td><td>3.400</td><td>3.400</td><td>3.400</td></tr>
+<tr class='st-ff'><td colspan='9'>Results for 1 ineligible racer not shown</td></tr></table>
+<script type="text/javascript">
+// Ajax failure handling, via a (provided) #ajax-failure div, suitable for
+// unattended kiosks.
+//
+// Include by having a &lt;? php require('inc/ajax-failure.inc'); ?&gt;
+// line in the BODY of the page.
+
+// This variable gets set to true when leaving a page; it should prevent errors from
+// showing for any in-flight ajax calls.
+var g_unloading = false;
+
+$(window).bind("beforeunload", function() { g_unloading = true; });
+
+
+function ajax_failure(status, statusText, errorThrown) {
+  $('#ajax_status').html(status + " ("
+                         + (errorThrown != '' ? errorThrown + ' / ' : '')
+                         + (status == 0 ? "likely timeout" : statusText)
+                         + ")");
+  $('#ajax-failure').removeClass('hidden');
+}
+
+function cancel_ajax_failure() {
+  $('#ajax-failure').addClass('hidden');
+}
+
+$(document).ajaxError(function(event, jqxhr, ajaxSettings, thrownError) {
+  console.log('ajaxError fired!');
+  console.log(event);
+  console.log(jqxhr);
+  if (!g_unloading) {
+    ajax_failure(jqxhr.status, jqxhr.statusText, thrownError);
+    $('#ajax-failure').removeClass('hidden');
+    setTimeout(function() { $('#ajax-failure').addClass('hidden'); }, 10000);
+  }
+});
+</script>
+
+<div id="ajax-failure" class="hidden">
+  Ajax request failed with <span id="ajax_status">0</span>.
+</div>
+</body>
+</html>
+

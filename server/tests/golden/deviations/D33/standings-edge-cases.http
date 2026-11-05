@@ -1,0 +1,6 @@
+### 001 standings-kiosk
+request: GET kiosk.php?page=kiosks/standings.kiosk
+status: 200
+length: 308
+body:
+[["", "109", "Ivy Quill", "Not eligible: not eligible for any award"], ["T1", "101", "Ann Lee", ""], ["T1", "102", "Bob lee", ""], ["T3", "103", "Cy Moss", ""], ["T3", "104", "Di Moss", ""], ["T3", "105", "Ed Moss", ""], ["6", "106", "Flo Nye", ""], ["7", "107", "Gus Oak", ""], ["8", "108", "Hal Pine", ""]]
