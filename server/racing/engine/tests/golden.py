@@ -129,6 +129,9 @@ QUIRK_DECISIONS = {
     "S12": "fix",
     "S28": "fix",
     "C34": "fix",
+    # PHP's stale test heat after a second lane mask change, which D72 fixes
+    # on the timer test page; the legacy timer.test tt-mask keeps it.
+    "C52": "fix",
 }
 
 
