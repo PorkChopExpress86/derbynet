@@ -31,6 +31,30 @@ RECORD_MESSAGES = """window.__messages = [];
 window.addEventListener('message', (e) => window.__messages.push(e.data));"""
 
 
+STOP_TIMERS = """() => {
+  const last = setTimeout(() => {});
+  for (let id = 0; id <= last; id++) { clearTimeout(id); clearInterval(id); }
+}"""
+
+
+@pytest.fixture(autouse=True)
+def _stop_the_polls(page):
+    """The replay page polls every 250 ms, so a poll could start after the
+    harness drained the requests in flight and reach the server while the
+    database is flushed (a Postgres deadlock at teardown, 1 in 192 under
+    load). Every timer in every frame stops, then what is out is drained,
+    before the page closes."""
+    yield
+    if page.is_closed():
+        return
+    for frame in page.frames:
+        try:
+            frame.evaluate(STOP_TIMERS)
+        except Exception:  # noqa: BLE001, S110 - a detached frame has no timers
+            pass
+    page.in_flight.drain(page)
+
+
 @pytest.fixture
 def videos(event, tmp_path):
     folder = tmp_path / "videos"
