@@ -7,6 +7,7 @@
       {% if timer.age is not None %}<span class="text-xs text-ink-muted"><span data-age="{{ timer.age }}">{{ timer.age }} s</span> ago</span>{% endif %}
     </span>
     <span class="text-xs text-ink-muted" data-lane-count>{% if timer.lanes %}{{ timer.lanes }} lane{{ timer.lanes|pluralize }}{% else %}Lane count not set{% endif %}</span>
+    {% if timer.reported_lanes %}<span class="text-xs">{% include "ui/timer/reported_lanes.html" with reported=timer.reported_lanes lanes=timer.lanes %}</span>{% endif %}
     {% else %}
     <span class="text-sm text-ink-muted" data-timer-status>Not monitoring timer state</span>
     {% endif %}
