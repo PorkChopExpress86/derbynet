@@ -129,6 +129,9 @@ QUIRK_DECISIONS = {
     "S12": "fix",
     "S28": "fix",
     "C34": "fix",
+    # Owner decision D33, which the #52 standings kiosk follows: a racer not
+    # eligible for its speed awards is listed marked, with no place.
+    "D33": "fix",
 }
 
 

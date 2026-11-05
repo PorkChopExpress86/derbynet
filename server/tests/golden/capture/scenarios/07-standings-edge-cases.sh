@@ -48,3 +48,11 @@ mkdir -p "$RAW/standings"
 curl -s -b "$COOKIES_CURL" -c "$COOKIES_CURL" "$BASE_URL/history.php" \
   | sed -n '/<div id="lane-bias">/,/<h3>Events Timeline<\/h3>/p' \
   > "$RAW/standings/edge-cases-history-lane-bias.html"
+
+# The standings kiosk on the same roster (#52, D33).  PHP leaves the excluded
+# Ivy Quill out of its rows and adds a footnote row for an ineligible racer.
+# A session of its own, as a kiosk has: kiosk.php ORs PRESENT_AWARDS into the
+# session it serves (S28).
+use_session kiosk
+capture_scenario kiosks/standings-edge-cases
+capture standings-kiosk "GET kiosk.php?page=kiosks/standings.kiosk"
