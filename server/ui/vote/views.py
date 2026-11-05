@@ -6,8 +6,9 @@ In the browser it asks `action.php?query=ballot.get` for the voter's ballot
 and posts each change to `action=vote.cast`, so the page and any other
 client share one code path. It polls `/ballot/status` every 5 s, which
 answers `{"balloting": "open"}` or `{"balloting": "closed"}` and nothing
-else, and swaps its state in place. `vote.js` polls `settings.list`, which
-any voter can ask for `ballot_password` (#64 S2), and reloads the page.
+else, and swaps its state in place (D77). `vote.js` polls `settings.list`,
+which any voter can ask for `ballot_password` (#64 S2), and reloads the
+page (`website/js/vote.js:203` to `:220`).
 """
 
 from django.http import Http404, JsonResponse

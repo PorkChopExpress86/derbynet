@@ -23,6 +23,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from django.db import transaction
+from django.utils import timezone
 
 from awards.eligibility import Eligibility
 from awards.models import Award, BallotAward, Vote, Voter
@@ -68,7 +69,7 @@ def password(event) -> str:
 
 def password_matches(event, given: str) -> bool:
     """PHP's `$pwd != read_raceinfo('ballot_password', '')` turned around
-    (`query.ballot.get.inc:12`): two numeric strings compare as numbers."""
+    (`query.ballot.get.inc:13`): two numeric strings compare as numbers."""
     stored = password(event)
     given_number, stored_number = php_numeric(given), php_numeric(stored)
     if given_number is not None and stored_number is not None:
@@ -92,13 +93,19 @@ def set_password(event, text: str) -> None:
     race_settings.write(event, "ballot_password", text)
 
 
-def voter(event, identifier: str) -> Voter:
-    """`retrieve_voterid()` (`voterid.inc:14` to `:29`): the voter's row,
+def voter(event, identifier: str, ip_address: str = "") -> Voter:
+    """`retrieve_voterid()` (`voterid.inc:14` to `:28`): the voter's row,
     added on its first visit, while balloting is closed too, as PHP adds
-    it."""
+    it, with the time and the client's address (`voterid.inc:18` to `:23`,
+    `dbnow_expr()` and `REMOTE_ADDR`)."""
     found = Voter.objects.filter(event=event, identifier=identifier).first()
     if found is None:
-        found = Voter.objects.create(event=event, identifier=identifier)
+        found = Voter.objects.create(
+            event=event,
+            identifier=identifier,
+            cast_at=timezone.now(),
+            ip_address=ip_address[: Voter._meta.get_field("ip_address").max_length],
+        )
     return found
 
 
@@ -109,7 +116,7 @@ class BallotEntry:
 
 
 def ballot(event, voter_row: Voter) -> dict[int, BallotEntry]:
-    """`query.ballot.get.inc:25` to `:42`: each award on the ballot with its
+    """`query.ballot.get.inc:27` to `:45`: each award on the ballot with its
     depth and this voter's choices, or nothing while balloting is closed."""
     if not is_open(event):
         return {}
@@ -125,8 +132,8 @@ def ballot(event, voter_row: Voter) -> dict[int, BallotEntry]:
         .values_list("award_id", "racer_id")
     ):
         # PHP adds an entry for a vote on an award off the ballot
-        # (`query.ballot.get.inc:39`); deleting an award's ballot row
-        # deletes its votes (`voterid.inc:84`), so none is left.
+        # (`query.ballot.get.inc:40` to `:44`); deleting an award's ballot row
+        # deletes its votes (`voterid.inc:85`), so none is left.
         if award_id in found:
             found[award_id].votes.append(racer_id)
     return found
@@ -154,7 +161,15 @@ def _racer_ids(posted) -> list[int] | None:
     return ids
 
 
-def cast(event, voter_identifier: str, award_id: int | None, posted_votes, *, allowed):
+def cast(
+    event,
+    voter_identifier: str,
+    award_id: int | None,
+    posted_votes,
+    *,
+    allowed,
+    ip_address: str = "",
+):
     """`vote.cast`: the voter's choices for one award replace any before.
     `award_id` is the posted id resolved to the event's award, or None.
 
@@ -165,8 +180,6 @@ def cast(event, voter_identifier: str, award_id: int | None, posted_votes, *, al
     PHP's `votes` reply."""
     with transaction.atomic():
         lock_race_state(event.id)
-        if not allowed and needs_password(event):
-            raise PASSWORD
         if not is_open(event):
             raise CLOSED_NOW
         award = (
@@ -183,9 +196,11 @@ def cast(event, voter_identifier: str, award_id: int | None, posted_votes, *, al
             .first()
         )
         # PHP compares the count with `false` for an award off the ballot,
-        # so only an empty list passes (`action.vote.cast.inc:33` to `:38`).
+        # so only an empty list passes (`action.vote.cast.inc:35` to `:40`).
         if racer_ids is not None and len(racer_ids) > (depth or 0):
             raise TOO_MANY
+        if not allowed and needs_password(event):
+            raise PASSWORD
         if racer_ids is None or len(set(racer_ids)) != len(racer_ids):
             raise INELIGIBLE
         racers = Racer.objects.filter(
@@ -196,7 +211,7 @@ def cast(event, voter_identifier: str, award_id: int | None, posted_votes, *, al
             eligibility.refusal(award, racer) for racer in racers
         ):
             raise INELIGIBLE
-        voter_row = voter(event, voter_identifier)
+        voter_row = voter(event, voter_identifier, ip_address)
         Vote.objects.filter(event=event, voter=voter_row, award=award).delete()
         Vote.objects.bulk_create(
             Vote(event=event, voter=voter_row, award=award, racer_id=racer_id)
@@ -223,7 +238,7 @@ class Tally:
 
 
 def tallies(event) -> list[Tally]:
-    """`vote_tabulations()` (`voterid.inc:34` to `:62`): each award with a
+    """`vote_tabulations()` (`voterid.inc:32` to `:61`): each award with a
     vote, by its sort then id, its candidates most votes first. PHP leaves
     a tie in the database's order; here the lower racer id comes first."""
     counts = Counter(

@@ -370,8 +370,14 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " open; vote.js polls settings.list, which answers ballot_password to"
         " anyone who asks for it.",
         "S14, D35: an award's racers are those vote.cast takes, partition"
-        " lists included; vote.js filters by the page's eligible class and"
-        " rank ids.",
+        " lists included, and a choice the award can no longer take leaves"
+        " the voter's list, so the next change replaces it; vote.js filters"
+        " by the page's eligible class and rank ids and shows every vote"
+        " ballot.get returns.",
+        "D77: a change of /ballot/status swaps the page's state in place;"
+        " vote.js reloads the page.",
+        "D77: a refused vote.cast shows a toast naming the reason; vote.js"
+        " ignores the reply.",
         "C33: the sort control keeps ?order= on this page; vote.php's links"
         " open ballot.php, which does not exist.",
         "D47: car numbers show three digits.",
@@ -385,15 +391,7 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
 # Differences from PHP that wait on a quirk id or an owner decision, by the
 # PHP page's name. The ticket's "## Still open" names each, and an entry moves
 # to `ROUTE_DIVERGENCES` once it has an id.
-UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {
-    "vote.php": (
-        "A change of /ballot/status swaps the page's state in place; vote.js"
-        " reloads the page (#54 scope).",
-        "A refused vote.cast shows a toast naming the reason and keeps the"
-        " voter's choices as the server has them; vote.js ignores the reply"
-        " (#54 scope).",
-    ),
-}
+UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {}
 
 # The PHP pages whose replacement behaves as PHP's does, layout aside.
 LIKE_PHP: frozenset[str] = frozenset()
@@ -517,6 +515,8 @@ class LegacyContext:
     user_agent: str = ""
     # The uploaded files of a multipart POST, by field name.
     files: Mapping = field(default_factory=dict)
+    # The client's address, PHP's `$_SERVER['REMOTE_ADDR']`.
+    remote_addr: str = ""
 
     def put(self, key: str, value) -> None:
         self.out[key] = value

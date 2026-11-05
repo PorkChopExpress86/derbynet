@@ -12,11 +12,12 @@ from django.test import Client
 
 from accounts.permissions import Perm
 from awards.models import BallotAward, Vote, Voter
+from awards.services import set_partition_list
 from awards.tests.factories import AwardFactory, BallotAwardFactory
 from core.models import RaceSettings, RaceState
 from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in, post
-from roster.tests.factories import GroupFactory, RacerFactory
+from roster.tests.factories import GroupFactory, RacerFactory, SubgroupFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -92,7 +93,7 @@ def test_ballot_open_needs_judging(client, event):
 
 @pytest.mark.parametrize("state", ["maybe", "", "OPEN"])
 def test_ballot_open_takes_only_open_or_closed(client, event, state):
-    """B1: PHP stores any text."""
+    """C55: PHP stores any text (`action.ballot.open.inc:8`)."""
     open_ballot(event)
     log_in(client, Perm.JUDGING)
 
@@ -126,7 +127,7 @@ def test_ballot_get_while_closed_is_empty_and_still_adds_the_voter(
     client, event, pack_award
 ):
     """PHP adds the Voters row on the first ballot.get, closed or open
-    (`voterid.inc:17` to `:22`); the port keeps it."""
+    (`voterid.inc:18` to `:23`); the port keeps it."""
     reply = ask(client, "ballot.get", password="")
 
     assert reply == {"ballot": {}}
@@ -146,7 +147,7 @@ def test_a_ballot_password_is_asked_for_once_per_session(client, event, pack_awa
 
 
 def test_two_numeric_passwords_compare_as_numbers(client, event):
-    """PHP's `!=` (`query.ballot.get.inc:12`)."""
+    """PHP's `!=` (`query.ballot.get.inc:13`)."""
     set_password(event, "10")
     assert "ballot" in ask(client, "ballot.get", password="1e1")
 
@@ -242,7 +243,7 @@ def test_more_choices_than_the_depth_are_refused(client, event, wolves, pack_awa
 
 
 def test_an_award_off_the_ballot_takes_only_an_empty_list(client, event, wolves):
-    """PHP compares the count with false (`action.vote.cast.inc:33`)."""
+    """PHP compares the count with false (`action.vote.cast.inc:35`)."""
     off = AwardFactory(event=event)
     open_ballot(event)
 
@@ -359,4 +360,71 @@ def test_ballot_results_tally_each_award_most_votes_first(
                 },
             ],
         },
+    ]
+
+
+# ----- review of #54 -----
+
+
+def test_a_closed_ballot_answers_closed_before_the_password(client, event, wolves):
+    """PHP's vote.cast answers closed first (`action.vote.cast.inc:16`); the
+    password check of S14 comes after PHP's own."""
+    award = BallotAwardFactory(award__event=event).award
+    set_password(event, "acorn")
+
+    assert code(vote(client, award, racer(wolves))) == "closed"
+
+
+def test_the_voter_row_keeps_the_time_and_the_address(client, event):
+    """`retrieve_voterid()` writes `when_cast` and `ip_addr`
+    (`voterid.inc:18` to `:23`)."""
+    client.get(
+        "/action.php", {"query": "ballot.get", "password": ""}, REMOTE_ADDR="10.1.2.3"
+    )
+
+    [voter] = Voter.objects.filter(event=event)
+    assert voter.cast_at is not None
+    assert voter.ip_address == "10.1.2.3"
+
+
+def test_a_racer_of_another_subgroup_is_refused(client, event, wolves):
+    """S14: `award.winner`'s subgroup check, which vote.cast now makes."""
+    den = SubgroupFactory(group=wolves, name="Den 1")
+    other = SubgroupFactory(group=wolves, name="Den 2")
+    award = BallotAwardFactory(
+        award__event=event, award__group=wolves, award__subgroup=den
+    ).award
+    open_ballot(event)
+
+    assert code(vote(client, award, racer(wolves, subgroup=other))) == "ineligible"
+    assert code(vote(client, award, racer(wolves, subgroup=den))) == "success"
+
+
+def test_a_racer_whose_partition_the_list_leaves_out_is_refused(client, event, wolves):
+    """S14, D35: a judged award goes only to a racer of its partition list."""
+    kept, left = racer(wolves), racer(wolves)
+    award = BallotAwardFactory(award__event=event).award
+    set_partition_list(event, [kept.partition], award=award)
+    open_ballot(event)
+
+    assert code(vote(client, award, left)) == "ineligible"
+    assert code(vote(client, award, kept)) == "success"
+
+
+def test_a_tally_tie_lists_the_lower_racer_id_first(client, event, wolves):
+    """As PHP's SQLite answers it: a php-scratch run of #54 gave three cars
+    with two votes each in racer id order."""
+    award = BallotAwardFactory(award__event=event, depth=3).award
+    a, b, c = racer(wolves), racer(wolves), racer(wolves)
+    open_ballot(event)
+    for choices in ([c, a], [b], [a, c, b]):
+        vote(Client(), award, *choices)
+    log_in(client, Perm.JUDGING)
+
+    [tally] = ask(client, "ballot.results")["awards"]
+
+    assert [x["carnumber"] for x in tally["candidates"]] == [
+        a.car_number,
+        b.car_number,
+        c.car_number,
     ]

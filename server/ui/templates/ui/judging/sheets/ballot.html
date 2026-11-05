@@ -1,4 +1,4 @@
-{# The ballot sheet (#54): judging.php's Manage Ballot dialog and its vote tallies. The open switch posts at once; the password and each award's votes per ballot post on change and answer with this sheet again; Choose gives the award to that racer, as award.winner does. #}
+{# The ballot sheet (#54): judging.php's Manage Ballot dialog and its vote tallies. The open switch posts at once; the password and each award's votes per ballot post on change and answer with this sheet again; Choose gives the award to that racer with award.winner, as on_vote_choose() does (website/js/judging.js:80 to :91). #}
 <div x-data x-init="judging.show('Ballot')" class="flex flex-col gap-4" data-ballot-sheet>
   <div class="flex items-center gap-3 rounded-xl border border-line p-3">
     <span id="ballot-open-l" class="min-w-0 flex-1"><span class="block font-semibold">Balloting is open</span><span class="block text-sm text-ink-muted">Voters on the vote page see the ballot within 5 s.</span></span>

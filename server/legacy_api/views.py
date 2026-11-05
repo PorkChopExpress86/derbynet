@@ -158,6 +158,7 @@ def dispatch(request):
         XmlWriter(_masked(post)),
         user_agent=request.headers.get("User-Agent", ""),
         files=request.FILES,
+        remote_addr=request.META.get("REMOTE_ADDR", ""),
     )
     if kind == "action":
         echo = _masked(args)

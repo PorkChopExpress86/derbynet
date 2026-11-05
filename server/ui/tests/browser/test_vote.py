@@ -24,7 +24,7 @@ from playwright.sync_api import expect
 
 from awards.models import Award, BallotAward, Vote
 from core.models import RaceSettings, RaceState
-from roster.models import Group
+from roster.models import Group, Racer
 from roster.services import groups
 from roster.services.racers import insert_new_racer, pass_racer
 from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
@@ -364,3 +364,27 @@ def test_the_judging_ballot_sheet_opens_balloting_and_sets_depths(
     assert RaceSettings.objects.get(event=event).ballot_password == "acorn"
     assert_accessible(page)
     shoot(page, "judging-ballot-sheet", full_page=False)
+
+
+def test_a_choice_that_can_no_longer_win_never_locks_the_award(page, event):
+    """A car chosen earlier that moved out of the award's group, still
+    checked in, leaves the voter's choices: the next vote replaces it, where
+    every vote failed with ineligible while the page posted it (#54
+    review)."""
+    found = pack(event)
+    wolf = ballot_award(event, "Best Wolf", 2, group=found["wolves"])
+    set_open(event)
+    page.goto("/vote/")
+    award_card(page, wolf).click()
+    vote_for(page, found["w1"])
+    bear = found["b1"]
+    Racer.objects.filter(pk=found["w1"].pk).update(
+        group=bear.group, subgroup=bear.subgroup, partition=bear.partition
+    )
+
+    page.reload()
+    expect(award_card(page, wolf)).to_contain_text("0 chosen")
+    award_card(page, wolf).click()
+    vote_for(page, found["w2"])
+
+    assert list(Vote.objects.values_list("racer_id", flat=True)) == [found["w2"].pk]

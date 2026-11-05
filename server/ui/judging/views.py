@@ -261,7 +261,8 @@ def ballot_password(request):
 def ballot_depth(request, award_id):
     """An award's votes per ballot (`award.edit` with `ballot_depth`,
     `website/js/judging.js:258`). 0 takes it off the ballot and deletes its
-    votes, as `set_ballot_depth()` does."""
+    votes, as `set_ballot_depth()` does (`website/inc/voterid.inc:63` to
+    `:88`)."""
     depth = posted_int(request.POST.get("depth", ""))
     if depth is None or depth not in state.DEPTHS:
         return service_error(request, "Pick 1 to 6 votes, or Not on ballot.")

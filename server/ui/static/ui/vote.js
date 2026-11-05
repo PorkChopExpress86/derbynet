@@ -5,18 +5,23 @@
 // who can win it, and every racer's car number and photos. `ballot.get`
 // says which awards are on the ballot, how many votes each takes, and this
 // voter's choices; each change posts the award's whole list to `vote.cast`,
-// as `toggle_vote()` does in `vote.js`. `/ballot/status` is polled every
-// 5 s, and a change swaps the state in place where `vote.js` reloads.
+// as `toggle_vote()` does (`website/js/vote.js:106` to `:127`).
+// `/ballot/status` is polled every 5 s, and a change swaps the state in
+// place (D77) where `vote.js` reloads (`website/js/vote.js:203` to `:220`).
+
 'use strict';
 
 (() => {
-  // What a refusal of vote.cast tells the voter.
+  // What a refusal of vote.cast tells the voter, in a toast (D77); vote.js
+  // posts with no success handler and ignores the reply
+  // (`website/js/vote.js:119` to `:124`).
   const REFUSALS = {
     closed: () => 'Voting is closed now.',
     'too-many': (store) => `${store.awardName()} takes no more than ${store.maxFor(store.awardId)}.`,
     'no-award': () => 'That award is no longer on the ballot.',
     password: () => 'Enter the ballot password again.',
-    ineligible: (store) => `That car cannot win ${store.awardName()}.`,
+    // The page's list of the award's cars is older than the server's.
+    ineligible: (store) => `A car you chose can no longer win ${store.awardName()}. Reload the page.`,
   };
 
   function plural(n, one, many) {
@@ -115,9 +120,15 @@
         const entry = this.ballot[awardId];
         return entry ? Number(entry.max_votes) : 0;
       },
+      // The voter's choices the award can still take. A car chosen earlier
+      // that has since left the award's group or partition list drops out,
+      // so the next change replaces it: vote.cast refuses the whole list
+      // while it names a car the award cannot take (S14), where PHP's
+      // stores any id (`action.vote.cast.inc:33`, `:55` to `:59`).
       votesFor(awardId) {
         const entry = this.ballot[awardId];
-        return entry ? entry.votes.filter((id) => String(id) in config.racers) : [];
+        const racers = this.racersFor(awardId);
+        return entry ? entry.votes.filter((id) => racers.includes(id)) : [];
       },
       racersFor(awardId) {
         const award = config.awards[awardId];
