@@ -288,10 +288,20 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " needs SET_UP.",
         "D53: the Timer settings button shows only to a session with"
         " CONTROL_RACE, which timer.settings needs.",
+        "D72: a browser without Web Serial is sent to /timer/no-serial/"
+        " before any timer script runs; PHP shows its own dialog over the"
+        " page.",
     ),
     "timer-test.php": (
         "S21: a 301 to /timer/test/, which needs CONTROL_RACE; PHP's page is"
         " anonymous.",
+        "D72: split into the status page /timer/ and the test page /timer/test/.",
+        "D72, C52: a lane toggle names the lane's end state and stages a new"
+        " test heat at every change (timer.set_test_lane); after a second"
+        " tt-mask change PHP leaves the timer on the heat it already staged,"
+        " so the timer never hears of the change"
+        " (racing/tests/test_timer_test_lanes.py).",
+        "D72: the log tail stops while the page is hidden.",
     ),
     "kiosk.php": (
         "D10: the 15 pages are rebuilt (ADR-10) behind a registry keyed by the"
@@ -313,6 +323,8 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
     "ondeck.php": (
         "D10: rebuilt (ADR-10); the running heat glides near the top where"
         " PHP animates Just Finished and Now Staging across the rows.",
+        "D73: the lane count is the race's lane count; PHP's page counts the"
+        " lanes of the results (get_lane_count_from_results).",
     ),
     "slideshow.php": (
         "D10: rebuilt (ADR-10); each slide fades in over the one before.",
@@ -326,26 +338,7 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
 # Differences from PHP that wait on a quirk id or an owner decision, by the
 # PHP page's name. The ticket's "## Still open" names each, and an entry moves
 # to `ROUTE_DIVERGENCES` once it has an id.
-UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {
-    "ondeck.php": (
-        "the lane count is the race's lane count; PHP's page counts the lanes"
-        " of the results (get_lane_count_from_results) (#52).",
-    ),
-    "timer.php": (
-        "a browser without Web Serial is sent to /timer/no-serial/ before any"
-        " timer script runs (#50 scope); PHP shows its own dialog over the page.",
-    ),
-    "timer-test.php": (
-        "split into the status page /timer/ and the test page /timer/test/ (#50"
-        " scope).",
-        "a lane toggle names the lane's end state and stages a new test heat at"
-        " every change (timer.set_test_lane); after a second tt-mask change PHP"
-        " leaves the timer on the heat it already staged, so the timer never"
-        " hears of the change (php-scratch.sh, 2026-11-04;"
-        " racing/tests/test_timer_test_lanes.py).",
-        "the log tail stops while the page is hidden (#50 risks).",
-    ),
-}
+UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {}
 
 # The PHP pages whose replacement behaves as PHP's does, layout aside.
 LIKE_PHP: frozenset[str] = frozenset()
