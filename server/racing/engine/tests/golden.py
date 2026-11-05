@@ -142,6 +142,14 @@ QUIRK_DECISIONS = {
     # right-click replay's clip name, C54 the remote camera's offers.
     "C53": "fix",
     "C54": "fix",
+    # The #64 rows the #54 ballot endpoints and vote page fix, as the
+    # ticket's "PHP defects to fix" lists them, and C55, ballot.open taking
+    # only open and closed, which the owner made a #64 row (2026-11-05).
+    "C33": "fix",
+    "S14": "fix",
+    "S15": "fix",
+    "S16": "fix",
+    "C55": "fix",
 }
 
 

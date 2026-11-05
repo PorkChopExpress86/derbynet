@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from awards.editing import set_ad_hoc_award, set_winner
-from awards.models import Award
+from awards.models import Award, BallotAward, Vote, Voter
 from awards.services import set_partition_list
 from core.models import RaceState
 from kiosks.models import Kiosk, Scene, SceneKiosk
@@ -42,6 +42,7 @@ URLS = [
     "/awards/edit/",
     "/judging/",
     "/judging/board/",
+    "/judging/ballot/",
     "/awards/present/",
     "/awards/present/current/",
     "/kiosks/",
@@ -69,6 +70,8 @@ URLS = [
     "/replay/camera/",
     "/ondeck/",
     "/slideshow/",
+    "/vote/",
+    "/ballot/status",
     "/kiosk/check-in/",
     "/kiosk/standings/",
     *(
@@ -104,8 +107,9 @@ def test_every_polled_url_is_measured():
 
 def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
     """Groups of passed racers, each round 1 scheduled, rounds 1 and 2 of
-    each group queued, each group's judged award, narrowed to its partition
-    and given to its first racer, and each group's kiosk, checking in and
+    each group queued, each group's judged award, narrowed to its partition,
+    given to its first racer and on the ballot with two votes, and each
+    group's kiosk, checking in and
     named in the first scene, showing please-check-in for its group. With
     `race`, the first round races a heat, and the kiosk presents the first
     award."""
@@ -122,6 +126,11 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
         set_partition_list(event, [racers[0].partition], award=award)
         set_winner(event, award, racers[0])
         set_ad_hoc_award(event, racers[1], f"Shiniest {round.group.name}")
+        # On the ballot, with a vote from each of two voters (#54).
+        BallotAward.objects.create(event=event, award=award, depth=2)
+        for n, racer in enumerate(racers[:2]):
+            voter = Voter.objects.create(event=event, identifier=f"{award.pk}-{n}")
+            Vote.objects.create(event=event, voter=voter, award=award, racer=racer)
         name = f"TV {round.group.name}"
         Kiosk.objects.create(
             event=event,

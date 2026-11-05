@@ -3,8 +3,8 @@ actions, `query=award.current` and `query=award.list`, over
 `awards.editing` and `awards.listing`.
 
 The award kiosk polls `award.current` anonymously (D5). `award.list` needs
-a login: every page that reads it has one. The ballot endpoints are
-deferred to #54 (D7) and recorded in `legacy_api.registry.DEFERRED`.
+a login: every page that reads it has one. The ballot endpoints are in
+`legacy_api.handlers.ballot` (#54).
 """
 
 import time

@@ -16,10 +16,12 @@ from dataclasses import dataclass, field
 
 from django.urls import get_script_prefix
 
+from awards import balloting
+from awards.balloting import Candidate
 from awards.editing import refusal_text
 from awards.eligibility import Eligibility
 from awards.listing import AD_HOC, sort_key
-from awards.models import Award
+from awards.models import Award, BallotAward
 from core.models import RaceSettings
 from roster.models import Group, Racer
 from roster.services.groups import Labels, labels
@@ -246,5 +248,51 @@ def award_sheet(event, award_id: int, order: str = "car") -> AwardSheet | None:
         [
             found.cards[r.pk]
             for r in _sorted(eligibility.winners(award, found.racer_rows), order)
+        ],
+    )
+
+
+# ----- the ballot sheet (#54) -----
+
+DEPTHS = balloting.DEPTH_CHOICES
+
+
+@dataclass(frozen=True)
+class BallotRow:
+    """A judged award on the ballot sheet: its votes per ballot, 0 for off
+    the ballot, and its tally, most votes first."""
+
+    award: AwardCard
+    depth: int
+    candidates: list[Candidate]
+
+    @property
+    def depths(self) -> tuple[int, ...]:
+        return DEPTHS if self.depth in DEPTHS else (*DEPTHS, self.depth)
+
+
+@dataclass
+class BallotSheet:
+    is_open: bool
+    password: str
+    rows: list[BallotRow]
+
+
+def ballot_sheet(event) -> BallotSheet:
+    """`judging.php`'s Manage Ballot dialog (`website/judging.php:160` to
+    `:177`) and its tallies (`on_votes_click()`, `website/js/judging.js:93`):
+    the open switch, the password, each judged award's votes per ballot and
+    its votes."""
+    found = _Event(event)
+    depths = dict(
+        BallotAward.objects.filter(event=event).values_list("award_id", "depth")
+    )
+    tallied = {t.award_id: t.candidates for t in balloting.tallies(event)}
+    return BallotSheet(
+        is_open=balloting.is_open(event),
+        password=balloting.password(event),
+        rows=[
+            BallotRow(found.award_card(a), depths.get(a.pk, 0), tallied.get(a.pk, []))
+            for a in found.judged()
         ],
     )

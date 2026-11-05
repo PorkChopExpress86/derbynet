@@ -123,16 +123,10 @@ class Deferred:
     reason: str
 
 
-_BALLOTING = "Balloting moved to the backlog (D7)."
-
 # Every PHP endpoint deferred to a backlog ticket. A name here is never
 # registered, so the dispatcher answers it as it answers any unknown name.
-DEFERRED: tuple[Deferred, ...] = (
-    Deferred("action", "ballot.open", "#54", _BALLOTING),
-    Deferred("query", "ballot.get", "#54", _BALLOTING),
-    Deferred("action", "vote.cast", "#54", _BALLOTING),
-    Deferred("query", "ballot.results", "#54", _BALLOTING),
-)
+# None is deferred today: #54 serves the ballot endpoints.
+DEFERRED: tuple[Deferred, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -369,6 +363,25 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " never connects again.",
         "C32: as replay.php's.",
     ),
+    "vote.php": (
+        "D20: a 301 to /vote/, the query string kept, so a printed link still"
+        " opens the ballot.",
+        "S2: polls /ballot/status, which answers only whether balloting is"
+        " open; vote.js polls settings.list, which answers ballot_password to"
+        " anyone who asks for it.",
+        "S14, D35: an award's racers are those vote.cast takes, partition"
+        " lists included, and a choice the award can no longer take leaves"
+        " the voter's list, so the next change replaces it; vote.js filters"
+        " by the page's eligible class and rank ids and shows every vote"
+        " ballot.get returns.",
+        "D77: a change of /ballot/status swaps the page's state in place;"
+        " vote.js reloads the page.",
+        "D77: a refused vote.cast shows a toast naming the reason; vote.js"
+        " ignores the reply.",
+        "C33: the sort control keeps ?order= on this page; vote.php's links"
+        " open ballot.php, which does not exist.",
+        "D47: car numbers show three digits.",
+    ),
     "photo.php/info": (
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",
@@ -502,6 +515,8 @@ class LegacyContext:
     user_agent: str = ""
     # The uploaded files of a multipart POST, by field name.
     files: Mapping = field(default_factory=dict)
+    # The client's address, PHP's `$_SERVER['REMOTE_ADDR']`.
+    remote_addr: str = ""
 
     def put(self, key: str, value) -> None:
         self.out[key] = value

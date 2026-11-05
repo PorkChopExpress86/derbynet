@@ -171,6 +171,19 @@ def edit_award(
             _set_ballot_depth(award, ballot_depth)
 
 
+def set_ballot_depth(event, award_id: int, depth: int) -> Award:
+    """The judging page's votes per ballot for one award (#54), as
+    `award.edit` with only `ballot_depth` sets it. Raises `AwardFailure`
+    for an id that names no award of the event."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        award = Award.objects.filter(event=event, pk=award_id).first()
+        if award is None:
+            raise AwardFailure("no-award", "That award is gone.")
+        _set_ballot_depth(award, depth)
+    return award
+
+
 def delete_award(event, award: Award | None, posted_id) -> None:
     """`award.delete`, with the `award.*delete` entry `history.php` reads.
     PHP records it whether or not the id names an award."""

@@ -60,11 +60,12 @@ def test_a_role_logs_out_with_a_post_from_the_app_bar(login):
     assert "role" not in client.session
 
 
-def test_no_vote_entry(login):
-    """Balloting is in the backlog (#54, D7)."""
-    page = login("RaceCoordinator").get("/").content.decode()
+def test_the_vote_entry_shows_to_a_visitor(client, event):
+    """`index.php:137` links Vote! for VIEW_RACE_RESULTS, which the
+    anonymous role has (#54)."""
+    page = client.get("/").content.decode()
 
-    assert "Vote" not in page
+    assert 'href="/vote/"' in page
 
 
 def test_the_drawer_shows_the_help_link_and_the_version(login):

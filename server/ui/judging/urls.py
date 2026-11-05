@@ -18,4 +18,16 @@ urlpatterns = [
         views.restore,
         name="judging-restore",
     ),
+    path("judging/ballot/", views.ballot, name="judging-ballot"),
+    path("judging/ballot/open/", views.ballot_open, name="judging-ballot-open"),
+    path(
+        "judging/ballot/password/",
+        views.ballot_password,
+        name="judging-ballot-password",
+    ),
+    path(
+        "judging/ballot/award/<int:award_id>/depth/",
+        views.ballot_depth,
+        name="judging-ballot-depth",
+    ),
 ]
