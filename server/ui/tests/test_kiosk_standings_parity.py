@@ -7,7 +7,10 @@ The roster has Ivy Quill (109), the fastest car, excluded. PHP leaves her out
 of the rows and adds a footnote row; Django lists her in score order, marked
 not eligible, with no place (D33). The two pages share no markup (D10), so
 the D33 entry records only the rows of the presentation shown with no
-parameters, as `kiosk_rows` reads them, and the test compares those.
+parameters, as `kiosk_rows` reads them, and the test compares those. Every
+row but Ivy Quill's must also equal PHP's, so the entry cannot drift from PHP
+when the writer runs again. The roster, settings and race times are read from
+the scenario script, so a change there reaches this test.
 
 `WRITE_DEVIATIONS=1 uv run pytest ui/tests/test_kiosk_standings_parity.py`
 rewrites the D33 entry and its expected transcript.
@@ -17,6 +20,7 @@ import html
 import json
 import os
 import re
+from urllib.parse import parse_qsl
 
 import pytest
 from django.test import Client
@@ -43,20 +47,33 @@ REASON = (
 )
 DEVIATION_CLAIM = {("D33", FIXTURE)}
 
-ROSTER = [
-    "firstname=Ann&lastname=Lee&carnumber=101&partition=Edge",
-    "firstname=Bob&lastname=lee&carnumber=102&partition=Edge",
-    "firstname=Cy&lastname=Moss&carnumber=103&partition=Edge",
-    "firstname=Di&lastname=Moss&carnumber=104&partition=Edge",
-    "firstname=Ed&lastname=Moss&carnumber=105&partition=Edge",
-    "firstname=Flo&lastname=Nye&carnumber=106&partition=Edge",
-    "firstname=Gus&lastname=Oak&carnumber=107&partition=Edge",
-    "firstname=Hal&lastname=Pine&carnumber=108&partition=Edge",
-    "firstname=Ivy&lastname=Quill&carnumber=109&partition=Edge&exclude=yes",
-]
-# RACE_TIME_EXPR of the scenario, in seconds: one time per car in every heat.
-TIMES = {101: 3, 102: 3, 103: 3.1, 104: 3.1, 105: 3.1}
-TIMES |= {106: 3.2, 107: 3.3, 108: 3.4, 109: 2.5}
+SCENARIO = GOLDEN_DIR / "capture" / "scenarios" / "07-standings-edge-cases.sh"
+# The steps the replay knows, in the scenario's order: settings, the roster,
+# check-in, then the first round scheduled and racing.
+KNOWN_STEPS = ("settings.write", "racer.import", "racer.bulk")
+KNOWN_STEPS += ("schedule.generate", "heat.select")
+
+
+def scenario_steps() -> tuple[list[str], dict[int, float]]:
+    """The `post_ok` bodies the scenario sends before its first race, and
+    `RACE_TIME_EXPR` as `{car: seconds}`, read from the script itself so a
+    change there reaches this test."""
+    script = SCENARIO.read_text()
+    setup = script[: script.index("export RACE_TIME_EXPR")]
+    steps = re.findall(r'^post_ok "([^"]*)"$', setup, re.M)
+    expr = re.search(r"^export RACE_TIME_EXPR='\((\{.*?\})\[", script, re.M)
+    times = {int(car): ms / 1000 for car, ms in json.loads(expr[1]).items()}
+    return steps, times
+
+
+def test_the_replay_knows_every_step_the_scenario_sends_before_racing():
+    steps, times = scenario_steps()
+    actions = [dict(parse_qsl(step))["action"] for step in steps]
+
+    assert set(actions) == set(KNOWN_STEPS)
+    assert sorted(actions, key=KNOWN_STEPS.index) == actions
+    cars = [dict(parse_qsl(s))["carnumber"] for s in steps if "racer.import" in s]
+    assert sorted(int(car) for car in cars) == sorted(times)
 
 
 def text(fragment: str) -> str:
@@ -108,14 +125,20 @@ def rows_body(rows: list[list[str]]) -> bytes:
 
 def run_edge_cases(client) -> bytes:
     """The scenario's roster raced out, then the kiosk page's rows."""
+    steps, times = scenario_steps()
     s = Scenario(client)
     s.reset()
-    s.post_ok("action=settings.write&unused-lane-mask=0&n-lanes=2")
-    for row in ROSTER:
-        s.import_racer(row)
-    s.post_ok("action=racer.bulk&who=all&what=checkin")
-    start_round(s, "Edge")
-    race_with(s, lambda car, lane: TIMES[car])
+    for step in steps:
+        action = dict(parse_qsl(step))["action"]
+        if action == "racer.import":
+            s.import_racer(step.removeprefix("action=racer.import&"))
+        elif action in ("settings.write", "racer.bulk"):
+            s.post_ok(step)
+    # The scenario's schedule.generate and heat.select name PHP's round 1,
+    # the only round, which start_round finds by its group.
+    [partition] = {dict(parse_qsl(x)).get("partition") for x in steps} - {None}
+    start_round(s, partition)
+    race_with(s, lambda car, lane: times[car])
 
     request = read_transcript(GOLDEN_DIR / FIXTURE)[EXCHANGE]["request"]
     response = Client().get("/" + request.removeprefix("GET "))
@@ -141,7 +164,10 @@ def test_d33_the_standings_kiosk_lists_the_excluded_racer_with_no_place(client, 
     rows = json.loads(django)
     [ivy] = [r for r in rows if r[1] == "109"]
     assert ivy[0] == "" and ivy[3]
-    assert [r[1] for r in rows if r[0]] == [str(c) for c in range(101, 109)]
+    # Every other row agrees with PHP's, place for place, so a writer rerun
+    # after a regression cannot fold the regression into the D33 entry.
+    php_rows = [r for r in php_kiosk_rows(php["body"]) if r[1]]
+    assert [r for r in rows if r is not ivy] == php_rows
 
 
 @pytest.mark.skipif(
