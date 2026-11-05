@@ -18,6 +18,7 @@ import json
 import re
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from playwright.sync_api import expect
 
@@ -26,7 +27,7 @@ from core.models import RaceSettings, RaceState
 from roster.models import Group
 from roster.services import groups
 from roster.services.racers import insert_new_racer, pass_racer
-from ui.tests.browser.conftest import assert_accessible, htmx_post, log_in, shoot
+from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
 from ui.tests.roles import PASSWORDS
 
 DESIGN = 1
@@ -118,6 +119,21 @@ def vote_for(page, racer):
         toggle(page).click()
     expect(toggle(page)).to_have_attribute("aria-pressed", "true")
     close_sheet(page)
+
+
+def logged_in_as(page, live_server, role: str):
+    """The browser takes the session of a login made beside it. The ballot
+    sheet is the subject here, not the login page: under load, the login
+    form's POST once took over 30 s to navigate (2 in 400 runs on Postgres)
+    and a tap before Alpine bound the role buttons was lost (reproduced by
+    holding the Alpine script)."""
+    client = Client()
+    reply = client.post("/login/", {"name": role, "password": PASSWORDS[role]})
+    assert reply.status_code == 302
+    cookie = client.cookies[settings.SESSION_COOKIE_NAME]
+    page.context.add_cookies(
+        [{"name": cookie.key, "value": cookie.value, "url": live_server.url}]
+    )
 
 
 def judge_session() -> Client:
@@ -325,10 +341,12 @@ def test_no_award_on_the_ballot_says_so(page, event):
     ).to_be_visible()
 
 
-def test_the_judging_ballot_sheet_opens_balloting_and_sets_depths(page, event):
+def test_the_judging_ballot_sheet_opens_balloting_and_sets_depths(
+    page, event, live_server
+):
     pack(event)
     award = Award.objects.create(event=event, name="Best Paint", award_type_id=DESIGN)
-    log_in(page, "RaceCoordinator")
+    logged_in_as(page, live_server, "RaceCoordinator")
     page.goto("/judging/")
     page.locator("[data-open-ballot]").click()
     sheet = page.locator("[data-ballot-sheet]")

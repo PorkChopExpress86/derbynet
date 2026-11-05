@@ -24,6 +24,7 @@ from awards.eligibility import Eligibility
 from awards.listing import AD_HOC, sort_key
 from awards.models import Award
 from core.models import RaceSettings
+from media import photos
 from roster.models import Racer
 from roster.services.groups import labels
 from roster.services.racers import CAR_PHOTOS, photo_url
@@ -34,7 +35,6 @@ POLL_SECONDS = 5
 # `:24`: the grid's thumbnails and the racer sheet's photo
 # (`website/vote.php:138`, `:141`).
 RENDER_THUMB = "200x200"
-RENDER_LARGE = "work"
 # `?order=` as `vote.php` reads it (`website/vote.php:42` to `:45`).
 ORDERS = ("car", "class", "name")
 
@@ -115,8 +115,16 @@ def build(event, order: str = "car") -> Page:
         .order_by("pk")
     )
 
-    def photo(r, render):
-        found = photo_url(CAR_PHOTOS, settings.car_photo_directory, r.car_photo, render)
+    repo = photos.repository(event, "car")
+
+    def thumb(r):
+        found = photo_url(
+            CAR_PHOTOS, settings.car_photo_directory, r.car_photo, RENDER_THUMB
+        )
+        return prefix + found if found else ""
+
+    def large(r):
+        found = photos.page_url(repo, r.car_photo, photos.WORK) if r.car_photo else ""
         return prefix + found if found else ""
 
     eligibility = Eligibility(event.id)
@@ -138,8 +146,8 @@ def build(event, order: str = "car") -> Page:
                 car(r.car_number),
                 r.group.name,
                 r.subgroup.name,
-                photo(r, RENDER_THUMB),
-                photo(r, RENDER_LARGE),
+                thumb(r),
+                large(r),
             )
             for r in racers
         ],
