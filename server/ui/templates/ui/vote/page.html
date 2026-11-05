@@ -1,0 +1,108 @@
+{% extends "ui/base.html" %}
+{% load static ui %}
+{# vote.php (#54), for a phone. One page with five states that the status poll and ballot.get switch in place: closed, password, no awards, the award list, and an award's racer grid. Tapping a racer opens its sheet, whose one toggle votes; a tap in the grid only opens the sheet, so scrolling never votes (touch-punch is gone). The racers, their photos and each award's racers come from the server; the voter's ballot comes from ballot.get. #}
+{% block head %}
+{{ config|json_script:"vote-config" }}
+<script src="{% static 'ui/vote.js' %}"></script>
+{% endblock %}
+{% block main %}
+<div x-data data-vote :data-vote-state="$store.vote.state" data-vote-state="{% if page.is_open %}loading{% else %}closed{% endif %}">
+  <p x-show="$store.vote.state === 'loading'" class="py-10 text-center text-ink-muted" data-state="loading">Loading the ballot…</p>
+
+  <section x-cloak x-show="$store.vote.state === 'closed'" aria-labelledby="vote-closed-h" class="mx-auto mt-6 max-w-md rounded-2xl border border-line bg-surface p-6 text-center" data-state="closed">
+    <span class="mx-auto grid size-14 place-items-center rounded-full bg-surface-2 text-ink-muted">{% include "ui/components/icon.html" with name="vote" cls="size-8" %}</span>
+    <h1 id="vote-closed-h" class="mt-3 text-xl font-semibold">Voting is closed</h1>
+    <p class="mt-2 text-ink-muted">This page opens the ballot by itself when voting starts. Keep it open.</p>
+  </section>
+
+  <form x-cloak x-show="$store.vote.state === 'password'" @submit.prevent="$store.vote.submitPassword()" class="mx-auto mt-6 flex max-w-md flex-col gap-3 rounded-2xl border border-line bg-surface p-6" data-state="password">
+    <h1 class="text-xl font-semibold">Enter the ballot password</h1>
+    <p class="text-ink-muted">The race crew gives it out with the ballot.</p>
+    <label for="ballot-password" class="font-medium">Ballot password</label>
+    <input id="ballot-password" type="password" autocomplete="off" x-model="$store.vote.password" :aria-invalid="$store.vote.wrongPassword.toString()" aria-describedby="wrong-password" class="min-h-12 rounded-xl border border-field bg-bg px-3 text-lg">
+    <p id="wrong-password" x-show="$store.vote.wrongPassword" role="alert" class="font-semibold text-danger-ink" data-wrong-password>The password you entered is incorrect. Please try again.</p>
+    <button type="submit" :disabled="$store.vote.busy" class="min-h-12 rounded-xl bg-accent px-4 text-lg font-semibold text-accent-ink disabled:opacity-60">Open the ballot</button>
+  </form>
+
+  <section x-cloak x-show="$store.vote.state === 'none'" aria-labelledby="vote-none-h" class="mx-auto mt-6 max-w-md rounded-2xl border border-line bg-surface p-6 text-center" data-state="none">
+    <h1 id="vote-none-h" class="text-xl font-semibold">No awards to vote on</h1>
+    <p class="mt-2 text-ink-muted">There are no awards available for voting.</p>
+  </section>
+
+  <section x-cloak x-show="$store.vote.state === 'open' && $store.vote.awardId === null" aria-labelledby="vote-awards-h" data-state="open">
+    <h1 id="vote-awards-h" class="text-xl font-semibold">Vote for the design awards</h1>
+    <p class="mt-1 text-ink-muted">Tap an award to see its cars and vote.</p>
+    <ul role="list" aria-label="Awards" class="mt-4 flex flex-col gap-3" data-award-cards>
+      {% for a in page.awards %}
+      <li x-show="$store.vote.onBallot({{ a.id }})" data-award-card="{{ a.id }}">
+        <button type="button" @click="$store.vote.openAward({{ a.id }})" class="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-4 text-left shadow-sm active:bg-surface-2">
+          <span class="flex min-w-0 flex-1 flex-col gap-1">
+            <span class="text-lg font-semibold">{{ a.name }}</span>
+            <span class="text-sm text-ink-muted"><span x-text="$store.vote.limitText({{ a.id }})" data-limit></span> · <span x-text="$store.vote.chosenText({{ a.id }})" data-chosen-count></span></span>
+            <span class="mt-1 flex flex-wrap gap-2" data-chosen>
+              <template x-for="id in $store.vote.votesFor({{ a.id }})" :key="id">
+                <span class="flex items-center gap-1 rounded-lg bg-surface-2 py-1 pl-1 pr-2" :data-chosen-racer="id">
+                  <template x-if="$store.vote.racer(id).thumb"><img :src="$store.vote.racer(id).thumb" alt="" class="size-10 rounded object-cover"></template>
+                  <template x-if="!$store.vote.racer(id).thumb"><span class="grid size-10 place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="car" cls="size-6" %}</span></template>
+                  <span class="font-mono font-semibold" x-text="$store.vote.racer(id).car"></span>
+                </span>
+              </template>
+            </span>
+          </span>
+          {% include "ui/components/icon.html" with name="chevron" cls="size-5 shrink-0 text-ink-muted" %}
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section x-cloak x-show="$store.vote.state === 'open' && $store.vote.awardId !== null" aria-labelledby="vote-award-h" data-award-view>
+    <button type="button" @click="$store.vote.closeAward()" class="-ml-2 flex min-h-11 items-center gap-1 rounded-lg px-2 font-semibold text-accent" data-back>{% include "ui/components/icon.html" with name="back" cls="size-5" %}All awards</button>
+    <h1 id="vote-award-h" class="mt-1 text-xl font-semibold" x-text="$store.vote.awardName()"></h1>
+    <p class="mt-1 text-ink-muted" aria-live="polite" data-award-summary><span x-text="$store.vote.limitText($store.vote.awardId)"></span> · <span x-text="$store.vote.chosenText($store.vote.awardId)"></span></p>
+    <fieldset class="mt-3">
+      <legend class="mb-1 text-sm font-medium text-ink-muted">Sort cars by</legend>
+      <div class="flex rounded-xl border border-field bg-surface p-1" data-sort>
+        {% for value, label in sort_options %}
+        <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent">
+          <input type="radio" class="sr-only" name="order" value="{{ value }}" x-model="$store.vote.order" @change="$store.vote.sorted()"{% if value == page.order %} checked{% endif %}>{{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <ul role="list" aria-label="Cars" class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" data-racer-cards>
+      {% for r in page.racers %}
+      <li x-show="$store.vote.canWin({{ r.id }})" :style="'order: ' + $store.vote.position({{ r.id }})" data-racer="{{ r.id }}">
+        <button type="button" @click="$store.vote.openRacer({{ r.id }}, $event)" aria-haspopup="dialog" :class="$store.vote.chose({{ r.id }}) ? 'border-accent ring-2 ring-accent' : 'border-line'" class="relative flex size-full flex-col overflow-hidden rounded-xl border bg-surface text-left">
+          <span class="grid aspect-[4/3] w-full place-items-center bg-surface-2 text-ink-muted">{% if r.thumb %}<img src="{{ r.thumb }}" alt="" loading="lazy" class="size-full object-cover" data-photo>{% else %}{% include "ui/components/icon.html" with name="car" cls="size-10" %}{% endif %}</span>
+          <span x-show="$store.vote.chose({{ r.id }})" class="absolute right-2 top-2 grid size-8 place-items-center rounded-full bg-accent text-accent-ink shadow" data-chosen-mark>{% include "ui/components/icon.html" with name="check" cls="size-5" %}<span class="sr-only">Your vote</span></span>
+          <span class="flex min-w-0 flex-col gap-0.5 p-2">
+            <span class="font-mono text-xl font-semibold" data-car>{{ r.car }}</span>
+            <span class="truncate text-sm text-ink-muted" data-group>{{ r.group }}</span>
+            {% if page.use_subgroups %}<span class="truncate text-sm text-ink-muted" data-subgroup>{{ r.subgroup }}</span>{% endif %}
+          </span>
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+    <p x-show="$store.vote.awardId !== null && $store.vote.racersFor($store.vote.awardId).length === 0" class="mt-4 rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No car can win this award.</p>
+  </section>
+</div>
+{% endblock %}
+{% block sheets %}
+{# A racer's sheet: the large photo and the one vote toggle, disabled with its reason while the award is full. #}
+{% component "sheet" name="vote-racer" title="" title_x="$store.vote.sheetTitle()" %}
+  <div class="flex flex-col gap-3" data-racer-sheet>
+    <div class="grid min-h-48 place-items-center overflow-hidden rounded-xl bg-surface-2 text-ink-muted">
+      <template x-if="$store.vote.sheetRacer() && $store.vote.sheetRacer().photo"><img :src="$store.vote.sheetRacer().photo" alt="" class="max-h-[50dvh] w-full object-contain" data-sheet-photo></template>
+      <template x-if="$store.vote.sheetRacer() && !$store.vote.sheetRacer().photo"><span class="py-10">{% include "ui/components/icon.html" with name="car" cls="size-16" %}</span></template>
+    </div>
+    <p class="text-ink-muted" x-text="$store.vote.sheetDetails()" data-sheet-details></p>
+    <button type="button" @click="$store.vote.toggle()" :aria-pressed="$store.vote.chose($store.vote.racerId).toString()" :disabled="$store.vote.busy || $store.vote.blocked()" aria-describedby="vote-full" :class="$store.vote.chose($store.vote.racerId) ? 'bg-accent text-accent-ink' : 'border-2 border-accent bg-surface text-accent'" class="flex min-h-14 items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold disabled:border-line disabled:bg-surface-2 disabled:text-ink-muted" data-vote-toggle>
+      <span x-show="$store.vote.chose($store.vote.racerId)">{% include "ui/components/icon.html" with name="check" cls="size-6" %}</span>
+      <span x-text="$store.vote.chose($store.vote.racerId) ? 'Voted. Tap to remove' : 'Vote for this car'"></span>
+    </button>
+    <p id="vote-full" x-show="$store.vote.blocked()" class="text-center font-medium text-danger-ink" data-full-reason x-text="$store.vote.fullText()"></p>
+  </div>
+{% endcomponent %}
+{% endblock %}

@@ -123,16 +123,10 @@ class Deferred:
     reason: str
 
 
-_BALLOTING = "Balloting moved to the backlog (D7)."
-
 # Every PHP endpoint deferred to a backlog ticket. A name here is never
 # registered, so the dispatcher answers it as it answers any unknown name.
-DEFERRED: tuple[Deferred, ...] = (
-    Deferred("action", "ballot.open", "#54", _BALLOTING),
-    Deferred("query", "ballot.get", "#54", _BALLOTING),
-    Deferred("action", "vote.cast", "#54", _BALLOTING),
-    Deferred("query", "ballot.results", "#54", _BALLOTING),
-)
+# None is deferred today: #54 serves the ballot endpoints.
+DEFERRED: tuple[Deferred, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -369,6 +363,19 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " never connects again.",
         "C32: as replay.php's.",
     ),
+    "vote.php": (
+        "D20: a 301 to /vote/, the query string kept, so a printed link still"
+        " opens the ballot.",
+        "S2: polls /ballot/status, which answers only whether balloting is"
+        " open; vote.js polls settings.list, which answers ballot_password to"
+        " anyone who asks for it.",
+        "S14, D35: an award's racers are those vote.cast takes, partition"
+        " lists included; vote.js filters by the page's eligible class and"
+        " rank ids.",
+        "C33: the sort control keeps ?order= on this page; vote.php's links"
+        " open ballot.php, which does not exist.",
+        "D47: car numbers show three digits.",
+    ),
     "photo.php/info": (
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",
@@ -378,7 +385,15 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
 # Differences from PHP that wait on a quirk id or an owner decision, by the
 # PHP page's name. The ticket's "## Still open" names each, and an entry moves
 # to `ROUTE_DIVERGENCES` once it has an id.
-UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {}
+UNDECIDED_DIVERGENCES: dict[str, tuple[str, ...]] = {
+    "vote.php": (
+        "A change of /ballot/status swaps the page's state in place; vote.js"
+        " reloads the page (#54 scope).",
+        "A refused vote.cast shows a toast naming the reason and keeps the"
+        " voter's choices as the server has them; vote.js ignores the reply"
+        " (#54 scope).",
+    ),
+}
 
 # The PHP pages whose replacement behaves as PHP's does, layout aside.
 LIKE_PHP: frozenset[str] = frozenset()

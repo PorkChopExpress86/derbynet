@@ -101,7 +101,7 @@ def test_every_page_has_a_section_a_permission_and_a_ticket():
 
 
 # #39's Context lists these pages, from the index and reached from other
-# pages. Printables (D6) and Vote (D7) are not ported.
+# pages. Printables are not ported (D6).
 CONTEXT_PAGES = {
     "setup.php", "checkin.php",
     "photo-thumbs.php?repo=head", "photo-thumbs.php?repo=car",

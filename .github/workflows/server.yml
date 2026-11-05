@@ -395,6 +395,15 @@ jobs:
           bash testing/test-messaging.sh http://127.0.0.1:8080
           bash testing/test-preferences.sh http://127.0.0.1:8080
 
+      # The balloting suite (#54).  It resets the database and builds its own
+      # roster and ballot.  The parity gate still skips it (tools/parity_gate.py
+      # SKIPS).
+      - name: Run the balloting suite against Django
+        if: matrix.group == 1
+        working-directory: .
+        run: |
+          bash testing/test-balloting.sh http://127.0.0.1:8080
+
       # The photo and slideshow suites (#35), in testing/exercise-one-database.sh
       # order. photo-setup.sh uploads the photos the others assign, and
       # test-photo-assignments.sh takes the master car numbers, since

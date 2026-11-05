@@ -20,6 +20,7 @@ urlpatterns = [
     path("", include("ui.imports.urls")),
     path("", include("ui.timer.urls")),
     path("", include("ui.kiosk_pages.urls")),
+    path("", include("ui.vote.urls")),
     *redirects.urlpatterns(),
     path("quickref.pdf", views.quickref, name="quickref"),
     path("components/", views.components, name="components"),

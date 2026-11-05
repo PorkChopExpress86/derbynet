@@ -21,13 +21,23 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from awards import editing
+from accounts.permissions import Perm, allows
+from awards import balloting, editing
 from awards.editing import AwardFailure
+from core.race_settings import NotWritten
 from ui.judging import state
 from ui.judging.state import Filters
 from ui.navigation import requires_page
 from ui.responses import active_event as _event
-from ui.responses import in_sheet, posted_int, refused, service_error, toast_html
+from ui.responses import (
+    in_sheet,
+    into_sheet,
+    posted_int,
+    refused,
+    service_error,
+    toast,
+    toast_html,
+)
 
 guard = requires_page("judging")
 
@@ -178,3 +188,88 @@ def ad_hoc(request, racer_id):
     if name.strip():
         return _reply(request, f"{who} gets {name.strip()}.")
     return _reply(request, f"{who} has no ad hoc award now.", level="info")
+
+
+# ----- the ballot sheet (#54) -----
+
+
+def _ballot_body(request, message: str, level: str = "ok") -> HttpResponse:
+    """The ballot sheet again, with a toast, for a control inside it."""
+    html = render_to_string(
+        "ui/judging/sheets/ballot.html",
+        {
+            "sheet": state.ballot_sheet(_event(request)),
+            "can_set_password": allows(request, Perm.SET_UP),
+        },
+        request,
+    )
+    return HttpResponse(
+        into_sheet(request, SHEET_BODY, html)
+        + toast_html(request, message, level, oob=True)
+    )
+
+
+@require_GET
+@guard
+def ballot(request):
+    """The ballot sheet: Manage Ballot and the tallies of `judging.php`."""
+    return render(
+        request,
+        "ui/judging/sheets/ballot.html",
+        {
+            "sheet": state.ballot_sheet(_event(request)),
+            "can_set_password": allows(request, Perm.SET_UP),
+        },
+    )
+
+
+@require_POST
+@guard
+def ballot_open(request):
+    """The open switch (`ballot.open`, `website/js/judging.js:390`)."""
+    is_open = request.POST.get("open") == "1"
+    balloting.set_open(_event(request), balloting.OPEN if is_open else balloting.CLOSED)
+    return toast(
+        request,
+        "Balloting is open." if is_open else "Balloting is closed.",
+        level="ok" if is_open else "info",
+    )
+
+
+@require_POST
+@guard
+def ballot_password(request):
+    """The ballot password. `judging.js:398` writes it with `settings.write`,
+    which needs SET_UP, so a judge without it cannot change it here either."""
+    if not allows(request, Perm.SET_UP):
+        return service_error(
+            request, "Only a role that can set up the race can change the password."
+        )
+    text = request.POST.get("ballot_password", "")
+    try:
+        balloting.set_password(_event(request), text)
+    except NotWritten:
+        return service_error(request, "That password is too long.")
+    return _ballot_body(
+        request,
+        "Voters need this password now." if text else "Voters need no password now.",
+    )
+
+
+@require_POST
+@guard
+def ballot_depth(request, award_id):
+    """An award's votes per ballot (`award.edit` with `ballot_depth`,
+    `website/js/judging.js:258`). 0 takes it off the ballot and deletes its
+    votes, as `set_ballot_depth()` does."""
+    depth = posted_int(request.POST.get("depth", ""))
+    if depth is None or depth not in state.DEPTHS:
+        return service_error(request, "Pick 1 to 6 votes, or Not on ballot.")
+    try:
+        found = editing.set_ballot_depth(_event(request), award_id, depth)
+    except AwardFailure as failure:
+        return refused(request, failure)
+    if depth == 0:
+        return _ballot_body(request, f"{found.name} is off the ballot.", "info")
+    votes = "vote" if depth == 1 else "votes"
+    return _ballot_body(request, f"{found.name} takes {depth} {votes} per ballot.")

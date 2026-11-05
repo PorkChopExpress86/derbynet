@@ -1,0 +1,47 @@
+{# The ballot sheet (#54): judging.php's Manage Ballot dialog and its vote tallies. The open switch posts at once; the password and each award's votes per ballot post on change and answer with this sheet again; Choose gives the award to that racer, as award.winner does. #}
+<div x-data x-init="judging.show('Ballot')" class="flex flex-col gap-4" data-ballot-sheet>
+  <div class="flex items-center gap-3 rounded-xl border border-line p-3">
+    <span id="ballot-open-l" class="min-w-0 flex-1"><span class="block font-semibold">Balloting is open</span><span class="block text-sm text-ink-muted">Voters on the vote page see the ballot within 5 s.</span></span>
+    {% url 'judging-ballot-open' as open_url %}{% include "ui/components/switch.html" with labelledby="ballot-open-l" checked=sheet.is_open name="open" url=open_url include="this" sync="this:queue last" %}
+  </div>
+
+  <form hx-post="{% url 'judging-ballot-password' %}" hx-trigger="change" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:queue last" class="flex flex-col gap-1" data-ballot-password>
+    <label for="ballot-password" class="font-semibold">Ballot password</label>
+    <input id="ballot-password" name="ballot_password" type="text" autocomplete="off" value="{{ sheet.password }}"{% if not can_set_password %} disabled aria-describedby="ballot-password-why"{% endif %} class="min-h-11 rounded-xl border border-field bg-bg px-3 disabled:opacity-60">
+    {% if can_set_password %}<p class="text-sm text-ink-muted">Empty means voters need no password.</p>{% else %}<p id="ballot-password-why" class="text-sm text-ink-muted">Only a role that can set up the race can change it.</p>{% endif %}
+  </form>
+
+  <section aria-labelledby="ballot-awards-h">
+    <h3 id="ballot-awards-h" class="font-semibold">Awards</h3>
+    <p class="text-sm text-ink-muted">Taking an award off the ballot clears its votes, perhaps from testing. It can go back on at once.</p>
+    {% if sheet.rows %}
+    <ul role="list" class="mt-2 flex flex-col gap-3" data-ballot-awards>
+      {% for row in sheet.rows %}
+      <li class="rounded-xl border border-line p-3" data-ballot-award="{{ row.award.id }}">
+        <form hx-post="{% url 'judging-ballot-depth' row.award.id %}" hx-trigger="change" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:queue last" class="flex flex-wrap items-center gap-2">
+          <label for="ballot-depth-{{ row.award.id }}" class="min-w-0 flex-1"><span class="block font-semibold">{{ row.award.name }}</span> <span class="block text-sm text-ink-muted">Votes per ballot</span></label>
+          <select id="ballot-depth-{{ row.award.id }}" name="depth" class="min-h-11 rounded-xl border border-field bg-bg px-2" data-depth>
+            {% for d in row.depths %}<option value="{{ d }}"{% if d == row.depth %} selected{% endif %}>{% if d == 0 %}Not on ballot{% else %}{{ d }}{% endif %}</option>{% endfor %}
+          </select>
+        </form>
+        {% if row.candidates %}
+        <ul role="list" class="mt-2 flex flex-col gap-1" data-tally>
+          {% for c in row.candidates %}
+          <li class="flex min-h-11 items-center gap-2" data-candidate="{{ c.racer_id }}">
+            <span class="min-w-0 flex-1 truncate"><span class="font-semibold" data-score>{{ c.score }} vote{{ c.score|pluralize }}</span> for <span class="font-mono">{{ c.car_number }}</span> {{ c.first_name }} {{ c.last_name }}</span>
+            <button type="button" name="racer" value="{{ c.racer_id }}" hx-post="{% url 'judging-assign' row.award.id %}" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:drop"{% if row.award.winner_name %} disabled title="Given to {{ row.award.winner_name }}"{% endif %} class="min-h-11 shrink-0 rounded-lg border border-line px-3 text-sm font-semibold disabled:opacity-60" data-choose>Choose</button>
+          </li>
+          {% endfor %}
+        </ul>
+        {% elif row.depth %}
+        <p class="mt-2 text-sm text-ink-muted" data-no-votes>No votes yet.</p>
+        {% endif %}
+        {% if row.award.winner_name %}<p class="mt-1 text-sm text-ink-muted">Given to {{ row.award.winner_name }}.</p>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-2 text-ink-muted" data-empty>There are no awards yet. Add them in the awards editor.</p>
+    {% endif %}
+  </section>
+</div>
