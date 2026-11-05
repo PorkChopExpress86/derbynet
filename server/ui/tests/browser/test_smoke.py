@@ -11,6 +11,11 @@ from django.urls import reverse
 from ui.navigation import ENTRIES
 from ui.tests.roles import ROLES
 
+# Pages whose poll never leaves the network idle for 500 ms: the replay page
+# polls replay.message every 250 ms, as replay.php does (#53). They are
+# checked once loaded.
+NEVER_IDLE = {"replay"}
+
 
 @pytest.mark.parametrize("role", ROLES)
 def test_every_registry_page_opens_without_errors(login, role):
@@ -19,4 +24,4 @@ def test_every_registry_page_opens_without_errors(login, role):
     for entry in ENTRIES:
         response = page.goto(reverse(entry.key))
         assert response is not None and response.ok, (entry.key, response.status)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_load_state("load" if entry.key in NEVER_IDLE else "networkidle")
