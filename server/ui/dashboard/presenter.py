@@ -93,6 +93,9 @@ class Extras:
     timer_age: int | None = None
     replay_age: int | None = None
     held: Held | None = None
+    # The timer's lane count when it differs from the race's (D74), from
+    # `racing.services.timer.reported_lane_count()`.
+    reported_lanes: int | None = None
 
 
 @dataclass
@@ -451,6 +454,7 @@ def present(payload: dict, extras: Extras | None = None) -> dict:
             "state": pill_state(timer["icon"]),
             "age": extras.timer_age,
             "lanes": lanes,
+            "reported_lanes": extras.reported_lanes,
         },
         "replay": {
             "text": strip_seconds(replay["message"]),

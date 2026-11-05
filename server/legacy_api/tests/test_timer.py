@@ -10,9 +10,9 @@ from django.test import Client
 from django.utils import timezone
 
 from accounts.permissions import Perm
-from core.models import ActionLog, RaceState
+from core.models import ActionLog, RaceSettings, RaceState
 from legacy_api.tests.conftest import log_in, post
-from racing.models import AuditEvent, TimerStatus
+from racing.models import AuditEvent, HeatLane, TimerStatus
 from racing.services import timer as timer_service
 
 pytestmark = pytest.mark.django_db
@@ -381,13 +381,45 @@ def test_a_timer_message_that_raises_still_answers_xml(event, jar, monkeypatch):
     assert '<failure code="server-error">Unexpected server error</failure>' in body
 
 
-def test_identified_takes_the_timers_lane_count(event, coordinator, jar):
-    """C26, kept for parity: the timer's lane count wins."""
+def reported_lanes(event):
+    return TimerStatus.objects.get(event=event).reported_lane_count
+
+
+def test_identified_sets_the_lane_count_while_nothing_is_scheduled(
+    event, coordinator, jar
+):
+    """D74, C26: with no heat scheduled, the timer's lane count wins."""
     ok(coordinator, "action=settings.write&n-lanes=6")
     message(jar, "IDENTIFIED&lane_count=4")
     assert timer_state(coordinator)["lanes"] == 4
+    assert reported_lanes(event) == 4
     message(jar, "IDENTIFIED&lane_count=abc")
     assert timer_state(coordinator)["lanes"] == 4
+    assert reported_lanes(event) == 4
+
+
+def test_identified_keeps_the_lane_count_once_heats_are_scheduled(
+    event, coordinator, jar
+):
+    """D74, C26: a schedule keeps the race's lane count; the timer's count
+    is stored to show beside it. PHP writes the timer's count."""
+    racing_round(coordinator)
+    message(jar, "HELLO")
+    message(jar, "IDENTIFIED&lane_count=6")
+    assert RaceSettings.objects.get(event=event).lane_count == 4
+    assert timer_state(coordinator)["lanes"] == 4
+    assert reported_lanes(event) == 6
+
+
+def test_a_raced_schedule_still_keeps_the_lane_count(event, coordinator, jar):
+    """D74: every heat run is still a schedule."""
+    racing_round(coordinator)
+    HeatLane.objects.filter(event=event).update(
+        finish_time=2.5, completed=timezone.now()
+    )
+    message(jar, "IDENTIFIED&lane_count=6")
+    assert RaceSettings.objects.get(event=event).lane_count == 4
+    assert reported_lanes(event) == 6
 
 
 def test_racing_off_while_staging_aborts_the_timer(event, coordinator, jar):

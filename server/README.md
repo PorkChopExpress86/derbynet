@@ -144,7 +144,7 @@ The finalists of a follow-on or aggregate round come from the standings (see bel
 - Every message, and every change of the timer's state, is written to the audit (`AuditEvent` 500 and 501) after the transaction, with the timer results and malfunctions PHP records (D19, D26). A failed audit write never changes the reply.
 - A queued remote start is taken with one `UPDATE ... WHERE remote_start_requested`, so one `<remote-start/>` goes out per `timer.remote-start`, however many heartbeats arrive together.
 - A staged heat of the timer test is a `TimerStatus` staged heat with no round. The timer test moves the current heat through `heat_state.TimerTestStart` and `TimerTestEnd`.
-- Hardening from #15: the `timer.*` actions and queries need `CONTROL_RACE` (S21), and `post-timer-log.php` needs `TIMER_MESSAGE` from the session (S22). The log file is opened only when its stored path names a `timer-*.log` in the event's logs folder. `IDENTIFIED` still overwrites the lane count with no check against the schedules (C26, kept for parity; #50).
+- Hardening from #15: the `timer.*` actions and queries need `CONTROL_RACE` (S21), and `post-timer-log.php` needs `TIMER_MESSAGE` from the session (S22). The log file is opened only when its stored path names a `timer-*.log` in the event's logs folder. `IDENTIFIED` sets the lane count only while no heat is scheduled; once a schedule exists the race keeps its count, and the timer status card and the race dashboard show the timer's beside it (D74, fixing C26; `racing.services.timer.heats_scheduled`).
 
 `legacy_api/tests/test_timer_parity.py` replays `capture/scenarios/03-timer.sh` and matches every timer transcript byte for byte. `testing/race-with-derby-timer.sh` races a round with the real `derby-timer.jar` and its simulated timer, in the `server` workflow.
 
@@ -449,10 +449,10 @@ The command writes the Django template `ui/templates/ui/timer/browser.html` from
 How the page and the timer pages differ from PHP:
 
 - `/timer.php` needs `TIMER_MESSAGE` (D5; PHP needs `SET_UP`) and shows its Timer settings button only with `CONTROL_RACE` (D53). Both are in `ROUTE_DIVERGENCES`.
-- A guard added at the top of the template sends a browser without Web Serial to `/timer/no-serial/`, which says to use desktop Chrome or Edge and, when the page is no secure context, links to its `https` address. PHP's page shows its own "no Web Serial" dialog over a broken page. #50's scope asks for this page; it has no #64 or decision id yet.
-- `timer-test.php` is split in two, as #50's scope lists them: the timer status page (`/timer/`: state, details, settings sheet, remote logging, log tail, Start Race, refused results) and the timer test (`/timer/test/`), where `timer-test.php` redirects. Both need `CONTROL_RACE` (S21).
-- A lane toggle on the timer test posts the lane and its end state, not the whole mask, and stages a new test heat at every change (`racing.services.timer.set_test_lane`). PHP's `tt-mask`, which the legacy endpoint keeps, lands on the heat already staged after a second change, so the timer never hears of it (`racing/tests/test_timer_test_lanes.py`). That PHP defect has no #64 row yet.
-- The log tail stops while the page is hidden (#50's risks); PHP polls on.
+- A guard added at the top of the template sends a browser without Web Serial to `/timer/no-serial/`, which says to use desktop Chrome or Edge and, when the page is no secure context, links to its `https` address. PHP's page shows its own "no Web Serial" dialog over a broken page (D72).
+- `timer-test.php` is split in two, as #50's scope lists them: the timer status page (`/timer/`: state, details, settings sheet, remote logging, log tail, Start Race, refused results) and the timer test (`/timer/test/`), where `timer-test.php` redirects (D72). Both need `CONTROL_RACE` (S21).
+- A lane toggle on the timer test posts the lane and its end state, not the whole mask, and stages a new test heat at every change (`racing.services.timer.set_test_lane`). PHP's `tt-mask`, which the legacy endpoint keeps, lands on the heat already staged after a second change, so the timer never hears of it (`racing/tests/test_timer_test_lanes.py`; D72, C52).
+- The log tail stops while the page is hidden (D72); PHP polls on.
 - The fake timer's script is `ui/static/ui/fake-timer.js`, a port of `website/js/fake-timer.js` with the same messages and timings: the PHP file posts to the relative `action.php`, which from `/timer/fake/` misses the server, and drives the PHP page's jQuery table.
 
 The pages are in `ui/timer/`.
@@ -467,7 +467,7 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`, `UNDECIDED
 - `kiosk.php` grants no permission, and the award kiosk clears no award on load (S28).
 - `please-check-in` reads `classids` as whole numbers (S12). The award kiosk plays only `confetti.webm` (C34). The standings kiosk is public on purpose (S29, D5) and lists racers not eligible for its speed awards marked, with no place (D33, D35), and dropped times struck through (D37), from #49's `ui.standings.state`.
 - While the playlist waits for the operator, the racing pages (now racing in its three layouts, on deck, results by racer) show the leaders of the round that ended, from `racing.services.playlist.intermission()` through `query=poll`'s Django-only `intermission` value, until the next round starts (D12).
-- The on-deck page counts the race's lanes, not the lanes of the results (undecided). Its running heat glides near the top in place of the Just Finished and Now Staging animation (D10). Results by racer glide up where PHP moves a row every 2 s (D10).
+- The on-deck page counts the race's lanes, not the lanes of the results (D73). Its running heat glides near the top in place of the Just Finished and Now Staging animation (D10). Results by racer glide up where PHP moves a row every 2 s (D10).
 
 ## Settings
 

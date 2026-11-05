@@ -42,6 +42,7 @@ Spawn a general-purpose agent with `model: opus`, briefed per plan/AGENT-BRIEF.m
 1. Run `plan/bin/pr-wait <pr>` in the background and wait for its notification.
 2. When a check fails, send its name and link to the implementer, which reads the log with `gh run view --log-failed`, fixes the cause, and pushes. Then wait again.
 3. When every check is green, run `plan/bin/pr-merge <pr>`, which squashes and deletes the branch. It refuses a PR whose body would close an issue that has a `## Still open` section; change the PR body to `Part of #N`. If it reports the issue still open, close it, or add a `## Still open` section and move the frontier again (Pick a ticket, step 1), because that section unblocks the tickets that depend on it.
+4. When the ticket has a screenshot box, post the screenshots (D75). Download the `ui-screenshots` artifact of the passing `ui (sqlite)` run with `gh run download <run> -n ui-screenshots`, into an empty scratchpad folder. Commit the ticket's PNGs to `N/` on the orphan `screenshots` branch, from a separate clone. Then comment on the ticket, embedding each image by its `raw.githubusercontent.com` URL at that commit's SHA. Tick the box only when every view it names is shot at both sizes; otherwise name the missing views under `## Still open`.
 
 ## 5. Reset
 

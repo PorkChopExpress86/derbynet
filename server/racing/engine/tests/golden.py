@@ -132,6 +132,9 @@ QUIRK_DECISIONS = {
     # Owner decision D33, which the #52 standings kiosk follows: a racer not
     # eligible for its speed awards is listed marked, with no place.
     "D33": "fix",
+    # PHP's stale test heat after a second lane mask change, which D72 fixes
+    # on the timer test page; the legacy timer.test tt-mask keeps it.
+    "C52": "fix",
 }
 
 

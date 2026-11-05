@@ -11,7 +11,16 @@ from racing.engine.phpcompat import php_intval, php_truthy
 from racing.services import polls, timer
 
 
-@action("timer-message", permission=Perm.TIMER_MESSAGE)
+@action(
+    "timer-message",
+    permission=Perm.TIMER_MESSAGE,
+    divergences=(
+        "D74: IDENTIFIED sets the race's lane count only while no heat of the"
+        " event is scheduled; afterward it stores the timer's count to show"
+        " beside the race's (fixes #64 C26). PHP always writes the timer's"
+        " count. The reply is the same.",
+    ),
+)
 def timer_message(ctx: LegacyContext) -> None:
     body = timer.handle_message(ctx.event, ctx.args, ctx.user_agent)
     ctx.xml.start_response()
