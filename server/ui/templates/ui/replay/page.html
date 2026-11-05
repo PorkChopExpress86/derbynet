@@ -1,0 +1,91 @@
+{% extends "ui/base.html" %}
+{% load static %}
+{# replay.php (#53). The setup screen picks the camera, its resolution and frame rate (D9), and shows the replay settings; Proceed puts the kiosk frame over the whole window. The frame, the playback canvas, the click shield, the frame-rate badge and the ?debug log are fixed over the page, as replay.php's full-window elements are. #}
+{% block head %}
+{{ config|json_script:"replay-config" }}
+<link rel="stylesheet" href="{% static 'ui/replay.css' %}">
+<script src="{% static 'ui/kiosk/screenfull.min.js' %}"></script>
+{# The WebRTC shim replay.php loads as js/adapter.js, pinned (ui/static/ui/vendor/VENDORED.md). #}
+<script src="{% static 'ui/vendor/adapter-9.0.6.js' %}"></script>
+<script src="{% static 'ui/message-poller.js' %}"></script>
+<script src="{% static 'ui/viewer-signaling.js' %}"></script>
+<script src="{% static 'ui/video-capture.js' %}"></script>
+<script src="{% static 'ui/circular-frame-buffer.js' %}"></script>
+<script src="{% static 'ui/video-device-picker.js' %}"></script>
+<script src="{% static 'ui/replay.js' %}"></script>
+{% endblock %}
+{% block main %}
+<div id="replay" data-replay-state="setup">
+  <div id="fps" hidden></div>
+  <div id="debug" class="replay-log-panel"{% if not config.debug %} hidden{% endif %}><div id="log" role="log" aria-label="Replay log"></div></div>
+
+  <iframe id="interior" class="replay-full" title="Kiosk" hidden></iframe>
+  <div id="click-shield" class="replay-full" hidden></div>
+  <div id="playback-background" class="replay-full" hidden><canvas id="playback" class="replay-full"></canvas></div>
+
+  <div id="replay-setup" class="flex flex-col gap-4" data-replay-setup>
+    <div id="recorder-warning" role="alert" class="rounded-xl border border-warn bg-warn-soft px-4 py-3 text-warn-ink" hidden>
+      <h2 class="font-semibold">This browser does not support MediaRecorder.</h2>
+      <p class="mt-1 text-sm">Replay is still possible, but you can't upload videos.</p>
+      <p class="mt-1 break-all text-sm">Your browser's User Agent string is:<br><span id="user_agent"></span></p>
+    </div>
+    <div id="no-camera-warning" role="alert" class="rounded-xl border border-danger bg-danger-soft px-4 py-3 text-danger-ink" hidden>
+      <h2 id="reject" class="font-semibold">Access to cameras is blocked.</h2>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-[3fr_2fr]">
+      <section aria-labelledby="cam-h" class="rounded-2xl border border-line bg-surface p-4">
+        <h2 id="cam-h" class="text-lg font-semibold">Camera setup</h2>
+        <div class="relative mt-3 overflow-hidden rounded-xl bg-black">
+          <video id="preview" autoplay muted playsinline class="aspect-video w-full object-contain"></video>
+          <p id="waiting-for-remote" class="absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-lg bg-surface px-3 py-2 text-center" hidden>Waiting for remote camera to connect...</p>
+        </div>
+        <p id="recording-stream-info" class="mt-2 text-sm text-ink-muted" hidden>Recording at <span id="recording-stream-size" data-stream-size></span></p>
+        <p id="camera-error" role="alert" class="mt-2 text-sm text-danger" hidden></p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+          <div>
+            <label for="device-picker" class="block text-sm font-medium">Camera</label>
+            <select id="device-picker" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3"><option value="">Please wait</option></select>
+          </div>
+          <div>
+            <label for="resolution-picker" class="block text-sm font-medium">Resolution</label>
+            <select id="resolution-picker" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3"></select>
+          </div>
+          <div>
+            <label for="frame-rate-picker" class="block text-sm font-medium">Frame rate</label>
+            <select id="frame-rate-picker" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3"></select>
+          </div>
+        </div>
+        <p class="mt-2 text-sm text-ink-muted">This browser remembers the camera, resolution and frame rate for next time.</p>
+      </section>
+
+      <section aria-labelledby="set-h" class="rounded-2xl border border-line bg-surface p-4" data-replay-settings>
+        <h2 id="set-h" class="text-lg font-semibold">Replay settings</h2>
+        <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
+          {% for key, label, text in settings_rows %}<dt>{{ label }}</dt><dd class="text-right font-medium" data-setting="{{ key }}">{{ text }}</dd>
+          {% endfor %}
+        </dl>
+        <a href="{{ settings_url }}" class="mt-3 inline-flex min-h-11 items-center font-medium text-accent underline underline-offset-2" data-action="replay-settings">Change in Settings</a>
+      </section>
+    </div>
+
+    <section aria-labelledby="run-h" class="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
+      <h2 id="run-h" class="text-lg font-semibold">Kiosk</h2>
+      <div>
+        <label for="inner_url" class="block text-sm font-medium">URL</label>
+        <input type="text" id="inner_url" name="inner_url" value="{{ kiosk_url }}" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3">
+      </div>
+      <div>
+        <label for="delay" class="block text-sm font-medium">Delay playback by (s) after the heat ends</label>
+        <input type="number" id="delay" name="delay" min="0" step="0.1" value="0.0" inputmode="decimal" class="mt-1 h-12 w-32 rounded-xl border border-field bg-surface px-3">
+      </div>
+      <label class="flex min-h-11 items-center gap-3">
+        <input type="checkbox" id="go-fullscreen" checked class="size-5">
+        <span>Change to fullscreen</span>
+      </label>
+      <button type="button" id="proceed" data-action="proceed" class="min-h-12 rounded-xl bg-accent px-4 font-semibold text-accent-ink sm:self-start">Proceed</button>
+      <p class="text-sm text-ink-muted">Click the kiosk to come back here; right-click it to replay now.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

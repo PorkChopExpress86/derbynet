@@ -329,6 +329,32 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
     "slideshow.php": (
         "D10: rebuilt (ADR-10); each slide fades in over the one before.",
     ),
+    "replay.php": (
+        "D20: a 301 to /replay/, the query string kept.",
+        "D5, D9, D16: needs CONTROL_RACE, the replay login; PHP's page is"
+        " anonymous, so the owner ran it in a browser kept logged out.",
+        "D9: the setup picks the camera, the resolution and the frame rate,"
+        " opens the camera with them as exact constraints, and this browser"
+        " remembers them; PHP asks for the window's size as ideal values and"
+        " remembers nothing.",
+        "D18: a clip runs from replay-skipback before the finish to the"
+        " post-roll after it, its start cut to the longest-clip setting, and"
+        " the setup shows these settings with a link to the settings page;"
+        " PHP stops recording at the finish and plays the last"
+        " replay-skipback ms. A finish that arrives while a clip is still"
+        " recording, waiting or playing is ignored, where PHP starts a second"
+        " playback over the first.",
+        "C32: the websocket path flushes the messages sent before the socket"
+        " opened with ws.send; PHP calls the undefined wc.send and loses the"
+        " first solicitation. The page renders g_websocket_url empty, so v1"
+        " polls (#56).",
+    ),
+    "camera.php": (
+        "D20: a 301 to /replay/camera/, the query string kept.",
+        "D5, D9, D16: needs CONTROL_RACE, the replay login; PHP's page is anonymous.",
+        "D9: this browser remembers the chosen camera.",
+        "C32: as replay.php's.",
+    ),
     "photo.php/info": (
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",

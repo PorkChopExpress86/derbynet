@@ -98,14 +98,15 @@ PLAIN_HTTP_HOST = "derbynet.test"
 
 @pytest.fixture(scope="session")
 def browser_type_launch_args(browser_type_launch_args):
-    """Chromium resolves `PLAIN_HTTP_HOST` to the live server, and offers a
-    fake camera that needs no permission prompt."""
+    """Chromium resolves `PLAIN_HTTP_HOST` to the live server, and offers
+    two fake cameras that need no permission prompt, so the replay setup can
+    choose between them (#53)."""
     return {
         **browser_type_launch_args,
         "args": [
             *browser_type_launch_args.get("args", []),
             f"--host-resolver-rules=MAP {PLAIN_HTTP_HOST} 127.0.0.1",
-            "--use-fake-device-for-media-stream",
+            "--use-fake-device-for-media-stream=device-count=2",
             "--use-fake-ui-for-media-stream",
         ],
     }

@@ -42,6 +42,7 @@ LIBRARIES = {
     "qrcode.min.js": "ui/vendor/qrcode-generator-1.4.4.js",
     "xlsx.full.min.js": "ui/vendor/xlsx-0.13.5.full.min.js",
     "screenfull.min.js": "ui/kiosk/screenfull.min.js",
+    "adapter.js": "ui/vendor/adapter-9.0.6.js",
 }
 
 SCRIPT = re.compile(r"""<script\b[^>]*\bsrc=["']js/([^"'?]+)""")

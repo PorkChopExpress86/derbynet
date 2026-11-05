@@ -132,6 +132,9 @@ QUIRK_DECISIONS = {
     # PHP's stale test heat after a second lane mask change, which D72 fixes
     # on the timer test page; the legacy timer.test tt-mask keeps it.
     "C52": "fix",
+    # The #64 row the #53 replay and camera pages fix, as the ticket's "PHP
+    # defects to fix" lists it.
+    "C32": "fix",
 }
 
 

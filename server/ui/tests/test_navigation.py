@@ -148,9 +148,11 @@ def test_every_built_page_records_how_it_differs_from_php():
 
 
 def test_a_new_page_with_no_record_fails_and_the_old_list_only_shrinks():
+    # replay.php was the example until #53 built it; a page with no record
+    # stands in.
     replay = navigation.entry("replay")
-    built = NavEntry(**{**vars(replay), "view": "ui.replay.views.page"})
-    assert unrecorded([built]) == ["replay.php"]
+    built = NavEntry(**{**vars(replay), "php": "unrecorded.php"})
+    assert unrecorded([built]) == ["unrecorded.php"]
     by_php = {e.php: e for e in ENTRIES}
     assert all(by_php[php].view for php in BUILT_BEFORE_THE_CHECK)
     recorded = set(ROUTE_DIVERGENCES) | set(UNDECIDED_DIVERGENCES) | LIKE_PHP
