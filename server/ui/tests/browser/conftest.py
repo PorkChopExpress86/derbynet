@@ -228,14 +228,16 @@ class InFlight:
     """The requests a browser context has sent and not yet finished.
 
     A navigation ends the old document's htmx and fetch requests and its
-    image loads, but Playwright then reports neither `requestfinished` nor
-    `requestfailed` for them (seen on a reload right after a click, #188,
-    and for a thumbnail left loading by a link, #47). So when a frame
+    image, script and stylesheet loads, but Playwright then reports neither
+    `requestfinished` nor `requestfailed` for them (seen on a reload right
+    after a click, #188, for a thumbnail left loading by a link, #47, and
+    for the timer's scripts when the Web Serial guard leaves `/timer.php`,
+    #50). So when a frame
     navigates, those requests leave the set: their replies can no longer
     reach the page. The new document sends none before it commits."""
 
     TIMEOUT_MS = 10_000
-    ORPHANED = ("xhr", "fetch", "image")
+    ORPHANED = ("xhr", "fetch", "image", "script", "stylesheet")
 
     def __init__(self, context):
         self.requests = set()

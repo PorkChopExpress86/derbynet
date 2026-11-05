@@ -216,13 +216,24 @@ def test_a_poll_that_never_answers_is_given_up_after_15_s(
     expect(page.locator('[data-lane="1"] [data-car]')).not_to_be_empty()
 
 
+def next_poll(tab):
+    """Wait for the reply to a poll sent after the test changed the state.
+    The first reply seen may answer a poll that read the state before the
+    change, so wait for two; the second went out after the first came back.
+    Counting replies, not seconds, keeps a slow server from failing the
+    test (seen on Postgres under `-n auto`)."""
+    for _ in range(2):
+        with tab.expect_response(lambda r: "query=poll&" in r.url):
+            pass
+
+
 def test_d12_two_racing_kiosks_show_the_leaders_through_the_intermission(
     page, live_server
 ):
     """Two fake kiosks of the Racing scene, now racing and on deck. When the
     round ends and the next step waits for the operator, both show the
-    round's leaders within one poll; when the operator starts the next round
-    both go back within one poll."""
+    round's leaders at the next poll; when the operator starts the next round
+    both go back at the next poll."""
     from core.models import SiteState
     from racing.services.playlist import round_ended, start_playlist
     from racing.services.playlist import start_waiting_step as start
@@ -251,8 +262,9 @@ def test_d12_two_racing_kiosks_show_the_leaders_through_the_intermission(
     round_ended(round, finalists_for)
     for tab in tabs.values():
         tab.bring_to_front()
+        next_poll(tab)
         leaders = tab.locator("[data-leaders]")
-        expect(leaders).to_be_visible(timeout=1500)
+        expect(leaders).to_be_visible(timeout=1000)
         expect(leaders).to_contain_text("Scouts, Round 1 leaders")
         expect(leaders.locator("li")).to_have_count(3)
         expect(leaders).to_contain_text("Up next: Scouts, Round 2")
@@ -265,7 +277,8 @@ def test_d12_two_racing_kiosks_show_the_leaders_through_the_intermission(
     start(event)
     for tab in tabs.values():
         tab.bring_to_front()
-        expect(tab.locator("[data-leaders]")).to_be_hidden(timeout=1500)
+        next_poll(tab)
+        expect(tab.locator("[data-leaders]")).to_be_hidden(timeout=1000)
     for tab in tabs.values():
         if tab is not page:
             tab.close()
