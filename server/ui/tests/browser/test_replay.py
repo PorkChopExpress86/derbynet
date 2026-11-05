@@ -47,12 +47,34 @@ def _stop_the_polls(page):
     yield
     if page.is_closed():
         return
-    for frame in page.frames:
+    for tab in page.context.pages:
+        if tab != page:
+            close_tab(page, tab)
+    stop_timers(page)
+    page.in_flight.drain(page)
+
+
+def stop_timers(tab):
+    for frame in tab.frames:
         try:
             frame.evaluate(STOP_TIMERS)
         except Exception:  # noqa: BLE001, S110 - a detached frame has no timers
             pass
-    page.in_flight.drain(page)
+
+
+def close_tab(page, tab):
+    """Close a second tab, such as the camera, once its polls have stopped
+    and its requests are answered. A tab closed with a POST out leaves that
+    request in the harness's in-flight list with no finished or failed
+    event, so the test failed at teardown with "still in flight after 10 s"
+    (PR #205's ui (postgres); test_closing_the_camera_tab_waits_for_its_post
+    holds the POST to show it)."""
+    stop_timers(tab)
+    waited = 0
+    while waited < 10_000 and any(r.frame.page == tab for r in page.in_flight.requests):
+        tab.wait_for_timeout(50)
+        waited += 50
+    tab.close()
 
 
 @pytest.fixture
@@ -499,7 +521,27 @@ def test_the_remote_camera_streams_to_the_replay_page_with_no_ice_server(login, 
         # Chromium gives an ideal value back bare.
         " return c && c.width == 1280 && c.height == 720; }"
     )
-    camera.close()
+    close_tab(page, camera)
+
+
+def test_closing_the_camera_tab_waits_for_its_post(login, event):
+    """The camera tab's message poll is held, then answered as the tab is
+    closed: plain camera.close() left the POST in flight at teardown, 3 runs
+    in 3 (PR #205's ui (postgres) failure)."""
+    page = login("RaceCoordinator")
+    desktop_only(page)
+    camera = page.context.new_page()
+    camera.goto("/replay/camera/")
+    expect(camera.locator("[data-stream-size]")).to_have_text(re.compile(r" × "))
+    held = []
+    camera.route("**/action.php", lambda route: held.append(route))
+    for _ in range(40):
+        if held:
+            break
+        camera.wait_for_timeout(100)
+    assert held
+    held[0].continue_()
+    close_tab(page, camera)
 
 
 def test_a_message_sent_before_the_websocket_opens_is_sent_once_it_does(login, event):
