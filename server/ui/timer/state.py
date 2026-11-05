@@ -57,14 +57,13 @@ def status(event, now: datetime) -> Status:
     text = strip_seconds(found["message"])
     # A malfunction in force, unless the status text already is its message.
     malfunction = timer.TimerState.read(row, now).malfunction_message
-    reported = row.reported_lane_count
     return Status(
         text=text,
         pill=pill_state(found["icon"]),
         state=state,
         connected=state != TimerStatus.State.NOT_CONNECTED,
         lanes=lanes,
-        reported_lanes=reported if reported and reported != lanes else None,
+        reported_lanes=timer.reported_lane_count(row, lanes),
         malfunction="" if malfunction == text else malfunction,
         details=timer.details(event),
         agent=row.agent,

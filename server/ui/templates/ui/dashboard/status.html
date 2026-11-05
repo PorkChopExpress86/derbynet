@@ -7,6 +7,8 @@
       {% if timer.age is not None %}<span class="text-xs text-ink-muted"><span data-age="{{ timer.age }}">{{ timer.age }} s</span> ago</span>{% endif %}
     </span>
     <span class="text-xs text-ink-muted" data-lane-count>{% if timer.lanes %}{{ timer.lanes }} lane{{ timer.lanes|pluralize }}{% else %}Lane count not set{% endif %}</span>
+    {# D74: the timer's lane count when it differs from the race's, which a schedule keeps. #}
+    {% if timer.reported_lanes %}<span class="text-xs text-warn-ink" data-reported-lanes>The timer reports {{ timer.reported_lanes }} lane{{ timer.reported_lanes|pluralize }}</span>{% endif %}
     {% else %}
     <span class="text-sm text-ink-muted" data-timer-status>Not monitoring timer state</span>
     {% endif %}

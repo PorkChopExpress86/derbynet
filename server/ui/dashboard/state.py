@@ -23,7 +23,7 @@ from accounts.permissions import Perm, allows
 from core.models import Event, RaceSettings, RaceState
 from kiosks.models import ReplayStatus
 from racing.models import HeatLane, Round, TimerStatus
-from racing.services import finals, lanes, master, playlist, polls
+from racing.services import finals, lanes, master, playlist, polls, timer
 from roster.models import Racer
 from roster.services.racers import HEADSHOTS
 from ui.dashboard.presenter import Extras, Held, present, strip_seconds
@@ -278,6 +278,7 @@ def build(request, event: Event, shown: Shown) -> Live:
         timer_age=_age(timer_row.last_contact, now),
         replay_age=_age(replay_row.last_contact, now),
         held=held,
+        reported_lanes=timer.reported_lane_count(timer_row, settings.lane_count),
     )
     context = present(payload, extras)
     signature = hashlib.sha256(_material(payload, extras, shown).encode()).hexdigest()[

@@ -138,6 +138,20 @@ def test_the_status_card_shows_the_timer_and_its_client(coordinator, jar):
     assert 'data-action="fake-timer"' not in html
 
 
+def test_the_status_card_shows_the_timers_lane_count_beside_the_races(
+    coordinator, jar, event
+):
+    """D74: once heats are scheduled the race keeps its count, and the card
+    shows the timer's beside it."""
+    scheduled(race_setup(event)["Wolves"], race=False)
+    connect(jar, lanes=6)
+    html = coordinator.get("/timer/").content.decode()
+    assert "data-lane-count>4 lanes<" in html
+    assert "The timer reports 6 lanes, and the race has 4." in html
+    connect(jar, lanes=4)
+    assert "data-reported-lanes" not in coordinator.get("/timer/").content.decode()
+
+
 def test_the_fake_timer_link_shows_while_no_timer_is_connected(coordinator):
     html = coordinator.get("/timer/").content.decode()
     assert "NOT CONNECTED" in html

@@ -3,7 +3,8 @@
   {% include "ui/components/status_pill.html" with state=status.pill text=status.text %}
   <span class="text-sm text-ink-muted" data-lane-count>{% if status.lanes %}{{ status.lanes }} lane{{ status.lanes|pluralize }}{% else %}Lane count not set{% endif %}</span>
 </div>
-{% if status.reported_lanes %}<p class="mt-2 text-sm text-warn-ink" data-reported-lanes>The timer reports {{ status.reported_lanes }} lane{{ status.reported_lanes|pluralize }}.</p>{% endif %}
+{# D74: once heats are scheduled the timer's IDENTIFIED leaves the race's lane count, so the card shows the timer's beside it. #}
+{% if status.reported_lanes %}<p class="mt-2 text-sm text-warn-ink" data-reported-lanes>The timer reports {{ status.reported_lanes }} lane{{ status.reported_lanes|pluralize }}, and the race has {{ status.lanes }}.</p>{% endif %}
 {% if status.malfunction %}<p role="status" class="mt-2 flex items-start gap-2 rounded-xl border border-danger bg-danger-soft px-3 py-2 text-sm text-danger-ink" data-malfunction>{% include "ui/components/icon.html" with name="warn" cls="mt-0.5 size-4 shrink-0" %}<span>{{ status.malfunction }}</span></p>{% endif %}
 
 <dl class="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm" data-timer-details>

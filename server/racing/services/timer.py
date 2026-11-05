@@ -362,11 +362,14 @@ def _hello(msg: _Message) -> None:
 def _identified(msg: _Message) -> None:
     lanes = php_numeric(msg.get("lane_count")) if msg.has("lane_count") else None
     if lanes is not None and 0 < lanes <= MAX_LANES:
-        # C26: kept for parity. The timer's lane count wins, with no check
-        # against the schedules (#50 asks the owner).
+        # D74, C26: the timer's count is kept to show beside the race's, and
+        # sets the race's only while no heat is scheduled, so a schedule
+        # never meets a lane count it was not made for. PHP always writes
+        # it. `handle_message` holds the race-state lock.
         msg.row.reported_lane_count = int(lanes)
-        msg.settings.lane_count = int(lanes)
-        msg.settings.save(update_fields=["lane_count"])
+        if not heats_scheduled(msg.event.id):
+            msg.settings.lane_count = int(lanes)
+            msg.settings.save(update_fields=["lane_count"])
     for key, column in (
         ("timer", "timer_type"),
         ("human", "human"),
@@ -383,6 +386,19 @@ def _identified(msg: _Message) -> None:
     else:
         msg.timer.state = State.CONNECTED
     msg.out.append(SUCCESS)
+
+
+def heats_scheduled(event_id: int) -> bool:
+    """A heat of any round of the event is scheduled, raced or not (D74)."""
+    return HeatLane.objects.filter(event_id=event_id).exists()
+
+
+def reported_lane_count(row: TimerStatus, lane_count: int) -> int | None:
+    """The lane count the timer reported, when it differs from the race's
+    (D74): the timer status card and the race dashboard show it beside the
+    race's."""
+    reported = row.reported_lane_count
+    return reported if reported and reported != lane_count else None
 
 
 def _started(msg: _Message) -> None:
