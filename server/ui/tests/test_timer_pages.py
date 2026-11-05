@@ -152,6 +152,24 @@ def test_the_status_card_shows_the_timers_lane_count_beside_the_races(
     assert "data-reported-lanes" not in coordinator.get("/timer/").content.decode()
 
 
+def test_the_card_drops_the_timers_lane_count_once_the_timer_goes_away(
+    coordinator, jar, event
+):
+    """D74 shows the count the timer reports now: a timer past the contact
+    timeout reports nothing, and the poll stops showing its old count."""
+    scheduled(race_setup(event)["Wolves"], race=False)
+    connect(jar, lanes=6)
+    first = hx(coordinator, "/timer/status/")
+    assert "The timer reports 6 lanes" in first.content.decode()
+    sig = SIG.search(first.content.decode()).group(1)
+    TimerStatus.objects.filter(event=event).update(
+        last_contact=timezone.now() - timezone.timedelta(hours=2)
+    )
+    stale = hx(coordinator, f"/timer/status/?sig={sig}")
+    assert stale.status_code == 200
+    assert "data-reported-lanes" not in stale.content.decode()
+
+
 def test_the_fake_timer_link_shows_while_no_timer_is_connected(coordinator):
     html = coordinator.get("/timer/").content.decode()
     assert "NOT CONNECTED" in html

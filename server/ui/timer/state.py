@@ -63,7 +63,7 @@ def status(event, now: datetime) -> Status:
         state=state,
         connected=state != TimerStatus.State.NOT_CONNECTED,
         lanes=lanes,
-        reported_lanes=timer.reported_lane_count(row, lanes),
+        reported_lanes=timer.reported_lane_count(row, lanes, now),
         malfunction="" if malfunction == text else malfunction,
         details=timer.details(event),
         agent=row.agent,

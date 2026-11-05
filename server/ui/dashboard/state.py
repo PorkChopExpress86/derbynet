@@ -278,7 +278,7 @@ def build(request, event: Event, shown: Shown) -> Live:
         timer_age=_age(timer_row.last_contact, now),
         replay_age=_age(replay_row.last_contact, now),
         held=held,
-        reported_lanes=timer.reported_lane_count(timer_row, settings.lane_count),
+        reported_lanes=timer.reported_lane_count(timer_row, settings.lane_count, now),
     )
     context = present(payload, extras)
     signature = hashlib.sha256(_material(payload, extras, shown).encode()).hexdigest()[

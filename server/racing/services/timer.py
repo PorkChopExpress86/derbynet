@@ -393,10 +393,13 @@ def heats_scheduled(event_id: int) -> bool:
     return HeatLane.objects.filter(event_id=event_id).exists()
 
 
-def reported_lane_count(row: TimerStatus, lane_count: int) -> int | None:
-    """The lane count the timer reported, when it differs from the race's
+def reported_lane_count(row: TimerStatus, lane_count: int, now: datetime) -> int | None:
+    """The lane count the timer reports, when it differs from the race's
     (D74): the timer status card and the race dashboard show it beside the
-    race's."""
+    race's. A timer that is not connected (`TimerState`'s contact timeout)
+    reports nothing, so a count left by a timer gone away does not show."""
+    if TimerState.read(row, now).state == State.NOT_CONNECTED:
+        return None
     reported = row.reported_lane_count
     return reported if reported and reported != lane_count else None
 

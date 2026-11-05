@@ -323,7 +323,33 @@ def test_the_dashboard_shows_the_timers_lane_count_beside_the_races(
     assert RaceSettings.objects.get(event=event).lane_count == 4
     changed = coordinator.get("/dashboard/live/", shown)
     assert changed.status_code == 200
-    assert "The timer reports 6 lanes" in changed.content.decode()
+    # The timer status card's sentence, from the same partial.
+    assert "The timer reports 6 lanes, and the race has 4." in changed.content.decode()
+
+
+def test_the_dashboard_drops_the_timers_lane_count_once_the_timer_goes_away(
+    coordinator, event, wolves
+):
+    """D74 shows the count the timer reports now, not one from a timer past
+    the contact timeout; the poll's signature changes when it goes stale."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from racing.models import TimerStatus
+
+    scheduled(wolves)
+    timer.handle_message(event, {"message": "HELLO"})
+    timer.handle_message(event, {"message": "IDENTIFIED", "lane_count": "6"})
+    html = page_of(coordinator)
+    assert "The timer reports 6 lanes" in html
+    shown = {"sig": signature(html), "round": "", "heat": "", "hold": 0}
+    TimerStatus.objects.filter(event=event).update(
+        last_contact=timezone.now() - timedelta(hours=2)
+    )
+    stale = coordinator.get("/dashboard/live/", shown)
+    assert stale.status_code == 200
+    assert "data-reported-lanes" not in stale.content.decode()
 
 
 def test_not_monitoring_the_timer(coordinator, event):
