@@ -341,15 +341,18 @@ class _RoundRows:
 
 
 def _rows_by_round(rounds) -> dict[int, _RoundRows]:
+    """The rows of the rounds listed first. The later reads name those ids,
+    not the query again: under READ COMMITTED a round added in between
+    would show in them with no entry here (PR #205)."""
     rows = {round_id: _RoundRows() for round_id in rounds.values_list("id", flat=True)}
     for round_id, racer_id, passed in (
-        RosterEntry.objects.filter(round__in=rounds)
+        RosterEntry.objects.filter(round_id__in=list(rows))
         .order_by("id")
         .values_list("round_id", "racer_id", "racer__passed_inspection")
     ):
         rows[round_id].roster[racer_id] = passed
     for round_id, heat, racer_id, time, place in HeatLane.objects.filter(
-        round__in=rounds
+        round_id__in=list(rows)
     ).values_list("round_id", "heat", "racer_id", "finish_time", "finish_place"):
         round = rows[round_id]
         round.charted.add(racer_id)
