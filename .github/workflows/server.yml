@@ -311,8 +311,8 @@ jobs:
           bash testing/test-unused-lanes.sh http://127.0.0.1:8080
 
       # The suites that race heats through timer-message (#32) with run_heat
-      # and need no endpoint of another ticket.  test-basic-racing.sh waits
-      # for history.php (#49).
+      # and need no endpoint of another ticket.  test-basic-racing.sh runs in
+      # group 3, with the award suite that follows it.
       - name: Run the timer-message suites against Django
         if: matrix.group == 1
         working-directory: .
@@ -339,7 +339,7 @@ jobs:
       # The award suite (#33) after the master schedule, then test-new-rounds.sh
       # (#41), in testing/exercise-one-database.sh order.  `test-awards.sh
       # basic`, and the first test-new-rounds.sh run after it, follow
-      # test-basic-racing.sh, which reads history.php (#49), so they wait.
+      # test-basic-racing.sh in group 3.
       - name: Run the award suite against Django
         if: matrix.group == 2
         working-directory: .
@@ -379,7 +379,7 @@ jobs:
 
       # The scene, playlist, message relay and preferences suites (#34), in
       # testing/exercise-one-database.sh order.  test-scenes.sh runs there
-      # after test-basic-racing.sh, which waits for history.php (#49); it needs
+      # after test-basic-racing.sh, which runs in group 3; it needs
       # only the scenes of a reset database, which keep the ids 1 to 6 that it
       # and test-playlist.sh and test-preferences.sh name.  DERBYNET_BACKEND
       # makes test-scenes.sh expect no Wrap-Up page for Aux2 (D10, #52).
@@ -398,7 +398,7 @@ jobs:
       # The photo and slideshow suites (#35), in testing/exercise-one-database.sh
       # order. photo-setup.sh uploads the photos the others assign, and
       # test-photo-assignments.sh takes the master car numbers, since
-      # test-basic-racing.sh waits for history.php (#49).  DERBYNET_BACKEND
+      # test-basic-racing.sh runs in its own step.  DERBYNET_BACKEND
       # makes test-photo-manipulations.sh expect upright EXIF renders (#73).
       - name: Run the photo and slide suites against Django
         if: matrix.group == 3
@@ -420,6 +420,25 @@ jobs:
           bash testing/test-slide-next.sh http://127.0.0.1:8080
           bash testing/test-photo-manipulations.sh http://127.0.0.1:8080
           bash testing/test-photo-upload.sh http://127.0.0.1:8080
+
+      # test-basic-racing.sh (#49), then `test-awards.sh basic` and
+      # test-new-rounds.sh, which read what it leaves, in
+      # testing/exercise-one-database.sh order.  The photo, role and
+      # permission steps before it there run in their own steps.
+      # DERBYNET_BACKEND makes test-basic-racing.sh expect Django's F
+      # statistic on history.php, which sums every lane (#20 Q24).
+      - name: Run the basic racing and award suites against Django
+        if: matrix.group == 3
+        working-directory: .
+        env:
+          DERBYNET_BACKEND: django
+        run: |
+          bash testing/reset-database.sh http://127.0.0.1:8080
+          bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-den-changes.sh http://127.0.0.1:8080
+          bash testing/test-basic-racing.sh http://127.0.0.1:8080
+          bash testing/test-awards.sh http://127.0.0.1:8080 basic
+          bash testing/test-new-rounds.sh http://127.0.0.1:8080
 
       - name: Run the result import suite against Django
         if: matrix.group == 3

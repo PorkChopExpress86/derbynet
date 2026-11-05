@@ -2092,6 +2092,15 @@
       "expected": "deviations/Q25/reschedule.http"
     },
     {
+      "quirk": "D33",
+      "fixture": "http/kiosks/standings-edge-cases.http",
+      "exchanges": [
+        "001 standings-kiosk"
+      ],
+      "reason": "PHP's standings kiosk leaves out the excluded racer and adds a row 'Results for 1 ineligible racer not shown'; Django lists the racer in score order, marked not eligible, with no place (D33). Only the rows of the presentation shown are recorded, as [place, car, name, why].",
+      "expected": "deviations/D33/standings-edge-cases.http"
+    },
+    {
       "quirk": "D34",
       "fixture": "http/racers/import-partition-case.http",
       "exchanges": [

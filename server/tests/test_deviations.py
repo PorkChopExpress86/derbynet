@@ -84,6 +84,7 @@ WRITERS = [
     "racing.engine.tests.test_lane_bias",
     "racing.engine.tests.test_speed_awards_parity",
     "racing.tests.test_award_current_parity",
+    "ui.tests.test_kiosk_standings_parity",
     "tools/reschedule_deviations.py",
 ]
 

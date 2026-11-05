@@ -115,6 +115,10 @@ orientation 6 come out.  The PHP server ignores the tag (#73) and won't be
 fixed, so by default the script expects PHP's sideways renders.  With
 `DERBYNET_BACKEND=django` it expects upright ones.
 
+`test-basic-racing.sh` checks the lane bias F statistic on `history.php`.  PHP
+prints 0.090, because its sums of squares count one lane twice and leave out
+the last (#20 Q24).  With `DERBYNET_BACKEND=django` it expects Django's 0.073.
+
 `test-reschedule.sh` checks PHP's charts by default.  With
 `DERBYNET_BACKEND=django` it expects the charts and car numbers of Django,
 which keeps the running and staged heats (D34, Q20), and the `notonroster`

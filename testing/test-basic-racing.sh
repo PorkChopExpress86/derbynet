@@ -249,5 +249,11 @@ curl_page history.php | page_text | expect_sentence "1.757 sample variance."
 curl_page history.php | page_text | expect_sentence "1.867 sample variance."
 curl_page history.php | page_text | expect_sentence "1.832 sample variance."
 curl_page history.php | page_text | expect_sentence "1.966 sample variance."
-curl_page history.php | page_text | expect_sentence "F statistic is 0.090 with df1=3 and df2=85"
+if [ "$DERBYNET_BACKEND" = django ] ; then
+    # Django sums every lane's squares (#20 Q24).  PHP's second loop counts
+    # the second-to-last lane twice and leaves out the last one.
+    curl_page history.php | page_text | expect_sentence "F statistic is 0.073 with df1=3 and df2=85"
+else
+    curl_page history.php | page_text | expect_sentence "F statistic is 0.090 with df1=3 and df2=85"
+fi
 
