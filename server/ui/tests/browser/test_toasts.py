@@ -6,7 +6,7 @@ from playwright.sync_api import expect
 
 
 @pytest.fixture
-def gallery(page, event, settings):
+def gallery(settings, page, event):
     settings.ENABLE_TEST_ENDPOINTS = True
     page.clock.install()
     page.goto("/components/")
@@ -93,7 +93,7 @@ def test_a_server_failure_shows_a_toast(gallery, page_errors):
     )
 
 
-def test_sortablejs_loads_only_on_a_page_with_a_sortable_list(page, event, settings):
+def test_sortablejs_loads_only_on_a_page_with_a_sortable_list(settings, page, event):
     settings.ENABLE_TEST_ENDPOINTS = True
     loaded = []
     page.on("request", lambda r: "sortable-" in r.url and loaded.append(r.url))

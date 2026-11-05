@@ -404,7 +404,19 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     held = []
     page.route("**/kiosks/board/**", lambda route: held.append(route))
     Kiosk.objects.filter(address="tv").update(name="Lobby")
-    page.wait_for_function("() => document.querySelector('#kiosk-board.htmx-request')")
+    # Wait for the held poll itself, not the board's htmx-request class: a
+    # poll sent before the route can still be out, and its reply, carrying
+    # the new name, could swap the switcher between the click's mousedown
+    # and mouseup. The click then lands on the board, not the button, and
+    # no POST goes out (CI on #193 and #199, held open by a mouse.down()
+    # with the reply released before mouse.up()). The board polls one at a
+    # time (`hx-sync="this:drop"`), so with this one held no reply comes.
+    for _ in range(500):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    assert held, "no poll was out within 10 s"
+    expect(page.locator("#kiosk-board.htmx-request")).to_have_count(1)
     with htmx_post(page, "/kiosks/scene/"):
         scene_button(page, racing).click()
         page.unroute("**/kiosks/board/**")

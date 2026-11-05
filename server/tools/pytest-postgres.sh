@@ -17,14 +17,26 @@ SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 NAME="derbynet-pytest-postgres-$$"
 trap 'docker rm -f -v "$NAME" >/dev/null 2>&1 || true' EXIT
 
+# Say which step failed: a busy machine once gave up waiting for Postgres
+# with no message and an empty pytest log (#52 retro).
+trap 'echo "pytest-postgres.sh: line $LINENO: \`$BASH_COMMAND\` failed" >&2' ERR
+
 docker run -d --name "$NAME" -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=derbynet \
        -p 127.0.0.1::5432 postgres:17 >/dev/null
 PORT="$(docker port "$NAME" 5432/tcp | head -1 | sed 's/.*://')"
-for _ in $(seq 1 30); do
+# Under CPU load (tools/pytest-under-load.sh) Postgres can take over 30 s.
+WAIT="${DERBYNET_PG_WAIT:-120}"
+for _ in $(seq 1 "$WAIT"); do
   docker exec "$NAME" pg_isready -U postgres -q && break
   sleep 1
 done
-docker exec "$NAME" pg_isready -U postgres -q
+if ! docker exec "$NAME" pg_isready -U postgres -q; then
+  echo "pytest-postgres.sh: Postgres in $NAME was not ready after $WAIT s" \
+       "(set DERBYNET_PG_WAIT); its last log lines:" >&2
+  docker logs --tail 20 "$NAME" >&2 || true
+  exit 1
+fi
+trap - ERR
 
 cd "$SERVER_DIR"
 DATABASE_URL="postgres://postgres:postgres@127.0.0.1:$PORT/derbynet" uv run pytest "$@"

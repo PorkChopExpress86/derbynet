@@ -147,7 +147,7 @@ def test_the_kiosk_and_camera_entries(page, event):
         expect(page.get_by_role("link", name=name)).to_be_visible()
 
 
-def test_the_documentation_hint_hides_when_settings_are_locked(page, event, settings):
+def test_the_documentation_hint_hides_when_settings_are_locked(settings, page, event):
     page.goto("/login/")
     page.locator('button[data-role="RaceCrew"]').click()
     expect(page.locator("[data-docs-hint]")).to_be_visible()
