@@ -204,10 +204,11 @@ def test_plain_http_away_from_localhost_links_to_https(
 
 def test_debug_shows_the_log_on_both_pages(login, event):
     page = login("RaceCoordinator")
-    page.goto("/replay/")
-    expect(page.locator("#debug")).to_be_hidden()
+    # The first page to poll gets HELLO; a second within 10 s does not.
     open_replay(page, "/replay/?debug")
     expect(page.locator("#log")).to_contain_text("HELLO")
+    page.goto("/replay/")
+    expect(page.locator("#debug")).to_be_hidden()
     page.goto("/replay/camera/?debug")
     expect(page.locator("#log")).to_be_visible()
 
