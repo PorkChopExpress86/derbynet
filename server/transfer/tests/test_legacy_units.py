@@ -8,7 +8,7 @@ import pytest
 
 from transfer.legacy.photos import relative_parts
 from transfer.legacy.upgrade import upgrade
-from transfer.legacy.values import BadValue, kiosk_page, local_time
+from transfer.legacy.values import BadValue, local_time
 
 
 def _v1_tables():
@@ -37,7 +37,8 @@ def test_upgrade_from_schema_1_adds_columns_tables_and_partitions():
         (1, "Welcome"),
         (2, "Opening"),
     ]
-    assert len(tables["scenekiosk"]) == 14
+    # PHP's 14, less Wrap-Up's local/kiosks/feedback.kiosk (#52).
+    assert len(tables["scenekiosk"]) == 13
     assert tables["partitions"] == [
         {"partitionid": 7, "name": "Default", "rankid": 7, "sortorder": None},
         {"partitionid": 8, "name": "Wolves", "rankid": 8, "sortorder": None},
@@ -111,18 +112,3 @@ def test_an_autumn_wall_time_reads_as_its_first_occurrence():
 )
 def test_relative_parts_reads_windows_and_posix_paths(path, directory, parts):
     assert relative_parts(path, directory) == parts
-
-
-def test_kiosk_page_splits_reload_and_params():
-    assert kiosk_page('!kiosks/x.kiosk#{"a":1}') == ("kiosks/x.kiosk", '{"a":1}', True)
-    assert kiosk_page(None) == ("", "", False)
-
-
-def test_kiosk_params_stay_the_text_php_stored():
-    """PHP never parses the parameters: `testing/test-scenes.sh` stores
-    `{confetti:false}` and the kiosk capture `title=Final Standings`."""
-    assert kiosk_page("kiosks/x.kiosk#{confetti:false}") == (
-        "kiosks/x.kiosk",
-        "{confetti:false}",
-        False,
-    )

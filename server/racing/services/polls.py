@@ -799,13 +799,49 @@ POLL_VALUES: Mapping[str, PollValue] = MappingProxyType(
 """`query=poll`'s value keys, each to the function that answers it."""
 
 
+def _intermission(run: Running, args: PollArgs) -> dict:
+    """The open playlist intermission (D12), for the racing kiosks: the round
+    that ended, its leaders best first, and the step that waits. None when
+    the playlist waits on nothing."""
+    from racing.services import playlist
+
+    found = playlist.intermission(run.state.event, run.state)
+    if found is None:
+        return {"intermission": None}
+    style = run.settings.name_style
+    return {
+        "intermission": {
+            "ended": (
+                f"{found.ended_group}, Round {found.ended_round}"
+                if found.ended_round is not None
+                else ""
+            ),
+            "next": f"{found.next_group}, Round {found.next_round}",
+            "leaders": [
+                {
+                    "place": i,
+                    "carnumber": r.car_number,
+                    "name": mangled_name(r.first_name, r.last_name, style),
+                }
+                for i, r in enumerate(found.leaders, 1)
+            ],
+        }
+    }
+
+
+DJANGO_POLL_VALUES: Mapping[str, PollValue] = MappingProxyType(
+    {"intermission": _intermission}
+)
+"""`query=poll` value keys PHP has no counterpart for (D12)."""
+
+
 def poll(event: Event, values: str, args: PollArgs) -> dict:
     """`query=poll&values=a,b,...`: each known key's keys, in the order
     asked. An unknown key adds nothing."""
     run = running(event)
     out: dict = {}
     for key in values.split(","):
-        value = POLL_VALUES.get(key)
+        value = POLL_VALUES.get(key) or DJANGO_POLL_VALUES.get(key)
         if value is not None:
             out.update(value(run, args))
     return out

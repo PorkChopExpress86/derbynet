@@ -204,6 +204,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         php="slideshow.php",
         icon="slideshow",
         phone_rank={ANONYMOUS_ROLE: 3},
+        view="ui.kiosk_pages.views.slideshow",
     ),
     NavEntry(
         "ondeck",
@@ -216,6 +217,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         short_label="On Deck",
         icon="ondeck",
         phone_rank={"RaceCrew": 3, ANONYMOUS_ROLE: 2, OTHER_ROLES: 5},
+        view="ui.kiosk_pages.views.ondeck",
     ),
     NavEntry(
         "racer-results",

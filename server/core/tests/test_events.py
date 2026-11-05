@@ -45,8 +45,19 @@ EXPECTED_SCENE_KIOSKS = {
     ("Awards", "Main", "kiosks/award-presentations.kiosk"),
     ("Wrap-Up", "Main", "kiosks/standings.kiosk"),
     ("Wrap-Up", "Aux1", "kiosks/derbynet.kiosk"),
-    ("Wrap-Up", "Aux2", "local/kiosks/feedback.kiosk"),
 }
+
+
+def test_a_fresh_event_has_no_scene_page_outside_the_registry():
+    """PHP seeds `local/kiosks/feedback.kiosk` for Wrap-Up's Aux2, a page
+    not in the repository (#52)."""
+    from kiosks.pages import PAGES
+
+    event = new_event("Pack 1 Derby")
+
+    pages = set(SceneKiosk.objects.filter(event=event).values_list("page", flat=True))
+    assert pages <= set(PAGES)
+    assert not SceneKiosk.objects.filter(page__contains="feedback").exists()
 
 
 def test_migrate_and_new_event_seed_the_legacy_award_types_and_scenes_exactly():

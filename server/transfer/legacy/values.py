@@ -99,19 +99,3 @@ def unix_time(value, *, scale=1):
         return datetime.fromtimestamp(count / scale, tz=UTC)
     except OverflowError, OSError, ValueError:
         raise BadValue(f"{value!r} is out of range") from None
-
-
-def kiosk_page(raw):
-    """Split a legacy kiosk page into `(page, params, reload_requested)`.
-
-    PHP marks a pending reload with a leading `!` (`mark_kiosk_for_reload()`)
-    and appends parameters after `#` (`parse_kiosk_params()`). The parameters
-    stay the text PHP stored, which PHP never parses: `testing/test-scenes.sh`
-    stores `{confetti:false}`.
-    """
-    page = text(raw)
-    reload = page.startswith("!")
-    if reload:
-        page = page[1:]
-    page, _, params = page.partition("#")
-    return page, params, reload

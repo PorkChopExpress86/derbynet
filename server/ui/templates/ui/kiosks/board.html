@@ -38,8 +38,10 @@
         {% if k.reload %}<p class="mt-1">{% include "ui/components/status_pill.html" with state="warn" text="Reloading" %}</p>{% endif %}
       </div>
     </div>
-    {% if can_control %}
+    {# Preview opens the kiosk's page with its parameters in a new window; kiosk.php's preview registers no kiosk and changes nothing (#52). #}
     <div class="mt-auto flex flex-wrap gap-2 border-t border-line p-2">
+      <a href="{% url 'kiosk-php' %}?{{ k.preview }}" target="_blank" rel="noopener" data-action="preview" class="flex min-h-11 grow basis-24 items-center justify-center rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Preview</a>
+    {% if can_control %}
       <button type="button" hx-get="{% url 'kiosks-page' %}?address={{ k.address|urlencode }}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="kioskSheet.open('Page for {{ k.name|default:k.madlib|escapejs }}', $event)" aria-haspopup="dialog" data-action="page" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Page</button>
       <button type="button" hx-get="{% url 'kiosks-name' %}?address={{ k.address|urlencode }}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="kioskSheet.open('Name {{ k.name|default:k.madlib|escapejs }}', $event)" aria-haspopup="dialog" data-action="name" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Name</button>
       {% if k.page.configurable %}
@@ -47,8 +49,8 @@
       {% endif %}
       <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-reload' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:replace" data-action="reload" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Reload</button>
       <button type="button" name="address" value="{{ k.address }}" hx-post="{% url 'kiosks-identify' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="#kiosk-board:replace" data-action="identify" class="min-h-11 grow basis-24 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2">Identify</button>
-    </div>
     {% endif %}
+    </div>
   </li>
   {% endfor %}
 </ul>

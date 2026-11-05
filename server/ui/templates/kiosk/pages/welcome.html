@@ -1,0 +1,9 @@
+{% extends "kiosk/base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block banner %}{% endblock %}
+{% block main %}
+<div class="k-center">
+  <img class="k-enter" src="{% url 'image-php' 'emblem' %}" alt="">
+  <p class="k-title k-enter-2">Welcome</p>
+</div>
+{% endblock %}

@@ -53,6 +53,12 @@ def ui_patterns(patterns=None, prefix=""):
 
 ROUTES = sorted({route: view for route, view in ui_patterns()}.items())
 
+# `kiosk.php` registers the kiosk and records its contact on a GET, and keeps
+# a kiosk with no address on one address through its session, as PHP's
+# `kiosk_page()` and `address_for_current_kiosk()` do; `poll.kiosk` is
+# `get_writes` in the registry for the same reason (#52).
+GET_WRITES = {"kiosk.php", "derbynet/kiosk.php"}
+
 
 def module_names(view) -> list[str]:
     """Every short lowercase string constant in the view's module, and in
@@ -195,8 +201,11 @@ def test_a_get_writes_nothing(coordinator, race, event, route, view):
     )
     for word in words_for(route, view):
         url = fill(route, race, word)
-        with no_session_writes(), no_db_writes():
+        if route in GET_WRITES:
             response = coordinator.get(url, HTTP_HX_REQUEST="true")
+        else:
+            with no_session_writes(), no_db_writes():
+                response = coordinator.get(url, HTTP_HX_REQUEST="true")
         assert response.status_code < 500, (url, response.status_code)
 
 

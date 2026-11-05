@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from awards.models import Award, AwardType, BallotAward, Vote, Voter
 from core.models import ActionLog
+from kiosks import pages
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round
 from roster.models import (
@@ -431,15 +432,19 @@ def _scene(row, ctx):
 
 
 def _page(ctx, table, legacy_id, raw):
-    page, params, reload = values.kiosk_page(raw)
-    if page.startswith("local/"):
+    """The registry key, parameters and reload flag of a legacy page string.
+    A page with no registry entry, any `local/kiosks/` page among them,
+    shows the identify page (D10, #52)."""
+    found = pages.from_legacy(values.text(raw))
+    if found.unknown:
         ctx.report.add(
-            Kind.LOCAL_KIOSK_PAGE,
+            Kind.UNKNOWN_KIOSK_PAGE,
             table,
             legacy_id,
-            f"page {page!r} is a local PHP kiosk, which Django cannot show",
+            f"page {found.unknown!r} is not a built-in kiosk page, so the kiosk"
+            " shows the identify page",
         )
-    return page, params, reload
+    return found.page, found.params, found.reload
 
 
 def _scene_kiosk(row, ctx):

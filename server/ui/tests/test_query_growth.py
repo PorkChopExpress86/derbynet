@@ -65,6 +65,23 @@ URLS = [
     "/timer/test/",
     "/timer/test/live/",
     "/timer/fake/",
+    "/ondeck/",
+    "/slideshow/",
+    "/kiosk/check-in/",
+    "/kiosk/standings/",
+    *(
+        f"/kiosk.php?page=kiosks/{name}.kiosk"
+        for name in (
+            "now-racing",
+            "now-racing-columnar",
+            "ondeck",
+            "please-check-in",
+            "results-by-racer",
+            "standings",
+            "award-presentations",
+            "identify",
+        )
+    ),
 ]
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 # An element whose hx-get names a URL and whose trigger polls.

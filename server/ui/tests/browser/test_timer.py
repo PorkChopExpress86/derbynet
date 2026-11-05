@@ -128,9 +128,9 @@ def test_only_a_race_coordinator_gets_the_timer_settings_button(page, event):
 
 def skip_timer_files(page, page_errors):
     """The guard leaves `/timer.php` while the browser's preload scanner is
-    still fetching the timer's files, and Playwright reports no end for a
-    script cut off by a navigation. They are refused here instead, so each
-    request ends; the page leaves before it would run them."""
+    still fetching the timer's files; the page leaves before it would run
+    them, so they are refused here. A refusal can come after the guard's
+    navigation, and the harness then drops the request it cut off."""
     page.route(re.compile(r"/(js|css|img)/"), lambda route: route.abort())
     page_errors.allow(r"request failed: \S*/(js|css|img)/\S* net::ERR_FAILED$")
     page_errors.allow(r"^console: Failed to load resource: net::ERR_FAILED$")

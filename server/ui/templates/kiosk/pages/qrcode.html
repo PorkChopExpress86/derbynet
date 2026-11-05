@@ -1,0 +1,9 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}QR Code{% endblock %}
+{% block scripts %}<script src="{% static 'ui/vendor/qrcode-generator-1.4.4.js' %}"></script><script src="{% static 'ui/kiosk-simple.js' %}"></script>{% endblock %}
+{% block main %}
+<div class="k-qr">
+  <h2 class="k-enter" data-qr-title>{{ params.title }}</h2>
+  <div class="k-enter-2" data-qr hidden></div>
+</div>
+{% endblock %}

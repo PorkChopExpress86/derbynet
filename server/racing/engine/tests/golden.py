@@ -124,6 +124,11 @@ QUIRK_DECISIONS = {
     "P5": "fix",
     "P6": "fix",
     "P7": "fix",
+    # Rows of #64 that the #52 kiosk pages fix, as the ticket's "PHP defects
+    # to fix" lists them.
+    "S12": "fix",
+    "S28": "fix",
+    "C34": "fix",
 }
 
 

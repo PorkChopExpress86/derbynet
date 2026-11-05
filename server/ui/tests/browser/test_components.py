@@ -7,7 +7,10 @@ from ui.tests.browser.conftest import assert_accessible, shoot
 
 
 @pytest.fixture
-def gallery(page, event, settings):
+def gallery(settings, page, event):
+    """`settings` comes before `page`, so the test endpoints stay on until
+    the page has closed: its 2 s poll could otherwise reach the server after
+    `settings` turned them off and log a 404 (seen on Postgres)."""
     settings.ENABLE_TEST_ENDPOINTS = True
     page.goto("/components/")
     page.wait_for_load_state("networkidle")

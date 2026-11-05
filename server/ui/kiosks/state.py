@@ -8,6 +8,7 @@ applied last (C19). Each kiosk's parameters are its own (C20).
 """
 
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 from core.models import RaceState
 from kiosks import parameters
@@ -109,6 +110,9 @@ class Card:
     page: Shown
     summary: str
     reload: bool
+    # The query of `kiosk.php` that previews the kiosk's page with its
+    # parameters, registering nothing (#52).
+    preview: str = ""
 
 
 @dataclass(frozen=True)
@@ -146,6 +150,7 @@ def board(event, now) -> Board:
             page=Shown.of(k.page),
             summary=summary(k.page, parameters.stored(k.params), groups),
             reload=k.reload_requested,
+            preview=urlencode({"page": k.page, "parameters": k.params or "{}"}),
         )
         for k in listed
     ]

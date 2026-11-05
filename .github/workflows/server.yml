@@ -381,10 +381,13 @@ jobs:
       # testing/exercise-one-database.sh order.  test-scenes.sh runs there
       # after test-basic-racing.sh, which waits for history.php (#49); it needs
       # only the scenes of a reset database, which keep the ids 1 to 6 that it
-      # and test-playlist.sh and test-preferences.sh name.
+      # and test-playlist.sh and test-preferences.sh name.  DERBYNET_BACKEND
+      # makes test-scenes.sh expect no Wrap-Up page for Aux2 (D10, #52).
       - name: Run the scene, playlist and messaging suites against Django
         if: matrix.group == 1
         working-directory: .
+        env:
+          DERBYNET_BACKEND: django
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/test-scenes.sh http://127.0.0.1:8080

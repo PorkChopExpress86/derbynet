@@ -1,0 +1,16 @@
+{# The racers who have not passed inspection, by group (please-check-in.kiosk), or the emblem once every racer has. data-title is the banner's. #}
+{% if waiting %}
+<span data-title="Please Check In" hidden></span>
+<p class="k-heading">These racers have not checked in yet:</p>
+<div class="k-wanted" data-wanted>
+  {% for group in waiting %}
+  <section data-group>
+    <h2>{{ group.group }}</h2>
+    <ul>{% for name in group.names %}<li>{{ name }}</li>{% endfor %}</ul>
+  </section>
+  {% endfor %}
+</div>
+{% else %}
+<span data-title="All Racers Have Checked In" hidden></span>
+<img class="k-enter" src="{% url 'image-php' 'emblem' %}" alt="" data-all-in>
+{% endif %}

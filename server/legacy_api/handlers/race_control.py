@@ -407,6 +407,9 @@ def poll_coordinator(ctx: LegacyContext) -> None:
     + (
         "D48: a partition with car number ranges carries carranges in the"
         " partitions list; PHP has no such key.",
+        "D12: the value intermission answers the open playlist intermission,"
+        " the round that ended and its leaders, for the racing kiosks (#52);"
+        " PHP has no such value.",
     ),
 )
 def poll(ctx: LegacyContext) -> None:

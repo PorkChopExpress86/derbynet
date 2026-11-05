@@ -42,3 +42,22 @@ def test_a_navigation_drops_an_image_still_loading(page, event):
         )
     page.goto("/login/")
     assert not [r for r in page.in_flight.requests if "held-image" in r.url]
+
+
+def test_a_navigation_drops_a_script_still_loading(page, event):
+    """The Web Serial guard on `/timer.php` leaves the page while the
+    preload scanner still fetches the timer's scripts, and Playwright
+    reports no end for them, so the drain waited 10 s on them (#50, seen
+    in CI on #52's PR when the route that refused them answered late)."""
+    page.route("**/held-script.js", lambda route: None)
+    page.goto("/login/")
+    with page.expect_request("**/held-script.js"):
+        page.evaluate(
+            """() => {
+              const script = document.createElement('script');
+              script.src = '/held-script.js';
+              document.body.append(script);
+            }"""
+        )
+    page.goto("/login/")
+    assert not [r for r in page.in_flight.requests if "held-script" in r.url]

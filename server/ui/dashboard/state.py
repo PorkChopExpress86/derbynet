@@ -22,17 +22,14 @@ from django.utils import timezone
 from accounts.permissions import Perm, allows
 from core.models import Event, RaceSettings, RaceState
 from kiosks.models import ReplayStatus
-from racing.engine.standings import finalists
 from racing.models import HeatLane, Round, TimerStatus
-from racing.services import finals, lanes, master, polls
-from racing.services.standings import standings_snapshot
+from racing.services import finals, lanes, master, playlist, polls
 from roster.models import Racer
 from roster.services.racers import HEADSHOTS
 from ui.dashboard.presenter import Extras, Held, present, strip_seconds
 from ui.responses import racer_name
 
 HOLD_MS = 10_000
-LEADERS = 3
 MASTER_LIST = 8
 PHOTO_RENDER = "80x80"
 
@@ -109,38 +106,26 @@ def _hold(
 
 def _intermission(event: Event, state: RaceState) -> dict | None:
     """The playlist step that waits for the race coordinator (D12): the round
-    that ended, its leaders, and the round that starts next."""
-    entry = state.waiting_entry
-    if entry is None:
+    that ended, its leaders, and the round that starts next, from
+    `racing.services.playlist.intermission`."""
+    found = playlist.intermission(event, state)
+    if found is None:
         return None
-    nxt = Round.objects.filter(
-        group_id=entry.group_id, number=entry.round_number
-    ).first()
-    info = {
-        "next_name": f"{entry.group.name}, Round {entry.round_number}",
-        "next_racers": nxt.roster.count() if nxt else 0,
-        "ended_name": "",
-        "leaders": [],
-    }
-    ended = state.ended_round
-    if ended is not None:
-        info["ended_name"] = f"{ended.group.name}, Round {ended.number}"
-        standings = standings_snapshot(event).standings
-        cut = finalists.from_round(
-            standings, ended.id, ended.group_id, bucketed=False, limit=LEADERS
-        )
-        picked = [f.racer_id for f in cut.finalists][:LEADERS]
-        by_id = Racer.objects.in_bulk(picked)
-        info["leaders"] = [
+    return {
+        "next_name": f"{found.next_group}, Round {found.next_round}",
+        "next_racers": found.next_racers,
+        "ended_name": f"{found.ended_group}, Round {found.ended_round}"
+        if found.ended_round is not None
+        else "",
+        "leaders": [
             {
                 "place": i,
-                "car": by_id[pk].car_number,
-                "name": racer_name(by_id[pk].first_name, by_id[pk].last_name),
+                "car": r.car_number,
+                "name": racer_name(r.first_name, r.last_name),
             }
-            for i, pk in enumerate(picked, 1)
-            if pk in by_id
-        ]
-    return info
+            for i, r in enumerate(found.leaders, 1)
+        ],
+    }
 
 
 def _finals(event: Event) -> tuple[list[dict], list[dict]]:

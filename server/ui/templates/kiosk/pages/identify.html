@@ -1,0 +1,12 @@
+{% extends "kiosk/base.html" %}{% load static %}
+{% block title %}Identify{% endblock %}
+{% block banner_title %}DerbyNet Kiosk{% endblock %}
+{% block scripts %}<script src="{% static 'ui/kiosk-simple.js' %}"></script>{% endblock %}
+{% block main %}
+<div class="k-center">
+  <p class="k-title k-enter" data-madlib>{{ madlib }}</p>
+  <p class="k-big k-enter-2" data-kiosk-name>{{ kiosk.name }}</p>
+  <p class="k-subtitle k-enter-3" data-window-size></p>
+  <p class="k-subtitle k-enter-3" data-address>{{ shown_address }}</p>
+</div>
+{% endblock %}
