@@ -1,0 +1,38 @@
+{% extends "ui/base.html" %}
+{% load static %}
+{# camera.php (#53): this device's camera as the replay page's Remote Camera. #}
+{% block head %}
+{{ config|json_script:"replay-config" }}
+<link rel="stylesheet" href="{% static 'ui/camera.css' %}">
+{# The WebRTC shim camera.php loads as js/adapter.js, pinned (ui/static/ui/vendor/VENDORED.md). #}
+<script src="{% static 'ui/vendor/adapter-9.0.6.js' %}"></script>
+<script src="{% static 'ui/message-poller.js' %}"></script>
+<script src="{% static 'ui/camera-signaling.js' %}"></script>
+<script src="{% static 'ui/video-device-picker.js' %}"></script>
+<script src="{% static 'ui/camera.js' %}"></script>
+{% endblock %}
+{% block main %}
+<div class="flex flex-col gap-4" data-camera-page>
+  <div id="no-camera-warning" role="alert" class="rounded-xl border border-danger bg-danger-soft px-4 py-3 text-danger-ink" hidden>
+    <h2 id="reject" class="font-semibold">Access to cameras is blocked.</h2>
+  </div>
+  <section aria-labelledby="cam-h" class="rounded-2xl border border-line bg-surface p-4">
+    <h2 id="cam-h" class="text-lg font-semibold">This camera</h2>
+    <p class="mt-1 text-sm text-ink-muted">Keep this page open. The replay station can now choose Remote Camera.</p>
+    <div class="mt-3 overflow-hidden rounded-xl bg-black">
+      <video id="preview" autoplay muted playsinline class="aspect-video w-full object-contain"></video>
+    </div>
+    <p class="mt-2 text-sm text-ink-muted">Sending <span id="stream-size" data-stream-size>no video yet</span></p>
+    <p id="camera-error" role="alert" class="mt-2 text-sm text-danger" hidden></p>
+    <div class="mt-3">
+      <label for="device-picker" class="block text-sm font-medium">Camera</label>
+      <select id="device-picker" class="mt-1 h-12 w-full rounded-xl border border-field bg-surface px-3"><option value="">Please wait</option></select>
+    </div>
+    <label class="mt-3 flex min-h-11 items-center gap-3">
+      <input type="checkbox" id="show-preview" checked class="size-5">
+      <span>Show preview</span>
+    </label>
+  </section>
+  <div id="log" class="camera-log" role="log" aria-label="Camera log"{% if not config.debug %} hidden{% endif %}></div>
+</div>
+{% endblock %}

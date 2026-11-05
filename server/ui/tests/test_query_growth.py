@@ -65,6 +65,8 @@ URLS = [
     "/timer/test/",
     "/timer/test/live/",
     "/timer/fake/",
+    "/replay/",
+    "/replay/camera/",
     "/ondeck/",
     "/slideshow/",
     "/kiosk/check-in/",

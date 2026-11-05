@@ -5,6 +5,7 @@ changes only it. Commands are rows written in the caller's transaction, so
 a rollback drops them with the race-state change that sent them.
 """
 
+import re
 from datetime import datetime, timedelta
 
 from django.db import transaction
@@ -97,3 +98,43 @@ def race_starts(settings: RaceSettings) -> str:
 
 def test(settings: RaceSettings) -> str:
     return f"TEST {_timing(settings)}"
+
+
+_ICE_SEPARATORS = re.compile(r"[\s,]+")
+
+
+def ice_servers(text: str) -> list[dict]:
+    """The WebRTC `iceServers` of the `replay_ice_servers` setting: one
+    server entry with every URL in it, or none for an empty setting, which
+    leaves the replay page and the camera to host candidates on a LAN with
+    no internet (#53)."""
+    urls = [url for url in _ICE_SEPARATORS.split(text) if url]
+    return [{"urls": urls}] if urls else []
+
+
+def page_settings(settings: RaceSettings) -> dict:
+    """What the replay page and the remote camera are given when they load
+    (#53). Skipback, showings and rate also come with each command, which
+    the page reads instead; the post-roll and the maximum clip length come
+    only here (D18). The websocket URL is empty, so both pages poll in v1;
+    #56 decides the push channel."""
+    return {
+        "skipback_ms": settings.replay_skipback_ms,
+        "showings": settings.replay_num_showings,
+        "rate": settings.replay_rate,
+        "post_roll_ms": settings.replay_post_roll_ms,
+        "max_clip_ms": settings.replay_max_clip_ms,
+        "upload_videos": settings.upload_videos,
+        "ice_servers": ice_servers(settings.replay_ice_servers),
+        "websocket_url": "",
+    }
+
+
+def clip_length_ms(settings: RaceSettings) -> int:
+    """D18: a clip runs `skipback` before the finish and the post-roll after
+    it, at most the maximum clip length. The replay page computes the same
+    from each command's skipback (ui/static/ui/replay.js)."""
+    return min(
+        settings.replay_skipback_ms + settings.replay_post_roll_ms,
+        settings.replay_max_clip_ms,
+    )

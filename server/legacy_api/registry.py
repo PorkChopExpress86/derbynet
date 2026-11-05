@@ -329,6 +329,46 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
     "slideshow.php": (
         "D10: rebuilt (ADR-10); each slide fades in over the one before.",
     ),
+    "replay.php": (
+        "D20: a 301 to /replay/, the query string kept.",
+        "D5, D9, D16: needs CONTROL_RACE, the replay login; PHP's page is"
+        " anonymous, so the owner ran it in a browser kept logged out.",
+        "D9: the setup picks the camera, the resolution and the frame rate,"
+        " opens the camera with them as exact constraints, and this browser"
+        " remembers them; PHP asks for the window's size as ideal values and"
+        " remembers nothing.",
+        "D18: a clip runs from replay-skipback before the finish to the"
+        " post-roll after it, its start cut to the longest-clip setting, and"
+        " the setup shows these settings with a link to the settings page;"
+        " PHP stops recording at the finish and plays the last"
+        " replay-skipback ms. The operator's delay counts from the end of the"
+        " post-roll, where recording now stops; PHP's counts from the"
+        " finish, where its recording stopped.",
+        "D76: the replay_ice_servers setting lists the STUN or TURN servers,"
+        " PHP's hardcoded Google STUN server by default; empty means host"
+        " candidates only, for a LAN with no internet.",
+        "C53: a right-click replay names its clip after the current START;"
+        " PHP's passes no name and uploads undefined.mkv.",
+        "C54: the remote camera's signaling messages are handled one at a"
+        " time; PHP handles them at once, and two offers in one poll fail to"
+        " set the second answer.",
+        "C32: the websocket path flushes the messages sent before the socket"
+        " opened with ws.send; PHP calls the undefined wc.send and loses the"
+        " first solicitation. The page renders g_websocket_url empty, so v1"
+        " polls (#56).",
+    ),
+    "camera.php": (
+        "D20: a 301 to /replay/camera/, the query string kept.",
+        "D5, D9, D16: needs CONTROL_RACE, the replay login; PHP's page is anonymous.",
+        "D9: this browser remembers the chosen camera.",
+        "D76: the replay_ice_servers setting, as replay.php's.",
+        "C54: a viewer's solicitation gets one offer, and a viewer that nags"
+        " again while not connected gets a new one; PHP offers twice to a new"
+        " viewer, and the two offers race at the viewer, and logs a known"
+        " viewer's nag as unrecognized, so a viewer that lost its connection"
+        " never connects again.",
+        "C32: as replay.php's.",
+    ),
     "photo.php/info": (
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",

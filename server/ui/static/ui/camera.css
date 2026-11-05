@@ -1,0 +1,12 @@
+/* The remote camera's ?debug log (#53), from website/css/camera.css. */
+.camera-log {
+  margin-top: 1rem;
+  max-height: 50dvh;
+  overflow: auto;
+  font: 14px/1.2 sans-serif;
+}
+.camera-log[hidden] { display: none; }
+.camera-log p { margin: 0; }
+.camera-log p.sent { text-align: left; }
+.camera-log p.rcvd { text-align: right; }
+.camera-log p.stream { text-align: center; }

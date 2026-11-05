@@ -320,3 +320,31 @@ def test_every_roster_writer_takes_the_race_state_lock_before_it_writes(
         if q["sql"].split()[0].upper() in ("INSERT", "UPDATE", "DELETE")
     ]
     assert writes and locked_at and locked_at[0] <= writes[0]
+
+
+def test_a_round_added_while_the_dashboard_reads_is_left_for_the_next_poll(
+    replay, monkeypatch
+):
+    """`adjustments()` lists the rounds, then reads their rosters. A round a
+    playlist step adds in between was in the roster query's subquery but not
+    in the list, a KeyError and a 500 on `dashboard/live/` (PR #205's
+    `ui (postgres)`, test_the_owners_race_day). The roster and chart reads
+    keep to the rounds listed."""
+    tigers = group(replay, "Tigers")
+    read = rounds.RosterEntry.objects.filter
+
+    def roster_read(*args, **kwargs):
+        added = Round.objects.create(event=replay.event, group=tigers, number=2)
+        rounds.RosterEntry.objects.create(
+            event=replay.event, round=added, racer=racers(replay, "Tigers")[0]
+        )
+        monkeypatch.setattr(rounds.RosterEntry.objects, "filter", read)
+        return read(*args, **kwargs)
+
+    monkeypatch.setattr(rounds.RosterEntry.objects, "filter", roster_read)
+
+    found = rounds.adjustments(replay.event)
+
+    assert set(found) == set(
+        Round.objects.filter(event=replay.event, number=1).values_list("pk", flat=True)
+    )

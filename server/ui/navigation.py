@@ -423,10 +423,11 @@ ENTRIES: tuple[NavEntry, ...] = (
         menu=False,
         view="ui.timer.views.test_page",
     ),
-    # Replay is a kiosk page that #53 ports. The entry is here only for the
-    # Photo role's bottom nav (D20), and needs CONTROL_RACE (D16). The login
-    # page's Replay Kiosk button links to replay.php, as the other kiosk
-    # buttons link to their PHP paths.
+    # The replay station and its remote camera (#53) need CONTROL_RACE, the
+    # replay login (D5, D9, D16). The replay entry is in the Photo role's
+    # bottom nav of the D20 table, for a role a pack gives CONTROL_RACE
+    # (D68). The login page's Replay Kiosk and Be a Camera buttons link to
+    # replay.php and camera.php, which answer with a 301 here.
     NavEntry(
         "replay",
         "Replay",
@@ -438,6 +439,19 @@ ENTRIES: tuple[NavEntry, ...] = (
         icon="replay",
         phone_rank={"Photo": 3},
         menu=False,
+        view="ui.replay.views.page",
+    ),
+    NavEntry(
+        "camera",
+        "Replay Camera",
+        "replay/camera/",
+        Perm.CONTROL_RACE,
+        DURING,
+        53,
+        php="camera.php",
+        icon="replay",
+        menu=False,
+        view="ui.replay.views.camera",
     ),
 )
 

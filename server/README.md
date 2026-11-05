@@ -196,7 +196,7 @@ uv run python -m tools.time_standings
 - Renders are made on first request under a per-file lock, in PHP's folders (`0-cropped`, `0-work`, `<W>x<H>`), with PHP's truncated sizes. Only the sizes in `photos.ALLOWED_BOXES` are made. Any other size gets the largest allowed render that fits inside it, so a client can't create folders.
 - A racer with no photo, or whose file is missing, gets `media/data/1x1.png` (PHP's `website/img/1x1.png`) with status 200. `photo.php/info/...` answers 404 (S8).
 - `photo.upload` decodes the file with Pillow and takes JPEG, PNG and GIF under a matching image extension, up to `DERBYNET_PHOTO_UPLOAD_MAX_MB`. `filename-change` names the stored file (C27). Autocrop finds the face with OpenCV's `haarcascade_frontalface_alt2`, or runs `DERBYNET_FACEDETECT` with no shell, and keeps PHP's crop math. A miss warns `No face detected for autocrop.` (#74). `media/tests/test_faces.py` holds OpenCV to PHP's miss count over `testing/data/headshots`.
-- `photo.crop` needs `ASSIGN_RACER_IMAGE` (S19). `video.upload` needs `CONTROL_RACE` (D16), takes `.mkv` and `.webm` only, and is capped by `DERBYNET_VIDEO_UPLOAD_MAX_MB` (S20). `query=slide.next` takes `classids` as integers only (S10).
+- `photo.crop` needs `ASSIGN_RACER_IMAGE` (S19). `video.upload` needs `CONTROL_RACE` (D16), takes `.mkv` and `.webm` only, and is capped by `DERBYNET_VIDEO_UPLOAD_MAX_MB` (S20). It keeps the base name with its spaces and `&`, as PHP's `basename()` does, and drops control characters (#53). `query=slide.next` takes `classids` as integers only (S10).
 - `image.php` and `slide.php` look in the event's `imagery` or `slides` folder, then the same folder under `DERBYNET_CONFIG_DIR`, then the image set the `images-dir` setting names, from `media/image_sets` (copied from `website/Images`).
 - A file is written before the transaction that names it, and removed only after the transaction that stops naming it commits. P1 to P7 in `racing/engine/tests/golden.py` list the other differences from PHP, which wait for an owner decision.
 
@@ -468,6 +468,19 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`, `UNDECIDED
 - `please-check-in` reads `classids` as whole numbers (S12). The award kiosk plays only `confetti.webm` (C34). The standings kiosk is public on purpose (S29, D5) and lists racers not eligible for its speed awards marked, with no place (D33, D35), and dropped times struck through (D37), from #49's `ui.standings.state`.
 - While the playlist waits for the operator, the racing pages (now racing in its three layouts, on deck, results by racer) show the leaders of the round that ended, from `racing.services.playlist.intermission()` through `query=poll`'s Django-only `intermission` value, until the next round starts (D12).
 - The on-deck page counts the race's lanes, not the lanes of the results (D73). Its running heat glides near the top in place of the Just Finished and Now Staging animation (D10). Results by racer glide up where PHP moves a row every 2 s (D10).
+
+## The replay page and the remote camera (#53)
+
+`/replay/` is `replay.php` and `/replay/camera/` is `camera.php`; the PHP paths answer with a 301 (D20). Both need `CONTROL_RACE` (D5, D9, D16). The views are in `ui/replay/`, the templates in `ui/templates/ui/replay/`, and the scripts are `website/js`'s, ported without jQuery to `ui/static/ui/`: `message-poller.js`, `viewer-signaling.js`, `camera-signaling.js`, `circular-frame-buffer.js`, `video-capture.js` and `video-device-picker.js`, with the page logic in `replay.js` and `camera.js`. `racing.services.replay.page_settings()` gives both pages their settings. `ui/tests/browser/test_replay.py` drives them with Chromium's two fake cameras.
+
+How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`:
+
+- The setup picks the camera, the resolution and the frame rate, opens them as exact constraints, and remembers them in the browser's `localStorage`, matched by id or, in a new session, by label (D9). The camera page remembers its camera too.
+- A clip runs from `replay-skipback` before the finish to the post-roll (`replay_post_roll_ms`) after it, cut to `replay_max_clip_ms` (D18). The setup shows these settings with a link to the settings page.
+- The operator's delay counts from the end of the post-roll, where recording stops (D18).
+- A right-click replay names its clip after the current START, where PHP uploads `undefined.mkv` (C53). The camera sends one offer per solicitation and offers again to a viewer that nags while not connected, and the replay page handles signaling messages one at a time (C54).
+- `g_websocket_url` renders empty, so both pages poll (#56). The websocket path's flush calls `ws.send` (C32).
+- `replay_ice_servers` (D76; default `stun:stun.l.google.com:19302`, PHP's hardcoded server) lists the STUN or TURN URLs, separated by spaces or commas; empty means host candidates only, for a LAN with no internet.
 
 ## Settings
 

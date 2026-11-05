@@ -1,0 +1,49 @@
+/* The replay page's full-window pieces (#53), from website/css/replay.css.
+   The kiosk frame, the click shield over it and the playback canvas cover
+   the whole window, above the manager shell. */
+.replay-full {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.replay-full[hidden] { display: none; }
+#interior { z-index: 40; background: #fff; }
+#playback-background { z-index: 45; background-color: #000; }
+#click-shield { z-index: 46; }
+html.replay-running { overflow: hidden; }
+
+#fps {
+  position: fixed;
+  z-index: 1000;
+  bottom: 0;
+  right: 0;
+  min-width: 80px;
+  padding: 0 4px;
+  text-align: right;
+  color: #000;
+  font: 14px/20px sans-serif;
+}
+#fps[hidden] { display: none; }
+
+/* The ?debug log: sent messages on the left, received on the right. */
+.replay-log-panel {
+  position: fixed;
+  z-index: 2000;
+  top: 4rem;
+  right: 0;
+  bottom: 0;
+  width: min(350px, 100vw);
+  overflow: auto;
+  padding: 0 8px;
+  background: #fff;
+  color: #000;
+  border-left: 1px solid #000;
+  font: 14px/1.2 sans-serif;
+}
+.replay-log-panel[hidden] { display: none; }
+#log p { margin: 0; }
+#log p.sent { text-align: left; }
+#log p.rcvd { text-align: right; }
+#log p.stream { text-align: center; }

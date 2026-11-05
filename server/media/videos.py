@@ -4,15 +4,19 @@ PHP's check is disabled by `if (false && ...)`, so anyone writes a file of
 any type into the video folder (S20). Django needs `CONTROL_RACE`, the replay
 login (D16), accepts only `.mkv` and `.webm`, and caps the size
 (`VIDEO_UPLOAD_MAX_BYTES`). A name in use gets PHP's `-1`, `-2` suffix.
+
+The name is reduced to its base name, as PHP's `basename()` does, with
+control characters dropped. A clip is named after its heat, such as
+`Lions & Tigers_Round1_Heat01.mkv`, so spaces and `&` stay (#53).
 """
 
+import re
 from pathlib import Path
 
 from django.conf import settings as django_settings
 
 from core.models import RaceSettings
 from media.photos import (
-    UNSAFE_NAME_CHARACTERS,
     Refused,
     check_upload_size,
     is_upload_name,
@@ -21,6 +25,13 @@ from media.photos import (
 )
 
 VIDEO_EXTENSIONS = ("mkv", "webm")
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def video_name(name: str) -> str:
+    """The base name a clip is stored under: after the last `/` or `\\`,
+    control characters dropped."""
+    return _CONTROL_CHARACTERS.sub("", re.split(r"[/\\]", name or "")[-1])
 
 
 def upload_video(event, upload, max_file_size=None) -> str:
@@ -29,7 +40,7 @@ def upload_video(event, upload, max_file_size=None) -> str:
     folder = RaceSettings.objects.get(event=event).video_directory
     if not folder:
         raise Refused("not-configured", "No video upload directory configured.")
-    name = UNSAFE_NAME_CHARACTERS.sub("_", (upload.name or "").rsplit("/", 1)[-1])
+    name = video_name(upload.name)
     extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if not is_upload_name(name) or extension not in VIDEO_EXTENSIONS:
         raise Refused(

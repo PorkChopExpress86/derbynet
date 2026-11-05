@@ -73,3 +73,33 @@ def test_no_video_folder_is_reported(client, folders, event):
     RaceSettings.objects.filter(event=event).update(video_directory="")
 
     assert send(client, "r.mkv")["outcome"]["code"] == "not-configured"
+
+
+def test_a_path_in_the_name_is_cut_to_its_base_name_and_a_php_file_refused(
+    client, folders
+):
+    """#53: `../x.php` stays out of the folder above, and is no video."""
+    log_in(client, Perm.CONTROL_RACE)
+
+    reply = send(client, "../x.php")
+
+    assert reply["outcome"]["code"] == "upload_video_type"
+    assert list(folders.video.iterdir()) == []
+    assert list(folders.video.parent.glob("x.php")) == []
+
+
+@pytest.mark.parametrize(
+    ("sent", "stored"),
+    [
+        ("Lions & Tigers_Round1_Heat01.mkv", "Lions & Tigers_Round1_Heat01.mkv"),
+        ("..\\..\\clip.webm", "clip.webm"),
+        ("he\x01at\x7f.mkv", "heat.mkv"),
+    ],
+)
+def test_a_clip_keeps_its_heat_name(client, folders, sent, stored):
+    """#53: PHP's basename() keeps spaces and `&`, which a class name has;
+    only path separators and control characters go."""
+    log_in(client, Perm.CONTROL_RACE)
+
+    assert send(client, sent)["outcome"]["code"] == "success"
+    assert [p.name for p in folders.video.iterdir()] == [stored]
