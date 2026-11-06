@@ -409,7 +409,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         "Fake Roster",
         "setup/fake-roster/",
         # C56: SET_UP, as racer.fake needs (`action.racer.fake.inc:26`).
-        # PHP's page asks for CHECK_IN_RACERS (`fakeroster.php:9`), so a role
+        # PHP's page asks for CHECK_IN_RACERS (`fakeroster.php:10`), so a role
         # without SET_UP saw a button that did nothing (#48).
         Perm.SET_UP,
         BEFORE,
