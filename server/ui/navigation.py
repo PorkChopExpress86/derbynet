@@ -327,6 +327,18 @@ ENTRIES: tuple[NavEntry, ...] = (
         menu=False,
         view="ui.roles.views.page",
     ),
+    # The events page of #9 (#212): no PHP page has its list, copy, switch,
+    # archive or export; `setup.php` makes and opens events only.
+    NavEntry(
+        "events",
+        "Events",
+        "setup/events/",
+        Perm.SET_UP,
+        BEFORE,
+        212,
+        menu=False,
+        view="ui.events.views.page",
+    ),
     NavEntry(
         "racing-groups",
         "Racing Groups",

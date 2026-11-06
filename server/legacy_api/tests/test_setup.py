@@ -6,7 +6,7 @@ import pytest
 from django.test import override_settings
 
 from accounts.permissions import SESSION_PERMISSIONS, SESSION_ROLE, Perm
-from core.models import Event, SiteState
+from core.models import Event, RaceState, SiteState
 from legacy_api.tests.conftest import log_in, post
 
 pytestmark = pytest.mark.django_db
@@ -86,6 +86,31 @@ def test_ez_old_opens_an_existing_event(client, event, data_dir):
     assert run(client, "action=setup.nodata&ez-old=Nope")["outcome"]["code"] == (
         "not-recognized"
     )
+
+
+def test_the_event_a_switch_replaces_becomes_read_only(client, event, data_dir):
+    """D14 (#212): ez-new and ez-old follow the switch rule of #9."""
+    log_in(client, Perm.SET_UP, role="RaceCoordinator")
+    run(client, "action=setup.nodata&ez-new=Second")
+    assert Event.objects.get(pk=event.pk).read_only
+
+    run(client, f"action=setup.nodata&ez-old={event.name}")
+
+    assert SiteState.objects.get(pk=1).active_event == event
+    assert Event.objects.get(pk=event.pk).read_only
+    assert Event.objects.get(name="Second").read_only
+
+
+def test_a_switch_while_racing_fails(client, event, data_dir):
+    """D2 (#9, Switch semantics)."""
+    log_in(client, Perm.SET_UP, role="RaceCoordinator")
+    RaceState.objects.filter(event=event).update(racing=True)
+
+    reply = run(client, "action=setup.nodata&ez-new=Second")
+
+    assert reply["outcome"]["code"] == "racing"
+    assert SiteState.objects.get(pk=1).active_event == event
+    assert not Event.objects.filter(name="Second").exists()
 
 
 def test_a_connection_string_is_refused_with_its_own_code(client, event):

@@ -4,14 +4,16 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.core.serializers.json import DjangoJSONEncoder
 
+from core.services import EventReadOnly
 from transfer.importer import ImportFailed, import_derbynet
 from transfer.legacy.source import SourceError
 
 
 class Command(BaseCommand):
     help = (
-        "Import one past DerbyNet event, a SQLite file at schema 1 to 10 or a"
-        " snapshot.get file, as a new event. The source is never modified."
+        "Import one past DerbyNet event, a SQLite file at schema 1 to 10, a"
+        " snapshot.get file, or a zip from export_event, as a new event. The"
+        " source is never modified."
     )
 
     def add_arguments(self, parser):
@@ -77,6 +79,8 @@ class Command(BaseCommand):
             )
         except SourceError as error:
             raise CommandError(str(error)) from None
+        except EventReadOnly as error:
+            raise CommandError(f"--replace: {error.description}") from None
         except ImportFailed as error:
             if error.report is not None:
                 self._write(error.report, report)

@@ -22,7 +22,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import ActionLog, Event, RaceSettings, RaceState
-from core.services import lock_race_state
+from core.services import EventReadOnly, lock_race_state
 from legacy_api.xml import php_escape
 from racing.engine import heat_state as hs
 from racing.engine.phpcompat import php_equals, php_numeric, php_truthy
@@ -251,7 +251,9 @@ def handle_message(
     the reply's children, between `<action-response ...>` and its end."""
     now = now or timezone.now()
     with transaction.atomic():
-        race = lock_race_state(event.id)
+        # A timer stays connected to a read-only event: its own state is
+        # bookkeeping, and `_finished` refuses the results (#212).
+        race = lock_race_state(event.id, writable=False)
         row = TimerStatus.objects.select_for_update().get(event=event)
         timer = TimerState.read(row, now)
         timed_out = _time_out(event, row, timer, now) if timer.timed_out else None
@@ -411,6 +413,15 @@ def _started(msg: _Message) -> None:
 
 
 def _finished(msg: _Message) -> None:
+    if Event.objects.filter(pk=msg.event.id, read_only=True).exists():
+        # Under the lock `handle_message` holds (#212). PHP has no
+        # read-only event.
+        msg.out.append(
+            f"\n  <failure code='{EventReadOnly.code}'>"
+            f"{php_escape(EventReadOnly.description)}</failure>\n"
+        )
+        msg.timer.state = State.CONNECTED
+        return
     fields = [(k, v) for k, v in msg.fields.items() if isinstance(v, str)]
     recorded, records = timer_result_locked(
         msg.race, fields, now=msg.now, finalists_for=msg.finalists_for
@@ -647,6 +658,7 @@ def _assign(event: Event, write) -> None:
     row, as a message does, so a FLAGS message never deletes a setting
     between the lookup and the write."""
     with transaction.atomic():
+        lock_race_state(event.id)
         TimerStatus.objects.select_for_update().get(event=event)
         write(TimerSetting.objects.filter(event=event))
 
@@ -728,9 +740,11 @@ def request_remote_start(event: Event, now: datetime | None = None) -> bool:
     """`timer.remote-start`: queue a start for the next timer message, if
     the timer offered remote start within the last minute."""
     now = now or timezone.now()
-    queued = TimerStatus.objects.filter(
-        event=event, remote_start_seen_at__gte=now - REMOTE_START_TIMEOUT
-    ).update(remote_start_requested=True)
+    with transaction.atomic():
+        lock_race_state(event.id)
+        queued = TimerStatus.objects.filter(
+            event=event, remote_start_seen_at__gte=now - REMOTE_START_TIMEOUT
+        ).update(remote_start_requested=True)
     return queued == 1
 
 

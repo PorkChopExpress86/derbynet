@@ -2,7 +2,7 @@
 {% load static ui %}
 {% block head %}<script src="{% static 'ui/setup.js' %}"></script>{% endblock %}
 {% block main %}
-{# setup.php as a first-run wizard (#48). Each step shows its status and one primary action; the steps replace setup.php's status list (D80). Create and open use core.setup_event, as setup.nodata does; #9's list, copy, archive and export screens are #212. #}
+{# setup.php as a first-run wizard (#48). Each step shows its status and one primary action; the steps replace setup.php's status list (D80). Create and open use core.setup_event, as setup.nodata does; #9's list, copy, switch, archive and export screens are the events page (#212), linked under Before race day. #}
 <div data-setup class="flex flex-col gap-4">
   <h1 class="text-2xl font-semibold">Set-Up</h1>
   <ol role="list" class="flex flex-col gap-3" data-steps>
@@ -37,6 +37,7 @@
       <li><a href="{% url 'playlist' %}" class="flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Rounds playlist</a></li>
       <li><a href="{% url 'fakeroster' %}" hx-get="{% url 'fakeroster' %}" hx-target="#setup-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click.prevent="setupPage.open('Make fake roster', $event)" data-action="fake-roster-link" class="flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Fake roster</a></li>
       <li><a href="{% url 'roles' %}" class="flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Roles and passwords</a></li>
+      <li><a href="{% url 'events' %}" data-link="events" class="flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Events: copy, switch, archive, export</a></li>
     </ul>
   </section>
 

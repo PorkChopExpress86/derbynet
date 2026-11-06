@@ -20,6 +20,16 @@ S25 = (
 
 
 D57 = "D57: a new event's folders are events/<slug>, not <year>/<name>."
+# #212: a switch follows the event lifecycle of #9.
+D14_SWITCH = (
+    "D14: the event ez-new or ez-old replaces becomes read-only, and ez-old"
+    " leaves a read-only event read-only until Reopen for editing; PHP has no"
+    " read-only event."
+)
+D2_RACING = (
+    "D2: a switch while the active event is racing fails with racing (#9,"
+    " Switch semantics); PHP switches."
+)
 
 
 def _text(ctx: LegacyContext, key: str) -> str | None:
@@ -31,7 +41,7 @@ def _text(ctx: LegacyContext, key: str) -> str | None:
     "setup.nodata",
     permission=Perm.SET_UP,
     session_write=True,
-    divergences=(D57, RESET_REPLY),
+    divergences=(D57, RESET_REPLY, D14_SWITCH, D2_RACING),
 )
 def setup_nodata(ctx: LegacyContext) -> None:
     if settings.LOCK_SETTINGS:

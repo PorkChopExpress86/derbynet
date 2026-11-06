@@ -15,10 +15,11 @@ from django.conf import settings
 from django.db import transaction
 
 from accounts.models import Role
-from core.models import Event, SiteState
+from core import events
+from core.models import Event
 from core.services import event_dir, new_event
 
-SUBFOLDERS = ("racers", "cars", "videos", "logs", "imagery", "slides")
+SUBFOLDERS = events.SUBFOLDERS
 
 
 @dataclass(frozen=True)
@@ -53,8 +54,18 @@ def start_event(name: str) -> Event:
                 (root / sub).mkdir(parents=True, exist_ok=True)
             except OSError as error:
                 raise SetupFailure(f"mkdir-{sub}", f"{root / sub}: {error}") from None
-        SiteState.objects.update_or_create(pk=1, defaults={"active_event": event})
+        _make_active(event)
     return event
+
+
+def _make_active(event: Event) -> None:
+    """The switch rule of #212 holds here too: the replaced event becomes
+    read-only, and a racing event is not replaced (#9, Past events and
+    Switch semantics). PHP's `setup.nodata` switches without either."""
+    try:
+        events.make_active(event)
+    except events.EventRefused as refused:
+        raise SetupFailure(refused.code, refused.description) from None
 
 
 def open_existing(name: str) -> Event:
@@ -67,7 +78,8 @@ def open_existing(name: str) -> Event:
         raise SetupFailure(
             "not-recognized", f"{name} is not a recognized configuration."
         )
-    SiteState.objects.update_or_create(pk=1, defaults={"active_event": event})
+    with transaction.atomic():
+        _make_active(event)
     return event
 
 

@@ -206,12 +206,37 @@ def _reset_rows(event):
     return deleted
 
 
-def lock_race_state(event_id):
+class EventReadOnly(Exception):
+    """A write to a past event: archived, or replaced as the active event
+    (#9, Past events; #212). "Reopen for editing" on the events page clears
+    it. The legacy dispatcher and the `ui` views answer it as a failure with
+    this code."""
+
+    code = "event-read-only"
+    description = "This event is read-only. Reopen it for editing on the events page."
+
+
+def require_writable(event_id):
+    """Refuse a write to a read-only event. Call it under `lock_race_state`,
+    which every change to `Event.read_only` takes too (`core.events`)."""
+    if Event.objects.filter(pk=event_id, read_only=True).exists():
+        raise EventReadOnly()
+
+
+def lock_race_state(event_id, *, writable=True):
     """Lock the event's `RaceState` row and return it.
 
     Call it first inside `transaction.atomic()`. Every writer of the roster,
     inspection status, lane settings, or results takes this lock, because
     `generate_schedule` rechecks those inputs under it (#20, "Transactions
     and locks").
+
+    A read-only event refuses with `EventReadOnly` (#212). `writable=False`
+    takes the lock without the refusal: for the event lifecycle itself, a
+    read the change must match (a snapshot, an export, a copy), and the
+    bookkeeping a field client writes to stay connected.
     """
-    return RaceState.objects.select_for_update().get(event_id=event_id)
+    race = RaceState.objects.select_for_update().get(event_id=event_id)
+    if writable:
+        require_writable(event_id)
+    return race

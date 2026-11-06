@@ -141,6 +141,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # A past event's refusal, as a toast (#212).
+    "ui.middleware.EventReadOnlyToast",
 ]
 
 ROOT_URLCONF = "derbynet.urls"

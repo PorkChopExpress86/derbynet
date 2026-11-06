@@ -24,6 +24,7 @@ urlpatterns = [
     path("", include("ui.settings_page.urls")),
     path("", include("ui.roles.urls")),
     path("", include("ui.setup.urls")),
+    path("", include("ui.events.urls")),
     *redirects.urlpatterns(),
     path("quickref.pdf", views.quickref, name="quickref"),
     path("components/", views.components, name="components"),
