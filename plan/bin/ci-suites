@@ -6,6 +6,11 @@ Usage: plan/bin/ci-suites <number>
 
 Exits 1 when a named suite is missing from the workflow. A suite that still
 waits on another ticket stays missing; say which ticket in the PR body.
+
+It also lists the parity gate's entries that name the ticket
+(`server/tools/parity_gate.py`: a step it skips or waits on). Lifting one
+changes what the gate compares, so raise it at the start, not after the
+endpoints exist (#54 retro).
 """
 
 import json
@@ -16,6 +21,7 @@ import sys
 from pathlib import Path
 
 SUITE = re.compile(r"\btesting/([\w-]+\.sh)\b")
+GATE_ENTRY = re.compile(r'^\s*"([^"]+)":\s*(.+)$', re.MULTILINE)
 HELPERS = {"common.sh"}  # sourced by the suites, never run alone
 
 
@@ -43,6 +49,11 @@ def main(argv: list[str]) -> int:
         else:
             missing += 1
             print(f"MISSING  testing/{suite}")
+    gate = (root / "server" / "tools" / "parity_gate.py").read_text()
+    ticket = re.compile(rf"#{argv[0]}\b")
+    for step, rest in GATE_ENTRY.findall(gate):
+        if ticket.search(rest):
+            print(f"PARITY   {step}: {rest.strip()}")
     return 1 if missing else 0
 
 

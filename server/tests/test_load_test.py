@@ -456,6 +456,19 @@ def test_summarize_compares_each_clients_rate_with_its_target():
     assert kiosk["achieved_per_s"] == pytest.approx(0.3)
 
 
+def test_a_reply_slower_than_the_period_lowers_the_expected_rate():
+    """An `Every` poll sends no second request while one is out, so a reply
+    later than the period skips the ticks it covered (#54 retro: the replay
+    poll made 60 of its 100 under 48 busy loops)."""
+    stats = lt.Stats()
+    for seconds in (0.1, 0.3, 0.6):  # one, two and three ticks of 0.25 s
+        stats.record("replay.message", seconds, None)
+    replay = lt.ClientType("replay", 1, lt.Every(0.25), "replay.message")
+    (rate,) = lt.summarize(stats, elapsed=1.5, clients=[replay])["rates"]
+    assert rate["target_per_s"] == pytest.approx(4.0)
+    assert rate["expected_per_s"] == pytest.approx(3 / 1.5)
+
+
 def test_verdict_names_each_failed_check():
     report = lt.summarize(make_stats(), elapsed=10.0, clients=CLIENTS)
     report["timer"] = {"finished_sent": 5, "finished_ok": 5, "finished_recorded": 4}

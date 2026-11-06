@@ -336,7 +336,7 @@ The report is markdown, and `--json` and `--markdown` also write it to files. It
 
 - the machine, OS, Python and Django versions, and the run length;
 - per endpoint, the requests, errors, 5xx responses, and p50, p95, p99 and maximum latency;
-- each client's achieved rate against its target, and how late the script started its requests (lag);
+- each client's achieved rate against its target and against the rate the server's latency allows (expected: a client that waits a pause after each reply, or skips the ticks a slow reply covers, falls behind its target), and how late the script started its requests (lag);
 - the `FINISHED` messages the timer sent and the server accepted, and the heats the server recorded (the `heats_run` of `poll.coordinator`);
 - with `--pid`, the CPU and memory of that process and its children, and the host's CPU, read from `/proc`. `--pid` needs the script on the server's machine.
 

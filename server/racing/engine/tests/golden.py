@@ -132,14 +132,15 @@ QUIRK_DECISIONS = {
     # Owner decision D33, which the #52 standings kiosk follows: a racer not
     # eligible for its speed awards is listed marked, with no place.
     "D33": "fix",
-    # PHP's stale test heat after a second lane mask change, which D72 fixes
-    # on the timer test page; the legacy timer.test tt-mask keeps it.
+    # The #64 row C52: PHP's stale test heat after a second lane mask change,
+    # which D72 fixes on the timer test page; the legacy timer.test tt-mask
+    # keeps it.
     "C52": "fix",
     # The #64 row the #53 replay and camera pages fix, as the ticket's "PHP
     # defects to fix" lists it.
     "C32": "fix",
-    # #53's review: the owner settled these as fixes (2026-11-05). C53 the
-    # right-click replay's clip name, C54 the remote camera's offers.
+    # #53's review: the owner settled these #64 rows as fixes (2026-11-05).
+    # C53 the right-click replay's clip name, C54 the remote camera's offers.
     "C53": "fix",
     "C54": "fix",
     # The #64 rows the #54 ballot endpoints and vote page fix, as the
