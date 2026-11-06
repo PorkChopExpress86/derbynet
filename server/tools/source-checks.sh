@@ -25,4 +25,5 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   ui/tests/test_browser_tab_close.py \
   ui/tests/test_php_libraries.py \
   legacy_api/tests/test_registry.py \
+  core/tests/test_read_only_guard.py \
   "$@"

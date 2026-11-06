@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
+from core.services import lock_race_state
 from racing.engine.heat_state import Advance
 from racing.engine.scheduling.lanes import count_one_bits
 from racing.engine.scheduling.rough import CantFulfill, max_runs_per_lane
@@ -162,7 +163,7 @@ def generate_schedule(round: Round, n_times_per_lane: int) -> int:
         inputs = _read_inputs(round)
         chart = _make_chart(inputs, n_times_per_lane)
         with transaction.atomic():
-            RaceState.objects.select_for_update().get(event_id=round.event_id)
+            lock_race_state(round.event_id)
             if _read_inputs(round) != inputs:
                 continue
             HeatLane.objects.filter(round=round).delete()
@@ -206,7 +207,7 @@ def generate_schedule(round: Round, n_times_per_lane: int) -> int:
 def unschedule(round: Round) -> int:
     """Delete the round's chart, results included. Returns the rows deleted."""
     with transaction.atomic():
-        RaceState.objects.select_for_update().get(event_id=round.event_id)
+        lock_race_state(round.event_id)
         deleted, _ = HeatLane.objects.filter(round=round).delete()
         EmptiedHeat.objects.filter(round=round).delete()
         after_chart_change(round, cancel_current=True)

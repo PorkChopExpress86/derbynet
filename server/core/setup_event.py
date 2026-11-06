@@ -15,10 +15,11 @@ from django.conf import settings
 from django.db import transaction
 
 from accounts.models import Role
-from core.models import Event, SiteState
-from core.services import event_dir, new_event
+from core import events
+from core.models import Event
+from core.services import new_event
 
-SUBFOLDERS = ("racers", "cars", "videos", "logs", "imagery", "slides")
+SUBFOLDERS = events.SUBFOLDERS
 
 
 @dataclass(frozen=True)
@@ -27,34 +28,31 @@ class SetupFailure(Exception):
     description: str
 
 
-def _valid_name(name: str) -> bool:
-    return (
-        bool(name.strip())
-        and not any(c in name for c in "/\\\0")
-        and name
-        not in (
-            ".",
-            "..",
-        )
-    )
-
-
 def start_event(name: str) -> Event:
     """`ez-new`: an event with its folders, made the active one."""
-    if not _valid_name(name):
+    if not events.valid_name(name):
         raise SetupFailure("mkdir", f"{name}:  not a usable folder name")
     with transaction.atomic():
         if Event.objects.filter(name=name).exists():
             raise SetupFailure("already_exists", "Directory already exists.")
         event = new_event(name)
-        root = event_dir(event.slug)
-        for sub in SUBFOLDERS:
-            try:
-                (root / sub).mkdir(parents=True, exist_ok=True)
-            except OSError as error:
-                raise SetupFailure(f"mkdir-{sub}", f"{root / sub}: {error}") from None
-        SiteState.objects.update_or_create(pk=1, defaults={"active_event": event})
+        try:
+            events.make_folders(event)
+        except events.EventRefused as refused:
+            raise SetupFailure(refused.code, refused.description) from None
+        _make_active(event)
     return event
+
+
+def _make_active(event: Event) -> None:
+    """The switch rule holds here too: the replaced event becomes read-only
+    (D14), a racing event is not replaced, and the settings lock refuses
+    (D81; #9, Hosted lock). PHP's `setup.nodata` switches without the first
+    two."""
+    try:
+        events.make_active(event)
+    except events.EventRefused as refused:
+        raise SetupFailure(refused.code, refused.description) from None
 
 
 def open_existing(name: str) -> Event:
@@ -67,7 +65,8 @@ def open_existing(name: str) -> Event:
         raise SetupFailure(
             "not-recognized", f"{name} is not a recognized configuration."
         )
-    SiteState.objects.update_or_create(pk=1, defaults={"active_event": event})
+    with transaction.atomic():
+        _make_active(event)
     return event
 
 

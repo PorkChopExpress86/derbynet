@@ -158,7 +158,9 @@ def assign(
 
 def request_reload(event, address: str) -> None:
     """`mark_kiosk_for_reload()`: the kiosk reloads at its next poll."""
-    Kiosk.objects.filter(event=event, address=address).update(reload_requested=True)
+    with transaction.atomic():
+        lock_race_state(event.id)
+        Kiosk.objects.filter(event=event, address=address).update(reload_requested=True)
 
 
 # ----- scenes ------------------------------------------------------------------
@@ -251,16 +253,18 @@ def set_scene_kiosk(
     No page takes the name out of the scene."""
     if scene is None:
         return
-    rows = SceneKiosk.objects.filter(scene=scene, kiosk_name=kiosk_name)
-    if not page:
-        rows.delete()
-        return
-    SceneKiosk.objects.update_or_create(
-        event_id=scene.event_id,
-        scene=scene,
-        kiosk_name=kiosk_name,
-        defaults={"page": page, "params": params or ""},
-    )
+    with transaction.atomic():
+        lock_race_state(scene.event_id)
+        rows = SceneKiosk.objects.filter(scene=scene, kiosk_name=kiosk_name)
+        if not page:
+            rows.delete()
+            return
+        SceneKiosk.objects.update_or_create(
+            event_id=scene.event_id,
+            scene=scene,
+            kiosk_name=kiosk_name,
+            defaults={"page": page, "params": params or ""},
+        )
 
 
 def scene_named(event, name: str | None) -> Scene | None:

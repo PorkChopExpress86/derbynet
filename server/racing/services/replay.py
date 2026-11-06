@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import RaceSettings
+from core.services import lock_race_state
 from kiosks.models import ReplayCommand, ReplayStatus
 
 REPLAY_TIMEOUT = timedelta(seconds=10)
@@ -62,12 +63,16 @@ def poll(event_id: int, reported: str, now: datetime) -> list[str]:
 
 def trigger(event_id: int) -> None:
     """`replay.trigger`: play the last few seconds back now."""
-    send(event_id, replay(RaceSettings.objects.get(event_id=event_id)))
+    with transaction.atomic():
+        lock_race_state(event_id)
+        send(event_id, replay(RaceSettings.objects.get(event_id=event_id)))
 
 
 def send_test(event_id: int) -> None:
     """`replay.test`."""
-    send(event_id, test(RaceSettings.objects.get(event_id=event_id)))
+    with transaction.atomic():
+        lock_race_state(event_id)
+        send(event_id, test(RaceSettings.objects.get(event_id=event_id)))
 
 
 def start(group_name: str, round_number: int, heat: int) -> str:

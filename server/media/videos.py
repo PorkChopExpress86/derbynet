@@ -14,8 +14,10 @@ import re
 from pathlib import Path
 
 from django.conf import settings as django_settings
+from django.db import transaction
 
 from core.models import RaceSettings
+from core.services import lock_race_state
 from media.photos import (
     Refused,
     check_upload_size,
@@ -50,7 +52,11 @@ def upload_video(event, upload, max_file_size=None) -> str:
     directory = Path(folder)
     if not directory.is_dir():
         raise move_failure(directory, "video")
-    try:
-        return store_upload(directory, name, upload, separator="-")
-    except OSError:
-        raise move_failure(directory, "video") from None
+    with transaction.atomic():
+        # A clip of a past event is refused (#212); the lock holds the
+        # event writable until the file is stored.
+        lock_race_state(event.pk)
+        try:
+            return store_upload(directory, name, upload, separator="-")
+        except OSError:
+            raise move_failure(directory, "video") from None

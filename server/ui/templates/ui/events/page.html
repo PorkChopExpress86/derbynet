@@ -1,0 +1,12 @@
+{% extends "ui/base.html" %}
+{% block main %}
+{# The events page (D14, D81): list, create with Copy from, switch, archive, Reopen for editing and export. PHP has no such page: setup.php makes and opens event folders only (action.setup.nodata.inc). #}
+<div data-events-page class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h1 class="text-2xl font-semibold">Events</h1>
+    <a href="{% url 'setup' %}" class="min-h-11 content-center rounded-xl border border-line px-4 font-semibold">Set-up</a>
+  </div>
+  <p class="text-ink-muted">One event is active at a time. The timer, the kiosks and every page work with the active event. When another event becomes active, the one it replaces turns read-only, so its results cannot change by accident. Reopen it for editing to change it again.</p>
+  {% include "ui/events/section.html" %}
+</div>
+{% endblock %}

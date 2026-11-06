@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from accounts.permissions import Perm, allows
 from core.models import ActionLog, SiteState
+from core.services import EventReadOnly
 from legacy_api.encoding import encode_php_json
 from legacy_api.forms import parse_php_form
 from legacy_api.registry import (
@@ -110,16 +111,24 @@ def _record_action(event, echo: dict) -> None:
 
 def _run(ctx: LegacyContext, endpoint, fmt: Format) -> bytes:
     """Run the handler and encode what it wrote, or a server-error failure."""
+    failure = SERVER_ERROR
     try:
         endpoint.handler(ctx)
         return ctx.xml.document() if fmt is Format.XML else encode_php_json(ctx.out)
+    except EventReadOnly as refusal:
+        # A write service refused a past event (D14, D81), and its
+        # transaction rolled back. PHP has no read-only event; every action
+        # but READ_ONLY_EXEMPT's carries READ_ONLY_DIVERGENCE. The ActionLog
+        # row `dispatch` wrote before the handler stays, as PHP logs every
+        # action (D81).
+        failure = (refusal.code, refusal.description)
     except Exception:
         logger.exception("legacy %s %s raised", endpoint.kind, endpoint.name)
     if fmt is Format.XML:
-        ctx.xml.failure_response(*SERVER_ERROR)
+        ctx.xml.failure_response(*failure)
         return ctx.xml.document()
     ctx.out = {key: value for key, value in ctx.out.items() if key == "action"}
-    ctx.failure(*SERVER_ERROR)
+    ctx.failure(*failure)
     return encode_php_json(ctx.out)
 
 

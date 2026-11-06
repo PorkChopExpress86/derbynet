@@ -1,0 +1,57 @@
+{# The events page's list and its new event form (D14, D81). Under DERBYNET_LOCK_SETTINGS the form, Make active, Archive and Reopen are hidden, and the services refuse with `locked` (#9, Hosted lock). Each change answers this whole section, so the list and the form's Copy from choices stay in step. #}
+<div id="events-section" class="flex flex-col gap-4">
+  {% if locked %}
+  <p role="status" data-events-locked class="rounded-lg bg-surface-2 px-3 py-2 text-sm">Events are locked on this server (DERBYNET_LOCK_SETTINGS): no event can be created, made active, archived or reopened here. Export still works.</p>
+  {% else %}
+  <section class="rounded-xl border border-line bg-surface p-4" data-section="new-event">
+    <h2 class="text-lg font-semibold">New event</h2>
+    <form hx-post="{% url 'events-create' %}" hx-target="#events-section" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" x-data="{ source: '' }" data-form="new-event" class="mt-3 flex flex-col gap-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label class="flex min-w-0 flex-col gap-1 text-sm"><span class="font-medium">Event name</span>
+          <input type="text" name="name" required maxlength="{{ max_name }}" autocomplete="off" placeholder="Pack 42, 2027" class="min-h-11 rounded-xl border border-field bg-surface px-3">
+        </label>
+        <label class="flex min-w-0 flex-col gap-1 text-sm"><span class="font-medium">Copy set-up from</span>
+          <select name="copy_from" x-model="source" class="min-h-11 rounded-xl border border-field bg-surface px-3">
+            <option value="">Nothing: start empty</option>
+            {% for row in listed %}<option value="{{ row.event.pk }}">{{ row.event.name }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <fieldset x-show="source !== ''" x-cloak class="flex flex-col gap-1" data-parts>
+        <legend class="text-sm font-medium">What to copy</legend>
+        <div class="mt-1 grid grid-cols-1 gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
+          {% for value, label in parts %}
+          <label class="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="part" value="{{ value }}" checked class="size-5 accent-accent">{{ label }}</label>
+          {% endfor %}
+        </div>
+        <p class="text-sm text-ink-muted">Racers, results and photos are never copied.</p>
+      </fieldset>
+      <div><button type="submit" data-action="create-event" class="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Create event</button></div>
+    </form>
+  </section>
+  {% endif %}
+
+  <ul role="list" class="flex flex-col gap-3" data-event-list>
+    {% for row in listed %}
+    <li data-event="{{ row.event.slug }}" data-states="{{ row.states|join:' ' }}" class="rounded-xl border {% if row.active %}border-accent{% else %}border-line{% endif %} bg-surface p-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="min-w-0 flex-1 break-words text-lg font-semibold">{{ row.event.name }}</h2>
+        {% for state in row.states %}{% include "ui/components/status_pill.html" with state=state.pill text=state.label %}{% endfor %}
+      </div>
+      <p class="mt-1 text-sm text-ink-muted"><time datetime="{{ row.event.created_at|date:'c' }}">{{ row.event.created_at|date:"j M Y" }}</time> · <span data-racers>{{ row.racers }} racer{{ row.racers|pluralize }}</span>{% if row.event.copied_from %} · copied from {{ row.event.copied_from.name }}{% endif %}{% if row.archived %} · archived {{ row.event.archived_at|date:"j M Y" }}{% endif %}</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        {% if not row.active and not locked %}
+        <button type="button" hx-post="{% url 'events-switch' row.event.pk %}" hx-target="#events-section" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" data-action="switch" class="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Make active</button>
+        {% endif %}
+        {% if row.event.read_only and not locked %}
+        <button type="button" hx-post="{% url 'events-reopen' row.event.pk %}" hx-target="#events-section" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" data-action="reopen" class="min-h-11 rounded-xl border border-line px-4 font-semibold">Reopen for editing</button>
+        {% endif %}
+        {% if not row.active and not row.archived and not locked %}
+        <button type="button" hx-post="{% url 'events-archive' row.event.pk %}" hx-target="#events-section" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" data-action="archive" class="min-h-11 rounded-xl border border-line px-4 font-semibold">Archive</button>
+        {% endif %}
+        <a href="{% url 'events-export' row.event.pk %}" download data-download="export" class="inline-flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Export zip</a>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>

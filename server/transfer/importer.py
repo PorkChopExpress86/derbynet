@@ -9,21 +9,25 @@ commit switches the event to (`legacy.folders`).
 """
 
 import os
+import shutil
+import tempfile
+import zipfile
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
 from django.db import transaction
 
+from core.events import lock_site_state
 from core.invariants import check_invariants
 from core.models import Event, RaceSettings, SiteState, event_scoped_models
-from core.services import new_event
+from core.services import event_dir, lock_race_state, new_event
 
 from .legacy.folders import FOLDERS, ImportFolder, recover
 from .legacy.photos import CAR_PHOTOS, HEADSHOTS, Photos
 from .legacy.raceinfo import apply_raceinfo, legacy_folders
 from .legacy.report import Report
-from .legacy.source import read_source
+from .legacy.source import SourceError, read_source
 from .legacy.tables import Context, load_tables
 from .legacy.upgrade import upgrade
 from .models import LegacyId
@@ -51,6 +55,7 @@ def import_derbynet(
     discard_videos=False,
     keep_folders=False,
     before=None,
+    media_from=None,
 ):
     """Import the legacy database at `path` and return the `Report`.
 
@@ -63,8 +68,28 @@ def import_derbynet(
     which then hold the new event's files (`legacy.folders`). `before`, when
     given, runs first inside the import's transaction (#48: the snapshot of
     the event a snapshot import replaces).
+
+    A zip from `export_event` is unpacked to a private folder first. Its
+    photos are found in its `racers/` and `cars/`, and its `videos/`,
+    `logs/`, `imagery/` and `slides/` come across too (`media_from`).
     """
     path = Path(path)
+    if zipfile.is_zipfile(path):
+        # An `export_event` zip (#212): its database, read beside its media.
+        with tempfile.TemporaryDirectory(prefix="derbynet-unzip-") as unpacked:
+            return import_derbynet(
+                _unpack(path, Path(unpacked)),
+                event_name=event_name or path.stem,
+                photos_dir=photos_dir,
+                car_photos_dir=car_photos_dir,
+                replace=replace,
+                accept_violations=accept_violations,
+                time_zone=time_zone,
+                discard_videos=discard_videos,
+                keep_folders=keep_folders,
+                before=before,
+                media_from=Path(unpacked),
+            )
     time_zone = time_zone or settings.TIME_ZONE
     try:
         zone = ZoneInfo(time_zone)
@@ -101,6 +126,9 @@ def import_derbynet(
             search_dirs={HEADSHOTS: photos_dir, CAR_PHOTOS: car_photos_dir},
         )
         photos.add_snapshot_photos(source.photos)
+        if media_from is not None:
+            for media in RECORDINGS:
+                _copy_tree(media_from / media, folder.path / media)
         # durable: the commit at the end of this block is the switch from the
         # old event's folders to the new one.
         with transaction.atomic(durable=True):
@@ -137,8 +165,61 @@ def import_derbynet(
         folder.discard()
         raise
     report.photos["replaced_folders_removed"] = [str(p) for p in folder.finish()]
+    if media_from is not None:
+        for media in EVENT_MEDIA:
+            _copy_tree(media_from / media, event_dir(report.event["slug"]) / media)
+        # The photos no racer shows, which the import's photo step leaves
+        # behind: a zip carries the whole folders (#212 review).
+        folders = RaceSettings.objects.get(event_id=report.event["id"])
+        for media, field in (
+            ("racers", "photo_directory"),
+            ("cars", "car_photo_directory"),
+        ):
+            _copy_tree(media_from / media, Path(getattr(folders, field)), keep=True)
     report.outcome = "committed"
     return report
+
+
+# The media of an `export_event` zip that the photos do not cover: the
+# recordings go into the import folder before the commit, and the event's
+# imagery and slides into its own folder after it.
+RECORDINGS = ("videos", "logs")
+EVENT_MEDIA = ("imagery", "slides")
+
+
+def _unpack(path: Path, into: Path) -> Path:
+    """Extract an `export_event` zip into `into`, and return its database.
+    A member that would land outside `into` is refused."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            for member in archive.infolist():
+                target = (into / member.filename).resolve()
+                if into.resolve() not in target.parents and target != into.resolve():
+                    raise SourceError(f"{path}: {member.filename!r} is outside the zip")
+            archive.extractall(into)
+    except (zipfile.BadZipFile, OSError) as error:
+        raise SourceError(f"cannot unpack {path}: {error}") from None
+    database = into / "derbynet.sqlite3"
+    if not database.is_file():
+        raise SourceError(f"{path} holds no derbynet.sqlite3")
+    return database
+
+
+def _copy_tree(source: Path, target: Path, *, keep: bool = False) -> None:
+    """The regular files under `source`, copied under `target`. With `keep`,
+    a file already at the target stays as it is."""
+    if not source.is_dir():
+        return
+    for parent, _dirs, names in os.walk(source):
+        for name in names:
+            path = Path(parent) / name
+            if path.is_symlink() or not path.is_file():
+                continue
+            destination = target / path.relative_to(source)
+            if keep and destination.exists():
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, destination)
 
 
 def _recordings_to_discard(name, replace, discard_videos, report):
@@ -206,6 +287,11 @@ def _create_event(name, replace, report):
     old = existing[0] if existing else None
     replaced = {}
     if old is not None:
+        # The site row before the old event's RaceState, as a switch takes
+        # them (`core.events` LOCK ORDER). A read-only event is not replaced
+        # (D14, D81).
+        lock_site_state()
+        lock_race_state(old.pk)
         old_settings = RaceSettings.for_event(old)
         replaced = {field: getattr(old_settings, field) for field in FOLDERS}
         # Frees the slug, so the new event gets the old one's folder name.

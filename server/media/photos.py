@@ -837,10 +837,14 @@ def upload_photo(
         )
     if repo.directory is None or not repo.directory.is_dir():
         raise move_failure(repo.directory or Path(""), "photo")
-    try:
-        target = store_upload(repo.directory, name, upload)
-    except OSError:
-        raise move_failure(repo.directory, "photo") from None
+    with transaction.atomic():
+        # A read-only event refuses before the file lands, with a racer or
+        # without (the photo stand's PWDuploadonly) (D14, D81).
+        lock_race_state(event.id)
+        try:
+            target = store_upload(repo.directory, name, upload)
+        except OSError:
+            raise move_failure(repo.directory, "photo") from None
 
     result = UploadResult()
     if target != name:
@@ -1019,11 +1023,12 @@ def crop_photo(event, repo: Repository, name: str, box: CropBox) -> None:
         if right <= left or bottom <= top:
             raise Refused("crop", "The crop is empty.")
         target = repo.file(name, CROPPED_FOLDER)
-        target.parent.mkdir(exist_ok=True)
         crop = _workable(image).crop((left, top, right, bottom))
-        _write_atomically(target, lambda stream: _encode(crop, fmt, stream))
         with transaction.atomic():
+            # A read-only event refuses before the crop is written (D81).
             lock_race_state(event.id)
+            target.parent.mkdir(exist_ok=True)
+            _write_atomically(target, lambda stream: _encode(crop, fmt, stream))
             Racer.objects.filter(event=event, **{repo.field: name}).update(
                 **{repo.field: f"{CROPPED_FOLDER}/{name}"}
             )

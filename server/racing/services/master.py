@@ -9,7 +9,8 @@ from collections.abc import Iterable
 from django.db import transaction
 from django.db.models import Case, Exists, F, Max, OuterRef, Value, When
 
-from core.models import Event, RaceState
+from core.models import Event
+from core.services import lock_race_state
 from racing.engine.scheduling.master import HeatRef, assign_master_heats
 from racing.models import HAS_RESULT, EmptiedHeat, HeatLane
 
@@ -75,7 +76,7 @@ def reassign_master_heats(event: Event, keep: Iterable[HeatRef] = ()) -> None:
     """
     keep = set(keep)
     with transaction.atomic():
-        RaceState.objects.select_for_update().get(event=event)
+        lock_race_state(event.pk)
         rows = HeatLane.objects.filter(event=event)
         highest = rows.filter(HAS_RESULT).aggregate(n=Max("master_heat"))["n"] or 0
         release_passed_emptied_heats(event)

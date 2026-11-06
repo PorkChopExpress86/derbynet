@@ -449,7 +449,9 @@ def apply_due_scene(event, now: datetime) -> bool:
     if not due.exists():
         return False
     with transaction.atomic():
-        state = lock_race_state(event.id)
+        # A kiosk poll of a read-only event still shows a scene that fell
+        # due before the switch: the scene is display state (#212).
+        state = lock_race_state(event.id, writable=False)
         if state.playlist_scene_at is None or not state.playlist_scene_at < now:
             return False
         state.playlist_scene_at = None

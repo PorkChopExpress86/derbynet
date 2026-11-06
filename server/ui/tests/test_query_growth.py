@@ -85,6 +85,7 @@ URLS = [
     "/setup/",
     "/setup/purge/?what=racers",
     "/setup/fake-roster/",
+    "/setup/events/",
     "/about/",
     # Sheets and fragments a page fetches with hx-get.
     "/awards/edit/new/",

@@ -19,6 +19,9 @@ from racing.services import polls, timer
         " event is scheduled; afterward it stores the timer's count to show"
         " beside the race's (fixes #64 C26). PHP always writes the timer's"
         " count. The reply is the same.",
+        "D81: on a read-only event, FINISHED answers event-read-only and records"
+        " nothing, while HELLO, IDENTIFIED, HEARTBEAT, MALFUNCTION, flags and"
+        " STARTED are taken; PHP has no read-only event.",
     ),
 )
 def timer_message(ctx: LegacyContext) -> None:

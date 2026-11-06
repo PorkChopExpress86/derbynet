@@ -19,6 +19,7 @@ from core.legacy_keys import (
     encode,
 )
 from core.models import RaceSettings, RaceState
+from core.services import lock_race_state
 from kiosks.models import ReplayStatus
 from racing.models import TimerStatus
 
@@ -103,6 +104,9 @@ def write(event, key, text: str) -> None:
     fields = {entry.fields[0]: value} if len(entry.fields) == 1 else value
     try:
         with transaction.atomic():
+            # A setting is a change to the event, so a past event refuses
+            # it (#212).
+            lock_race_state(event.pk)
             row = ROW_MODELS[entry.model].for_event(event)
             for name, field_value in fields.items():
                 _check(event, entry, row._meta.get_field(name), field_value, key)

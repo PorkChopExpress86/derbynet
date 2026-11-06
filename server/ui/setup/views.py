@@ -5,8 +5,8 @@ and health checks replace `setup.php`'s status list (D80).
 
 The event step creates or opens an event through `core.setup_event`, as
 `setup.nodata` does; on a first run, with no role logged in, it then logs in
-as the post-setup role, as `setup.nodata` does. The list, copy, archive and
-export screens of #9 are #212. Every data
+as the post-setup role, as `setup.nodata` does. The list, copy, switch, archive
+and export screens of #9 are `ui.events` (#212). Every data
 change goes through `transfer.backups`, which writes a snapshot first (D78).
 """
 
