@@ -3,6 +3,7 @@
 
 import os
 import re
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from racing.services.rounds import FollowOn
 from roster.models import Partition, Racer
 from roster.services import groups
 from roster.services.racers import pass_racer
+from roster.services.weigh_in import record_weigh_in, set_partition_weigh_in
 from ui.tests.browser.conftest import (
     PLAIN_HTTP_HOST,
     SIZES,
@@ -82,7 +84,11 @@ def take_photo(page, path, button="Capture only"):
     over, and upload it."""
     photo = sheet(page)
     photo.locator("[data-pick]").set_input_files(str(path))
-    expect(photo.locator("[data-preview]")).to_be_visible()
+    # The browser decodes and downscales the photo before the preview shows
+    # (photo-sheets.js `downscale`), which is CPU work: under load it
+    # outran the 5 s default once in 250 runs (#70). Reproduced by delaying
+    # `createImageBitmap` 6 s.
+    expect(photo.locator("[data-preview]")).to_be_visible(timeout=20_000)
     photo.get_by_role("button", name=button).click()
 
 
@@ -719,3 +725,148 @@ def test_the_status_filter(login, event):
     expect(card(page, late)).to_be_visible()
     page.get_by_label("Status").select_option(label="Racing!")
     expect(page.locator("[data-racer]")).to_have_count(4)
+
+
+# ----- the weigh-in (#70, D8, D54) -------------------------------------------------
+
+
+def weigh_partitions(event):
+    """Scouts weigh pass or fail with a 5 oz maximum, Outlaws record each
+    weight in ounces with a 5 oz maximum, and Tigers have no weigh-in."""
+    add_racers(event, "Scouts", 2, 101, passed=False)
+    add_racers(event, "Outlaws", 2, 201, passed=False)
+    add_racers(event, "Tigers", 1, 301, passed=False)
+    for name, mode in (("Scouts", "pass_fail"), ("Outlaws", "recorded")):
+        partition = Partition.objects.get(event=event, name=name)
+        set_partition_weigh_in(partition, mode, "oz", "5")
+
+
+@pytest.mark.parametrize("partition", ["Scouts", "Outlaws"])
+def test_the_owners_station_flow_with_a_weigh_in(login, event, folders, partition):
+    """D6 with D8 and D54, on a phone: the volunteer weighs the car, enters
+    the racer and car names, gets the class's next car number, takes the
+    car photo, and passes the racer. Scouts weigh pass or fail, Outlaws
+    record the weight."""
+    page = login("RaceCrew")
+    phone_only(page)
+    weigh_partitions(event)
+    open_checkin(page)
+
+    page.get_by_role("button", name="New racer").click()
+    form = sheet(page)
+    expect(form.locator('[data-racer-sheet="new"]')).to_be_visible()
+    htmx_settled(page)
+    form.get_by_label("Class").select_option(label=partition)
+    htmx_settled(page)
+    number = "103" if partition == "Scouts" else "203"
+    expect(form.locator("#f-carno")).to_have_value(number)
+    if partition == "Scouts":
+        weigh_fields = form.locator('[data-weigh-fields="pass_fail"]')
+        expect(weigh_fields).to_contain_text("(max 5.0 oz)")
+        weigh_fields.get_by_label("Pass").check()
+    else:
+        expect(form.locator('[data-weigh-fields="recorded"] [data-unit]')).to_have_text(
+            "oz"
+        )
+        form.get_by_label("Car weight").fill("4.9")
+    form.get_by_label("First name").fill("Wendy")
+    form.get_by_label("Last name").fill("Weigh")
+    form.get_by_label("Car name").fill("Feather")
+    shoot(page, f"checkin-weigh-add-{partition.lower()}", full_page=False)
+    form.get_by_role("button", name="Add racer").click()
+    expect(form.locator("[data-notice]")).to_have_text(f"Added {number} Wendy Weigh.")
+    racer = Racer.objects.get(event=event, first_name="Wendy")
+    if partition == "Scouts":
+        expect(form.locator("[data-weigh-result]")).to_have_text("Passed")
+        assert (racer.weigh_in_passed, racer.weight_grams) == (True, None)
+    else:
+        expect(form.locator("[data-weight]")).to_have_text("4.9 oz")
+        assert racer.weight_grams == Decimal("138.91")
+
+    form.get_by_role("button", name="Take car photo").click()
+    take_photo(page, CAR_PHOTO, "Capture and check in")
+    crop(page)
+    expect(card(page, racer).locator('[data-thumb="car"]')).to_be_visible()
+    expect(card(page, racer)).to_have_attribute("data-passed", "1")
+    racer.refresh_from_db()
+    assert racer.passed_inspection and racer.car_number == int(number)
+    assert racer.car_photo.endswith(".jpg")
+
+
+def test_a_card_weighs_with_pass_and_fail_or_a_weight(login, event):
+    page = open_checkin(login("RaceCrew"))
+    weigh_partitions(event)
+    page.reload()
+    scout = Racer.objects.get(event=event, car_number=101)
+    outlaw = Racer.objects.get(event=event, car_number=201)
+
+    weigh_group = card(page, scout).get_by_role("group", name="Weigh-in, Scouts1 Racer")
+    weigh_group.get_by_role("button", name="Weigh-in Fail").click()
+    expect(card(page, scout).locator("[data-weigh-result]")).to_have_text("Failed")
+    expect(weigh_group.get_by_role("button", name="Weigh-in Fail")).to_have_attribute(
+        "aria-pressed", "true"
+    )
+    dismiss_toasts(page)
+
+    weight = card(page, outlaw).get_by_label("Weight, Outlaws1 Racer")
+    weight.fill("5.4")
+    card(page, outlaw).get_by_role("button", name="Save weight").click()
+    expect(page.locator("#toasts")).to_contain_text(
+        "5.4 oz is over the 5.0 oz maximum for Outlaws."
+    )
+    expect(card(page, outlaw).locator("[data-over]")).to_have_text(
+        re.compile(r"Over the 5\.0 oz max")
+    )
+    expect(card(page, outlaw).locator("[data-weight]")).to_have_text("5.4 oz")
+    scout.refresh_from_db()
+    outlaw.refresh_from_db()
+    assert scout.weigh_in_passed is False
+    assert outlaw.weight_grams == Decimal("153.09")
+
+    page.locator("#f-weigh").select_option(label="Failed weigh-in")
+    expect(page.locator("[data-racer]")).to_have_count(2)
+    page.locator("#f-weigh").select_option(label="Not weighed")
+    expect(page.locator("[data-racer]")).to_have_count(2)
+
+
+def test_a_partition_with_no_weigh_in_shows_no_controls(login, event):
+    page = login("RaceCrew")
+    add_racers(event, "Tigers", 2, 101, passed=False)
+    open_checkin(page)
+    expect(page.locator("[data-racer]")).to_have_count(2)
+    expect(page.locator("[data-weigh-in]")).to_have_count(0)
+    expect(page.locator("#f-weigh")).to_have_count(0)
+    racer = Racer.objects.get(event=event, car_number=101)
+    card(page, racer).get_by_role("button", name="Tigers1 Racer", exact=True).click()
+    expect(sheet(page).locator("[data-racer-form]")).to_be_visible()
+    expect(sheet(page).locator("[data-weigh-in], [data-weigh-fields]")).to_have_count(0)
+    sheet(page).locator("[data-racer-form]").get_by_role("button", name="Close").click()
+    page.get_by_role("button", name="New racer").click()
+    expect(sheet(page).locator('[data-racer-sheet="new"]')).to_be_visible()
+    htmx_settled(page)
+    expect(sheet(page).locator("[data-weigh-fields]")).to_have_count(0)
+
+
+def test_weigh_in_screenshots_and_accessibility(login, event):
+    """The card and the racer sheet in each weigh-in mode (D75)."""
+    page = login("RaceCrew")
+    weigh_partitions(event)
+    record_weigh_in(Racer.objects.get(event=event, car_number=101), passed=True)
+    record_weigh_in(Racer.objects.get(event=event, car_number=201), weight="5.2")
+    open_checkin(page)
+    expect(page.locator("[data-weigh-in]")).to_have_count(4)
+    shoot(page, "checkin-weigh-cards")
+    assert_accessible(page)
+    for car_number, mode in ((101, "pass-fail"), (201, "recorded"), (301, "none")):
+        racer = Racer.objects.get(event=event, car_number=car_number)
+        card(page, racer).get_by_role(
+            "button", name=f"{racer.first_name} Racer", exact=True
+        ).click()
+        expect(sheet(page).locator("[data-racer-form]")).to_be_visible()
+        htmx_settled(page)
+        shoot(page, f"checkin-weigh-sheet-{mode}", full_page=False)
+        assert_accessible(page)
+        sheet(page).locator("[data-racer-form]").get_by_role(
+            "button", name="Close"
+        ).click()
+        expect(sheet(page)).to_be_hidden()

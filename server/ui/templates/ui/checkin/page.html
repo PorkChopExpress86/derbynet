@@ -22,6 +22,14 @@
         {% for value, label in states %}<option value="{{ value }}"{% if filters.state == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </div>
+    {% if listing.weighs %}{# The weigh-in filter (#70), once a partition weighs its cars. #}
+    <div class="flex gap-2">
+      <label for="f-weigh" class="sr-only">Weigh-in</label>
+      <select id="f-weigh" name="weigh" class="h-12 min-w-0 flex-1 rounded-xl border border-field bg-surface px-3 text-base">
+        {% for value, label in weighs %}<option value="{{ value }}"{% if filters.weigh == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
     {% include "ui/components/segmented.html" with name="status" legend="Show" options=statuses selected=filters.status %}
     {% include "ui/components/segmented.html" with name="order" legend="Sort by" options=orders selected=filters.order %}
   </form>

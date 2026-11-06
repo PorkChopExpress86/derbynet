@@ -53,6 +53,5 @@
   <p class="mt-2 text-sm {% if card.status == 'Racing!' %}text-ok-ink{% else %}text-warn-ink{% endif %}" data-status>{{ card.status }}</p>
   {% endif %}
   {% if card.exclude or card.no_speed_awards %}<p class="mt-1 text-xs text-ink-muted" data-awards>{% if card.exclude %}Not eligible for any award{% else %}Not eligible for speed awards{% endif %}</p>{% endif %}
-  {# Room for the weigh-in step (#70). #}
-  <div data-weigh-in class="empty:hidden"></div>
+  {% include "ui/checkin/weigh_in.html" with where="card" target="#toasts" swap="beforeend" %}
 </li>

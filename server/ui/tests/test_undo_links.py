@@ -23,6 +23,7 @@ from awards.models import Award
 from racing.models import PlaylistEntry
 from racing.services import heats
 from roster.models import Racer
+from roster.services.weigh_in import record_weigh_in, set_partition_weigh_in
 from ui.tests.race import race_setup, run_heat, scheduled
 from ui.tests.test_photos import folders, put  # noqa: F401  (a fixture)
 
@@ -45,8 +46,12 @@ def unassign_photo(event, client, folders):  # noqa: F811
 
 
 def unpass_racer(event, client, folders):  # noqa: F811
+    """In a partition that records weights with a maximum, with the car
+    weighed over it (#70), so the Undo leaves the weigh-in alone too."""
     race_setup(event)
     racer = Racer.objects.filter(event=event).first()
+    set_partition_weigh_in(racer.partition, "recorded", "oz", "5")
+    record_weigh_in(racer, weight="5.2")
     return f"/checkin/racer/{racer.pk}/pass/", {"passed": "0"}
 
 
