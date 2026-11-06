@@ -1,4 +1,4 @@
-{% load ui %}{# The racer sheet, for add and edit: PHP's seven fields, in the order of the owner's station (D6): the racer and car names and the class first, then the car number the class suggests. After an add it offers Take car photo and Pass. #}
+{% load ui %}{# The racer sheet, for add and edit: PHP's seven fields, in the order of the owner's station (D6): the racer and car names and the class first, then the car number the class suggests and the class's weigh-in (#70, D8, D54). After an add it offers the weigh-in, Take car photo and Pass. #}
 <div x-data x-init="checkin.show('{% if racer %}{{ card.car }} {{ racer|racer_name|escapejs }}{% else %}New racer{% endif %}')" data-racer-sheet="{% if racer %}{{ racer.pk }}{% else %}new{% endif %}">
   {% if notice %}<p class="mb-3 rounded-lg bg-ok-soft px-3 py-2 font-medium text-ok-ink" role="status" data-notice>{{ notice }}</p>{% endif %}
   {% if warnings %}
@@ -12,6 +12,7 @@
     <div class="flex items-center gap-3">
       <p class="min-w-0 flex-1 text-sm">{% if card.passed %}<strong class="text-ok-ink">Passed</strong>{% else %}Not passed yet{% endif %}{% if card.status and card.status != "Racing!" %} · {{ card.status }}{% endif %}</p>
     </div>
+    {% include "ui/checkin/weigh_in.html" with where="sheet" target="#checkin-sheet-body" swap="innerHTML" %}
     <div class="grid grid-cols-2 gap-2">
       {% if can_photo %}
       <button type="button" hx-get="{% url 'checkin-photo' racer.pk 'car' %}" hx-target="#checkin-sheet-body" data-action="take-car-photo" class="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl border border-line px-3 font-semibold">{% include "ui/components/icon.html" with name="car" cls="size-5" %}{% if card.car_photo %}New car photo{% else %}Take car photo{% endif %}</button>
@@ -59,6 +60,9 @@
     <div id="carno-hint" hx-get="{% url 'checkin-number' %}" hx-include="closest form"  hx-target="this" hx-trigger="change from:#f-partition, input from:#f-carno delay:400ms{% if not racer %}, every 10s [checkin.sheetOpen()]{% endif %}" hx-swap="innerHTML" hx-sync="this:queue last" aria-live="polite">
       {% include "ui/checkin/number.html" with fill=False warnings=None %}
     </div>
+    {% if not racer %}{# The class's weigh-in (#70); an existing racer is weighed above. #}
+    <div id="weigh-fields" hx-get="{% url 'checkin-weigh-fields' %}" hx-include="#f-partition" hx-target="this" hx-trigger="change from:#f-partition" hx-swap="innerHTML" hx-sync="this:replace" class="hidden has-[*]:block">{% include "ui/checkin/weigh_fields.html" %}</div>
+    {% endif %}
     <div>
       <label for="f-note" class="mb-1 block text-sm font-medium">From <span class="font-normal text-ink-muted">(pack, den or town)</span></label>
       <input id="f-note" name="note_from" value="{{ values.note_from|default:'' }}" autocomplete="off" class="h-12 w-full rounded-xl border border-field bg-surface px-3 text-base">
@@ -68,8 +72,6 @@
       <label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="exclude" value="1"{% if values.exclude %} checked{% endif %} class="size-5 accent-accent" data-setting="exclude">Not eligible for any award</label>
       <label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="no_speed" value="1"{% if values.no_speed %} checked{% endif %} class="size-5 accent-accent" data-setting="no-speed">Not eligible for speed awards</label>
     </fieldset>
-    {# Room for the weigh-in step (#70). #}
-    <div data-weigh-in class="empty:hidden"></div>
     <div class="flex flex-col gap-2 lg:flex-row-reverse">
       <button type="submit" class="min-h-12 flex-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink" data-action="save">{% if racer %}Save{% else %}Add racer{% endif %}</button>
       <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">{% if racer %}Close{% else %}Cancel{% endif %}</button>

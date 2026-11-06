@@ -1142,3 +1142,21 @@ def test_replace_neither_counts_nor_follows_a_symlinked_video(
     assert report["photos"]["discarded_recordings"] == {"files": 3, "bytes": 10}
     assert target.read_bytes() == b"keep me"
     assert not Path(old.video_directory).exists()
+
+
+@pytest.mark.parametrize("source", ["v10", "snapshot"])
+def test_an_import_has_no_weigh_in(tmp_path, source):
+    """PHP stores no car weight (#70), so every partition imports with no
+    weigh-in and every racer as not weighed."""
+    database = SNAPSHOT if source == "snapshot" else legacy_folder(tmp_path, "v10")
+    report, _ = _import(tmp_path, database)
+    event = _event(report)
+    partitions = Partition.objects.filter(event=event)
+    racers = Racer.objects.filter(event=event)
+    assert partitions.exists() and racers.exists()
+    assert set(
+        partitions.values_list("weigh_in_mode", "weight_unit", "max_weight_grams")
+    ) == {("none", "", None)}
+    assert set(racers.values_list("weigh_in_passed", "weight_grams", "weighed_at")) == {
+        (None, None, None)
+    }

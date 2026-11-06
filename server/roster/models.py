@@ -20,16 +20,6 @@ class Group(EventScoped):
     Every other group is organic.
     """
 
-    class WeighIn(models.TextChoices):
-        NONE = "none"
-        PASS_FAIL = "pass-fail"
-        RECORDED = "recorded"
-
-    class WeightUnit(models.TextChoices):
-        GRAMS = "g"
-        OUNCES = "oz"
-        POUNDS = "lb"
-
     name = models.CharField(max_length=75)
     sort_order = models.IntegerField()
     durable = models.BooleanField(default=False)
@@ -49,13 +39,6 @@ class Group(EventScoped):
         related_name="aggregates",
         blank=True,
     )
-    weigh_in = models.CharField(
-        max_length=10, choices=WeighIn.choices, default=WeighIn.NONE
-    )
-    weight_unit = models.CharField(
-        max_length=2, choices=WeightUnit.choices, blank=True, default=""
-    )
-    max_weight_grams = models.FloatField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -125,18 +108,55 @@ class Partition(EventScoped):
     the constraint below checks the exact name. They compare `name_key`, not
     the database's `lower()`, which folds only ASCII on SQLite, so both
     databases refuse the same names.
+
+    The weigh-in fields are Django only (D8, D54): how check-in weighs the
+    partition's cars, the unit weights are entered and shown in, and an
+    optional maximum, stored in grams. `roster.services.weigh_in` sets and
+    reads them.
     """
+
+    class WeighInMode(models.TextChoices):
+        NONE = "none", "No weigh-in"
+        PASS_FAIL = "pass_fail", "Pass or fail"
+        RECORDED = "recorded", "Recorded weight"
+
+    class WeightUnit(models.TextChoices):
+        GRAMS = "g", "grams"
+        OUNCES = "oz", "ounces"
+        POUNDS = "lb", "pounds"
 
     name = models.CharField(max_length=200)
     subgroup = models.ForeignKey(
         Subgroup, on_delete=models.PROTECT, related_name="partitions"
     )
     sort_order = models.IntegerField()
+    weigh_in_mode = models.CharField(
+        max_length=10, choices=WeighInMode.choices, default=WeighInMode.NONE
+    )
+    weight_unit = models.CharField(
+        max_length=2, choices=WeightUnit.choices, blank=True, default=""
+    )
+    max_weight_grams = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True
+    )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["event", "name"], name="partition_unique_name_per_event"
+            ),
+            # A recorded weight, and a maximum, need a unit to show in.
+            models.CheckConstraint(
+                condition=~Q(weight_unit="")
+                | (
+                    ~Q(weigh_in_mode="recorded")
+                    & (~Q(weigh_in_mode="pass_fail") | Q(max_weight_grams=None))
+                ),
+                name="partition_weight_unit_when_needed",
+            ),
+            models.CheckConstraint(
+                condition=Q(max_weight_grams=None) | Q(max_weight_grams__gt=0),
+                name="partition_max_weight_positive",
             ),
         ]
 
@@ -201,6 +221,13 @@ class Racer(EventScoped):
     # eligible for any award", speed and judged awards alike.
     exclude = models.BooleanField(default=False)
     not_eligible_for_speed_awards = models.BooleanField(default=False)
+    # The weigh-in (D8, D54), Django only: null until the car is weighed.
+    # `weight_grams` is set only in a partition that records weights.
+    weigh_in_passed = models.BooleanField(null=True, blank=True)
+    weight_grams = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True
+    )
+    weighed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -211,6 +238,10 @@ class Racer(EventScoped):
             models.CheckConstraint(
                 condition=Q(car_photo__regex=PHOTO_PATH_REGEX),
                 name="racer_car_photo_relative_path",
+            ),
+            models.CheckConstraint(
+                condition=Q(weight_grams=None) | Q(weight_grams__gt=0),
+                name="racer_weight_positive",
             ),
         ]
 
