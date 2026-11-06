@@ -37,6 +37,14 @@ class CiSuites(unittest.TestCase):
         self.assertIn('PARITY   test-balloting.sh: ', result.stdout)
         self.assertNotIn('#49', result.stdout)
 
+    def test_it_lists_the_parity_gate_entries_of_the_tickets_suites(self):
+        """#204's WAITING entry named the legacy pages, not #204, so the
+        listing left it out and the build found it late (#204 retro)."""
+        result = run('204', 'Runs testing/test-each-role.sh.')
+        self.assertIn('PARITY   test-each-role.sh: ', result.stdout)
+        self.assertIn('PARITY   test-each-role.sh (2): ', result.stdout)
+        self.assertNotIn('test-balloting.sh', result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()
