@@ -205,10 +205,12 @@ def decision_rows() -> dict[str, str]:
     return rows
 
 
-def quirk_decision_comments() -> list[tuple[list[str], str]]:
-    """`(ids, comment)` for each comment in QUIRK_DECISIONS: a comment block
-    covers the keys below it up to the next comment, an inline comment its key."""
-    source = GOLDEN_PY.read_text()
+def quirk_decision_comments(source: str | None = None) -> list[tuple[list[str], str]]:
+    """`(ids, comment)` for each comment in QUIRK_DECISIONS (of golden.py, or
+    of `source`): a comment block covers the keys below it up to the next
+    comment, an inline comment its key."""
+    if source is None:
+        source = GOLDEN_PY.read_text()
     start = source.index("QUIRK_DECISIONS = {")
     body = source[start : source.index("\n}\n", start)]
     blocks, comment, ids = [], [], []
@@ -219,7 +221,9 @@ def quirk_decision_comments() -> list[tuple[list[str], str]]:
             if ids:
                 blocks.append((ids, " ".join(comment)))
                 comment, ids = [], []
-            comment.append(line.lstrip("# "))
+            # Only the comment's own "# ": a line that opens with "#64"
+            # keeps it (#48 retro).
+            comment.append(line.removeprefix("#").removeprefix(" "))
         elif key:
             ids.append(key[1])
             if key[2]:
@@ -252,6 +256,22 @@ def test_the_comment_reader_finds_each_block_and_inline_comment():
         ["R10", "R11", "R12"]
     ]
     assert (["Q19"], "D30") in comments
+
+
+def test_a_comment_line_that_opens_with_an_issue_number_keeps_it():
+    """#48 wrapped "a row of #64" so a line opened with `#64`, and the reader
+    dropped it with the comment's own `#`: `C57` then read as unsourced."""
+    source = (
+        "QUIRK_DECISIONS = {\n"
+        "    # The fake roster sheet, a row of\n"
+        "    # #64.\n"
+        '    "C57": "fix",\n'
+        "}\n"
+    )
+    assert quirk_decision_comments(source) == [
+        (["C57"], "The fake roster sheet, a row of #64.")
+    ]
+    assert unsourced(quirk_decision_comments(source), {}) == []
 
 
 def test_an_accepted_in_decision_mentions_the_quirk():
