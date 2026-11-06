@@ -42,6 +42,7 @@ def poll_kiosk(ctx: LegacyContext) -> None:
     divergences=(
         "S27: needs PRESENT_AWARDS, as kiosk-dashboard.php does; PHP lists"
         " every kiosk address to anyone.",
+        # kiosk-dashboard.php:13 requires PRESENT_AWARDS_PERMISSION.
         *DASHBOARD_DIVERGENCES,
     ),
 )

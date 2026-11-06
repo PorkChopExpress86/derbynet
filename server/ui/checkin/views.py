@@ -30,11 +30,10 @@ from racing.services import finals
 from racing.services.finals import FinalsFailure
 from racing.services.reschedule import RescheduleFailure
 from roster.models import Partition, Racer
-from roster.services import car_numbers, checkin, groups, racers, weigh_in
+from roster.services import car_numbers, checkin, groups, racers
 from roster.services.car_numbers import RangeFailure
 from roster.services.checkin import CheckInFailure
 from roster.services.racers import Bulk, Edit, Failure, RacerFailure
-from roster.services.weigh_in import WeighInFailure
 from ui.checkin import state
 from ui.checkin.state import Filters
 from ui.navigation import requires_page
@@ -157,7 +156,6 @@ def page(request):
             "orders": state.ORDERS,
             "statuses": state.STATUSES,
             "states": state.STATES,
-            "weighs": state.WEIGHS,
             "poll_seconds": state.POLL_SECONDS,
             "page_title": "Check-In",
         },
@@ -252,61 +250,6 @@ def pass_racer(request, racer_id):
     if from_sheet:
         return sheet_reply(request, _sheet_racer(request, racer), message)
     return toasted(request, message)
-
-
-def _posted_pass(value) -> bool | None:
-    """Pass ("1"), Fail ("0"), or nothing chosen."""
-    if value in (None, ""):
-        return None
-    return php_truthy(value)
-
-
-def _posted_weight(value) -> str | None:
-    value = (value or "").strip()
-    return value or None
-
-
-@require_POST
-@guard
-def weigh(request, racer_id):
-    """The weigh-in step (#70, D8, D54): Pass or Fail in a `pass_fail`
-    partition, the weight in the partition's unit in a `recorded` one. A
-    weight over the maximum saves, with its warning (D8). PHP has no
-    weigh-in."""
-    racer = _racer(request, racer_id)
-    try:
-        weighed = weigh_in.record_weigh_in(
-            racer,
-            passed=_posted_pass(request.POST.get("passed")),
-            weight=_posted_weight(request.POST.get("weight")),
-        )
-    except WeighInFailure as failure:
-        return refused(request, failure)
-    who = f"{state.car(racer.car_number)} {name_of(racer)}"
-    if weighed.weight:
-        message = f"{who} weighs {weighed.weight}."
-    else:
-        message = f"{who}: weigh-in {'passed' if weighed.passed else 'failed'}."
-    warnings = [weighed.warning] if weighed.warning else []
-    if _in_sheet(request):
-        return sheet_reply(
-            request, _sheet_racer(request, racer, warnings=warnings), message
-        )
-    if weighed.warning:
-        return toasted(request, weighed.warning, level="info")
-    return toasted(request, message, level="ok" if weighed.passed else "info")
-
-
-@require_GET
-@guard
-def weigh_fields(request):
-    """The add sheet's weigh-in fields for the class picked (#70)."""
-    partition = _partition(request, request.GET.get("partitionid"))
-    return render(
-        request,
-        "ui/checkin/weigh_fields.html",
-        {"weigh_setting": weigh_in.setting(partition), "values": {}},
-    )
 
 
 @require_GET
@@ -429,7 +372,6 @@ def _racer_sheet_context(
         "error": error,
         "range_full": car_numbers.ranges_full(partition),
         "range_partition": partition,
-        "weigh_setting": weigh_in.setting(partition),
         **_perms(request),
     }
     return context
@@ -445,19 +387,7 @@ def _racer_values(post) -> dict:
         "carno": post.get("carno", ""),
         "exclude": php_truthy(post.get("exclude", "")),
         "no_speed": php_truthy(post.get("no_speed", "")),
-        "weigh_passed": post.get("weigh_passed", ""),
-        "weight": post.get("weight", ""),
     }
-
-
-def _weigh_entry(values) -> weigh_in.Entry | None:
-    """The add sheet's weigh-in, or None when the volunteer left it for
-    later."""
-    passed = _posted_pass(values["weigh_passed"])
-    weight = _posted_weight(values["weight"])
-    if passed is None and weight is None:
-        return None
-    return weigh_in.Entry(passed=passed, weight=weight)
 
 
 def _sheet_error(request, racer, values, error: str):
@@ -474,9 +404,8 @@ def _sheet_error(request, racer, values, error: str):
 @guard
 def racer_new(request):
     """The add sheet (GET) and the new racer (POST): name, car name and class
-    first, the car number from the class's range (D6, D48), the weigh-in the
-    class asks for (#70, D8, D54), then Take car photo and Pass. A duplicate
-    or out-of-range number, and a weight over the maximum, is saved with its
+    first, the car number from the class's range (D6, D48), then Take car
+    photo and Pass. A duplicate or out-of-range number is saved with its
     warning on the sheet, which stays open for a fix."""
     if no := _need(request, Perm.REGISTER_NEW_RACER, "Your role cannot add racers."):
         return no
@@ -510,13 +439,10 @@ def racer_new(request):
             partition=partition,
             exclude=values["exclude"],
             no_speed_awards=values["no_speed"],
-            weigh_in=_weigh_entry(values),
         )
     except RacerFailure as failure:
         if failure.code == Failure.RANGE_FULL:
             values["carno"] = ""
-        return _sheet_error(request, None, values, failure.description)
-    except WeighInFailure as failure:
         return _sheet_error(request, None, values, failure.description)
     racer = Racer.objects.select_related("group", "partition").get(pk=new.racer.pk)
     return sheet_reply(

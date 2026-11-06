@@ -17,6 +17,7 @@ from kiosks.models import Kiosk, Scene, SceneKiosk
 from roster.models import Group
 from ui.tests.browser.conftest import (
     assert_accessible,
+    close_tab,
     htmx_post,
     htmx_settled,
     shoot,
@@ -296,9 +297,7 @@ def test_kiosk_dashboard_parity(login, event):
         with page.expect_popup() as popup:
             window.click()
         assert kiosk_url.search(popup.value.url)
-        # Let its load finish, or the closed window leaves it in flight.
-        popup.value.wait_for_load_state()
-        popup.value.close()
+        close_tab(page, popup.value)
 
 
 def test_a_presenter_sees_the_board_without_controls(page, live_server, event):

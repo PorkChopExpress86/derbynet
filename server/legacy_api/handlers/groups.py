@@ -4,7 +4,8 @@
 The legacy names are kept: a class is a group, a rank a subgroup. An id from
 the request names a row of the active event only (`ctx.resolve`). PHP acts
 on whatever id it is given, so an id that names nothing changes nothing here
-and answers as PHP does for it, except in `partition.move`, which refuses it.
+and answers as PHP does for it (action.class.edit.inc:14-16, 32), except in
+`partition.move`, which refuses it.
 """
 
 from django.db import DatabaseError

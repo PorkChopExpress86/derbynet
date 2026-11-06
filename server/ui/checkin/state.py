@@ -8,8 +8,8 @@ A card carries every column of PHP's check-in table (`website/js/checkin.js`):
 the car number, the partition, the head and car thumbnails, the name, the car
 name with its "from" note, the Passed switch with its status text, and the XBS
 switch when `use-xbs` is on. It adds what Django knows and PHP does not: the
-D36 question for a racer whose group's round is running, the D32 request
-for a place in the final, and the partition's weigh-in (#70, D8, D54).
+D36 question for a racer whose group's round is running, and the D32 request
+for a place in the final.
 """
 
 import hashlib
@@ -22,7 +22,7 @@ from awards.models import Award
 from core.models import RaceSettings
 from racing.models import HAS_RESULT, FinalRequest, HeatLane, RosterEntry
 from roster.models import Partition, Racer
-from roster.services import car_numbers, weigh_in
+from roster.services import car_numbers
 from roster.services.checkin import round_in_progress_for
 from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url
 from ui.responses import car, nocase, racer_name, round_name
@@ -45,14 +45,6 @@ STATES = (
     ("unpassed", "Scheduled but not passed"),
     ("unscheduled", "Not scheduled"),
 )
-# The weigh-in filter (#70). A racer whose partition has no weigh-in matches
-# none of them.
-WEIGHS = (
-    ("", "Any weigh-in"),
-    ("weighed", "Weighed"),
-    ("unweighed", "Not weighed"),
-    ("failed", "Failed weigh-in"),
-)
 _STATE_TEXT = {
     "racing": "Racing!",
     "late": "Late!",
@@ -64,14 +56,13 @@ _STATE_TEXT = {
 @dataclass(frozen=True)
 class Filters:
     """The filter bar: the search text, the partition, passed or not, the
-    status text, the weigh-in, and the order."""
+    status text, and the order."""
 
     q: str = ""
     partition: int | None = None
     status: str = "all"
     order: str = "name"
     state: str = ""
-    weigh: str = ""
 
     @classmethod
     def from_request(cls, data) -> Filters:
@@ -86,31 +77,17 @@ class Filters:
         status = text("status")
         order = text("order")
         state = text("state")
-        weigh = text("weigh")
         return cls(
             q=text("q")[:100],
             partition=partition,
             status=status if status in dict(STATUSES) else "all",
             order=order if order in dict(ORDERS) else "name",
             state=state if state in _STATE_TEXT else "",
-            weigh=weigh if weigh in dict(WEIGHS) else "",
         )
 
     def shows(self, card: Card) -> bool:
-        """The status and weigh-in filters, which need the card."""
-        if self.state and card.status != _STATE_TEXT[self.state]:
-            return False
-        if not self.weigh:
-            return True
-        weighed = card.weigh
-        if weighed is None:
-            return False
-        match self.weigh:
-            case "weighed":
-                return weighed.weighed
-            case "unweighed":
-                return not weighed.weighed
-        return weighed.failed
+        """The status filter, which needs the card's status."""
+        return not self.state or card.status == _STATE_TEXT[self.state]
 
     def matches(self, racer: Racer) -> bool:
         if self.partition is not None and racer.partition_id != self.partition:
@@ -176,9 +153,6 @@ class Card:
     final: str = ""
     # The racer has a result, so check-in can no longer change the pass.
     locked: bool = False
-    # The weigh-in under the partition's setting, or None when the
-    # partition has none (#70).
-    weigh: weigh_in.Status | None = None
 
     @property
     def name(self) -> str:
@@ -197,8 +171,6 @@ class Listing:
     shown: int
     partitions: list[tuple[int, str]]
     use_xbs: bool
-    # Some partition weighs its cars, so the filter bar offers the weigh-in.
-    weighs: bool = False
     next_numbers: dict[int, int | None] = field(default_factory=dict)
     signature: str = ""
 
@@ -307,7 +279,6 @@ def cards_for(event, racers: list[Racer]) -> list[Card]:
                 else "",
                 final=final,
                 locked=r.pk in raced,
-                weigh=weigh_in.status(r),
             )
         )
     return cards
@@ -322,14 +293,6 @@ def racers_of(event):
 def card(event, racer_id: int) -> Card | None:
     found = list(racers_of(event).filter(pk=racer_id))
     return cards_for(event, found)[0] if found else None
-
-
-def any_weigh_in(event) -> bool:
-    return (
-        Partition.objects.filter(event=event)
-        .exclude(weigh_in_mode=Partition.WeighInMode.NONE)
-        .exists()
-    )
 
 
 def partitions(event) -> list[tuple[int, str]]:
@@ -367,7 +330,6 @@ def build(event, filters: Filters) -> Listing:
         shown=len(cards),
         partitions=partitions(event),
         use_xbs=RaceSettings.objects.get(event=event).use_xbs,
-        weighs=any_weigh_in(event),
         next_numbers=next_numbers(event),
     )
     material = json.dumps(
@@ -376,7 +338,6 @@ def build(event, filters: Filters) -> Listing:
             "counts": [listing.total, listing.passed, listing.shown],
             "partitions": listing.partitions,
             "xbs": listing.use_xbs,
-            "weighs": listing.weighs,
             "next": sorted(listing.next_numbers.items()),
             "filters": asdict(filters),
         },

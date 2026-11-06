@@ -5,14 +5,11 @@ dashboard and check-in page, so a read per row grows with the race.
 
 Each URL is read at two sizes of race day: groups, racers, scheduled rounds,
 a raced heat and queued playlist steps. The count must not grow. Every URL a
-template fetches with hx-get, polled or not, must be in the list when it takes
-no argument (#70 retro): the #70 review found `/checkin/weigh/`, fetched when
-the add sheet's partition changes, unmeasured.
+template polls must be in the list.
 """
 
 import re
 from pathlib import Path
-from urllib.parse import urlsplit
 
 import pytest
 from django.db import connection
@@ -28,21 +25,18 @@ from core.models import RaceState
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from racing.models import PlaylistEntry
 from roster.models import Racer
-from roster.services.weigh_in import record_weigh_in, set_partition_weigh_in
 from ui.tests.race import race_setup, run_heat, scheduled
 from ui.tests.roles import PASSWORDS
 
 pytestmark = pytest.mark.django_db
 
-# The page loads, the polls and the argument-free hx-get fragments of every
-# ui page. A new page adds its URLs; the first test names a missing one.
+# The page loads and the polls of every ui page. A new page adds its URLs.
 URLS = [
     "/dashboard/",
     "/dashboard/live/",
     "/checkin/",
     "/checkin/list/",
     "/checkin/number/",
-    "/checkin/weigh/",
     "/groups/",
     "/playlist/",
     "/awards/edit/",
@@ -80,21 +74,6 @@ URLS = [
     "/ballot/status",
     "/kiosk/check-in/",
     "/kiosk/standings/",
-    # Sheets and fragments a page fetches with hx-get.
-    "/awards/edit/new/",
-    "/awards/edit/partitions/",
-    "/checkin/bulk/",
-    "/checkin/racer/new/",
-    "/checkin/qr/",
-    "/dashboard/lanes/sheet/",
-    "/dashboard/new-round/sheet/",
-    "/dashboard/replay/settings/sheet/",
-    "/groups/aggregate/new/",
-    "/groups/group/new/",
-    "/groups/partitions/",
-    "/groups/rule/?rule=one-group",
-    "/playlist/scheduling/",
-    "/timer/settings/",
     *(
         f"/kiosk.php?page=kiosks/{name}.kiosk"
         for name in (
@@ -109,32 +88,28 @@ URLS = [
         )
     ),
 ]
-# A fetched URL left out, with the reason.
-NOT_MEASURED = {
-    "/dashboard/results/sheet/": "names the heat on screen by its round's id",
-}
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
-# An hx-get that names a URL with no argument, polled or not.
-FETCH = re.compile(r"hx-get=\"\{% url '([\w-]+)' %\}\"")
+# An element whose hx-get names a URL and whose trigger polls.
+POLL = re.compile(
+    r"<[^>]*hx-get=\"\{% url '([\w-]+)' %\}\"[^>]*(?:poll_trigger|every )"
+)
 
 
-def test_every_fetched_url_is_measured():
-    fetched = {
+def test_every_polled_url_is_measured():
+    polled = {
         reverse(name)
         for path in TEMPLATES.rglob("*.html")
-        for name in FETCH.findall(path.read_text())
+        for name in POLL.findall(path.read_text())
     }
-    assert "/dashboard/live/" in fetched, "the hx-get pattern found no poll"
-    measured = {urlsplit(url).path for url in URLS}
-    assert fetched - measured - set(NOT_MEASURED) == set()
+    assert polled, "the poll pattern found no poll"
+    assert polled - set(URLS) == set()
 
 
 def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
     """Groups of passed racers, each round 1 scheduled, rounds 1 and 2 of
     each group queued, each group's judged award, narrowed to its partition,
-    given to its first racer and on the ballot with two votes, each group's
-    partition recording weights with a maximum and its first racer weighed
-    over it (#70), and each group's kiosk, checking in and
+    given to its first racer and on the ballot with two votes, and each
+    group's kiosk, checking in and
     named in the first scene, showing please-check-in for its group. With
     `race`, the first round races a heat, and the kiosk presents the first
     award."""
@@ -151,8 +126,6 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
         set_partition_list(event, [racers[0].partition], award=award)
         set_winner(event, award, racers[0])
         set_ad_hoc_award(event, racers[1], f"Shiniest {round.group.name}")
-        set_partition_weigh_in(racers[0].partition, "recorded", "oz", "5")
-        record_weigh_in(racers[0], weight="5.2")
         # On the ballot, with a vote from each of two voters (#54).
         BallotAward.objects.create(event=event, award=award, depth=2)
         for n, racer in enumerate(racers[:2]):

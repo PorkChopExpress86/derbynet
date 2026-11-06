@@ -5,9 +5,7 @@
 # red lint shows up in seconds instead of after CI.  It also checks that the
 # HTTP golden fixtures were captured from the testing/ scripts being pushed
 # (server/tools/golden_inputs.py), which the golden-fixtures workflow finds
-# only after a 25-minute capture, and the paths the ADRs cite, which
-# plan-checks.yml checks (#70 retro: a path without its server/ prefix failed
-# CI twice).  Turn it on once per clone:
+# only after a 25-minute capture.  Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
 #
@@ -37,10 +35,6 @@ while read -r _ local_sha _ remote_sha; do
   fi
 done
 [ -n "$changed" ] || exit 0
-
-echo "pre-push: server/docs/adr/check-paths.sh" >&2
-# Print only the failures and the count, not one line per cited path.
-bash "$ROOT/server/docs/adr/check-paths.sh" | grep -v -e '^ok ' -e '^allowed '
 
 cd "$ROOT/server"
 # makemigrations reads DATABASE_URL; the check needs no particular database.

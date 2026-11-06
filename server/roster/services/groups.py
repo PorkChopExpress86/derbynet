@@ -912,9 +912,10 @@ def order_partitions(
 
 def _take_sort_order(row, sort_order: int | None) -> None:
     """A subgroup takes the sort order of its first partition by id, as PHP
-    does. A group takes the lowest of its partitions'; PHP takes whichever
-    its subquery reads first, which follows subgroup ids. A row with no
-    partition keeps its own; PHP sets it to null."""
+    does (action.partition.order.inc:44-45). A group takes the lowest of its
+    partitions'; PHP takes whichever its subquery reads first, which follows
+    subgroup ids. A row with no partition keeps its own; PHP sets it to
+    null."""
     if sort_order is not None:
         type(row).objects.filter(pk=row.pk).update(sort_order=sort_order)
 

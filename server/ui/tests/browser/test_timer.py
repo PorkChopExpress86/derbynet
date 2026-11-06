@@ -27,6 +27,16 @@ from ui.tests.browser.conftest import (
 from ui.tests.race import race_setup, scheduled
 
 ABORTED = r"request failed: \S*/timer/(status|test/live)/\S* net::ERR_ABORTED$"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _built_timer():
+    """A fresh checkout or worktree has no copied timer scripts, and every
+    test here then failed on its own missing file (#53 retro). Say so once."""
+    if not timer_build.built():
+        pytest.fail("Run `uv run python manage.py build_timer` first.", pytrace=False)
+
+
 FLAGS = (
     "FLAGS&flag-debug=bool:false&desc-debug=Debug output&flag-delay=int:300"
     "&desc-delay=Milliseconds between polls&ports=COM1,COM2"
@@ -78,8 +88,6 @@ def test_the_browser_timer_loads_every_file(login, page_errors):
     `testing/puppeteer/all-pages-test.js`."""
     page = login("RaceCoordinator")
     desktop_only(page)
-    if not timer_build.built():
-        pytest.fail("Run `manage.py build_timer` first.", pytrace=False)
     failed = []
     page.on(
         "response",

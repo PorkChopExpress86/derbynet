@@ -18,9 +18,11 @@ retro: a phone page scrolled 407 px sideways, seen only in a screenshot).
 
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap. When the
-test body returns, the harness waits for every request the page still has in
-flight before any fixture tears down (#45 retro), so a late reply never meets
-a flushed database or `settings` already put back.
+test body returns, the harness stops every tab's timers, closes the other
+tabs, and waits for every request still in flight before any fixture tears
+down (#45 and #53 retros), so a late reply or a late poll never meets a
+flushed database or `settings` already put back. Close a second tab with
+`close_tab(page, tab)`: a tab closed with a request out fails the test.
 `wait_for_load_state("networkidle")` waits for a page load only, and returns
 at once after an htmx request. A swap that leaves an `hx-get` or `hx-post`
 control unbound once its task ends fails the test (#46 retro).
@@ -242,6 +244,8 @@ class InFlight:
 
     def __init__(self, context):
         self.requests = set()
+        # Requests a tab still had out when it closed, as "METHOD URL".
+        self.closed_with = []
         context.on("request", lambda r: self.requests.add(r))
         context.on("requestfinished", lambda r: self.requests.discard(r))
         context.on("requestfailed", lambda r: self.requests.discard(r))
@@ -249,6 +253,20 @@ class InFlight:
 
     def watch(self, page):
         page.on("framenavigated", lambda frame: self.navigated(frame))
+        page.on("close", lambda closed: self.page_closed(closed))
+
+    def of(self, tab) -> set:
+        """The requests in flight that `tab` sent."""
+        return {r for r in self.requests if _sent_by(r) == tab}
+
+    def page_closed(self, tab):
+        """Playwright reports no end for the requests of a tab closed with
+        them out (the camera tab's POST, PR #205's ui (postgres)), so they
+        leave the set and the harness names them: close a tab with
+        `close_tab()`, which waits for them first."""
+        left = self.of(tab)
+        self.requests -= left
+        self.closed_with += sorted(f"{r.method} {r.url}" for r in left)
 
     def navigated(self, frame):
         self.requests -= {
@@ -268,21 +286,90 @@ class InFlight:
         return sorted(f"{r.method} {r.url}" for r in self.requests)
 
 
+def _sent_by(request):
+    try:
+        return request.frame.page
+    except Exception:  # noqa: BLE001 - a service worker's request has no frame
+        return None
+
+
+# Clears every timeout and interval the frame has set. Timer ids count up
+# from 1, or from 1e12 under Playwright's clock (`page.clock.install()`), so
+# the loop runs over the first and the last SPAN ids: from 0 it spun the
+# renderer for hours on test_toasts.py's fake clock (#53 retro).
+STOP_TIMERS = """() => {
+  const SPAN = 100000;
+  const last = setTimeout(() => {});
+  const stop = (id) => { clearTimeout(id); clearInterval(id); };
+  for (let id = 0; id <= Math.min(last, SPAN); id++) stop(id);
+  for (let id = Math.max(SPAN + 1, last - SPAN); id <= last; id++) stop(id);
+}"""
+
+
+def stop_timers(tab):
+    """Stop every poll in every frame of `tab`, so no request starts after
+    the harness drained them."""
+    for frame in tab.frames:
+        try:
+            frame.evaluate(STOP_TIMERS)
+        except Exception:  # noqa: BLE001, S110 - a detached frame has no timers
+            pass
+
+
+def close_tab(page, tab):
+    """Close a second tab of `page`'s context, such as the camera or a
+    kiosk, once its polls have stopped and its requests are answered. A tab
+    closed with a request out fails the test (`InFlight.page_closed`)."""
+    stop_timers(tab)
+    waited = 0
+    while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
+        tab.wait_for_timeout(50)
+        waited += 50
+    tab.close()
+
+
+def _settle(page) -> list[str]:
+    """Stop every tab's polls, close the other tabs, and drain what is out.
+    A page that polls more often than the drain's 50 ms check, such as the
+    replay page's 250 ms `replay.message`, could otherwise start a request
+    after the drain that met the database flush (a Postgres deadlock, #53).
+    Returns the requests still out after the timeout."""
+    if page.is_closed():
+        return []
+    for tab in page.context.pages:
+        if tab != page:
+            close_tab(page, tab)
+    stop_timers(page)
+    return page.in_flight.drain(page)
+
+
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_call(item):
-    """After the test body and before any fixture's teardown, wait for the
-    page's requests in flight. A test that ends on a click, or a poll that
-    happens to be out, would otherwise get its reply after `settings` turned
-    the test endpoints off (a 404) or the database was flushed."""
+    """After the test body and before any fixture's teardown, stop every
+    tab's polls and wait for its requests in flight. A test that ends on a
+    click, or a poll that happens to be out, would otherwise get its reply
+    after `settings` turned the test endpoints off (a 404) or the database
+    was flushed."""
     page = item.funcargs.get("page")
     in_flight = getattr(page, "in_flight", None)
     try:
         result = yield
     except BaseException:
         if in_flight is not None:
-            in_flight.drain(page)
+            try:
+                _settle(page)
+            except Exception:  # noqa: BLE001, S110 - the test's own error wins
+                pass
         raise
-    if in_flight is not None and (stuck := in_flight.drain(page)):
+    if in_flight is None:
+        return result
+    stuck = _settle(page)
+    if in_flight.closed_with:
+        raise AssertionError(
+            f"a tab closed with requests out: {in_flight.closed_with}; "
+            "close it with close_tab(page, tab)"
+        )
+    if stuck:
         raise AssertionError(f"still in flight after 10 s: {stuck}")
     return result
 

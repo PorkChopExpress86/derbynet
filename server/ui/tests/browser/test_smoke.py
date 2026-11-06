@@ -12,8 +12,8 @@ from ui.navigation import ENTRIES
 from ui.tests.roles import ROLES
 
 # Pages whose poll never leaves the network idle for 500 ms: the replay page
-# polls replay.message every 250 ms, as replay.php does (#53). They are
-# checked once loaded.
+# polls replay.message every 250 ms, as replay.php does (replay.php:54-87,
+# #53). They are checked once loaded.
 NEVER_IDLE = {"replay"}
 
 

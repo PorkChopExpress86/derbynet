@@ -121,6 +121,7 @@ def test_ready_aggregates_come_in_the_order_given():
 
 def test_an_aggregate_drawing_from_a_ready_aggregate_is_ready_too():
     """`unfinished` cannot name an aggregate with no round, but the pass
-    still treats a ready constituent as finished, as PHP does."""
+    still treats a ready constituent as finished, as PHP does
+    (query.poll.coordinator.inc:52-58)."""
     inner, outer = Aggregate(8, (1,)), Aggregate(9, (8,))
     assert ready_aggregates([outer, inner], racing={1}, unfinished={8}) == [8, 9]

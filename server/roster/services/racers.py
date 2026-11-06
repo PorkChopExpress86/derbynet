@@ -34,7 +34,6 @@ from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from roster.fake_names import FAKE_NAMES
 from roster.models import Group, Partition, Racer, Subgroup
 from roster.services import car_numbers, groups
-from roster.services import weigh_in as weigh_in_service
 
 FAKE_IMAGES: Final = Path(__file__).resolve().parent.parent / "fake_racer_images"
 WALK_IN_FIRST_NAME: Final = "Walk-In"
@@ -116,16 +115,13 @@ def insert_new_racer(
     partition_name: str = "",
     exclude: bool = False,
     no_speed_awards: bool = False,
-    weigh_in: weigh_in_service.Entry | None = None,
 ) -> NewRacer:
     """`insert_new_racer()`: a racer in `partition`, else in the partition
     named `partition_name` (D34: a name that differs only in case joins the
     existing partition), else in `Default`. A blank car number takes the
     partition's next one. A car number another racer has is allowed, with a
     warning. The racer is entered in round 1 of its group, and the history
-    gets `racer.*create`. Both award settings (D33) save with the racer, and
-    so does the check-in sheet's weigh-in (#70), which no legacy endpoint
-    sends; a refused weigh-in adds no racer."""
+    gets `racer.*create`. Both award settings (D33) save with the racer."""
     with transaction.atomic():
         lock_race_state(event.id)
         if partition is None:
@@ -168,10 +164,6 @@ def insert_new_racer(
             group_id=subgroup.group_id,
         )
         _store_award_settings(racer, exclude=exclude, no_speed_awards=no_speed_awards)
-        if weigh_in is not None:
-            weighed = weigh_in_service.record_locked(racer.pk, weigh_in)
-            if weighed.warning:
-                warnings.append(weighed.warning)
         groups.fill_in_missing_roster_entries(event.id)
         _record(
             event.id,
