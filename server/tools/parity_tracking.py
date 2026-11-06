@@ -7,13 +7,16 @@ behind the gate's expected red.
     uv run python -m tools.parity_tracking --dry-run [--issue-body FILE] ...
 
 Each `<database>=<path>` is one gate job's `parity_gate.py --failing` file.
-The failing list is each failing step's label and the databases it fails
-on. The open issue titled `TITLE` carries the list it last showed, in a
-comment line at the top of its body. When tonight's list differs, the
-script rewrites the body (each failing step, its difference count on each
-database, and the WAITING entry it waits on) and comments with the steps
-that started and stopped failing. When the list is the same it changes
-nothing. With no such issue, it opens one.
+A gate job that died before writing it counts as one failing entry, `(the
+leg did not report)`, so the issue still changes. The failing list is each
+failing step's label and the databases it fails on. The open issue labeled
+`LABEL` and titled `TITLE` carries the list it last showed, in a comment
+line at the top of its body. It is found by its label, not by a search,
+whose index can lag behind a new issue and open a second one. When
+tonight's list differs, the script rewrites the body (each failing step,
+its difference count on each database, and the WAITING entry it waits on)
+and comments with the steps that started and stopped failing. When the
+list is the same it changes nothing. With no such issue, it opens one.
 
 Every `gh` call names `--repo PorkChopExpress86/derbynet`: the issue stays on
 the owner's fork, never upstream (CLAUDE.md). `--dry-run` prints each call
@@ -30,6 +33,10 @@ from pathlib import Path
 
 REPO = "PorkChopExpress86/derbynet"
 TITLE = "Parity gate: failing steps"
+LABEL = "parity-gate"
+LABEL_COLOR = "d93f0b"
+NO_REPORT = "(the leg did not report)"
+CUT_SHORT = "(the leg was cut short)"
 MARKER = "<!-- parity-gate-failing: "
 
 
@@ -38,15 +45,26 @@ class Leg:
     database: str
     steps: list[dict]
     short: list[str]
+    reported: bool = True
 
 
 def read_legs(arguments: list[str]) -> list[Leg]:
     legs = []
     for argument in arguments:
         database, _, path = argument.partition("=")
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-        legs.append(Leg(database, data["steps"], data["short"]))
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+            legs.append(Leg(database, data["steps"], data["short"]))
+        except OSError, ValueError, KeyError, TypeError:
+            reason = f"the gate job wrote no readable {Path(path).name}"
+            legs.append(Leg(database, [], [reason], reported=False))
     return legs
+
+
+def _extra(leg: Leg) -> list[str]:
+    if not leg.reported:
+        return [NO_REPORT]
+    return [CUT_SHORT] if leg.short else []
 
 
 def failing_list(legs: list[Leg]) -> dict[str, list[str]]:
@@ -54,8 +72,7 @@ def failing_list(legs: list[Leg]) -> dict[str, list[str]]:
     leg cut short counts as a failing step of its own."""
     found: dict[str, set[str]] = {}
     for leg in legs:
-        labels = [step["label"] for step in leg.steps]
-        labels += ["(the leg was cut short)"] * bool(leg.short)
+        labels = [step["label"] for step in leg.steps] + _extra(leg)
         for label in labels:
             found.setdefault(label, set()).add(leg.database)
     return {label: sorted(databases) for label, databases in sorted(found.items())}
@@ -99,8 +116,8 @@ def render(legs: list[Leg], run_url: str, sha: str) -> str:
         cells, waiting, problems = [], None, []
         for leg in legs:
             step = next((s for s in leg.steps if s["label"] == label), None)
-            if label == "(the leg was cut short)" and leg.short:
-                cells.append("cut short")
+            if label in _extra(leg):
+                cells.append("did not report" if label == NO_REPORT else "cut short")
                 problems += [p for p in leg.short if p not in problems]
             elif step is None:
                 cells.append("passes")
@@ -157,22 +174,24 @@ class Gh:
     def _canned(self, args) -> str:
         """What `gh issue list` answers in a dry run: the issue whose body is
         `--issue-body`, or none."""
-        if self.issue_body is None:
+        if self.issue_body is None or "--label" not in args:
             return "[]"
         return json.dumps([{"number": 0, "title": TITLE, "body": self.issue_body}])
 
 
 def find_issue(gh: Gh) -> dict | None:
+    """The open issue with `LABEL` and `TITLE`. A label filter lists the
+    repository's issues directly, with no search index to lag."""
     found = json.loads(
         gh(
             "issue",
             "list",
             "--state",
             "open",
-            "--search",
-            f'in:title "{TITLE}"',
+            "--label",
+            LABEL,
             "--limit",
-            "50",
+            "100",
             "--json",
             "number,title,body",
         )
@@ -191,7 +210,30 @@ def track(gh: Gh, legs: list[Leg], run_url: str, sha: str, workdir: Path) -> str
     body = workdir / "parity-tracking-body.md"
     body.write_text(render(legs, run_url, sha), encoding="utf-8")
     if issue is None:
-        gh("issue", "create", "--title", TITLE, "--body-file", str(body), writes=True)
+        # --force makes the label if the fork lacks it, and changes nothing
+        # if it has it.
+        gh(
+            "label",
+            "create",
+            LABEL,
+            "--color",
+            LABEL_COLOR,
+            "--description",
+            "The nightly parity gate's failing steps (#218)",
+            "--force",
+            writes=True,
+        )
+        gh(
+            "issue",
+            "create",
+            "--title",
+            TITLE,
+            "--label",
+            LABEL,
+            "--body-file",
+            str(body),
+            writes=True,
+        )
         return "opened"
     number = str(issue["number"])
     gh("issue", "edit", number, "--body-file", str(body), writes=True)

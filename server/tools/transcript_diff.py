@@ -330,6 +330,10 @@ class Run:
     # What the run has shown of its clock and its replay client
     # (tools/contact_windows.py).
     clock: Clock = field(default_factory=Clock)
+    # The role the run's session is logged in as, "" for none: a leg starts
+    # with no session, and the shell suite keeps its cookies from step to
+    # step.
+    role: str = ""
 
     def _renumber(self, pattern: re.Pattern, kind: str, text: str) -> str:
         """`pattern`'s second group, an id of `kind`, renumbered."""
@@ -651,6 +655,8 @@ class Difference:
     a: object
     b: object
     allowed_by: str | None = None
+    # The role the session sent the request as (`Run.role`), or None.
+    role: str | None = None
 
 
 @dataclass(frozen=True)
@@ -834,16 +840,19 @@ def diff(
     allow: Allow | None = None,
     now: datetime | None = None,
     runs: tuple[Run, Run] | None = None,
+    after: tuple[float, float] = (INFINITY, INFINITY),
 ) -> Report:
     """Compare two `output.curl` runs exchange by exchange. `now` is when
     they ran, for telling volatile timestamps from fixed dates. `runs`, from
     `new_runs`, carries the id numbering over from an earlier part of the
-    same two runs; it is updated in place, past any divergence too."""
+    same two runs; it is updated in place, past any divergence too. `after`
+    is the latest time each run's later parts allow
+    (`contact_windows.latest_times`)."""
     run_a, run_b = runs or new_runs(now)
     report = Report()
     exchanges_a, exchanges_b = parse(a_text), parse(b_text)
-    latest_a = latest_times([e.body for e in exchanges_a])
-    latest_b = latest_times([e.body for e in exchanges_b])
+    latest_a = latest_times([e.body for e in exchanges_a], after[0])
+    latest_b = latest_times([e.body for e in exchanges_b], after[1])
     for i, ex_a, ex_b in _pairs(exchanges_a, exchanges_b):
         if ex_a is MISSING or ex_b is MISSING:
             index = (ex_b if ex_a is MISSING else ex_a).index
@@ -902,7 +911,13 @@ def diff(
         )
         for item in found:
             difference = Difference(
-                ex_a.index, req_a.endpoint, ex_a.request, item.path, item.a, item.b
+                ex_a.index,
+                req_a.endpoint,
+                ex_a.request,
+                item.path,
+                item.a,
+                item.b,
+                role=run_a.role if run_a.role == run_b.role else None,
             )
             difference.allowed_by = windows.get(item.path) or (
                 allow(difference) if allow else None
@@ -953,6 +968,9 @@ def _after(request: Request, body: str, run: Run, latest: float = INFINITY) -> N
     """Number afresh what the request left no id of, and take in what the
     reply shows of the run's clock."""
     run.clock.observe(request.endpoint, body, latest)
+    role = _logged_in_as(request, body)
+    if role is not None:
+        run.role = role
     if _resets_database(request):
         run.ids, run.rule = FirstAppearance(), None
         run.clock.forget_replay()
@@ -967,6 +985,24 @@ def _after(request: Request, body: str, run: Run, latest: float = INFINITY) -> N
     if rule != "custom" and run.rule in (None, rule):
         run.ids.forget(*GROUP_KINDS)
     run.rule = rule
+
+
+def _logged_in_as(request: Request, body: str) -> str | None:
+    """The role a successful `role.login` logs the session in as, "" for a
+    logout (no name), or None for any other exchange."""
+    if request.endpoint != "action role.login":
+        return None
+    if request.key[0] == "login":
+        name = request.key[1]
+    else:
+        name = dict(request.key[2]).get("name", "")
+    values, _ = _json_values(body.strip())
+    outcome = (
+        values[0].get("outcome") if values and isinstance(values[0], dict) else None
+    )
+    if not isinstance(outcome, dict) or outcome.get("summary") != "success":
+        return None
+    return name
 
 
 def _resets_database(request: Request) -> bool:

@@ -74,8 +74,10 @@ def test_it_opens_the_issue_when_there_is_none(tmp_path):
     )
 
     assert did == "opened"
-    [create] = writes(gh)
+    label, create = writes(gh)
+    assert label[:4] == ["gh", "label", "create", "parity-gate"]
     assert create[:3] == ["gh", "issue", "create"]
+    assert create[create.index("--label") + 1] == "parity-gate"
     body = (tmp_path / "parity-tracking-body.md").read_text()
     assert (
         "| `test-scenes.sh` | 10 differences | 10 differences | no WAITING entry |"
@@ -184,3 +186,36 @@ def test_the_gate_writes_the_file_the_tracker_reads(tmp_path):
             "problems": ["fails"],
         }
     ]
+
+
+def test_a_gate_job_that_wrote_nothing_is_a_failing_entry(tmp_path):
+    # The postgres gate job died before `--failing`: the upload found no
+    # file, so the track job's path names nothing.
+    gh = pt.Gh(dry_run=True, issue_body=issue_body(tmp_path, NOV_05))
+    legs = pt.read_legs(
+        [
+            f"sqlite={saved(tmp_path, 'sqlite', NOV_05)}",
+            f"postgres={tmp_path / 'failing-postgres.json'}",
+        ]
+    )
+
+    did = pt.track(gh, legs, "https://example/run/7", "a" * 40, tmp_path)
+
+    assert did == "updated"
+    comment = (tmp_path / "parity-tracking-comment.md").read_text()
+    assert "- Now fails: `(the leg did not report)` (postgres)" in comment
+    body = (tmp_path / "parity-tracking-body.md").read_text()
+    assert "| `(the leg did not report)` | passes | did not report |" in body
+
+
+def test_the_issue_is_found_by_its_label_not_by_a_search(tmp_path):
+    gh = pt.Gh(dry_run=True, issue_body=issue_body(tmp_path, NOV_05))
+
+    did = pt.track(
+        gh, legs(tmp_path, NOV_05), "https://example/run/8", "b" * 40, tmp_path
+    )
+
+    assert did == "unchanged"
+    [listing] = [call for call in gh.calls if call[1:3] == ["issue", "list"]]
+    assert "--search" not in listing
+    assert listing[listing.index("--label") + 1] == "parity-gate"

@@ -79,8 +79,13 @@ def window_reasons(report: td.Report) -> list[str]:
 
 def test_a_replay_state_each_clock_gives_is_allowed_with_both_ages():
     # PHP's replay polled 4 s ago; Django's 30 s ago, past the 10 s window.
-    php = [login(T0), poll(replay_state=replay_state(T0 - 4, 4))]
-    django = [login(T0), poll(replay_state=replay_state(T0 - 30, None))]
+    # A later timecheck bounds each reply.
+    php = [login(T0), poll(replay_state=replay_state(T0 - 4, 4)), login(T0 + 1)]
+    django = [
+        login(T0),
+        poll(replay_state=replay_state(T0 - 30, None)),
+        login(T0 + 1),
+    ]
 
     report = compare(php, django)
 
@@ -88,7 +93,7 @@ def test_a_replay_state_each_clock_gives_is_allowed_with_both_ages():
     reasons = window_reasons(report)
     assert len(reasons) == 4  # state, icon, connected, message
     assert "PHP connected, last contact 4 s before" in reasons[0]
-    assert "Django NOT CONNECTED, last contact at least 29 s before" in reasons[0]
+    assert "Django NOT CONNECTED, last contact 29 to 33 s before" in reasons[0]
 
 
 def test_not_connected_while_the_legs_own_clock_says_the_window_is_open_fails():
@@ -117,8 +122,8 @@ def test_connected_past_the_window_by_its_own_age_fails():
 
 def test_a_timer_each_clock_gives_is_allowed():
     # PHP's timer was last heard 67 s ago, Django's 26 s ago: 60 s window.
-    php = [login(T0), poll(timer_state=timer_state(T0 - 67, None))]
-    django = [login(T0), poll(timer_state=timer_state(T0 - 26, 26))]
+    php = [login(T0), poll(timer_state=timer_state(T0 - 67, None)), login(T0 + 1)]
+    django = [login(T0), poll(timer_state=timer_state(T0 - 26, 26)), login(T0 + 1)]
 
     report = compare(php, django)
 
@@ -134,9 +139,9 @@ def test_a_timer_connected_past_its_window_fails():
 
 
 def test_the_timers_other_keys_are_still_compared():
-    php = [login(T0), poll(timer_state=timer_state(T0 - 67, None))]
+    php = [login(T0), poll(timer_state=timer_state(T0 - 67, None)), login(T0 + 1)]
     lanes = {**timer_state(T0 - 26, 26), "lanes": 3}
-    django = [login(T0), poll(timer_state=lanes)]
+    django = [login(T0), poll(timer_state=lanes), login(T0 + 1)]
 
     report = compare(php, django)
 
@@ -212,10 +217,15 @@ def _queue_runs(django_lapsed: bool):
         poll(replay_state=replay_state(T0 - 1, 1)),
         replay_message([]),
     ]
-    php = [*start, poll(replay_state=replay_state(T0, 1)), replay_message(["A", "B"])]
-    django_state = replay_state(T0 - 1, None if django_lapsed else 2)
-    django = [*start, poll(replay_state=django_state), replay_message(["A"])]
-    return php, django
+    # 30 s pass. PHP's replay polled meanwhile; Django's didn't, and its
+    # window shut, or with `django_lapsed` false it says it is still open.
+    later = login(T0 + 30)
+    php_state = replay_state(T0 + 29, 1)
+    django_state = replay_state(T0 - 1, None) if django_lapsed else php_state
+    php = [*start, later, poll(replay_state=php_state), replay_message(["A", "B"])]
+    django = [*start, later, poll(replay_state=django_state), replay_message(["A"])]
+    end = login(T0 + 31)
+    return [*php, end], [*django, end]
 
 
 def test_a_queue_cut_short_after_that_leg_showed_its_window_shut_is_allowed():
@@ -234,3 +244,74 @@ def test_a_queue_cut_short_with_the_window_open_fails():
     report = compare(php, django)
 
     assert "$.replay[1]" in [d.path for d in report.differences]
+
+
+# ----- a clock with no bound excuses nothing (#218 review) ------------------
+
+
+def _diffs(report: td.Report) -> list[str]:
+    return [d.path for d in report.differences]
+
+
+def test_not_connected_inside_the_window_with_a_later_timecheck_fails():
+    # Django's timer was heard at T0, and a timecheck 5 s later bounds the
+    # reply: NOT CONNECTED inside 60 s is wrong.
+    php = [login(T0), poll(timer_state=timer_state(T0, 3)), login(T0 + 5)]
+    django = [login(T0), poll(timer_state=timer_state(T0, None)), login(T0 + 5)]
+
+    assert "$.timer-state.state" in _diffs(compare(php, django))
+
+
+def test_not_connected_at_the_end_of_a_step_with_no_later_time_fails():
+    # No later time bounds the reply, so the window can't be shown to have
+    # closed.
+    php = [login(T0), poll(timer_state=timer_state(T0, 3))]
+    django = [login(T0), poll(timer_state=timer_state(T0, None))]
+
+    assert "$.timer-state.state" in _diffs(compare(php, django))
+
+
+def test_a_later_steps_time_bounds_the_end_of_a_step():
+    php = [login(T0), poll(timer_state=timer_state(T0 - 67, None))]
+    django = [login(T0), poll(timer_state=timer_state(T0 - 26, 26))]
+    flipped = [login(T0), poll(timer_state=timer_state(T0 - 3, None))]
+    bound = (T0 + 2, T0 + 2)
+
+    assert td.diff(transcript(*php), transcript(*django), now=NOW, after=bound).ok
+    # Django's NOT CONNECTED 3 to 5 s after its contact is wrong.
+    report = td.diff(transcript(*django), transcript(*flipped), now=NOW, after=bound)
+    assert "$.timer-state.state" in _diffs(report)
+
+
+def test_a_leg_that_never_heard_the_timer_is_not_a_window_difference():
+    php = [login(T0), poll(timer_state=timer_state(T0, 3)), login(T0 + 5)]
+    django = [login(T0), poll(timer_state=timer_state(0, None)), login(T0 + 5)]
+
+    assert "$.timer-state.state" in _diffs(compare(php, django))
+
+
+def test_connected_against_its_own_clock_fails_past_the_window():
+    # The age says 3 s, but the leg's clock is 20 s past the contact.
+    php = [login(T0 + 20), poll(timer_state=timer_state(T0 - 67, None))]
+    django = [login(T0 + 80), poll(timer_state=timer_state(T0, 3))]
+
+    assert "$.timer-state.state" in _diffs(compare(php, django))
+
+
+# ----- the windows are the servers' ---------------------------------------
+
+
+def test_the_windows_are_djangos_and_phps():
+    from pathlib import Path
+
+    from racing.services.replay import REPLAY_TIMEOUT
+    from racing.services.timer import CONTACT_TIMEOUT
+    from tools.contact_windows import REPLAY_WINDOW, TIMER_WINDOW
+
+    assert CONTACT_TIMEOUT.total_seconds() == TIMER_WINDOW
+    assert REPLAY_TIMEOUT.total_seconds() == REPLAY_WINDOW
+    website = Path(__file__).resolve().parents[2] / "website" / "inc"
+    timer = (website / "timer-state.inc").read_text().splitlines()
+    replay = (website / "replay.inc").read_text().splitlines()
+    assert f"$this->last_contact + {TIMER_WINDOW} < time()" in timer[71]
+    assert f"define('REPLAY_TIMEOUT_LIMIT', {REPLAY_WINDOW});" in replay[28]

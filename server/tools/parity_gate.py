@@ -52,6 +52,7 @@ from datetime import datetime
 from pathlib import Path
 
 from legacy_api.parity_paths import ParityPath
+from tools.contact_windows import INFINITY, latest_times
 from tools.transcript_diff import (
     MISSING,
     Difference,
@@ -268,6 +269,8 @@ def step_path_text(
 # The steps whose replies may differ from PHP's until the ticket each names
 # lands. Their requests and outcomes are still judged, and the gate fails
 # while one matches PHP, so the list can't go stale. The summary lists them.
+# #221 lists the columns: Classes.durable, the Awards ids of no group or
+# racer, the RaceInfo rows, and the ballotid of Voters and Votes.
 _SNAPSHOT = (
     "#221: the snapshot is compared as one text, with its ids raw, and some of"
     " its columns differ from PHP's"
@@ -323,7 +326,13 @@ def read_leg(directory: Path) -> list[Step]:
 def _allow(difference: Difference) -> str | None:
     from legacy_api.registry import allowed_by
 
-    return allowed_by(difference.endpoint, difference.path, difference.a, difference.b)
+    return allowed_by(
+        difference.endpoint,
+        difference.path,
+        difference.a,
+        difference.b,
+        difference.role,
+    )
 
 
 @dataclass
@@ -372,6 +381,7 @@ def judge(
     step_paths = STEP_PATHS if step_paths is None else step_paths
     # One numbering per leg, carried from step to step.
     runs = new_runs(now)
+    bounds = {**later_bounds(php, "php"), **later_bounds(django, "django")}
     by_label = {s.label: s for s in django}
     results = []
     for step in php:
@@ -407,7 +417,12 @@ def judge(
             step.label, step_paths.get(step.label, ()), step_divergences, allow
         )
         report = diff(
-            _read(step.transcript), _read(other.transcript), step_allow, now, runs
+            _read(step.transcript),
+            _read(other.transcript),
+            step_allow,
+            now,
+            runs,
+            (bounds["php", step.label], bounds["django", other.label]),
         )
         result.report = report
         _judge_step(result, report, other, step_divergences)
@@ -423,6 +438,20 @@ def judge(
     return results
 
 
+def later_bounds(steps: list[Step], leg: str) -> dict[tuple[str, str], float]:
+    """For each step of a leg, by `(leg, label)`, the latest time the leg's
+    later steps allow it to have ended: the contact windows judge a step's
+    last replies by it (`tools/contact_windows.py`). Infinite for the last
+    step that shows a time."""
+    out, bound = {}, INFINITY
+    for step in reversed(steps):
+        out[leg, step.label] = bound
+        bodies = [e.body for e in parse(_read(step.transcript))]
+        if bodies:
+            bound = min(bound, latest_times(bodies)[0])
+    return out
+
+
 def _with_step_paths(label, paths, step_divergences, allow):
     """`allow`, and the step's own STEP_PATHS before it."""
     if not paths:
@@ -431,7 +460,11 @@ def _with_step_paths(label, paths, step_divergences, allow):
     def check(difference):
         for allowed in paths:
             if allowed.covers(
-                difference.endpoint, difference.path, difference.a, difference.b
+                difference.endpoint,
+                difference.path,
+                difference.a,
+                difference.b,
+                difference.role,
             ):
                 text = step_path_text(label, allowed, step_divergences)
                 if text:

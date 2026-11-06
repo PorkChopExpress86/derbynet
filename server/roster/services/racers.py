@@ -450,6 +450,29 @@ class PassDetails:
     last_name: str
 
 
+def pass_requested(
+    event, racer: Racer | None, code: str | None, passed: bool, authorized: bool
+) -> PassDetails | None:
+    """`racer.pass` as posted: the racer by `code`, a barcode, when one is
+    given, else `racer`; then `pass_racer`'s refusals in PHP's order.
+
+    PHP resolves the barcode first and makes a walk-in racer for an unknown
+    `PWDwi` car number, whoever asks (`action.racer.pass.inc:9-12`,
+    `barcode.inc:19-39`), and then passes it. Without `authorized` Django
+    makes none (S23): a walk-in that exists is passed or refused as any other
+    racer, and one that would be made is refused `notauthorized`, the code
+    the S23 refusal takes in PHP's order.
+    """
+    from roster.services import barcode
+
+    if code is not None:
+        found = barcode.resolve(event, code, create=authorized)
+        if found.would_create:
+            raise RacerFailure(Failure.NOT_AUTHORIZED, "Not authorized.")
+        racer = found.racer
+    return pass_racer(racer, passed, authorized)
+
+
 def pass_racer(
     racer: Racer | None, passed: bool, authorized: bool = True
 ) -> PassDetails | None:

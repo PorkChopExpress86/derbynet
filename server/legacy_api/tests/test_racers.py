@@ -402,6 +402,27 @@ def test_pass_refuses_in_phps_order(client, coordinator):
     assert scheduled["reload"] is True
 
 
+def test_an_existing_walk_in_refuses_in_phps_order(client, coordinator, event):
+    """`barcode.inc:19-39`: a `PWDwi` barcode whose car number a racer has
+    names that racer, and PHP makes none, so its refusals come as for any
+    racer: one with results is `alreadyscheduled`, whoever asks."""
+    racer = imported(coordinator, "firstname=A&lastname=B&carnumber=305")
+    HeatLaneFactory(
+        round=Round.objects.get(group=racer.group), racer=racer, finish_time=2.5
+    )
+    other = imported(coordinator, "firstname=C&lastname=D&carnumber=306")
+    client.post("/action.php", {"action": "role.login", "name": ""})
+
+    scheduled = act(client, "action=racer.pass&barcode=PWDwi305")
+    unscheduled = act(client, "action=racer.pass&barcode=PWDwi306")
+
+    assert scheduled["outcome"]["code"] == "alreadyscheduled"
+    assert scheduled["reload"] is True
+    assert unscheduled["outcome"]["code"] == "notauthorized"
+    assert not Racer.objects.get(pk=other.pk).passed_inspection
+    assert Racer.objects.filter(event=event).count() == 2
+
+
 def test_a_refused_pass_has_no_reload_and_changes_nothing(client, coordinator):
     # PHP's json_not_authorized() branch writes no reload.
     racer = imported(coordinator, "firstname=A&lastname=B")

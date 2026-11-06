@@ -28,6 +28,10 @@ on:
   push:
     branches: ['parity-check/**']
 
+# Every job reads only; the track job alone writes issues.
+permissions:
+  contents: read
+
 concurrency:
   group: parity-${{ github.ref }}
   cancel-in-progress: true
@@ -242,14 +246,15 @@ jobs:
           --failing "$RUNNER_TEMP/failing-${{ matrix.database }}.json"
           "$RUNNER_TEMP/php" "$RUNNER_TEMP/django"
 
-      # The failing steps, for the track job.  The gate fails while a step
-      # waits on a ticket, so this runs whatever the comparison said.
+      # The failing steps, for the track job, whatever the comparison said.
+      # A job that died before writing them uploads nothing, and the track
+      # job records that leg as one that did not report.
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: failing-${{ matrix.database }}
           path: ${{ runner.temp }}/failing-${{ matrix.database }}.json
-          if-no-files-found: error
+          if-no-files-found: warn
 
   # One issue on this fork lists the steps failing the gate, and changes when
   # that list does (#218): server/tools/parity_tracking.py.  Every gh call it
@@ -275,7 +280,10 @@ jobs:
         with:
           python-version: '3.14'
 
+      # With no artifact at all the download fails; the step goes on, and
+      # parity_tracking.py records each missing file.
       - uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           pattern: failing-*
           merge-multiple: true

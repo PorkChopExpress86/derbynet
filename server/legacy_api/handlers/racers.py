@@ -198,22 +198,20 @@ def racer_bulk(ctx: LegacyContext) -> None:
 def racer_pass(ctx: LegacyContext) -> None:
     passed = php_truthy(_text(ctx, "value", "1"))
     needed = CHECK_IN if passed else Perm.REVERT_CHECK_IN
-    authorized = bool(granted_for(ctx.session) & needed)
     code = _optional(ctx, "barcode")
-    if code is not None:
-        if not authorized and barcode.makes_walk_in(code):
-            # PHP makes the walk-in and passes it, so no other refusal of
-            # PHP's comes first; Django makes none (S23).
-            _refuse(ctx)
-            return
-        racer = barcode.resolve(ctx.event, code).racer
-    else:
-        racer = ctx.resolve(Racer, _optional(ctx, "racer"))
+    racer = None if code is not None else ctx.resolve(Racer, _optional(ctx, "racer"))
     try:
-        details = racers.pass_racer(racer, passed, authorized=authorized)
+        details = racers.pass_requested(
+            ctx.event,
+            racer,
+            code,
+            passed,
+            authorized=bool(granted_for(ctx.session) & needed),
+        )
     except RacerFailure as failure:
         if failure.code == racers.Failure.NOT_AUTHORIZED:
-            # PHP's json_not_authorized() adds no reload.
+            # json_not_authorized() writes no reload; only the other refusals
+            # reach json_out('reload', true) (action.racer.pass.inc:44-50).
             _refuse(ctx)
             return
         _fail(ctx, failure)

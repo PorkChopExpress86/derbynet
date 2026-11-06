@@ -81,22 +81,27 @@ class Resolved:
 
     racer: Racer | None
     created: bool = False
+    # With `create=False`: a walk-in racer would have been made.
+    would_create: bool = False
 
 
-def makes_walk_in(barcode: str) -> bool:
-    """Whether `resolve` may make a walk-in racer for the barcode."""
-    return isinstance(parse(barcode), WalkIn)
-
-
-def resolve(event, barcode: str) -> Resolved:
+def resolve(event, barcode: str, create: bool = True) -> Resolved:
     """Find the event's racer a barcode names. An unknown `PWDwi` car number
-    becomes a walk-in racer (`racers.find_or_create_walk_in`)."""
+    becomes a walk-in racer (`racers.find_or_create_walk_in`), unless
+    `create` is false: then only a racer with that car number is found, and
+    `would_create` says whether one would have been made."""
     from roster.services import racers
 
     racers_of_event = Racer.objects.filter(event=event)
     match parse(barcode):
         case RacerId(racer_id):
             return Resolved(racers_of_event.filter(pk=racer_id).first())
+        case WalkIn(car_number) if not create:
+            existing = (
+                racers_of_event.filter(car_number=car_number).order_by("pk").first()
+            )
+            would = existing is None and car_number in racers.CAR_NUMBER_RANGE
+            return Resolved(existing, would_create=would)
         case WalkIn(car_number):
             racer, created = racers.find_or_create_walk_in(event, car_number)
             return Resolved(racer, created)

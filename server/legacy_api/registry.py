@@ -14,7 +14,8 @@ from typing import Literal
 from django.conf import settings
 from django.db.models import Model
 
-from accounts.permissions import Requirement
+from accounts.defaults import DEFAULT_ROLES
+from accounts.permissions import Perm, Requirement
 from core.models import Event
 from legacy_api.formats import Format, format_of
 from legacy_api.missing import MISSING
@@ -192,19 +193,38 @@ _CURRENT_HEAT = (
 )
 _KIOSK_LISTS = ("query poll.kiosk.all", "action kiosk.assign", "action scene.apply")
 
-# The endpoints Django refuses where PHP answers anyone, with the divergence
-# and the keys of PHP's answer.
+# The default roles (accounts/defaults.py), as the shell suite logs in, and
+# those of them without a permission; "" is no login.
+_ROLES = {name: permissions for name, _, permissions, _ in DEFAULT_ROLES}
+
+
+def _without(permission: int) -> tuple[str, ...]:
+    return tuple(sorted(name for name, held in _ROLES.items() if not held & permission))
+
+
+# The endpoints Django refuses where PHP answers anyone, with the divergence,
+# the roles it covers, and the keys of PHP's answer.
 _REFUSES = (
-    ("query class.list", "D5", ("classes",)),
-    ("query poll.kiosk.all", "S27", ("current-scene", "kiosks", "kiosk-pages")),
+    # D5: a login; RaceCoordinator, RaceCrew, Timer and Photo all get the list.
+    ("query class.list", "D5", ("",), ("classes",)),
+    # S27: PRESENT_AWARDS, as kiosk-dashboard.php:13 requires.
+    (
+        "query poll.kiosk.all",
+        "S27",
+        _without(Perm.PRESENT_AWARDS),
+        ("current-scene", "kiosks", "kiosk-pages"),
+    ),
 )
 _REFUSED = {
     "summary": "failure",
     "code": "notauthorized",
     "description": REFUSALS["notauthorized"],
 }
-# The page PHP seeds for Aux2 in its Wrap-Up scene (D10, #52).
+# The page PHP seeds for Aux2 in its Wrap-Up scene (D10, #52), and the index
+# of Wrap-Up among the scenes both servers seed (core.services.LEGACY_SCENES,
+# website/sql/sqlite/scene-tables.inc); a test keeps it true.
 _FEEDBACK = "local/kiosks/feedback.kiosk"
+_WRAP_UP = 5
 
 # Each reply path a recorded divergence changes, as the parity gate saw it,
 # with the values the divergence names. Add one only for a difference that an
@@ -286,20 +306,26 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
     # A refusal where PHP answers: Django's notauthorized outcome, and none of
     # the keys PHP's answer has.
     *(
-        ParityPath(endpoint, path, divergence, php=MISSING, django=_REFUSED)
-        for endpoint, divergence, _ in _REFUSES
-        for path in ("$.outcome",)
+        ParityPath(
+            endpoint, "$.outcome", divergence, php=MISSING, django=_REFUSED, roles=roles
+        )
+        for endpoint, divergence, roles, _ in _REFUSES
     ),
     *(
-        ParityPath(endpoint, f"$.{key}", divergence, django=MISSING)
-        for endpoint, divergence, keys in _REFUSES
+        ParityPath(endpoint, f"$.{key}", divergence, django=MISSING, roles=roles)
+        for endpoint, divergence, roles, keys in _REFUSES
         for key in keys
     ),
     # replay.message from a role without CONTROL_RACE (D16): PHP answers
     # success, and Django refuses.
     *(
         ParityPath(
-            "action replay.message", f"$.outcome.{key}", "D16", php=php, django=dj
+            "action replay.message",
+            f"$.outcome.{key}",
+            "D16",
+            php=php,
+            django=dj,
+            roles=_without(Perm.CONTROL_RACE),
         )
         for key, php, dj in (
             ("summary", "success", "failure"),
@@ -307,20 +333,29 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
             ("description", "", REFUSALS["notauthorized"]),
         )
     ),
-    ParityPath("action replay.message", "$.replay", "D16", php=list, django=MISSING),
+    ParityPath(
+        "action replay.message",
+        "$.replay",
+        "D16",
+        php=list,
+        django=MISSING,
+        roles=_without(Perm.CONTROL_RACE),
+    ),
     # #52's Wrap-Up seed (D10): PHP's Aux2 on local/kiosks/feedback.kiosk,
     # which Django leaves out, so the Wrap-Up scene's kiosks after it move up
-    # one, and a kiosk named Aux2 keeps the page it had.
+    # one, and a kiosk named Aux2 keeps the page it had. Wrap-Up is the
+    # sixth seeded scene (`_WRAP_UP`), and every seeded scene has a kiosk, so
+    # it is at that index in both lists until a scene is added or removed.
     ParityPath(
         "query scene.list",
-        "$.scenes[*].kiosks[*].kiosk_name",
+        f"$.scenes[{_WRAP_UP}].kiosks[*].kiosk_name",
         "D10",
         php="Aux2",
         django="Main",
     ),
     ParityPath(
         "query scene.list",
-        "$.scenes[*].kiosks[*].page",
+        f"$.scenes[{_WRAP_UP}].kiosks[*].page",
         "D10",
         php=_FEEDBACK,
         django="kiosks/standings.kiosk",
@@ -328,8 +363,8 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
     *(
         ParityPath(endpoint, path, "D10", php=kiosk, django=MISSING)
         for endpoint, path in (
-            ("query scene.list", "$.scenes[*].kiosks[*]"),
-            ("action scene.setkiosk", "$.all-scenes[*].kiosks[*]"),
+            ("query scene.list", f"$.scenes[{_WRAP_UP}].kiosks[*]"),
+            ("action scene.setkiosk", f"$.all-scenes[{_WRAP_UP}].kiosks[*]"),
         )
         for kiosk in (
             {
@@ -365,12 +400,15 @@ def divergence_text(endpoint: str, divergence: str) -> str | None:
     return None
 
 
-def allowed_by(endpoint: str, path: str, php=ANY, django=ANY) -> str | None:
+def allowed_by(
+    endpoint: str, path: str, php=ANY, django=ANY, role: str | None = None
+) -> str | None:
     """The divergence that lets Django's reply differ from PHP's at `path`,
-    where PHP gave `php` and Django `django`, or None. The parity gate fails
-    on a difference this doesn't allow."""
+    where PHP gave `php` and Django `django` to a session logged in as
+    `role` (`""` for none, None when unknown), or None. The parity gate
+    fails on a difference this doesn't allow."""
     for allowed in PARITY_PATHS:
-        if allowed.covers(endpoint, path, php, django):
+        if allowed.covers(endpoint, path, php, django, role):
             return divergence_text(endpoint, allowed.divergence)
     return None
 

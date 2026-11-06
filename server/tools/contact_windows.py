@@ -6,8 +6,7 @@ Both servers call the timer connected for 60 s after its last contact
 and the replay client for 10 s (`REPLAY_TIMEOUT_LIMIT`,
 `website/inc/replay.inc:29`, `racing.services.replay.REPLAY_TIMEOUT`). The
 legs of the parity gate run at different speeds, so one leg's window can
-close where the other's is still open: tonight's Django leg runs
-test-basic-racing.sh in 22 s where PHP takes 3. The gate then sees a
+close where the other's is still open. The gate then sees a
 connected timer or replay against a NOT CONNECTED one, a `HELLO` that only
 one replay poll sends, and the commands one leg queued while its replay was
 connected and the other dropped.
@@ -40,7 +39,13 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
+# This module loads no Django, so the windows are copies, which
+# tests/test_contact_windows.py holds to Django's and PHP's.
+# `$this->last_contact + 60 < time()`, website/inc/timer-state.inc:72;
+# racing.services.timer.CONTACT_TIMEOUT.
 TIMER_WINDOW = 60
+# REPLAY_TIMEOUT_LIMIT, website/inc/replay.inc:29;
+# racing.services.replay.REPLAY_TIMEOUT.
 REPLAY_WINDOW = 10
 
 NOT_CONNECTED = 1
@@ -106,11 +111,13 @@ class Clock:
         self.replay_contact, self.replay_lapsed = None, False
 
 
-def latest_times(bodies: list[str]) -> list[float]:
+def latest_times(bodies: list[str], after: float = INFINITY) -> list[float]:
     """For each exchange of one leg's step, the latest time the leg can be
     at it: before every time a later reply of the step shows, plus the
-    slack of whole seconds. Infinite after the last one."""
-    out, latest = [], INFINITY
+    slack of whole seconds. `after` bounds the step's last exchanges: the
+    latest time the leg's later steps allow (`parity_gate.later_bounds`).
+    Infinite with no later time, which excuses nothing."""
+    out, latest = [], after
     for body in reversed(bodies):
         reply = _reply(body)
         if reply is not None:
@@ -189,18 +196,24 @@ def _span(earliest: float, latest: float) -> str:
 def _judge_state(key: str, state: dict, earliest, latest: float) -> Verdict:
     contact_key, window, _ = _STATES[key]
     contact = state.get(contact_key)
+    if not isinstance(contact, int | float) or contact <= 0 or earliest is None:
+        # Never contacted, or no clock: the window explains nothing.
+        return Verdict(False, f"state {state.get('state')} with no contact to judge")
+    # The contact lies in [contact, contact + 1).
+    youngest = max(earliest - contact - 1, 0)
     if state.get("state") == CONNECTED:
         age = _age(state)
         if age is None:
             return Verdict(False, "connected with no age shown")
-        return Verdict(age <= window, f"connected, last contact {age} s before")
-    if contact == 0 or contact is None:
-        return Verdict(True, "NOT CONNECTED, never contacted")
-    if not isinstance(contact, int | float) or contact < 0 or earliest is None:
-        return Verdict(False, "NOT CONNECTED with no clock to judge it by")
-    # The contact lies in [contact, contact + 1).
+        # Its own age, and the leg's clock, must both leave the window open.
+        return Verdict(
+            age <= window and youngest <= window,
+            f"connected, last contact {age} s before",
+        )
+    if latest == INFINITY:
+        return Verdict(False, "NOT CONNECTED with no later time to bound it")
     oldest = latest - contact
-    span = _span(max(earliest - contact - 1, 0), oldest)
+    span = _span(youngest, oldest)
     return Verdict(oldest > window, f"NOT CONNECTED, last contact {span} before")
 
 
@@ -249,18 +262,15 @@ def _queue_allowances(raw_a, raw_b, clock_a, clock_b, latest_a, latest_b):
         (said, hello_clock, hello_latest), (quiet, other_clock, other_latest) = legs
         closed = _replay_age(hello_clock, hello_latest)
         opened = _replay_age(other_clock, other_latest)
-        # The HELLO leg's window may have closed: no contact, or one the
-        # window may have passed. The other's may still have been open.
-        may_close = hello_clock.replay_contact is None or (
-            closed is not None and closed[1] > REPLAY_WINDOW
+        # The HELLO leg's window may have closed: a contact the window may
+        # have passed by a bounded clock. The other's may still have been
+        # open. A leg with no contact explains nothing.
+        may_close = (
+            closed is not None and closed[1] != INFINITY and closed[1] > REPLAY_WINDOW
         )
         may_open = opened is not None and opened[0] <= REPLAY_WINDOW
         if may_close and may_open:
-            said_text = (
-                "no replay contact"
-                if closed is None
-                else f"last replay contact {_span(*closed)} before"
-            )
+            said_text = f"last replay contact {_span(*closed)} before"
             allowed["$.replay[0]"] = (
                 f"contact window ({REPLAY_WINDOW} s, on each leg's own clock):"
                 f" {said} says HELLO, {said_text}; {quiet}'s last replay"
