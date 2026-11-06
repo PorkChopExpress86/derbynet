@@ -101,7 +101,8 @@ def scaled_track(settings) -> dict:
     the scale speed of a 3.0 s run, each as PHP's `%4.1f` prints them."""
     length = settings.track_length
     return {
-        "length": length,
+        # As `read_raceinfo` gives it: `32`, or `32.5` since #48 (D80).
+        "length": f"{length:g}",
         "feet": f"{13 * 12 / 7 * length:4.1f}",
         "mph": f"{length / 3.0 * 3600 * 25 / 5280:4.1f}",
     }
