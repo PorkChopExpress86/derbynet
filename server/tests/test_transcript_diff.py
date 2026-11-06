@@ -370,16 +370,35 @@ def _page_runs(request, django_page):
     return a, a[:i] + django_page + "\n"
 
 
-def test_a_login_redirected_to_the_setup_page_waits_on_48():
+DJANGO_SETUP_PAGE = (
+    '<!doctype html>\n<html lang="en">\n<head>\n'
+    "  <title>Set-Up \u00b7 DerbyNet</title>\n</head></html>"
+)
+
+
+def test_a_login_redirected_to_the_setup_page_lands_on_it_on_both_servers():
     # role.login with no event: PHP redirects to its setup page, and Django
-    # to setup.php, which it doesn't serve until #48.
-    a, b = _page_runs("login RaceCoordinator", NOT_FOUND)
+    # to setup.php, whose 301 lands on #48's /setup/.
+    a, b = _page_runs("login RaceCoordinator", DJANGO_SETUP_PAGE)
 
     report = differences(a, b)
 
     assert report.ok
-    [waiting] = report.allowed
-    assert waiting.allowed_by.startswith("#48: ")
+    [same] = report.allowed
+    assert same.allowed_by.startswith("#48: ")
+
+
+def test_a_login_redirected_to_a_missing_setup_page_is_a_difference():
+    # #48 serves Django's setup page, so a 404 there is a regression.
+    a, b = _page_runs("login RaceCoordinator", NOT_FOUND)
+
+    assert not differences(a, b).ok
+
+
+def test_another_endpoint_landing_on_the_setup_pages_is_a_difference():
+    a, b = _page_runs("post action.php action=heat.select&roundid=1", DJANGO_SETUP_PAGE)
+
+    assert not differences(a, b).ok
 
 
 @pytest.mark.parametrize("page", [NOT_FOUND, SERVER_ERROR], ids=["404", "500"])
@@ -905,6 +924,30 @@ def test_order_fields_name_a_position_and_an_id():
     # The same ranks in the other order is another request.
     swapped = a.replace("rankid_1=8&rankid_2=3", "rankid_1=3&rankid_2=8")
     assert differences(a, swapped).diverged.index == 2
+
+
+BALLOT = """
+    action.php?query=ballot.get
+
+    {{"ballot": {{"{award}": {{"max_votes": 2, "votes": [{a}]}}}}}}
+
+    post action.php action=vote.cast&awardid={award}&votes=[{a},{b}]
+
+    {{"action": {{"action": "vote.cast", "awardid": {award}, "votes": "[{a},{b}]"}},
+      "outcome": {{"summary": "success"}},
+      "votes": ["{voter} {award} {a}", "{voter} {award} {b}"]}}
+    """
+
+
+def test_ballot_and_vote_ids_are_numbered():
+    # test-balloting.sh: ballot.get keys awards by id, and vote.cast names
+    # racers in `votes=[...]`, echoes it, and answers `voter award racer`.
+    a = BALLOT.format(award=3, a=12, b=36, voter=1)
+
+    assert differences(a, BALLOT.format(award=26, a=1349, b=1373, voter=7)).ok
+    # A vote for the racer already voted for is another request.
+    twice = BALLOT.format(award=26, a=1349, b=1349, voter=7)
+    assert differences(a, twice).diverged.index == 2
 
 
 NORMALIZE_MJS = Path(__file__).resolve().parent / "golden/capture/normalize.mjs"

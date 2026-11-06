@@ -10,6 +10,7 @@ GitHub holds the live state, so this file copies none of it.
 - `gh issue list --repo PorkChopExpress86/derbynet --label django-migration --state open` lists what is left. A ticket labeled `ready-for-agent` has every dependency closed or marked `## Still open`, which `plan/lint-issues.py` checks.
 - `git log origin/master --grep '#N\b'` lists what has landed for ticket N, and `server/legacy_api/registry.py` lists every legacy endpoint Django serves.
 - #64 tracks the PHP defects, and epic #3 stays open until its last row is fixed.
+- The open issue titled "Parity gate: failing steps", which `parity.yml` opens and updates when its list of failing steps changes (#218), lists what the nightly parity gate fails.
 
 The shell suites in `testing/` run against Django one by one as their endpoints land. A suite goes into `.github/workflows/server.yml` once it passes on SQLite and Postgres with no stand-in.
 

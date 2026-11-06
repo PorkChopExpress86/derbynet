@@ -87,9 +87,15 @@ def _fail(ctx: LegacyContext, failure: GroupFailure) -> None:
 # ----- Classes ------------------------------------------------------------
 
 
-@query("class.list", permission=Access.LOGGED_IN)
+@query(
+    "class.list",
+    permission=Access.LOGGED_IN,
+    divergences=(
+        "D5: needs a login; PHP lists the classes to anyone. No kiosk page,"
+        " standings page or page of either server reads it.",
+    ),
+)
 def class_list(ctx: LegacyContext) -> None:
-    # PHP answers anyone. No kiosk reads it, so it needs a login (D5).
     _put_classes(ctx)
 
 

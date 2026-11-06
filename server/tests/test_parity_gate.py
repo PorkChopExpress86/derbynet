@@ -55,7 +55,7 @@ def judge(php, django, **kwargs):
     kwargs.setdefault("waiting", {})
     kwargs.setdefault("step_divergences", {})
     kwargs.setdefault("step_paths", {})
-    kwargs.setdefault("after_skip", {})
+    kwargs.setdefault("replies_differ", {})
     kwargs.setdefault("skips", {})
     kwargs.setdefault("allow", lambda difference: None)
     return gate.judge(php, django, NOW, **kwargs)
@@ -157,18 +157,20 @@ def test_a_skip_is_reported_and_not_compared(tmp_path):
     assert "skip (#54)" in gate.render([result], ("php", "django"))
 
 
-def test_a_step_after_a_skip_may_differ_but_not_match(tmp_path):
+def test_a_step_whose_replies_may_differ_must_not_match(tmp_path):
     php = leg(tmp_path, "php", [("snapshot_get", "pass", 1, poll(), "")])
     differs = leg(tmp_path, "differs", [("snapshot_get", "pass", 1, poll("2"), "")])
     matches = leg(tmp_path, "matches", [("snapshot_get", "pass", 1, poll(), "")])
-    skips = {"snapshot_get": "#54"}
+    skips = {"snapshot_get": "#221"}
 
-    [differed] = judge(php, differs, after_skip=skips)
-    [matched] = judge(php, matches, after_skip=skips)
+    [differed] = judge(php, differs, replies_differ=skips)
+    [matched] = judge(php, matches, replies_differ=skips)
 
     assert not differed.failed
-    assert "follows a skip: #54" in gate.render([differed], ("php", "django"))
-    assert "remove it from AFTER_SKIP" in matched.problems[0]
+    summary = gate.render([differed], ("php", "django"))
+    assert "replies may differ: #221" in summary
+    assert "Replies may differ (`REPLIES_DIFFER`): `snapshot_get` (#221)." in summary
+    assert "remove it from REPLIES_DIFFER" in matched.problems[0]
 
 
 def test_the_summary_groups_failing_differences_by_path(tmp_path):
@@ -702,3 +704,75 @@ def test_the_master_schedule_step_allows_only_the_next_up_heat_r7_shows():
     assert allows("$.racers[0].finishtime", 3.977, "")
     assert not allows("$.racers[0].finishtime", "", 3.977)
     assert not allows("$.racers[0].finishplace", 4, 2)
+
+
+# ----- allowances scoped to the case their decision covers (#218 review) ----
+
+
+def test_replay_message_refusal_is_allowed_only_without_control_race():
+    # D16: a role without CONTROL_RACE.
+    args = ("action replay.message", "$.outcome.summary", "success", "failure")
+
+    assert allowed_by(*args, role="RaceCrew").startswith("D16: ")
+    assert allowed_by(*args, role="") is not None
+    assert allowed_by(*args, role="RaceCoordinator") is None
+    assert allowed_by(*args) is None  # no known role
+
+
+def test_class_list_refusal_is_allowed_only_for_no_login():
+    args = ("query class.list", "$.classes", [{"classid": 1}], MISSING)
+
+    assert allowed_by(*args, role="").startswith("D5: ")
+    assert allowed_by(*args, role="RaceCrew") is None
+    assert allowed_by(*args) is None
+
+
+def test_poll_kiosk_all_refusal_is_allowed_only_without_present_awards():
+    args = ("query poll.kiosk.all", "$.kiosks", [], MISSING)
+
+    assert allowed_by(*args, role="").startswith("S27: ")
+    assert allowed_by(*args, role="RaceCoordinator") is None
+
+
+def test_the_wrap_up_kiosk_allowance_covers_the_wrap_up_scene_only():
+    from core.services import LEGACY_SCENES
+    from legacy_api.registry import _WRAP_UP
+
+    # The seeded scenes all have a kiosk, so scene.list shows each at its
+    # seed position.
+    assert LEGACY_SCENES[_WRAP_UP][0] == "Wrap-Up"
+    assert all(any(pages) for _, *pages in LEGACY_SCENES)
+    wrap_up = f"$.scenes[{_WRAP_UP}].kiosks[1].kiosk_name"
+    assert allowed_by("query scene.list", wrap_up, "Aux2", "Main").startswith("D10")
+    assert (
+        allowed_by(
+            "query scene.list", "$.scenes[0].kiosks[0].kiosk_name", "Aux2", "Main"
+        )
+        is None
+    )
+
+
+def test_the_differ_carries_the_logged_in_role(tmp_path):
+    from tools import transcript_diff as td
+
+    run = (
+        "\nlogin RaceCrew\n\n"
+        '{"outcome": {"summary": "success"}}\n'
+        "\npost action.php action=replay.message\n\n"
+        '{"outcome": {"summary": "success", "code": "success", "description": ""},'
+        ' "replay": []}\n'
+    )
+    refused = run.replace(
+        '{"outcome": {"summary": "success", "code": "success", "description": ""},'
+        ' "replay": []}',
+        '{"outcome": {"summary": "failure", "code": "notauthorized",'
+        ' "description": "Not authorized -- please see race coordinator."}}',
+    )
+
+    def allow(d):
+        return allowed_by(d.endpoint, d.path, d.a, d.b, d.role)
+
+    assert td.diff(run, refused, allow=allow).ok
+    as_coordinator = run.replace("RaceCrew", "RaceCoordinator")
+    refused_coordinator = refused.replace("RaceCrew", "RaceCoordinator")
+    assert not td.diff(as_coordinator, refused_coordinator, allow=allow).ok
