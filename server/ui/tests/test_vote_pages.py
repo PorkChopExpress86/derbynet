@@ -78,7 +78,7 @@ def test_the_old_url_redirects_with_its_order(client, event):
 
 
 def test_the_page_lists_passed_racers_eligible_for_awards(client, pack):
-    """`website/vote.php:68`: passedinspection = 1 AND exclude = 0."""
+    """`website/vote.php:67`: passedinspection = 1 AND exclude = 0."""
     with no_db_writes(), no_session_writes():
         response = client.get("/vote/")
 

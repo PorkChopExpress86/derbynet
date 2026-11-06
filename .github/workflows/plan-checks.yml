@@ -47,6 +47,10 @@ jobs:
         if: github.event_name != 'issues'
         run: bash server/docs/adr/check-paths.sh
 
+      - name: Test the plan tools
+        if: github.event_name != 'issues'
+        run: python3 -I -m unittest discover -s plan/tests
+
       - name: Decide whether to lint the issues
         id: scope
         # A pull request checks out its merge commit, whose first parent is the

@@ -147,12 +147,21 @@ def least_polls(report: dict) -> float:
     return kiosks * ((DURATION - 1.5) / period - 1)
 
 
+def lowest(report: dict, label: str, low: float) -> float:
+    """`low`, scaled by the rate the load script expected from the server's
+    latency. A client that waits for each reply falls behind its pacing when
+    the server is slow: under 48 busy loops the replay poll made 60 of its
+    100 and the timer 29 heartbeats against a fixed 40 (#54 retro)."""
+    (rate,) = [r for r in report["rates"] if r["endpoint"] == label]
+    return low * min(1.0, rate["expected_per_s"] / rate["target_per_s"])
+
+
 @pytest.mark.parametrize("label", EXPECTED)
 def test_each_client_type_polls_at_its_rate(report, label):
     low, high = EXPECTED[label]
-    if low is None:
-        low = least_polls(report)
-    assert low <= requests_of(report, label) <= high
+    low = least_polls(report) if low is None else lowest(report, label, low)
+    requests = requests_of(report, label)
+    assert low <= requests <= high
 
 
 def test_nothing_failed(report):

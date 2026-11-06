@@ -285,3 +285,45 @@ def test_no_decided_quirk_waits_for_the_owner():
         if mentions(row, quirk)
     ]
     assert wrong == []
+
+
+def unsourced(blocks: list[tuple[list[str], str]], rows: dict[str, str]) -> list[str]:
+    """The QUIRK_DECISIONS keys no record backs. A Q id is a row of #20's
+    "Quirk decisions", a C or S id a row of #64 that its comment names (or an
+    accepted one), a D id a row of plan/owner-decisions.md, and any other id
+    an accepted quirk whose comment says "Accepted in Dnn". #54 keyed `B1`,
+    an id no record held, and the registry guard took it because it trusts
+    these keys."""
+    wrong = []
+    for ids, text in blocks:
+        for quirk in ids:
+            if re.fullmatch(r"Q\d+", quirk):
+                continue
+            if re.fullmatch(r"[CS]\d+", quirk):
+                ok = "#64" in text or ACCEPTED.search(text) is not None
+            elif re.fullmatch(r"D\d+", quirk):
+                ok = quirk in rows
+            else:
+                ok = ACCEPTED.search(text) is not None
+            if not ok:
+                wrong.append(quirk)
+    return wrong
+
+
+def test_an_id_with_no_record_is_unsourced():
+    rows = {"D7": "Balloting"}
+    assert unsourced([(["B1"], "The rows #54 fixes, as #64 lists them.")], rows) == [
+        "B1"
+    ]
+    assert unsourced([(["C55"], "Settled by the owner.")], rows) == ["C55"]
+    assert unsourced([(["D99"], "An owner decision.")], rows) == ["D99"]
+    assert unsourced([(["C55", "D7"], "The #64 row and D7.")], rows) == []
+    assert unsourced([(["R1"], "Accepted in D51 (#29).")], rows) == []
+
+
+def test_every_quirk_decision_names_its_record():
+    keys = list(QUIRK_DECISIONS)
+    blocks = quirk_decision_comments()
+    commented = {quirk for ids, _ in blocks for quirk in ids}
+    blocks += [([quirk], "") for quirk in keys if quirk not in commented]
+    assert unsourced(blocks, decision_rows()) == []

@@ -303,6 +303,13 @@ def summarize(stats: Stats, elapsed: float, clients: Iterable[ClientType]) -> di
         if isinstance(client.pacer, After) and latencies:
             mean = sum(latencies) / len(latencies)
             expected = client.instances / (client.pacer.delay + mean)
+        elif isinstance(client.pacer, Every) and latencies:
+            # A reply later than the period skips the ticks it covered.
+            period = client.pacer.period
+            cycles = [
+                max(1, math.ceil(lat / period - 1e-9)) * period for lat in latencies
+            ]
+            expected = client.instances * len(cycles) / sum(cycles)
         else:
             expected = target
         achieved = len(latencies) / elapsed if elapsed else 0.0
@@ -310,6 +317,7 @@ def summarize(stats: Stats, elapsed: float, clients: Iterable[ClientType]) -> di
         rates.append(
             {
                 "client": client.name,
+                "endpoint": client.endpoint,
                 "instances": client.instances,
                 "pacing": str(client.pacer),
                 "target_per_s": round(target, 4),

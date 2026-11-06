@@ -11,7 +11,9 @@
 #
 #   server/tools/pytest-under-load.sh --postgres -m browser -n 4 --count 25 -k phone ui/tests/browser/test_photos.py
 #
-# --postgres runs through tools/pytest-postgres.sh.  --loops sets the number
+# --postgres runs through tools/pytest-postgres.sh, and starts the loops once
+# its Postgres is ready: started under load, it once missed a 300 s wait
+# (#54 retro).  --loops sets the number
 # of busy loops (default 8).  Results go to var/load-runs/<time>/ under
 # server/, or DERBYNET_LOAD_RUN_DIR: pytest.log and junit.xml.  At the end it
 # prints pytest's summary lines, with -rf's list of failures, and the log's
@@ -36,21 +38,36 @@ mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 
 PIDS=()
+RUN_PID=
 stop_loops() {
   for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done
+  PIDS=()
 }
-trap stop_loops EXIT
+stop_all() {
+  stop_loops
+  if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
+}
+trap stop_all EXIT
 trap 'exit 143' TERM INT HUP
-for _ in $(seq 1 "$LOOPS"); do
-  bash -c 'while :; do :; done' &
-  PIDS+=("$!")
-done
 
 cd "$SERVER_DIR"
 echo "Under load ($LOOPS loops): ${RUNNER[*]} $*"
 echo "Log: $OUT/pytest.log"
+READY="$OUT/postgres-ready"
+rm -f "$READY"
+DERBYNET_PG_READY_FILE="$READY" \
+  "${RUNNER[@]}" -rf --junitxml="$OUT/junit.xml" "$@" >"$OUT/pytest.log" 2>&1 &
+RUN_PID=$!
+if [ "${RUNNER[0]}" != uv ]; then
+  while [ ! -e "$READY" ] && kill -0 "$RUN_PID" 2>/dev/null; do sleep 1; done
+fi
+for _ in $(seq 1 "$LOOPS"); do
+  bash -c 'while :; do :; done' &
+  PIDS+=("$!")
+done
 status=0
-"${RUNNER[@]}" -rf --junitxml="$OUT/junit.xml" "$@" >"$OUT/pytest.log" 2>&1 || status=$?
+wait "$RUN_PID" || status=$?
+RUN_PID=
 stop_loops
 
 # The short test summary (-rf) and the final line, which names an error such

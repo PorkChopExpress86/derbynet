@@ -24,19 +24,23 @@ trap 'echo "pytest-postgres.sh: line $LINENO: \`$BASH_COMMAND\` failed" >&2' ERR
 docker run -d --name "$NAME" -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=derbynet \
        -p 127.0.0.1::5432 postgres:17 >/dev/null
 PORT="$(docker port "$NAME" 5432/tcp | head -1 | sed 's/.*://')"
-# Under CPU load (tools/pytest-under-load.sh) Postgres can take over 30 s.
+# Under CPU load Postgres can take over 30 s. The image's first start runs a
+# server for initdb on the socket only, then restarts it, so wait on TCP:
+# the socket answered during that first server (#54 retro).
 WAIT="${DERBYNET_PG_WAIT:-120}"
 for _ in $(seq 1 "$WAIT"); do
-  docker exec "$NAME" pg_isready -U postgres -q && break
+  docker exec "$NAME" pg_isready -h 127.0.0.1 -U postgres -q && break
   sleep 1
 done
-if ! docker exec "$NAME" pg_isready -U postgres -q; then
+if ! docker exec "$NAME" pg_isready -h 127.0.0.1 -U postgres -q; then
   echo "pytest-postgres.sh: Postgres in $NAME was not ready after $WAIT s" \
        "(set DERBYNET_PG_WAIT); its last log lines:" >&2
   docker logs --tail 20 "$NAME" >&2 || true
   exit 1
 fi
 trap - ERR
+# tools/pytest-under-load.sh starts its busy loops once this file exists.
+if [ -n "${DERBYNET_PG_READY_FILE:-}" ]; then touch "$DERBYNET_PG_READY_FILE"; fi
 
 cd "$SERVER_DIR"
 DATABASE_URL="postgres://postgres:postgres@127.0.0.1:$PORT/derbynet" uv run pytest "$@"
