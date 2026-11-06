@@ -8,7 +8,9 @@ Exits 1 when a named suite is missing from the workflow. A suite that still
 waits on another ticket stays missing; say which ticket in the PR body.
 
 It also lists the parity gate's entries (`server/tools/parity_gate.py`: a
-step it skips or waits on) that name the ticket or one of its suites. Lifting
+step it skips, waits on, or lets differ) that name the ticket or one of its
+suites. An entry that is a constant (`"snapshot_get": _SNAPSHOT,`) is read
+as the constant's text. Lifting
 one changes what the gate compares, so raise it at the start, not after the
 endpoints exist (#54 retro). #204's entry named the legacy pages, not #204
 (#204 retro).
@@ -24,6 +26,16 @@ from pathlib import Path
 SUITE = re.compile(r"\btesting/([\w-]+\.sh)\b")
 GATE_ENTRY = re.compile(r'^\s*"([^"]+)":\s*(.+)$', re.MULTILINE)
 HELPERS = {"common.sh"}  # sourced by the suites, never run alone
+CONSTANT = re.compile(r"^([A-Z_][A-Z0-9_]*),?$")
+
+
+def constant_text(gate: str, name: str) -> str | None:
+    """The text a module-level `NAME = ...` assigns: its line, or from its
+    "(" to the ")" that closes it at the start of a line."""
+    found = re.search(
+        rf"^{name}\b[^=\n]*= (\(.*?^\)|[^\n]*)", gate, re.MULTILINE | re.DOTALL
+    )
+    return " ".join(found[1].split()) if found else None
 
 
 def main(argv: list[str]) -> int:
@@ -51,10 +63,14 @@ def main(argv: list[str]) -> int:
         else:
             missing += 1
             print(f"MISSING  testing/{suite}")
-    gate = (root / "server" / "tools" / "parity_gate.py").read_text()
+    gate_path = os.environ.get("PARITY_GATE")  # a fake gate, for plan/tests
+    gate = Path(gate_path or root / "server" / "tools" / "parity_gate.py").read_text()
     ticket = re.compile(rf"#{argv[0]}\b")
     listed = set()
     for step, rest in GATE_ENTRY.findall(gate):
+        named = CONSTANT.match(rest.strip())
+        if named:
+            rest = constant_text(gate, named[1]) or rest
         # A step's label is its script, its arguments, and " (2)" for a rerun.
         if ticket.search(rest) or step.split()[0] in suites:
             # An entry that goes on over several lines opens with "(".
