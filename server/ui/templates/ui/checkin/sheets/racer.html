@@ -12,7 +12,7 @@
     <div class="flex items-center gap-3">
       <p class="min-w-0 flex-1 text-sm">{% if card.passed %}<strong class="text-ok-ink">Passed</strong>{% else %}Not passed yet{% endif %}{% if card.status and card.status != "Racing!" %} · {{ card.status }}{% endif %}</p>
     </div>
-    {% include "ui/checkin/weigh_in.html" with where="sheet" %}
+    {% include "ui/checkin/weigh_in.html" with where="sheet" target="#checkin-sheet-body" swap="innerHTML" %}
     <div class="grid grid-cols-2 gap-2">
       {% if can_photo %}
       <button type="button" hx-get="{% url 'checkin-photo' racer.pk 'car' %}" hx-target="#checkin-sheet-body" data-action="take-car-photo" class="flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl border border-line px-3 font-semibold">{% include "ui/components/icon.html" with name="car" cls="size-5" %}{% if card.car_photo %}New car photo{% else %}Take car photo{% endif %}</button>

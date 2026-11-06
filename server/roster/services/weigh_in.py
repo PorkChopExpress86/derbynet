@@ -101,12 +101,7 @@ def setting(partition: Partition | None) -> Setting | None:
     """The partition's weigh-in, or None when it has none."""
     if partition is None or partition.weigh_in_mode == Mode.NONE:
         return None
-    unit, maximum = partition.weight_unit, partition.max_weight_grams
-    return Setting(
-        partition.weigh_in_mode,
-        unit,
-        shown(maximum, unit) if maximum is not None and unit else "",
-    )
+    return Setting(partition.weigh_in_mode, partition.weight_unit, _maximum(partition))
 
 
 @dataclass(frozen=True)
@@ -167,41 +162,40 @@ def shown(grams: Decimal, unit: str) -> str:
     return f"{in_unit(grams, unit)} {_unit(unit).value}"
 
 
+def _maximum(partition: Partition) -> str:
+    """The partition's maximum in its unit, with the unit, or "". A maximum
+    always has a unit (`partition_weight_unit_when_needed`)."""
+    maximum, unit = partition.max_weight_grams, partition.weight_unit
+    return shown(maximum, unit) if maximum is not None and unit else ""
+
+
 def status(racer: Racer) -> Status | None:
     """The racer's weigh-in under its partition's setting, or None when the
-    partition has no weigh-in. Reads `racer.partition`."""
+    partition has no weigh-in. Reads `racer.partition`. The stored pass is
+    the one source: `set_partition_weigh_in` keeps it in step with the
+    maximum and clears it on a new mode."""
     partition = racer.partition
     mode = partition.weigh_in_mode
     if mode == Mode.NONE:
         return None
     unit = partition.weight_unit
-    maximum = partition.max_weight_grams
+    grams = racer.weight_grams if mode == Mode.RECORDED else None
     if mode == Mode.RECORDED:
-        grams = racer.weight_grams
         weighed = grams is not None
-        over = weighed and maximum is not None and grams > maximum
-        return Status(
-            mode=mode,
-            unit=unit,
-            weighed=weighed,
-            passed=(not over) if weighed else None,
-            failed=over,
-            over=over,
-            weight=shown(grams, unit) if weighed else "",
-            value=in_unit(grams, unit) if weighed else "",
-            maximum=shown(maximum, unit) if maximum is not None else "",
-        )
-    passed = racer.weigh_in_passed
+    else:
+        weighed = racer.weigh_in_passed is not None
+    passed = racer.weigh_in_passed if weighed else None
+    failed = passed is False
     return Status(
         mode=mode,
         unit=unit,
-        weighed=passed is not None,
+        weighed=weighed,
         passed=passed,
-        failed=passed is False,
-        over=False,
-        weight="",
-        value="",
-        maximum=shown(maximum, unit) if maximum is not None and unit else "",
+        failed=failed,
+        over=failed and mode == Mode.RECORDED,
+        weight=shown(grams, unit) if grams is not None else "",
+        value=in_unit(grams, unit) if grams is not None else "",
+        maximum=_maximum(partition),
     )
 
 
@@ -270,7 +264,12 @@ def set_partition_weigh_in(
     """Set how check-in weighs the partition's cars, for the settings page
     (#48). `max_weight` is in `unit`; None or "" clears it. A recorded
     weight, or a pass-or-fail maximum, needs a unit. Stored weights stay in
-    grams, so a new unit changes only how they show."""
+    grams, so a new unit changes only how they show.
+
+    In the same transaction, a new maximum passes or fails each recorded car
+    again, and a new mode clears every weigh-in of the partition, since a
+    pass or fail is no weight and a weight is no pass or fail. Clearing is a
+    D8 default the owner may correct (review of #70)."""
     try:
         mode = Mode(mode)
     except ValueError:
@@ -287,8 +286,23 @@ def set_partition_weigh_in(
         raise WeighInFailure(Code.UNIT_NEEDED, "Pick the unit weights are entered in.")
     with transaction.atomic():
         lock_race_state(partition.event_id)
+        old_mode = (
+            Partition.objects.filter(pk=partition.pk)
+            .values_list("weigh_in_mode", flat=True)
+            .get()
+        )
         Partition.objects.filter(pk=partition.pk).update(
             weigh_in_mode=mode, weight_unit=unit, max_weight_grams=maximum
         )
+        racers = Racer.objects.filter(partition_id=partition.pk)
+        if mode != old_mode:
+            racers.update(weigh_in_passed=None, weight_grams=None, weighed_at=None)
+        elif mode == Mode.RECORDED:
+            weighed = racers.filter(weight_grams__isnull=False)
+            if maximum is None:
+                weighed.update(weigh_in_passed=True)
+            else:
+                weighed.filter(weight_grams__lte=maximum).update(weigh_in_passed=True)
+                weighed.filter(weight_grams__gt=maximum).update(weigh_in_passed=False)
     partition.refresh_from_db()
     return partition

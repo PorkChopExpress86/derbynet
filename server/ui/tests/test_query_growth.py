@@ -25,6 +25,7 @@ from core.models import RaceState
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from racing.models import PlaylistEntry
 from roster.models import Racer
+from roster.services.weigh_in import record_weigh_in, set_partition_weigh_in
 from ui.tests.race import race_setup, run_heat, scheduled
 from ui.tests.roles import PASSWORDS
 
@@ -37,6 +38,7 @@ URLS = [
     "/checkin/",
     "/checkin/list/",
     "/checkin/number/",
+    "/checkin/weigh/",
     "/groups/",
     "/playlist/",
     "/awards/edit/",
@@ -108,8 +110,9 @@ def test_every_polled_url_is_measured():
 def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
     """Groups of passed racers, each round 1 scheduled, rounds 1 and 2 of
     each group queued, each group's judged award, narrowed to its partition,
-    given to its first racer and on the ballot with two votes, and each
-    group's kiosk, checking in and
+    given to its first racer and on the ballot with two votes, each group's
+    partition recording weights with a maximum and its first racer weighed
+    over it (#70), and each group's kiosk, checking in and
     named in the first scene, showing please-check-in for its group. With
     `race`, the first round races a heat, and the kiosk presents the first
     award."""
@@ -126,6 +129,8 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
         set_partition_list(event, [racers[0].partition], award=award)
         set_winner(event, award, racers[0])
         set_ad_hoc_award(event, racers[1], f"Shiniest {round.group.name}")
+        set_partition_weigh_in(racers[0].partition, "recorded", "oz", "5")
+        record_weigh_in(racers[0], weight="5.2")
         # On the ballot, with a vote from each of two voters (#54).
         BallotAward.objects.create(event=event, award=award, depth=2)
         for n, racer in enumerate(racers[:2]):

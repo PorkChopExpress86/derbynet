@@ -197,3 +197,47 @@ def test_the_database_refuses_a_recorded_partition_with_no_unit(event):
     partition = racer_in(event, "Outlaws", "none").partition
     with pytest.raises(IntegrityError), transaction.atomic():
         Partition.objects.filter(pk=partition.pk).update(weigh_in_mode="recorded")
+
+
+def test_a_new_maximum_recomputes_the_stored_pass(event):
+    """Review of #70: the stored pass follows the partition's maximum."""
+    racer = racer_in(event, "Outlaws", "recorded", "oz", max_weight="5")
+    other = insert_new_racer(
+        event, first_name="Ann", last_name="Light", partition=racer.partition
+    ).racer
+    record_weigh_in(racer, weight="5.2")
+    record_weigh_in(other, weight="4.8")
+    set_partition_weigh_in(racer.partition, "recorded", "oz", "6")
+    racer.refresh_from_db()
+    assert racer.weigh_in_passed is True
+    set_partition_weigh_in(racer.partition, "recorded", "oz", "5")
+    racer.refresh_from_db()
+    other.refresh_from_db()
+    assert (racer.weigh_in_passed, other.weigh_in_passed) == (False, True)
+    set_partition_weigh_in(racer.partition, "recorded", "oz")
+    racer.refresh_from_db()
+    assert racer.weigh_in_passed is True
+    assert racer.weight_grams == Decimal("147.42")
+
+
+def test_a_new_mode_clears_the_partitions_weigh_ins(event):
+    """Review of #70 (a D8 default the owner may correct): a weigh-in made
+    under one mode means nothing under another, so a mode change clears it.
+    A new unit or maximum keeps it."""
+    racer = racer_in(event, "Outlaws", "recorded", "oz", max_weight="5")
+    elsewhere = racer_in(event, "Scouts", "pass_fail")
+    record_weigh_in(racer, weight="5.2")
+    record_weigh_in(elsewhere, passed=True)
+    set_partition_weigh_in(racer.partition, "recorded", "g", "150")
+    racer.refresh_from_db()
+    assert racer.weight_grams == Decimal("147.42")
+    set_partition_weigh_in(racer.partition, "pass_fail", "oz", "5")
+    racer = Racer.objects.select_related("partition").get(pk=racer.pk)
+    assert (racer.weigh_in_passed, racer.weight_grams, racer.weighed_at) == (
+        None,
+        None,
+        None,
+    )
+    assert weigh_in.status(racer).weighed is False
+    elsewhere.refresh_from_db()
+    assert elsewhere.weigh_in_passed is True

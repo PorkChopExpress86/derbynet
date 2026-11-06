@@ -908,3 +908,21 @@ def test_no_legacy_endpoint_reads_or_writes_the_weigh_in(crew, event):
     crew.post("/action.php", {"action": "racer.pass", "racer": racer.pk, "value": 1})
     racer.refresh_from_db()
     assert racer.passed_inspection and racer.weight_grams == Decimal("155.92")
+
+
+def test_a_raised_maximum_clears_the_failed_card_and_filter(crew, event):
+    """Review of #70: the stored pass, the card and the filter agree after
+    the partition's maximum changes."""
+    racer = weighs(event, "Outlaws", "recorded", "oz", "5")[0]
+    record_weigh_in(racer, weight="5.2")
+    assert card_ids(
+        get(crew, "/checkin/list/", {"weigh": "failed"}).content.decode()
+    ) == [racer.pk]
+    set_partition_weigh_in(racer.partition, "recorded", "oz", "6")
+    racer.refresh_from_db()
+    assert racer.weigh_in_passed is True
+    assert (
+        card_ids(get(crew, "/checkin/list/", {"weigh": "failed"}).content.decode())
+        == []
+    )
+    assert "data-over" not in card_html(crew, racer)
