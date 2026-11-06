@@ -154,6 +154,9 @@ QUIRK_DECISIONS = {
     # #48: the fake roster page needs SET_UP, as racer.fake does; the owner
     # made it a #64 row (2026-11-05).
     "C56": "fix",
+    # #48 review: the fake roster sheet makes exactly groups x per group, a
+    # row of #64 (C57).
+    "C57": "fix",
     # The #64 rows #48 fixes, as its "PHP defects to fix" lists them: S30
     # about.php's phpinfo() and C35 its timer-humant.
     "S30": "fix",

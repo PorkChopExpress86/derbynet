@@ -196,7 +196,7 @@ def test_replay_saves_all_five_and_the_replay_service_reads_them(coordinator, ev
     for key, value in (
         ("replay-rate", "25"),
         ("replay-num-showings", "3"),
-        ("replay-skipback", "3.5"),
+        ("replay-skipback", "3500"),
         ("replay-post-roll", "1.5"),
         ("replay-max-clip", "8"),
     ):
@@ -310,3 +310,45 @@ def test_a_folder_change_moves_no_photo_files(coordinator, event):
     racer.refresh_from_db()
     assert racer.headshot == "ava.jpg"
     assert list(new.iterdir()) == []
+
+
+# ----- ranges: PHP's own inputs and choices (D80, #48 review) ---------------------
+
+
+def test_track_length_takes_a_fraction_as_php_does(coordinator, event):
+    """settings.php's track-length input has no step, and settings.js posts
+    `Number(val)`, which PHP stores as typed (`settings.php:141-144`,
+    `settings.js` PostSettingChange)."""
+    assert "data-saved" in html(save(coordinator, "track-length", "32.5"))
+    assert race_settings.read(event, "track-length") == "32.5"
+    assert RaceSettings.for_event(event).track_length == 32.5
+
+
+def test_linger_has_no_maximum_as_in_php(coordinator, event):
+    """settings.php's linger input has a step and no bounds
+    (`settings.php:171-173`)."""
+    assert "data-saved" in html(save(coordinator, "now-racing-linger-ms", "900"))
+    assert race_settings.read(event, "now-racing-linger-ms") == "900000"
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "ok"),
+    [
+        ("replay-num-showings", "1", True),
+        ("replay-num-showings", "3", True),
+        ("replay-num-showings", "4", False),
+        ("replay-skipback", "2500", True),
+        ("replay-skipback", "6000", True),
+        ("replay-skipback", "2000", False),
+        ("replay-skipback", "5500", False),
+        ("replay-skipback", "6500", False),
+        ("replay-rate", "100", True),
+        ("replay-rate", "60", False),
+    ],
+)
+def test_replay_takes_coordinator_php_choices(coordinator, event, key, value, ok):
+    """coordinator.php's replay dialog offers showings 1 to 3 and skipback
+    2.5, 3, 3.5, 4, 4.5, 5 and 6 s, posted in milliseconds
+    (`coordinator.php:217-233`)."""
+    body = html(save(coordinator, key, value))
+    assert ("data-saved" in body) is ok, body

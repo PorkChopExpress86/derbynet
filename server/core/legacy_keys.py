@@ -338,7 +338,7 @@ REGISTRY: dict[str, Mapped | Dropped | Prefix] = {
     "scoring": _setting("scoring", Int(), 0),
     "max-runs-per-car": _setting("max_runs_per_car", Int(), 0),
     "rotation-schedule": _setting("rotation_schedule", Bool(), False),
-    "track-length": _setting("track_length", Int(), 40),
+    "track-length": _setting("track_length", Float(), 40),
     "finish-formatting": _setting("finish_formatting", Str(), "%5.3f"),
     "update-period": _setting("update_period_ms", Int(), 2500),
     "warn-no-timer": _setting("warn_no_timer", Bool(), True),

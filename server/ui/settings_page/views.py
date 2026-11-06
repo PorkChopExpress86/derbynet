@@ -4,7 +4,8 @@ service of #70.
 
 A field posts its key and value and gets itself back, with "Saved" or the
 refusal beside it. A lane count change also sends the lanes in use and the
-lane colors out of band, since both follow the count. No GET writes.
+lane colors out of band, since both follow the count. No GET writes. A
+number outside its field's range is refused, where PHP stores any (D80).
 """
 
 from django.http import HttpResponse
@@ -13,7 +14,6 @@ from django.template.loader import render_to_string
 from django.views.decorators.http import require_GET, require_POST
 
 from core import diagnostics, settings_page
-from core.models import RaceSettings
 from core.settings_page import Kind, SaveRefused
 from roster.models import Partition
 from roster.services.weigh_in import WeighInFailure, set_partition_weigh_in
@@ -39,13 +39,12 @@ def page(request):
 
 def _lanes_html(request, event) -> str:
     """The lanes in use and the lane colors, out of band."""
-    row = RaceSettings.for_event(event)
     return render_to_string(
         "ui/settings_page/lanes_oob.html",
         {
             "scheduling": playlist_state.scheduling(event),
             "part": "lanes",
-            "lane_colors": settings_page.lane_colors(row.lane_colors, row.lane_count),
+            "lane_colors": state.lane_colors(event),
             **state.CHOICES,
         },
         request,
@@ -63,12 +62,12 @@ def save(request):
         settings_page.save_field(event, key, request.POST.get("value", ""))
     except SaveRefused as refused:
         error = refused.description
-    f = settings_page.BY_KEY.get(key)
-    if f is None:
+    setting = settings_page.BY_KEY.get(key)
+    if setting is None:
         return HttpResponse(status=400)
-    view = state.field_view(event, f)
+    view = state.field_view(event, setting)
     view.saved, view.error = not error, error
-    if error and f.kind is Kind.DIRECTORY:
+    if error and setting.kind is Kind.DIRECTORY:
         # The refused path stays in the field, with its own badge.
         view.value = request.POST.get("value", "")
         view.status = diagnostics.folder_status(view.value)
@@ -87,12 +86,11 @@ def lane_colors(request):
         settings_page.save_lane_colors(event, request.POST.getlist("color"))
     except SaveRefused as refused:
         error = refused.description
-    row = RaceSettings.for_event(event)
     return render(
         request,
         "ui/settings_page/lane_colors.html",
         {
-            "lane_colors": settings_page.lane_colors(row.lane_colors, row.lane_count),
+            "lane_colors": state.lane_colors(event),
             "saved": not error,
             "error": error,
             **state.CHOICES,

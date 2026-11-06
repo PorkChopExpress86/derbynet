@@ -10,6 +10,7 @@ from django.test import Client, override_settings
 from accounts.permissions import SESSION_ROLE
 from core.models import Event, RaceSettings, SiteState
 from roster.models import Racer
+from roster.services.racers import fake_partition_name, insert_new_racer
 from transfer import backups, snapshot
 from ui.tests.race import add_racers, race_setup, scheduled
 
@@ -299,8 +300,25 @@ def test_fake_roster_makes_checked_in_racers(coordinator, event):
     )
     assert response["HX-Redirect"] == "/checkin/"
     racers = Racer.objects.filter(event=event)
-    assert 6 * 3 <= racers.count() <= 6 * 7
+    # C57: exactly groups x per group; racer.fake swings each group by up
+    # to 2 at random (`action.racer.fake.inc:32-36`).
+    assert racers.count() == 6 * 5
+    for g in range(1, 7):
+        group = fake_partition_name(g)
+        assert racers.filter(partition__name=group).count() == 5
     assert not racers.filter(passed_inspection=False).exists()
+
+
+def test_fake_roster_check_in_passes_every_racer_of_the_event(coordinator, event):
+    """As PHP does: racer.fake's check-in passes every racer of the event,
+    not only the fake ones (`action.racer.fake.inc:68`)."""
+    insert_new_racer(event, first_name="Real", last_name="One", partition_name="Lions")
+    hx(
+        coordinator,
+        "/setup/fake-roster/",
+        {"ngroups": "1", "racers_per_group": "2", "check_in": ["0", "1"]},
+    )
+    assert Racer.objects.get(event=event, first_name="Real").passed_inspection
 
 
 @pytest.mark.parametrize(

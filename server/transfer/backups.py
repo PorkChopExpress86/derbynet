@@ -15,10 +15,11 @@ closures, allowed racers, the timer audit, racer notes, check-in times and
 from dataclasses import dataclass
 from pathlib import Path
 
+from django.db import transaction
 from django.utils import timezone
 
 from core.models import Event
-from core.services import event_dir, reset_event
+from core.services import event_dir, lock_race_state, reset_event
 from legacy_api.xml import PROLOG
 from racing.services import purge as purges
 from transfer import snapshot
@@ -80,14 +81,20 @@ def find_snapshot(name: str) -> Path | None:
 
 def purge(event: Event, what: str) -> Path:
     """`database.purge` of one mode, or Re-Initialize (`database.execute`'s
-    `schema` script), after a snapshot. Returns the snapshot."""
+    `schema` script), after a snapshot. Returns the snapshot.
+
+    The snapshot is read under the `RaceState` lock the change then holds,
+    in one transaction, so no write lands between the two (#48 review). The
+    file is on disk, so it survives a change that rolls back."""
     if what not in (*PURGES, REINITIALIZE):
         raise BackupFailed("not-recognized", f"Unrecognized purge operation: {what}")
-    taken = take_snapshot(event, what)
-    if what == REINITIALIZE:
-        reset_event(event)
-    else:
-        purges.purge(event, what)
+    with transaction.atomic():
+        lock_race_state(event.pk)
+        taken = take_snapshot(event, what)
+        if what == REINITIALIZE:
+            reset_event(event)
+        else:
+            purges.purge(event, what)
     return taken
 
 
@@ -100,6 +107,14 @@ class Imported:
 def import_snapshot(event: Event, content: bytes) -> Imported:
     """`snapshot.put` of an uploaded file, after a snapshot of the event it
     replaces. Raises `snapshot.PutFailure` for a file it refuses, which
-    changes nothing."""
-    taken = take_snapshot(event, IMPORT)
-    return Imported(taken, snapshot.put(event, content))
+    changes nothing. The snapshot is taken inside the import's own
+    transaction, under the replaced event's lock (`snapshot.put`'s
+    `before`)."""
+    taken: list[Path] = []
+
+    def before():
+        lock_race_state(event.pk)
+        taken.append(take_snapshot(event, IMPORT))
+
+    tables = snapshot.put(event, content, before=before)
+    return Imported(taken[0], tables)

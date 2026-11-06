@@ -28,7 +28,7 @@
     ["scoring", "2", "scoring=2", "scoring", "2"],
     ["replay-rate", "25", "replay-rate=25", "replay-rate", "25"],
     ["replay-num-showings", "3", "replay-num-showings=3", "replay-num-showings", "3"],
-    ["replay-skipback", "3.5", "replay-skipback=3500", "replay-skipback", "3500"]
+    ["replay-skipback", "3500", "replay-skipback=3500", "replay-skipback", "3500"]
   ],
   "car-numbering": ["car-numbering=0+1", "0+1"],
   "lane-colors": ["lane-colors=red,none,blue", "red,none,blue"],

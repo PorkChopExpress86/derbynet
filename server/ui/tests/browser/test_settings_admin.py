@@ -269,9 +269,8 @@ def test_a_fresh_install_reaches_the_dashboard_through_the_wizard(page, no_event
 
 
 def test_make_fake_roster_on_a_phone(login, event):
-    """Acceptance: 6 groups of about 5, every racer checked in. racer.fake
-    gives each group 2 more or fewer at random, as PHP does
-    (`action.racer.fake.inc:36`), so the count is checked against the rows."""
+    """Acceptance: 6 groups of 5, every racer checked in: exactly 30 (C57;
+    racer.fake swings each group by up to 2, `action.racer.fake.inc:32-36`)."""
     phone_only(login("anonymous"))
     page = coordinator(login)
     page.goto("/setup/")
@@ -280,15 +279,15 @@ def test_make_fake_roster_on_a_phone(login, event):
     ).click()
     form = page.locator('[data-sheet="setup"] [data-fake-roster]')
     expect(form.get_by_label("Groups")).to_have_value("6")
-    expect(form.get_by_label("Racers per group, about")).to_have_value("5")
+    expect(form.get_by_label("Racers per group")).to_have_value("5")
     expect(form.get_by_role("switch")).to_be_checked()
     shoot(page, "setup-fake-roster", full_page=False)
     form.get_by_role("button", name="Make fake racers").click()
     page.wait_for_url(re.compile(r"/checkin/$"))
+    expect(page.locator("[data-racer]")).to_have_count(30)
     made = Racer.objects.filter(event=event)
-    assert 18 <= made.count() <= 42
-    assert made.filter(passed_inspection=True).count() == made.count()
-    expect(page.locator("[data-racer]")).to_have_count(made.count())
+    assert made.count() == 30
+    assert made.filter(passed_inspection=True).count() == 30
 
 
 def test_purge_racers_on_a_phone(login, event):

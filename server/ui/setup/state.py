@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from accounts.permissions import role
 from core import diagnostics, setup_details
+from core.diagnostics import Status
 from core.models import Event, RaceSettings
 from core.settings_page import BY_KEY
 from core.setup_event import post_setup_role
@@ -103,16 +104,16 @@ def build(request, event: Event | None) -> Wizard:
         Step(
             "event",
             "Create or open an event",
-            "ok" if event else "unknown",
+            Status.OK if event else Status.UNKNOWN,
             f"The open event is {event.name}." if event else "No event yet.",
         ),
         Step(
             "schema",
             "Database migrations",
-            "trouble" if pending else "ok",
+            Status.TROUBLE if pending else Status.OK,
             f"{len(pending)} not applied." if pending else "Up to date.",
         ),
-        Step("time-zone", "Time zone", "ok", tz.name),
+        Step("time-zone", "Time zone", Status.OK, tz.name),
     ]
     wizard = Wizard(
         event=event,
@@ -133,19 +134,21 @@ def build(request, event: Event | None) -> Wizard:
             Step(
                 "lanes",
                 "Lanes on the track",
-                "ok" if row.lane_count else "unknown",
+                Status.OK if row.lane_count else Status.UNKNOWN,
                 f"{row.lane_count} lanes." if row.lane_count else "Not set.",
             ),
             Step(
                 "photos",
                 "Photo folders",
-                "ok" if all(c.status == "ok" for c in folders) else "trouble",
+                Status.OK
+                if all(c.status == Status.OK for c in folders)
+                else Status.TROUBLE,
                 "Racer and car photo folders.",
             ),
             Step(
                 "roster",
                 "Roster",
-                "ok" if counts["nracers"] else "unknown",
+                Status.OK if counts["nracers"] else Status.UNKNOWN,
                 f"{counts['nracers']} racers." if counts["nracers"] else "No racers.",
             ),
         ]
@@ -159,7 +162,7 @@ def build(request, event: Event | None) -> Wizard:
         Step(
             "login",
             "Log in for race day",
-            "ok" if current else "unknown",
+            Status.OK if current else Status.UNKNOWN,
             f"Logged in as {current}." if current else "Not logged in.",
         )
     )

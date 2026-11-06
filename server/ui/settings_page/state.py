@@ -17,7 +17,7 @@ from ui.playlist import state as playlist_state
 
 @dataclass
 class FieldView:
-    f: Field
+    field: Field
     value: object
     choices: list = field(default_factory=list)
     disabled: bool = False
@@ -30,11 +30,11 @@ class FieldView:
 
     @property
     def key(self) -> str:
-        return self.f.key
+        return self.field.key
 
     @property
     def kind(self) -> str:
-        return self.f.kind.value
+        return self.field.kind.value
 
 
 @dataclass
@@ -44,14 +44,16 @@ class SectionView:
     fields: list[FieldView]
 
 
-def field_view(event, f: Field, *, row=None, values=None, locked=None) -> FieldView:
+def field_view(
+    event, setting: Field, *, row=None, values=None, locked=None
+) -> FieldView:
     row = row or RaceSettings.for_event(event)
     values = values if values is not None else settings_page.read_values(event)
     locked = lanes_locked(event) if locked is None else locked
-    value = settings_page.value_of(row, values, f)
-    view = FieldView(f, value, list(settings_page.options(f)))
-    view.disabled = f.lane_lock and locked
-    if f.kind is Kind.DIRECTORY:
+    value = settings_page.value_of(row, values, setting)
+    view = FieldView(setting, value, list(settings_page.options(setting)))
+    view.disabled = setting.lane_lock and locked
+    if setting.kind is Kind.DIRECTORY:
         view.status = diagnostics.folder_status(str(value))
         view.read_only = django_settings.LOCK_SETTINGS
     return view
@@ -114,6 +116,11 @@ class Page:
     scheduling: object
 
 
+def lane_colors(event) -> list[str]:
+    """Each lane's color, for the lane colors partial."""
+    return settings_page.lane_colors(RaceSettings.for_event(event))
+
+
 def build(event) -> Page:
     row = RaceSettings.for_event(event)
     values = settings_page.read_values(event)
@@ -123,9 +130,9 @@ def build(event) -> Page:
             s.value,
             SECTION_TITLES[s],
             [
-                field_view(event, f, row=row, values=values, locked=locked)
-                for f in FIELDS
-                if f.section is s
+                field_view(event, setting, row=row, values=values, locked=locked)
+                for setting in FIELDS
+                if setting.section is s
             ],
         )
         for s in Section
@@ -133,7 +140,7 @@ def build(event) -> Page:
     return Page(
         sections=sections,
         lane_count=row.lane_count,
-        lane_colors=settings_page.lane_colors(row.lane_colors, row.lane_count),
+        lane_colors=settings_page.lane_colors(row),
         lanes_locked=locked,
         settings_locked=django_settings.LOCK_SETTINGS,
         weigh_in=weigh_in_rows(event),

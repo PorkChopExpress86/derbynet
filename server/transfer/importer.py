@@ -50,6 +50,7 @@ def import_derbynet(
     time_zone=None,
     discard_videos=False,
     keep_folders=False,
+    before=None,
 ):
     """Import the legacy database at `path` and return the `Report`.
 
@@ -59,7 +60,9 @@ def import_derbynet(
     event's videos and logs cannot be recovered from the source, so
     `replace` refuses to remove any unless `discard_videos` is set. With
     `keep_folders`, the new event takes the replaced event's folder paths,
-    which then hold the new event's files (`legacy.folders`).
+    which then hold the new event's files (`legacy.folders`). `before`, when
+    given, runs first inside the import's transaction (#48: the snapshot of
+    the event a snapshot import replaces).
     """
     path = Path(path)
     time_zone = time_zone or settings.TIME_ZONE
@@ -101,6 +104,8 @@ def import_derbynet(
         # durable: the commit at the end of this block is the switch from the
         # old event's folders to the new one.
         with transaction.atomic(durable=True):
+            if before is not None:
+                before()
             event, replaced = _create_event(name, replace, report)
             ctx = Context(event, tables, report, zone, photos)
             legacy_ids = load_tables(ctx)

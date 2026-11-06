@@ -435,6 +435,8 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         "D20: a 301 to /setup/fake-roster/, the query string kept.",
         "C56: needs SET_UP, as racer.fake does; fakeroster.php asks for"
         " CHECK_IN_RACERS, so its button failed for a role without SET_UP.",
+        "C57: each group gets exactly the racers asked for; racer.fake adds or"
+        " drops up to 2 per group at random.",
     ),
 }
 

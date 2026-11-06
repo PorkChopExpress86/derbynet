@@ -76,16 +76,13 @@ class Field:
     options: Sequence[tuple[str, str]] = ()
     minimum: Decimal | None = None
     maximum: Decimal | None = None
-    step: Decimal = Decimal(1)
+    # None: any number, the browser's `step="any"`.
+    step: Decimal | None = Decimal(1)
     # Refused while unraced heats exist (`already-scheduled`).
     lane_lock: bool = False
     # A `RaceSettings` field written directly: a Django-only setting.
     model_field: str = ""
     extra: dict = field(default_factory=dict)
-
-
-def _n(text: str) -> Decimal:
-    return Decimal(text)
 
 
 # `settings.php`'s precision radio (`finish-formatting`).
@@ -101,26 +98,22 @@ REPLAY_RATES = (
     ("75", "0.75×"),
     ("100", "1×"),
 )
+# `coordinator.php:217-226`'s replay-skipback choices, in milliseconds as
+# the dialog posts them (D80).
+REPLAY_SKIPBACKS = tuple(
+    (str(ms), f"{ms / 1000:g} s") for ms in (2500, 3000, 3500, 4000, 4500, 5000, 6000)
+)
 CAR_NUMBERS_FROM = (("101", "101"), ("1", "1"))
 LANE_COLORS = ("none", "blue", "green", "orange", "pink", "purple", "red", "yellow")
 # `settings.php`'s n-lanes input (`max="20"`).
 MAX_LANE_COUNT = 20
 MAX_TROPHIES = 20
 
-T, R, A, P, U, Y = (
-    Section.TRACK,
-    Section.RACERS,
-    Section.AWARDS,
-    Section.PHOTOS,
-    Section.RULES,
-    Section.REPLAY,
-)
-
 FIELDS: tuple[Field, ...] = (
     # Track
     Field(
         "warn-no-timer",
-        T,
+        Section.TRACK,
         Kind.SWITCH,
         "Warn when no timer is connected",
         "Turn off if you enter times by hand; the race dashboard then stops"
@@ -128,35 +121,38 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "n-lanes",
-        T,
+        Section.TRACK,
         Kind.NUMBER,
         "Lanes on the track",
         "How many lanes the track has, used lanes or not.",
         unit="lanes",
-        minimum=_n("0"),
-        maximum=_n(str(MAX_LANE_COUNT)),
+        minimum=Decimal("0"),
+        maximum=Decimal(str(MAX_LANE_COUNT)),
         lane_lock=True,
     ),
     Field(
         "reverse-lanes",
-        T,
+        Section.TRACK,
         Kind.SWITCH,
         "Number lanes in reverse",
         "Turn on when the timer counts lanes from the other side of the track.",
     ),
     Field(
         "track-length",
-        T,
+        Section.TRACK,
         Kind.NUMBER,
         "Track length",
         "Used to show speeds in scale miles per hour.",
         unit="ft",
-        minimum=_n("0"),
-        maximum=_n("999"),
+        minimum=Decimal("0"),
+        maximum=Decimal("999"),
+        # `settings.php:152` has no step, and `settings.js` posts the number
+        # as typed, so a fractional length saves (D80).
+        step=None,
     ),
     Field(
         "finish-formatting",
-        T,
+        Section.TRACK,
         Kind.SEGMENTED,
         "Time precision",
         "How many digits finish times show with.",
@@ -164,33 +160,33 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "now-racing-linger-ms",
-        T,
+        Section.TRACK,
         Kind.SECONDS,
         "Previous heat stays on Now Racing for",
         "How long the last heat's results stay up before the next heat shows.",
         unit="s",
-        minimum=_n("0"),
-        maximum=_n("600"),
-        step=_n("0.1"),
+        minimum=Decimal("0"),
+        # No maximum: `settings.php:171` has a step and no bounds (D80).
+        step=Decimal("0.1"),
     ),
     # Racers
     Field(
         "supergroup-label",
-        R,
+        Section.RACERS,
         Kind.TEXT,
         "The whole roster is a",
         'What the full roster is called, such as "Pack".',
     ),
     Field(
         "partition-label",
-        R,
+        Section.RACERS,
         Kind.TEXT,
         "A sub-division is a",
         'What a sub-division of the roster is called, such as "Den".',
     ),
     Field(
         "name-style",
-        R,
+        Section.RACERS,
         Kind.SEGMENTED,
         "Show racer names as",
         "How racer names show on the kiosks and results.",
@@ -198,7 +194,7 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "car-numbering-from",
-        R,
+        Section.RACERS,
         Kind.SEGMENTED,
         "Assigned car numbers start at",
         "The first car number given to a new racer with none.",
@@ -206,7 +202,7 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "car-numbering-by-partition",
-        R,
+        Section.RACERS,
         Kind.SWITCH,
         "Hundreds place counts up for each sub-division",
         "With this on, the second sub-division's cars start at 201 (or 101).",
@@ -214,48 +210,48 @@ FIELDS: tuple[Field, ...] = (
     # Awards
     Field(
         "n-pack-trophies",
-        A,
+        Section.AWARDS,
         Kind.NUMBER,
         "Speed trophies for the whole roster",
         "How many top finishers of the whole roster get a speed trophy.",
-        minimum=_n("0"),
-        maximum=_n(str(MAX_TROPHIES)),
+        minimum=Decimal("0"),
+        maximum=Decimal(str(MAX_TROPHIES)),
     ),
     Field(
         "n-den-trophies",
-        A,
+        Section.AWARDS,
         Kind.NUMBER,
         "Speed trophies per group",
         "How many top finishers of each racing group get a speed trophy.",
-        minimum=_n("0"),
-        maximum=_n(str(MAX_TROPHIES)),
+        minimum=Decimal("0"),
+        maximum=Decimal(str(MAX_TROPHIES)),
     ),
     Field(
         "n-rank-trophies",
-        A,
+        Section.AWARDS,
         Kind.NUMBER,
         "Speed trophies per subgroup",
         "How many top finishers of each subgroup get a speed trophy.",
-        minimum=_n("0"),
-        maximum=_n(str(MAX_TROPHIES)),
+        minimum=Decimal("0"),
+        maximum=Decimal(str(MAX_TROPHIES)),
     ),
     Field(
         "one-trophy-per",
-        A,
+        Section.AWARDS,
         Kind.SWITCH,
         "At most one trophy per racer",
         "A racer who wins at a higher level is left out of the lower levels.",
     ),
     Field(
         "use-xbs",
-        A,
+        Section.AWARDS,
         Kind.SWITCH,
         'Offer an "Exclusively By Scout" award',
         "Adds the award for cars the racer built on their own.",
     ),
     Field(
         "xbs-award",
-        A,
+        Section.AWARDS,
         Kind.TEXT,
         '"Exclusively By Scout" award name',
         "The award's name, when it is offered.",
@@ -263,14 +259,14 @@ FIELDS: tuple[Field, ...] = (
     # Photos
     Field(
         "images-dir",
-        P,
+        Section.PHOTOS,
         Kind.SELECT,
         "Image set",
         "The artwork the kiosks show.",
     ),
     Field(
         "photos-on-now-racing",
-        P,
+        Section.PHOTOS,
         Kind.SEGMENTED,
         "Photos on Now Racing",
         "Which photo the Now Racing kiosk shows for each car.",
@@ -278,49 +274,49 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "show-car-photos-on-deck",
-        P,
+        Section.PHOTOS,
         Kind.SWITCH,
         "Car photos on the On Deck kiosk",
         "Shows each car's photo beside the racer on deck.",
     ),
     Field(
         "show-racer-photos-rr",
-        P,
+        Section.PHOTOS,
         Kind.SWITCH,
         "Racer photos on Results By Racer",
         "Shows each racer's photo in the results by racer.",
     ),
     Field(
         "show-car-photos-rr",
-        P,
+        Section.PHOTOS,
         Kind.SWITCH,
         "Car photos on Results By Racer",
         "Shows each car's photo in the results by racer.",
     ),
     Field(
         "photo-dir",
-        P,
+        Section.PHOTOS,
         Kind.DIRECTORY,
         "Racer photos folder",
         "Where racer photos are kept, under the data folder.",
     ),
     Field(
         "car-photo-dir",
-        P,
+        Section.PHOTOS,
         Kind.DIRECTORY,
         "Car photos folder",
         "Where car photos are kept, under the data folder.",
     ),
     Field(
         "upload-videos",
-        P,
+        Section.PHOTOS,
         Kind.SWITCH,
         "Upload replay videos",
         "The replay station saves each heat's clip to the videos folder.",
     ),
     Field(
         "video-dir",
-        P,
+        Section.PHOTOS,
         Kind.DIRECTORY,
         "Videos folder",
         "Where replay clips are kept, under the data folder.",
@@ -328,21 +324,21 @@ FIELDS: tuple[Field, ...] = (
     # Rules
     Field(
         "use-master-sched",
-        U,
+        Section.RULES,
         Kind.SWITCH,
         "Interleave heats from different groups",
         "Runs the heats of rounds at the same level in one shared order.",
     ),
     Field(
         "use-points",
-        U,
+        Section.RULES,
         Kind.SWITCH,
         "Race by points",
         "Ranks racers by their places in each heat instead of by their times.",
     ),
     Field(
         "scoring",
-        U,
+        Section.RULES,
         Kind.SEGMENTED,
         "Scoring",
         "Average every heat time, drop each car's slowest, or take its fastest.",
@@ -351,7 +347,7 @@ FIELDS: tuple[Field, ...] = (
     # Replay (D9, D18). #53 reads all five.
     Field(
         "replay-rate",
-        Y,
+        Section.REPLAY,
         Kind.SEGMENTED,
         "Playback speed",
         "How fast each replay plays, slower than real time.",
@@ -359,52 +355,50 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "replay-num-showings",
-        Y,
+        Section.REPLAY,
         Kind.NUMBER,
         "Showings",
         "How many times each replay plays.",
         unit="times",
-        minimum=_n("1"),
-        maximum=_n("10"),
+        minimum=Decimal("1"),
+        # `coordinator.php:229-233` offers 1 to 3 (D80).
+        maximum=Decimal("3"),
     ),
     Field(
         "replay-skipback",
-        Y,
-        Kind.SECONDS,
+        Section.REPLAY,
+        Kind.SEGMENTED,
         "Recorded before the last car finishes",
         "How much of the race before the finish each clip shows.",
-        unit="s",
-        minimum=_n("0.5"),
-        maximum=_n("10"),
-        step=_n("0.5"),
+        options=REPLAY_SKIPBACKS,
     ),
     Field(
         "replay-post-roll",
-        Y,
+        Section.REPLAY,
         Kind.SECONDS,
         "Recorded after the last car finishes",
         "How long each clip runs past the finish line (D18).",
         unit="s",
-        minimum=_n("0"),
-        maximum=_n("10"),
-        step=_n("0.5"),
+        minimum=Decimal("0"),
+        maximum=Decimal("10"),
+        step=Decimal("0.5"),
         model_field="replay_post_roll_ms",
     ),
     Field(
         "replay-max-clip",
-        Y,
+        Section.REPLAY,
         Kind.SECONDS,
         "Longest clip",
         "A clip never runs longer than this (D18).",
         unit="s",
-        minimum=_n("1"),
-        maximum=_n("30"),
-        step=_n("0.5"),
+        minimum=Decimal("1"),
+        maximum=Decimal("30"),
+        step=Decimal("0.5"),
         model_field="replay_max_clip_ms",
     ),
 )
 
-BY_KEY: dict[str, Field] = {f.key: f for f in FIELDS}
+BY_KEY: dict[str, Field] = {setting.key: setting for setting in FIELDS}
 CAR_NUMBERING_KEYS = ("car-numbering-from", "car-numbering-by-partition")
 
 
@@ -423,25 +417,38 @@ def image_sets() -> list[tuple[str, str]]:
     return [(n, n) for n in names if not n.startswith(".")]
 
 
-def options(f: Field) -> Sequence[tuple[str, str]]:
-    return image_sets() if f.kind is Kind.SELECT else f.options
+def options(setting: Field) -> Sequence[tuple[str, str]]:
+    return image_sets() if setting.kind is Kind.SELECT else setting.options
 
 
-def _decimal(raw: str, f: Field) -> Decimal:
+def _range(setting: Field) -> str:
+    if setting.maximum is None:
+        return f"pick {setting.minimum} or more"
+    return f"pick {setting.minimum} to {setting.maximum}"
+
+
+def _plain(value: Decimal) -> str:
+    """A number as `settings.js`'s `Number(val)` posts it: `32.5`, `40`."""
+    return format(value.normalize(), "f")
+
+
+def _decimal(raw: str, setting: Field) -> Decimal:
     try:
         value = Decimal(str(raw).strip())
     except InvalidOperation:
         value = None
     if value is None or not value.is_finite():
-        raise SaveRefused("not-a-number", f"{f.label}: type a number.")
-    if (f.minimum is not None and value < f.minimum) or (
-        f.maximum is not None and value > f.maximum
+        raise SaveRefused("not-a-number", f"{setting.label}: type a number.")
+    if setting.minimum is not None and value < setting.minimum:
+        raise SaveRefused("out-of-range", f"{setting.label}: {_range(setting)}.")
+    if setting.maximum is not None and value > setting.maximum:
+        raise SaveRefused("out-of-range", f"{setting.label}: {_range(setting)}.")
+    if (
+        setting.kind is Kind.NUMBER
+        and setting.step == 1
+        and value != value.to_integral_value()
     ):
-        raise SaveRefused(
-            "out-of-range", f"{f.label}: pick {f.minimum} to {f.maximum}."
-        )
-    if f.kind is Kind.NUMBER and value != value.to_integral_value():
-        raise SaveRefused("not-a-number", f"{f.label}: type a whole number.")
+        raise SaveRefused("not-a-number", f"{setting.label}: type a whole number.")
     return value
 
 
@@ -449,30 +456,32 @@ def _milliseconds(value: Decimal) -> str:
     return str(int((value * 1000).to_integral_value()))
 
 
-def _post_for(f: Field, raw: str) -> dict[str, str]:
+def _post_for(setting: Field, raw: str) -> dict[str, str]:
     """What `settings.js` posts for the field."""
-    match f.kind:
+    match setting.kind:
         case Kind.SWITCH:
-            on = {f"{f.key}": "1"} if raw == "1" else {}
-            return {f"{f.key}-checkbox": "yes", **on}
+            on = {f"{setting.key}": "1"} if raw == "1" else {}
+            return {f"{setting.key}-checkbox": "yes", **on}
         case Kind.NUMBER:
-            return {f.key: str(int(_decimal(raw, f)))}
+            return {setting.key: _plain(_decimal(raw, setting))}
         case Kind.SECONDS:
-            return {f.key: _milliseconds(_decimal(raw, f))}
+            return {setting.key: _milliseconds(_decimal(raw, setting))}
         case Kind.SEGMENTED | Kind.SELECT:
-            if raw not in {value for value, _ in options(f)}:
-                raise SaveRefused("bad-choice", f"{f.label}: pick one of the choices.")
-            return {f.key: raw}
+            if raw not in {value for value, _ in options(setting)}:
+                raise SaveRefused(
+                    "bad-choice", f"{setting.label}: pick one of the choices."
+                )
+            return {setting.key: raw}
         case Kind.DIRECTORY:
             path = raw.strip()
             if path and inside(path) is None:
                 raise SaveRefused(
                     "outside",
-                    f"{f.label}: pick a folder under {django_settings.DATA_DIR}.",
+                    f"{setting.label}: pick a folder under {django_settings.DATA_DIR}.",
                 )
-            return {f.key: path}
+            return {setting.key: path}
         case _:
-            return {f.key: raw}
+            return {setting.key: raw}
 
 
 def _apply(event: Event, post: dict) -> None:
@@ -488,12 +497,12 @@ def car_numbering(text: str) -> tuple[bool, str]:
     return mult.strip() not in ("0", ""), smallest.strip() or "101"
 
 
-def _save_car_numbering(event: Event, f: Field, raw: str) -> None:
+def _save_car_numbering(event: Event, setting: Field, raw: str) -> None:
     """`on_car_numbering_change()` writes `<0 or 100>+<101 or 1>`."""
     by_partition, smallest = car_numbering(race_settings.read(event, "car-numbering"))
-    if f.key == "car-numbering-from":
+    if setting.key == "car-numbering-from":
         if raw not in {v for v, _ in CAR_NUMBERS_FROM}:
-            raise SaveRefused("bad-choice", f"{f.label}: pick 101 or 1.")
+            raise SaveRefused("bad-choice", f"{setting.label}: pick 101 or 1.")
         smallest = raw
     else:
         by_partition = raw == "1"
@@ -504,18 +513,18 @@ def save_field(event: Event, key: str, raw: str) -> None:
     """Save one field of the settings page. Raises `SaveRefused` with
     `settings.write`'s code (`locked`, `already-scheduled`, `not-written`)
     or the page's own (`out-of-range`, `outside`, ...)."""
-    f = BY_KEY.get(key)
-    if f is None or not isinstance(raw, str):
+    setting = BY_KEY.get(key)
+    if setting is None or not isinstance(raw, str):
         raise SaveRefused("unrecognized", "That is not a setting.")
     with transaction.atomic():
         lock_race_state(event.pk)
         if key in CAR_NUMBERING_KEYS:
-            _save_car_numbering(event, f, raw)
-        elif f.model_field:
-            ms = int(_milliseconds(_decimal(raw, f)))
-            RaceSettings.objects.filter(event=event).update(**{f.model_field: ms})
+            _save_car_numbering(event, setting, raw)
+        elif setting.model_field:
+            ms = int(_milliseconds(_decimal(raw, setting)))
+            RaceSettings.objects.filter(event=event).update(**{setting.model_field: ms})
         else:
-            _apply(event, _post_for(f, raw))
+            _apply(event, _post_for(setting, raw))
 
 
 def save_lane_colors(event: Event, colors: Sequence[str]) -> None:
@@ -527,24 +536,27 @@ def save_lane_colors(event: Event, colors: Sequence[str]) -> None:
     _apply(event, {"lane-colors": text})
 
 
-def lane_colors(text: str, lane_count: int) -> list[str]:
+def lane_colors(event_settings: RaceSettings) -> list[str]:
     """Each lane's color from `lane-colors`, `none` for a lane it leaves out."""
-    given = (text or "").split(",") if text else []
+    text = event_settings.lane_colors
+    given = text.split(",") if text else []
     return [
         given[i] if i < len(given) and given[i] in LANE_COLORS else "none"
-        for i in range(lane_count)
+        for i in range(event_settings.lane_count)
     ]
 
 
-def value_of(event_settings: RaceSettings, values: dict[str, str | None], f: Field):
+def value_of(
+    event_settings: RaceSettings, values: dict[str, str | None], setting: Field
+):
     """The field's value as the page shows it."""
-    if f.model_field:
-        return _seconds(getattr(event_settings, f.model_field))
-    if f.key in CAR_NUMBERING_KEYS:
+    if setting.model_field:
+        return _seconds(getattr(event_settings, setting.model_field))
+    if setting.key in CAR_NUMBERING_KEYS:
         by_partition, smallest = car_numbering(values["car-numbering"] or "")
-        return smallest if f.key == "car-numbering-from" else by_partition
-    text = values[FORM_SETTINGS[f.key].setting] or ""
-    match f.kind:
+        return smallest if setting.key == "car-numbering-from" else by_partition
+    text = values[FORM_SETTINGS[setting.key].setting] or ""
+    match setting.kind:
         case Kind.SWITCH:
             return text not in ("", "0")
         case Kind.SECONDS:
@@ -558,5 +570,9 @@ def _seconds(ms: int) -> str:
 
 def read_values(event: Event) -> dict[str, str | None]:
     """The legacy text of every setting the page shows."""
-    keys = {FORM_SETTINGS[f.key].setting for f in FIELDS if f.key in FORM_SETTINGS}
+    keys = {
+        FORM_SETTINGS[setting.key].setting
+        for setting in FIELDS
+        if setting.key in FORM_SETTINGS
+    }
     return race_settings.read_many(event, sorted(keys | {"car-numbering"}))

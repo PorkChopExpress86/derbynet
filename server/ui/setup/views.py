@@ -1,11 +1,12 @@
 """The set-up page (#48): `setup.php` as a first-run wizard, the setup
 health checks, the data section (purges, preferences, snapshots), and the
-"Make fake roster" sheet that replaces `fakeroster.php`.
+"Make fake roster" sheet that replaces `fakeroster.php`. The wizard's steps
+and health checks replace `setup.php`'s status list (D80).
 
 The event step creates or opens an event through `core.setup_event`, as
 `setup.nodata` does; on a first run, with no role logged in, it then logs in
 as the post-setup role, as `setup.nodata` does. The list, copy, archive and
-export screens of #9 are a follow-up ticket (#48's report). Every data
+export screens of #9 are #212. Every data
 change goes through `transfer.backups`, which writes a snapshot first (D78).
 """
 
