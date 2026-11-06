@@ -7,10 +7,11 @@ Usage: plan/bin/ci-suites <number>
 Exits 1 when a named suite is missing from the workflow. A suite that still
 waits on another ticket stays missing; say which ticket in the PR body.
 
-It also lists the parity gate's entries that name the ticket
-(`server/tools/parity_gate.py`: a step it skips or waits on). Lifting one
-changes what the gate compares, so raise it at the start, not after the
-endpoints exist (#54 retro).
+It also lists the parity gate's entries (`server/tools/parity_gate.py`: a
+step it skips or waits on) that name the ticket or one of its suites. Lifting
+one changes what the gate compares, so raise it at the start, not after the
+endpoints exist (#54 retro). #204's entry named the legacy pages, not #204
+(#204 retro).
 """
 
 import json
@@ -43,7 +44,8 @@ def main(argv: list[str]) -> int:
     workflow = (root / ".github" / "workflows" / "server.yml").read_text()
     ran = set(re.findall(r"bash testing/([\w-]+\.sh)", workflow))
     missing = 0
-    for suite in sorted(set(SUITE.findall(body)) - HELPERS):
+    suites = sorted(set(SUITE.findall(body)) - HELPERS)
+    for suite in suites:
         if suite in ran:
             print(f"in CI    testing/{suite}")
         else:
@@ -51,9 +53,16 @@ def main(argv: list[str]) -> int:
             print(f"MISSING  testing/{suite}")
     gate = (root / "server" / "tools" / "parity_gate.py").read_text()
     ticket = re.compile(rf"#{argv[0]}\b")
+    listed = set()
     for step, rest in GATE_ENTRY.findall(gate):
-        if ticket.search(rest):
-            print(f"PARITY   {step}: {rest.strip()}")
+        # A step's label is its script, its arguments, and " (2)" for a rerun.
+        if ticket.search(rest) or step.split()[0] in suites:
+            # An entry that goes on over several lines opens with "(".
+            entry = rest.strip() if rest.strip() != "(" else "(several lines)"
+            line = f"PARITY   {step}: {entry}"
+            if line not in listed:
+                listed.add(line)
+                print(line)
     return 1 if missing else 0
 
 
