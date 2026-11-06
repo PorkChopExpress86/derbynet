@@ -1,0 +1,19 @@
+{
+  "anonymous": {
+    "denied": {
+      "camera.php": "D16: replay's camera setup needs CONTROL_RACE",
+      "preferences.php": "S4: needs a login with SET_UP, since PHP's file carries ballot_password",
+      "replay.php": "D16: replay needs CONTROL_RACE",
+      "timer-test.php": "S21, D72: the timer test page /timer/test/ needs CONTROL_RACE"
+    }
+  },
+  "RaceCrew": {
+    "denied": {
+      "camera.php": "D16: replay's camera setup needs CONTROL_RACE, which RaceCrew lacks",
+      "fakeroster.php": "C56: needs SET_UP, as racer.fake does",
+      "preferences.php": "S4: needs a login with SET_UP, since PHP's file carries ballot_password",
+      "replay.php": "D16: replay needs CONTROL_RACE, which RaceCrew lacks",
+      "timer-test.php": "S21, D72: the timer test page /timer/test/ needs CONTROL_RACE"
+    }
+  }
+}

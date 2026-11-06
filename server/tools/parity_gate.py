@@ -89,10 +89,6 @@ _PAGES = (
 _EACH_ROLE = Waiting(f"{_PAGES} (test-visit-each-page.sh)", "about.php")
 WAITING: dict[str, Waiting] = {
     "test-each-role.sh": _EACH_ROLE,
-    # The page checks, which record no request, follow the first logout.
-    "test-permissions.sh": Waiting(
-        f"{_PAGES} (fixtures/role-pages.json)", "post action.php action=role.login"
-    ),
     "test-basic-racing.sh": Waiting("#49 (history.php)", "history.php"),
     "puppeteer_test all-pages-test.js": Waiting(_PAGES),
     "puppeteer_test coordinator-test.js": Waiting("#41 (coordinator.php)"),

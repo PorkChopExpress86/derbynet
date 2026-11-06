@@ -87,7 +87,8 @@ render or number:
 - To check standings, read the workbook that `export-json.php` serves with
   `standings_sheet`, `standings_row` and `expect_row`.
 - Which pages each role can open is `fixtures/role-pages.json`, and
-  `test-permissions.sh` holds every server to it.
+  `test-permissions.sh` holds every server to it, with the pages Django decided
+  otherwise in `fixtures/role-pages-django.json` (see below).
 - Never write a database ID.  Look it up by a stable key with `racerid_of`
   (car number), `racerid_named`, `roundid_of` (class and round), `classid_of`,
   `rankid_of`, `partitionid_of` and `awardid_of`, or take it from the response
@@ -109,6 +110,28 @@ usual ID.
 With `DERBYNET_BACKEND=django`, `test-visit-each-page.sh` expects `print.php` to
 answer 404, since the Django server drops the printables (#55), and
 `exercise-one-database.sh` skips `test-balloting.sh` (#54).
+
+`test-permissions.sh` holds each server to the page access it decided on.  By
+default it checks PHP's: every page in `fixtures/role-pages.json`, where an
+allowed page answers 200 and a denied one redirects to the login page.  With
+`DERBYNET_BACKEND=django` it differs in two ways (#204):
+
+- Django answers each old page URL with a 301 to its rebuilt page (D20), so
+  the script follows that one redirect and judges the page it lands on: an
+  allowed page answers 200, and a denied one a 302 to the login page.  A second
+  redirect, or one to another server, fails.  The 301 targets are not in any
+  fixture, so moving a page doesn't break the suite.
+- `fixtures/role-pages-django.json` is an override that moves each page whose
+  access Django decided otherwise into the other list, with the quirk id or
+  owner decision that says why, so it reads as a diff against the PHP fixture.
+  Anonymous visitors and `RaceCrew` are denied `replay.php` and `camera.php`,
+  which need `CONTROL_RACE` (D16), `timer-test.php`, which needs it too (S21,
+  D72), and `preferences.php`, which needs a login with `SET_UP` (S4).
+  `RaceCrew` is also denied `fakeroster.php`, which needs `SET_UP` (C56).  The
+  script fails when the override moves a page the PHP fixture doesn't have in
+  the other list, and prints how many pages it checked for each role.
+  `vote.php` needs no override: Django's ballot page (#54) is open to everyone,
+  as PHP's is.
 
 `test-photo-manipulations.sh` checks how the renders of a photo with EXIF
 orientation 6 come out.  The PHP server ignores the tag (#73) and won't be
