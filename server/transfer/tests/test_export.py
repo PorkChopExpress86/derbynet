@@ -7,11 +7,13 @@ from pathlib import Path
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.utils import timezone
 
 from core.models import Event, RaceSettings
 from core.services import event_dir
+from kiosks.models import Kiosk
 from racing.models import HeatLane
-from roster.models import Racer
+from roster.models import Group, Racer, Subgroup
 from transfer.export import DATABASE, MEDIA_FOLDERS
 from ui.tests.race import race_round, race_setup, scheduled
 
@@ -160,3 +162,62 @@ def test_a_zip_member_outside_the_folder_is_refused(tmp_path):
     with pytest.raises(CommandError, match="outside"):
         call_command("import_derbynet", str(bad), event="Bad")
     assert not (tmp_path / "escape.txt").exists()
+
+
+def test_the_round_trip_keeps_what_the_importer_reads_beyond_a_snapshot(
+    raced, tmp_path
+):
+    """#212 review: a racer's note and check-in time, the classes' and ranks'
+    trophy counts, the kiosks, and photos no racer shows all come back."""
+    folders = RaceSettings.objects.get(event=raced)
+    (Path(folders.photo_directory) / "unassigned.jpg").write_bytes(b"spare")
+    (Path(folders.car_photo_directory) / "spare-car.jpg").write_bytes(b"car")
+    checked_in = timezone.now().replace(microsecond=0)
+    Racer.objects.filter(event=raced, car_number=101).update(
+        note="Bring a spare axle", checked_in_at=checked_in
+    )
+    Group.objects.filter(event=raced, name="Wolves").update(n_trophies=2)
+    Subgroup.objects.filter(event=raced, group__name="Wolves").update(n_trophies=1)
+    Kiosk.objects.create(
+        event=raced, address="10.0.0.9", name="Lobby TV", page="kiosks/flag.kiosk"
+    )
+    target = tmp_path / "e.zip"
+
+    call_command("export_event", raced.slug, output=target)
+    call_command("import_derbynet", str(target), event="Restored")
+
+    restored = Event.objects.get(name="Restored")
+    racer = Racer.objects.get(event=restored, car_number=101)
+    assert (racer.note, racer.checked_in_at) == ("Bring a spare axle", checked_in)
+    assert Group.objects.get(event=restored, name="Wolves").n_trophies == 2
+    assert {
+        s.n_trophies
+        for s in Subgroup.objects.filter(event=restored, group__name="Wolves")
+    } == {1}
+    assert Kiosk.objects.filter(
+        event=restored, address="10.0.0.9", name="Lobby TV", page="kiosks/flag.kiosk"
+    ).exists()
+    new = RaceSettings.objects.get(event=restored)
+    assert (Path(new.photo_directory) / "unassigned.jpg").read_bytes() == b"spare"
+    assert (Path(new.car_photo_directory) / "spare-car.jpg").read_bytes() == b"car"
+
+
+def test_an_import_does_not_replace_a_read_only_event(raced, tmp_path):
+    """README: an import's --replace refuses a read-only event (D14, D81)."""
+    target = tmp_path / "e.zip"
+    call_command("export_event", raced.slug, output=target)
+    Event.objects.filter(pk=raced.pk).update(read_only=True)
+    racers_before = racers(raced)
+
+    with pytest.raises(CommandError, match="read-only"):
+        call_command(
+            "import_derbynet",
+            str(target),
+            event=raced.name,
+            replace=True,
+            discard_videos=True,
+        )
+
+    assert Event.objects.get(pk=raced.pk).read_only
+    assert racers(raced) == racers_before
+    assert Event.objects.filter(name=raced.name).count() == 1

@@ -8,11 +8,11 @@ script. Nothing here runs SQL a caller sends.
 from dataclasses import dataclass, field
 
 from django.core.management import call_command
-from django.db import DatabaseError, connection
+from django.db import DatabaseError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 
 from core.models import Event
-from core.services import reset_event
+from core.services import lock_race_state, reset_event
 from kiosks.models import SignalMessage
 
 
@@ -30,7 +30,9 @@ def _schema(event: Event) -> list[dict]:
 
 
 def _update_schema(event: Event) -> list[dict]:
-    """Apply pending migrations. With none pending it does nothing."""
+    """Apply pending migrations. With none pending it does nothing. The
+    schema is the server's, every event's at once, so a read-only event does
+    not refuse it (D81)."""
     executor = MigrationExecutor(connection)
     plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
     if not plan:
@@ -40,8 +42,11 @@ def _update_schema(event: Event) -> list[dict]:
 
 
 def _drop_message_queue_table(event: Event) -> list[dict]:
-    """The queue is a table of the event's rows, so dropping it empties them."""
-    deleted = SignalMessage.objects.filter(event=event).delete()[0]
+    """The queue is a table of the event's rows, so dropping it empties them.
+    A read-only event refuses (D81)."""
+    with transaction.atomic():
+        lock_race_state(event.pk)
+        deleted = SignalMessage.objects.filter(event=event).delete()[0]
     return [{"sql": "Empty the message queue", "result": deleted}]
 
 

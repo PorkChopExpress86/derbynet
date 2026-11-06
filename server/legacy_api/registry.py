@@ -8,7 +8,7 @@ handlers write `$json_out` or echo XML: the last outcome wins.
 
 import logging
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from django.conf import settings
@@ -38,6 +38,30 @@ REFUSALS: dict[FailureCode, str] = {
 # PHP's list names `replay-message`, which no action has (#64 C22).
 UNLOGGED_ACTIONS = frozenset(
     {"role.login", "vote.cast", "replay.message", "message.send", "message.retrieve"}
+)
+
+
+# A past event's refusal (#212): every action answers `event-read-only` on a
+# read-only event, from its write service's `lock_race_state`, except these.
+# `register()` adds READ_ONLY_DIVERGENCE to every other action.
+READ_ONLY_EXEMPT: dict[str, str] = {
+    "timer-message": "D81: the timer's own bookkeeping; FINISHED is refused",
+    "message.retrieve": "D81: a kiosk or replay station reading its queue",
+    "message.send": "D81: the replay page and its camera signal WebRTC",
+    "replay.message": "D81: the replay station reporting its state",
+    # Site-level: none of these writes an event's rows.
+    "role.login": "site-level: roles are site-wide (ADR-07), and the session",
+    "login": "site-level: roles are site-wide (ADR-07), and the session",
+    "session.write": "site-level: the visitor's session",
+    "setup.nodata": "site-level: makes or opens an event, the lifecycle (D81)",
+    "file.directory.new.nodata": "site-level: a folder under the data folder",
+    # Registered only with DERBYNET_ENABLE_TEST_ENDPOINTS. It copies a slide
+    # into the event's slides folder, for the shell suites.
+    "test.setup": "test endpoint: seeds a slide for the shell suites",
+}
+READ_ONLY_DIVERGENCE = (
+    "D14, D81: on a read-only (past) event it answers event-read-only and"
+    " changes nothing; PHP has no read-only event."
 )
 
 
@@ -94,6 +118,11 @@ class Registry:
         self._endpoints: dict[tuple[Kind, str], Endpoint] = {}
 
     def register(self, endpoint: Endpoint) -> None:
+        if endpoint.kind == "action" and endpoint.name not in READ_ONLY_EXEMPT:
+            endpoint = replace(
+                endpoint,
+                divergences=(*endpoint.divergences, READ_ONLY_DIVERGENCE),
+            )
         key = (endpoint.kind, endpoint.name)
         if key in self._endpoints:
             raise ValueError(f"{endpoint.kind} {endpoint.name} is registered twice")

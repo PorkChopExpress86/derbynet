@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.conf import settings
 from django.db import transaction
 
+from core.events import lock_site_state
 from core.invariants import check_invariants
 from core.models import Event, RaceSettings, SiteState, event_scoped_models
 from core.services import event_dir, lock_race_state, new_event
@@ -167,6 +168,14 @@ def import_derbynet(
     if media_from is not None:
         for media in EVENT_MEDIA:
             _copy_tree(media_from / media, event_dir(report.event["slug"]) / media)
+        # The photos no racer shows, which the import's photo step leaves
+        # behind: a zip carries the whole folders (#212 review).
+        folders = RaceSettings.objects.get(event_id=report.event["id"])
+        for media, field in (
+            ("racers", "photo_directory"),
+            ("cars", "car_photo_directory"),
+        ):
+            _copy_tree(media_from / media, Path(getattr(folders, field)), keep=True)
     report.outcome = "committed"
     return report
 
@@ -196,8 +205,9 @@ def _unpack(path: Path, into: Path) -> Path:
     return database
 
 
-def _copy_tree(source: Path, target: Path) -> None:
-    """The regular files under `source`, copied under `target`."""
+def _copy_tree(source: Path, target: Path, *, keep: bool = False) -> None:
+    """The regular files under `source`, copied under `target`. With `keep`,
+    a file already at the target stays as it is."""
     if not source.is_dir():
         return
     for parent, _dirs, names in os.walk(source):
@@ -206,6 +216,8 @@ def _copy_tree(source: Path, target: Path) -> None:
             if path.is_symlink() or not path.is_file():
                 continue
             destination = target / path.relative_to(source)
+            if keep and destination.exists():
+                continue
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, destination)
 
@@ -275,7 +287,10 @@ def _create_event(name, replace, report):
     old = existing[0] if existing else None
     replaced = {}
     if old is not None:
-        # A read-only event is not replaced (#212).
+        # The site row before the old event's RaceState, as a switch takes
+        # them (`core.events` LOCK ORDER). A read-only event is not replaced
+        # (D14, D81).
+        lock_site_state()
         lock_race_state(old.pk)
         old_settings = RaceSettings.for_event(old)
         replaced = {field: getattr(old_settings, field) for field in FOLDERS}

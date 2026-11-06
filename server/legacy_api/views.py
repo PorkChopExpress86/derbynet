@@ -116,8 +116,11 @@ def _run(ctx: LegacyContext, endpoint, fmt: Format) -> bytes:
         endpoint.handler(ctx)
         return ctx.xml.document() if fmt is Format.XML else encode_php_json(ctx.out)
     except EventReadOnly as refusal:
-        # A write service refused a past event (#212), and its transaction
-        # rolled back. PHP has no read-only event.
+        # A write service refused a past event (D14, D81), and its
+        # transaction rolled back. PHP has no read-only event; every action
+        # but READ_ONLY_EXEMPT's carries READ_ONLY_DIVERGENCE. The ActionLog
+        # row `dispatch` wrote before the handler stays, as PHP logs every
+        # action (D81).
         failure = (refusal.code, refusal.description)
     except Exception:
         logger.exception("legacy %s %s raised", endpoint.kind, endpoint.name)

@@ -1,14 +1,25 @@
 """`manage.py export_event <slug>` and the events page's download: one event
-as a zip that `import_derbynet` reads back (#9, Archive; #212).
+as a zip that `import_derbynet` reads back (D14, D81; #9, Archive).
 
 The zip is a legacy event folder: `derbynet.sqlite3`, a standalone SQLite
-file at schema 10 with `snapshot.get`'s tables and columns, beside the
-event's media folders, `racers/`, `cars/`, `videos/`, `logs/`, `imagery/`
-and `slides/`. A photo's path in `RegistrationInfo` is relative to its
-folder, so the importer finds it in the zip's `racers/` or `cars/`. The
-database keeps what a snapshot keeps: it loses `ntrophies`, `note`,
-`checkin_time`, the fraction of a second of each result's time, and
-what the legacy schema has no column for (`transfer.snapshot`).
+file at schema 10, beside the event's whole media folders, `racers/`,
+`cars/`, `videos/`, `logs/`, `imagery/` and `slides/`, unassigned photos
+included. A photo's path in `RegistrationInfo` is relative to its folder,
+so the importer finds it in the zip's `racers/` or `cars/`.
+
+The database holds `snapshot.get`'s tables and columns, and also what the
+importer reads from a PHP database and a snapshot leaves out: each racer's
+`note` and `checkin_time`, the classes' and ranks' `ntrophies`, and the
+`Kiosks` table (`_beyond_the_snapshot`). A round trip still loses, as D65
+records for a snapshot round trip:
+
+- lane closures and each round's allowed racers, which the legacy schema
+  has no column for;
+- the timer audit and the action log's Django-only rows;
+- the fraction of a second of each result's completion time, which
+  `RaceChart.completed` keeps to the second (`snapshot._stamp`);
+- the event's folders' paths, which the importer replaces with the new
+  event's own (`legacy.folders`).
 """
 
 import os
@@ -21,6 +32,9 @@ from django.db import transaction
 
 from core.models import Event, RaceSettings
 from core.services import event_dir, lock_race_state
+from kiosks import pages
+from kiosks.models import Kiosk
+from roster.models import Group, Racer, Subgroup
 from transfer import snapshot
 
 DATABASE = "derbynet.sqlite3"
@@ -56,6 +70,64 @@ def write_database(path: Path, tables: dict[str, tuple[list[str], list[list]]]):
                 )
     finally:
         connection.close()
+
+
+def _ms(moment) -> int | None:
+    return None if moment is None else int(moment.timestamp() * 1000)
+
+
+def _seconds(moment) -> int | None:
+    return None if moment is None else int(moment.timestamp())
+
+
+def _beyond_the_snapshot(event: Event, tables: dict) -> dict:
+    """`snapshot.tables` plus the columns and the table the importer reads
+    from a PHP database (`transfer.legacy.tables`) and a snapshot omits. The
+    snapshot numbers each table's rows in primary key order, so the rows
+    here line up with its rows."""
+
+    def add(name, columns, values):
+        old_columns, rows = tables[name]
+        values = list(values)
+        if len(values) != len(rows):
+            raise ValueError(f"{name}: the rows changed under the export's lock")
+        tables[name] = (
+            [*old_columns, *columns],
+            [[*row, *more] for row, more in zip(rows, values, strict=True)],
+        )
+
+    mine = {"event": event}
+    add(
+        "RegistrationInfo",
+        ["note", "checkin_time"],
+        (
+            [racer.note, _ms(racer.checked_in_at)]
+            for racer in Racer.objects.filter(**mine).order_by("pk")
+        ),
+    )
+    add(
+        "Classes",
+        ["ntrophies"],
+        ([g.n_trophies] for g in Group.objects.filter(**mine).order_by("pk")),
+    )
+    add(
+        "Ranks",
+        ["ntrophies"],
+        ([r.n_trophies] for r in Subgroup.objects.filter(**mine).order_by("pk")),
+    )
+    tables["Kiosks"] = (
+        ["address", "name", "page", "last_contact"],
+        [
+            [
+                k.address,
+                k.name,
+                pages.legacy_string(k.page, k.params),
+                _seconds(k.last_contact),
+            ]
+            for k in Kiosk.objects.filter(**mine).order_by("pk")
+        ],
+    )
+    return tables
 
 
 def _media(event: Event) -> dict[str, Path]:
@@ -94,7 +166,7 @@ def export_event(event: Event, target: Path) -> Path:
     target = Path(target)
     with transaction.atomic():
         lock_race_state(event.pk, writable=False)
-        tables = snapshot.tables(event)
+        tables = _beyond_the_snapshot(event, snapshot.tables(event))
         media = _media(event)
     target.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="derbynet-export-") as work:

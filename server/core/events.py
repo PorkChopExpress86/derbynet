@@ -18,6 +18,7 @@ opens event folders only (`action.setup.nodata.inc`).
 
 from dataclasses import dataclass
 
+from django.conf import settings as django_settings
 from django.db import models, transaction
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
@@ -113,10 +114,21 @@ EVENT_FOLDERS = (
 )
 
 
-@dataclass(frozen=True)
+# Not frozen: a context manager sets `__traceback__` on an exception that
+# passes through it.
+@dataclass(eq=False)
 class EventRefused(Exception):
     code: str
     description: str
+
+
+def refuse_if_locked() -> None:
+    """`DERBYNET_LOCK_SETTINGS` hides event management (#9, Hosted lock):
+    creating, switching, archiving and reopening an event refuse with
+    `locked`, as `setup.nodata` does (`legacy_api/handlers/setup.py`);
+    export stays available (D81)."""
+    if django_settings.LOCK_SETTINGS:
+        raise EventRefused("locked", "Settings are locked and cannot be changed.")
 
 
 class State(models.TextChoices):
@@ -124,6 +136,11 @@ class State(models.TextChoices):
     READ_ONLY = "read-only", "Read-only"
     ARCHIVED = "archived", "Archived"
     EDITABLE = "editable", "Open for editing"
+
+    @property
+    def pill(self) -> str:
+        """The status pill's colour on the events page."""
+        return {"active": "ok", "read-only": "warn"}.get(self.value, "idle")
 
 
 def state_of(event: Event, active_id: int | None) -> list[State]:
@@ -174,7 +191,7 @@ def listing() -> list[Listed]:
     return [Listed(e, e.racer_count, state_of(e, active_id)) for e in events]
 
 
-def _valid_name(name: str) -> bool:
+def valid_name(name: str) -> bool:
     return (
         bool(name.strip())
         and len(name) <= MAX_NAME_LENGTH
@@ -196,11 +213,16 @@ def create_event(name: str, *, copy_from: int | None = None, parts=ALL_PARTS) ->
     """A new event with its folders, not made active (D81: switching is
     its own step). With `copy_from`, the `parts` of that event come across;
     racers, results and photos never do (#9, Copy from)."""
+    refuse_if_locked()
     name = name.strip()
     parts = frozenset(Part(p) for p in parts)
-    if not _valid_name(name):
+    if not valid_name(name):
         raise EventRefused("name", "An event needs a name, without / or \\.")
     if Part.AWARDS in parts and Part.GROUPS not in parts:
+        # An award definition names the class or rank it is for, and its
+        # partition list names partitions. With no class copied, each such
+        # award would become a pack award, or name another event's class
+        # (D81).
         raise EventRefused(
             "copy-awards-needs-classes",
             "Award definitions name classes and ranks, so copy those too.",
@@ -357,6 +379,18 @@ def _copy_settings(source: Event, event: Event, groups: dict[int, int]) -> None:
     RaceSettings.objects.filter(event=event).update(**values)
 
 
+# LOCK ORDER: a transaction that locks `SiteState` and an event's
+# `RaceState` takes `SiteState` first (`lock_site_state`), then the
+# `RaceState`. Two transactions that took them in opposite orders could
+# deadlock on Postgres: a switch (`make_active`) against an import that
+# replaces the active event (`transfer.importer`).
+
+
+def lock_site_state() -> SiteState | None:
+    """The site row, locked: the first lock of LOCK ORDER."""
+    return SiteState.objects.select_for_update().filter(pk=1).first()
+
+
 @dataclass(frozen=True)
 class Switched:
     replaced: Event | None
@@ -369,7 +403,8 @@ def make_active(event: Event) -> Switched:
     racing flag is on, stricter than #9's "heat running" (D81). A switch
     never unlocks `event`: a past event stays read-only until Reopen for
     editing (D81). Call it inside `transaction.atomic()`."""
-    state = SiteState.objects.select_for_update().filter(pk=1).first()
+    refuse_if_locked()
+    state = lock_site_state()
     if state is None:
         SiteState.objects.create(pk=1, active_event=event)
         return Switched(None, event)
@@ -402,9 +437,13 @@ def archive(event_id: int) -> Event:
     """Archive a past event: it becomes read-only and is marked archived.
     The active event is refused, since the field clients are using it; an
     archived event can still be made active, staying read-only (D81)."""
+    refuse_if_locked()
     with transaction.atomic():
+        # SiteState first, as make_active takes it (LOCK ORDER), so a switch
+        # cannot make the event active between this check and the archive.
+        state = lock_site_state()
         event = _locked(event_id)
-        if SiteState.objects.filter(pk=1, active_event_id=event.pk).exists():
+        if state is not None and state.active_event_id == event.pk:
             raise EventRefused(
                 "active", "Switch to another event before archiving this one."
             )
@@ -418,6 +457,7 @@ def archive(event_id: int) -> Event:
 def reopen(event_id: int) -> Event:
     """Reopen for editing: the event takes changes again, and is no longer
     archived. The active event stays as it is (D81)."""
+    refuse_if_locked()
     with transaction.atomic():
         event = _locked(event_id)
         event.read_only = False

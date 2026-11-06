@@ -327,7 +327,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         menu=False,
         view="ui.roles.views.page",
     ),
-    # The events page of #9 (#212): no PHP page has its list, copy, switch,
+    # The events page (D14, D81): no PHP page has its list, copy, switch,
     # archive or export; `setup.php` makes and opens events only.
     NavEntry(
         "events",

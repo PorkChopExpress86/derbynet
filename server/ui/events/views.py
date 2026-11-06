@@ -4,13 +4,15 @@ event; archiving; Reopen for editing; and the export download. The rules
 are `core.events`'s (#9, Past events and Copy from), and the zip is
 `transfer.export`'s.
 
-PHP has no such page. `setup.php` creates and opens event folders only
-(`action.setup.nodata.inc`), and the set-up page keeps that step (#48).
+PHP has no such page (D14, D81). `setup.php` creates and opens event
+folders only (`action.setup.nodata.inc`), and the set-up page keeps that
+step (#48).
 """
 
 import tempfile
 from pathlib import Path
 
+from django.conf import settings as django_settings
 from django.http import FileResponse, Http404
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -30,6 +32,9 @@ def _context(**extra) -> dict:
         "listed": listed,
         "parts": events.Part.choices,
         "max_name": events.MAX_NAME_LENGTH,
+        # The hosted lock hides creating, switching, archiving and reopening;
+        # export stays (D81; #9, Hosted lock).
+        "locked": django_settings.LOCK_SETTINGS,
         **extra,
     }
 
@@ -40,11 +45,31 @@ def page(request):
     return render(request, "ui/events/page.html", _context())
 
 
-def _section(request, message: str):
-    """The page's events section after a change, with its toast."""
+def _changed(request, change, message):
+    """Run one lifecycle service and answer the page's events section with a
+    toast of `message(result)`, or the service's refusal as an error toast."""
+    try:
+        result = change()
+    except events.EventRefused as refused:
+        return service_error(request, refused.description)
     response = render(request, "ui/events/section.html", _context())
-    response.write(toast_html(request, message, level="ok", oob=True))
+    response.write(toast_html(request, message(result), level="ok", oob=True))
     return response
+
+
+def _created(event) -> str:
+    if event.copied_from is not None:
+        return f"Created {event.name}, copied from {event.copied_from.name}."
+    return f"Created {event.name}."
+
+
+def _switched(switched) -> str:
+    message = f"{switched.active.name} is the active event."
+    if switched.replaced is not None:
+        message += f" {switched.replaced.name} is now read-only."
+    if switched.active.read_only:
+        message += " It is read-only until you reopen it for editing."
+    return message
 
 
 @require_POST
@@ -54,68 +79,48 @@ def create(request):
     copy_from = posted_int(source, positive=True) if source else None
     if source and copy_from is None:
         return service_error(request, "Choose an event to copy from.")
-    try:
-        event = events.create_event(
+    return _changed(
+        request,
+        lambda: events.create_event(
             request.POST.get("name", ""),
             copy_from=copy_from,
             parts=[p for p in request.POST.getlist("part") if p in events.Part.values],
-        )
-    except events.EventRefused as refused:
-        return service_error(request, refused.description)
-    if event.copied_from is not None:
-        message = f"Created {event.name}, copied from {event.copied_from.name}."
-    else:
-        message = f"Created {event.name}."
-    return _section(request, message)
-
-
-def _event_id(raw) -> int:
-    found = posted_int(raw, positive=True)
-    if found is None:
-        raise Http404("No such event.")
-    return found
+        ),
+        _created,
+    )
 
 
 @require_POST
 @guard
 def switch(request, pk: int):
-    try:
-        switched = events.switch_to(_event_id(pk))
-    except events.EventRefused as refused:
-        return service_error(request, refused.description)
-    message = f"{switched.active.name} is the active event."
-    if switched.replaced is not None:
-        message += f" {switched.replaced.name} is now read-only."
-    if switched.active.read_only:
-        message += " It is read-only until you reopen it for editing."
-    return _section(request, message)
+    return _changed(request, lambda: events.switch_to(pk), _switched)
 
 
 @require_POST
 @guard
 def archive(request, pk: int):
-    try:
-        event = events.archive(_event_id(pk))
-    except events.EventRefused as refused:
-        return service_error(request, refused.description)
-    return _section(request, f"Archived {event.name}. It is read-only.")
+    return _changed(
+        request,
+        lambda: events.archive(pk),
+        lambda event: f"Archived {event.name}. It is read-only.",
+    )
 
 
 @require_POST
 @guard
 def reopen(request, pk: int):
-    try:
-        event = events.reopen(_event_id(pk))
-    except events.EventRefused as refused:
-        return service_error(request, refused.description)
-    return _section(request, f"{event.name} is open for editing.")
+    return _changed(
+        request,
+        lambda: events.reopen(pk),
+        lambda event: f"{event.name} is open for editing.",
+    )
 
 
 @require_GET
 @guard
 def export(request, pk: int):
     """The event's zip, as `manage.py export_event` writes it."""
-    event = Event.objects.filter(pk=_event_id(pk)).first()
+    event = Event.objects.filter(pk=pk).first()
     if event is None:
         raise Http404("No such event.")
     with tempfile.TemporaryDirectory(prefix="derbynet-download-") as work:

@@ -22,7 +22,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import ActionLog, Event, RaceSettings, RaceState
-from core.services import EventReadOnly, lock_race_state
+from core.services import EventReadOnly, lock_race_state, require_writable
 from legacy_api.xml import php_escape
 from racing.engine import heat_state as hs
 from racing.engine.phpcompat import php_equals, php_numeric, php_truthy
@@ -413,9 +413,11 @@ def _started(msg: _Message) -> None:
 
 
 def _finished(msg: _Message) -> None:
-    if Event.objects.filter(pk=msg.event.id, read_only=True).exists():
-        # Under the lock `handle_message` holds (#212). PHP has no
-        # read-only event.
+    try:
+        # Under the lock `handle_message` holds (D81). PHP has no read-only
+        # event.
+        require_writable(msg.event.id)
+    except EventReadOnly:
         msg.out.append(
             f"\n  <failure code='{EventReadOnly.code}'>"
             f"{php_escape(EventReadOnly.description)}</failure>\n"

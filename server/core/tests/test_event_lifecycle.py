@@ -5,6 +5,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from accounts.permissions import SESSION_PERMISSIONS, SESSION_ROLE
 from awards.listing import AD_HOC
@@ -341,3 +343,84 @@ def test_a_running_timer_and_kiosk_follow_a_switch(client):
     assert kiosk.status_code == 200
     assert b"flag.kiosk" in kiosk.content
     assert Kiosk.objects.get(event=new, address="K1").last_contact is not None
+
+
+def test_the_settings_lock_refuses_every_change_but_export(settings, tmp_path):
+    """D81: under the settings lock, creating, switching, archiving and
+    reopening refuse with `locked`; export stays available."""
+    settings.DATA_DIR = tmp_path
+    active = events.create_event("Active")
+    other = events.create_event("Other")
+    past = events.create_event("Past")
+    events.archive(past.pk)
+    settings.LOCK_SETTINGS = True
+
+    for change in (
+        lambda: events.create_event("New"),
+        lambda: events.switch_to(other.pk),
+        lambda: events.archive(other.pk),
+        lambda: events.reopen(past.pk),
+    ):
+        with pytest.raises(events.EventRefused) as refused:
+            change()
+        assert refused.value.code == "locked"
+    assert SiteState.get().active_event == active
+    assert not Event.objects.filter(name="New").exists()
+    assert Event.objects.get(pk=other.pk).archived_at is None
+    assert Event.objects.get(pk=past.pk).read_only
+
+    from transfer.export import export_event
+
+    assert export_event(other, tmp_path / "other.zip").is_file()
+
+
+# ----- lock order (core.events LOCK ORDER) -----
+
+
+def _locked_tables(run) -> list[str]:
+    """The tables each SELECT ... FOR UPDATE that `run` sends names, in order."""
+    with CaptureQueriesContext(connection) as seen:
+        run()
+    return [
+        table
+        for q in seen.captured_queries
+        if "FOR UPDATE" in q["sql"]
+        for table in ("core_sitestate", "core_racestate")
+        if f'FROM "{table}"' in q["sql"]
+    ]
+
+
+needs_row_locks = pytest.mark.skipif(
+    not connection.features.has_select_for_update,
+    reason="SQLite sends no FOR UPDATE; the order shows on Postgres",
+)
+
+
+def _site_state_first(tables: list[str]) -> bool:
+    return tables.index("core_sitestate") < tables.index("core_racestate")
+
+
+@needs_row_locks
+def test_a_switch_locks_the_site_row_before_the_race_state():
+    events.create_event("Old")
+    new = events.create_event("New")
+
+    assert _site_state_first(_locked_tables(lambda: events.switch_to(new.pk)))
+
+
+@needs_row_locks
+def test_an_import_that_replaces_the_active_event_locks_in_the_same_order(
+    settings, tmp_path
+):
+    """#212 review: the importer locked the old event's RaceState, then
+    updated SiteState, the other order from a switch; on Postgres the two
+    could deadlock."""
+    settings.DATA_DIR = tmp_path
+    from transfer import snapshot
+
+    active = events.create_event("Active")
+    content = ("<?xml version='1.0'?>" + snapshot.get(active)).encode()
+
+    tables = _locked_tables(lambda: snapshot.put(active, content))
+
+    assert _site_state_first(tables)

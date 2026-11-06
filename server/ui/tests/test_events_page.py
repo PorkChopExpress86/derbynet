@@ -168,3 +168,55 @@ def test_a_page_write_to_a_read_only_event_is_an_error_toast(coordinator, event)
     assert 'data-toast="error"' in html(response)
     assert "read-only" in html(response)
     assert not Racer.objects.get(pk=racer.pk).passed_inspection
+
+
+def test_the_settings_lock_refuses_creating_and_switching(coordinator, event, settings):
+    """#9, Hosted lock: DERBYNET_LOCK_SETTINGS hides event creation, and
+    the events page refuses with `locked`, as setup.nodata does."""
+    other = events.create_event("Other")
+    past = events.create_event("Past")
+    Event.objects.filter(pk=past.pk).update(read_only=True)
+    settings.LOCK_SETTINGS = True
+
+    created = coordinator.post("/setup/events/new/", {"name": "Hosted new"})
+    switched = coordinator.post(f"/setup/events/{other.pk}/switch/")
+    archived = coordinator.post(f"/setup/events/{other.pk}/archive/")
+    reopened = coordinator.post(f"/setup/events/{past.pk}/reopen/")
+    exported = coordinator.get(f"/setup/events/{other.pk}/export.zip")
+
+    assert created.status_code == 422
+    assert "locked" in html(created)
+    assert not Event.objects.filter(name="Hosted new").exists()
+    assert switched.status_code == 422
+    assert SiteState.get().active_event == event
+    assert not Event.objects.get(pk=event.pk).read_only
+    assert (archived.status_code, reopened.status_code) == (422, 422)
+    assert Event.objects.get(pk=other.pk).archived_at is None
+    assert Event.objects.get(pk=past.pk).read_only
+    assert exported.status_code == 200
+
+
+def test_the_settings_lock_hides_create_and_make_active(coordinator, event, settings):
+    events.create_event("Other")
+    past = events.create_event("Past")
+    Event.objects.filter(pk=past.pk).update(read_only=True)
+    settings.LOCK_SETTINGS = True
+
+    page = html(coordinator.get("/setup/events/"))
+
+    assert "data-events-locked" in page
+    assert 'data-form="new-event"' not in page
+    assert 'data-action="switch"' not in page
+    assert 'data-action="archive"' not in page
+    assert 'data-action="reopen"' not in page
+    assert 'data-download="export"' in page
+
+
+def test_the_settings_lock_refuses_the_wizards_new_event(coordinator, event, settings):
+    settings.LOCK_SETTINGS = True
+
+    response = coordinator.post("/setup/event/new/", {"name": "Wizard new"})
+
+    assert response.status_code == 422
+    assert not Event.objects.filter(name="Wizard new").exists()
+    assert SiteState.get().active_event == event

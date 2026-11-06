@@ -29,10 +29,15 @@ from awards.models import BallotAward
 from awards.tests.factories import AwardFactory
 from core import events, race_settings
 from core.models import ActionLog, Event, RaceSettings, SiteState, event_scoped_models
-from core.services import EventReadOnly
+from core.services import EventReadOnly, event_dir
 from core.tests.factories import EventFactory
 from kiosks.models import Kiosk, Scene
-from legacy_api.registry import REGISTRY, Format
+from legacy_api.registry import (
+    READ_ONLY_DIVERGENCE,
+    READ_ONLY_EXEMPT,
+    REGISTRY,
+    Format,
+)
 from legacy_api.tests.test_event_leak import LEAK_REQUESTS, call, identical_roster
 from legacy_api.xml import PROLOG
 from racing.models import TimerStatus
@@ -46,19 +51,8 @@ from ui.tests.race import add_racers, race_round, race_setup, scheduled
 
 pytestmark = pytest.mark.django_db
 
-# Actions that never refuse a read-only event, and why.
-FIELD_CLIENT_ACTIONS = {
-    "role.login": "a login is site-wide (ADR-07)",
-    "login": "a login is site-wide (ADR-07)",
-    "session.write": "the visitor's session, not the event",
-    "setup.nodata": "creates or opens an event: the lifecycle itself",
-    "file.directory.new.nodata": "a folder under the data folder",
-    "timer-message": "the timer's connection; FINISHED refuses its results",
-    "message.retrieve": "a kiosk or replay station reading its queue",
-    "message.send": "the replay page and its camera signal WebRTC through it",
-    "replay.message": "the replay station reporting its state",
-    "test.setup": "a test endpoint",
-}
+# Actions that never refuse a read-only event, and why (D81).
+FIELD_CLIENT_ACTIONS = READ_ONLY_EXEMPT
 
 # Requests that name rows of the read-only event, by action name. Values in
 # braces are the ids `race_day` returns.
@@ -243,8 +237,28 @@ def rows(event):
     }
 
 
+def media(event) -> dict[str, bytes]:
+    """Every file under the event's folders, by path, with its bytes: the
+    photo, car photo, video and log folders, and the event's own folder."""
+    folders = RaceSettings.objects.get(event=event)
+    roots = {
+        Path(getattr(folders, field))
+        for field in events.EVENT_FOLDERS
+        if getattr(folders, field)
+    } | {event_dir(event.slug)}
+    return {
+        str(path): path.read_bytes()
+        for root in roots
+        if root.is_dir()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
 @pytest.fixture
-def day(client):
+def day(client, settings, tmp_path):
+    # The event's folders are this test's, so `media` sees only its files.
+    settings.DATA_DIR = tmp_path
     first, active = EventFactory(), EventFactory()
     identical_roster(first)
     SiteState.objects.filter(pk=1).update(active_event=active)
@@ -269,7 +283,7 @@ ACTIONS = [e for e in REGISTRY if e.kind == "action"]
 def test_every_action_refuses_a_read_only_event(client, day, endpoint):
     event, ids = day
     fields = request_for(endpoint.name, ids) | uploads(endpoint.name, event)
-    before = rows(event)
+    before, files = rows(event), media(event)
 
     response = call(client, endpoint.kind, endpoint.name, fields)
 
@@ -281,6 +295,7 @@ def test_every_action_refuses_a_read_only_event(client, day, endpoint):
         EventReadOnly.code,
     )
     assert rows(event) == before
+    assert media(event) == files
 
 
 @pytest.mark.parametrize("endpoint", ACTIONS, ids=[e.name for e in ACTIONS])
@@ -332,3 +347,46 @@ def test_a_timer_keeps_its_connection_and_records_no_result(client, day):
     assert _outcome(heartbeat, Format.XML) == "success"
     assert _outcome(finished, Format.XML) == EventReadOnly.code
     assert rows(event)["racing.HeatLane"] == before
+
+
+@pytest.mark.parametrize(
+    "selector",
+    [{}, {"racerid": "0"}, {"barcode": "PWDuploadonly"}, {"racerid": "{racer}"}],
+    ids=["no-racer", "racerid-0", "PWDuploadonly", "racer"],
+)
+def test_a_photo_upload_stores_no_file_in_a_read_only_event(client, day, selector):
+    """The photo stand uploads with no racer, or with PWDuploadonly: the
+    file must not land before the refusal (#212 review)."""
+    event, ids = day
+    files = media(event)
+    fields = {"repo": "head"} | {k: v.format(**ids) for k, v in selector.items()}
+
+    response = call(
+        client, "action", "photo.upload", fields | uploads("photo.upload", event)
+    )
+
+    assert _outcome(response, Format.JSON) == EventReadOnly.code
+    assert media(event) == files
+
+
+def test_a_crop_writes_no_file_in_a_read_only_event(client, day):
+    event, ids = day
+    files = media(event)
+
+    response = call(client, "action", "photo.crop", request_for("photo.crop", ids))
+
+    assert _outcome(response, Format.JSON) == EventReadOnly.code
+    assert media(event) == files
+
+
+def test_every_refusing_action_records_the_divergence():
+    """D14, D81 in each write action's divergences, and an exemption only
+    for a registered action."""
+    actions = {e.name: e for e in REGISTRY if e.kind == "action"}
+
+    assert [
+        name
+        for name, e in actions.items()
+        if name not in READ_ONLY_EXEMPT and READ_ONLY_DIVERGENCE not in e.divergences
+    ] == []
+    assert set(READ_ONLY_EXEMPT) - set(actions) <= {"test.setup"}

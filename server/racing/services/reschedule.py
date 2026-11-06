@@ -20,7 +20,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
-from core.services import lock_race_state
+from core.services import lock_race_state, require_writable
 from kiosks.models import Kiosk
 from racing.engine.heat_state import RacingOff
 from racing.engine.scheduling.adjuster import (
@@ -482,6 +482,9 @@ def adjust_rounds(
     writes the charts, after the recheck, with the locked `RaceState` and
     each round mapped to whether it was racing; whatever it raises rolls
     every write back."""
+    # A read-only event refuses before the guard is written (D81); the
+    # transaction below refuses again under the lock.
+    require_writable(event_id)
     held = clock()
     if not _take_guard(event_id, held):
         raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
