@@ -142,3 +142,13 @@ def test_about_works_with_no_event(db):
     response = Client().get("/about/")
     assert response.status_code == 200
     assert "No timer has connected." in html(response)
+
+
+def test_a_session_of_the_role_stays_logged_in_after_a_change(login, event):
+    """The session holds the role, not its password, so a crew phone
+    already logged in stays so, as PHP's sessions do (`authorize.inc:5-9`)."""
+    crew = login("RaceCrew")
+    login("RaceCoordinator").post(
+        "/settings/roles/RaceCrew/password/", {"password": "new-crew-pw"}
+    )
+    assert crew.get("/checkin/").status_code == 200

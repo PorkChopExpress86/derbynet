@@ -271,7 +271,7 @@ def test_a_fresh_install_reaches_the_dashboard_through_the_wizard(page, no_event
 def test_make_fake_roster_on_a_phone(login, event):
     """Acceptance: 6 groups of about 5, every racer checked in. racer.fake
     gives each group 2 more or fewer at random, as PHP does
-    (`action.racer.fake.inc`), so the count is checked against the rows."""
+    (`action.racer.fake.inc:36`), so the count is checked against the rows."""
     phone_only(login("anonymous"))
     page = coordinator(login)
     page.goto("/setup/")

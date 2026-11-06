@@ -214,7 +214,7 @@ def snapshot_import(request):
 def fake_roster(request):
     """`fakeroster.php`: a page of its own for the 301, and the sheet the
     set-up page opens. A POST makes the racers through `racer.fake`'s
-    service, then goes to check-in, as `fakeroster.php` does."""
+    service, then goes to check-in, as `fakeroster.php:32` does."""
     wizard_fake = state.FAKE
     if request.method == "GET":
         template = (

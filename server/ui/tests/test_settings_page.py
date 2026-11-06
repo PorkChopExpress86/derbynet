@@ -221,7 +221,8 @@ def test_drop_slowest_is_no_setting(event):
     """The importer turns a legacy `drop-slowest` into `scoring=1` once
     (`transfer/tests/test_import_rules.py::test_drop_slowest_becomes_scoring_1_
     unless_scoring_is_set`), so no stored key is left for a page load to
-    migrate as settings.php does, and settings.write cannot store one."""
+    migrate as settings.php does (`settings.php:95`), and settings.write
+    cannot store one."""
     result = settings_form.apply_form(
         event, {"action": "settings.write", "drop-slowest": "1"}
     )
@@ -295,3 +296,17 @@ def test_crew_cannot_open_settings(login, event):
     crew = login("RaceCrew")
     assert crew.get("/settings/").status_code == 302
     assert save(crew, "track-length", "1").status_code == 403
+
+
+def test_a_folder_change_moves_no_photo_files(coordinator, event):
+    """A new racer photos folder only changes where photos are read, as
+    PHP's settings.write writes the one setting
+    (`action.settings.write.inc:116`); racers keep their file names."""
+    racer = add_racers(event, "Lions", 1, 101)[0]
+    Racer.objects.filter(pk=racer.pk).update(headshot="ava.jpg")
+    new = Path(settings.DATA_DIR) / "events" / "wt48-moved"
+    new.mkdir(parents=True, exist_ok=True)
+    save(coordinator, "photo-dir", str(new))
+    racer.refresh_from_db()
+    assert racer.headshot == "ava.jpg"
+    assert list(new.iterdir()) == []
