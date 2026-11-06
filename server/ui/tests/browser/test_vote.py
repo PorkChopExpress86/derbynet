@@ -275,6 +275,11 @@ def test_the_sort_control_orders_the_grid_and_keeps_the_url(page, event):
               .sort((a, b) => a[0] - b[0]).map((p) => p[1])"""
         )
 
+    # Alpine shows the award view on the next animation frame, after the
+    # click returns, so a read right after the click can find no car. The
+    # browser harness's toast check before each click made that the rule
+    # here, not the exception (PR #223; #220).
+    expect(page.locator("[data-racer-cards] [data-car]:visible")).to_have_count(4)
     # Last names are all "Racer": by first name, Ava Ben Cal Dee.
     assert shown() == ["101", "102", "103", "201"]
     page.locator('[data-sort] input[value="class"]').check(force=True)
