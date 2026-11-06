@@ -99,9 +99,9 @@ def test_a_nul_in_the_name_is_no_such_role(client, event, name):
 
 
 def test_the_timer_logs_in_as_a_role_without_naming_it(client, event, endpoint):
-    """The response leaves `role` out for an empty password, as PHP does. The
-    session holds the role and Timer's bits, but a login anyone can make does
-    not count as logged in."""
+    """The response leaves `role` out for an empty password, as PHP does
+    (action.role.login.inc:27-36). The session holds the role and Timer's
+    bits, but a login anyone can make does not count as logged in."""
     endpoint("query", "probe.logged-in", permission=Access.LOGGED_IN)
     endpoint("query", "probe.timer", permission=Perm.TIMER_MESSAGE)
     endpoint("query", "probe.results", permission=Perm.VIEW_RACE_RESULTS)

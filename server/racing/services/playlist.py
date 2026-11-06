@@ -7,7 +7,7 @@ heat selected, racing stays off, and the race state holds an intermission
 naming the waiting step and the round that ended. `start_waiting_step()`
 ends the intermission and turns racing on; `skip_waiting_step()` ends it
 by passing over the waiting step. A step that does not wait behaves as
-PHP does.
+PHP does (playlist.inc:135-163).
 
 #27 calls `round_ended` when its heat advance finds the round complete, and
 #34 calls `start_playlist` for `playlist.start`. Choosing finalists reads
@@ -88,8 +88,8 @@ def _first_unraced_heat(round: Round) -> int | None:
 
 def _select(state: RaceState, round: Round) -> None:
     """`advance_heat` to the round's first unraced heat, as
-    `activate_playlist_entry()` does. With no such heat, racing turns off
-    and the current heat stays."""
+    `activate_playlist_entry()` does (playlist.inc:119-125). With no such
+    heat, racing turns off and the current heat stays."""
     heat = _first_unraced_heat(round)
     if heat is None:
         heats.transition(state, hs.RacingOff())

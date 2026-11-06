@@ -30,7 +30,8 @@ class Round(EventScoped):
     # `unused-lane-mask` format. A reschedule keeps off them, so a lane
     # reopened during the round is used only by charts made after the
     # reopen (D37, #108). `generate_schedule` clears it, and with no closure
-    # a reschedule reads the mask in force, as PHP does. Django only.
+    # a reschedule reads the mask in force, as PHP does
+    # (action.schedule.reschedule.inc:125). Django only.
     chart_mask = models.PositiveIntegerField(default=0)
 
     class Meta:

@@ -21,6 +21,7 @@ from racing.services import replay
 from ui.tests.browser.conftest import (
     PLAIN_HTTP_HOST,
     assert_accessible,
+    close_tab,
     shoot,
 )
 from ui.tests.race import race_setup, scheduled
@@ -29,52 +30,6 @@ from ui.tests.race import race_setup, scheduled
 # replay page told the kiosk frame.
 RECORD_MESSAGES = """window.__messages = [];
 window.addEventListener('message', (e) => window.__messages.push(e.data));"""
-
-
-STOP_TIMERS = """() => {
-  const last = setTimeout(() => {});
-  for (let id = 0; id <= last; id++) { clearTimeout(id); clearInterval(id); }
-}"""
-
-
-@pytest.fixture(autouse=True)
-def _stop_the_polls(page):
-    """The replay page polls every 250 ms, so a poll could start after the
-    harness drained the requests in flight and reach the server while the
-    database is flushed (a Postgres deadlock at teardown, 1 in 192 under
-    load). Every timer in every frame stops, then what is out is drained,
-    before the page closes."""
-    yield
-    if page.is_closed():
-        return
-    for tab in page.context.pages:
-        if tab != page:
-            close_tab(page, tab)
-    stop_timers(page)
-    page.in_flight.drain(page)
-
-
-def stop_timers(tab):
-    for frame in tab.frames:
-        try:
-            frame.evaluate(STOP_TIMERS)
-        except Exception:  # noqa: BLE001, S110 - a detached frame has no timers
-            pass
-
-
-def close_tab(page, tab):
-    """Close a second tab, such as the camera, once its polls have stopped
-    and its requests are answered. A tab closed with a POST out leaves that
-    request in the harness's in-flight list with no finished or failed
-    event, so the test failed at teardown with "still in flight after 10 s"
-    (PR #205's ui (postgres); test_closing_the_camera_tab_waits_for_its_post
-    holds the POST to show it)."""
-    stop_timers(tab)
-    waited = 0
-    while waited < 10_000 and any(r.frame.page == tab for r in page.in_flight.requests):
-        tab.wait_for_timeout(50)
-        waited += 50
-    tab.close()
 
 
 @pytest.fixture

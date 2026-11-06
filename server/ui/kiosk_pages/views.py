@@ -2,9 +2,9 @@
 standalone `ondeck.php` and `slideshow.php`.
 
 - `kiosk.php` with no `address` and no `page` answers 302 to
-  `?address=<this kiosk's address>`, as PHP does. With `address`, it
-  registers the kiosk, records the contact, consumes a pending reload
-  (`kiosks.services.kiosk_setting`), and renders the page the kiosk is
+  `?address=<this kiosk's address>`, as PHP does (kiosk.php:8-10). With
+  `address`, it registers the kiosk, records the contact, consumes a pending
+  reload (`kiosks.services.kiosk_setting`), and renders the page the kiosk is
   given. With `page`, it previews that page with `parameters` and
   registers nothing. A page string with no registry entry, such as
   `../settings.php` or a `local/kiosks/` page, renders the identify page
