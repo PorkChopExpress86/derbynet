@@ -318,8 +318,11 @@ def test_purge_racers_on_a_phone(login, event):
 def test_setup_links_downloads_and_snapshot_confirm(login, event):
     """setup.php parity: the links to the other set-up pages, the
     preferences and snapshot downloads, and the import confirmation."""
+    add_racers(event, "Lions", 3, 101)
     page = coordinator(login)
     page.goto("/setup/")
+    page.locator('[data-section="data"]').scroll_into_view_if_needed()
+    shoot(page, "setup-data", full_page=False)
     links = page.locator("[data-links]")
     for name in (
         "Import roster",
