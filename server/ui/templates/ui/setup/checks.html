@@ -1,0 +1,9 @@
+{# The setup health checks of details-for-setup-page.inc (#48, core.diagnostics.health_checks): the database, the configuration folders, each photo folder, and the upload limit. With the wizard's steps they replace setup.php's status list (D80). #}
+<ul role="list" class="mt-2 flex flex-col gap-2" data-checks>
+  {% for c in checks %}
+  <li data-check="{{ c.key }}" data-check-status="{{ c.status }}" class="flex items-start gap-2">
+    {% if c.status == "ok" %}{% include "ui/components/status_pill.html" with state="ok" text="OK" %}{% elif c.status == "readonly" %}{% include "ui/components/status_pill.html" with state="warn" text="Read-only" %}{% else %}{% include "ui/components/status_pill.html" with state="danger" text="Trouble" %}{% endif %}
+    <p class="min-w-0 break-words text-sm"><span class="font-medium">{{ c.label }}.</span> {{ c.detail }}</p>
+  </li>
+  {% endfor %}
+</ul>

@@ -21,7 +21,7 @@ def test_a_visitor_on_a_new_install_follows_home_to_set_up(db):
 
     assert [url for url, _ in response.redirect_chain] == ["/", "/setup/"]
     assert response.status_code == 200
-    assert 'data-placeholder="setup"' in response.content.decode()
+    assert "data-setup" in response.content.decode()
 
 
 def test_set_up_opens_on_a_new_install(db):
@@ -94,12 +94,24 @@ def test_the_helper_catches_a_write(login):
         client.post("/logout/")
 
 
-def test_the_page_is_a_placeholder_until_its_ticket_lands(login):
-    page = login("RaceCoordinator").get("/setup/").content.decode()
+def test_the_page_is_a_placeholder_until_its_ticket_lands(login, rf):
+    """#48 built the last placeholder pages, so the placeholder renders for a
+    made-up entry."""
+    import dataclasses
 
-    assert 'data-placeholder="setup"' in page
-    assert "Ticket #48 builds this page" in page
-    assert "setup.php" in page
+    from ui import navigation
+    from ui.views import placeholder
+
+    request = rf.get("/x/")
+    request.session = login("RaceCoordinator").session
+    request.nav_entry = dataclasses.replace(
+        navigation.entry("about"), key="x", view="", php="x.php", ticket=99
+    )
+    page = placeholder(request).content.decode()
+
+    assert 'data-placeholder="x"' in page
+    assert "Ticket #99 builds this page" in page
+    assert "x.php" in page
 
 
 def test_the_active_page_is_marked_in_the_menus(login):

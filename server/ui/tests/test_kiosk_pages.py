@@ -10,6 +10,7 @@ from django.test import Client
 
 from accounts.permissions import Perm
 from core.models import RaceSettings
+from kiosks import displays
 from kiosks.models import Kiosk
 from kiosks.pages import PAGES
 from roster.models import Group, Racer
@@ -515,3 +516,11 @@ def test_racing_pages_have_the_leaders_panel_and_others_do_not(event):
     for key, page in PAGES.items():
         html = body(Client().get("/kiosk.php", {"page": key}))
         assert ("data-leaders " in html) == page.racing, key
+
+
+def test_scale_mph_shows_a_fractional_track_length_as_typed(event):
+    """A track length of 32.5 ft, as settings.php saves it (#48, D80)."""
+    RaceSettings.objects.filter(event=event).update(track_length=32.5)
+    track = displays.scaled_track(RaceSettings.for_event(event))
+    assert track["length"] == "32.5"
+    assert track["mph"] == f"{32.5 / 3.0 * 3600 * 25 / 5280:4.1f}"

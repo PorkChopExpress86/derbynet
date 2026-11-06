@@ -3,13 +3,14 @@
 captures; these tests pin the contract and the fixes."""
 
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qsl
 
 import pytest
-from django.test import Client
+from django.test import Client, override_settings
 from django.utils import timezone
 
+import derbynet.settings
 from accounts.permissions import Perm
 from core.models import RaceState
 from legacy_api.registry import REGISTRY
@@ -464,3 +465,21 @@ def test_the_timer_test_lists_every_lane_whatever_comes_first(client, event, val
     found = poll(Client(), values=values)
 
     assert found["racers"] == [{"lane": n} for n in (1, 2, 3, 4)]
+
+
+def test_a_heat_time_reads_in_the_configured_time_zone(client, event, monkeypatch):
+    """D56: DERBYNET_TIME_ZONE sets the server's zone, and a recorded heat's
+    time reads in it."""
+    monkeypatch.setenv("DERBYNET_TIME_ZONE", "America/Chicago")
+    zone = derbynet.settings._time_zone()
+    assert zone == "America/Chicago"
+    rounds = setup_race(client)
+    ok(client, f"action=heat.select&roundid={rounds['Lions'].pk}&now_racing=1")
+    finished = datetime(2026, 7, 4, 17, 0, tzinfo=UTC)
+    monkeypatch.setattr(timezone, "now", lambda: finished)
+    with override_settings(TIME_ZONE=zone):
+        finish(event)
+        found = polls.poll_results(event, details=True, now=finished)
+    completed = {r["completed"] for r in found["results"] if r["completed"]}
+    # 17:00 UTC is noon in Chicago, on daylight time in July.
+    assert completed == {"2026-07-04 12:00:00"}

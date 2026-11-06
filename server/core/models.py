@@ -1,4 +1,5 @@
 from django.apps import apps
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -105,7 +106,8 @@ class RaceSettings(PerEvent):
     max_runs_per_car = models.PositiveSmallIntegerField(default=0)
     rotation_schedule = models.BooleanField(default=False)
 
-    track_length = models.PositiveIntegerField(default=40)
+    # Feet, as typed: `settings.php` takes a fraction (#48, D80).
+    track_length = models.FloatField(default=40, validators=[MinValueValidator(0)])
     finish_formatting = models.CharField(max_length=20, default="%5.3f")
     update_period_ms = models.PositiveIntegerField(default=2500)
     warn_no_timer = models.BooleanField(default=True)

@@ -483,13 +483,14 @@ class PutFailure(Exception):
         self.description = description
 
 
-def put(event: Event, content: bytes) -> list[tuple[str, str, int, int]]:
+def put(event: Event, content: bytes, before=None) -> list[tuple[str, str, int, int]]:
     """Replace `event` with the snapshot `content`. Returns, for each table of
     the file, its name, its id column, the rows the event held before, and the
     rows the file brought. The old event's rows go in the same
     transaction that brings the new ones, so a snapshot that fails changes
-    nothing."""
-    before = {
+    nothing. `before`, when given, runs first inside the import's
+    transaction, as the set-up page's automatic snapshot needs (#48, D78)."""
+    counts = {
         name: (columns[0], len(rows))
         for name, (columns, rows) in tables(event, False).items()
     }
@@ -507,12 +508,16 @@ def put(event: Event, content: bytes) -> list[tuple[str, str, int, int]]:
             raise PutFailure("bad-snapshot", "; ".join(problems))
         try:
             import_derbynet(
-                path, event_name=event.name, replace=True, keep_folders=True
+                path,
+                event_name=event.name,
+                replace=True,
+                keep_folders=True,
+                before=before,
             )
         except (ImportFailed, SourceError) as error:
             raise PutFailure("import-failed", str(error)) from error
         return [
-            (table, *before.get(table, ("", 0)), len(rows))
+            (table, *counts.get(table, ("", 0)), len(rows))
             for table, rows in (
                 (_CANONICAL.get(name, name), rows)
                 for name, rows in source.tables.items()

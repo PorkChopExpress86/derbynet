@@ -1,0 +1,6 @@
+{# A snapshot import's result (#48): the tables it brought, and the snapshot of the event it replaced (D78). #}
+<div data-import-report class="mt-3 rounded-lg border border-line p-3 text-sm">
+  <p data-saved class="font-medium text-ok-ink">The snapshot is imported. The event as it was is saved as <a href="{{ url }}" class="font-mono underline underline-offset-2">{{ imported.snapshot.name }}</a>.</p>
+  <ul class="mt-2 grid grid-cols-1 gap-x-4 sm:grid-cols-2">{% for table, id_column, before, count in imported.tables %}<li data-table="{{ table }}">{{ table }}: {{ count }} row{{ count|pluralize }} <span class="text-ink-muted">(was {{ before }})</span></li>{% endfor %}</ul>
+  <a href="{% url 'setup' %}" class="mt-2 inline-flex min-h-11 items-center font-semibold underline underline-offset-2">Reload the set-up page</a>
+</div>

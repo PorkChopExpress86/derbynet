@@ -1,0 +1,31 @@
+{# One partition's weigh-in (D8, D54, #70). It saves with its button through set_partition_weigh_in. A new mode clears every weigh-in of the partition, so while the picked mode differs from the stored one the row says how many it clears, and the button says so too. #}
+<li id="weigh-in-{{ row.partition.pk }}" data-weigh-in="{{ row.partition.name }}" class="border-b border-line py-3 last:border-b-0" x-data="{ mode: '{{ row.mode|escapejs }}', stored: '{{ row.mode|escapejs }}', weighed: {{ row.weighed }} }">
+  <form hx-post="{% url 'settings-weigh-in' row.partition.pk %}" hx-target="#weigh-in-{{ row.partition.pk }}" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" class="flex flex-col gap-3">
+    <fieldset>
+      <legend class="font-semibold">{{ row.partition.name }}</legend>
+      <div class="mt-2 flex flex-wrap rounded-xl border border-field bg-surface p-1">
+        {% for value, label in modes %}
+        <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent">
+          <input type="radio" class="sr-only" name="mode" value="{{ value }}" x-model="mode"{% if value == row.mode %} checked{% endif %}>{{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="flex flex-wrap items-end gap-3" x-show="mode !== 'none'">
+      <label class="flex flex-col gap-1 text-sm"><span class="font-medium">Unit</span>
+        <select name="unit" class="min-h-11 rounded-xl border border-field bg-surface px-3">
+          <option value="">Pick a unit</option>
+          {% for value, label in units %}<option value="{{ value }}"{% if value == row.unit %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="flex flex-col gap-1 text-sm"><span class="font-medium">Maximum weight <span class="font-normal text-ink-muted">(optional, in the unit)</span></span>
+        <input type="number" inputmode="decimal" name="max" value="{{ row.maximum }}" step="any" min="0" class="min-h-11 w-32 rounded-xl border border-field bg-surface px-3 tabular-nums">
+      </label>
+    </div>
+    <p x-cloak x-show="mode !== stored && weighed > 0" role="status" data-clears class="rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn-ink">Saving a new weigh-in mode clears the {{ row.weighed }} weigh-in{{ row.weighed|pluralize }} already recorded for {{ row.partition.name }}. Those cars need weighing again.</p>
+    <div class="flex items-center gap-3">
+      <button type="submit" class="min-h-11 rounded-xl px-4 font-semibold" :class="mode !== stored && weighed > 0 ? 'bg-danger text-white dark:text-black' : 'bg-accent text-accent-ink'" x-text="mode !== stored && weighed > 0 ? 'Save and clear {{ row.weighed }} weigh-in{{ row.weighed|pluralize }}' : 'Save'">Save</button>
+      {% if row.error %}<p role="alert" data-error class="text-sm text-danger-ink">{{ row.error }}</p>{% elif row.saved %}<p data-saved class="text-sm text-ok-ink">Saved</p>{% endif %}
+    </div>
+  </form>
+</li>

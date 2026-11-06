@@ -7,6 +7,7 @@ have. Each key then goes through the registry in `core.legacy_keys`.
 
 import re
 
+from django.core.exceptions import ValidationError
 from django.db import connection, models
 
 from core.legacy_keys import Dropped, LegacyValueError, Ref, decode, entry_for
@@ -225,3 +226,7 @@ def _check_range(field, value):
         low, high = connection.ops.integer_field_range(field.get_internal_type())
         if (low is not None and value < low) or (high is not None and value > high):
             raise BadValue(f"{value} is out of range for {field.name}")
+    try:
+        field.run_validators(value)
+    except ValidationError:
+        raise BadValue(f"{value} is out of range for {field.name}") from None

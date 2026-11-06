@@ -1,0 +1,41 @@
+{# A wizard step's primary action (#48). #}
+{% if step.key == "event" %}
+<form method="post" action="{% url 'setup-event-new' %}" class="flex flex-col gap-2 sm:flex-row sm:items-end">
+  {% csrf_token %}
+  <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm"><span class="font-medium">New event's name</span>
+    <input type="text" name="name" required autocomplete="off" placeholder="Pack 123 Derby {% now 'Y' %}" class="min-h-11 rounded-xl border border-field bg-surface px-3">
+  </label>
+  <button type="submit" class="min-h-11 rounded-xl {% if wizard.event %}border border-line{% else %}bg-accent text-accent-ink{% endif %} px-4 font-semibold">Start a new event</button>
+</form>
+{% if wizard.events|length > 1 or wizard.events and not wizard.event %}
+<form method="post" action="{% url 'setup-event-open' %}" class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+  {% csrf_token %}
+  <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm"><span class="font-medium">Or open an event this server holds</span>
+    <select name="name" class="min-h-11 rounded-xl border border-field bg-surface px-3">
+      {% for e in wizard.events %}<option value="{{ e.slug }}"{% if e == wizard.event %} selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="min-h-11 rounded-xl border border-line px-4 font-semibold">Open</button>
+</form>
+{% endif %}
+{% elif step.key == "schema" %}
+{% if wizard.pending %}
+<form method="post" action="{% url 'setup-migrate' %}">{% csrf_token %}<button type="submit" class="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Apply {{ wizard.pending|length }} migration{{ wizard.pending|length|pluralize }}</button></form>
+{% else %}<p class="text-sm">The server applies migrations when it starts, so there is nothing to do.</p>{% endif %}
+{% elif step.key == "time-zone" %}
+{% include "ui/setup/time_zone.html" with tz=wizard.tz %}
+{% elif step.key == "lanes" %}
+{% include "ui/settings_page/field.html" with fv=wizard.lanes %}
+{% elif step.key == "photos" %}
+<ul role="list" class="flex flex-col gap-1 text-sm">{% for c in wizard.folders %}<li data-check="{{ c.key }}" class="flex flex-wrap items-center gap-2">{% if c.status == "ok" %}{% include "ui/components/status_pill.html" with state="ok" text="OK" %}{% elif c.status == "readonly" %}{% include "ui/components/status_pill.html" with state="warn" text="Read-only" %}{% else %}{% include "ui/components/status_pill.html" with state="danger" text="Trouble" %}{% endif %}<span class="min-w-0 break-all">{{ c.detail }}</span></li>{% endfor %}</ul>
+<a href="{% url 'settings' %}#photos" class="mt-2 inline-flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Change the folders in Settings</a>
+{% elif step.key == "roster" %}
+<div class="flex flex-wrap gap-2">
+  <a href="{% url 'import-roster' %}" class="inline-flex min-h-11 items-center rounded-xl {% if wizard.nracers %}border border-line{% else %}bg-accent text-accent-ink{% endif %} px-4 font-semibold">Import a roster</a>
+  <button type="button" hx-get="{% url 'fakeroster' %}" hx-target="#setup-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="setupPage.open('Make fake roster', $event)" aria-haspopup="dialog" data-action="fake-roster" class="min-h-11 rounded-xl border border-line px-4 font-semibold">Make a fake roster</button>
+</div>
+{% elif step.key == "login" %}
+{% if wizard.role %}<a href="{% url 'dashboard' %}" class="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 font-semibold text-accent-ink">Go to the race dashboard</a>
+{% elif wizard.post_setup %}<form method="post" action="{% url 'setup-login' %}">{% csrf_token %}<button type="submit" class="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Log in as {{ wizard.post_setup }}</button></form>
+{% else %}<a href="{% url 'login' %}" class="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 font-semibold text-accent-ink">Log in</a>{% endif %}
+{% endif %}

@@ -1,0 +1,8 @@
+{# What a preferences upload applied, and the error that stopped it (#48). #}
+<div data-preferences-report class="mt-3 rounded-lg border border-line p-3 text-sm">
+  {% if report.failure %}<p role="alert" data-error class="mb-2 rounded-lg bg-danger-soft px-3 py-2 text-danger-ink">{{ report.failure.description }}</p>{% else %}<p data-saved class="mb-2 font-medium text-ok-ink">The file applied.</p>{% endif %}
+  {% if report.applied %}
+  <p class="font-medium">Applied {{ report.applied|length }} line{{ report.applied|length|pluralize }}:</p>
+  <ul class="mt-1 max-h-60 overflow-y-auto font-mono text-xs" data-applied>{% for number, line in report.applied %}<li><span class="text-ink-muted">{{ number }}:</span> {{ line }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>

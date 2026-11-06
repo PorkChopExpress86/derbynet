@@ -80,6 +80,12 @@ URLS = [
     "/ballot/status",
     "/kiosk/check-in/",
     "/kiosk/standings/",
+    "/settings/",
+    "/settings/roles/",
+    "/setup/",
+    "/setup/purge/?what=racers",
+    "/setup/fake-roster/",
+    "/about/",
     # Sheets and fragments a page fetches with hx-get.
     "/awards/edit/new/",
     "/awards/edit/partitions/",

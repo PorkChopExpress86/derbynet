@@ -595,11 +595,48 @@ def fake_partition_name(n: int) -> str:
     }.get(n, f"Fake Group {n}")
 
 
-def make_fake_racers(
-    event, n_groups: int, per_group: int, check_in: bool, rng=random
+# The "Make fake roster" sheet's ranges, as `fakeroster.php`'s inputs give
+# them (#48): 1 to 10 groups, default 6, of 2 to 20 racers, default 5.
+FAKE_GROUPS = (1, 10)
+FAKE_PER_GROUP = (2, 20)
+FAKE_DEFAULTS = (6, 5)
+
+
+class FakeRosterRefused(Exception):
+    pass
+
+
+def make_fake_roster(
+    event, n_groups: int, per_group: int, check_in: bool
 ) -> list[Racer]:
-    """`racer.fake`: `n_groups` partitions of about `per_group` racers each
-    (two either way), with names from a list and a random racer and car
+    """The setup page's "Make fake roster" sheet: `make_fake_racers` within
+    the sheet's ranges, exactly `per_group` racers in each group. C57:
+    racer.fake adds or drops up to 2 per group at random
+    (`action.racer.fake.inc:32-36`), which this sheet does not."""
+    if not FAKE_GROUPS[0] <= n_groups <= FAKE_GROUPS[1]:
+        raise FakeRosterRefused(f"Pick {FAKE_GROUPS[0]} to {FAKE_GROUPS[1]} groups.")
+    if not FAKE_PER_GROUP[0] <= per_group <= FAKE_PER_GROUP[1]:
+        raise FakeRosterRefused(
+            f"Pick {FAKE_PER_GROUP[0]} to {FAKE_PER_GROUP[1]} racers per group."
+        )
+    return make_fake_racers(event, n_groups, per_group, check_in, swing=0)
+
+
+# `racer.fake`'s swing: each group gets up to this many more or fewer racers
+# than asked (`action.racer.fake.inc:32`).
+FAKE_SWING: Final = 2
+
+
+def make_fake_racers(
+    event,
+    n_groups: int,
+    per_group: int,
+    check_in: bool,
+    rng=random,
+    swing: int = FAKE_SWING,
+) -> list[Racer]:
+    """`racer.fake`: `n_groups` partitions of `per_group` racers each, give
+    or take `swing` at random, with names from a list and a random racer and car
     picture, copied into the photo folders as `fake_<racerid>.svg`. With
     `check_in`, every racer of the event passes. Sets `fake-racers`."""
     folders = RaceSettings.objects.get(event=event)
@@ -610,7 +647,7 @@ def make_fake_racers(
         lock_race_state(event.id)
         names = list(FAKE_NAMES)
         for g in range(1, n_groups + 1):
-            size = per_group + rng.randint(-2, 2)
+            size = per_group + rng.randint(-swing, swing)
             for r in range(size):
                 first, last = names.pop(rng.randrange(len(names)))
                 if not names:

@@ -1,0 +1,19 @@
+{# The data section (#48): setup.php's four purges and Re-Initialize. Each opens a confirmation with its count from the setup details ("Delete 42 racers"), and the purge saves a snapshot first (D78). #}
+<ul role="list" class="mt-2 flex flex-col gap-2" data-purges>
+  {% for p in wizard.purges %}
+  <li data-purge="{{ p.what }}" class="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2">
+    <span><span class="font-medium">{{ p.title }}</span> <span class="text-sm text-ink-muted" data-count="{{ p.count }}">{{ p.count }} {% if p.count == 1 %}{{ p.noun }}{% else %}{{ p.noun_plural }}{% endif %}</span></span>
+    <button type="button" hx-get="{% url 'setup-purge' %}?what={{ p.what }}" hx-target="#setup-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="setupPage.open('{{ p.title|escapejs }}', $event)" aria-haspopup="dialog"{% if not p.count %} disabled{% endif %} class="min-h-11 rounded-xl border border-danger px-4 font-semibold text-danger-ink disabled:opacity-50">{{ p.title }}…</button>
+  </li>
+  {% endfor %}
+  <li data-purge="reinitialize" class="flex flex-wrap items-center justify-between gap-2 py-2">
+    <span><span class="font-medium">Re-initialize</span> <span class="text-sm text-ink-muted">Erase everything in the event but its folders and lane count.</span></span>
+    <button type="button" hx-get="{% url 'setup-purge' %}?what=reinitialize" hx-target="#setup-sheet-body" hx-swap="innerHTML" hx-sync="this:replace" @click="setupPage.open('Re-initialize', $event)" aria-haspopup="dialog" class="min-h-11 rounded-xl border border-danger px-4 font-semibold text-danger-ink">Re-initialize…</button>
+  </li>
+</ul>
+{% if wizard.snapshots %}
+<details class="mt-2 text-sm" data-snapshots>
+  <summary class="min-h-11 cursor-pointer content-center font-medium">Snapshots saved before a change, newest first</summary>
+  <ul role="list" class="mt-1 flex flex-col gap-1">{% for s in wizard.snapshots %}<li><a href="{% url 'setup-snapshot' s.name %}" class="break-all underline underline-offset-2">{{ s.name }}</a></li>{% endfor %}</ul>
+</details>
+{% endif %}

@@ -89,6 +89,9 @@ class _Parser:
         self.aggregate: Group | None = None
         self.agg_groups: list[Group] = []
         self.agg_subgroups: list[Subgroup] = []
+        # Each line applied, as (line number, line), for the setup page's
+        # report (#48).
+        self.applied: list[tuple[int, str]] = []
 
     def line(self, number: int, line: str) -> None:
         tag, has_value, value = line.partition("=")
@@ -104,6 +107,7 @@ class _Parser:
             handled = method(number, val, arg) is not False
         if not handled:
             self.setting(number, line, tag, val)
+        self.applied.append((number, line))
 
     # ----- structure -----
 
@@ -326,7 +330,27 @@ class _Parser:
 
 def apply(event: Event, content: str) -> PrefsFailure | None:
     """Apply a preferences file. Returns the failure, or None on success."""
+    return apply_report(event, content).failure
+
+
+@dataclass
+class Report:
+    # Each line applied before any failure, as (line number, line).
+    applied: list[tuple[int, str]]
+    failure: PrefsFailure | None
+
+
+def apply_report(event: Event, content: str) -> Report:
+    """Apply a preferences file, and say which lines it applied. As in
+    PHP's `preferences.upload`, the first failure stops the file, and the
+    lines before it stay applied."""
     parser = _Parser(event)
+    failure = _apply_lines(parser, content)
+    return Report(parser.applied, failure)
+
+
+def _apply_lines(parser: _Parser, content: str) -> PrefsFailure | None:
+    event = parser.event
     try:
         for number, raw in enumerate(re.split(r"\r\n|\n|\r", content), start=1):
             line = raw.strip()

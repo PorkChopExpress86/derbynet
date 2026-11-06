@@ -1,0 +1,8 @@
+{# The snapshot and preferences downloads of about.php (#48): the legacy endpoints, which need SET_UP here (S4, S5). #}
+{% now "Ymd-His" as stamp %}
+<ul role="list" class="mt-2 flex flex-wrap gap-2" data-download-links>
+  <li><a href="{% url 'action-php' %}?query=snapshot.get" download="derbynet-{{ stamp }}.xml" data-download="snapshot" class="inline-flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Snapshot, complete</a></li>
+  <li><a href="{% url 'action-php' %}?query=snapshot.get&amp;clean" download="derbynet-{{ stamp }}-cleaned.xml" data-download="snapshot-clean" class="inline-flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Snapshot, cleaned</a></li>
+  <li><a href="{% url 'preferences' %}" download="derbynet.pref" data-download="preferences" class="inline-flex min-h-11 items-center rounded-xl border border-line px-4 font-semibold">Preferences</a></li>
+</ul>
+<p class="mt-2 text-sm text-ink-muted">A cleaned snapshot keeps only each racer's initials. Neither keeps videos, lane closures, allowed racers, the timer audit, racer notes, check-in times or trophy counts (D65).</p>

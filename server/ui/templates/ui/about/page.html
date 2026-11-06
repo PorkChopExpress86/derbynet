@@ -1,0 +1,41 @@
+{% extends "ui/base.html" %}
+{% block main %}
+{# about.php (#48). No PHP or Django configuration dump (S30). The timer's name is read from timer-human (C35). The local URLs, user agent and JavaScript version are left out, and the health checks and database.check added for SET_UP (D80). #}
+<div data-about class="flex flex-col gap-4">
+  <h1 class="text-2xl font-semibold">About DerbyNet</h1>
+  <p><b>DerbyNet</b> is the free, open-source, multi-screen race management system for Pinewood Derby-style racing. Please include this page if you report a bug.</p>
+  <section class="rounded-xl border border-line bg-surface p-4" data-about-version>
+    <h2 class="font-semibold">Version</h2>
+    <p class="mt-1">Version <span class="font-mono">{{ version }}</span>{% if build_date %}, built on <span data-build-date>{{ build_date }}</span>{% endif %}.</p>
+  </section>
+  {% include "ui/setup/time_zone.html" %}
+  <section class="rounded-xl border border-line bg-surface p-4" data-schema>
+    <h2 class="font-semibold">Database schema</h2>
+    {% if pending %}<p class="mt-1 text-danger-ink">{{ pending|length }} migration{{ pending|length|pluralize }} not applied: {{ pending|join:", " }}. Restart the server to apply them.</p>{% else %}<p class="mt-1">The schema is up to date.</p>{% endif %}
+    {% if set_up %}<p class="mt-1 break-all text-sm" data-database>{{ database }}</p>{% else %}<p class="mt-1 text-sm text-ink-muted">The database location shows when you are logged in for set-up.</p>{% endif %}
+  </section>
+  <section class="rounded-xl border border-line bg-surface p-4" data-timer>
+    <h2 class="font-semibold">Timer</h2>
+    {% if timer and timer.type %}<p class="mt-1"><span data-timer-type>{{ timer.type }}</span>{% if timer.human %} <span data-timer-human>{{ timer.human }}</span>{% endif %}{% if timer.ident %} ({{ timer.ident }}){% endif %}</p>{% else %}<p class="mt-1 text-ink-muted">No timer has connected.</p>{% endif %}
+  </section>
+  {% if set_up %}
+  <section class="rounded-xl border border-line bg-surface p-4" data-health>
+    <h2 class="font-semibold">Set-up checks</h2>
+    {% include "ui/setup/checks.html" %}
+  </section>
+  <section class="rounded-xl border border-line bg-surface p-4" data-database-check>
+    <h2 class="font-semibold">Database check</h2>
+    {% if not event %}<p class="mt-1 text-ink-muted">No event is open.</p>{% elif violations %}
+    <p class="mt-1 text-danger-ink">The check found {{ violations|length }} problem{{ violations|length|pluralize }}:</p>
+    <ul class="mt-1 list-disc pl-5 text-sm">{% for tag, rows in violations.items %}<li data-violation="{{ tag }}"><span class="font-mono">{{ tag }}</span>: {{ rows|length }} row{{ rows|length|pluralize }}</li>{% endfor %}</ul>
+    {% else %}<p class="mt-1">No problems found.</p>{% endif %}
+  </section>
+  {% if event %}
+  <section class="rounded-xl border border-line bg-surface p-4" data-downloads>
+    <h2 class="font-semibold">Downloads</h2>
+    {% include "ui/setup/downloads.html" %}
+  </section>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
