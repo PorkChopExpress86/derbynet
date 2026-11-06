@@ -926,6 +926,30 @@ def test_order_fields_name_a_position_and_an_id():
     assert differences(a, swapped).diverged.index == 2
 
 
+BALLOT = """
+    action.php?query=ballot.get
+
+    {{"ballot": {{"{award}": {{"max_votes": 2, "votes": [{a}]}}}}}}
+
+    post action.php action=vote.cast&awardid={award}&votes=[{a},{b}]
+
+    {{"action": {{"action": "vote.cast", "awardid": {award}, "votes": "[{a},{b}]"}},
+      "outcome": {{"summary": "success"}},
+      "votes": ["{voter} {award} {a}", "{voter} {award} {b}"]}}
+    """
+
+
+def test_ballot_and_vote_ids_are_numbered():
+    # test-balloting.sh: ballot.get keys awards by id, and vote.cast names
+    # racers in `votes=[...]`, echoes it, and answers `voter award racer`.
+    a = BALLOT.format(award=3, a=12, b=36, voter=1)
+
+    assert differences(a, BALLOT.format(award=26, a=1349, b=1373, voter=7)).ok
+    # A vote for the racer already voted for is another request.
+    twice = BALLOT.format(award=26, a=1349, b=1349, voter=7)
+    assert differences(a, twice).diverged.index == 2
+
+
 NORMALIZE_MJS = Path(__file__).resolve().parent / "golden/capture/normalize.mjs"
 
 

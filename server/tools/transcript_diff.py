@@ -52,7 +52,8 @@ What is normalized, on both runs alike:
   (`rewrite_ids`, `translate`), which the golden replays use. On top: the
   `who` of `racer.bulk` (`c<classid>`, `r<rankid>`, `d<partitionid>`), the
   `PWDid<racerid>` barcode, the `classid_<position>=<classid>` and
-  `rankid_<position>=<rankid>` fields of `class.order` and `rank.order`
+  `rankid_<position>=<rankid>` fields of `class.order` and `rank.order`, the
+  racer ids of `vote.cast`'s `votes=[...]`
   (`class.add`'s `rankid_<rankid>=1` names the id in the key, as `translate`
   reads it), a racer id in a `photo.php/<repo>/racer/<id>` URL, and
   `roundid N` in XML failure text.
@@ -187,6 +188,8 @@ def _event_folder(found: re.Match) -> str:
 _ROUND_IN_TEXT = re.compile(r"(roundid )(\d+)")
 _BARCODE = re.compile(r"(PWDid)(\d+)")
 _WHO = re.compile(r"([cdr])(\d+)")
+# The racer ids of vote.cast's `votes=[<racerid>,...]` (testing/test-balloting.sh).
+_VOTE = re.compile(r"(^\[|,)(\d+)(?=[,\]])")
 _WHO_KINDS = {"c": "class", "r": "rank", "d": "partition"}
 _PLAIN_KEY = re.compile(r"[A-Za-z_][\w-]*")
 # class.order, rank.order and partition.order post
@@ -370,6 +373,8 @@ class Run:
                 [_, (key, text)] = self._ids_in([("action", action), (key, str(value))])
                 value = int(text) if number and text.lstrip("-").isdigit() else text
                 value = self.who(value) if key == "who" else value
+                if key == "votes" and action == "vote.cast":
+                    value = self._renumber(_VOTE, "racer", value)
             else:
                 value = self.map_echoed_field(action, key, value)
             out[key] = value
@@ -401,12 +406,15 @@ class Run:
         return out
 
     def fields(self, data: str) -> tuple[tuple[str, str], ...]:
+        names = dict(parse_qsl(data, keep_blank_values=True))
         out = []
         for key, value in self._ids_in(parse_qsl(data, keep_blank_values=True)):
             if key == "who":
                 value = self.who(value)
             elif key == "barcode":
                 value = self._renumber(_BARCODE, "racer", value)
+            elif key == "votes" and names.get("action") == "vote.cast":
+                value = self._renumber(_VOTE, "racer", value)
             out.append((key, self.mask(value)))
         return tuple(out)
 
@@ -543,11 +551,47 @@ def _json(value, endpoint: str, run: Run):
         echo = run.echoed(value["action"])
         value = {k: v for k, v in value.items() if k != "action"}
     value = rewrite_ids(value, run.ids)
+    value = _ballot_ids(value, endpoint, run.ids)
     if echo is not None:
         value["action"] = echo
     if endpoint == "action schedule.reschedule" and isinstance(value, dict):
         value = mask_reschedule_timing(value)
     return _mask_strings(value, run)
+
+
+def _ballot_ids(value, endpoint: str, ids: FirstAppearance):
+    """The ids of the balloting replies (#54): ballot.get's `ballot`, keyed
+    by award id with each award's voted racer ids, and the
+    `<voterid> <awardid> <racerid>` lines of vote.cast's `votes`."""
+    if not isinstance(value, dict):
+        return value
+    ballot = value.get("ballot")
+    if endpoint == "query ballot.get" and isinstance(ballot, dict):
+        value = {
+            **value,
+            "ballot": {
+                str(ids("award", key)): (
+                    {**entry, "votes": [ids("racer", r) for r in entry["votes"]]}
+                    if isinstance(entry, dict) and isinstance(entry.get("votes"), list)
+                    else entry
+                )
+                for key, entry in ballot.items()
+            },
+        }
+    votes = value.get("votes")
+    if endpoint == "action vote.cast" and isinstance(votes, list):
+        value = {**value, "votes": [_vote_line(v, ids) for v in votes]}
+    return value
+
+
+def _vote_line(line, ids: FirstAppearance):
+    parts = line.split(" ") if isinstance(line, str) else []
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        return line
+    return " ".join(
+        str(ids(kind, int(part)))
+        for kind, part in zip(("voter", "award", "racer"), parts, strict=True)
+    )
 
 
 def _mask_strings(value, run: Run):
