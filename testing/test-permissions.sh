@@ -16,6 +16,8 @@ FIXTURE="`dirname $0`/fixtures/role-pages.json"
 # answers 200, a denied one a 302 to the login page.  A second redirect, or one
 # to another server, fails.
 DJANGO_FIXTURE="`dirname $0`/fixtures/role-pages-django.json"
+# The scheme, host and port of BASE_URL: a 301 must stay on this server.
+[[ "$BASE_URL" =~ ^[a-z]+://[^/]+ ]] && SERVER_ORIGIN="${BASH_REMATCH[0]}"
 
 # role_pages <role> <allowed|denied>: the pages of that list, one per line.
 role_pages() {
@@ -46,7 +48,6 @@ if [ "$DERBYNET_BACKEND" = django ] ; then
                           | index([$page]) != null))))' > /dev/null || \
         test_fails "$DJANGO_FIXTURE" moves a page the PHP fixture does not \
                    have in the other list, or a role lists a page twice
-    [[ "$BASE_URL" =~ ^[a-z]+://[^/]+ ]] && SERVER_ORIGIN="${BASH_REMATCH[0]}"
 fi
 
 # page_status <page>: what curl_status prints for the page.  On Django, a 301
@@ -70,7 +71,8 @@ page_status() {
 # first: PHP's kiosk.php adds the permission to present awards to the session, so
 # once a kiosk page has been opened, awards-presentation.php opens too.  For the
 # same reason, an anonymous visitor starts over afterward.  Django's kiosk.php
-# grants nothing (S28); the order stays, for one script.
+# grants nothing (S28, the kiosk.php entry of server/legacy_api/registry.py);
+# the order stays, for one script.
 check_role_pages() {
     local PAGE RESULT FINAL DENIED=0 ALLOWED=0
     # PHP's denied page answers any redirect to login.  Django's ends in a 302.

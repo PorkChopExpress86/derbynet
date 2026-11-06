@@ -431,8 +431,10 @@ jobs:
           bash testing/test-photo-upload.sh http://127.0.0.1:8080
 
       # The page permissions suite (#204), which testing/exercise-one-database.sh
-      # runs after the photo suites and before test-basic-racing.sh, on the
-      # roster it has imported by then.  DERBYNET_BACKEND makes it follow each
+      # runs after the photo suites and test-each-role.sh, and before
+      # test-basic-racing.sh, on the roster it has imported by then.
+      # test-each-role.sh still waits on the legacy pages (WAITING in
+      # server/tools/parity_gate.py), so it is not run here.  DERBYNET_BACKEND makes it follow each
       # old page's 301 (D20) and read the pages Django decided otherwise from
       # testing/fixtures/role-pages-django.json (testing/README.md).
       - name: Run the permissions suite against Django

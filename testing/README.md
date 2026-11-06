@@ -126,12 +126,17 @@ allowed page answers 200 and a denied one redirects to the login page.  With
   owner decision that says why, so it reads as a diff against the PHP fixture.
   Anonymous visitors and `RaceCrew` are denied `replay.php` and `camera.php`,
   which need `CONTROL_RACE` (D16), `timer-test.php`, which needs it too (S21,
-  D72), and `preferences.php`, which needs a login with `SET_UP` (S4).
-  `RaceCrew` is also denied `fakeroster.php`, which needs `SET_UP` (C56).  The
-  script fails when the override moves a page the PHP fixture doesn't have in
-  the other list, and prints how many pages it checked for each role.
-  `vote.php` needs no override: Django's ballot page (#54) is open to everyone,
-  as PHP's is.
+  D72), and `preferences.php`, which needs a login with `SET_UP` (S4): PHP
+  serves anyone its RaceInfo dump (`website/preferences.php:7-15`,
+  `website/inc/preferences.inc:534`), `ballot_password` among it (`:93`).
+  `RaceCrew`'s permissions, 8687 (`server/accounts/defaults.py:15`), lack
+  `CONTROL_RACE`, 512 (`server/accounts/permissions.py:29`).  `RaceCrew` is
+  also denied `fakeroster.php`, which needs `SET_UP` (C56).  The script fails
+  when the override moves a page the PHP fixture doesn't have in the other
+  list, and prints how many pages it checked for each role.
+  `vote.php` needs no override: Django's ballot page is anonymous (#54, the
+  `vote` entry of `server/ui/navigation.py`), and the Django leg finds its 301
+  to `/vote/`, then 200, for every role.
 
 `test-photo-manipulations.sh` checks how the renders of a photo with EXIF
 orientation 6 come out.  The PHP server ignores the tag (#73) and won't be

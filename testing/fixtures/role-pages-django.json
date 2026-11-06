@@ -2,17 +2,17 @@
   "anonymous": {
     "denied": {
       "camera.php": "D16: replay's camera setup needs CONTROL_RACE",
-      "preferences.php": "S4: needs a login with SET_UP, since PHP's file carries ballot_password",
+      "preferences.php": "S4: needs a login with SET_UP; PHP serves anyone the RaceInfo dump (website/preferences.php:7-15, website/inc/preferences.inc:534), ballot_password among it (:93)",
       "replay.php": "D16: replay needs CONTROL_RACE",
       "timer-test.php": "S21, D72: the timer test page /timer/test/ needs CONTROL_RACE"
     }
   },
   "RaceCrew": {
     "denied": {
-      "camera.php": "D16: replay's camera setup needs CONTROL_RACE, which RaceCrew lacks",
+      "camera.php": "D16: replay's camera setup needs CONTROL_RACE; RaceCrew's 8687 (server/accounts/defaults.py:15) lacks CONTROL_RACE, 512 (server/accounts/permissions.py:29)",
       "fakeroster.php": "C56: needs SET_UP, as racer.fake does",
-      "preferences.php": "S4: needs a login with SET_UP, since PHP's file carries ballot_password",
-      "replay.php": "D16: replay needs CONTROL_RACE, which RaceCrew lacks",
+      "preferences.php": "S4: needs a login with SET_UP; PHP serves anyone the RaceInfo dump (website/preferences.php:7-15, website/inc/preferences.inc:534), ballot_password among it (:93)",
+      "replay.php": "D16: replay needs CONTROL_RACE; RaceCrew's 8687 (server/accounts/defaults.py:15) lacks CONTROL_RACE, 512 (server/accounts/permissions.py:29)",
       "timer-test.php": "S21, D72: the timer test page /timer/test/ needs CONTROL_RACE"
     }
   }
