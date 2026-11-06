@@ -40,7 +40,7 @@ Requires `doctor: ok`: the run's container (or runserver process) is running and
 
 ## Drive
 
-1. Log in through the UI: open `/login.php`, click the role button (`RaceCoordinator`), type the password in the textbox, press Enter. The page moves to `/index.php`.
+1. Log in through the UI. On PHP: open `/login.php`, click the role button (`RaceCoordinator`), type the password in the textbox, press Enter; the page moves to `/index.php`. On Django, do what `log_in()` in `server/ui/tests/browser/conftest.py` does: open `/login/?all` (it lists every role, not only the interactive ones), click `button[data-role="RaceCoordinator"]`, fill the field labelled `Password`, press Enter, and wait for the URL to end in `/`.
 2. Open the feature's page and use `browser_snapshot` refs for clicks. Stable handles are listed per feature in `features/`.
 3. Accept the PHP `confirm()` and `alert()` dialogs with `browser_handle_dialog`.
 4. Check phone layout with `browser_resize` to 390x844, desktop at 1280x800.
@@ -53,8 +53,8 @@ Read [features/README.md](features/README.md) and the matching feature file befo
 Save proof under `.claude/verify-evidence/<VERIFY_RUN>/` (git-ignored, kept by cleanup):
 
 - A screenshot after the action: `browser_take_screenshot` with `filename: .claude/verify-evidence/v1/<feature>-<step>.png`.
-- A second, read-only view of the stored state: the legacy API, as in `curl -s 'http://127.0.0.1:8090/action.php?query=racer.list' > .claude/verify-evidence/v1/racer-list-after.json`.
-- Console errors: `browser_console_messages` with `level: error`. Any error fails the proof.
+- A second, read-only view of the stored state: the legacy API, with the cookie jar `seed` logged in as RaceCoordinator, as in `curl -s -b .claude/verify-evidence/v1/cookies.txt 'http://127.0.0.1:8090/action.php?query=racer.list' > .claude/verify-evidence/v1/racer-list-after.json`. Django answers most queries only after a login (D5).
+- Console errors: `browser_console_messages` with `level: error`. Any error fails the proof. A Playwright script registers its `console` and `pageerror` listeners before its first `goto` and prints what they caught in a `finally`, so a script that crashes still reports them.
 
 Exercise the real user path; the API is for seeding and for the second view only.
 
