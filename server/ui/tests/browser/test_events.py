@@ -23,6 +23,12 @@ def card(page, event_name: str):
     )
 
 
+def dismiss_toasts(page):
+    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
+    while toasts.count():
+        toasts.first.click()
+
+
 def test_copy_an_event_switch_to_it_and_see_the_old_one_read_only(login, event):
     page = login("RaceCoordinator")
     if page.size != "phone":
@@ -101,6 +107,9 @@ def test_reopen_and_archive_from_the_page(login, event):
         old.get_by_role("button", name="Reopen for editing").click()
     expect(card(page, event.name)).to_have_attribute("data-states", "editable")
 
+    # At 1280x800 the "open for editing" toast covers the lower part of the
+    # Archive button, and on CI's fonts the button's centre falls under it.
+    dismiss_toasts(page)
     with htmx_post(page, f"/setup/events/{event.pk}/archive/"):
         card(page, event.name).get_by_role("button", name="Archive").click()
     expect(card(page, event.name)).to_have_attribute("data-states", "archived")
