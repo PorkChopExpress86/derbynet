@@ -60,3 +60,10 @@ def run(event: Event, script: str) -> ScriptResult:
         return ScriptResult(executed=runner(event))
     except DatabaseError as error:
         return ScriptResult(("sqlfailure", str(error)))
+
+
+def migrate() -> list[str]:
+    """Apply the pending migrations, for the setup wizard's schema step
+    (#48), which replaces `setup.php`'s initialize and update buttons.
+    Returns the migrations applied."""
+    return [entry["sql"].removeprefix("Migrate ") for entry in _update_schema(None)]

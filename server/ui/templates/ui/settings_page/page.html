@@ -1,0 +1,51 @@
+{% extends "ui/base.html" %}
+{% load ui %}
+{% block main %}
+{# settings.php as collapsible sections (#48). Each field saves on change. The sections start open on a laptop and closed on a phone. #}
+<div data-settings class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h1 class="text-2xl font-semibold">Settings</h1>
+    <a href="{% url 'setup' %}" class="min-h-11 content-center rounded-xl border border-line px-4 font-semibold">Set-up</a>
+  </div>
+  {% include "ui/setup/time_zone.html" with tz=page.time_zone %}
+  {% for section in page.sections %}
+  <details id="{{ section.key }}" data-section="{{ section.key }}" x-data x-init="if (matchMedia('(min-width: 1024px)').matches) $el.open = true" class="rounded-xl border bg-surface {% if section.key == 'track' and page.lanes_locked %}border-danger border-l-8{% else %}border-line{% endif %}">
+    <summary class="flex min-h-12 cursor-pointer items-center justify-between gap-2 px-4 text-lg font-semibold">{{ section.title }}{% include "ui/components/icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</summary>
+    <div class="px-4 pb-3">
+      {% if section.key == "track" and page.lanes_locked %}
+      <p role="status" data-lanes-locked class="mb-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-ink">Racing schedules already exist with heats left to race, so the lane count and the lanes in use are locked. Remove the unraced schedules on the <a href="{% url 'dashboard' %}" class="font-semibold underline underline-offset-2">race dashboard</a> to change them.</p>
+      {% endif %}
+      {% if section.key == "photos" and page.settings_locked %}
+      <p role="status" data-settings-locked class="mb-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">The folders are locked on this server (DERBYNET_LOCK_SETTINGS), so they show here but cannot change.</p>
+      {% endif %}
+      {% for fv in section.fields %}
+      {% include "ui/settings_page/field.html" %}
+      {% if fv.key == "n-lanes" %}
+      <div id="track-lanes" class="border-b border-line py-3">{% include "ui/playlist/scheduling.html" with scheduling=page.scheduling part="lanes" %}</div>
+      <div id="track-lane-colors">{% include "ui/settings_page/lane_colors.html" with lane_colors=page.lane_colors %}</div>
+      {% endif %}
+      {% endfor %}
+      {% if section.key == "rules" %}
+      <div class="py-3">{% include "ui/playlist/scheduling.html" with scheduling=page.scheduling part="method" %}</div>
+      {% endif %}
+      {% if section.key == "replay" %}
+      <p class="py-3 text-sm text-ink-muted">Each clip runs from the time recorded before the last car finishes to the time after it, and never longer than the longest clip (D18).</p>
+      {% endif %}
+    </div>
+  </details>
+  {% if section.key == "rules" %}
+  <details data-section="weigh-in" x-data x-init="if (matchMedia('(min-width: 1024px)').matches) $el.open = true" class="rounded-xl border border-line bg-surface">
+    <summary class="flex min-h-12 cursor-pointer items-center justify-between gap-2 px-4 text-lg font-semibold">Weigh-in{% include "ui/components/icon.html" with name="chevron" cls="size-5 text-ink-muted" %}</summary>
+    <div class="px-4 pb-3">
+      <p class="text-sm text-ink-muted">How check-in weighs each {{ page.partition_label|lower }}'s cars: not at all, pass or fail, or a recorded weight in the unit you pick. A car over the maximum still checks in, with a warning.</p>
+      {% if page.weigh_in %}
+      <ul role="list">{% for row in page.weigh_in %}{% include "ui/settings_page/weigh_in_row.html" %}{% endfor %}</ul>
+      {% else %}
+      <p class="py-3">There are no {{ page.partition_label|lower }}s yet. Add racers or <a href="{% url 'racing-groups' %}" class="font-semibold underline underline-offset-2">racing groups</a> first.</p>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

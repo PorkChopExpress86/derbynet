@@ -386,6 +386,56 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         "S8: removed, and answers 404; PHP serves the file any setting names, or a"
         " path from the URL.",
     ),
+    # #48's pages.
+    "settings.php": (
+        "D20: a 301 to /settings/, the query string kept.",
+        "S25: a folder is a text field with a status badge and a Check button,"
+        " and must be under the data folder; PHP browses the server's files"
+        " and takes any path.",
+        "D8, D54: a Weigh-in section sets each partition's weigh-in, and says"
+        " before the save that a new mode clears the partition's weigh-ins;"
+        " PHP has no weigh-in.",
+        "D9, D18: a Replay section sets the speed, the showings, the time"
+        " before the finish, the post-roll and the longest clip; PHP sets the"
+        " first three in coordinator.php's dialog and has no other two.",
+        "D56: the page shows the server's time zone and how to change it.",
+        "Q13: loading the page writes nothing; settings.php writes scoring=1"
+        " for a legacy drop-slowest key, which the importer converts once.",
+        "D80: a number outside its field's range (settings.php's input min and"
+        " max, and coordinator.php's replay choices) is refused with an inline"
+        " error; PHP stores any number posted.",
+    ),
+    "setup.php": (
+        "D20: a 301 to /setup/, the query string kept.",
+        "D2, D57: an event is created or opened among the server's events;"
+        " PHP's database dialogs take an SQLite path, an ODBC DSN or a PDO"
+        " string, and its schema buttons are a migrations step.",
+        "S25: no server file browser.",
+        "D78: each purge, Re-Initialize and snapshot import saves a complete"
+        " snapshot first, and the toast links it.",
+        "D65: the snapshot import confirms that it replaces all data and names"
+        " what a snapshot does not restore.",
+        "D56: the wizard shows the server's time zone and how to change it.",
+        "D80: the wizard's steps and the health checks replace setup.php's"
+        " status list: the database takes writes, the configuration folders,"
+        " each photo folder, and Django's upload cap against the photo stand's"
+        " 30 MB.",
+    ),
+    "about.php": (
+        "D20: a 301 to /about/, the query string kept.",
+        "S30: no phpinfo() or other configuration dump.",
+        "C35: the timer's name is read from timer-human; about.php reads"
+        " timer-humant, so the name never shows.",
+        "S5: the snapshot downloads show to SET_UP only, as snapshot.get needs.",
+        "D80: the page drops the server's local URLs, the browser's user agent"
+        " and its JavaScript version, and adds the setup health checks and the"
+        " database.check results for SET_UP.",
+    ),
+    "fakeroster.php": (
+        "D20: a 301 to /setup/fake-roster/, the query string kept.",
+        "C56: needs SET_UP, as racer.fake does; fakeroster.php asks for"
+        " CHECK_IN_RACERS, so its button failed for a role without SET_UP.",
+    ),
 }
 
 # Differences from PHP that wait on a quirk id or an owner decision, by the

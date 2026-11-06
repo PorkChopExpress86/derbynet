@@ -1,0 +1,16 @@
+{# The "Make fake roster" form (#48): fakeroster.php's fields, posting to racer.fake's service. The sheet and the page of its own both use it. #}
+<form method="post" action="{% url 'fakeroster' %}" hx-post="{% url 'fakeroster' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" data-fake-roster class="flex flex-col gap-3">
+  {% csrf_token %}
+  <p class="text-sm text-ink-muted">Made-up racers, with fake racer and car pictures, in groups like a race by den. Use them to try DerbyNet out; delete them from the set-up page's Data section.</p>
+  <label class="flex flex-col gap-1"><span class="font-medium">Groups</span>
+    <input type="number" inputmode="numeric" name="ngroups" value="{{ fake.defaults.0 }}" min="{{ fake.groups.0 }}" max="{{ fake.groups.1 }}" data-autofocus class="min-h-11 w-28 rounded-xl border border-field bg-surface px-3 tabular-nums">
+  </label>
+  <label class="flex flex-col gap-1"><span class="font-medium">Racers per group, about</span>
+    <input type="number" inputmode="numeric" name="racers_per_group" value="{{ fake.defaults.1 }}" min="{{ fake.per_group.0 }}" max="{{ fake.per_group.1 }}" class="min-h-11 w-28 rounded-xl border border-field bg-surface px-3 tabular-nums">
+    <span class="text-sm text-ink-muted">Each group gets up to two more or fewer, as in PHP.</span>
+  </label>
+  <label class="flex min-h-11 items-center justify-between gap-3"><span class="font-medium">Check in everyone</span>
+    <input type="hidden" name="check_in" value="0"><input type="checkbox" role="switch" name="check_in" value="1" checked class="size-6 accent-accent">
+  </label>
+  <button type="submit" class="min-h-12 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Make fake racers</button>
+</form>

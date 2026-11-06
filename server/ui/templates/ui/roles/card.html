@@ -1,0 +1,24 @@
+{# One role (#48, D79): its permissions, whether it keeps a default password, and a password change. #}
+{% if rv %}
+<li id="role-{{ rv.role.pk }}" data-role-card="{{ rv.role.name }}" class="rounded-xl border {% if rv.default_password %}border-warn{% else %}border-line{% endif %} bg-surface p-4">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="text-lg font-semibold">{{ rv.label }}</h2>
+    {% if rv.default_password %}{% include "ui/components/status_pill.html" with state="warn" text="Default password" %}{% elif rv.no_password and rv.role.name %}{% include "ui/components/status_pill.html" with state="idle" text="No password" %}{% endif %}
+    {% if not rv.role.interactive %}<span class="text-sm text-ink-muted">For devices, not on the login page</span>{% endif %}
+  </div>
+  <p class="mt-2 text-sm"><span class="font-medium">Can:</span> {% if rv.every_permission %}everything{% elif rv.permissions %}{{ rv.permissions|join:", " }}{% else %}nothing beyond what anyone can see{% endif %}.</p>
+  {% if rv.role.name %}
+  <form hx-post="{% url 'roles-password' rv.role.name %}" hx-target="#role-{{ rv.role.pk }}" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end" x-data="{ none: false }">
+    <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm"><span class="font-medium">New password for {{ rv.role.name }}</span>
+      <input type="password" name="password" autocomplete="new-password" :disabled="none" class="min-h-11 rounded-xl border border-field bg-surface px-3 disabled:opacity-60">
+    </label>
+    {% if rv.may_keep_none %}
+    <label class="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="none" value="1" x-model="none" class="size-5 accent-accent">No password</label>
+    {% endif %}
+    <button type="submit" class="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Change password</button>
+  </form>
+  {% if rv.may_keep_none %}<p class="mt-1 text-sm text-ink-muted">derby-timer.jar logs in as {{ rv.role.name }}; a new password must also go into its settings.</p>{% endif %}
+  {% endif %}
+  {% if rv.error %}<p role="alert" data-error class="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-ink">{{ rv.error }}</p>{% elif rv.saved %}<p data-saved class="mt-2 text-sm text-ok-ink">Password changed for every event.</p>{% endif %}
+</li>
+{% endif %}

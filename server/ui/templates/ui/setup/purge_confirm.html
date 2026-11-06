@@ -1,0 +1,18 @@
+{# A purge's confirmation in the page's sheet (#48), as the confirm sheet of #39 names the count: "Delete 42 racers". #}
+<div data-purge-confirm="{{ what }}">
+  {% if purge %}
+  <p>{{ purge.body }}</p>
+  {% else %}
+  <p>Re-initializing empties {{ wizard.event.name }}: its racers, groups, schedules, results, awards, scenes and settings, all but its folders and lane count. It cannot be undone, but a snapshot is saved first.</p>
+  {% endif %}
+  <p class="mt-2 text-sm text-ink-muted">A complete snapshot of the event is saved first (D78).</p>
+  <form hx-post="{% url 'setup-purge' %}" hx-target="#toasts" hx-swap="beforeend" hx-include="this" hx-sync="this:drop" @htmx:after-request="$store.ui.close()" class="mt-4 flex flex-col gap-2 lg:flex-row-reverse">
+    <input type="hidden" name="what" value="{{ what }}">
+    {% if purge %}
+    <button type="submit" data-confirm data-autofocus class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Delete {{ purge.count }} {% if purge.count == 1 %}{{ purge.noun }}{% else %}{{ purge.noun_plural }}{% endif %}</button>
+    {% else %}
+    <button type="submit" data-confirm data-autofocus class="min-h-12 flex-1 rounded-xl bg-danger px-4 font-semibold text-white dark:text-black">Erase {{ wizard.reinitialize }} racer{{ wizard.reinitialize|pluralize }} and everything else</button>
+    {% endif %}
+    <button type="button" @click="$store.ui.close()" class="min-h-12 flex-1 rounded-xl border border-line px-4 font-semibold">Cancel</button>
+  </form>
+</div>

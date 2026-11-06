@@ -1,0 +1,8 @@
+{% extends "ui/base.html" %}
+{% block main %}
+{# fakeroster.php's page, which its 301 lands on (#48). The set-up page opens the same form in its sheet. #}
+<div class="mx-auto flex max-w-lg flex-col gap-4">
+  <h1 class="text-2xl font-semibold">Make a fake roster</h1>
+  <div class="rounded-xl border border-line bg-surface p-4">{% include "ui/setup/fake_roster_form.html" %}</div>
+</div>
+{% endblock %}

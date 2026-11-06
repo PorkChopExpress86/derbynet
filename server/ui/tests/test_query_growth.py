@@ -76,6 +76,12 @@ URLS = [
     "/ballot/status",
     "/kiosk/check-in/",
     "/kiosk/standings/",
+    "/settings/",
+    "/settings/roles/",
+    "/setup/",
+    "/setup/purge/?what=racers",
+    "/setup/fake-roster/",
+    "/about/",
     *(
         f"/kiosk.php?page=kiosks/{name}.kiosk"
         for name in (

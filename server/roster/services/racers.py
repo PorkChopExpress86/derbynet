@@ -595,6 +595,31 @@ def fake_partition_name(n: int) -> str:
     }.get(n, f"Fake Group {n}")
 
 
+# The "Make fake roster" sheet's ranges, as `fakeroster.php`'s inputs give
+# them (#48): 1 to 10 groups, default 6, of 2 to 20 racers, default 5.
+FAKE_GROUPS = (1, 10)
+FAKE_PER_GROUP = (2, 20)
+FAKE_DEFAULTS = (6, 5)
+
+
+class FakeRosterRefused(Exception):
+    pass
+
+
+def make_fake_roster(
+    event, n_groups: int, per_group: int, check_in: bool
+) -> list[Racer]:
+    """The setup page's "Make fake roster" sheet: `make_fake_racers` within
+    the sheet's ranges."""
+    if not FAKE_GROUPS[0] <= n_groups <= FAKE_GROUPS[1]:
+        raise FakeRosterRefused(f"Pick {FAKE_GROUPS[0]} to {FAKE_GROUPS[1]} groups.")
+    if not FAKE_PER_GROUP[0] <= per_group <= FAKE_PER_GROUP[1]:
+        raise FakeRosterRefused(
+            f"Pick {FAKE_PER_GROUP[0]} to {FAKE_PER_GROUP[1]} racers per group."
+        )
+    return make_fake_racers(event, n_groups, per_group, check_in)
+
+
 def make_fake_racers(
     event, n_groups: int, per_group: int, check_in: bool, rng=random
 ) -> list[Racer]:

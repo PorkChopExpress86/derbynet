@@ -23,8 +23,12 @@ from ui import navigation
 
 # PHP page to the URL name of its replacement, for pages not in the registry.
 # The phone page `mcheckin.php` folds into check-in, which reads its `tok`
-# (#42).
-EXTRA_PAGES: dict[str, str] = {"mcheckin.php": "checkin"}
+# (#42). The snapshot import of `import-snapshot.php` is on the set-up page
+# (#48).
+EXTRA_PAGES: dict[str, str] = {
+    "mcheckin.php": "checkin",
+    "import-snapshot.php": "setup",
+}
 # PHP page to the dotted path of the view that redirects it by its query.
 QUERY_PAGES: dict[str, str] = {"photo-thumbs.php": "ui.photos.views.legacy_page"}
 

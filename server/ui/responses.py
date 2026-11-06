@@ -20,6 +20,15 @@ def active_event(request):
     return found
 
 
+def active_event_or_none(request):
+    """The open event, or None on a new install, which the set-up and about
+    pages still serve (#48)."""
+    try:
+        return active_event(request)
+    except Http404:
+        return None
+
+
 # The pages `make_banner()` (`templates/banner.inc`) draws a back button for,
 # by the URL name of each new page. test_banner_pages_are_make_banners_list
 # reads the PHP list.

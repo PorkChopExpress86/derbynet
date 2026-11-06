@@ -1,5 +1,7 @@
 """M7: the 301 table comes from the registry."""
 
+import dataclasses
+
 from ui import navigation, redirects
 
 
@@ -13,8 +15,11 @@ def test_every_built_registry_page_redirects_from_its_php_page():
     assert redirects.legacy_pages() == {**built, **redirects.EXTRA_PAGES}
 
 
-def test_a_placeholder_does_not_take_its_php_url():
-    assert "setup.php" not in redirects.legacy_pages()
+def test_a_placeholder_does_not_take_its_php_url(monkeypatch):
+    """#48 built the last placeholders, so the check runs on a made-up one."""
+    placeholder = dataclasses.replace(navigation.entry("about"), view="", php="x.php")
+    monkeypatch.setattr(navigation, "ENTRIES", (*navigation.ENTRIES, placeholder))
+    assert "x.php" not in redirects.legacy_pages()
     assert "coordinator.php" in redirects.legacy_pages()
 
 

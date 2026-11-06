@@ -1,0 +1,5 @@
+{# The server's time zone and how to change it (D56). No setting stores it: it comes from DERBYNET_TIME_ZONE or TZ when the server starts. #}
+<div data-time-zone="{{ tz.name }}" class="rounded-xl border border-line bg-surface p-4">
+  <p><span class="font-semibold">Time zone:</span> <span data-zone class="font-mono">{{ tz.name }}</span>{% if tz.source %} <span class="text-ink-muted">(from {{ tz.source }})</span>{% else %} <span class="text-ink-muted">(neither DERBYNET_TIME_ZONE nor TZ is set)</span>{% endif %}</p>
+  <p class="mt-1 text-sm text-ink-muted">Heat times and results use this zone. To change it, set <code>DERBYNET_TIME_ZONE</code> (or <code>TZ</code>) to a zone name such as <code>America/Chicago</code> in the Docker container's environment, then restart the server. Docker on Windows has no local zone to read, so the server runs on UTC there until you set it.</p>
+</div>

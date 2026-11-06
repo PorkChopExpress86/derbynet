@@ -350,11 +350,20 @@ def start_next(request):
 # ----- the scheduling partial ------------------------------------------------------
 
 
+# The halves of the partial the settings page embeds apart (#48).
+SCHEDULING_PARTS = ("method", "lanes")
+
+
 def _scheduling(request, *, error="") -> HttpResponse:
+    part = request.POST.get("part") or request.GET.get("part", "")
     return render(
         request,
         "ui/playlist/scheduling.html",
-        {"scheduling": state.scheduling(_event(request)), "error": error},
+        {
+            "scheduling": state.scheduling(_event(request)),
+            "error": error,
+            "part": part if part in SCHEDULING_PARTS else "",
+        },
     )
 
 

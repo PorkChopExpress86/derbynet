@@ -120,6 +120,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         48,
         php="setup.php",
         icon="setup",
+        view="ui.setup.views.page",
     ),
     NavEntry(
         "checkin",
@@ -294,7 +295,15 @@ ENTRIES: tuple[NavEntry, ...] = (
     ),
     # Other
     NavEntry(
-        "about", "About", "about/", ANON, OTHER, 48, php="about.php", icon="about"
+        "about",
+        "About",
+        "about/",
+        ANON,
+        OTHER,
+        48,
+        php="about.php",
+        icon="about",
+        view="ui.about.views.page",
     ),
     # Reached from other pages (#39 Context).
     NavEntry(
@@ -306,6 +315,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         48,
         php="settings.php",
         menu=False,
+        view="ui.settings_page.views.page",
     ),
     NavEntry(
         "roles",
@@ -315,6 +325,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         BEFORE,
         48,
         menu=False,
+        view="ui.roles.views.page",
     ),
     NavEntry(
         "racing-groups",
@@ -397,11 +408,15 @@ ENTRIES: tuple[NavEntry, ...] = (
         "fakeroster",
         "Fake Roster",
         "setup/fake-roster/",
-        Perm.CHECK_IN_RACERS,
+        # C56: SET_UP, as racer.fake needs (`action.racer.fake.inc:26`).
+        # PHP's page asks for CHECK_IN_RACERS (`fakeroster.php:9`), so a role
+        # without SET_UP saw a button that did nothing (#48).
+        Perm.SET_UP,
         BEFORE,
         48,
         php="fakeroster.php",
         menu=False,
+        view="ui.setup.views.fake_roster",
     ),
     NavEntry(
         "fake-timer",

@@ -1,0 +1,14 @@
+{% extends "ui/base.html" %}
+{% block main %}
+{# The roles page (#48, D79). Replaces editing local/config-roles.inc by hand. #}
+<div data-roles class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h1 class="text-2xl font-semibold">Roles and passwords</h1>
+    <a href="{% url 'setup' %}" class="min-h-11 content-center rounded-xl border border-line px-4 font-semibold">Set-up</a>
+  </div>
+  <p class="text-ink-muted">Each role is a shared login for a job on race day. Roles apply to every event on this server, so a new password works for all of them at once.</p>
+  <ul role="list" class="flex flex-col gap-3">
+    {% for rv in roles %}{% include "ui/roles/card.html" %}{% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% load ui %}{# One settings field (#48). It saves on change through settings-save (Enter fires change and submit; the second is dropped while the first is out) and comes back as itself, with Saved or the refusal. The help line replaces settings.php's title= tooltips. #}
+<div id="field-{{ fv.key }}" data-field="{{ fv.key }}" data-kind="{{ fv.kind }}" class="border-b border-line py-3 last:border-b-0">
+  <form hx-post="{% url 'settings-save' %}" hx-trigger="change, submit" hx-target="#field-{{ fv.key }}" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" class="flex flex-col gap-2{% if fv.kind == 'switch' %} sm:flex-row sm:items-center sm:justify-between{% endif %}">
+    <input type="hidden" name="key" value="{{ fv.key }}">
+    {% if fv.kind == "switch" %}
+    <div class="min-w-0">
+      <label for="set-{{ fv.key }}" class="font-medium">{{ fv.f.label }}</label>
+      <p id="help-{{ fv.key }}" class="text-sm text-ink-muted">{{ fv.f.help }}</p>
+    </div>
+    <input type="hidden" name="value" value="0">
+    <input type="checkbox" role="switch" id="set-{{ fv.key }}" name="value" value="1"{% if fv.value %} checked{% endif %}{% if fv.disabled %} disabled{% endif %} aria-describedby="help-{{ fv.key }}" class="size-6 shrink-0 accent-accent">
+    {% elif fv.kind == "segmented" or fv.kind == "select" %}
+    {% if fv.kind == "segmented" %}
+    <fieldset aria-describedby="help-{{ fv.key }}"{% if fv.disabled %} disabled{% endif %}>
+      <legend class="font-medium">{{ fv.f.label }}</legend>
+      <p id="help-{{ fv.key }}" class="mb-2 text-sm text-ink-muted">{{ fv.f.help }}</p>
+      <div class="flex flex-wrap rounded-xl border border-field bg-surface p-1">
+        {% for value, label in fv.choices %}
+        <label class="flex min-h-11 flex-1 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg px-3 text-sm font-medium text-ink-muted has-checked:bg-accent has-checked:text-accent-ink has-focus-visible:outline-3 has-focus-visible:outline-accent">
+          <input type="radio" class="sr-only" name="value" value="{{ value }}"{% if value == fv.value %} checked{% endif %}>{{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    {% else %}
+    <label for="set-{{ fv.key }}" class="font-medium">{{ fv.f.label }}</label>
+    <p id="help-{{ fv.key }}" class="text-sm text-ink-muted">{{ fv.f.help }}</p>
+    <select id="set-{{ fv.key }}" name="value" aria-describedby="help-{{ fv.key }}" class="min-h-11 rounded-xl border border-field bg-surface px-3 sm:max-w-xs">
+      {% for value, label in fv.choices %}<option value="{{ value }}"{% if value == fv.value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    {% elif fv.kind == "directory" %}
+    <label for="set-{{ fv.key }}" class="font-medium">{{ fv.f.label }}</label>
+    <p id="help-{{ fv.key }}" class="text-sm text-ink-muted">{{ fv.f.help }}</p>
+    {% if fv.read_only %}
+    <p class="break-all font-mono text-sm" data-locked-folder>{{ fv.value|default:"(none)" }}</p>
+    {% include "ui/settings_page/folder_badge.html" with status=fv.status %}
+    {% else %}
+    <div class="flex flex-wrap items-center gap-2">
+      <input type="text" id="set-{{ fv.key }}" name="value" value="{{ fv.value }}" autocomplete="off" spellcheck="false" aria-describedby="help-{{ fv.key }} badge-{{ fv.key }}" class="min-h-11 min-w-0 flex-1 basis-60 rounded-xl border border-field bg-surface px-3 font-mono text-sm">
+      <button type="submit" data-action="check-folder" class="min-h-11 rounded-xl border border-line px-4 font-semibold">Check</button>
+    </div>
+    <span id="badge-{{ fv.key }}" aria-live="polite">{% include "ui/settings_page/folder_badge.html" with status=fv.status %}</span>
+    {% endif %}
+    {% else %}
+    <label for="set-{{ fv.key }}" class="font-medium">{{ fv.f.label }}</label>
+    <p id="help-{{ fv.key }}" class="text-sm text-ink-muted">{{ fv.f.help }}</p>
+    <div class="flex items-center gap-2">
+      {% if fv.kind == "text" %}
+      <input type="text" id="set-{{ fv.key }}" name="value" value="{{ fv.value }}" aria-describedby="help-{{ fv.key }}"{% if fv.disabled %} disabled{% endif %} class="min-h-11 min-w-0 flex-1 rounded-xl border border-field bg-surface px-3 sm:max-w-sm">
+      {% else %}
+      <input type="number" inputmode="decimal" id="set-{{ fv.key }}" name="value" value="{{ fv.value }}"{% if fv.f.minimum is not None %} min="{{ fv.f.minimum }}"{% endif %}{% if fv.f.maximum is not None %} max="{{ fv.f.maximum }}"{% endif %} step="{{ fv.f.step }}" aria-describedby="help-{{ fv.key }}"{% if fv.disabled %} disabled{% endif %} class="min-h-11 w-28 rounded-xl border border-field bg-surface px-3 tabular-nums disabled:opacity-60">
+      {% if fv.f.unit %}<span class="text-ink-muted">{{ fv.f.unit }}</span>{% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
+  </form>
+  {% if fv.error %}<p role="alert" data-error class="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-ink">{{ fv.error }}</p>{% elif fv.saved %}<p data-saved class="mt-1 flex items-center gap-1 text-sm text-ok-ink">{% include "ui/components/icon.html" with name="check" cls="size-4" %}Saved</p>{% endif %}
+  {% if fv.disabled %}<p class="mt-1 text-sm text-warn-ink" data-lane-locked>Locked while heats are left to race.</p>{% endif %}
+</div>
