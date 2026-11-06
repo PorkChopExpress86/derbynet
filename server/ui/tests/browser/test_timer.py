@@ -381,6 +381,7 @@ def test_timer_test_parity_simulate_lanes_and_results(login, event):
     expect(simulate).to_have_attribute("aria-checked", "true")
 
     lane_2 = live.get_by_role("button", name="Car in lane 2")
+    dismiss_toasts(page)
     with htmx_post(page, "/timer/test/lane/"):
         lane_2.click()
     expect(lane_2).to_have_attribute("aria-pressed", "false")

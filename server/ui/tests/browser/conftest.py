@@ -15,8 +15,9 @@ uploads, and `assert_accessible(page)` runs axe-core and fails on a serious or
 critical violation. `no_sideways_scroll(page)` fails a page wider than its
 viewport; each `shoot()` runs it, and so does the end of every test (#44
 retro: a phone page scrolled 407 px sideways, seen only in a screenshot).
-A click, tap or check on a control a toast overlaps fails at once
-(`TOAST_OVER`); close the toasts with `dismiss_toasts(page)` first.
+A click, tap or check on a control a toast overlaps, or comes within
+48 px of, fails at once (`TOAST_OVER`); close the toasts with
+`dismiss_toasts(page)` first.
 
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap. When the
@@ -161,14 +162,16 @@ def _fresh_css(tmp_path_factory, worker_id):
         pytest.fail(css_build.OUT_OF_DATE.format(css_build.OUTPUT), pytrace=False)
 
 
-# The text of the first toast whose box overlaps the element's, or null. The
+# The text of the first toast within `margin` px of the element, or null. The
 # toasts stay 8 s, or until closed for an error, and Playwright clicks the
 # centre of what it clicks. A toast over the bottom of a button let a local
 # click through and timed out on CI's fonts (#212 retro), so any overlap
 # fails, the same on every machine.
-TOAST_OVER = """(element) => {
+TOAST_OVER = """(element, margin) => {
   if (element.closest('#toasts')) return null;
-  const box = element.getBoundingClientRect();
+  const r = element.getBoundingClientRect();
+  const box = {left: r.left, right: r.right, top: r.top - margin,
+               bottom: r.bottom + margin};
   for (const toast of document.querySelectorAll('#toasts > *')) {
     const t = toast.getBoundingClientRect();
     if (t.width && t.height && box.left < t.right && t.left < box.right
@@ -178,6 +181,10 @@ TOAST_OVER = """(element) => {
   }
   return null;
 }"""
+# CI's fonts move the page and the toasts: two clicks clear locally by up
+# to 32 px were covered there (PR #223). So the target counts as covered
+# within this margin above and below it.
+TOAST_MARGIN = 48
 CLEAR_OF_TOASTS = ("click", "dblclick", "tap", "check", "uncheck")
 
 
@@ -189,7 +196,7 @@ def _clear_of_toasts(action):
             try:
                 # Where the click lands: Playwright scrolls the element in first.
                 self.scroll_into_view_if_needed(timeout=kwargs.get("timeout"))
-                toast = self.evaluate(TOAST_OVER)
+                toast = self.evaluate(TOAST_OVER, TOAST_MARGIN)
             except Error:
                 # A swap replaced the element mid-check (seen once on the
                 # photos page); the action finds the new one, and its own

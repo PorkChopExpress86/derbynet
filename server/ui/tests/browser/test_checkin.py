@@ -130,6 +130,7 @@ def test_the_owners_station_flow(login, event, folders):
         expect(form.locator("#f-carno")).to_have_value(number)
         if first == "Sam":
             shoot(page, "checkin-add-sheet", full_page=False)
+        dismiss_toasts(page)
         form.get_by_role("button", name="Add racer").click()
         expect(form.locator("[data-notice]")).to_have_text(
             f"Added {number} {first} Station."

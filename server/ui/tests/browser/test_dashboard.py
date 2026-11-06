@@ -206,6 +206,7 @@ def test_a_changed_round_1_result_suggests_finalists(login, event):
     assert set(final.roster.values_list("racer__car_number", flat=True)) == roster
     shoot(page, "dashboard-suggestions")
 
+    dismiss_toasts(page)
     card.get_by_role("button", name=re.compile("^Add ")).click()
     expect(card).not_to_contain_text("Now qualifies")
     assert set(final.roster.values_list("racer__car_number", flat=True)) == {
@@ -363,6 +364,7 @@ def test_each_control_updates_the_page_without_a_get(login, event):
     expect(heat_text).to_have_text("Heat 1 of 8")
     expect(page.locator('[data-lane="1"] [data-result]')).to_contain_text("2.500")
     page.get_by_role("button", name="Manual results").click()
+    dismiss_toasts(page)
     sheet(page).get_by_role("button", name="Discard results").click()
     expect(page.locator('[data-lane="1"] [data-result]')).not_to_contain_text("2.5")
     page.locator("#toasts").get_by_role("button", name="Undo").click()
