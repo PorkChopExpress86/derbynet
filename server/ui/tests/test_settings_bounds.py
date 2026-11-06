@@ -21,9 +21,8 @@ KEYS = {"now-racing-linger-sec": "now-racing-linger-ms"}
 # so a fractional length saves (D80).
 STEP_ANY = {"track-length"}
 # A minimum PHP's input lacks: `settings.php:171-173` has no `min`, and the
-# page refuses a negative linger. D80 names only PHP's ranges, so this one is
-# a question for the owner, found by this test (#48 retro).
-MINIMUM_NOT_IN_PHP = {"now-racing-linger-ms": Decimal(0)}
+# owner chose to refuse a negative linger (D80).
+OWNER_MINIMUMS = {"now-racing-linger-ms": Decimal(0)}
 # coordinator.php's replay choices, by the field they bound.
 SELECTS = {
     "replay-skipback": settings_page.REPLAY_SKIPBACKS,
@@ -76,7 +75,7 @@ def test_each_number_input_bounds_its_field_as_in_settings_php():
             wrong.append(f"{name}: no field {key!r}")
             continue
         step = None if key in STEP_ANY else bound(attrs.get("step", "1"))
-        minimum = MINIMUM_NOT_IN_PHP.get(key, bound(attrs.get("min")))
+        minimum = OWNER_MINIMUMS.get(key, bound(attrs.get("min")))
         want = (minimum, bound(attrs.get("max")), step)
         got = (field.minimum, field.maximum, field.step)
         if got != want:

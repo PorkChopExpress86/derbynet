@@ -166,7 +166,8 @@ FIELDS: tuple[Field, ...] = (
         "How long the last heat's results stay up before the next heat shows.",
         unit="s",
         minimum=Decimal("0"),
-        # No maximum: `settings.php:171` has a step and no bounds (D80).
+        # No maximum: `settings.php:171` has a step and no bounds. The
+        # minimum of 0 is the owner's, not PHP's (D80).
         step=Decimal("0.1"),
     ),
     # Racers
