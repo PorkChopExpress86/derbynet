@@ -29,11 +29,11 @@ The gate fails when:
 - a reply differs from PHP's, in any step, waiting or not, unless the
   registry allows it.
 - a step in `WAITING` passes on Django, a step in `STEP_DIVERGENCES` no
-  longer parts, or a step in `AFTER_SKIP` matches PHP. Remove the entry.
+  longer parts, or a step in `REPLIES_DIFFER` matches PHP. Remove the entry.
 - a step ran in one leg and not in the other.
 
-A step in `AFTER_SKIP` shows the state of a step Django skipped, so its
-replies may differ. A difference in a reply is allowed when the registry's
+The replies of a step in `REPLIES_DIFFER` may differ from PHP's until the
+ticket it names lands. A difference in a reply is allowed when the registry's
 `PARITY_PATHS` covers its endpoint, path and values
 (`legacy_api.registry.allowed_by`), or, in one step only, when that step's
 `STEP_PATHS` entry does. A step in `STEP_DIVERGENCES` asks the two
@@ -265,10 +265,18 @@ def step_path_text(
     return f"{label}: {reason}" if allowed.divergence in ids else None
 
 
-# The steps after a skipped step whose replies show the state that step would
-# have left, up to the next reset. Their replies may differ from PHP's; their
-# requests and outcomes are still judged.
-AFTER_SKIP: dict[str, str] = {}
+# The steps whose replies may differ from PHP's until the ticket each names
+# lands. Their requests and outcomes are still judged, and the gate fails
+# while one matches PHP, so the list can't go stale. The summary lists them.
+_SNAPSHOT = (
+    "#221: the snapshot is compared as one text, with its ids raw, and some of"
+    " its columns differ from PHP's"
+)
+REPLIES_DIFFER: dict[str, str] = {
+    "snapshot_get": _SNAPSHOT,
+    # snapshot.put loads the snapshot snapshot_get took.
+    "snapshot_put": _SNAPSHOT,
+}
 
 # The differences, and the allowed ones, listed for each step; the counts
 # cover the rest.
@@ -327,7 +335,7 @@ class StepResult:
     problems: list[str] = field(default_factory=list)
     waiting: Waiting | None = None
     diverges_by: str | None = None
-    after_skip: str | None = None
+    replies_differ: str | None = None
 
     @property
     def matches(self) -> bool:
@@ -351,12 +359,12 @@ def judge(
     waiting: dict[str, Waiting] | None = None,
     step_divergences: dict[str, str] | None = None,
     allow=_allow,
-    after_skip: dict[str, str] | None = None,
+    replies_differ: dict[str, str] | None = None,
     skips: dict[str, str] | None = None,
     step_paths: dict[str, tuple[ParityPath, ...]] | None = None,
 ) -> list[StepResult]:
     waiting = WAITING if waiting is None else waiting
-    after_skip = AFTER_SKIP if after_skip is None else after_skip
+    replies_differ = REPLIES_DIFFER if replies_differ is None else replies_differ
     skips = SKIPS if skips is None else skips
     step_divergences = (
         STEP_DIVERGENCES if step_divergences is None else step_divergences
@@ -373,7 +381,7 @@ def judge(
             step,
             other,
             waiting=waiting.get(step.label),
-            after_skip=after_skip.get(step.label),
+            replies_differ=replies_differ.get(step.label),
         )
         results.append(result)
         if step.outcome == "fail":
@@ -475,12 +483,12 @@ def _judge_step(
     elif parted:
         result.problems.append("the requests part from PHP's")
     # A difference in a reply it did get fails the gate, waiting or not.
-    if report.differences and result.after_skip is None:
+    if report.differences and result.replies_differ is None:
         result.problems.append(f"{len(report.differences)} differences from PHP")
-    elif result.after_skip is not None and not report.differences:
+    elif result.replies_differ is not None and not report.differences:
         result.problems.append(
-            f"matches PHP although it follows a skip ({result.after_skip}):"
-            " remove it from AFTER_SKIP in server/tools/parity_gate.py"
+            f"matches PHP although its replies may differ ({result.replies_differ}):"
+            " remove it from REPLIES_DIFFER in server/tools/parity_gate.py"
         )
     if result.waiting is None:
         result.problems += excused
@@ -542,8 +550,8 @@ def render(results: list[StepResult], labels: tuple[str, str]) -> str:
             verdict = "FAIL: " + "; ".join(r.problems)
         elif r.waiting:
             verdict = f"waiting on {r.waiting}"
-        elif r.after_skip:
-            verdict = f"follows a skip: {r.after_skip}"
+        elif r.replies_differ:
+            verdict = f"replies may differ: {r.replies_differ}"
         else:
             verdict = "ok"
         out.append(
@@ -557,6 +565,16 @@ def render(results: list[StepResult], labels: tuple[str, str]) -> str:
         if step is not None and step.retried
     ]
     out += ["", "Retried once: " + (", ".join(retried) if retried else "none") + "."]
+    excused = [
+        f"`{r.label}` ({r.replies_differ})"
+        for r in results
+        if r.replies_differ and not r.failed
+    ]
+    if excused:
+        out += [
+            "",
+            "Replies may differ (`REPLIES_DIFFER`): " + "; ".join(excused) + ".",
+        ]
     out += _by_path(results)
     for r in results:
         if r.report is None or (r.report.ok and not r.report.allowed):
@@ -578,7 +596,7 @@ def _by_path(results: list[StepResult]) -> list[str]:
     counts: dict[tuple[str, str], int] = defaultdict(int)
     steps: dict[tuple[str, str], list[str]] = defaultdict(list)
     for r in results:
-        if r.report is None or r.after_skip:
+        if r.report is None or r.replies_differ:
             continue
         for difference in r.report.differences:
             key = (difference.endpoint, _INDEX.sub("[*]", difference.path))

@@ -55,7 +55,7 @@ def judge(php, django, **kwargs):
     kwargs.setdefault("waiting", {})
     kwargs.setdefault("step_divergences", {})
     kwargs.setdefault("step_paths", {})
-    kwargs.setdefault("after_skip", {})
+    kwargs.setdefault("replies_differ", {})
     kwargs.setdefault("skips", {})
     kwargs.setdefault("allow", lambda difference: None)
     return gate.judge(php, django, NOW, **kwargs)
@@ -157,18 +157,20 @@ def test_a_skip_is_reported_and_not_compared(tmp_path):
     assert "skip (#54)" in gate.render([result], ("php", "django"))
 
 
-def test_a_step_after_a_skip_may_differ_but_not_match(tmp_path):
+def test_a_step_whose_replies_may_differ_must_not_match(tmp_path):
     php = leg(tmp_path, "php", [("snapshot_get", "pass", 1, poll(), "")])
     differs = leg(tmp_path, "differs", [("snapshot_get", "pass", 1, poll("2"), "")])
     matches = leg(tmp_path, "matches", [("snapshot_get", "pass", 1, poll(), "")])
-    skips = {"snapshot_get": "#54"}
+    skips = {"snapshot_get": "#221"}
 
-    [differed] = judge(php, differs, after_skip=skips)
-    [matched] = judge(php, matches, after_skip=skips)
+    [differed] = judge(php, differs, replies_differ=skips)
+    [matched] = judge(php, matches, replies_differ=skips)
 
     assert not differed.failed
-    assert "follows a skip: #54" in gate.render([differed], ("php", "django"))
-    assert "remove it from AFTER_SKIP" in matched.problems[0]
+    summary = gate.render([differed], ("php", "django"))
+    assert "replies may differ: #221" in summary
+    assert "Replies may differ (`REPLIES_DIFFER`): `snapshot_get` (#221)." in summary
+    assert "remove it from REPLIES_DIFFER" in matched.problems[0]
 
 
 def test_the_summary_groups_failing_differences_by_path(tmp_path):

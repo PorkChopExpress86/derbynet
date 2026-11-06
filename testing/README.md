@@ -210,7 +210,8 @@ the runs step by step (#37).  With `PARITY_DIR` set, each step of
 its outcome there, retries once a failed step that resets the database itself,
 and the run goes on past a failure.  `server/tools/parity_gate.py` then judges
 the two legs: the steps that wait on another ticket are in its `WAITING`, the
-steps the Django leg skips in its `SKIPS`, and the reply paths a recorded
+steps the Django leg skips in its `SKIPS`, the steps whose replies may differ
+until a ticket lands in its `REPLIES_DIFFER`, and the reply paths a recorded
 divergence changes in one step only, with the values it explains, in its
 `STEP_PATHS`.  The reply paths a divergence changes in every reply of an
 endpoint are in `PARITY_PATHS` in `server/legacy_api/registry.py`.  Both are
