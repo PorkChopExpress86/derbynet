@@ -1,0 +1,72 @@
+# Preferences written 2026-11-06
+
+group-formation-rule = custom
+
+GROUP = Lions & Tigers
+  SIMPLE SUBGROUP = Lion
+  SIMPLE SUBGROUP = Lion Pro-Stock
+  SIMPLE SUBGROUP = Tiger
+  SIMPLE SUBGROUP = Tiger Pro-Stock
+ENDGROUP
+GROUP = Webelos I and II
+  SIMPLE SUBGROUP = Webelos
+  SIMPLE SUBGROUP = Webelos Pro-Stock
+  SIMPLE SUBGROUP = Arrow of Light
+  SIMPLE SUBGROUP = Arrow of Light Pro-Stock
+ENDGROUP
+GROUP = Wolves & Bears
+  SIMPLE SUBGROUP = Bear
+  SIMPLE SUBGROUP = Bear Pro-Stock
+  SIMPLE SUBGROUP = Wolf
+  SIMPLE SUBGROUP = Wolf Pro-Stock
+ENDGROUP
+
+photos-on-now-racing = car
+no-show-car-photos-on-deck
+n-lanes = 4
+use-subgroups
+partition-label = Rank
+supergroup-label = Council
+n-pack-trophies = 0
+n-den-trophies = 0
+n-rank-trophies = 3
+racing_scene = 4
+warn-no-timer
+track-length = 42
+finish-formatting = %6.4f
+now-racing-linger-ms = 2500
+name-style = 1
+car-numbering = 0+1
+one-trophy-per
+use-xbs
+xbs-award = Best Build
+use-points
+scoring = 2
+replay-rate = 25
+replay-num-showings = 3
+replay-skipback = 3500
+
+AGGREGATE = All Lions
+  CONSTITUENT SUBGROUP = Lion
+  CONSTITUENT SUBGROUP = Lion Pro-Stock
+ENDAGGREGATE
+AGGREGATE = All Tigers
+  CONSTITUENT SUBGROUP = Tiger
+  CONSTITUENT SUBGROUP = Tiger Pro-Stock
+ENDAGGREGATE
+AGGREGATE = All Wolves
+  CONSTITUENT SUBGROUP = Wolf
+  CONSTITUENT SUBGROUP = Wolf Pro-Stock
+ENDAGGREGATE
+AGGREGATE = All Bears
+  CONSTITUENT SUBGROUP = Bear
+  CONSTITUENT SUBGROUP = Bear Pro-Stock
+ENDAGGREGATE
+AGGREGATE = All Webelos
+  CONSTITUENT SUBGROUP = Webelos
+  CONSTITUENT SUBGROUP = Webelos Pro-Stock
+ENDAGGREGATE
+AGGREGATE = All Arrow-of-Light
+  CONSTITUENT SUBGROUP = Arrow of Light
+  CONSTITUENT SUBGROUP = Arrow of Light Pro-Stock
+ENDAGGREGATE

@@ -18,6 +18,13 @@ pytestmark = pytest.mark.django_db
 FIXTURES = Path(__file__).resolve().parents[2] / "transfer" / "tests" / "fixtures"
 
 
+@pytest.fixture(autouse=True)
+def _data_dir(settings, tmp_path):
+    """The automatic snapshots go under the event's folder in the data
+    folder, so each test gets a data folder of its own."""
+    settings.DATA_DIR = tmp_path
+
+
 @pytest.fixture
 def coordinator(login):
     return login("RaceCoordinator")
@@ -327,3 +334,33 @@ def test_c56_the_crew_is_refused_at_the_fake_roster(login, event):
     refused = hx(crew, "/setup/fake-roster/", {"ngroups": "2", "racers_per_group": "3"})
     assert refused.status_code == 403
     assert not Racer.objects.filter(event=event).exists()
+
+
+def test_a_preferences_file_php_wrote_gives_phps_settings(coordinator, event):
+    """Acceptance: `php_written.pref` is what PHP's preferences.php wrote,
+    and `php_written_settings.json` PHP's settings in that event. Its
+    `racing_scene = 4` names PHP's fourth scene, Racing, by id, so the line
+    names this event's Racing scene instead."""
+    import json
+
+    from core import race_settings
+    from kiosks.models import Scene
+    from roster.models import Group, GroupConstituentSubgroup, Subgroup
+
+    data = Path(__file__).parent / "data"
+    racing = Scene.objects.get(event=event, name="Racing")
+    text = (data / "php_written.pref").read_text()
+    text = text.replace("racing_scene = 4", f"racing_scene = {racing.pk}")
+    response = coordinator.post(
+        "/setup/preferences/", {"prefs": _upload("derbynet.pref", text.encode())}
+    )
+    assert "The file applied." in html(response), html(response)
+    expected = json.loads((data / "php_written_settings.json").read_text())["settings"]
+    assert race_settings.read_many(event, list(expected)) == expected
+    assert RaceSettings.for_event(event).racing_scene == racing
+    aggregates = GroupConstituentSubgroup.objects.filter(event=event)
+    assert aggregates.values("aggregate").distinct().count() == 6
+    assert Group.objects.filter(event=event).count() == 3 + 6
+    assert (
+        Subgroup.objects.filter(event=event, group__name="Lions & Tigers").count() == 4
+    )

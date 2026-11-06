@@ -16,6 +16,13 @@ from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
 from ui.tests.race import add_racers, race_setup, scheduled
 
 
+@pytest.fixture(autouse=True)
+def _data_dir(settings, tmp_path):
+    """The automatic snapshots go under the event's folder in the data
+    folder, so each test gets a data folder of its own."""
+    settings.DATA_DIR = tmp_path
+
+
 def phone_only(page):
     if page.size != "phone":
         pytest.skip("this acceptance check is at 390x844")
@@ -163,7 +170,7 @@ def test_weigh_in_in_ounces_shows_at_check_in(login, event):
     section = open_section(page, "weigh-in")
     row = section.locator('[data-weigh-in="Outlaws"]')
     row.get_by_text("Recorded weight").click()
-    row.get_by_label("Unit", exact=True).select_option("oz")
+    row.locator('select[name="unit"]').select_option("oz")
     row.get_by_label(re.compile("Maximum weight")).fill("5")
     with htmx_post(page, "/settings/weigh-in/"):
         row.get_by_role("button", name="Save").click()

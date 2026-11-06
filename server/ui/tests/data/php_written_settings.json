@@ -1,0 +1,32 @@
+{
+  "about": "query=settings.list from the PHP event that wrote php_written.pref (testing/docker/php-scratch.sh, 2026-11-05, #48): test-preferences.sh's file, then settings.php's posts. The folders, the schema, racing_scene (a scene id) and lane-colors (which preferences.php does not write) are left out.",
+  "settings": {
+    "car-numbering": "0+1",
+    "finish-formatting": "%6.4f",
+    "group-formation-rule": "custom",
+    "lane_count": "4",
+    "n-den-trophies": "0",
+    "n-pack-trophies": "0",
+    "n-rank-trophies": "3",
+    "name-style": "1",
+    "now-racing-linger-ms": "2500",
+    "one-trophy-per": "1",
+    "partition-label": "Rank",
+    "photos-on-now-racing": "car",
+    "replay-num-showings": "3",
+    "replay-rate": "25",
+    "replay-skipback": "3500",
+    "scoring": "2",
+    "show-car-photos-rr": "1",
+    "show-cars-on-deck": "0",
+    "show-racer-photos-rr": "1",
+    "supergroup-label": "Council",
+    "track-length": "42",
+    "upload-videos": "1",
+    "use-points": "1",
+    "use-subgroups": "1",
+    "use-xbs": "1",
+    "warn-no-timer": "1",
+    "xbs-award": "Best Build"
+  }
+}
