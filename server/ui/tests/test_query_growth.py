@@ -5,11 +5,14 @@ dashboard and check-in page, so a read per row grows with the race.
 
 Each URL is read at two sizes of race day: groups, racers, scheduled rounds,
 a raced heat and queued playlist steps. The count must not grow. Every URL a
-template polls must be in the list.
+template fetches with hx-get, polled or not, must be in the list when it takes
+no argument (#70 retro): the #70 review found `/checkin/weigh/`, fetched when
+the add sheet's partition changes, unmeasured.
 """
 
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from django.db import connection
@@ -31,7 +34,8 @@ from ui.tests.roles import PASSWORDS
 
 pytestmark = pytest.mark.django_db
 
-# The page loads and the polls of every ui page. A new page adds its URLs.
+# The page loads, the polls and the argument-free hx-get fragments of every
+# ui page. A new page adds its URLs; the first test names a missing one.
 URLS = [
     "/dashboard/",
     "/dashboard/live/",
@@ -76,6 +80,21 @@ URLS = [
     "/ballot/status",
     "/kiosk/check-in/",
     "/kiosk/standings/",
+    # Sheets and fragments a page fetches with hx-get.
+    "/awards/edit/new/",
+    "/awards/edit/partitions/",
+    "/checkin/bulk/",
+    "/checkin/racer/new/",
+    "/checkin/qr/",
+    "/dashboard/lanes/sheet/",
+    "/dashboard/new-round/sheet/",
+    "/dashboard/replay/settings/sheet/",
+    "/groups/aggregate/new/",
+    "/groups/group/new/",
+    "/groups/partitions/",
+    "/groups/rule/?rule=one-group",
+    "/playlist/scheduling/",
+    "/timer/settings/",
     *(
         f"/kiosk.php?page=kiosks/{name}.kiosk"
         for name in (
@@ -90,21 +109,24 @@ URLS = [
         )
     ),
 ]
+# A fetched URL left out, with the reason.
+NOT_MEASURED = {
+    "/dashboard/results/sheet/": "names the heat on screen by its round's id",
+}
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
-# An element whose hx-get names a URL and whose trigger polls.
-POLL = re.compile(
-    r"<[^>]*hx-get=\"\{% url '([\w-]+)' %\}\"[^>]*(?:poll_trigger|every )"
-)
+# An hx-get that names a URL with no argument, polled or not.
+FETCH = re.compile(r"hx-get=\"\{% url '([\w-]+)' %\}\"")
 
 
-def test_every_polled_url_is_measured():
-    polled = {
+def test_every_fetched_url_is_measured():
+    fetched = {
         reverse(name)
         for path in TEMPLATES.rglob("*.html")
-        for name in POLL.findall(path.read_text())
+        for name in FETCH.findall(path.read_text())
     }
-    assert polled, "the poll pattern found no poll"
-    assert polled - set(URLS) == set()
+    assert "/dashboard/live/" in fetched, "the hx-get pattern found no poll"
+    measured = {urlsplit(url).path for url in URLS}
+    assert fetched - measured - set(NOT_MEASURED) == set()
 
 
 def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
