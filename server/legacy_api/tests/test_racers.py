@@ -382,6 +382,38 @@ def test_anonymous_cannot_check_a_racer_in(client, coordinator, event):
     assert not Racer.objects.filter(event=event, car_number=305).exists()
 
 
+def test_pass_refuses_in_phps_order(client, coordinator):
+    """`action.racer.pass.inc:17-46`: a racer named uniquely, then one with
+    no results, then the permission (S23). Each request also meets every
+    later refusal condition, and gets PHP's first code: test-permissions.sh's
+    bare anonymous post is `notunique`."""
+    racer = imported(coordinator, "firstname=A&lastname=B")
+    HeatLaneFactory(
+        round=Round.objects.get(group=racer.group), racer=racer, finish_time=2.5
+    )
+    client.post("/action.php", {"action": "role.login", "name": ""})
+
+    unnamed = act(client, "action=racer.pass")
+    scheduled = act(client, f"action=racer.pass&racer={racer.pk}&value=0")
+
+    assert unnamed["outcome"]["code"] == "notunique"
+    assert unnamed["reload"] is True
+    assert scheduled["outcome"]["code"] == "alreadyscheduled"
+    assert scheduled["reload"] is True
+
+
+def test_a_refused_pass_has_no_reload_and_changes_nothing(client, coordinator):
+    # PHP's json_not_authorized() branch writes no reload.
+    racer = imported(coordinator, "firstname=A&lastname=B")
+    client.post("/action.php", {"action": "role.login", "name": ""})
+
+    reply = act(client, f"action=racer.pass&racer={racer.pk}")
+
+    assert reply["outcome"]["code"] == "notauthorized"
+    assert "reload" not in reply
+    assert not Racer.objects.get(pk=racer.pk).passed_inspection
+
+
 def test_the_photo_role_checks_in_by_barcode_as_the_photo_stand_posts(
     client, coordinator, event
 ):

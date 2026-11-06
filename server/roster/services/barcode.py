@@ -83,6 +83,11 @@ class Resolved:
     created: bool = False
 
 
+def makes_walk_in(barcode: str) -> bool:
+    """Whether `resolve` may make a walk-in racer for the barcode."""
+    return isinstance(parse(barcode), WalkIn)
+
+
 def resolve(event, barcode: str) -> Resolved:
     """Find the event's racer a barcode names. An unknown `PWDwi` car number
     becomes a walk-in racer (`racers.find_or_create_walk_in`)."""

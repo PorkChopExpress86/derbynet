@@ -15,6 +15,13 @@ DASHBOARD_DIVERGENCES = (
     ' writes and always shows "".',
     "C20: each kiosk's parameters are its own; PHP's are always null.",
 )
+# #52's Wrap-Up seed (core/services.py), which every reply that shows a scene's
+# kiosks or the page a scene gives a kiosk shows.
+WRAP_UP_SEED = (
+    "D10: a new event's Wrap-Up scene gives Aux2 no page, so it has two"
+    " kiosks; PHP seeds local/kiosks/feedback.kiosk, a page not in the"
+    " repository (#52).",
+)
 
 
 def _text(ctx: LegacyContext, name: str) -> str | None:
@@ -27,7 +34,12 @@ def _put_all(ctx: LegacyContext, keys: dict) -> None:
         ctx.put(key, value)
 
 
-@query("poll.kiosk", permission=Access.ANONYMOUS, get_writes=True)
+@query(
+    "poll.kiosk",
+    permission=Access.ANONYMOUS,
+    get_writes=True,
+    divergences=WRAP_UP_SEED,
+)
 def poll_kiosk(ctx: LegacyContext) -> None:
     """Every kiosk polls every 5 s, anonymously (D5). The poll adds an
     unknown address, records the contact, consumes a pending reload, and
@@ -86,9 +98,7 @@ def kiosk_reload(ctx: LegacyContext) -> None:
     permission=Access.LOGGED_IN,
     divergences=(
         "D5: needs a login; PHP lists the scenes to anyone.",
-        "D10: a new event's Wrap-Up scene gives Aux2 no page, so it has two"
-        " kiosks; PHP seeds local/kiosks/feedback.kiosk, a page not in the"
-        " repository (#52).",
+        *WRAP_UP_SEED,
     ),
 )
 def scene_list(ctx: LegacyContext) -> None:
@@ -126,7 +136,10 @@ def scene_delete(ctx: LegacyContext) -> None:
 @action(
     "scene.setkiosk",
     permission=Perm.SET_UP,
-    divergences=("R12: a scene id of no scene of the event changes nothing.",),
+    divergences=(
+        "R12: a scene id of no scene of the event changes nothing.",
+        *WRAP_UP_SEED,
+    ),
 )
 def scene_setkiosk(ctx: LegacyContext) -> None:
     """`page` with optional `params` sets the page kiosks named `kiosk_name`
@@ -146,6 +159,7 @@ def scene_setkiosk(ctx: LegacyContext) -> None:
     "scene.apply",
     permission=Perm.CONTROL_RACE,
     divergences=DASHBOARD_DIVERGENCES
+    + WRAP_UP_SEED
     + ("R12: an id or name of no scene of the event leaves no scene current.",),
 )
 def scene_apply(ctx: LegacyContext) -> None:

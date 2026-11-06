@@ -108,8 +108,7 @@ usual ID.
 
 `test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
 With `DERBYNET_BACKEND=django`, `test-visit-each-page.sh` expects `print.php` to
-answer 404, since the Django server drops the printables (#55), and
-`exercise-one-database.sh` skips `test-balloting.sh` (#54).
+answer 404, since the Django server drops the printables (#55).
 
 `test-permissions.sh` holds each server to the page access it decided on.  By
 default it checks PHP's: every page in `fixtures/role-pages.json`, where an
@@ -216,8 +215,13 @@ divergence changes in one step only, with the values it explains, in its
 `STEP_PATHS`.  The reply paths a divergence changes in every reply of an
 endpoint are in `PARITY_PATHS` in `server/legacy_api/registry.py`.  Both are
 lists of `ParityPath` (`server/legacy_api/parity_paths.py`), which loads no
-Django.  A page that curl reached by a redirect, and that Django doesn't serve
-yet, is in `WAITING_PAGES` in `server/tools/transcript_diff.py`.
+Django.  A page that curl reached by a redirect, and that is the same page on
+both servers, is in `SAME_PAGES` in `server/tools/transcript_diff.py`.  The
+timer's and the replay client's contact windows are judged on each leg's own
+clock (`server/tools/contact_windows.py`), since the legs run at different
+speeds.  The `track` job keeps one issue on this fork, "Parity gate: failing
+steps", that lists the failing steps and changes when that list does
+(`server/tools/parity_tracking.py`, #218).
 A leg that ends writes `complete` next to `steps.tsv`; the gate fails a leg
 without it.
 

@@ -173,13 +173,8 @@ run_tests() {
     step test-den-changes.sh
     step test-unused-lanes.sh
 
-    # Resets database.  Balloting moved to the backlog (#54, D7), and the Django
-    # server doesn't serve it yet.
-    if [ "$DERBYNET_BACKEND" = django ] ; then
-        skip_step test-balloting.sh "balloting is deferred to #54 (D7)"
-    else
-        step --resets test-balloting.sh
-    fi
+    # Resets database
+    step --resets test-balloting.sh
 
     if [ -n "$PARITY_DIR" ] ; then
         # A fixed name, so that both legs of the parity gate post the same file name

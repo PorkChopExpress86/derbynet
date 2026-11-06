@@ -450,12 +450,17 @@ class PassDetails:
     last_name: str
 
 
-def pass_racer(racer: Racer | None, passed: bool) -> PassDetails | None:
+def pass_racer(
+    racer: Racer | None, passed: bool, authorized: bool = True
+) -> PassDetails | None:
     """`racer.pass`: set the racer's inspection status and check-in time.
 
-    Refused with `notunique` when the barcode or id named no racer, and with
-    `alreadyscheduled` when the racer has a result. Returns the details the
-    photo stand announces, for a pass.
+    Refused with `notunique` when the barcode or id named no racer, then with
+    `alreadyscheduled` when the racer has a result, then with `notauthorized`
+    when the caller may not make the change, in PHP's order
+    (`website/ajax/action.racer.pass.inc:17-46`). PHP lets anyone pass a
+    racer; `authorized` is the caller's permission for this change (S23).
+    Returns the details the photo stand announces, for a pass.
     """
     if racer is None:
         raise RacerFailure(Failure.NOT_UNIQUE, "Need to identify racer uniquely.")
@@ -466,6 +471,8 @@ def pass_racer(racer: Racer | None, passed: bool) -> PassDetails | None:
                 Failure.ALREADY_SCHEDULED,
                 "Schedule data already exists for this racer",
             )
+        if not authorized:
+            raise RacerFailure(Failure.NOT_AUTHORIZED, "Not authorized.")
         Racer.objects.filter(pk=racer.pk).update(
             passed_inspection=passed, checked_in_at=timezone.now()
         )

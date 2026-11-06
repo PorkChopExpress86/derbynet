@@ -192,6 +192,20 @@ _CURRENT_HEAT = (
 )
 _KIOSK_LISTS = ("query poll.kiosk.all", "action kiosk.assign", "action scene.apply")
 
+# The endpoints Django refuses where PHP answers anyone, with the divergence
+# and the keys of PHP's answer.
+_REFUSES = (
+    ("query class.list", "D5", ("classes",)),
+    ("query poll.kiosk.all", "S27", ("current-scene", "kiosks", "kiosk-pages")),
+)
+_REFUSED = {
+    "summary": "failure",
+    "code": "notauthorized",
+    "description": REFUSALS["notauthorized"],
+}
+# The page PHP seeds for Aux2 in its Wrap-Up scene (D10, #52).
+_FEEDBACK = "local/kiosks/feedback.kiosk"
+
 # Each reply path a recorded divergence changes, as the parity gate saw it,
 # with the values the divergence names. Add one only for a difference that an
 # existing divergence of that endpoint already explains; any other difference
@@ -268,6 +282,69 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
             ("133x200 none GWRB", "200x133 none RGBW"),
             ("400x600 none GWRB", "600x400 none RGBW"),
         )
+    ),
+    # A refusal where PHP answers: Django's notauthorized outcome, and none of
+    # the keys PHP's answer has.
+    *(
+        ParityPath(endpoint, path, divergence, php=MISSING, django=_REFUSED)
+        for endpoint, divergence, _ in _REFUSES
+        for path in ("$.outcome",)
+    ),
+    *(
+        ParityPath(endpoint, f"$.{key}", divergence, django=MISSING)
+        for endpoint, divergence, keys in _REFUSES
+        for key in keys
+    ),
+    # replay.message from a role without CONTROL_RACE (D16): PHP answers
+    # success, and Django refuses.
+    *(
+        ParityPath(
+            "action replay.message", f"$.outcome.{key}", "D16", php=php, django=dj
+        )
+        for key, php, dj in (
+            ("summary", "success", "failure"),
+            ("code", "success", "notauthorized"),
+            ("description", "", REFUSALS["notauthorized"]),
+        )
+    ),
+    ParityPath("action replay.message", "$.replay", "D16", php=list, django=MISSING),
+    # #52's Wrap-Up seed (D10): PHP's Aux2 on local/kiosks/feedback.kiosk,
+    # which Django leaves out, so the Wrap-Up scene's kiosks after it move up
+    # one, and a kiosk named Aux2 keeps the page it had.
+    ParityPath(
+        "query scene.list",
+        "$.scenes[*].kiosks[*].kiosk_name",
+        "D10",
+        php="Aux2",
+        django="Main",
+    ),
+    ParityPath(
+        "query scene.list",
+        "$.scenes[*].kiosks[*].page",
+        "D10",
+        php=_FEEDBACK,
+        django="kiosks/standings.kiosk",
+    ),
+    *(
+        ParityPath(endpoint, path, "D10", php=kiosk, django=MISSING)
+        for endpoint, path in (
+            ("query scene.list", "$.scenes[*].kiosks[*]"),
+            ("action scene.setkiosk", "$.all-scenes[*].kiosks[*]"),
+        )
+        for kiosk in (
+            {
+                "kiosk_name": "Main",
+                "page": "kiosks/standings.kiosk",
+                "parameters": "{}",
+            },
+            {"kiosk_name": "Aux2", "page": _FEEDBACK, "parameters": "{}"},
+        )
+    ),
+    ParityPath(
+        "action scene.apply", "$.kiosks[*].page", "D10", php=_FEEDBACK, django=str
+    ),
+    ParityPath(
+        "query poll.kiosk", "$.kiosk-setting.page", "D10", php=_FEEDBACK, django=str
     ),
 )
 

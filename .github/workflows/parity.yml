@@ -16,7 +16,8 @@ name: parity
 #
 # The gate can't pass until the tickets in WAITING (server/tools/parity_gate.py)
 # land, so it runs nightly, on demand, and on a push to a branch named
-# parity-check/<anything>.  It does not run on pull requests: a red gate would
+# parity-check/<anything>.  The track job keeps one issue on this fork that
+# lists the failing steps (#218).  It does not run on pull requests: a red gate would
 # stop plan/bin/pr-merge, which merges only when every check passed.  To try a
 # change to the gate, push its commit to parity-check/<name> as well.
 
@@ -238,4 +239,58 @@ jobs:
           uv run python -m tools.parity_gate
           --labels php,django-${{ matrix.database }}
           --summary "$GITHUB_STEP_SUMMARY"
+          --failing "$RUNNER_TEMP/failing-${{ matrix.database }}.json"
           "$RUNNER_TEMP/php" "$RUNNER_TEMP/django"
+
+      # The failing steps, for the track job.  The gate fails while a step
+      # waits on a ticket, so this runs whatever the comparison said.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: failing-${{ matrix.database }}
+          path: ${{ runner.temp }}/failing-${{ matrix.database }}.json
+          if-no-files-found: error
+
+  # One issue on this fork lists the steps failing the gate, and changes when
+  # that list does (#218): server/tools/parity_tracking.py.  Every gh call it
+  # makes names --repo PorkChopExpress86/derbynet, never upstream.  Only a run
+  # on master writes to the issue; a run on any other branch, or in another
+  # repository, is a dry run that prints what it would do.
+  track:
+    name: track the failing steps
+    needs: gate
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: failing-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/failing
+
+      - name: Open or update the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: >-
+            ${{ (github.repository != 'PorkChopExpress86/derbynet'
+                 || github.ref != 'refs/heads/master') && '--dry-run' || '' }}
+        run: >-
+          uv run --no-project python -m tools.parity_tracking $DRY_RUN
+          --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          --sha "$GITHUB_SHA"
+          --workdir "$RUNNER_TEMP"
+          sqlite="$RUNNER_TEMP/failing/failing-sqlite.json"
+          postgres="$RUNNER_TEMP/failing/failing-postgres.json"

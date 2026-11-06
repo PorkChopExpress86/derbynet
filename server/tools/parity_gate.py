@@ -3,6 +3,7 @@ shell suite, step by step.
 
     uv run python -m tools.parity_gate PHP_STEPS DJANGO_STEPS
     uv run python -m tools.parity_gate --summary "$GITHUB_STEP_SUMMARY" A B
+    uv run python -m tools.parity_gate --failing failing.json A B
 
 Each leg is `testing/exercise-one-database.sh` run with `PARITY_DIR` set
 (`testing/steps.sh`, `testing/docker/run-suite.sh parity`): a `steps.tsv`
@@ -42,6 +43,7 @@ is printed, so nothing is hidden.
 """
 
 import argparse
+import json
 import re
 import sys
 from collections import defaultdict
@@ -89,7 +91,6 @@ _PAGES = (
 _EACH_ROLE = Waiting(f"{_PAGES} (test-visit-each-page.sh)", "about.php")
 WAITING: dict[str, Waiting] = {
     "test-each-role.sh": _EACH_ROLE,
-    "test-basic-racing.sh": Waiting("#49 (history.php)", "history.php"),
     "puppeteer_test all-pages-test.js": Waiting(_PAGES),
     "puppeteer_test coordinator-test.js": Waiting("#41 (coordinator.php)"),
     "puppeteer_test ondeck-columns-test.js": Waiting("#52 (ondeck.php)"),
@@ -102,9 +103,7 @@ WAITING: dict[str, Waiting] = {
 }
 
 # The steps the Django leg skips, with the reason. The PHP leg skips none.
-SKIPS: dict[str, str] = {
-    "test-balloting.sh": "#54 (D7): balloting moved to the backlog",
-}
+SKIPS: dict[str, str] = {}
 
 # The steps whose requests differ between the legs on purpose, because the
 # script asks Django other questions when DERBYNET_BACKEND=django. Their
@@ -269,13 +268,7 @@ def step_path_text(
 # The steps after a skipped step whose replies show the state that step would
 # have left, up to the next reset. Their replies may differ from PHP's; their
 # requests and outcomes are still judged.
-AFTER_SKIP: dict[str, str] = {
-    # test-balloting.sh resets the database and builds its own; without it,
-    # the snapshot holds the roster test-unused-lanes.sh left.
-    "snapshot_get": "#54 (the state test-balloting.sh leaves)",
-    # snapshot.put loads the snapshot snapshot_get took.
-    "snapshot_put": "#54 (the snapshot taken without test-balloting.sh)",
-}
+AFTER_SKIP: dict[str, str] = {}
 
 # The differences, and the allowed ones, listed for each step; the counts
 # cover the rest.
@@ -610,12 +603,34 @@ def _by_path(results: list[StepResult]) -> list[str]:
     return out
 
 
+def failing(results: list[StepResult], short: list[str]) -> dict:
+    """The steps that fail the gate, for `tools/parity_tracking.py`: each
+    one's label, its count of differences from PHP, the WAITING entry it
+    waits on, and its problems. `short` holds why a leg was cut short."""
+    return {
+        "short": short,
+        "steps": [
+            {
+                "label": r.label,
+                "differences": len(r.report.differences) if r.report else 0,
+                "waiting": str(r.waiting) if r.waiting else None,
+                "problems": r.problems,
+            }
+            for r in results
+            if r.failed
+        ],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("php", type=Path, help="the PHP leg's steps directory")
     parser.add_argument("django", type=Path, help="the Django leg's steps directory")
     parser.add_argument("--labels", default="php,django")
     parser.add_argument("--summary", type=Path, help="append the report here too")
+    parser.add_argument(
+        "--failing", type=Path, help="write the failing steps here, as JSON"
+    )
     parser.add_argument("--now", type=datetime.fromisoformat, default=None)
     args = parser.parse_args(argv)
     labels = tuple(args.labels.split(",", 1))
@@ -623,6 +638,10 @@ def main(argv: list[str] | None = None) -> int:
     results = judge(php, django, args.now)
     if not php or not django:
         print("A leg recorded no steps: see its suite.log.", file=sys.stderr)
+        if args.failing:
+            args.failing.write_text(
+                json.dumps(failing([], ["a leg recorded no steps"]), indent=1)
+            )
         return 1
     short = [
         reason
@@ -633,6 +652,8 @@ def main(argv: list[str] | None = None) -> int:
     if short:
         text = "\n".join(f"**FAIL: {reason}.**" for reason in short) + "\n\n" + text
     print(text)
+    if args.failing:
+        args.failing.write_text(json.dumps(failing(results, short), indent=1))
     if args.summary:
         with args.summary.open("a", encoding="utf-8") as summary:
             summary.write(text + "\n")
