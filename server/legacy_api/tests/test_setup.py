@@ -89,7 +89,7 @@ def test_ez_old_opens_an_existing_event(client, event, data_dir):
 
 
 def test_the_event_a_switch_replaces_becomes_read_only(client, event, data_dir):
-    """D14 (#212): ez-new and ez-old follow the switch rule of #9."""
+    """D14, D81: ez-new and ez-old follow the switch rule of #212."""
     log_in(client, Perm.SET_UP, role="RaceCoordinator")
     run(client, "action=setup.nodata&ez-new=Second")
     assert Event.objects.get(pk=event.pk).read_only
@@ -102,7 +102,7 @@ def test_the_event_a_switch_replaces_becomes_read_only(client, event, data_dir):
 
 
 def test_a_switch_while_racing_fails(client, event, data_dir):
-    """D2 (#9, Switch semantics)."""
+    """D81: refused while the racing flag is on."""
     log_in(client, Perm.SET_UP, role="RaceCoordinator")
     RaceState.objects.filter(event=event).update(racing=True)
 

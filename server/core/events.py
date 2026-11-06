@@ -49,7 +49,9 @@ MAX_NAME_LENGTH = Event._meta.get_field("name").max_length
 
 
 class Part(models.TextChoices):
-    """What Copy from offers (#9, Copy from; owner, 2026-10-23)."""
+    """What Copy from offers (D14). Classes and ranks bring their
+    partitions, and award definitions leave winners and ad hoc awards
+    behind (D81)."""
 
     SETTINGS = "settings", "Settings"
     GROUPS = "groups", "Classes and ranks"
@@ -191,7 +193,7 @@ def make_folders(event: Event) -> None:
 
 
 def create_event(name: str, *, copy_from: int | None = None, parts=ALL_PARTS) -> Event:
-    """A new event with its folders, not made active (#212: switching is
+    """A new event with its folders, not made active (D81: switching is
     its own step). With `copy_from`, the `parts` of that event come across;
     racers, results and photos never do (#9, Copy from)."""
     name = name.strip()
@@ -363,9 +365,10 @@ class Switched:
 
 def make_active(event: Event) -> Switched:
     """Make `event` the active one, and the event it replaces read-only
-    (#9, Past events). Refused while the active event is racing (#9,
-    Switch semantics). A switch never unlocks `event`: a past event stays
-    read-only until Reopen for editing. Call it inside `transaction.atomic()`."""
+    (#9, Past events; D14). Refused with `racing` while the active event's
+    racing flag is on, stricter than #9's "heat running" (D81). A switch
+    never unlocks `event`: a past event stays read-only until Reopen for
+    editing (D81). Call it inside `transaction.atomic()`."""
     state = SiteState.objects.select_for_update().filter(pk=1).first()
     if state is None:
         SiteState.objects.create(pk=1, active_event=event)
@@ -397,7 +400,8 @@ def switch_to(event_id: int) -> Switched:
 
 def archive(event_id: int) -> Event:
     """Archive a past event: it becomes read-only and is marked archived.
-    The active event is refused, since the field clients are using it."""
+    The active event is refused, since the field clients are using it; an
+    archived event can still be made active, staying read-only (D81)."""
     with transaction.atomic():
         event = _locked(event_id)
         if SiteState.objects.filter(pk=1, active_event_id=event.pk).exists():
@@ -413,7 +417,7 @@ def archive(event_id: int) -> Event:
 
 def reopen(event_id: int) -> Event:
     """Reopen for editing: the event takes changes again, and is no longer
-    archived. The active event stays as it is."""
+    archived. The active event stays as it is (D81)."""
     with transaction.atomic():
         event = _locked(event_id)
         event.read_only = False

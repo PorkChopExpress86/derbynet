@@ -411,6 +411,9 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " PHP's database dialogs take an SQLite path, an ODBC DSN or a PDO"
         " string, and its schema buttons are a migrations step.",
         "S25: no server file browser.",
+        "D14, D81: a switch from the wizard makes the replaced event"
+        " read-only, and is refused while the active event's racing flag is"
+        " on; PHP switches freely.",
         "D78: each purge, Re-Initialize and snapshot import saves a complete"
         " snapshot first, and the toast links it.",
         "D65: the snapshot import confirms that it replaces all data and names"
