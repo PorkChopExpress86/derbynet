@@ -1,6 +1,6 @@
 """Lint the Django migration plan's issue bodies, read live from GitHub.
 
-Usage: python3 -I plan/lint-issues.py [--repo OWNER/NAME] [--file N=PATH ...]
+Usage: python3 -I plan/lint-issues.py [--repo OWNER/NAME] [--labels L,...] [--file N=PATH ...]
 
 Reads every issue labeled django-migration, then checks each body for:
 - style: no em or en dashes, curly quotes, mid-sentence colons, or filler words
@@ -17,7 +17,9 @@ Reads every issue labeled django-migration, then checks each body for:
   waits on
 
 --file N=PATH lints a local draft in place of issue N's live body, so an edit can be
-checked before `gh issue edit N --body-file PATH`. Exits 1 on any finding.
+checked before `gh issue edit N --body-file PATH`. A draft for an issue not
+created yet takes `--file 0=PATH`: it is linted as a new open issue with the
+labels `--labels` names (default kind:ticket). Exits 1 on any finding.
 """
 import json, os, re, subprocess, sys
 
@@ -26,10 +28,13 @@ GH = os.environ.get('GH', 'gh')
 args = sys.argv[1:]
 repo = 'PorkChopExpress86/derbynet'
 drafts = {}
+new_labels = ['kind:ticket']
 while args:
     a = args.pop(0)
     if a == '--repo':
         repo = args.pop(0)
+    elif a == '--labels':
+        new_labels = [l for l in args.pop(0).split(',') if l]
     elif a == '--file':
         n, path = args.pop(0).split('=', 1)
         drafts[int(n)] = open(path, encoding='utf-8').read()
@@ -50,7 +55,9 @@ out = gh('issue', 'list', '--repo', repo, '--label', 'django-migration', '--stat
          '--limit', '500', '--json', 'number,state,body,labels')
 issues = {i['number']: i for i in json.loads(out)}
 for n, body in drafts.items():
-    issues[n]['body'] = body
+    # A number GitHub has not given out yet (0 for a draft) is a new issue.
+    issues.setdefault(n, {'number': n, 'state': 'OPEN', 'labels': [
+        {'name': name} for name in ['django-migration', *new_labels]]})['body'] = body
 
 
 def numbers(kind):

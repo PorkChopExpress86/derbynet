@@ -2,11 +2,13 @@
 transactions (#34). Run on SQLite and on Postgres."""
 
 import json
+from types import SimpleNamespace
 
 from django.utils import timezone
 
 from core.models import SiteState
 from kiosks.models import ReplayStatus
+from legacy_api.handlers import replay as replay_handler
 from legacy_api.tests.conftest import post
 from legacy_api.tests.test_race_control_concurrency import (
     concurrent,
@@ -20,13 +22,18 @@ COMMANDS = [f"START Lions_Round1_Heat{n:02d}" for n in range(1, 41)]
 
 
 @concurrent
-def test_two_replay_polls_get_every_command_exactly_once(event):
+def test_two_replay_polls_get_every_command_exactly_once(event, monkeypatch):
+    """The polls read the clock the status was set with. Under a full
+    suite's load the logins took over the 10 s REPLAY_TIMEOUT, and a poll
+    got HELLO first (#53 retro; the handler's clock 11 s on shows it)."""
+    now = timezone.now()
+    monkeypatch.setattr(replay_handler, "timezone", SimpleNamespace(now=lambda: now))
     event_id = SiteState.objects.get(pk=1).active_event_id
     ReplayStatus.objects.filter(event_id=event_id).update(
-        state=ReplayStatus.State.CONNECTED, last_contact=timezone.now()
+        state=ReplayStatus.State.CONNECTED, last_contact=now
     )
     for command in COMMANDS:
-        assert replay.send(event_id, command)
+        assert replay.send(event_id, command, now)
     clients = [coordinator(), coordinator()]
 
     def drain(client):

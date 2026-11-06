@@ -768,8 +768,8 @@ def widen_and_clip(
 
 def autocrop(repo: Repository, name: str, result: UploadResult) -> bool:
     """Crop a fresh upload to the face, widened 10% and made 4:3 tall, as
-    PHP does. Returns whether it cropped; a miss or an error is a warning.
-    The caller holds the photo's lock."""
+    PHP does (action.photo.upload.inc:128-132). Returns whether it cropped; a
+    miss or an error is a warning. The caller holds the photo's lock."""
     original = repo.file(name)
     try:
         image, fmt = _open_upright(original)
@@ -1076,7 +1076,8 @@ def delete_photo(event, repo: Repository, name) -> bool:
     held throughout, so no render made meanwhile is left behind. Returns
     whether there was such a photo: a file of that name at the top of the
     folder, or a racer of the event that showed it. A bad name changes
-    nothing; `photo.delete` answers success either way, as PHP does."""
+    nothing; `photo.delete` answers success either way, as PHP does
+    (action.photo.delete.inc:58)."""
     if repo.directory is None or not is_valid_name(name):
         return False
     with _photo_lock(repo, name):

@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import expect
 
-from ui.tests.browser.conftest import InFlight
+from ui.tests.browser.conftest import InFlight, _settle, close_tab
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -66,3 +66,71 @@ def test_a_navigation_drops_a_request_still_loading(page, page_errors, event, ki
 
 def test_every_type_the_harness_drops_has_a_held_request():
     assert sorted(HELD) == sorted(InFlight.ORPHANED)
+
+
+def test_a_tab_closed_with_a_request_out_is_named(page, event):
+    """A tab closed with its request out left that request in the set with
+    no end, and the drain failed 10 s later with no hint why (the camera tab
+    in PR #205's ui (postgres)). The harness now names it."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.route("**/held-request", lambda route: None)
+    tab.goto("/login/")
+    with tab.expect_request("**/held-request"):
+        tab.evaluate(HELD["fetch"])
+    tab.close()
+    assert not page.in_flight.of(tab)
+    assert page.in_flight.closed_with == [
+        f"GET {page.url.rsplit('/', 2)[0]}/held-request"
+    ]
+    page.in_flight.closed_with.clear()
+
+
+def test_close_tab_waits_for_the_request_out(page, event):
+    """`close_tab()` waits for a held request's reply before the tab
+    closes, so nothing is left to name."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    held = []
+    tab.route("**/held-request", lambda route: held.append(route))
+    tab.goto("/login/")
+    with tab.expect_request("**/held-request"):
+        tab.evaluate(HELD["fetch"])
+    for _ in range(200):
+        if held:
+            break
+        tab.wait_for_timeout(20)
+    held[0].fulfill(body="")
+    close_tab(page, tab)
+    assert page.in_flight.closed_with == []
+
+
+def test_the_settle_after_a_test_stops_a_fast_poll(page, event):
+    """A poll faster than the drain's 50 ms check could start a request
+    after the drain and meet the database flush (the replay page's 250 ms
+    poll, a Postgres deadlock in #53). The settle stops every timer first."""
+    page.route("**/held-request", lambda route: route.fulfill(body=""))
+    page.goto("/login/")
+    page.evaluate("() => setInterval(() => fetch('/held-request'), 10)")
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    assert _settle(page) == []
+    after = len(sent)
+    page.wait_for_timeout(200)
+    assert len(sent) == after
+
+
+def test_the_settle_stops_the_polls_of_a_page_on_a_fake_clock(page, event):
+    """Playwright's clock numbers its timers from 1e12, so clearing every id
+    from 0 spun the renderer for hours and hung the whole run (test_toasts,
+    #53 retro). The settle clears only the ids a page can hold."""
+    page.clock.install()
+    page.route("**/held-request", lambda route: route.fulfill(body=""))
+    page.goto("/login/")
+    page.evaluate("() => setInterval(() => fetch('/held-request'), 10)")
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.clock.run_for(1000)
+    page.wait_for_timeout(100)
+    assert sent == []

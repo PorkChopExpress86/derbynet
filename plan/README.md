@@ -22,6 +22,8 @@ python3 -I plan/lint-issues.py --file N=/tmp/bodyN.md
 gh issue edit N --repo PorkChopExpress86/derbynet --body-file /tmp/bodyN.md
 ```
 
+A body for an issue not created yet lints with `--file 0=PATH`, as a new open issue with the labels `--labels kind:ticket,ready-for-agent` names (default `kind:ticket`). `plan/tests/` tests the lint against a fake `gh`; CI runs it.
+
 The lint reads every other issue live, so a reference or dependency is checked against the whole plan. It needs `gh` on `PATH`, or `GH=/path/to/gh`. CI runs it in `.github/workflows/plan-checks.yml`.
 
 The lint counts a PR as merged when GitHub says so, or when GitHub shows it closed and its head commit is on `origin/master`, as when a PR is merged by hand. A PR closes an issue through GitHub's closing references or a `Closes #N`, `Fixes #N` or `Resolves #N` in its body. Two sections, placed anywhere in a body, tell the lint that a state is meant:

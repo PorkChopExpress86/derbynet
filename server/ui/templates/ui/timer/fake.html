@@ -2,7 +2,7 @@
 {% load static %}
 {% block head %}<script src="{% static 'ui/fake-timer.js' %}"></script>{% endblock %}
 {% block main %}
-{# fake-timer.php for a phone (#50). ui/fake-timer.js posts the legacy timer-message messages to action.php from this session, as js/fake-timer.js does. #}
+{# fake-timer.php for a phone (#50). ui/fake-timer.js posts the legacy timer-message messages to action.php from this session, as js/fake-timer.js does (js/fake-timer.js:175-258). #}
 <div x-data="fakeTimer('{{ action_url|escapejs }}', '{{ home_url|escapejs }}', {{ lane_count }})" class="flex flex-col gap-4" data-fake-timer>
   <section class="rounded-2xl border border-line bg-surface p-4 text-sm">
     <p>This page acts as a timer connected to the server, so you can try DerbyNet without a real timer.</p>

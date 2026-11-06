@@ -16,7 +16,7 @@ from core.models import RaceSettings
 from kiosks.models import Kiosk, Scene
 from racing.services import heats
 from roster.models import Racer
-from ui.tests.browser.conftest import shoot
+from ui.tests.browser.conftest import close_tab, shoot
 from ui.tests.race import race_setup, run_heat, scheduled
 
 ADDRESS = "kiosk-test52"
@@ -281,4 +281,4 @@ def test_d12_two_racing_kiosks_show_the_leaders_through_the_intermission(
         expect(tab.locator("[data-leaders]")).to_be_hidden(timeout=1000)
     for tab in tabs.values():
         if tab is not page:
-            tab.close()
+            close_tab(page, tab)
