@@ -2,9 +2,10 @@
 #
 # Runs the tests that read only the source, not a database or a page: the PHP
 # cites and claims, the QUIRK_DECISIONS records, copied helpers, the rules in
-# services, read-then-act views, browser tab closes, the registry, and the
-# parity gate's entries for the suites server.yml runs.  They take a few
-# seconds, and .githooks/pre-push runs them.  #48 found five of them failing
+# services, read-then-act views, browser tab closes, the registry, tests that
+# flush the seeded rows, frozen exception classes, and the parity gate's
+# entries for the suites server.yml runs.  They take a few seconds, and
+# .githooks/pre-push runs them.  #48 found five of them failing
 # one full-suite round at a time (#48 retro); run this after each batch of
 # edits.
 #
@@ -19,6 +20,7 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_deviations.py \
   tests/test_parity_gate_ci.py \
   tests/test_pytest_under_load.py \
+  tests/test_transactional_tests.py \
   ui/tests/test_no_copied_helpers.py \
   ui/tests/test_rules_in_services.py \
   ui/tests/test_read_then_act.py \
@@ -26,4 +28,5 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   ui/tests/test_php_libraries.py \
   legacy_api/tests/test_registry.py \
   core/tests/test_read_only_guard.py \
+  core/tests/test_exception_classes.py \
   "$@"

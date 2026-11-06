@@ -18,6 +18,7 @@ from roster.models import Group
 from ui.tests.browser.conftest import (
     assert_accessible,
     close_tab,
+    dismiss_toasts,
     htmx_post,
     htmx_settled,
     shoot,
@@ -102,6 +103,7 @@ def tap(page, control):
     (a poll, a filter, a reply out of band), once htmx has bound it."""
     htmx_settled(page)
     bound(page, control)
+    dismiss_toasts(page)
     control.click()
 
 
@@ -294,6 +296,7 @@ def test_kiosk_dashboard_parity(login, event):
         expect(window).to_be_hidden()
     else:
         kiosk_url = re.compile(r"/kiosk\.php\?address=localhost%20\d+$")
+        dismiss_toasts(page)
         with page.expect_popup() as popup:
             window.click()
         assert kiosk_url.search(popup.value.url)
@@ -372,6 +375,7 @@ def test_scene_editor_parity(login, event):
     # Another page for Main in this scene.
     tap(page, page.locator('#scene-entries [data-entry="Main"] [data-action="page"]'))
     picker = ready(page, sheet(page, "scenes").locator("[data-page-sheet]"))
+    dismiss_toasts(page)
     with htmx_post(page, "/kiosks/scenes/page/"):
         picker.locator('[data-page-choice="standings"]').click()
     expect(page.locator('#scene-entries [data-entry="Main"] [data-page]')).to_have_text(
@@ -380,6 +384,7 @@ def test_scene_editor_parity(login, event):
     shoot(page, "scenes-editor-edited")
 
     # Delete scene: the page loads at the first scene.
+    dismiss_toasts(page)
     page.locator('[data-action="delete-scene"]').click()
     confirm = ready(page, sheet(page, "scenes").locator("[data-delete-scene-sheet]"))
     with page.expect_navigation():

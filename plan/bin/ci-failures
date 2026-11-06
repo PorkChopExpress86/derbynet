@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""Lists each test that failed on a PR's current checks, and whether it also
+failed on a recent master run: a known flake, not the PR's doing.
+
+Usage: plan/bin/ci-failures <pr> [--master-runs N]   (default 15)
+
+Reads the failed checks' logs (`gh run view --log-failed`) for pytest's
+`FAILED path::test` and `ERROR path::test` lines, then the logs of the last
+N failed runs on master. Prints one line per failing test:
+
+    known  <test id>  master <sha> run <id>
+    new    <test id>
+
+and a `no test id` line for a failed check whose log names none (a lint or a
+build step). Exits 1 when a test is new or a check has no test id, 0 when
+every failure is known from master. #212's `test_vote.py` sort test failed
+on ui (postgres), and the same test had failed on master's push of 0141fa3b;
+only a 50-run local repro showed it was no regression (#212 retro).
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+
+TEST_ID = re.compile(r"\b(?:FAILED|ERROR) ([\w/.-]+\.py::\S+)")
+RUN = re.compile(r"/actions/runs/(\d+)")
+
+
+def gh(*args: str) -> str:
+    command = [os.environ.get("GH", "gh"), *args]
+    return subprocess.run(command, check=True, capture_output=True, text=True).stdout
+
+
+def failed_tests(run_id: str, repo: str) -> set[str]:
+    log = gh("run", "view", run_id, "--repo", repo, "--log-failed")
+    return set(TEST_ID.findall(log))
+
+
+def main(argv: list[str]) -> int:
+    if not argv or not argv[0].isdigit():
+        print("usage: ci-failures <pr> [--master-runs N]", file=sys.stderr)
+        return 2
+    pr = argv[0]
+    master_runs = int(argv[2]) if argv[1:2] == ["--master-runs"] else 15
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+
+    checks = json.loads(
+        gh("pr", "checks", pr, "--repo", repo, "--json", "bucket,name,link")
+    )
+    failed = [c for c in checks if c["bucket"] == "fail"]
+    if not failed:
+        print(f"PR #{pr}: no failed check")
+        return 0
+    tests: set[str] = set()
+    status = 0
+    for run_id in sorted({m.group(1) for c in failed if (m := RUN.search(c["link"]))}):
+        found = failed_tests(run_id, repo)
+        tests |= found
+        if not found:
+            names = ", ".join(c["name"] for c in failed if f"/runs/{run_id}/" in c["link"])
+            print(f"no test id  run {run_id} ({names}): read its log")
+            status = 1
+
+    known: dict[str, str] = {}
+    if tests:
+        runs = json.loads(
+            gh(
+                "run", "list", "--repo", repo, "--branch", "master",
+                "--status", "failure", "--limit", str(master_runs),
+                "--json", "databaseId,headSha",
+            )
+        )
+        for run in runs:
+            for test in failed_tests(str(run["databaseId"]), repo) & (tests - known.keys()):
+                known[test] = f"master {run['headSha'][:8]} run {run['databaseId']}"
+    for test in sorted(tests):
+        if test in known:
+            print(f"known  {test}  {known[test]}")
+        else:
+            print(f"new    {test}")
+            status = 1
+    return status
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

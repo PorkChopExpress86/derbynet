@@ -16,6 +16,7 @@ from roster.models import Group, Partition, Subgroup
 from roster.services import groups
 from ui.tests.browser.conftest import (
     assert_accessible,
+    dismiss_toasts,
     htmx_post,
     no_sideways_scroll,
     shoot,
@@ -41,12 +42,6 @@ def open_groups(page):
 
 def sheet(page):
     return page.locator('[data-sheet="groups"]')
-
-
-def dismiss_toasts(page):
-    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 def page_of(login):
@@ -212,6 +207,7 @@ def test_partition_add_rename_delete_and_ranges(login, event):
     body.get_by_role("button", name="Remove 500 to 599").click()
     expect(body.locator('[data-range="500-599"]')).to_have_count(0)
 
+    dismiss_toasts(page)
     body.locator('[data-action="delete"]').click()
     body.get_by_role("button", name="Delete 1 den").click()
     expect(body.locator("[data-sheet-notice]")).to_have_text("Deleted Wolves.")
@@ -434,10 +430,12 @@ def test_labels_switch_and_trophy_counts(login, event):
     with saved(page):
         page.get_by_label("The whole roster is a").press("Tab")
     expect(page.locator("[data-calc] legend")).to_have_text("Troop standings")
+    dismiss_toasts(page)
     with saved(page):
         page.get_by_role("button", name="More: Per patrol").click()
     with saved(page):
         page.get_by_role("button", name="Fewer: Troop trophies").click()
+    dismiss_toasts(page)
     with saved(page):
         page.get_by_role("button", name="More: Per subgroup").click()
     found = RaceSettings.objects.get(event=event)
@@ -483,6 +481,7 @@ def test_edit_and_delete_groups_and_subgroups(login, event):
     all_racers.refresh_from_db()
     assert (all_racers.name, all_racers.n_trophies) == ("Everyone", 4)
 
+    dismiss_toasts(page)
     page.locator(f'[data-subgroup="{cubs.pk}"] [data-edit-subgroup]').click()
     form = sheet(page).locator("[data-subgroup-sheet]")
     form.get_by_label("Speed trophies").select_option("2")
@@ -497,6 +496,7 @@ def test_edit_and_delete_groups_and_subgroups(login, event):
     expect(sheet(page)).to_be_hidden()
     assert not Subgroup.objects.filter(pk=cubs.pk).exists()
 
+    dismiss_toasts(page)
     page.locator(f'[data-group="{empty.pk}"] [data-edit-group]').first.click()
     sheet(page).locator('[data-action="delete"]').click()
     sheet(page).get_by_role("button", name="Delete 1 group").click()

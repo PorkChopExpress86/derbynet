@@ -15,6 +15,8 @@ uploads, and `assert_accessible(page)` runs axe-core and fails on a serious or
 critical violation. `no_sideways_scroll(page)` fails a page wider than its
 viewport; each `shoot()` runs it, and so does the end of every test (#44
 retro: a phone page scrolled 407 px sideways, seen only in a screenshot).
+A click, tap or check on a control a toast overlaps fails at once
+(`TOAST_OVER`); close the toasts with `dismiss_toasts(page)` first.
 
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap. When the
@@ -157,6 +159,70 @@ def _fresh_css(tmp_path_factory, worker_id):
         tmp_path_factory, worker_id
     ):
         pytest.fail(css_build.OUT_OF_DATE.format(css_build.OUTPUT), pytrace=False)
+
+
+# The text of the first toast whose box overlaps the element's, or null. The
+# toasts stay 8 s, or until closed for an error, and Playwright clicks the
+# centre of what it clicks. A toast over the bottom of a button let a local
+# click through and timed out on CI's fonts (#212 retro), so any overlap
+# fails, the same on every machine.
+TOAST_OVER = """(element) => {
+  if (element.closest('#toasts')) return null;
+  const box = element.getBoundingClientRect();
+  for (const toast of document.querySelectorAll('#toasts > *')) {
+    const t = toast.getBoundingClientRect();
+    if (t.width && t.height && box.left < t.right && t.left < box.right
+        && box.top < t.bottom && t.top < box.bottom) {
+      return toast.textContent.trim().replace(/\\s+/g, ' ').slice(0, 80);
+    }
+  }
+  return null;
+}"""
+CLEAR_OF_TOASTS = ("click", "dblclick", "tap", "check", "uncheck")
+
+
+def _clear_of_toasts(action):
+    def act(self, *args, **kwargs):
+        if not kwargs.get("force") and not kwargs.get("trial"):
+            from playwright.sync_api import Error
+
+            try:
+                # Where the click lands: Playwright scrolls the element in first.
+                self.scroll_into_view_if_needed(timeout=kwargs.get("timeout"))
+                toast = self.evaluate(TOAST_OVER)
+            except Error:
+                # A swap replaced the element mid-check (seen once on the
+                # photos page); the action finds the new one, and its own
+                # wait and error stand.
+                toast = None
+            if toast is not None:
+                raise AssertionError(
+                    f"the toast {toast!r} covers {self}: dismiss_toasts(page) "
+                    "first, as a race crew would"
+                )
+        return action(self, *args, **kwargs)
+
+    return act
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _toasts_cover_nothing_clicked():
+    """Each click, tap and check fails at once when a toast overlaps its
+    target, where Playwright waited 30 s for the toast to go."""
+    from playwright.sync_api import Locator
+
+    with pytest.MonkeyPatch.context() as patch:
+        for name in CLEAR_OF_TOASTS:
+            patch.setattr(Locator, name, _clear_of_toasts(getattr(Locator, name)))
+        yield
+
+
+def dismiss_toasts(page):
+    """Close the toasts, as a race coordinator would, before tapping a
+    control they cover."""
+    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
+    while toasts.count():
+        toasts.first.click()
 
 
 @pytest.fixture(autouse=True)

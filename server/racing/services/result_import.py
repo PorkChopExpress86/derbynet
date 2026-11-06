@@ -19,7 +19,9 @@ from roster.models import Group, Partition, Racer, Subgroup
 from roster.services import groups
 
 
-@dataclass(frozen=True)
+# Not frozen: a context manager sets `__traceback__` on an exception that
+# passes through it (core/tests/test_exception_classes.py).
+@dataclass(eq=False)
 class ImportFailure(Exception):
     code: str
     description: str

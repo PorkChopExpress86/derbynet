@@ -23,6 +23,7 @@ from ui.tests.browser.conftest import (
     PLAIN_HTTP_HOST,
     SIZES,
     assert_accessible,
+    dismiss_toasts,
     htmx_settled,
     log_in,
     no_sideways_scroll,
@@ -71,12 +72,6 @@ def sheet(page):
 
 def card(page, racer):
     return page.locator(f'[data-racer="{racer.pk}"]')
-
-
-def dismiss_toasts(page):
-    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 def take_photo(page, path, button="Capture only"):
@@ -604,6 +599,7 @@ def test_add_edit_and_delete_a_racer(login, event):
     expect(card(page, racer).locator("[data-car-name]")).to_have_text("Edited")
 
     card(page, racer).get_by_role("button", name="Del Me", exact=True).click()
+    dismiss_toasts(page)
     sheet(page).get_by_role("button", name="Delete racer").click()
     sheet(page).get_by_role("button", name="Delete 1 racer").click()
     expect(card(page, racer)).to_have_count(0)

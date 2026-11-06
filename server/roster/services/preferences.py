@@ -71,7 +71,9 @@ DESIGN_GENERAL = "Design General"
 SKIPPED_AWARD_TYPES = ("Speed General", "Speed Trophy")
 
 
-@dataclass(frozen=True)
+# Not frozen: a context manager sets `__traceback__` on an exception that
+# passes through it (core/tests/test_exception_classes.py).
+@dataclass(eq=False)
 class PrefsFailure(Exception):
     code: str
     description: str
