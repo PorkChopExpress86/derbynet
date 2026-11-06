@@ -5,6 +5,7 @@ changes, photos, and the QR code."""
 
 import io
 import re
+from decimal import Decimal
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -17,6 +18,7 @@ from core.models import RaceSettings
 from racing.models import FinalRequest, HeatLane, RosterEntry
 from roster.models import CarRange, Partition, Racer
 from roster.services.racers import pass_racer
+from roster.services.weigh_in import record_weigh_in, set_partition_weigh_in
 from ui.tests.db import no_db_writes
 from ui.tests.race import add_racers, chart, race_setup, run_heat, scheduled
 from ui.tests.sessions import no_session_writes
@@ -727,3 +729,182 @@ def test_undo_of_an_unpass_does_not_ask_the_question_again(crew, running):
     # The card still offers the question to whoever wants to answer it.
     html = get(crew, "/checkin/list/", {"q": "150"}).content.decode()
     assert 'data-action="ask"' in html
+
+
+# ----- the weigh-in (#70, D8, D54) -----
+
+
+def weighs(event, partition_name, mode, unit="", max_weight=None, n=1, first=301):
+    racers = add_racers(event, partition_name, n, first, passed=False)
+    set_partition_weigh_in(racers[0].partition, mode, unit, max_weight)
+    return racers
+
+
+def card_html(client, racer) -> str:
+    html = get(client, "/checkin/list/").content.decode()
+    found = re.search(rf'<li [^>]*data-racer="{racer.pk}".*?</li>', html, re.S)
+    return found.group(0)
+
+
+@pytest.mark.parametrize(
+    ("unit", "typed", "shown"),
+    [
+        ("oz", "5.0", "5.0 oz"),
+        ("g", "141.75", "141.75 g"),
+        ("lb", "0.3125", "0.3125 lb"),
+    ],
+)
+def test_a_recorded_weight_is_stored_in_grams_and_shown_on_the_card(
+    crew, event, unit, typed, shown
+):
+    racer = weighs(event, "Outlaws", "recorded", unit, first=7)[0]
+    reply = post(crew, f"/checkin/racer/{racer.pk}/weigh/", {"weight": typed})
+    assert reply.status_code == 200
+    assert f"007 Outlaws1 Racer weighs {shown}." in reply.content.decode()
+    racer.refresh_from_db()
+    assert racer.weight_grams == Decimal("141.75")
+    card = card_html(crew, racer)
+    assert f'<span class="text-sm font-semibold" data-weight>{shown}</span>' in card
+    assert "data-car>007<" in card  # D47
+
+
+def test_pass_fail_shows_pass_and_fail_and_records_the_choice(crew, event):
+    racer = weighs(event, "Scouts", "pass_fail")[0]
+    card = card_html(crew, racer)
+    assert 'data-weigh-in="pass_fail"' in card and "Not weighed" in card
+    assert 'data-action="weigh-pass"' in card and 'data-action="weigh-fail"' in card
+    assert "data-weight-input" not in card
+    reply = post(crew, f"/checkin/racer/{racer.pk}/weigh/", {"passed": "0"})
+    assert "weigh-in failed." in reply.content.decode()
+    racer.refresh_from_db()
+    assert (racer.weigh_in_passed, racer.weight_grams) == (False, None)
+    assert "Failed" in card_html(crew, racer)
+
+
+def test_a_partition_with_no_weigh_in_shows_no_controls(crew, event):
+    racer = add_racers(event, "Tigers", 1, 101, passed=False)[0]
+    assert "data-weigh-in" not in card_html(crew, racer)
+    sheet = get(crew, f"/checkin/racer/{racer.pk}/").content.decode()
+    assert "data-weigh-in" not in sheet and "data-weigh-fields" not in sheet
+    page = crew.get("/checkin/").content.decode()
+    assert 'name="weigh"' not in page
+    refused = post(crew, f"/checkin/racer/{racer.pk}/weigh/", {"passed": "1"})
+    assert refused.status_code == 422
+    assert "Tigers has no weigh-in" in refused.content.decode()
+
+
+def test_a_weight_for_pass_fail_and_none_for_recorded_are_refused(crew, event):
+    scout = weighs(event, "Scouts", "pass_fail")[0]
+    outlaw = weighs(event, "Outlaws", "recorded", "oz", first=401)[0]
+    assert (
+        post(crew, f"/checkin/racer/{scout.pk}/weigh/", {"weight": "5"}).status_code
+        == 422
+    )
+    assert (
+        post(crew, f"/checkin/racer/{outlaw.pk}/weigh/", {"weight": " "}).status_code
+        == 422
+    )
+    assert not Racer.objects.filter(weighed_at__isnull=False).exists()
+
+
+def test_over_the_maximum_saves_warns_and_shows_a_chip(crew, event):
+    racer = weighs(event, "Outlaws", "recorded", "oz", "5")[0]
+    reply = post(crew, f"/checkin/racer/{racer.pk}/weigh/", {"weight": "5.3"})
+    assert reply.status_code == 200
+    assert "5.3 oz is over the 5.0 oz maximum for Outlaws." in reply.content.decode()
+    racer.refresh_from_db()
+    assert racer.weight_grams == Decimal("150.25")
+    card = card_html(crew, racer)
+    assert "data-over" in card and "Over the 5.0 oz max" in card
+
+
+def test_the_sheet_weighs_and_answers_with_its_next_body(crew, event):
+    racer = weighs(event, "Outlaws", "recorded", "oz", "5")[0]
+    sheet = get(crew, f"/checkin/racer/{racer.pk}/").content.decode()
+    assert 'id="weight-sheet-' in sheet
+    reply = post(
+        crew,
+        f"/checkin/racer/{racer.pk}/weigh/",
+        {"weight": "5.5"},
+        HTTP_HX_TARGET="checkin-sheet-body",
+    ).content.decode()
+    assert "data-racer-sheet" in reply and "data-warnings" in reply
+    assert "5.5 oz is over the 5.0 oz maximum" in reply
+
+
+def test_the_add_sheet_asks_the_classs_weigh_in_and_saves_it(crew, event):
+    outlaws = weighs(event, "Outlaws", "recorded", "oz", "5")[0].partition
+    scouts = weighs(event, "Scouts", "pass_fail", first=401)[0].partition
+    fields = get(crew, "/checkin/weigh/", {"partitionid": outlaws.pk}).content.decode()
+    assert 'data-weigh-fields="recorded"' in fields and "(max 5.0 oz)" in fields
+    fields = get(crew, "/checkin/weigh/", {"partitionid": scouts.pk}).content.decode()
+    assert 'data-weigh-fields="pass_fail"' in fields
+    assert (
+        "data-weigh-fields"
+        not in get(crew, "/checkin/weigh/", {"partitionid": "junk"}).content.decode()
+    )
+
+    def add(partition, **weigh):
+        return post(
+            crew,
+            "/checkin/racer/new/",
+            {
+                "firstname": "New",
+                "lastname": partition.name,
+                "partitionid": partition.pk,
+                "carno": "",
+                **weigh,
+            },
+        ).content.decode()
+
+    reply = add(outlaws, weight="5.25")
+    assert "5.25 oz is over the 5.0 oz maximum" in reply
+    assert Racer.objects.get(
+        last_name="Outlaws", first_name="New"
+    ).weight_grams == Decimal("148.83")
+    add(scouts, weigh_passed="1")
+    assert (
+        Racer.objects.get(last_name="Scouts", first_name="New").weigh_in_passed is True
+    )
+    refused = add(scouts, weight="5")
+    assert "data-sheet-error" in refused and "pass or fail" in refused
+    assert Racer.objects.filter(last_name="Scouts", first_name="New").count() == 1
+
+
+def test_the_weigh_in_filter(crew, event):
+    scouts = weighs(event, "Scouts", "pass_fail", n=3)
+    outlaws = weighs(event, "Outlaws", "recorded", "oz", "5", n=2, first=401)
+    plain = add_racers(event, "Tigers", 1, 501, passed=False)
+    record_weigh_in(scouts[0], passed=True)
+    record_weigh_in(scouts[1], passed=False)
+    record_weigh_in(outlaws[0], weight="5.5")
+
+    def shown(weigh):
+        return set(
+            card_ids(get(crew, "/checkin/list/", {"weigh": weigh}).content.decode())
+        )
+
+    assert shown("weighed") == {scouts[0].pk, scouts[1].pk, outlaws[0].pk}
+    assert shown("unweighed") == {scouts[2].pk, outlaws[1].pk}
+    assert shown("failed") == {scouts[1].pk, outlaws[0].pk}
+    assert plain[0].pk in shown("") and plain[0].pk in shown("junk")
+    assert 'name="weigh"' in crew.get("/checkin/").content.decode()
+
+
+def test_a_weigh_in_changes_the_poll_signature(crew, event):
+    racer = weighs(event, "Outlaws", "recorded", "oz")[0]
+    sig = signature(crew.get("/checkin/").content.decode())
+    record_weigh_in(racer, weight="5")
+    assert get(crew, "/checkin/list/", {"sig": sig}).status_code == 200
+
+
+def test_no_legacy_endpoint_reads_or_writes_the_weigh_in(crew, event):
+    """The legacy wire contract is unchanged (#70): `racer.list` answers the
+    same before and after a weigh-in, and `racer.pass` leaves it alone."""
+    racer = weighs(event, "Outlaws", "recorded", "oz", "5")[0]
+    before = crew.get("/action.php", {"query": "racer.list"}).content
+    record_weigh_in(racer, weight="5.5")
+    assert crew.get("/action.php", {"query": "racer.list"}).content == before
+    crew.post("/action.php", {"action": "racer.pass", "racer": racer.pk, "value": 1})
+    racer.refresh_from_db()
+    assert racer.passed_inspection and racer.weight_grams == Decimal("155.92")
