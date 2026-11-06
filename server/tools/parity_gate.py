@@ -3,6 +3,7 @@ shell suite, step by step.
 
     uv run python -m tools.parity_gate PHP_STEPS DJANGO_STEPS
     uv run python -m tools.parity_gate --summary "$GITHUB_STEP_SUMMARY" A B
+    uv run python -m tools.parity_gate --failing failing.json A B
 
 Each leg is `testing/exercise-one-database.sh` run with `PARITY_DIR` set
 (`testing/steps.sh`, `testing/docker/run-suite.sh parity`): a `steps.tsv`
@@ -28,11 +29,11 @@ The gate fails when:
 - a reply differs from PHP's, in any step, waiting or not, unless the
   registry allows it.
 - a step in `WAITING` passes on Django, a step in `STEP_DIVERGENCES` no
-  longer parts, or a step in `AFTER_SKIP` matches PHP. Remove the entry.
+  longer parts, or a step in `REPLIES_DIFFER` matches PHP. Remove the entry.
 - a step ran in one leg and not in the other.
 
-A step in `AFTER_SKIP` shows the state of a step Django skipped, so its
-replies may differ. A difference in a reply is allowed when the registry's
+The replies of a step in `REPLIES_DIFFER` may differ from PHP's until the
+ticket it names lands. A difference in a reply is allowed when the registry's
 `PARITY_PATHS` covers its endpoint, path and values
 (`legacy_api.registry.allowed_by`), or, in one step only, when that step's
 `STEP_PATHS` entry does. A step in `STEP_DIVERGENCES` asks the two
@@ -42,6 +43,7 @@ is printed, so nothing is hidden.
 """
 
 import argparse
+import json
 import re
 import sys
 from collections import defaultdict
@@ -50,6 +52,7 @@ from datetime import datetime
 from pathlib import Path
 
 from legacy_api.parity_paths import ParityPath
+from tools.contact_windows import INFINITY, latest_times
 from tools.transcript_diff import (
     MISSING,
     Difference,
@@ -89,7 +92,6 @@ _PAGES = (
 _EACH_ROLE = Waiting(f"{_PAGES} (test-visit-each-page.sh)", "about.php")
 WAITING: dict[str, Waiting] = {
     "test-each-role.sh": _EACH_ROLE,
-    "test-basic-racing.sh": Waiting("#49 (history.php)", "history.php"),
     "puppeteer_test all-pages-test.js": Waiting(_PAGES),
     "puppeteer_test coordinator-test.js": Waiting("#41 (coordinator.php)"),
     "puppeteer_test ondeck-columns-test.js": Waiting("#52 (ondeck.php)"),
@@ -102,9 +104,7 @@ WAITING: dict[str, Waiting] = {
 }
 
 # The steps the Django leg skips, with the reason. The PHP leg skips none.
-SKIPS: dict[str, str] = {
-    "test-balloting.sh": "#54 (D7): balloting moved to the backlog",
-}
+SKIPS: dict[str, str] = {}
 
 # The steps whose requests differ between the legs on purpose, because the
 # script asks Django other questions when DERBYNET_BACKEND=django. Their
@@ -266,15 +266,19 @@ def step_path_text(
     return f"{label}: {reason}" if allowed.divergence in ids else None
 
 
-# The steps after a skipped step whose replies show the state that step would
-# have left, up to the next reset. Their replies may differ from PHP's; their
-# requests and outcomes are still judged.
-AFTER_SKIP: dict[str, str] = {
-    # test-balloting.sh resets the database and builds its own; without it,
-    # the snapshot holds the roster test-unused-lanes.sh left.
-    "snapshot_get": "#54 (the state test-balloting.sh leaves)",
+# The steps whose replies may differ from PHP's until the ticket each names
+# lands. Their requests and outcomes are still judged, and the gate fails
+# while one matches PHP, so the list can't go stale. The summary lists them.
+# #221 lists the columns: Classes.durable, the Awards ids of no group or
+# racer, the RaceInfo rows, and the ballotid of Voters and Votes.
+_SNAPSHOT = (
+    "#221: the snapshot is compared as one text, with its ids raw, and some of"
+    " its columns differ from PHP's"
+)
+REPLIES_DIFFER: dict[str, str] = {
+    "snapshot_get": _SNAPSHOT,
     # snapshot.put loads the snapshot snapshot_get took.
-    "snapshot_put": "#54 (the snapshot taken without test-balloting.sh)",
+    "snapshot_put": _SNAPSHOT,
 }
 
 # The differences, and the allowed ones, listed for each step; the counts
@@ -322,7 +326,13 @@ def read_leg(directory: Path) -> list[Step]:
 def _allow(difference: Difference) -> str | None:
     from legacy_api.registry import allowed_by
 
-    return allowed_by(difference.endpoint, difference.path, difference.a, difference.b)
+    return allowed_by(
+        difference.endpoint,
+        difference.path,
+        difference.a,
+        difference.b,
+        difference.role,
+    )
 
 
 @dataclass
@@ -334,7 +344,7 @@ class StepResult:
     problems: list[str] = field(default_factory=list)
     waiting: Waiting | None = None
     diverges_by: str | None = None
-    after_skip: str | None = None
+    replies_differ: str | None = None
 
     @property
     def matches(self) -> bool:
@@ -358,12 +368,12 @@ def judge(
     waiting: dict[str, Waiting] | None = None,
     step_divergences: dict[str, str] | None = None,
     allow=_allow,
-    after_skip: dict[str, str] | None = None,
+    replies_differ: dict[str, str] | None = None,
     skips: dict[str, str] | None = None,
     step_paths: dict[str, tuple[ParityPath, ...]] | None = None,
 ) -> list[StepResult]:
     waiting = WAITING if waiting is None else waiting
-    after_skip = AFTER_SKIP if after_skip is None else after_skip
+    replies_differ = REPLIES_DIFFER if replies_differ is None else replies_differ
     skips = SKIPS if skips is None else skips
     step_divergences = (
         STEP_DIVERGENCES if step_divergences is None else step_divergences
@@ -371,6 +381,7 @@ def judge(
     step_paths = STEP_PATHS if step_paths is None else step_paths
     # One numbering per leg, carried from step to step.
     runs = new_runs(now)
+    bounds = {**later_bounds(php, "php"), **later_bounds(django, "django")}
     by_label = {s.label: s for s in django}
     results = []
     for step in php:
@@ -380,7 +391,7 @@ def judge(
             step,
             other,
             waiting=waiting.get(step.label),
-            after_skip=after_skip.get(step.label),
+            replies_differ=replies_differ.get(step.label),
         )
         results.append(result)
         if step.outcome == "fail":
@@ -406,7 +417,12 @@ def judge(
             step.label, step_paths.get(step.label, ()), step_divergences, allow
         )
         report = diff(
-            _read(step.transcript), _read(other.transcript), step_allow, now, runs
+            _read(step.transcript),
+            _read(other.transcript),
+            step_allow,
+            now,
+            runs,
+            (bounds["php", step.label], bounds["django", other.label]),
         )
         result.report = report
         _judge_step(result, report, other, step_divergences)
@@ -422,6 +438,20 @@ def judge(
     return results
 
 
+def later_bounds(steps: list[Step], leg: str) -> dict[tuple[str, str], float]:
+    """For each step of a leg, by `(leg, label)`, the latest time the leg's
+    later steps allow it to have ended: the contact windows judge a step's
+    last replies by it (`tools/contact_windows.py`). Infinite for the last
+    step that shows a time."""
+    out, bound = {}, INFINITY
+    for step in reversed(steps):
+        out[leg, step.label] = bound
+        bodies = [e.body for e in parse(_read(step.transcript))]
+        if bodies:
+            bound = min(bound, latest_times(bodies)[0])
+    return out
+
+
 def _with_step_paths(label, paths, step_divergences, allow):
     """`allow`, and the step's own STEP_PATHS before it."""
     if not paths:
@@ -430,7 +460,11 @@ def _with_step_paths(label, paths, step_divergences, allow):
     def check(difference):
         for allowed in paths:
             if allowed.covers(
-                difference.endpoint, difference.path, difference.a, difference.b
+                difference.endpoint,
+                difference.path,
+                difference.a,
+                difference.b,
+                difference.role,
             ):
                 text = step_path_text(label, allowed, step_divergences)
                 if text:
@@ -482,12 +516,12 @@ def _judge_step(
     elif parted:
         result.problems.append("the requests part from PHP's")
     # A difference in a reply it did get fails the gate, waiting or not.
-    if report.differences and result.after_skip is None:
+    if report.differences and result.replies_differ is None:
         result.problems.append(f"{len(report.differences)} differences from PHP")
-    elif result.after_skip is not None and not report.differences:
+    elif result.replies_differ is not None and not report.differences:
         result.problems.append(
-            f"matches PHP although it follows a skip ({result.after_skip}):"
-            " remove it from AFTER_SKIP in server/tools/parity_gate.py"
+            f"matches PHP although its replies may differ ({result.replies_differ}):"
+            " remove it from REPLIES_DIFFER in server/tools/parity_gate.py"
         )
     if result.waiting is None:
         result.problems += excused
@@ -549,8 +583,8 @@ def render(results: list[StepResult], labels: tuple[str, str]) -> str:
             verdict = "FAIL: " + "; ".join(r.problems)
         elif r.waiting:
             verdict = f"waiting on {r.waiting}"
-        elif r.after_skip:
-            verdict = f"follows a skip: {r.after_skip}"
+        elif r.replies_differ:
+            verdict = f"replies may differ: {r.replies_differ}"
         else:
             verdict = "ok"
         out.append(
@@ -564,6 +598,16 @@ def render(results: list[StepResult], labels: tuple[str, str]) -> str:
         if step is not None and step.retried
     ]
     out += ["", "Retried once: " + (", ".join(retried) if retried else "none") + "."]
+    excused = [
+        f"`{r.label}` ({r.replies_differ})"
+        for r in results
+        if r.replies_differ and not r.failed
+    ]
+    if excused:
+        out += [
+            "",
+            "Replies may differ (`REPLIES_DIFFER`): " + "; ".join(excused) + ".",
+        ]
     out += _by_path(results)
     for r in results:
         if r.report is None or (r.report.ok and not r.report.allowed):
@@ -585,7 +629,7 @@ def _by_path(results: list[StepResult]) -> list[str]:
     counts: dict[tuple[str, str], int] = defaultdict(int)
     steps: dict[tuple[str, str], list[str]] = defaultdict(list)
     for r in results:
-        if r.report is None or r.after_skip:
+        if r.report is None or r.replies_differ:
             continue
         for difference in r.report.differences:
             key = (difference.endpoint, _INDEX.sub("[*]", difference.path))
@@ -610,12 +654,34 @@ def _by_path(results: list[StepResult]) -> list[str]:
     return out
 
 
+def failing(results: list[StepResult], short: list[str]) -> dict:
+    """The steps that fail the gate, for `tools/parity_tracking.py`: each
+    one's label, its count of differences from PHP, the WAITING entry it
+    waits on, and its problems. `short` holds why a leg was cut short."""
+    return {
+        "short": short,
+        "steps": [
+            {
+                "label": r.label,
+                "differences": len(r.report.differences) if r.report else 0,
+                "waiting": str(r.waiting) if r.waiting else None,
+                "problems": r.problems,
+            }
+            for r in results
+            if r.failed
+        ],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("php", type=Path, help="the PHP leg's steps directory")
     parser.add_argument("django", type=Path, help="the Django leg's steps directory")
     parser.add_argument("--labels", default="php,django")
     parser.add_argument("--summary", type=Path, help="append the report here too")
+    parser.add_argument(
+        "--failing", type=Path, help="write the failing steps here, as JSON"
+    )
     parser.add_argument("--now", type=datetime.fromisoformat, default=None)
     args = parser.parse_args(argv)
     labels = tuple(args.labels.split(",", 1))
@@ -623,6 +689,10 @@ def main(argv: list[str] | None = None) -> int:
     results = judge(php, django, args.now)
     if not php or not django:
         print("A leg recorded no steps: see its suite.log.", file=sys.stderr)
+        if args.failing:
+            args.failing.write_text(
+                json.dumps(failing([], ["a leg recorded no steps"]), indent=1)
+            )
         return 1
     short = [
         reason
@@ -633,6 +703,8 @@ def main(argv: list[str] | None = None) -> int:
     if short:
         text = "\n".join(f"**FAIL: {reason}.**" for reason in short) + "\n\n" + text
     print(text)
+    if args.failing:
+        args.failing.write_text(json.dumps(failing(results, short), indent=1))
     if args.summary:
         with args.summary.open("a", encoding="utf-8") as summary:
             summary.write(text + "\n")

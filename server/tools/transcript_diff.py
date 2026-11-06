@@ -40,8 +40,8 @@ How a body is compared:
 - Other pages are not compared, because each server renders HTML its own way
   (`curl_page` in `common.sh`); they count as skipped. An `action.php`
   request answered with a page, because curl followed a redirect, is
-  compared as text, except the pages `WAITING_PAGES` lists by title, which
-  are allowed and name the ticket that serves Django's page.
+  compared as text, except the pages `SAME_PAGES` lists by title, which
+  are allowed as the same page on both servers.
 
 What is normalized, on both runs alike:
 
@@ -52,7 +52,8 @@ What is normalized, on both runs alike:
   (`rewrite_ids`, `translate`), which the golden replays use. On top: the
   `who` of `racer.bulk` (`c<classid>`, `r<rankid>`, `d<partitionid>`), the
   `PWDid<racerid>` barcode, the `classid_<position>=<classid>` and
-  `rankid_<position>=<rankid>` fields of `class.order` and `rank.order`
+  `rankid_<position>=<rankid>` fields of `class.order` and `rank.order`, the
+  racer ids of `vote.cast`'s `votes=[...]`
   (`class.add`'s `rankid_<rankid>=1` names the id in the key, as `translate`
   reads it), a racer id in a `photo.php/<repo>/racer/<id>` URL, and
   `roundid N` in XML failure text.
@@ -66,6 +67,11 @@ What is normalized, on both runs alike:
   and zone) within `TIMESTAMP_WINDOW` of now, which is when the run was
   made. A fixed date, such as an award's or the roster's, is compared.
 - `CONNECTED (N sec.)`.
+- The timer's and the replay client's contact windows, judged on each run's
+  own clock (`tools/contact_windows.py`): a connected state against NOT
+  CONNECTED, a `HELLO` one replay poll sends, and the commands one run's
+  replay dropped while its window was shut, when each run's value is what
+  its own last contact and clock give.
 - Cache breakers. In a request, the last part of a photo URL is the script's
   `$RANDOM`, masked whatever its value. In a reply, the last part of
   `photo.php/<repo>/file/<render>/<name>/N` or of a racer photo URL is the
@@ -130,6 +136,7 @@ from legacy_api.tests.php_http import (
     rewrite_ids,
     translate,
 )
+from tools.contact_windows import INFINITY, Clock, latest_times, window_allowances
 
 # Where each rule of server/tests/golden/capture/normalize.mjs is handled.
 GOLDEN_RULES = {
@@ -181,6 +188,8 @@ def _event_folder(found: re.Match) -> str:
 _ROUND_IN_TEXT = re.compile(r"(roundid )(\d+)")
 _BARCODE = re.compile(r"(PWDid)(\d+)")
 _WHO = re.compile(r"([cdr])(\d+)")
+# The racer ids of vote.cast's `votes=[<racerid>,...]` (testing/test-balloting.sh).
+_VOTE = re.compile(r"(^\[|,)(\d+)(?=[,\]])")
 _WHO_KINDS = {"c": "class", "r": "rank", "d": "partition"}
 _PLAIN_KEY = re.compile(r"[A-Za-z_][\w-]*")
 # class.order, rank.order and partition.order post
@@ -318,6 +327,13 @@ class Run:
     now: datetime
     # The group formation rule the run last applied, or None when unknown.
     rule: str | None = None
+    # What the run has shown of its clock and its replay client
+    # (tools/contact_windows.py).
+    clock: Clock = field(default_factory=Clock)
+    # The role the run's session is logged in as, "" for none: a leg starts
+    # with no session, and the shell suite keeps its cookies from step to
+    # step.
+    role: str = ""
 
     def _renumber(self, pattern: re.Pattern, kind: str, text: str) -> str:
         """`pattern`'s second group, an id of `kind`, renumbered."""
@@ -361,6 +377,8 @@ class Run:
                 [_, (key, text)] = self._ids_in([("action", action), (key, str(value))])
                 value = int(text) if number and text.lstrip("-").isdigit() else text
                 value = self.who(value) if key == "who" else value
+                if key == "votes" and action == "vote.cast":
+                    value = self._renumber(_VOTE, "racer", value)
             else:
                 value = self.map_echoed_field(action, key, value)
             out[key] = value
@@ -392,12 +410,15 @@ class Run:
         return out
 
     def fields(self, data: str) -> tuple[tuple[str, str], ...]:
+        names = dict(parse_qsl(data, keep_blank_values=True))
         out = []
         for key, value in self._ids_in(parse_qsl(data, keep_blank_values=True)):
             if key == "who":
                 value = self.who(value)
             elif key == "barcode":
                 value = self._renumber(_BARCODE, "racer", value)
+            elif key == "votes" and names.get("action") == "vote.cast":
+                value = self._renumber(_VOTE, "racer", value)
             out.append((key, self.mask(value)))
         return tuple(out)
 
@@ -534,11 +555,47 @@ def _json(value, endpoint: str, run: Run):
         echo = run.echoed(value["action"])
         value = {k: v for k, v in value.items() if k != "action"}
     value = rewrite_ids(value, run.ids)
+    value = _ballot_ids(value, endpoint, run.ids)
     if echo is not None:
         value["action"] = echo
     if endpoint == "action schedule.reschedule" and isinstance(value, dict):
         value = mask_reschedule_timing(value)
     return _mask_strings(value, run)
+
+
+def _ballot_ids(value, endpoint: str, ids: FirstAppearance):
+    """The ids of the balloting replies (#54): ballot.get's `ballot`, keyed
+    by award id with each award's voted racer ids, and the
+    `<voterid> <awardid> <racerid>` lines of vote.cast's `votes`."""
+    if not isinstance(value, dict):
+        return value
+    ballot = value.get("ballot")
+    if endpoint == "query ballot.get" and isinstance(ballot, dict):
+        value = {
+            **value,
+            "ballot": {
+                str(ids("award", key)): (
+                    {**entry, "votes": [ids("racer", r) for r in entry["votes"]]}
+                    if isinstance(entry, dict) and isinstance(entry.get("votes"), list)
+                    else entry
+                )
+                for key, entry in ballot.items()
+            },
+        }
+    votes = value.get("votes")
+    if endpoint == "action vote.cast" and isinstance(votes, list):
+        value = {**value, "votes": [_vote_line(v, ids) for v in votes]}
+    return value
+
+
+def _vote_line(line, ids: FirstAppearance):
+    parts = line.split(" ") if isinstance(line, str) else []
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        return line
+    return " ".join(
+        str(ids(kind, int(part)))
+        for kind, part in zip(("voter", "award", "racer"), parts, strict=True)
+    )
 
 
 def _mask_strings(value, run: Run):
@@ -598,6 +655,8 @@ class Difference:
     a: object
     b: object
     allowed_by: str | None = None
+    # The role the session sent the request as (`Run.role`), or None.
+    role: str | None = None
 
 
 @dataclass(frozen=True)
@@ -781,14 +840,19 @@ def diff(
     allow: Allow | None = None,
     now: datetime | None = None,
     runs: tuple[Run, Run] | None = None,
+    after: tuple[float, float] = (INFINITY, INFINITY),
 ) -> Report:
     """Compare two `output.curl` runs exchange by exchange. `now` is when
     they ran, for telling volatile timestamps from fixed dates. `runs`, from
     `new_runs`, carries the id numbering over from an earlier part of the
-    same two runs; it is updated in place, past any divergence too."""
+    same two runs; it is updated in place, past any divergence too. `after`
+    is the latest time each run's later parts allow
+    (`contact_windows.latest_times`)."""
     run_a, run_b = runs or new_runs(now)
     report = Report()
     exchanges_a, exchanges_b = parse(a_text), parse(b_text)
+    latest_a = latest_times([e.body for e in exchanges_a], after[0])
+    latest_b = latest_times([e.body for e in exchanges_b], after[1])
     for i, ex_a, ex_b in _pairs(exchanges_a, exchanges_b):
         if ex_a is MISSING or ex_b is MISSING:
             index = (ex_b if ex_a is MISSING else ex_a).index
@@ -815,8 +879,8 @@ def diff(
         body_a = read_body(ex_a.body, req_a, run_a)
         body_b = read_body(ex_b.body, req_b, run_b)
         report.compared += 1
-        waiting = _waiting_page(req_a, body_a, body_b)
-        if waiting:
+        same = _same_page(req_a, body_a, body_b)
+        if same:
             report.allowed.append(
                 Difference(
                     ex_a.index,
@@ -825,35 +889,58 @@ def diff(
                     "text",
                     _title(body_a),
                     _title(body_b),
-                    waiting,
+                    same,
                 )
             )
-            _after(req_a, ex_a.body, run_a)
-            _after(req_b, ex_b.body, run_b)
+            _after(req_a, ex_a.body, run_a, latest_a[i])
+            _after(req_b, ex_b.body, run_b, latest_b[i])
             continue
         found = diff_bodies(body_a, body_b, req_a.endpoint)
+        windows = (
+            window_allowances(
+                req_a.endpoint,
+                ex_a.body,
+                ex_b.body,
+                run_a.clock,
+                run_b.clock,
+                latest_a[i],
+                latest_b[i],
+            )
+            if found
+            else {}
+        )
         for item in found:
             difference = Difference(
-                ex_a.index, req_a.endpoint, ex_a.request, item.path, item.a, item.b
+                ex_a.index,
+                req_a.endpoint,
+                ex_a.request,
+                item.path,
+                item.a,
+                item.b,
+                role=run_a.role if run_a.role == run_b.role else None,
             )
-            difference.allowed_by = allow(difference) if allow else None
+            difference.allowed_by = windows.get(item.path) or (
+                allow(difference) if allow else None
+            )
             if difference.allowed_by:
                 report.allowed.append(difference)
             else:
                 report.differences.append(difference)
-        _after(req_a, ex_a.body, run_a)
-        _after(req_b, ex_b.body, run_b)
+        _after(req_a, ex_a.body, run_a, latest_a[i])
+        _after(req_b, ex_b.body, run_b, latest_b[i])
     return report
 
 
-# The pages a request is redirected to that Django doesn't serve yet: the
-# endpoint, the <title> of PHP's page and of Django's, and the ticket that
-# serves it. PHP's role.login with no event redirects to its setup page, and
-# Django's to setup.php, which answers 404 until #48 builds it.
-WAITING_PAGES: dict[tuple[str, str, str], str] = {
-    ("action role.login", "DerbyNet Set-Up", "Not Found"): (
-        "#48: Django serves no setup.php yet, where PHP redirects a login with"
-        " no event to its setup page"
+# The pages a request is redirected to that are the same page on both servers,
+# by the endpoint and the <title> of PHP's page and of Django's, with why.
+# Pages are not compared (each server renders HTML its own way), so the title
+# says which page the redirect landed on. PHP's role.login with no event
+# redirects to its setup page, and Django's to setup.php, whose 301 lands on
+# /setup/, #48's port of it (setup.php in ROUTE_DIVERGENCES).
+SAME_PAGES: dict[tuple[str, str, str], str] = {
+    ("action role.login", "DerbyNet Set-Up", "Set-Up \u00b7 DerbyNet"): (
+        "#48: a login with no event lands on the setup page on both servers,"
+        " PHP's setup.php and Django's /setup/"
     ),
 }
 
@@ -872,15 +959,21 @@ def _title(body: Body) -> str | None:
     return found[1].strip() if found else ""
 
 
-def _waiting_page(request: Request, a: Body, b: Body) -> str | None:
-    """The WAITING_PAGES entry that explains the two pages, or None."""
-    return WAITING_PAGES.get((request.endpoint, _title(a), _title(b)))
+def _same_page(request: Request, a: Body, b: Body) -> str | None:
+    """The SAME_PAGES entry that explains the two pages, or None."""
+    return SAME_PAGES.get((request.endpoint, _title(a), _title(b)))
 
 
-def _after(request: Request, body: str, run: Run) -> None:
-    """Number afresh what the request left no id of."""
+def _after(request: Request, body: str, run: Run, latest: float = INFINITY) -> None:
+    """Number afresh what the request left no id of, and take in what the
+    reply shows of the run's clock."""
+    run.clock.observe(request.endpoint, body, latest)
+    role = _logged_in_as(request, body)
+    if role is not None:
+        run.role = role
     if _resets_database(request):
         run.ids, run.rule = FirstAppearance(), None
+        run.clock.forget_replay()
         return
     rule = _applied_rule(request, body)
     if rule is None:
@@ -892,6 +985,24 @@ def _after(request: Request, body: str, run: Run) -> None:
     if rule != "custom" and run.rule in (None, rule):
         run.ids.forget(*GROUP_KINDS)
     run.rule = rule
+
+
+def _logged_in_as(request: Request, body: str) -> str | None:
+    """The role a successful `role.login` logs the session in as, "" for a
+    logout (no name), or None for any other exchange."""
+    if request.endpoint != "action role.login":
+        return None
+    if request.key[0] == "login":
+        name = request.key[1]
+    else:
+        name = dict(request.key[2]).get("name", "")
+    values, _ = _json_values(body.strip())
+    outcome = (
+        values[0].get("outcome") if values and isinstance(values[0], dict) else None
+    )
+    if not isinstance(outcome, dict) or outcome.get("summary") != "success":
+        return None
+    return name
 
 
 def _resets_database(request: Request) -> bool:

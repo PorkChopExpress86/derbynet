@@ -24,16 +24,7 @@ NTH_RUN = re.compile(r" \(\d+\)$")
 # Stale entries the lead has yet to decide on, with why. Remove an entry here
 # with its entry in parity_gate.py; the test fails while one is listed that
 # isn't stale any more.
-KNOWN_STALE: dict[str, str] = {
-    "test-basic-racing.sh": (
-        "#204 retro: in server.yml since #203; its 16 reply differences"
-        " (replay-state, replay.message) still fail the gate without the entry"
-    ),
-    "test-balloting.sh": (
-        "#204 retro: in server.yml since #54; exercise-one-database.sh still"
-        " skips it on Django"
-    ),
-}
+KNOWN_STALE: dict[str, str] = {}
 
 
 def ran_against_django(workflow: str) -> set[str]:

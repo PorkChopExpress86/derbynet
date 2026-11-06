@@ -32,17 +32,27 @@ class ParityPath:
     normalizing: a value, `MISSING` (`legacy_api.missing`) for a key one
     reply lacks, a type such as `int` for any value of it, or `ANY`.
     `divergence` is the id that starts one of the endpoint's `divergences`
-    (`R3`); the guard in legacy_api/tests/test_registry.py checks it does."""
+    (`R3`); the guard in legacy_api/tests/test_registry.py checks it does.
+    `roles`, when set, are the roles the divergence covers: the role the
+    session was logged in as when it sent the request (`""` for none), as the
+    transcript's last login shows it. A difference with no known role is
+    not covered then."""
 
     endpoint: str
     path: str
     divergence: str
     php: object = ANY
     django: object = ANY
+    # A sorted tuple, not a set, so the test ids built from a ParityPath are
+    # the same in every pytest-xdist worker.
+    roles: tuple[str, ...] | None = None
 
-    def covers(self, endpoint: str, path: str, php=ANY, django=ANY) -> bool:
+    def covers(
+        self, endpoint: str, path: str, php=ANY, django=ANY, role: str | None = None
+    ) -> bool:
         return (
             endpoint == self.endpoint
+            and (self.roles is None or role in self.roles)
             and _path_pattern(self.path).fullmatch(path) is not None
             and _matches(self.php, php)
             and _matches(self.django, django)

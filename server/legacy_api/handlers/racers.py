@@ -183,24 +183,37 @@ def racer_bulk(ctx: LegacyContext) -> None:
     ctx.put("reload", True)
 
 
+# Every caller reaches the handler: PHP refuses only after it has found the
+# racer and its results, so the service refuses in that order.
 @action(
     "racer.pass",
-    permission=Perm.CHECK_IN_RACERS | Perm.PHOTO_UPLOAD | Perm.REVERT_CHECK_IN,
+    permission=Access.ANONYMOUS,
+    divergences=(
+        "S23: needs CHECK_IN_RACERS or PHOTO_UPLOAD to pass a racer, and"
+        " REVERT_CHECK_IN to unpass one, after the notunique and"
+        " alreadyscheduled refusals as in PHP; PHP passes a racer for anyone,"
+        " and a walk-in barcode makes the racer first.",
+    ),
 )
 def racer_pass(ctx: LegacyContext) -> None:
     passed = php_truthy(_text(ctx, "value", "1"))
     needed = CHECK_IN if passed else Perm.REVERT_CHECK_IN
-    if not granted_for(ctx.session) & needed:
-        _refuse(ctx)
-        return
     code = _optional(ctx, "barcode")
-    if code is not None:
-        racer = barcode.resolve(ctx.event, code).racer
-    else:
-        racer = ctx.resolve(Racer, _optional(ctx, "racer"))
+    racer = None if code is not None else ctx.resolve(Racer, _optional(ctx, "racer"))
     try:
-        details = racers.pass_racer(racer, passed)
+        details = racers.pass_requested(
+            ctx.event,
+            racer,
+            code,
+            passed,
+            authorized=bool(granted_for(ctx.session) & needed),
+        )
     except RacerFailure as failure:
+        if failure.code == racers.Failure.NOT_AUTHORIZED:
+            # json_not_authorized() writes no reload; only the other refusals
+            # reach json_out('reload', true) (action.racer.pass.inc:44-50).
+            _refuse(ctx)
+            return
         _fail(ctx, failure)
         ctx.put("reload", True)
         return
