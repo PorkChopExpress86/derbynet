@@ -22,6 +22,21 @@
 
 set -e -E -o pipefail
 
+# It refuses to start through a pipe or under `timeout`: #47 and #48 each
+# lost a 25-repeat run to `timeout 3000 ... | grep`, killed with nothing
+# kept (#48 retro).
+refuse() {
+  echo "pytest-under-load.sh: $1. Run it with the Bash tool's run_in_background," \
+       "with no pipe and no timeout, and read the summary it prints." >&2
+  exit 2
+}
+[ -p /dev/stdout ] && refuse "its output is a pipe"
+pid=$PPID
+while [ "${pid:-0}" -gt 1 ]; do
+  [ "$(ps -o comm= -p "$pid" || true)" = timeout ] && refuse "it runs under timeout"
+  pid=$(ps -o ppid= -p "$pid" | tr -d ' ') || pid=1
+done
+
 SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER=(uv run pytest)
 LOOPS=8

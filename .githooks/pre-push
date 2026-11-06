@@ -7,7 +7,8 @@
 # (server/tools/golden_inputs.py), which the golden-fixtures workflow finds
 # only after a 25-minute capture, and the paths the ADRs cite, which
 # plan-checks.yml checks (#70 retro: a path without its server/ prefix failed
-# CI twice).  Turn it on once per clone:
+# CI twice), and the tests that read only the source
+# (server/tools/source-checks.sh, #48 retro).  Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
 #
@@ -51,3 +52,5 @@ run python tools/convert_generators.py --check
 run python tools/reschedule_deviations.py --check
 run python manage.py makemigrations --check --dry-run
 run python tools/golden_inputs.py --check
+echo "pre-push: tools/source-checks.sh" >&2
+tools/source-checks.sh
