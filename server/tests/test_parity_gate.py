@@ -808,7 +808,10 @@ def test_the_raceinfo_allowance_covers_a_setting_only_django_has():
         assert allowed_by(endpoint, path, php, django) is None, path
     received = PUT_TABLE.format("RaceInfo") + "/table-summary/@rows-received"
     assert allowed_by(PUT, received, "12", "82").startswith("D82")
+    assert allowed_by(PUT, received, "12", "12").startswith("D82")
     for endpoint, path, php, django in (
+        (PUT, received, "12", "5"),
+        (PUT, received, "12", "11"),
         (PUT, received, "12", "eighty"),
         (PUT, received, "12", MISSING),
         (PUT, PUT_TABLE.format("Roster") + "/table-summary/@rows-received", "1", "2"),

@@ -328,6 +328,12 @@ def _replay(field, codec, default):
     return Mapped(REPLAY, (field,), codec, default)
 
 
+# The keys of Django-only settings (D18, D76), which no PHP writes: the
+# snapshot carries them so that a round trip keeps them (D82, #221).
+DJANGO_ONLY_KEYS = frozenset(
+    {"replay-post-roll-ms", "replay-max-clip-ms", "replay-ice-servers"}
+)
+
 REGISTRY: dict[str, Mapped | Dropped | Prefix] = {
     # Lanes, scheduling, and scoring.
     "lane_count": _setting("lane_count", Int(), 0),
@@ -377,6 +383,12 @@ REGISTRY: dict[str, Mapped | Dropped | Prefix] = {
     "replay-skipback": _setting("replay_skipback_ms", Int(), 4000),
     "replay-num-showings": _setting("replay_num_showings", Int(), 2),
     "replay-rate": _setting("replay_rate", Int(), 50),
+    # Django-only (DJANGO_ONLY_KEYS).
+    "replay-post-roll-ms": _setting("replay_post_roll_ms", Int(), 2000),
+    "replay-max-clip-ms": _setting("replay_max_clip_ms", Int(), 10000),
+    "replay-ice-servers": _setting(
+        "replay_ice_servers", Str(), "stun:stun.l.google.com:19302"
+    ),
     # Folders.
     "photo-directory": _setting("photo_directory", Str(), EVENT_FOLDER),
     "car-photo-directory": _setting("car_photo_directory", Str(), EVENT_FOLDER),

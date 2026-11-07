@@ -1231,3 +1231,24 @@ def test_a_snapshot_put_with_no_file_size_still_differs():
         "<bytes>",
         "",
     )
+
+
+def test_an_id_that_names_no_row_never_matches_a_renumbered_id():
+    # PHP's racers 5 and 7 and a vote for racer 1, which is no row, against
+    # Django's racers 1 and 2 and a vote for its first racer: renumbered,
+    # Django's vote names racer 1, and PHP's must not.
+    def racers(ids, voted):
+        tables = snapshot_tables()
+        tables["RegistrationInfo"] = [
+            {"racerid": n, "lastname": name, "classid": 1}
+            for n, name in zip(ids, ("Ames", "Burr"), strict=True)
+        ]
+        tables["Votes"] = [{"voteid": 1, "awardid": 1, "racerid": voted, "voterid": 1}]
+        return tables
+
+    [found] = snapshot_differences(racers((5, 7), 1), racers((1, 2), 1)).differences
+    assert found.path == "$.Votes.rows[0].racerid"
+    assert (found.a, found.b) == ("<no RegistrationInfo row>", 1)
+    # 0 and null still stay as they are, and differ from each other.
+    [found] = snapshot_differences(racers((5, 7), 0), racers((1, 2), None)).differences
+    assert (found.a, found.b) == (0, None)

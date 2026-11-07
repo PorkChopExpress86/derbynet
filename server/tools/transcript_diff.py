@@ -691,8 +691,9 @@ def read_snapshot(text: str) -> dict | None:
     the gaps a deletion leaves, and Django numbers each table from 1 (D57).
     So each table whose first column is its id is renumbered by row order
     (`SNAPSHOT_IDS`), and every column that names one of its rows maps
-    through the same numbers. An id that names no row, such as 0, stays as it
-    is. `high-water` and `missing` are what the ids give, so they become
+    through the same numbers. 0 and null stay as they are, and any other id
+    that names no row becomes `<no <table> row>`, which no renumbered id
+    equals. `high-water` and `missing` are what the ids give, so they become
     `<ids>` when they agree with the rows, and are compared raw when they
     don't. RaceInfo's rows are keyed by `itemkey`, since its ids are only the
     order of the writes, which differs between servers. A Voters
@@ -743,7 +744,9 @@ def _snapshot_id(table: str, value, numbers):
     mapping = numbers.get(table)
     if mapping is None or not _is_id(value):
         return value
-    return mapping.get(value, value)
+    # An id that names no row would otherwise read as whatever row the other
+    # snapshot numbers so.
+    return mapping.get(value, f"<no {table} row>")
 
 
 def _snapshot_row(table: str | None, row: dict, numbers) -> dict:

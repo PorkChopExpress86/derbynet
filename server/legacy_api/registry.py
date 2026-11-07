@@ -19,7 +19,7 @@ from accounts.permissions import Perm, Requirement
 from core.models import Event
 from legacy_api.formats import Format, format_of
 from legacy_api.missing import MISSING
-from legacy_api.parity_paths import ANY, DIGITS, ParityPath
+from legacy_api.parity_paths import ANY, DIGITS, NO_FEWER, ParityPath
 from legacy_api.xml import XmlWriter
 
 logger = logging.getLogger(__name__)
@@ -419,6 +419,7 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
         "D82",
         php=DIGITS,
         django=DIGITS,
+        between=NO_FEWER,
     ),
     # PHP counts each table after wiping the database, Django the rows of the
     # event the restore replaces (D57).
