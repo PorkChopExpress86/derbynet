@@ -16,8 +16,8 @@ from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in
 from racing.models import HeatLane, RosterEntry, Round
 from racing.tests.factories import HeatLaneFactory, RoundFactory
-from roster.models import Group, Racer
-from roster.tests.factories import GroupFactory, RacerFactory
+from roster.models import Group, Racer, Subgroup
+from roster.tests.factories import GroupFactory, RacerFactory, SubgroupFactory
 from transfer.legacy import folders
 from transfer.legacy.folders import FOLDERS, ImportFolder, recover
 
@@ -320,6 +320,91 @@ def test_get_then_put_keeps_the_rows_the_race_state_names(client, coordinator):
         "results": None,
     }
     assert (state.current_scene.name, state.playlist_scene.name) == ("Awards",) * 2
+
+
+def _kiosk_classes(event, params: str) -> list[str]:
+    """The names of the groups a kiosk's `classids` lists, in its order."""
+    names = dict(Group.objects.filter(event=event).values_list("pk", "name"))
+    return [names.get(pk, f"no group {pk}") for pk in json.loads(params)["classids"]]
+
+
+def _standings_of(event, params: str) -> tuple:
+    """The round and subgroup a standings kiosk's `st-rr<round>-<subgroup>`
+    key names, by name."""
+    round_id, subgroup_id = json.loads(params)["key"].removeprefix("st-rr").split("-")
+    found = Round.objects.filter(event=event, pk=round_id).first()
+    subgroup = Subgroup.objects.filter(event=event, pk=subgroup_id).first()
+    return (
+        found and (found.group.name, found.number),
+        subgroup and subgroup.name,
+    )
+
+
+def _pk(model, event, name):
+    return model.objects.get(event=event, name=name).pk
+
+
+# The current award key of each kind, built from the event's rows by name,
+# as awards/presentation.py and speed_awards.py build them.
+AWARD_KEYS = {
+    "judged": lambda e: f"award-{_pk(Award, e, 'Best paint')}",
+    "pack": lambda e: "speed-2",
+    "group with a tie": lambda e: f"speed-1b-{_pk(Group, e, 'Lions')}",
+    "subgroup": lambda e: (
+        f"speed-3-{_pk(Group, e, 'Lions')}-{_pk(Subgroup, e, 'Cubs')}"
+    ),
+}
+
+
+@pytest.mark.parametrize("award", AWARD_KEYS)
+def test_get_then_put_keeps_each_kiosks_classes_and_the_current_award(
+    client, coordinator, award
+):
+    """#231: the ids inside a kiosk's parameters and the current award key
+    name the same rows, by name, after a round trip."""
+    from core.models import RaceState
+    from kiosks.models import Scene, SceneKiosk
+
+    other = EventFactory()
+    GroupFactory.create_batch(2, event=other)
+    AwardFactory.create_batch(2, event=other)
+    wolves = GroupFactory(event=coordinator, name="Wolves")
+    lions = GroupFactory(event=coordinator, name="Lions")
+    SubgroupFactory(event=coordinator, group=wolves, name="Pups")
+    cubs = SubgroupFactory(event=coordinator, group=lions, name="Cubs")
+    RoundFactory(event=coordinator, group=wolves, number=1)
+    RoundFactory(event=coordinator, group=lions, number=1)
+    lions_2 = RoundFactory(event=coordinator, group=lions, number=2)
+    AwardFactory(event=coordinator, name="Other")
+    AwardFactory(event=coordinator, name="Best paint")
+    racing = Scene.objects.get(event=coordinator, name="Racing")
+    slideshow = {"title": "Hi", "subdir": "", "classids": [lions.pk, wolves.pk]}
+    for name, page, params in (
+        ("Lobby", "please-check-in", {"classids": [lions.pk]}),
+        ("Hall", "slideshow", slideshow),
+        ("Board", "standings", {"key": f"st-rr{lions_2.pk}-{cubs.pk}"}),
+    ):
+        SceneKiosk.objects.create(
+            event=coordinator,
+            scene=racing,
+            kiosk_name=name,
+            page=f"kiosks/{page}.kiosk",
+            params=json.dumps(params),
+        )
+    RaceState.objects.filter(event=coordinator).update(
+        current_award_key=AWARD_KEYS[award](coordinator)
+    )
+
+    assert "<success/>" in put(client, get(client).content).content.decode()
+
+    new = active()
+    kiosks = {k.kiosk_name: k.params for k in SceneKiosk.objects.filter(event=new)}
+    assert _kiosk_classes(new, kiosks["Lobby"]) == ["Lions"]
+    assert _kiosk_classes(new, kiosks["Hall"]) == ["Lions", "Wolves"]
+    assert json.loads(kiosks["Hall"])["title"] == "Hi"
+    assert _standings_of(new, kiosks["Board"]) == (("Lions", 2), "Cubs")
+    state = RaceState.objects.get(event=new)
+    assert state.current_award_key == AWARD_KEYS[award](new)
 
 
 def test_clean_cuts_names_to_initials(client, coordinator):

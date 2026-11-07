@@ -1,6 +1,7 @@
 """`manage.py export_event` writes a zip that `import_derbynet` reads back
 with the same racers, results and media (#212; #9, Archive)."""
 
+import json
 import zipfile
 from pathlib import Path
 
@@ -221,3 +222,48 @@ def test_an_import_does_not_replace_a_read_only_event(raced, tmp_path):
     assert Event.objects.get(pk=raced.pk).read_only
     assert racers(raced) == racers_before
     assert Event.objects.filter(name=raced.name).count() == 1
+
+
+def test_the_round_trip_keeps_each_kiosks_classes_and_the_current_award(
+    raced, tmp_path
+):
+    """#231: the ids a kiosk's parameters and the current award key hold name
+    the same rows, by name, in the imported event."""
+    from core.models import RaceState
+    from racing.models import Round
+
+    bears = Group.objects.get(event=raced, name="Bears")
+    cubs = Subgroup.objects.filter(event=raced, group=bears).first()
+    wolves_1 = Round.objects.get(event=raced, group__name="Wolves", number=1)
+    for address, page, params in (
+        ("10.0.0.9", "please-check-in", {"classids": [bears.pk]}),
+        ("10.0.0.10", "standings", {"key": f"st-r{wolves_1.pk}"}),
+    ):
+        Kiosk.objects.create(
+            event=raced,
+            address=address,
+            name="Lobby TV",
+            page=f"kiosks/{page}.kiosk",
+            params=json.dumps(params),
+        )
+    RaceState.objects.filter(event=raced).update(
+        current_award_key=f"speed-1-{bears.pk}-{cubs.pk}"
+    )
+    target = tmp_path / "e.zip"
+
+    call_command("export_event", raced.slug, output=target)
+    call_command("import_derbynet", str(target), event="Restored")
+
+    restored = Event.objects.get(name="Restored")
+    kiosks = {
+        k.address: json.loads(k.params) for k in Kiosk.objects.filter(event=restored)
+    }
+    groups = dict(Group.objects.filter(event=restored).values_list("pk", "name"))
+    assert [groups.get(pk) for pk in kiosks["10.0.0.9"]["classids"]] == ["Bears"]
+    new_round = Round.objects.get(event=restored, group__name="Wolves", number=1)
+    assert kiosks["10.0.0.10"] == {"key": f"st-r{new_round.pk}"}
+    new_bears = Group.objects.get(event=restored, name="Bears")
+    new_cubs = Subgroup.objects.get(event=restored, group=new_bears, name=cubs.name)
+    assert RaceState.objects.get(event=restored).current_award_key == (
+        f"speed-1-{new_bears.pk}-{new_cubs.pk}"
+    )

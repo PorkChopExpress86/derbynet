@@ -120,11 +120,7 @@ class _Awarding:
                 name += " (Tie)"
             for i, racer_id in enumerate(recipients):
                 letter = tie_letters(i) if len(rung) > 1 else ""
-                key = f"speed-{1 + place}{letter}"
-                if group_id is not None:
-                    key += f"-{group_id}"
-                if subgroup_id is not None:
-                    key += f"-{subgroup_id}"
+                key = SpeedKey(1 + place, letter, group_id, subgroup_id).text
                 self.awards.append(
                     SpeedAward(
                         key=key,
@@ -138,6 +134,49 @@ class _Awarding:
                 )
                 self.holders.append(racer_id)
             place += 1
+
+
+@dataclass(frozen=True)
+class SpeedKey:
+    """A speed award's `current_award_key`, `speed-<place><tie>[-<group>]
+    [-<subgroup>]`, as `add_speed_group()` builds it
+    (website/inc/awards.inc:118-121). `tie` is empty for an untied place.
+    A subgroup's award always names its group too."""
+
+    place: int
+    tie: str = ""
+    group_id: int | None = None
+    subgroup_id: int | None = None
+
+    @property
+    def text(self) -> str:
+        key = f"speed-{self.place}{self.tie}"
+        if self.group_id is not None:
+            key += f"-{self.group_id}"
+        if self.subgroup_id is not None:
+            key += f"-{self.subgroup_id}"
+        return key
+
+
+_SPEED_KEY = re.compile(
+    r"speed-([1-9][0-9]*)([a-z]*)(?:-([1-9][0-9]*)(?:-([1-9][0-9]*))?)?"
+)
+
+
+def parse_speed_key(key: str) -> SpeedKey | None:
+    """The inverse of `SpeedKey.text`: None for text it never writes, such
+    as `speed-02` or `speed-1-x`, which `current_speed_award` still reads
+    loosely (query.award.current.inc:21-42)."""
+    found = _SPEED_KEY.fullmatch(key)
+    if found is None:
+        return None
+    place, tie, group, subgroup = found.groups()
+    return SpeedKey(
+        int(place),
+        tie,
+        None if group is None else int(group),
+        None if subgroup is None else int(subgroup),
+    )
 
 
 def tie_letters(i: int) -> str:

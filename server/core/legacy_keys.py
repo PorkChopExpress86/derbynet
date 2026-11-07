@@ -68,6 +68,12 @@ class Str(Codec):
         return value
 
 
+class AwardKey(Str):
+    """`current_award_key`: `award-<awardid>` or a speed award's
+    `speed-<place>[-<classid>[-<rankid>]]`, text that holds ids. The
+    snapshot and the importer map them (`transfer.legacy.embedded`)."""
+
+
 class Bool(Codec):
     """PHP truthiness: `""` and `"0"` are false, and any other text is true."""
 
@@ -415,7 +421,7 @@ REGISTRY: dict[str, Mapped | Dropped | Prefix] = {
     "current_scene": _state("current_scene", Ref("kiosks.Scene"), None),
     "playlist_scene": _state("playlist_scene", Ref("kiosks.Scene"), None),
     "playlist_scene_at": _state("playlist_scene_at", UnixTime(), None),
-    "current_award_key": _state("current_award_key", Str(), ""),
+    "current_award_key": _state("current_award_key", AwardKey(), ""),
     "reveal_current_award": _state("reveal_current_award", Bool(), False),
     # Timer.
     "timer_state": Mapped(

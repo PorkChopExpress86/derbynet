@@ -7,6 +7,7 @@ for an award made with no `class_and_rank`, which the awards editor reads
 as an unknown class; Django stores no such difference (deviations.json).
 """
 
+import re
 import time
 from collections import Counter
 
@@ -209,6 +210,21 @@ def _row_id(text: str) -> int:
     if number is None or not 0 < number < 2**63 or number != int(number):
         return -1
     return int(number)
+
+
+def award_key(award_id: int) -> str:
+    """A judged or ad hoc award's `current_award_key` (website/inc/awards.inc:50)."""
+    return f"award-{award_id}"
+
+
+_AWARD_KEY = re.compile(r"award-([1-9][0-9]*)")
+
+
+def parse_award_key(key: str) -> int | None:
+    """The award id of an `award_key`, or None for text it never writes.
+    `current()` reads keys more loosely (query.award.current.inc:21-25)."""
+    found = _AWARD_KEY.fullmatch(key)
+    return None if found is None else int(found[1])
 
 
 class UnrecognizedKey(Exception):

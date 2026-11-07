@@ -31,7 +31,7 @@ from roster.models import (
     Subgroup,
 )
 
-from . import values
+from . import embedded, values
 from .photos import CAR_PHOTOS, HEADSHOTS
 from .report import Kind
 from .values import BadValue
@@ -434,7 +434,8 @@ def _scene(row, ctx):
 def _page(ctx, table, legacy_id, raw):
     """The registry key, parameters and reload flag of a legacy page string.
     A page with no registry entry, any `local/kiosks/` page among them,
-    shows the identify page (D10, #52)."""
+    shows the identify page (D10, #52). The ids its parameters hold are
+    mapped to the imported rows (#231)."""
     found = pages.from_legacy(values.text(raw))
     if found.unknown:
         ctx.report.add(
@@ -444,7 +445,12 @@ def _page(ctx, table, legacy_id, raw):
             f"page {found.unknown!r} is not a built-in kiosk page, so the kiosk"
             " shows the identify page",
         )
-    return found.page, found.params, found.reload
+    mapped = embedded.kiosk_params(
+        found.page, found.params, lambda model, legacy: ctx.ids[model].get(legacy)
+    )
+    for dropped in mapped.dropped:
+        ctx.report.add(Kind.CHANGED_VALUE, table, legacy_id, dropped)
+    return found.page, mapped.text, found.reload
 
 
 def _scene_kiosk(row, ctx):

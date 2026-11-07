@@ -23,7 +23,7 @@ from django.utils import timezone
 
 from awards.models import Award, AwardType, BallotAward, Vote, Voter
 from core import race_settings
-from core.legacy_keys import Ref, decode, encode, entry_for
+from core.legacy_keys import AwardKey, Ref, decode, encode, entry_for
 from core.models import Event
 from kiosks import pages
 from kiosks.models import Scene, SceneKiosk
@@ -38,6 +38,7 @@ from roster.models import (
     Subgroup,
 )
 from transfer.importer import LATEST_SCHEMA, ImportFailed, import_derbynet
+from transfer.legacy import embedded
 from transfer.legacy.photos import is_valid_name
 from transfer.legacy.raceinfo import PACKED_REFS
 from transfer.legacy.source import SourceError, read_source
@@ -62,7 +63,7 @@ def _json(value) -> str:
     return encode_php_json(value, numeric_check=False).decode().rstrip("\n")
 
 
-class _Ids:
+class Numbering:
     """Legacy ids: each table is numbered from 1 in the order of its rows."""
 
     def __init__(self):
@@ -80,17 +81,29 @@ class _Ids:
         """The legacy id, or None for a row the snapshot doesn't hold."""
         return self._maps.get(model, {}).get(pk)
 
+    def lookup(self, label: str, pk: int):
+        """`get` by model label, as `transfer.legacy.embedded` asks."""
+        return self.get(_REF_MODELS[label], pk)
+
 
 # The models a RaceInfo reference names, by the label the importer maps it
 # through (transfer.legacy.raceinfo).
-_REF_MODELS = {"roster.group": Group, "kiosks.scene": Scene, "racing.round": Round}
+_REF_MODELS = {
+    "roster.group": Group,
+    "roster.subgroup": Subgroup,
+    "kiosks.scene": Scene,
+    "racing.round": Round,
+    "awards.award": Award,
+}
 
 
-def _raceinfo_value(key: str, raw: str, ids: _Ids) -> str:
+def _raceinfo_value(key: str, raw: str, ids: Numbering) -> str:
     """A RaceInfo value with each id it holds as the snapshot numbers that
     row, as the importer reads it back (`_assign`). A row the snapshot
     doesn't hold reads as none."""
     entry = entry_for(key)
+    if isinstance(entry.codec, AwardKey):
+        return embedded.award_key(raw, ids.lookup).text
     if isinstance(entry.codec, Ref):
         targets = {entry.fields[0]: entry.codec.model.lower()}
     else:
@@ -129,10 +142,12 @@ def _csv(numbers) -> str:
 
 
 def tables(
-    event: Event, clean: bool = False
+    event: Event, clean: bool = False, ids: Numbering | None = None
 ) -> dict[str, tuple[list[str], list[list]]]:
-    """Every table of the snapshot, in PHP's order, as its columns and rows."""
-    ids = _Ids()
+    """Every table of the snapshot, in PHP's order, as its columns and rows.
+    `ids`, when given, is filled with the numbering, for a table the caller
+    adds."""
+    ids = Numbering() if ids is None else ids
     mine = {"event": event}
     groups = ids.of(Group, Group.objects.filter(**mine))
     subgroups = ids.of(Subgroup, Subgroup.objects.filter(**mine))
@@ -330,7 +345,9 @@ def tables(
                     n,
                     ids(Scene, k.scene_id),
                     k.kiosk_name,
-                    pages.legacy_string(k.page, k.params),
+                    pages.legacy_string(
+                        k.page, embedded.kiosk_params(k.page, k.params, ids.lookup).text
+                    ),
                 ]
                 for n, k in enumerate(
                     SceneKiosk.objects.filter(**mine).order_by("pk"), 1

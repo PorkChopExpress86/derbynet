@@ -10,12 +10,19 @@ import re
 from django.core.exceptions import ValidationError
 from django.db import connection, models
 
-from core.legacy_keys import Dropped, LegacyValueError, Ref, decode, entry_for
+from core.legacy_keys import (
+    AwardKey,
+    Dropped,
+    LegacyValueError,
+    Ref,
+    decode,
+    entry_for,
+)
 from core.models import FullFieldRule, RaceSettings, RaceState
 from kiosks.models import ReplayCommand, ReplayStatus
 from racing.models import TimerStatus
 
-from . import values
+from . import embedded, values
 from .photos import CAR_PHOTOS, HEADSHOTS
 from .report import Kind
 from .values import BadValue
@@ -197,6 +204,13 @@ def _assign(ctx, row, key, fields, entry):
                 value = None
             else:
                 value = {**value, "round_id": round_id}
+        elif isinstance(entry.codec, AwardKey):
+            mapped = embedded.award_key(
+                value, lambda model, legacy: ctx.ids[model].get(legacy)
+            )
+            for dropped in mapped.dropped:
+                ctx.report.add(Kind.CHANGED_VALUE, "raceinfo", key, dropped)
+            value = mapped.text
         elif target is not None and value is not None:
             new = ctx.ids[target].get(value)
             if new is None:

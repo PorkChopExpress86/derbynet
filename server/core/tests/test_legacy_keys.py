@@ -8,6 +8,7 @@ from core import legacy_keys
 from core.legacy_keys import (
     EVENT_FOLDER,
     REGISTRY,
+    AwardKey,
     Balloting,
     Bool,
     CurrentRound,
@@ -153,6 +154,9 @@ ROUND_TRIPS = [
     (Str(), ""),
     (Str(), "%5.3f"),
     (Str(), "a+b#c"),
+    (AwardKey(), ""),
+    (AwardKey(), "award-12"),
+    (AwardKey(), "speed-1b-3-7"),
     (Bool(), True),
     (Bool(), False),
     (Ref("roster.Group"), 12),
