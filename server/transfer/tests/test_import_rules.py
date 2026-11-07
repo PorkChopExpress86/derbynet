@@ -1280,3 +1280,41 @@ def test_a_php_award_key_that_names_no_row_is_cleared_and_reported(tmp_path, key
     [finding] = [f for f in report["findings"] if f["legacy_id"] == "current_award_key"]
     assert finding["kind"] == "changed-value"
     assert key in finding["detail"]
+
+
+def test_a_php_snapshots_ids_given_as_text_name_the_same_rows(tmp_path):
+    """#231 review: a PHP on MySQL or older PDO writes ids as text. PHP's SQL
+    (please-check-in.kiosk:101-102) and standings-kiosk.js:127-132 read
+    "7" as 7, so the import maps them as it maps numbers."""
+    from kiosks.models import SceneKiosk
+
+    source = _php_snapshot(
+        tmp_path,
+        pages={
+            6: 'kiosks/please-check-in.kiosk#{"classids":["7","3"]}',
+            12: 'kiosks/standings.kiosk#{"classid":"7","rankid":"3"}',
+        },
+    )
+
+    report, _ = _import(tmp_path, source)
+
+    event = _event(report)
+    kiosks = {
+        k.kiosk_name + "@" + k.scene.name: json.loads(k.params or "{}")
+        for k in SceneKiosk.objects.filter(event=event).select_related("scene")
+    }
+    groups = _names(Group, event)
+    assert [groups[pk] for pk in kiosks["Aux1@Check-In"]["classids"]] == [
+        "TheLastClass",
+        "Bears and Frères",
+    ]
+    from roster.models import Subgroup
+
+    standings = kiosks["Main@Wrap-Up"]
+    assert groups[standings["classid"]] == "TheLastClass"
+    assert _names(Subgroup, event)[standings["rankid"]] == "Bears and Frères"
+    assert not [
+        f
+        for f in report["findings"]
+        if f["table"] == "scenekiosk" and f["kind"] == "changed-value"
+    ]

@@ -56,8 +56,16 @@ class Mapped:
     dropped: tuple[str, ...] = ()
 
 
-def _whole_number(value) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool)
+def _id(value) -> int | None:
+    """An id as a kiosk's parameters hold it: a whole number, or its decimal
+    digits as text, which a PHP on MySQL or older PDO writes and PHP's SQL
+    (please-check-in.kiosk:101-102) and standings-kiosk.js:127-132 (`==`)
+    read as the number. None for anything else, `true` among them."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.isascii() and value.isdigit():
+        return int(value)
+    return None
 
 
 def _map_fields(key, lookup: Lookup):
@@ -97,9 +105,10 @@ def _classids(value, lookup: Lookup, dropped: list[str]):
         return value
     kept = []
     for item in value:
-        if item == NO_CLASS and _whole_number(item):
+        legacy = _id(item)
+        if legacy == NO_CLASS:
             continue
-        new = lookup(GROUP, item) if _whole_number(item) else None
+        new = None if legacy is None else lookup(GROUP, legacy)
         if new is None:
             dropped.append(f"classids {item!r} names no class; dropped")
         else:
@@ -126,7 +135,8 @@ def _standings_key(value, lookup: Lookup, dropped: list[str]):
 
 def _single(model: str):
     def read(value, lookup: Lookup, dropped: list[str]):
-        new = lookup(model, value) if _whole_number(value) else None
+        legacy = _id(value)
+        new = None if legacy is None else lookup(model, legacy)
         if new is None:
             dropped.append(f"{model.split('.')[1]} {value!r} names no row; dropped")
         return new

@@ -185,9 +185,21 @@ STANDINGS = "kiosks/standings.kiosk"
     [
         (CHECK_IN, '{"classids":[7,3]}', '{"classids":[1007,1003]}', 0),
         (CHECK_IN, "{classids:[3]}", '{"classids":[1003]}', 0),
-        (CHECK_IN, '{"classids":[3,9,"7",true]}', '{"classids":[1003]}', 3),
+        (CHECK_IN, '{"classids":[3,9,"7",true]}', '{"classids":[1003,1007]}', 2),
         (CHECK_IN, '{"classids":[9]}', '{"classids":[0]}', 2),
         (CHECK_IN, '{"classids":[0]}', '{"classids":[0]}', 0),
+        # A PHP on MySQL or older PDO stores ids as text, which PHP's SQL and
+        # standings-kiosk.js's == still read as the id (#231 review).
+        (CHECK_IN, '{"classids":["7","3"]}', '{"classids":[1007,1003]}', 0),
+        (CHECK_IN, '{"classids":["0"]}', '{"classids":[0]}', 0),
+        (CHECK_IN, '{"classids":["3x"," 3","",3.0,null]}', '{"classids":[0]}', 6),
+        (
+            STANDINGS,
+            '{"classid":"3","rankid":"5"}',
+            '{"classid":1003,"rankid":1005}',
+            0,
+        ),
+        (STANDINGS, '{"classid":true}', "{}", 1),
         (CHECK_IN, '{"classids":[0,3]}', '{"classids":[1003]}', 0),
         (CHECK_IN, '{"classids":[]}', '{"classids":[]}', 0),
         (CHECK_IN, "", "", 0),
