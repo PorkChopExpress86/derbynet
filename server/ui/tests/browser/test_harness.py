@@ -106,20 +106,40 @@ def test_close_tab_waits_for_the_request_out(page, event):
 
 
 def answer_the_poll(route):
-    """A 204, as the port's polls answer when nothing changed. Chromium
-    reports an empty 200 that the page never reads as `net::ERR_ABORTED`,
-    so a poll sent before the settle stopped it failed the test at
-    teardown, 2 to 3 runs in 50 under load (#224)."""
+    """A 204, as the port's polls answer when nothing changed. An empty 200
+    that the page never reads fails with `net::ERR_ABORTED` while the page
+    is still open (`test_an_unread_empty_200_is_an_abort`), so a poll the
+    settle tests answered that way failed them at teardown (#224)."""
     route.fulfill(status=204)
 
 
 def start_a_fast_poll(page):
     """Start a 10 ms poll, and return once its first request is out, so the
-    settle always meets a poll that has already sent. Without that wait the
-    settle usually stopped the poll before it sent anything, and the
-    abort above showed only under load (#224)."""
+    settle always meets a poll that has already sent. Without that wait,
+    whether the poll had sent first was down to timing: with the empty 200
+    above the settle tests failed only a few load runs in 50, where with
+    the wait they fail every run (#224)."""
     with page.expect_request("**/held-request"):
         page.evaluate("() => setInterval(() => fetch('/held-request'), 10)")
+
+
+def test_an_unread_empty_200_is_an_abort(page, page_errors, event):
+    """Chromium ends an empty 200 that the page never reads with
+    `net::ERR_ABORTED`, while the page is still open, and a 204 that the
+    page never reads finishes (#224). Hence `answer_the_poll`."""
+    page_errors.allow(r"/empty-200 net::ERR_ABORTED$")
+    page.route("**/empty-200", lambda route: route.fulfill(body=""))
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    with page.expect_event(
+        "requestfailed", lambda r: r.url.endswith("/empty-200")
+    ) as failed:
+        page.evaluate("() => { fetch('/empty-200'); }")
+    assert failed.value.failure == "net::ERR_ABORTED"
+    with page.expect_event(
+        "requestfinished", lambda r: r.url.endswith("/held-request")
+    ):
+        page.evaluate("() => { fetch('/held-request'); }")
 
 
 def test_the_settle_after_a_test_stops_a_fast_poll(page, event):
