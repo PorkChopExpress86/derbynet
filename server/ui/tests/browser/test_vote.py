@@ -263,6 +263,13 @@ def test_earlier_votes_show_on_the_award_card(page, event):
     shoot(page, "vote-awards")
 
 
+def expect_grid_order(page, racers):
+    """The grid shows `racers` in this order: each card's `order` style is
+    its place, read again until it matches."""
+    for place, r in enumerate(racers):
+        expect(page.locator(f'[data-racer="{r.pk}"]')).to_have_css("order", str(place))
+
+
 def test_the_sort_control_orders_the_grid_and_keeps_the_url(page, event):
     found = pack(event)
     # First names that put each order apart: by name Ava Ben Cal Dee is
@@ -271,47 +278,58 @@ def test_the_sort_control_orders_the_grid_and_keeps_the_url(page, event):
     # all three, so a sort that changed nothing passed (#220).
     for key, first in (("w1", "Dee"), ("w2", "Ava"), ("w3", "Cal"), ("b1", "Ben")):
         Racer.objects.filter(pk=found[key].pk).update(first_name=first)
+    w1, w2, w3, b1 = (found[key] for key in ("w1", "w2", "w3", "b1"))
     best = ballot_award(event, "Best in Show", 1)
     set_open(event)
     page.goto("/vote/?order=name")
     award_card(page, best).click()
 
-    def shown():
-        return page.locator("[data-racer-cards] [data-car]").evaluate_all(
-            """cars => cars.filter((c) => c.offsetParent)
-              .map((c) => [getComputedStyle(c.closest('li')).order, c.textContent])
-              .sort((a, b) => a[0] - b[0]).map((p) => p[1])"""
-        )
-
     # Alpine shows the award view on the next animation frame, after the
-    # click returns, so a read right after the click can find no car. The
-    # browser harness's toast check before each click made that the rule
-    # here, not the exception (PR #223; #220).
+    # click returns, so a read right after the click can find no car (PR
+    # #223; #220). Each check here retries.
     expect(page.locator("[data-racer-cards] [data-car]:visible")).to_have_count(4)
-    assert shown() == ["102", "201", "103", "101"]
-    # After a sort, the read waits for the URL: x-model sets the order and
-    # Alpine writes each card's `order` style before `@change` calls
-    # sorted(), which replaces the URL (#220: the styles read inside
-    # history.replaceState were already the new order's).
+    expect_grid_order(page, [w2, b1, w3, w1])
     page.locator('[data-sort] input[value="class"]').check(force=True)
     expect(page).to_have_url(re.compile(r"/vote/\?order=class$"))
-    assert shown() == ["102", "103", "101", "201"]
+    expect_grid_order(page, [w2, w3, w1, b1])
     page.locator('[data-sort] input[value="car"]').check(force=True)
     expect(page).to_have_url(re.compile(r"/vote/\?order=car$"))
-    assert shown() == ["101", "102", "103", "201"]
+    expect_grid_order(page, [w1, w2, w3, b1])
     assert_accessible(page)
     shoot(page, "vote-grid")
-    car_card(page, found["b1"]).click()
+    car_card(page, b1).click()
     expect(page.locator("[data-sheet-details]")).to_have_text("Bears")
     assert_accessible(page)
     shoot(page, "vote-sheet", full_page=False)
+
+
+# Counts each finished poll(), whatever it did, and records every change to
+# the page's state or to whether the award view shows.
+WATCH_POLLS = """() => {
+  const store = Alpine.store('vote');
+  const poll = store.poll;
+  window.__polls = 0;
+  store.poll = async function () {
+    try { await poll.call(this); } finally { window.__polls++; }
+  };
+  window.__changes = [];
+  const vote = document.querySelector('[data-vote]');
+  const view = document.querySelector('[data-award-view]');
+  new MutationObserver(() => {
+    window.__changes.push(`state=${vote.dataset.voteState}`);
+  }).observe(vote, {attributeFilter: ['data-vote-state']});
+  new MutationObserver(() => {
+    window.__changes.push(`view=${getComputedStyle(view).display}`);
+  }).observe(view, {attributeFilter: ['style']});
+}"""
 
 
 def test_a_status_poll_sent_before_the_award_opened_leaves_it_open(page, event):
     """The other suspect of #220: a `/ballot/status` poll sent from the
     award list, answered after the visitor opened an award. Held until then,
     the server's own answer is still `open`, the same as the page's, so
-    `poll()` returns before `closeAward()` and the grid keeps its cars."""
+    `poll()` returns at once: it neither reloads the ballot (which hides the
+    grid while `ballot.get` is out) nor calls `closeAward()`."""
     found = pack(event)
     best = ballot_award(event, "Best in Show", 1)
     set_open(event)
@@ -321,8 +339,10 @@ def test_a_status_poll_sent_before_the_award_opened_leaves_it_open(page, event):
         lambda route: route.continue_() if held else held.append(route),
     )
     page.goto("/vote/")
+    # The first poll goes out 5 s after Alpine starts, well after this.
+    page.evaluate(WATCH_POLLS)
     expect(award_card(page, best)).to_be_visible()
-    for _ in range(140):  # the first poll goes out 5 s after the page loads
+    for _ in range(140):
         if held:
             break
         page.wait_for_timeout(50)
@@ -331,15 +351,20 @@ def test_a_status_poll_sent_before_the_award_opened_leaves_it_open(page, event):
     award_card(page, best).click()
     cars = page.locator("[data-racer-cards] [data-car]:visible")
     expect(cars).to_have_count(4)
+    page.evaluate("window.__changes = []")
     with page.expect_response("**/ballot/status") as answer:
         held[0].continue_()
     assert answer.value.json() == {"balloting": "open"}
-    # Alpine would hide the view on the next frame after a closeAward().
+    page.wait_for_function("window.__polls >= 1")
+    # x-show writes its style on the next frame.
     page.evaluate(
         "() => new Promise((done) => requestAnimationFrame(() => setTimeout(done)))"
     )
+    # One read, not a retrying expect: a reload or a closeAward() that is
+    # undone by the time an expect retries is the fault looked for here.
+    assert page.evaluate("window.__changes") == []
     expect(page.locator("[data-award-view]")).to_be_visible()
-    assert cars.all_text_contents() == ["101", "102", "103", "201"]
+    expect(cars).to_have_text(["101", "102", "103", "201"])
     car_card(page, found["w1"]).click()
     expect(toggle(page)).to_be_enabled()
 
