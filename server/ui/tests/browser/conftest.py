@@ -403,6 +403,32 @@ def close_tab(page, tab):
     tab.close()
 
 
+# A fetch the settle sends after it stops the timers.
+SETTLE_BARRIER = "/settle-barrier"
+
+
+def _barrier(page):
+    """Wait until Playwright has reported the requests `page` sent before
+    its timers stopped. A `request` event can reach Python after the
+    evaluate that sent it returns, so the drain found the set empty with a
+    poll's last request out (#224 retro, 1 run in 50 under load;
+    `test_the_settle_drains_a_request_sent_as_it_stops`). The barrier is a
+    fetch sent after the stop, answered 204 here; its end is reported after
+    the earlier fetch's start (the same test)."""
+    if not page.url.startswith("http"):
+        return
+    page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
+    try:
+        with page.expect_event(
+            "requestfinished",
+            lambda r: r.url.endswith(SETTLE_BARRIER),
+            timeout=InFlight.TIMEOUT_MS,
+        ):
+            page.evaluate(f"() => {{ fetch('{SETTLE_BARRIER}'); }}")
+    finally:
+        page.unroute(f"**{SETTLE_BARRIER}")
+
+
 def _settle(page) -> list[str]:
     """Stop every tab's polls, close the other tabs, and drain what is out.
     A page that polls more often than the drain's 50 ms check, such as the
@@ -415,6 +441,7 @@ def _settle(page) -> list[str]:
         if tab != page:
             close_tab(page, tab)
     stop_timers(page)
+    _barrier(page)
     return page.in_flight.drain(page)
 
 
