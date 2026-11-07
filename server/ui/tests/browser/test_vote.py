@@ -9,6 +9,8 @@
 - Votes from an earlier visit show on the award card, the sort control keeps
   `?order=` on this page (C33), a refused vote names the reason in a toast,
   and a ballot with no award says so.
+- A status poll sent before an award opened and answered after leaves the
+  award open (#220).
 - The judging page's ballot sheet opens balloting and sets an award's votes
   per ballot.
 - The screenshots of every state at both sizes.
@@ -263,6 +265,12 @@ def test_earlier_votes_show_on_the_award_card(page, event):
 
 def test_the_sort_control_orders_the_grid_and_keeps_the_url(page, event):
     found = pack(event)
+    # First names that put each order apart: by name Ava Ben Cal Dee is
+    # 102 201 103 101, by class (Wolves first, then by name) 102 103 101
+    # 201, and by car 101 102 103 201. pack()'s own names give one order for
+    # all three, so a sort that changed nothing passed (#220).
+    for key, first in (("w1", "Dee"), ("w2", "Ava"), ("w3", "Cal"), ("b1", "Ben")):
+        Racer.objects.filter(pk=found[key].pk).update(first_name=first)
     best = ballot_award(event, "Best in Show", 1)
     set_open(event)
     page.goto("/vote/?order=name")
@@ -280,20 +288,60 @@ def test_the_sort_control_orders_the_grid_and_keeps_the_url(page, event):
     # browser harness's toast check before each click made that the rule
     # here, not the exception (PR #223; #220).
     expect(page.locator("[data-racer-cards] [data-car]:visible")).to_have_count(4)
-    # Last names are all "Racer": by first name, Ava Ben Cal Dee.
-    assert shown() == ["101", "102", "103", "201"]
+    assert shown() == ["102", "201", "103", "101"]
+    # After a sort, the read waits for the URL: x-model sets the order and
+    # Alpine writes each card's `order` style before `@change` calls
+    # sorted(), which replaces the URL (#220: the styles read inside
+    # history.replaceState were already the new order's).
     page.locator('[data-sort] input[value="class"]').check(force=True)
     expect(page).to_have_url(re.compile(r"/vote/\?order=class$"))
-    # Groups by sort order: Wolves were added first.
-    assert shown()[:3] == ["101", "102", "103"]
+    assert shown() == ["102", "103", "101", "201"]
     page.locator('[data-sort] input[value="car"]').check(force=True)
     expect(page).to_have_url(re.compile(r"/vote/\?order=car$"))
+    assert shown() == ["101", "102", "103", "201"]
     assert_accessible(page)
     shoot(page, "vote-grid")
     car_card(page, found["b1"]).click()
     expect(page.locator("[data-sheet-details]")).to_have_text("Bears")
     assert_accessible(page)
     shoot(page, "vote-sheet", full_page=False)
+
+
+def test_a_status_poll_sent_before_the_award_opened_leaves_it_open(page, event):
+    """The other suspect of #220: a `/ballot/status` poll sent from the
+    award list, answered after the visitor opened an award. Held until then,
+    the server's own answer is still `open`, the same as the page's, so
+    `poll()` returns before `closeAward()` and the grid keeps its cars."""
+    found = pack(event)
+    best = ballot_award(event, "Best in Show", 1)
+    set_open(event)
+    held = []
+    page.route(
+        "**/ballot/status",
+        lambda route: route.continue_() if held else held.append(route),
+    )
+    page.goto("/vote/")
+    expect(award_card(page, best)).to_be_visible()
+    for _ in range(140):  # the first poll goes out 5 s after the page loads
+        if held:
+            break
+        page.wait_for_timeout(50)
+    assert held, "no /ballot/status poll in 7 s"
+
+    award_card(page, best).click()
+    cars = page.locator("[data-racer-cards] [data-car]:visible")
+    expect(cars).to_have_count(4)
+    with page.expect_response("**/ballot/status") as answer:
+        held[0].continue_()
+    assert answer.value.json() == {"balloting": "open"}
+    # Alpine would hide the view on the next frame after a closeAward().
+    page.evaluate(
+        "() => new Promise((done) => requestAnimationFrame(() => setTimeout(done)))"
+    )
+    expect(page.locator("[data-award-view]")).to_be_visible()
+    assert cars.all_text_contents() == ["101", "102", "103", "201"]
+    car_card(page, found["w1"]).click()
+    expect(toggle(page)).to_be_enabled()
 
 
 def test_a_refused_vote_names_the_reason(page, event):
