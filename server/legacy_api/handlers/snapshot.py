@@ -23,6 +23,8 @@ DIVERGENCES = (
     "S7: an unknown table or column refuses the upload, and none is run as SQL.",
     "D57: the reply is built in memory, its Events tables are empty, and a restore"
     " replaces the open event with a new one, with new ids and new folders.",
+    "D10: a new event seeds no Wrap-Up kiosk on local/kiosks/feedback.kiosk, so"
+    " a snapshot of the seeded scenes has one SceneKiosk row fewer than PHP's.",
 )
 
 

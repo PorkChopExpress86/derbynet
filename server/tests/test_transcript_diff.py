@@ -4,6 +4,7 @@
 blank line and the response body, so the fixtures here are in that form.
 """
 
+import json
 import re
 import textwrap
 from datetime import datetime
@@ -959,3 +960,274 @@ def test_every_golden_normalization_rule_is_accounted_for():
 
     assert len(rules) == 9
     assert set(td.GOLDEN_RULES) == rules
+
+
+# The snapshot (#221)
+
+
+def snapshot_run(tables, photos=()) -> str:
+    """A snapshot.get exchange whose snapshot holds `tables`, `{name: rows}`,
+    with each table's high-water and missing as PHP's query.snapshot.get.inc
+    writes them."""
+    entries = []
+    for name, rows in tables.items():
+        ids = [next(iter(r.values())) for r in rows]
+        top = max(ids, default=0)
+        entries.append(
+            {
+                "table": name,
+                "high-water": top,
+                "rows": rows,
+                "missing": sorted(set(range(1, top + 1)) - set(ids)),
+            }
+        )
+    body = json.dumps([*entries, *photos], indent=1, ensure_ascii=False)
+    return (
+        "\naction.php?query=snapshot.get\n\n"
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f"<snapshot><![CDATA[\n{body}\n]]></snapshot>\n"
+    )
+
+
+def snapshot_tables(
+    classids=(1, 2),
+    voteids=(1, 2),
+    raceinfo=(("schema", "10"), ("lane_count", "6")),
+    identifier="2a31422da15b83c777e60d49ef62aada",
+    cast="2026-11-01 01:39:28",
+    folder="/var/lib/derbynet/2026/Pack-1/racers",
+    durable=None,
+    racer_class=0,
+):
+    lions, wolves = classids
+    return {
+        "Classes": [
+            {"classid": lions, "class": "Lions", "constituents": "", "durable": None},
+            {
+                "classid": wolves,
+                "class": "Wolves",
+                "constituents": str(lions),
+                "durable": durable,
+            },
+        ],
+        "RegistrationInfo": [
+            {"racerid": 1, "lastname": "Ames", "classid": classids[racer_class]},
+        ],
+        "RaceInfo": [
+            {"raceinfoid": n, "itemkey": key, "itemvalue": value}
+            for n, (key, value) in enumerate(
+                [*raceinfo, ("photo-directory", folder)], 1
+            )
+        ],
+        "BallotAwards": [
+            {"ballotid": 1, "awardid": 1, "depth": 2},
+            {"ballotid": 1, "awardid": 2, "depth": 1},
+        ],
+        "Voters": [
+            {
+                "voterid": 1,
+                "ballotid": 1,
+                "when_cast": cast,
+                "ip_addr": "127.0.0.1",
+                "identifier": identifier,
+            }
+        ],
+        "Votes": [
+            {"voteid": voteid, "awardid": 1, "racerid": 1, "voterid": 1}
+            for voteid in voteids
+        ],
+    }
+
+
+def snapshot_differences(php: dict, django: dict) -> td.Report:
+    return td.diff(snapshot_run(php), snapshot_run(django), now=NOW)
+
+
+def test_a_snapshot_with_other_ids_matches():
+    # PHP's ids have gaps where rows were deleted, Django numbers each table
+    # from 1 (D57); RaceInfo's rows come in another order; the voter's
+    # session id, the time it voted, and the event folder differ by run.
+    php = snapshot_tables(classids=(3, 7), voteids=(4, 9))
+    django = snapshot_tables(
+        raceinfo=(("lane_count", "6"), ("schema", "10")),
+        identifier="4e7d86e3a10da8f4be3f57cab716c7f7",
+        cast="2026-11-01 01:41:02",
+        folder="/var/lib/derbynet/events/pack-1/racers",
+    )
+
+    report = snapshot_differences(php, django)
+
+    assert report.ok, report.render()
+    assert report.compared == 1
+
+
+def test_a_snapshot_value_that_differs_fails_with_its_table_and_column():
+    report = snapshot_differences(snapshot_tables(), snapshot_tables(durable=0))
+
+    [found] = report.differences
+    assert found.endpoint == "query snapshot.get"
+    assert found.path == "$.Classes.rows[1].durable"
+    assert (found.a, found.b) == (None, 0)
+
+
+def test_a_snapshot_row_naming_another_row_fails():
+    # Renumbering keeps what each id names: the racer in another class, or
+    # an aggregate built of another class, still differs.
+    report = snapshot_differences(snapshot_tables(), snapshot_tables(racer_class=1))
+
+    [found] = report.differences
+    assert found.path == "$.RegistrationInfo.rows[0].classid"
+    assert (found.a, found.b) == (1, 2)
+
+    other = snapshot_tables()
+    other["Classes"][1]["constituents"] = "2"
+    [found] = snapshot_differences(snapshot_tables(), other).differences
+    assert (found.path, found.a, found.b) == (
+        "$.Classes.rows[1].constituents",
+        "1",
+        "2",
+    )
+
+
+def test_a_snapshot_id_that_names_no_row_is_compared_as_it_is():
+    php, django = snapshot_tables(), snapshot_tables()
+    php["RegistrationInfo"][0]["classid"] = 0
+    django["RegistrationInfo"][0]["classid"] = None
+
+    [found] = snapshot_differences(php, django).differences
+    assert (found.path, found.a, found.b) == (
+        "$.RegistrationInfo.rows[0].classid",
+        0,
+        None,
+    )
+
+
+def test_the_ballot_id_is_compared_as_it_is():
+    django = snapshot_tables()
+    for n, row in enumerate(django["BallotAwards"], 1):
+        row["ballotid"] = n
+    django["Voters"][0]["ballotid"] = None
+
+    found = snapshot_differences(snapshot_tables(), django).differences
+    assert [(f.path, f.a, f.b) for f in found] == [
+        ("$.BallotAwards.high-water", 1, 2),
+        ("$.BallotAwards.rows[1].ballotid", 1, 2),
+        ("$.Voters.rows[0].ballotid", 1, None),
+    ]
+
+
+def test_a_high_water_or_missing_list_the_rows_dont_give_is_compared():
+    php, django = snapshot_tables(), snapshot_tables()
+    text = snapshot_run(django).replace('"high-water": 2', '"high-water": 5', 1)
+    text = text.replace('"missing": []', '"missing": [3]', 1)
+
+    report = td.diff(snapshot_run(php), text, now=NOW)
+
+    assert [(f.path, f.a, f.b) for f in report.differences] == [
+        ("$.Classes.high-water", "<ids>", 5),
+        ("$.Classes.missing", "<ids>", [3]),
+    ]
+
+
+def test_a_raceinfo_key_one_snapshot_lacks_fails():
+    django = snapshot_tables(raceinfo=(("schema", "10"), ("lane_count", "4")))
+    django["RaceInfo"].append({"raceinfoid": 9, "itemkey": "Heat", "itemvalue": ""})
+
+    found = snapshot_differences(snapshot_tables(), django).differences
+    assert [(f.path, f.a, f.b) for f in found] == [
+        ("$.RaceInfo.rows.lane_count", "6", "4"),
+        ("$.RaceInfo.rows.Heat", td.MISSING, ""),
+    ]
+
+
+def test_a_table_out_of_order_or_missing_fails():
+    php = snapshot_tables()
+    django = dict(reversed(list(snapshot_tables().items())))
+    del django["Votes"]
+
+    found = snapshot_differences(php, django).differences
+    assert [(f.path, f.a, f.b) for f in found[:-1]] == [
+        ("$.tables[0]", "Classes", "Voters"),
+        ("$.tables[1]", "RegistrationInfo", "BallotAwards"),
+        ("$.tables[3]", "BallotAwards", "RegistrationInfo"),
+        ("$.tables[4]", "Voters", "Classes"),
+        ("$.tables[5]", "Votes", td.MISSING),
+    ]
+    assert (found[-1].path, found[-1].b) == ("$.Votes", td.MISSING)
+
+
+def test_a_snapshot_that_is_not_json_is_compared_as_xml():
+    text = snapshot_run(snapshot_tables()).replace("[\n", "[\nnot json", 1)
+
+    [found] = td.diff(snapshot_run(snapshot_tables()), text, now=NOW).differences
+    assert (found.path, found.a, found.b) == ("$", "<json>", "<xml>")
+
+
+def test_the_photo_entries_are_renumbered_with_their_racers():
+    def photos(racerid):
+        tables = snapshot_tables()
+        tables["RegistrationInfo"][0]["racerid"] = racerid
+        tables["Votes"] = [{**v, "racerid": racerid} for v in tables["Votes"]]
+        return snapshot_run(
+            tables,
+            [
+                {
+                    "racerid": racerid,
+                    "imagefile": {"basename": "a.jpg", "displayed": "ff"},
+                }
+            ],
+        )
+
+    assert td.diff(photos(5), photos(1), now=NOW).ok
+    changed = photos(1).replace('"displayed": "ff"', '"displayed": "fe"')
+    [found] = td.diff(photos(5), changed, now=NOW).differences
+    assert found.path == "$.photos[0].imagefile.displayed"
+
+
+PUT = """
+    snapshot.put /leg/steps/derby-snapshot.xml
+
+    <?xml version="1.0" encoding="UTF-8"?>
+    <action-response action="snapshot.put">
+      <uploaded-file name="derby-snapshot.xml" size="{size}">
+        <table name="Classes" rows-before="0" idcolumn="classid">
+          <table-summary rows-received="{classes}"/>
+        </table>
+        <table name="Ranks" rows-before="0" idcolumn="rankid">
+          <table-summary rows-received="5"/>
+        </table>
+        <table name="RaceInfo" rows-before="6" idcolumn="raceinfoid">
+          <table-summary rows-received="12"/>
+        </table>
+        <success/>
+      </uploaded-file>
+    </action-response>
+    """
+
+
+def test_a_snapshot_put_names_each_table_and_masks_the_file_size():
+    # The file is the snapshot the leg's own snapshot.get wrote.
+    report = differences(
+        PUT.format(size=42640, classes=5), PUT.format(size=48608, classes=4)
+    )
+
+    [found] = report.differences
+    assert found.endpoint == "action snapshot.put"
+    assert found.path == (
+        "/action-response/uploaded-file/table[@name='Classes']"
+        "/table-summary/@rows-received"
+    )
+    assert (found.a, found.b) == ("5", "4")
+
+
+def test_a_snapshot_put_with_no_file_size_still_differs():
+    report = differences(
+        PUT.format(size=42640, classes=5), PUT.format(size="", classes=5)
+    )
+
+    [found] = report.differences
+    assert (found.path, found.a, found.b) == (
+        "/action-response/uploaded-file/@size",
+        "<bytes>",
+        "",
+    )

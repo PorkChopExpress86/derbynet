@@ -51,6 +51,11 @@ _CANONICAL = {
 }
 
 
+# PHP's one ballot, which every BallotAwards and Voters row names
+# (BALLOTID, website/inc/voterid.inc:5-6).
+_BALLOT = 1
+
+
 def _json(value) -> str:
     return encode_php_json(value, numeric_check=False).decode().rstrip("\n")
 
@@ -140,7 +145,9 @@ def tables(
                     g.name,
                     g.sort_order,
                     _csv(constituents.get(g.pk, [])),
-                    int(g.durable),
+                    # PHP leaves it NULL unless the class is made durable
+                    # (create_class, website/inc/aggregate_round.inc:115-133).
+                    1 if g.durable else None,
                     _csv(filters.get(g.pk, [])),
                 ]
                 for n, g in enumerate(groups, 1)
@@ -196,9 +203,11 @@ def tables(
                     n,
                     a.name,
                     a.award_type_id,
-                    ids(Group, a.group_id),
-                    ids(Subgroup, a.subgroup_id),
-                    ids(Racer, a.racer_id),
+                    # PHP stores 0 for none (website/ajax/action.award.edit.inc:68-73,
+                    # and racerid's DEFAULT 0 in website/sql/sqlite/schema.inc:23).
+                    ids(Group, a.group_id) or 0,
+                    ids(Subgroup, a.subgroup_id) or 0,
+                    ids(Racer, a.racer_id) or 0,
                     a.sort,
                 ]
                 for n, a in enumerate(awards, 1)
@@ -318,16 +327,14 @@ def tables(
         "BallotAwards": (
             ["ballotid", "awardid", "depth"],
             [
-                [n, ids(Award, b.award_id), b.depth]
-                for n, b in enumerate(
-                    BallotAward.objects.filter(**mine).order_by("pk"), 1
-                )
+                [_BALLOT, ids(Award, b.award_id), b.depth]
+                for b in BallotAward.objects.filter(**mine).order_by("pk")
             ],
         ),
         "Voters": (
             ["voterid", "ballotid", "when_cast", "ip_addr", "identifier"],
             [
-                [n, None, _stamp(v.cast_at), v.ip_address, v.identifier]
+                [n, _BALLOT, _stamp(v.cast_at), v.ip_address, v.identifier]
                 for n, v in enumerate(voters, 1)
             ],
         ),

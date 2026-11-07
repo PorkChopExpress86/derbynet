@@ -225,6 +225,8 @@ _REFUSED = {
 # website/sql/sqlite/scene-tables.inc); a test keeps it true.
 _FEEDBACK = "local/kiosks/feedback.kiosk"
 _WRAP_UP = 5
+# The SceneKiosk rows PHP seeds; feedback.kiosk is the last of them.
+_SEEDED_KIOSKS = 14
 
 # Each reply path a recorded divergence changes, as the parity gate saw it,
 # with the values the divergence names. Add one only for a difference that an
@@ -380,6 +382,29 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
     ),
     ParityPath(
         "query poll.kiosk", "$.kiosk-setting.page", "D10", php=_FEEDBACK, django=str
+    ),
+    # The same seed in a snapshot of the seeded scenes (#221): PHP's last
+    # SceneKiosk row, renumbered as tools/transcript_diff.py renumbers a
+    # snapshot, and the rows snapshot.put reads from each file.
+    ParityPath(
+        "query snapshot.get",
+        "$.SceneKiosk.rows[*]",
+        "D10",
+        php={
+            "scenekioskid": _SEEDED_KIOSKS,
+            "sceneid": _WRAP_UP + 1,
+            "kiosk_name": "Aux2",
+            "page": _FEEDBACK,
+        },
+        django=MISSING,
+    ),
+    ParityPath(
+        "action snapshot.put",
+        "/action-response/uploaded-file/table[@name='SceneKiosk']"
+        "/table-summary/@rows-received",
+        "D10",
+        php=str(_SEEDED_KIOSKS),
+        django=str(_SEEDED_KIOSKS - 1),
     ),
 )
 

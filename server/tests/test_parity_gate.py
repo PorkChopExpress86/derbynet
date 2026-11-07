@@ -752,6 +752,43 @@ def test_the_wrap_up_kiosk_allowance_covers_the_wrap_up_scene_only():
     )
 
 
+def test_the_snapshot_wrap_up_kiosk_allowance_covers_that_row_only():
+    from core.services import LEGACY_SCENES
+    from legacy_api.registry import _FEEDBACK, _SEEDED_KIOSKS, _WRAP_UP
+
+    # PHP seeds each non-empty page of its scenes, and feedback.kiosk, which
+    # Django leaves out, last (website/sql/sqlite/scene-tables.inc:50-65).
+    seeded = sum(1 for _, *pages in LEGACY_SCENES for page in pages if page)
+    assert (seeded + 1, LEGACY_SCENES[-1][0]) == (_SEEDED_KIOSKS, "Wrap-Up")
+    row = {
+        "scenekioskid": 14,
+        "sceneid": _WRAP_UP + 1,
+        "kiosk_name": "Aux2",
+        "page": _FEEDBACK,
+    }
+    path = "$.SceneKiosk.rows[13]"
+    assert allowed_by("query snapshot.get", path, row, MISSING).startswith("D10")
+    # Another kiosk missing, the row in Django's snapshot only, or the
+    # feedback row on another page or scene, still fails.
+    for php, django in (
+        ({**row, "kiosk_name": "Aux1"}, MISSING),
+        ({**row, "sceneid": 5}, MISSING),
+        ({**row, "page": "kiosks/standings.kiosk"}, MISSING),
+        (MISSING, row),
+        (row, {**row, "kiosk_name": "Main"}),
+    ):
+        assert allowed_by("query snapshot.get", path, php, django) is None
+    assert allowed_by("query scene.list", path, row, MISSING) is None
+    received = (
+        "/action-response/uploaded-file/table[@name='{}']/table-summary/@rows-received"
+    )
+    put = "action snapshot.put"
+    assert allowed_by(put, received.format("SceneKiosk"), "14", "13").startswith("D10")
+    assert allowed_by(put, received.format("SceneKiosk"), "14", "12") is None
+    assert allowed_by(put, received.format("SceneKiosk"), "15", "14") is None
+    assert allowed_by(put, received.format("Scenes"), "14", "13") is None
+
+
 def test_the_differ_carries_the_logged_in_role(tmp_path):
     from tools import transcript_diff as td
 

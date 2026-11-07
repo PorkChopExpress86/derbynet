@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from accounts.permissions import Perm
+from awards.models import Award, BallotAward, Vote
+from awards.tests.factories import AwardFactory, BallotAwardFactory, VoteFactory
 from core.models import Event, RaceSettings, SiteState
 from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in
@@ -120,6 +122,67 @@ def test_get_writes_the_wrapper_and_every_table_in_php_order(client, coordinator
     assert tables["RaceChart"]["rows"][0]["finishtime"] == 3.5
     assert tables["Classes"]["missing"] == []
     assert tables["Classes"]["high-water"] == len(tables["Classes"]["rows"])
+
+
+def _awards_and_ballot(event):
+    """A pack award, a group award, both on the ballot, a vote each from two
+    voters, and a durable aggregate beside a plain group."""
+    lions = GroupFactory(event=event, name="Lions")
+    every = GroupFactory(event=event, name="All", durable=True)
+    for group in (lions, every):
+        RoundFactory(event=event, group=group, number=1)
+    racer = RacerFactory(group=lions)
+    pack = AwardFactory(event=event, name="Pack")
+    den = AwardFactory(event=event, name="Den", group=lions)
+    for award in (pack, den):
+        BallotAwardFactory(award=award, depth=2)
+    for identifier in ("one", "two"):
+        VoteFactory(
+            voter__event=event, voter__identifier=identifier, award=pack, racer=racer
+        )
+
+
+def test_get_writes_the_values_php_stores(client, coordinator):
+    # #221: PHP leaves Classes.durable NULL unless a class is made durable
+    # (create_class, website/inc/aggregate_round.inc:115-133, class.add's 1),
+    # stores 0 for an award's missing classid and rankid (award.edit's
+    # class_and_rank of 0, website/ajax/action.award.edit.inc:68-73) and
+    # racerid (`racerid INTEGER DEFAULT 0`, website/sql/sqlite/schema.inc:23),
+    # and has one ballot, BALLOTID 1 (website/inc/voterid.inc:5-6), for every
+    # BallotAwards and Voters row.
+    _awards_and_ballot(coordinator)
+
+    tables = tables_of(get(client).content)
+
+    assert [r["durable"] for r in tables["Classes"]["rows"]] == [None, 1]
+    assert [
+        (r["classid"], r["rankid"], r["racerid"]) for r in tables["Awards"]["rows"]
+    ] == [(0, 0, 0), (1, 0, 0)]
+    assert [r["ballotid"] for r in tables["BallotAwards"]["rows"]] == [1, 1]
+    assert tables["BallotAwards"]["high-water"] == 1
+    assert tables["BallotAwards"]["missing"] == []
+    assert [r["ballotid"] for r in tables["Voters"]["rows"]] == [1, 1]
+
+
+def test_get_then_put_keeps_the_awards_and_the_ballot(client, coordinator):
+    _awards_and_ballot(coordinator)
+    first = tables_of(get(client).content)
+
+    assert "<success/>" in put(client, get(client).content).content.decode()
+
+    event = active()
+    assert event.pk != coordinator.pk
+    assert tables_of(get(client).content) == first
+    assert sorted(
+        (a.name, a.group.name if a.group else None, a.racer_id)
+        for a in Award.objects.filter(event=event)
+    ) == [("Den", "Lions", None), ("Pack", None, None)]
+    assert sorted(Group.objects.filter(event=event).values_list("name", "durable")) == [
+        ("All", True),
+        ("Lions", False),
+    ]
+    assert BallotAward.objects.filter(event=event).count() == 2
+    assert Vote.objects.filter(event=event).count() == 2
 
 
 def test_clean_cuts_names_to_initials(client, coordinator):

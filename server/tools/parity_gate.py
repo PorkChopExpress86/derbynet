@@ -268,17 +268,7 @@ def step_path_text(
 # The steps whose replies may differ from PHP's until the ticket each names
 # lands. Their requests and outcomes are still judged, and the gate fails
 # while one matches PHP, so the list can't go stale. The summary lists them.
-# #221 lists the columns: Classes.durable, the Awards ids of no group or
-# racer, the RaceInfo rows, and the ballotid of Voters and Votes.
-_SNAPSHOT = (
-    "#221: the snapshot is compared as one text, with its ids raw, and some of"
-    " its columns differ from PHP's"
-)
-REPLIES_DIFFER: dict[str, str] = {
-    "snapshot_get": _SNAPSHOT,
-    # snapshot.put loads the snapshot snapshot_get took.
-    "snapshot_put": _SNAPSHOT,
-}
+REPLIES_DIFFER: dict[str, str] = {}
 
 # The differences, and the allowed ones, listed for each step; the counts
 # cover the rest.
