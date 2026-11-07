@@ -128,14 +128,16 @@ def _async_unsafe():
         yield
 
 
-def _css_is_fresh(tmp_path_factory, worker_id) -> bool:
+def _css_is_fresh(tmp_path_factory, config) -> bool:
     """`css_build.check()`, run once per pytest run. Tailwind CLIs started at
     once by several xdist workers can fail to load their native binding, so
     the first worker runs it under a file lock in the directory every worker
-    shares, and the others read its answer."""
+    shares, and the others read its answer. It reads `config.workerinput`
+    rather than xdist's `worker_id` fixture, which `-p no:xdist` removes: that
+    errored every browser test at setup in #220 (#220 retro)."""
     from ui import css_build
 
-    if worker_id == "master":
+    if not hasattr(config, "workerinput"):
         return css_build.check()
     import fcntl
 
@@ -149,7 +151,7 @@ def _css_is_fresh(tmp_path_factory, worker_id) -> bool:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _fresh_css(tmp_path_factory, worker_id):
+def _fresh_css(tmp_path_factory, pytestconfig):
     """A page styled by a stale `app.css` lacks the classes a template just
     gained, so its screenshots and layout checks mislead. Where the Tailwind
     CLI is installed, refuse to run on a stale build; the `ui` CI job checks
@@ -157,7 +159,7 @@ def _fresh_css(tmp_path_factory, worker_id):
     from ui import css_build
 
     if css_build.binary_path().exists() and not _css_is_fresh(
-        tmp_path_factory, worker_id
+        tmp_path_factory, pytestconfig
     ):
         pytest.fail(css_build.OUT_OF_DATE.format(css_build.OUTPUT), pytrace=False)
 

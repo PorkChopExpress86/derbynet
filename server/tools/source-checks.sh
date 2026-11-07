@@ -4,7 +4,8 @@
 # cites and claims, the QUIRK_DECISIONS records, copied helpers, the rules in
 # services, read-then-act views, browser tab closes, the registry, tests that
 # flush the seeded rows, frozen exception classes, and the parity gate's
-# entries for the suites server.yml runs, and plan/tests, the plan tools' tests
+# entries for the suites server.yml runs, fixtures only xdist provides (#220
+# retro), and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  They take a few seconds, and
 # .githooks/pre-push runs them.  #48 found five of them failing
 # one full-suite round at a time (#48 retro); run this after each batch of
@@ -23,6 +24,7 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_deviations.py \
   tests/test_parity_gate_ci.py \
   tests/test_pytest_under_load.py \
+  tests/test_no_xdist_fixtures.py \
   tests/test_transactional_tests.py \
   ui/tests/test_no_copied_helpers.py \
   ui/tests/test_rules_in_services.py \

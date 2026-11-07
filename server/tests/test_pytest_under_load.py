@@ -1,6 +1,8 @@
 """`tools/pytest-under-load.sh` refuses a pipe and a `timeout` before it
 starts anything: #47 and #48 each lost a 25-repeat run to
-`timeout 3000 ... | grep` (#48 retro)."""
+`timeout 3000 ... | grep` (#48 retro). It also refuses an output folder
+that already holds files: #220 reused one, and a wait for its `junit.xml`
+fired on an earlier session's results (#220 retro)."""
 
 import shutil
 import subprocess
@@ -11,13 +13,13 @@ import pytest
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
 
 
-def run(command: str) -> subprocess.CompletedProcess:
+def run(command: str, out: str = "/nonexistent") -> subprocess.CompletedProcess:
     return subprocess.run(
         ["bash", "-c", command],
         capture_output=True,
         text=True,
         timeout=60,
-        env={"PATH": "/usr/bin:/bin", "DERBYNET_LOAD_RUN_DIR": "/nonexistent"},
+        env={"PATH": "/usr/bin:/bin", "DERBYNET_LOAD_RUN_DIR": out},
     )
 
 
@@ -37,3 +39,16 @@ def test_a_timeout_is_refused():
     )
     assert result.returncode == 2
     assert "it runs under timeout" in result.stderr
+
+
+def test_an_output_folder_with_files_is_refused(tmp_path):
+    (tmp_path / "junit.xml").write_text("an earlier run's results")
+    # Output to a file, as the Bash tool's run_in_background sends it.
+    result = run(
+        f"'{SCRIPT}' --loops 0 tests/test_pytest_under_load.py >/dev/null",
+        out=str(tmp_path),
+    )
+    assert result.returncode == 2
+    assert "already holds files" in result.stderr
+    assert (tmp_path / "junit.xml").read_text() == "an earlier run's results"
+    assert not (tmp_path / "pytest.log").exists()
