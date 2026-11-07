@@ -100,7 +100,7 @@ def test_close_tab_waits_for_the_request_out(page, event):
         if held:
             break
         tab.wait_for_timeout(20)
-    held[0].fulfill(body="")
+    held[0].fulfill(status=204)
     close_tab(page, tab)
     assert page.in_flight.closed_with == []
 
