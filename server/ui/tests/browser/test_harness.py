@@ -100,7 +100,7 @@ def test_close_tab_waits_for_the_request_out(page, event):
         if held:
             break
         tab.wait_for_timeout(20)
-    held[0].fulfill(body="")
+    held[0].fulfill(status=204)
     close_tab(page, tab)
     assert page.in_flight.closed_with == []
 
@@ -156,6 +156,40 @@ def test_the_settle_after_a_test_stops_a_fast_poll(page, event):
     page.wait_for_timeout(200)
     # One read after the wait: the point is that nothing more was sent.
     assert len(sent) == after
+
+
+def test_the_settle_drains_a_request_sent_as_it_stops(page, event, monkeypatch):
+    """A poll's last tick can send in the task that stops the timers, and
+    its `request` event reach Python after the stop returns. The drain then
+    found nothing out and returned (1 run in 50 under load, #224 retro).
+    Here the tick is held in that task: `clearTimeout` sends first."""
+    held = []
+    page.route("**/held-request", lambda route: held.append(route))
+    page.goto("/login/")
+    page.evaluate(
+        """() => {
+          const clear = window.clearTimeout;
+          window.clearTimeout = (id) => {
+            window.clearTimeout = clear;
+            fetch('/held-request');
+            clear(id);
+          };
+        }"""
+    )
+    monkeypatch.setattr(InFlight, "TIMEOUT_MS", 300)
+    assert _settle(page) == [f"GET {page.url.rsplit('/', 2)[0]}/held-request"]
+    held[0].fulfill(status=204)
+    assert page.in_flight.drain(page) == []
+
+
+def test_the_settle_sends_no_barrier_from_a_blank_page(page, monkeypatch):
+    """A page that never left `about:blank` has no server to fetch from; a
+    barrier there would wait out its timeout."""
+    monkeypatch.setattr(InFlight, "TIMEOUT_MS", 300)
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    assert _settle(page) == []
+    assert sent == []
 
 
 def test_the_settle_stops_the_polls_of_a_page_on_a_fake_clock(page, event):
