@@ -22,7 +22,9 @@ from core.services import new_event
 SUBFOLDERS = events.SUBFOLDERS
 
 
-@dataclass(frozen=True)
+# Not frozen: a context manager sets `__traceback__` on an exception that
+# passes through it (core/tests/test_exception_classes.py).
+@dataclass(eq=False)
 class SetupFailure(Exception):
     code: str
     description: str

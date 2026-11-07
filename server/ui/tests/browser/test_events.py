@@ -7,7 +7,12 @@ from playwright.sync_api import expect
 from core import events
 from core.models import Event, SiteState
 from roster.models import Group
-from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
+from ui.tests.browser.conftest import (
+    assert_accessible,
+    dismiss_toasts,
+    htmx_post,
+    shoot,
+)
 from ui.tests.race import add_racers
 
 
@@ -21,12 +26,6 @@ def card(page, event_name: str):
     return page.locator("[data-event]").filter(
         has=page.get_by_role("heading", name=event_name, exact=True)
     )
-
-
-def dismiss_toasts(page):
-    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 def test_copy_an_event_switch_to_it_and_see_the_old_one_read_only(login, event):

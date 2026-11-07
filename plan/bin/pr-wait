@@ -1,8 +1,9 @@
 #!/bin/bash
 # Waits until every check on PR <number>'s current head has finished, then prints
 # one "<bucket> <name> <link>" line per check.  Exits 0 only if all passed or
-# were skipped.  Waits for checks to appear first, because GitHub creates the
-# runs a few seconds after a push.
+# were skipped.  On a failure it also prints `plan/bin/ci-failures`: each
+# failing test, and whether it failed on master lately.  Waits for checks to
+# appear first, because GitHub creates the runs a few seconds after a push.
 #
 # Usage: plan/bin/pr-wait <pr> [--timeout-min N]   (default 90)
 set -euo pipefail
@@ -36,8 +37,11 @@ while :; do
              --jq '.[] | "\(.bucket) \(.name) \(.link)"' 2>/dev/null || true)
   if [ -n "$checks" ] && ! grep -q '^pending ' <<<"$checks"; then
     echo "$checks"
-    ! grep -qvE '^(pass|skipping) ' <<<"$checks"
-    exit
+    grep -qvE '^(pass|skipping) ' <<<"$checks" || exit 0
+    # Which failing tests also failed on master lately: a known flake (#212 retro).
+    echo "ci-failures:"
+    GH="$GH" REPO="$REPO" "$(dirname "$0")/ci-failures" "$PR" || true
+    exit 1
   fi
   if [ "$(date +%s)" -ge "$deadline" ]; then
     echo "timed out after $TIMEOUT_MIN min; still pending:" >&2

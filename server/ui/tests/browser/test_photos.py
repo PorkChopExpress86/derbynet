@@ -16,6 +16,7 @@ from media.models import PhotoRotation
 from roster.models import Racer
 from ui.tests.browser.conftest import (
     assert_accessible,
+    dismiss_toasts,
     htmx_post,
     htmx_settled,
     shoot,
@@ -110,6 +111,7 @@ def test_a_phone_assigns_and_unassigns_with_no_drag(login, event, folders):
     first.refresh_from_db()
     assert first.headshot == "blue.jpg"
 
+    dismiss_toasts(page)
     card(page, first).get_by_role(
         "button", name="Unassign the photo of Scouts1 Racer"
     ).click()

@@ -19,6 +19,7 @@ from ui import timer_build
 from ui.tests.browser.conftest import (
     PLAIN_HTTP_HOST,
     assert_accessible,
+    dismiss_toasts,
     htmx_post,
     htmx_settled,
     log_in,
@@ -30,11 +31,28 @@ ABORTED = r"request failed: \S*/timer/(status|test/live)/\S* net::ERR_ABORTED$"
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _built_timer():
+def _built_timer(tmp_path_factory):
     """A fresh checkout or worktree has no copied timer scripts, and every
-    test here then failed on its own missing file (#53 retro). Say so once."""
-    if not timer_build.built():
-        pytest.fail("Run `uv run python manage.py build_timer` first.", pytrace=False)
+    test here then failed on its own missing file (#53 retro), in three
+    tickets' full browser runs in a row (#212 retro). So build them, once,
+    as `manage.py build_timer` does: a few seconds, with `javac` or docker.
+    xdist workers share the base temp folder, so the first one builds under
+    a file lock there and the others find the files."""
+    import fcntl
+
+    shared = tmp_path_factory.getbasetemp().parent
+    with (shared / "timer-build.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if timer_build.built():
+            return
+        try:
+            timer_build.copy_sources()
+            timer_build.profiles_js()
+        except timer_build.BuildError as error:
+            pytest.fail(
+                f"`manage.py build_timer` failed: {error}. Run it by hand.",
+                pytrace=False,
+            )
 
 
 FLAGS = (
@@ -265,6 +283,7 @@ def test_status_parity_details_settings_and_start_race(login, event):
         status.get_by_role("button", name="Start Race").click()
     assert "<remote-start/>" in timer_message(page, "HEARTBEAT")
 
+    dismiss_toasts(page)
     page.get_by_role("button", name="Timer settings").click()
     sheet = page.locator('[data-sheet="timer"]')
     expect(sheet.get_by_label("Port")).to_be_visible()
@@ -278,12 +297,14 @@ def test_status_parity_details_settings_and_start_race(login, event):
         (TimerSetting.Kind.PORTS, "COM2")
     ]
 
+    dismiss_toasts(page)
     page.get_by_role("button", name="Timer settings").click()
     expect(sheet.get_by_label("Device")).to_be_visible()
     htmx_settled(page)
     with htmx_post(page, "/timer/settings/device/"):
         sheet.get_by_label("Device").select_option("Champ")
 
+    dismiss_toasts(page)
     page.get_by_role("button", name="Timer settings").click()
     debug = sheet.get_by_role("switch", name="debug")
     expect(debug).to_be_visible()
@@ -291,11 +312,13 @@ def test_status_parity_details_settings_and_start_race(login, event):
     with htmx_post(page, "/timer/settings/flag/"):
         debug.click()
 
+    dismiss_toasts(page)
     page.get_by_role("button", name="Timer settings").click()
     delay = sheet.get_by_label("delay")
     expect(delay).to_have_value("300")
     htmx_settled(page)
     delay.fill("450")
+    dismiss_toasts(page)
     sheet.get_by_role("button", name="Cancel").click()
     expect(delay).to_have_value("300")
     delay.fill("450")
@@ -358,6 +381,7 @@ def test_timer_test_parity_simulate_lanes_and_results(login, event):
     expect(simulate).to_have_attribute("aria-checked", "true")
 
     lane_2 = live.get_by_role("button", name="Car in lane 2")
+    dismiss_toasts(page)
     with htmx_post(page, "/timer/test/lane/"):
         lane_2.click()
     expect(lane_2).to_have_attribute("aria-pressed", "false")
@@ -376,6 +400,7 @@ def test_timer_test_parity_simulate_lanes_and_results(login, event):
     with htmx_post(page, "/timer/test/reverse/"):
         live.get_by_role("switch", name="Number lanes in reverse").click()
     assert RaceSettings.objects.get(event=event).reverse_lanes
+    dismiss_toasts(page)
     with htmx_post(page, "/timer/test/lanes/"):
         live.get_by_role("button", name="More: Lanes on the track").click()
     assert RaceSettings.objects.get(event=event).lane_count == 5

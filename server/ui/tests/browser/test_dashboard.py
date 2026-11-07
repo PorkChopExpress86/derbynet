@@ -18,7 +18,7 @@ from racing.services import (
     timer,
 )
 from racing.services.rounds import FollowOn, playlist_finalists
-from ui.tests.browser.conftest import assert_accessible, shoot
+from ui.tests.browser.conftest import assert_accessible, dismiss_toasts, shoot
 from ui.tests.race import (
     add_racers,
     chart,
@@ -54,14 +54,6 @@ def finished(event, round):
     scheduled(round)
     while current(event)[2]:
         run_heat(event)
-
-
-def dismiss_toasts(page):
-    """Close the toasts, as a race coordinator would, before tapping a
-    control they cover."""
-    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 def stop_polling(page):
@@ -214,6 +206,7 @@ def test_a_changed_round_1_result_suggests_finalists(login, event):
     assert set(final.roster.values_list("racer__car_number", flat=True)) == roster
     shoot(page, "dashboard-suggestions")
 
+    dismiss_toasts(page)
     card.get_by_role("button", name=re.compile("^Add ")).click()
     expect(card).not_to_contain_text("Now qualifies")
     assert set(final.roster.values_list("racer__car_number", flat=True)) == {
@@ -255,6 +248,7 @@ def test_the_race_day_runs_through_both_finals(login, page):
         )
         if i == 0:
             shoot(page, "dashboard-intermission")
+        dismiss_toasts(page)
         card.get_by_role("button", name="Start next round").click()
         expect(page.locator("[data-intermission]")).to_have_count(0)
         state = RaceState.objects.get(event=event)
@@ -370,6 +364,7 @@ def test_each_control_updates_the_page_without_a_get(login, event):
     expect(heat_text).to_have_text("Heat 1 of 8")
     expect(page.locator('[data-lane="1"] [data-result]')).to_contain_text("2.500")
     page.get_by_role("button", name="Manual results").click()
+    dismiss_toasts(page)
     sheet(page).get_by_role("button", name="Discard results").click()
     expect(page.locator('[data-lane="1"] [data-result]')).not_to_contain_text("2.5")
     page.locator("#toasts").get_by_role("button", name="Undo").click()
@@ -437,6 +432,7 @@ def test_schedule_race_and_round_controls(login, event):
     assert HeatLane.objects.filter(round=found["Bears"]).count() == 40
 
     wolves = page.locator(f'[data-roundid="{found["Wolves"].pk}"]')
+    dismiss_toasts(page)
     wolves.get_by_role("button", name="Schedule").click()
     sheet(page).get_by_role("button", name="Schedule Only").click()
     expect(wolves.get_by_role("button", name="Race")).to_be_visible()

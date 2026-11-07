@@ -20,6 +20,7 @@ from roster.services import groups
 from roster.services.racers import insert_new_racer, pass_racer
 from ui.tests.browser.conftest import (
     assert_accessible,
+    dismiss_toasts,
     htmx_post,
     htmx_settled,
     shoot,
@@ -121,13 +122,8 @@ def tap(page, control):
     (a poll, a filter, a reply out of band), once htmx has bound it."""
     htmx_settled(page)
     bound(page, control)
+    dismiss_toasts(page)
     control.click()
-
-
-def dismiss_toasts(page):
-    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 def open_judging(page, query=""):
@@ -151,6 +147,7 @@ def open_editor(page):
 
 
 def edit_award(page, award):
+    dismiss_toasts(page)
     page.locator(f'[data-award="{award.pk}"] [data-edit-award]').click()
     return ready(page, sheet(page, "awards").locator("[data-award-sheet]"))
 
@@ -399,6 +396,7 @@ def test_editor_parity_list_reorder_new_edit_delete(login, event):
     )
 
     edit_award(page, stripes)
+    dismiss_toasts(page)
     sheet(page, "awards").locator('[data-action="delete"]').click()
     confirm = ready(page, sheet(page, "awards").locator("[data-delete-confirm]"))
     with htmx_post(page, f"/awards/edit/{stripes.pk}/delete/"):

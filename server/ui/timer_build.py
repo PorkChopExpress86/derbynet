@@ -13,7 +13,8 @@ build them for PHP.
   host has no JDK.
 
 The copied scripts and `profiles.js` are not committed (`.gitignore`). The ui
-CI job runs `manage.py build_timer` before the browser tests. No Django image
+CI job runs `manage.py build_timer` before the browser tests, and
+`ui/tests/browser/test_timer.py` builds them when they are missing. No Django image
 exists yet; the image ticket (#58) has to run it too, so nothing runs Java at
 request time.
 The legacy files the page also loads, jQuery, `mobile.js`, `modal.js`,

@@ -13,7 +13,12 @@ from kiosks.models import Scene
 from racing.models import PlaylistEntry, Round
 from racing.services import lanes
 from racing.tests.factories import PlaylistEntryFactory
-from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
+from ui.tests.browser.conftest import (
+    assert_accessible,
+    dismiss_toasts,
+    htmx_post,
+    shoot,
+)
 from ui.tests.race import car_times, race_setup, run_heat, scheduled
 
 
@@ -30,12 +35,6 @@ def open_playlist(page, query=""):
 
 def sheet(page):
     return page.locator('[data-sheet="playlist"]')
-
-
-def dismiss_toasts(page):
-    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 def card(page, name):
