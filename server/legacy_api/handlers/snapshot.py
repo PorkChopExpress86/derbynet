@@ -22,7 +22,10 @@ DIVERGENCES = (
     "S6: a photo name that is not a plain file name refuses the upload.",
     "S7: an unknown table or column refuses the upload, and none is run as SQL.",
     "D57: the reply is built in memory, its Events tables are empty, and a restore"
-    " replaces the open event with a new one, with new ids and new folders.",
+    " replaces the open event with a new one, with new ids and new folders, and"
+    " put's rows-before counts the rows it replaces, not PHP's fresh-schema seed.",
+    "D82: the snapshot's RaceInfo carries every setting Django keeps, not only"
+    " the keys PHP has written.",
     "D10: a new event seeds no Wrap-Up kiosk on local/kiosks/feedback.kiosk, so"
     " a snapshot of the seeded scenes has one SceneKiosk row fewer than PHP's.",
 )

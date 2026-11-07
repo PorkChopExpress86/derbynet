@@ -19,7 +19,7 @@ from accounts.permissions import Perm, Requirement
 from core.models import Event
 from legacy_api.formats import Format, format_of
 from legacy_api.missing import MISSING
-from legacy_api.parity_paths import ANY, ParityPath
+from legacy_api.parity_paths import ANY, DIGITS, ParityPath
 from legacy_api.xml import XmlWriter
 
 logger = logging.getLogger(__name__)
@@ -227,6 +227,8 @@ _FEEDBACK = "local/kiosks/feedback.kiosk"
 _WRAP_UP = 5
 # The SceneKiosk rows PHP seeds; feedback.kiosk is the last of them.
 _SEEDED_KIOSKS = 14
+# A table of a snapshot.put reply, as tools/transcript_diff.py names it.
+_PUT_TABLE = "/action-response/uploaded-file/table[@name='{}']"
 
 # Each reply path a recorded divergence changes, as the parity gate saw it,
 # with the values the divergence names. Add one only for a difference that an
@@ -400,11 +402,32 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
     ),
     ParityPath(
         "action snapshot.put",
-        "/action-response/uploaded-file/table[@name='SceneKiosk']"
-        "/table-summary/@rows-received",
+        f"{_PUT_TABLE.format('SceneKiosk')}/table-summary/@rows-received",
         "D10",
         php=str(_SEEDED_KIOSKS),
         django=str(_SEEDED_KIOSKS - 1),
+    ),
+    # A setting PHP never wrote, which Django's snapshot carries (D82), and
+    # so the RaceInfo rows snapshot.put reads from each file. A key both
+    # have is compared.
+    ParityPath(
+        "query snapshot.get", "$.RaceInfo.rows.*", "D82", php=MISSING, django=str
+    ),
+    ParityPath(
+        "action snapshot.put",
+        f"{_PUT_TABLE.format('RaceInfo')}/table-summary/@rows-received",
+        "D82",
+        php=DIGITS,
+        django=DIGITS,
+    ),
+    # PHP counts each table after wiping the database, Django the rows of the
+    # event the restore replaces (D57).
+    ParityPath(
+        "action snapshot.put",
+        f"{_PUT_TABLE.format('*')}/@rows-before",
+        "D57",
+        php=DIGITS,
+        django=DIGITS,
     ),
 )
 

@@ -789,6 +789,50 @@ def test_the_snapshot_wrap_up_kiosk_allowance_covers_that_row_only():
     assert allowed_by(put, received.format("Scenes"), "14", "13") is None
 
 
+PUT = "action snapshot.put"
+PUT_TABLE = "/action-response/uploaded-file/table[@name='{}']"
+
+
+def test_the_raceinfo_allowance_covers_a_setting_only_django_has():
+    get = "query snapshot.get"
+    assert allowed_by(get, "$.RaceInfo.rows.Heat", MISSING, "").startswith("D82")
+    # A key both have with other values, a key only PHP has, a value that is
+    # not text, another table, or another endpoint, still fails.
+    for endpoint, path, php, django in (
+        (get, "$.RaceInfo.rows.lane_count", "6", "4"),
+        (get, "$.RaceInfo.rows.balloting", "open", MISSING),
+        (get, "$.RaceInfo.rows.Heat", MISSING, ["", "1"]),
+        (get, "$.Classes.rows[0].class", MISSING, "Lions"),
+        ("query settings.list", "$.RaceInfo.rows.Heat", MISSING, ""),
+    ):
+        assert allowed_by(endpoint, path, php, django) is None, path
+    received = PUT_TABLE.format("RaceInfo") + "/table-summary/@rows-received"
+    assert allowed_by(PUT, received, "12", "82").startswith("D82")
+    for endpoint, path, php, django in (
+        (PUT, received, "12", "eighty"),
+        (PUT, received, "12", MISSING),
+        (PUT, PUT_TABLE.format("Roster") + "/table-summary/@rows-received", "1", "2"),
+        (PUT, PUT_TABLE.format("RaceInfo") + "/@idcolumn", "raceinfoid", "id"),
+        ("action photo.upload", received, "12", "82"),
+    ):
+        assert allowed_by(endpoint, path, php, django) is None, path
+
+
+def test_the_rows_before_allowance_covers_rows_before_counts_only():
+    before = PUT_TABLE.format("RegistrationInfo") + "/@rows-before"
+    assert allowed_by(PUT, before, "0", "24").startswith("D57")
+    for endpoint, path, php, django in (
+        (PUT, before, "0", ""),
+        (PUT, before, "0", "-1"),
+        (PUT, before, MISSING, "24"),
+        (PUT, PUT_TABLE.format("Roster") + "/table-summary/@rows-received", "0", "4"),
+        (PUT, "/action-response/uploaded-file/@size", "0", "4"),
+        (PUT, PUT_TABLE.format("Roster") + "/@idcolumn", "0", "4"),
+        ("query snapshot.get", before, "0", "24"),
+    ):
+        assert allowed_by(endpoint, path, php, django) is None, path
+
+
 def test_the_differ_carries_the_logged_in_role(tmp_path):
     from tools import transcript_diff as td
 

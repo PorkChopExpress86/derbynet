@@ -19,6 +19,19 @@ class _Any:
 ANY = _Any()  # A ParityPath value that matches any value.
 
 
+class _Digits:
+    def __repr__(self):
+        return "DIGITS"
+
+    def matches(self, value) -> bool:
+        return isinstance(value, str) and value.isdigit()
+
+
+# A ParityPath value that matches a whole number written as text, as an XML
+# attribute holds one.
+DIGITS = _Digits()
+
+
 @dataclass(frozen=True)
 class ParityPath:
     """Where in an endpoint's reply the parity gate (#37) lets Django differ
@@ -30,7 +43,8 @@ class ParityPath:
     characters and `[*]` for any list index. `php` and `django` are the
     values the divergence gives each server there, after the differ's
     normalizing: a value, `MISSING` (`legacy_api.missing`) for a key one
-    reply lacks, a type such as `int` for any value of it, or `ANY`.
+    reply lacks, a type such as `int` for any value of it, `DIGITS` for a
+    whole number as text, or `ANY`.
     `divergence` is the id that starts one of the endpoint's `divergences`
     (`R3`); the guard in legacy_api/tests/test_registry.py checks it does.
     `roles`, when set, are the roles the divergence covers: the role the
@@ -68,6 +82,8 @@ class ParityPath:
 def _matches(expected, value) -> bool:
     if expected is ANY or value is ANY:
         return True
+    if isinstance(expected, _Digits):
+        return expected.matches(value)
     # 0 == False and 1 == True in Python; JSON tells them apart.
     if isinstance(expected, type):
         return type(value) is expected
