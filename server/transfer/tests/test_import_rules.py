@@ -1216,12 +1216,13 @@ def test_a_php_snapshots_kiosk_ids_name_the_same_rows(tmp_path):
         "TheLastClass",
         "Bears and Frères",
     ]
-    assert kiosks["Main@Check-In"] == {"title": "Hi", "subdir": "", "classids": []}
+    # D83: no class is left, so the kiosk shows nobody, not every class.
+    assert kiosks["Main@Check-In"] == {"title": "Hi", "subdir": "", "classids": [0]}
     round_id, subgroup_id = kiosks["Main@Wrap-Up"]["key"][5:].split("-")
     found = Round.objects.get(pk=round_id, event=event)
     assert (found.group.name, found.number) == ("TheLastClass", 1)
     assert _names(Subgroup, event)[int(subgroup_id)] == "TheLastClass"
-    assert kiosks["Main@Welcome"] == {}
+    assert kiosks["Main@Welcome"] == {"key": ""}
     changed = {
         (f["table"], f["legacy_id"]): f["detail"]
         for f in _findings(report, "changed-value")
@@ -1229,7 +1230,7 @@ def test_a_php_snapshots_kiosk_ids_name_the_same_rows(tmp_path):
     }
     assert set(changed) == {("scenekiosk", 6), ("scenekiosk", 5), ("scenekiosk", 1)}
     assert "6" in changed[("scenekiosk", 6)]
-    assert "every class" in changed[("scenekiosk", 5)]
+    assert "shows nobody" in changed[("scenekiosk", 5)]
     assert "st-q6" in changed[("scenekiosk", 1)]
 
 

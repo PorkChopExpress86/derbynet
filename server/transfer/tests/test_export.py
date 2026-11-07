@@ -267,3 +267,36 @@ def test_the_round_trip_keeps_each_kiosks_classes_and_the_current_award(
     assert RaceState.objects.get(event=restored).current_award_key == (
         f"speed-1-{new_bears.pk}-{new_cubs.pk}"
     )
+
+
+def test_d83_a_kiosk_whose_classes_are_gone_still_shows_nobody_after_export(
+    raced, tmp_path
+):
+    """`[0]`, an import's list for a kiosk whose classes are all gone (D83),
+    is written as it is, where PHP's `IN (0)` lists nobody
+    (please-check-in.kiosk:101-102), and reads back as `[0]` unreported."""
+    import sqlite3
+
+    Kiosk.objects.create(
+        event=raced,
+        address="10.0.0.9",
+        name="Lobby TV",
+        page="kiosks/please-check-in.kiosk",
+        params='{"classids":[0]}',
+    )
+    target = tmp_path / "e.zip"
+
+    call_command("export_event", raced.slug, output=target)
+    with zipfile.ZipFile(target) as archive:
+        archive.extract(DATABASE, tmp_path)
+    connection = sqlite3.connect(tmp_path / DATABASE)
+    [(page,)] = connection.execute("SELECT page FROM Kiosks").fetchall()
+    connection.close()
+    from transfer.tests.legacy import run_import
+
+    report, _ = run_import(target, "--event", "Restored", report_dir=tmp_path / "r")
+
+    assert page == 'kiosks/please-check-in.kiosk#{"classids":[0]}'
+    restored = Event.objects.get(name="Restored")
+    assert Kiosk.objects.get(event=restored).params == '{"classids":[0]}'
+    assert not [f for f in report["findings"] if f["table"] == "kiosks"]

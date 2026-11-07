@@ -9,9 +9,12 @@ back, as it maps every id column.
 
 Each function takes `lookup(model label, id)`, which gives the id the row
 has on the other side, or None for a row there is none of. An id that
-names no row is dropped: from `classids`, a standings `key`, `classid` or
-`rankid` parameter, or the whole award key, which becomes `""`. Each drop
-comes back as a sentence for the import report.
+names no row is dropped (D83): from `classids`, which becomes `[0]` when no
+id is left, so the kiosk still shows nobody (please-check-in.kiosk:101-102,
+`NO_CLASS`); from a standings
+`key` or the award key, which become `""`; and with the `classid` or
+`rankid` parameter that holds it. Each drop comes back as a sentence for
+the import report.
 """
 
 import json
@@ -38,6 +41,12 @@ _FIELD_MODELS = {"group_id": GROUP, "subgroup_id": SUBGROUP, "round_id": ROUND}
 # (website/js/standings-kiosk.js:127-132), mapped so a trip back to PHP
 # keeps them.
 _PHP_ONLY = {parameters.STANDINGS: ("classid", "rankid")}
+
+
+# The `classids` of a kiosk whose classes are all gone (D83): no class has
+# id 0, so please-check-in.kiosk:101-102 and slide.next list nobody, where
+# an empty list would list every class.
+NO_CLASS = 0
 
 
 @dataclass(frozen=True)
@@ -88,14 +97,19 @@ def _classids(value, lookup: Lookup, dropped: list[str]):
         return value
     kept = []
     for item in value:
+        if item == NO_CLASS and _whole_number(item):
+            continue
         new = lookup(GROUP, item) if _whole_number(item) else None
         if new is None:
             dropped.append(f"classids {item!r} names no class; dropped")
         else:
             kept.append(new)
     if value and not kept:
-        # please-check-in.kiosk:101-102 filters only on a list with ids.
-        dropped.append("classids is now empty, so the kiosk shows every class")
+        # please-check-in.kiosk:101-102 filters only on a list with ids, so
+        # an empty list would show every class (D83).
+        if dropped:
+            dropped.append("no class is left, so the kiosk shows nobody")
+        return [NO_CLASS]
     return kept
 
 
@@ -105,8 +119,8 @@ def _standings_key(value, lookup: Lookup, dropped: list[str]):
     parsed = parse_standings_key(value)
     new = None if parsed is None else _map_fields(parsed, lookup)
     if new is None:
-        dropped.append(f"key {value!r} names no standings; dropped")
-        return None
+        dropped.append(f"key {value!r} names no standings; cleared")
+        return ""
     return new.text
 
 
