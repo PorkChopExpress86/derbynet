@@ -265,6 +265,10 @@ def test_get_then_put_keeps_every_setting(client, coordinator):
     for name, value in EVERY_SETTING.items():
         default = getattr(defaults, name)
         assert value != getattr(default, "name", default), name
+    # Another event's rows first, so no id is the snapshot's own number: a
+    # setting that names a row has to be renumbered with it.
+    other = EventFactory()
+    GroupFactory.create_batch(2, event=other)
     lions = GroupFactory(event=coordinator, name="Lions")
     RoundFactory(event=coordinator, group=lions, number=1)
     every = GroupFactory(event=coordinator, name="All", durable=True)
@@ -283,6 +287,39 @@ def test_get_then_put_keeps_every_setting(client, coordinator):
 
     assert active().pk != coordinator.pk
     assert _settings_by_name(active()) == EVERY_SETTING
+
+
+def test_get_then_put_keeps_the_rows_the_race_state_names(client, coordinator):
+    # RaceInfo's ids are the snapshot's numbers for the rows they name, as
+    # the importer reads them back, whatever ids the database handed out.
+    from core.models import RaceState
+    from kiosks.models import Scene
+
+    other = EventFactory()
+    RoundFactory.create_batch(2, event=other, group__event=other)
+    lions = GroupFactory(event=coordinator, name="Lions")
+    first = RoundFactory(event=coordinator, group=lions, number=1)
+    RoundFactory(event=coordinator, group=lions, number=2)
+    awards = Scene.objects.get(event=coordinator, name="Awards")
+    RaceState.objects.filter(event=coordinator).update(
+        current_group=lions,
+        current_round=first,
+        current_heat=2,
+        last_heat={"round_id": first.pk, "heat": 1, "results": None},
+        current_scene=awards,
+        playlist_scene=awards,
+    )
+
+    assert "<success/>" in put(client, get(client).content).content.decode()
+
+    state = RaceState.objects.get(event=active())
+    assert (state.current_group.name, state.current_round.number) == ("Lions", 1)
+    assert state.last_heat == {
+        "round_id": state.current_round_id,
+        "heat": 1,
+        "results": None,
+    }
+    assert (state.current_scene.name, state.playlist_scene.name) == ("Awards",) * 2
 
 
 def test_clean_cuts_names_to_initials(client, coordinator):

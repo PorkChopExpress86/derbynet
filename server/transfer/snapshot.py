@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from awards.models import Award, AwardType, BallotAward, Vote, Voter
 from core import race_settings
+from core.legacy_keys import Ref, decode, encode, entry_for
 from core.models import Event
 from kiosks import pages
 from kiosks.models import Scene, SceneKiosk
@@ -38,6 +39,7 @@ from roster.models import (
 )
 from transfer.importer import LATEST_SCHEMA, ImportFailed, import_derbynet
 from transfer.legacy.photos import is_valid_name
+from transfer.legacy.raceinfo import PACKED_REFS
 from transfer.legacy.source import SourceError, read_source
 
 # The names of the export schema, by the lower case the reader keys tables with.
@@ -73,6 +75,47 @@ class _Ids:
 
     def __call__(self, model, pk):
         return None if pk is None else self._maps[model][pk]
+
+    def get(self, model, pk):
+        """The legacy id, or None for a row the snapshot doesn't hold."""
+        return self._maps.get(model, {}).get(pk)
+
+
+# The models a RaceInfo reference names, by the label the importer maps it
+# through (transfer.legacy.raceinfo).
+_REF_MODELS = {"roster.group": Group, "kiosks.scene": Scene, "racing.round": Round}
+
+
+def _raceinfo_value(key: str, raw: str, ids: _Ids) -> str:
+    """A RaceInfo value with each id it holds as the snapshot numbers that
+    row, as the importer reads it back (`_assign`). A row the snapshot
+    doesn't hold reads as none."""
+    entry = entry_for(key)
+    if isinstance(entry.codec, Ref):
+        targets = {entry.fields[0]: entry.codec.model.lower()}
+    else:
+        targets = {f: PACKED_REFS[f] for f in entry.fields if f in PACKED_REFS}
+    if not targets and "last_heat" not in entry.fields:
+        return raw
+    value = decode(key, raw)
+    if value is None:
+        return raw
+    if isinstance(entry.codec, Ref):
+        return encode(key, ids.get(_REF_MODELS[targets[entry.fields[0]]], value))
+    if "last_heat" in entry.fields:
+        round_id = ids.get(Round, value["round_id"])
+        return encode(
+            key, None if round_id is None else {**value, "round_id": round_id}
+        )
+    mapped = {
+        name: (
+            ids.get(_REF_MODELS[targets[name]], v)
+            if name in targets and v is not None
+            else v
+        )
+        for name, v in value.items()
+    }
+    return encode(key, mapped)
 
 
 def _stamp(moment):
@@ -270,7 +313,10 @@ def tables(
                 [n, key, value]
                 for n, (key, value) in enumerate(
                     [
-                        *race_settings.all_keys(event).items(),
+                        *(
+                            (key, _raceinfo_value(key, value, ids))
+                            for key, value in race_settings.all_keys(event).items()
+                        ),
                         ("schema", str(LATEST_SCHEMA)),
                     ],
                     1,
