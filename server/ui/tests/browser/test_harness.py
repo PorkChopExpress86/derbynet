@@ -105,18 +105,36 @@ def test_close_tab_waits_for_the_request_out(page, event):
     assert page.in_flight.closed_with == []
 
 
+def answer_the_poll(route):
+    """A 204, as the port's polls answer when nothing changed. Chromium
+    reports an empty 200 that the page never reads as `net::ERR_ABORTED`,
+    so a poll sent before the settle stopped it failed the test at
+    teardown, 2 to 3 runs in 50 under load (#224)."""
+    route.fulfill(status=204)
+
+
+def start_a_fast_poll(page):
+    """Start a 10 ms poll, and return once its first request is out, so the
+    settle always meets a poll that has already sent. Without that wait the
+    settle usually stopped the poll before it sent anything, and the
+    abort above showed only under load (#224)."""
+    with page.expect_request("**/held-request"):
+        page.evaluate("() => setInterval(() => fetch('/held-request'), 10)")
+
+
 def test_the_settle_after_a_test_stops_a_fast_poll(page, event):
     """A poll faster than the drain's 50 ms check could start a request
     after the drain and meet the database flush (the replay page's 250 ms
     poll, a Postgres deadlock in #53). The settle stops every timer first."""
-    page.route("**/held-request", lambda route: route.fulfill(body=""))
+    page.route("**/held-request", answer_the_poll)
     page.goto("/login/")
-    page.evaluate("() => setInterval(() => fetch('/held-request'), 10)")
     sent = []
     page.on("request", lambda r: sent.append(r))
+    start_a_fast_poll(page)
     assert _settle(page) == []
     after = len(sent)
     page.wait_for_timeout(200)
+    # One read after the wait: the point is that nothing more was sent.
     assert len(sent) == after
 
 
@@ -125,12 +143,13 @@ def test_the_settle_stops_the_polls_of_a_page_on_a_fake_clock(page, event):
     from 0 spun the renderer for hours and hung the whole run (test_toasts,
     #53 retro). The settle clears only the ids a page can hold."""
     page.clock.install()
-    page.route("**/held-request", lambda route: route.fulfill(body=""))
+    page.route("**/held-request", answer_the_poll)
     page.goto("/login/")
-    page.evaluate("() => setInterval(() => fetch('/held-request'), 10)")
+    start_a_fast_poll(page)
     assert _settle(page) == []
     sent = []
     page.on("request", lambda r: sent.append(r))
     page.clock.run_for(1000)
     page.wait_for_timeout(100)
+    # One read after the wait: the point is that nothing more was sent.
     assert sent == []
