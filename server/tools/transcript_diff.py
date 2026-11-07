@@ -36,6 +36,14 @@ How a body is compared:
   `/action-response/heat-ready/@heat`. JSON object keys are compared as a set,
   since JSON objects are unordered. Types are strict: `1`, `"1"`, `1.0` and
   `true` all differ.
+- A `snapshot.get` body is the snapshot's JSON, compared as one value: its
+  table names in order under `tables`, then each table by name
+  (`$.Classes.rows[0].durable`, `$.RaceInfo.rows.lane_count`), and the
+  photo entries under `photos`. `read_snapshot` says how its ids are
+  renumbered. A `snapshot.put` reply names each `<table>` by its table
+  (`/action-response/uploaded-file/table[@name='RaceInfo']/@rows-before`),
+  and the uploaded file's `size` is masked, since the file is the one the
+  run's own `snapshot.get` wrote (#221).
 - A `photo.php` body (the digest or shape the script printed) is text.
 - Other pages are not compared, because each server renders HTML its own way
   (`curl_page` in `common.sh`); they count as skipped. An `action.php`
@@ -538,6 +546,12 @@ def read_body(text: str, request: Request, run: Run) -> Body:
             root = ElementTree.fromstring(stripped.encode())
         except ElementTree.ParseError:
             return as_text
+        if request.endpoint == "query snapshot.get" and root.tag == "snapshot":
+            snapshot = read_snapshot(root.text or "")
+            if snapshot is not None:
+                return Body(BodyKind.JSON, [_mask_strings(snapshot, run)])
+        if request.endpoint == "action snapshot.put":
+            _name_put_tables(root)
         return Body(BodyKind.XML, [_xml(root, run)])
     values, trailing = _json_values(stripped)
     if not values:
@@ -632,6 +646,168 @@ def _xml(element, run: Run) -> Element:
         run.mask(text),
         [_xml(child, run) for child in element],
     )
+
+
+# The snapshot (#221)
+
+# The table that each column of the export schema
+# (website/inc/export-schema.inc) referring to a row names a row of; a
+# table's own first column is its id. `BallotAwards.ballotid` and
+# `Voters.ballotid` name the one ballot PHP has (BALLOTID,
+# website/inc/voterid.inc:5-6), not a row, and `finishid` names a timer
+# event, so they are compared as they are.
+SNAPSHOT_IDS = {
+    "classid": "Classes",
+    "antecedent": "Classes",
+    "dependent": "Classes",
+    "rankid": "Ranks",
+    "racerid": "RegistrationInfo",
+    "roundid": "Rounds",
+    "awardtypeid": "AwardTypes",
+    "awardid": "Awards",
+    "rosterid": "Roster",
+    "resultid": "RaceChart",
+    "raceinfoid": "RaceInfo",
+    "scenekioskid": "SceneKiosk",
+    "sceneid": "Scenes",
+    "sceneid_at_finish": "Scenes",
+    "queueid": "Playlist",
+    "voterid": "Voters",
+    "voteid": "Votes",
+    "partitionid": "Partitions",
+}
+# The tables whose first column is not a row's own id: BallotAwards' is the
+# ballot, and ConstituentClasses' is the class an aggregate takes in.
+SNAPSHOT_NO_ROW_IDS = frozenset({"BallotAwards", "ConstituentClasses"})
+# The columns that hold a comma-separated list of ids.
+SNAPSHOT_ID_LISTS = {"constituents": "Classes", "rankids": "Ranks"}
+
+
+def read_snapshot(text: str) -> dict | None:
+    """A `snapshot.get` body, the JSON text inside `<snapshot>`, as one value
+    to compare, or None when it is not a snapshot.
+
+    Each server numbers its rows its own way: PHP keeps its database ids, with
+    the gaps a deletion leaves, and Django numbers each table from 1 (D57).
+    So each table whose first column is its id is renumbered by row order
+    (`SNAPSHOT_IDS`), and every column that names one of its rows maps
+    through the same numbers. 0 and null stay as they are, and any other id
+    that names no row becomes `<no <table> row>`, which no renumbered id
+    equals. `high-water` and `missing` are what the ids give, so they become
+    `<ids>` when they agree with the rows, and are compared raw when they
+    don't. RaceInfo's rows are keyed by `itemkey`, since its ids are only the
+    order of the writes, which differs between servers. A Voters
+    `identifier` is the voter's session id (website/ajax/action.vote.cast.inc:8),
+    as random as a session cookie."""
+    try:
+        entries = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        return None
+    tables = {e["table"]: e for e in entries if isinstance(e.get("table"), str)}
+    numbers = {
+        name: _row_numbers(entry)
+        for name, entry in tables.items()
+        if name not in SNAPSHOT_NO_ROW_IDS
+    }
+    out = {"tables": list(tables)}
+    for name, entry in tables.items():
+        out[name] = _snapshot_table(name, entry, numbers)
+    photos = [e for e in entries if "table" not in e]
+    if photos:
+        out["photos"] = [_snapshot_row(None, p, numbers) for p in photos]
+    return out
+
+
+def _row_numbers(entry: dict) -> dict[int, int] | None:
+    """Each row's id by its place in the table, for a table whose rows each
+    have their own id in the first column; else None."""
+    rows = entry.get("rows")
+    if not isinstance(rows, list) or not all(isinstance(r, dict) and r for r in rows):
+        return None
+    ids = [next(iter(r.values())) for r in rows]
+    if not all(_is_id(i) for i in ids) or len(set(ids)) != len(ids):
+        return None
+    return {raw: n for n, raw in enumerate(sorted(ids), 1)}
+
+
+def _id_order(value) -> int:
+    return value if _is_id(value) else 0
+
+
+def _is_id(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _snapshot_id(table: str, value, numbers):
+    mapping = numbers.get(table)
+    if mapping is None or not _is_id(value):
+        return value
+    # An id that names no row would otherwise read as whatever row the other
+    # snapshot numbers so.
+    return mapping.get(value, f"<no {table} row>")
+
+
+def _snapshot_row(table: str | None, row: dict, numbers) -> dict:
+    out = {}
+    for n, (column, value) in enumerate(row.items()):
+        if n == 0 and table in numbers:
+            value = _snapshot_id(table, value, numbers)
+        elif column in SNAPSHOT_IDS:
+            value = _snapshot_id(SNAPSHOT_IDS[column], value, numbers)
+        elif column in SNAPSHOT_ID_LISTS and isinstance(value, str) and value:
+            parts = value.split(",")
+            if all(p.isdigit() for p in parts):
+                named = SNAPSHOT_ID_LISTS[column]
+                value = ",".join(
+                    str(_snapshot_id(named, int(p), numbers)) for p in parts
+                )
+        elif column == "identifier" and isinstance(value, str) and value:
+            value = "<session id>"
+        out[column] = value
+    return out
+
+
+def _snapshot_table(name: str, entry: dict, numbers) -> dict:
+    rows = entry.get("rows")
+    out = {k: v for k, v in entry.items() if k != "table"}
+    if not isinstance(rows, list):
+        return out
+    mine = numbers.get(name)
+    if mine is not None:
+        ids = sorted(mine)
+        if entry.get("high-water") == (ids[-1] if ids else 0):
+            out["high-water"] = "<ids>"
+        gaps = sorted(set(range(1, ids[-1] + 1)) - set(ids)) if ids else []
+        if entry.get("missing") == gaps:
+            out["missing"] = "<ids>"
+    if name == "RaceInfo" and all(
+        isinstance(r, dict) and isinstance(r.get("itemkey"), str) for r in rows
+    ):
+        keyed: dict = {}
+        for row in sorted(rows, key=lambda r: _id_order(r.get("raceinfoid"))):
+            keyed.setdefault(row["itemkey"], []).append(row.get("itemvalue"))
+        out["rows"] = {k: v[0] if len(v) == 1 else v for k, v in keyed.items()}
+        return out
+    out["rows"] = [
+        _snapshot_row(name, r, numbers) if isinstance(r, dict) else r for r in rows
+    ]
+    return out
+
+
+def _name_put_tables(root) -> None:
+    """Name each `<table>` of a `snapshot.put` reply by its table, so a path
+    says which table it is (`table[@name='RaceInfo']`), and mask the
+    uploaded file's size: the file is the snapshot the run's own
+    `snapshot.get` wrote, which that step compares."""
+    for uploaded in root.iter("uploaded-file"):
+        if (uploaded.get("size") or "").isdigit():
+            uploaded.set("size", "<bytes>")
+        for table in uploaded.findall("table"):
+            name = table.get("name")
+            if name is not None:
+                table.tag = f"table[@name='{name}']"
 
 
 # Comparing

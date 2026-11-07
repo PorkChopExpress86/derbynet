@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from accounts.permissions import Perm
+from awards.models import Award, BallotAward, Vote
+from awards.tests.factories import AwardFactory, BallotAwardFactory, VoteFactory
 from core.models import Event, RaceSettings, SiteState
 from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in
@@ -120,6 +122,204 @@ def test_get_writes_the_wrapper_and_every_table_in_php_order(client, coordinator
     assert tables["RaceChart"]["rows"][0]["finishtime"] == 3.5
     assert tables["Classes"]["missing"] == []
     assert tables["Classes"]["high-water"] == len(tables["Classes"]["rows"])
+
+
+def _awards_and_ballot(event):
+    """A pack award, a group award, both on the ballot, a vote each from two
+    voters, and a durable aggregate beside a plain group."""
+    lions = GroupFactory(event=event, name="Lions")
+    every = GroupFactory(event=event, name="All", durable=True)
+    for group in (lions, every):
+        RoundFactory(event=event, group=group, number=1)
+    racer = RacerFactory(group=lions)
+    pack = AwardFactory(event=event, name="Pack")
+    den = AwardFactory(event=event, name="Den", group=lions)
+    for award in (pack, den):
+        BallotAwardFactory(award=award, depth=2)
+    for identifier in ("one", "two"):
+        VoteFactory(
+            voter__event=event, voter__identifier=identifier, award=pack, racer=racer
+        )
+
+
+def test_get_writes_the_values_php_stores(client, coordinator):
+    # #221: PHP leaves Classes.durable NULL unless a class is made durable
+    # (create_class, website/inc/aggregate_round.inc:115-133, class.add's 1),
+    # stores 0 for an award's missing classid and rankid (award.edit's
+    # class_and_rank of 0, website/ajax/action.award.edit.inc:68-73) and
+    # racerid (`racerid INTEGER DEFAULT 0`, website/sql/sqlite/schema.inc:23),
+    # and has one ballot, BALLOTID 1 (website/inc/voterid.inc:5-6), for every
+    # BallotAwards and Voters row.
+    _awards_and_ballot(coordinator)
+
+    tables = tables_of(get(client).content)
+
+    assert [r["durable"] for r in tables["Classes"]["rows"]] == [None, 1]
+    assert [
+        (r["classid"], r["rankid"], r["racerid"]) for r in tables["Awards"]["rows"]
+    ] == [(0, 0, 0), (1, 0, 0)]
+    assert [r["ballotid"] for r in tables["BallotAwards"]["rows"]] == [1, 1]
+    assert tables["BallotAwards"]["high-water"] == 1
+    assert tables["BallotAwards"]["missing"] == []
+    assert [r["ballotid"] for r in tables["Voters"]["rows"]] == [1, 1]
+
+
+def test_get_then_put_keeps_the_awards_and_the_ballot(client, coordinator):
+    _awards_and_ballot(coordinator)
+    first = tables_of(get(client).content)
+
+    assert "<success/>" in put(client, get(client).content).content.decode()
+
+    event = active()
+    assert event.pk != coordinator.pk
+    assert tables_of(get(client).content) == first
+    assert sorted(
+        (a.name, a.group.name if a.group else None, a.racer_id)
+        for a in Award.objects.filter(event=event)
+    ) == [("Den", "Lions", None), ("Pack", None, None)]
+    assert sorted(Group.objects.filter(event=event).values_list("name", "durable")) == [
+        ("All", True),
+        ("Lions", False),
+    ]
+    assert BallotAward.objects.filter(event=event).count() == 2
+    assert Vote.objects.filter(event=event).count() == 2
+
+
+# A value other than its default for every RaceSettings field, but the
+# folders: a restore keeps the open event's folders (#134), which
+# test_a_restore_keeps_the_folder_paths_and_brings_the_photos_back checks.
+# The two references are filled in by the test.
+EVERY_SETTING = {
+    "lane_count": 6,
+    "unused_lane_mask": 2,
+    "reverse_lanes": True,
+    "use_master_sched": True,
+    "use_points": True,
+    "scoring": 1,
+    "max_runs_per_car": 2,
+    "rotation_schedule": True,
+    "track_length": 32.5,
+    "finish_formatting": "%6.4f",
+    "update_period_ms": 3000,
+    "warn_no_timer": False,
+    "timer_send_logs": True,
+    "group_formation_rule": "by-class",
+    "use_subgroups": True,
+    "supergroup_label": "Troop",
+    "partition_label": "Patrol",
+    "full_field_rule": "group",
+    "full_field_group": "All",
+    "n_pack_trophies": 4,
+    "n_den_trophies": 2,
+    "n_rank_trophies": 1,
+    "one_trophy_per": True,
+    "use_xbs": True,
+    "xbs_award": "Best Build",
+    "car_numbering": "200+201",
+    "name_style": 1,
+    "ballot_password": "secret",
+    "photos_on_now_racing": "car",
+    "show_cars_on_deck": False,
+    "show_racer_photos_rr": False,
+    "show_car_photos_rr": False,
+    "now_racing_linger_ms": 5000,
+    "lane_colors": "red,blue",
+    "images_dir": "Cub Scouts",
+    "racing_scene": "Racing",
+    "upload_videos": False,
+    "replay_skipback_ms": 6000,
+    "replay_num_showings": 3,
+    "replay_rate": 75,
+    "replay_post_roll_ms": 2003,
+    "replay_max_clip_ms": 12000,
+    "replay_ice_servers": "stun:stun.example.org:3478",
+    "websocket_url": "ws://example.org/ws",
+    "ws_trigger_port": "8080",
+}
+KEPT_FOLDERS = {"photo_directory", "car_photo_directory", "video_directory"}
+KEPT_FOLDERS |= {"logs_directory"}
+
+
+def _settings_by_name(event) -> dict:
+    row = RaceSettings.objects.get(event=event)
+    out = {}
+    for name in EVERY_SETTING:
+        value = getattr(row, name)
+        out[name] = getattr(value, "name", value)
+    return out
+
+
+def test_get_then_put_keeps_every_setting(client, coordinator):
+    # D82: the snapshot carries every setting Django keeps, so a new field
+    # with no RaceInfo key fails here.
+    from kiosks.models import Scene
+    from roster.models import GroupConstituent
+
+    fields = {
+        f.name
+        for f in RaceSettings._meta.concrete_fields
+        if f.name not in ("id", "event")
+    }
+    assert set(EVERY_SETTING) == fields - KEPT_FOLDERS
+    defaults = RaceSettings()
+    for name, value in EVERY_SETTING.items():
+        default = getattr(defaults, name)
+        assert value != getattr(default, "name", default), name
+    # Another event's rows first, so no id is the snapshot's own number: a
+    # setting that names a row has to be renumbered with it.
+    other = EventFactory()
+    GroupFactory.create_batch(2, event=other)
+    lions = GroupFactory(event=coordinator, name="Lions")
+    RoundFactory(event=coordinator, group=lions, number=1)
+    every = GroupFactory(event=coordinator, name="All", durable=True)
+    GroupConstituent.objects.create(
+        event=coordinator, aggregate=every, constituent=lions
+    )
+    values = {
+        **EVERY_SETTING,
+        "full_field_group": every,
+        "racing_scene": Scene.objects.get(event=coordinator, name="Racing"),
+    }
+    RaceSettings.objects.filter(event=coordinator).update(**values)
+    assert _settings_by_name(coordinator) == EVERY_SETTING
+
+    assert "<success/>" in put(client, get(client).content).content.decode()
+
+    assert active().pk != coordinator.pk
+    assert _settings_by_name(active()) == EVERY_SETTING
+
+
+def test_get_then_put_keeps_the_rows_the_race_state_names(client, coordinator):
+    # RaceInfo's ids are the snapshot's numbers for the rows they name, as
+    # the importer reads them back, whatever ids the database handed out.
+    from core.models import RaceState
+    from kiosks.models import Scene
+
+    other = EventFactory()
+    RoundFactory.create_batch(2, event=other, group__event=other)
+    lions = GroupFactory(event=coordinator, name="Lions")
+    first = RoundFactory(event=coordinator, group=lions, number=1)
+    RoundFactory(event=coordinator, group=lions, number=2)
+    awards = Scene.objects.get(event=coordinator, name="Awards")
+    RaceState.objects.filter(event=coordinator).update(
+        current_group=lions,
+        current_round=first,
+        current_heat=2,
+        last_heat={"round_id": first.pk, "heat": 1, "results": None},
+        current_scene=awards,
+        playlist_scene=awards,
+    )
+
+    assert "<success/>" in put(client, get(client).content).content.decode()
+
+    state = RaceState.objects.get(event=active())
+    assert (state.current_group.name, state.current_round.number) == ("Lions", 1)
+    assert state.last_heat == {
+        "round_id": state.current_round_id,
+        "heat": 1,
+        "results": None,
+    }
+    assert (state.current_scene.name, state.playlist_scene.name) == ("Awards",) * 2
 
 
 def test_clean_cuts_names_to_initials(client, coordinator):

@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from awards.models import Award, AwardType, BallotAward, Vote, Voter
 from core import race_settings
+from core.legacy_keys import Ref, decode, encode, entry_for
 from core.models import Event
 from kiosks import pages
 from kiosks.models import Scene, SceneKiosk
@@ -38,6 +39,7 @@ from roster.models import (
 )
 from transfer.importer import LATEST_SCHEMA, ImportFailed, import_derbynet
 from transfer.legacy.photos import is_valid_name
+from transfer.legacy.raceinfo import PACKED_REFS
 from transfer.legacy.source import SourceError, read_source
 
 # The names of the export schema, by the lower case the reader keys tables with.
@@ -49,6 +51,11 @@ _CANONICAL = {
         " ConstituentClasses Events EventLaneDetails"
     ).split()
 }
+
+
+# PHP's one ballot, which every BallotAwards and Voters row names
+# (BALLOTID, website/inc/voterid.inc:5-6).
+_BALLOT = 1
 
 
 def _json(value) -> str:
@@ -68,6 +75,47 @@ class _Ids:
 
     def __call__(self, model, pk):
         return None if pk is None else self._maps[model][pk]
+
+    def get(self, model, pk):
+        """The legacy id, or None for a row the snapshot doesn't hold."""
+        return self._maps.get(model, {}).get(pk)
+
+
+# The models a RaceInfo reference names, by the label the importer maps it
+# through (transfer.legacy.raceinfo).
+_REF_MODELS = {"roster.group": Group, "kiosks.scene": Scene, "racing.round": Round}
+
+
+def _raceinfo_value(key: str, raw: str, ids: _Ids) -> str:
+    """A RaceInfo value with each id it holds as the snapshot numbers that
+    row, as the importer reads it back (`_assign`). A row the snapshot
+    doesn't hold reads as none."""
+    entry = entry_for(key)
+    if isinstance(entry.codec, Ref):
+        targets = {entry.fields[0]: entry.codec.model.lower()}
+    else:
+        targets = {f: PACKED_REFS[f] for f in entry.fields if f in PACKED_REFS}
+    if not targets and "last_heat" not in entry.fields:
+        return raw
+    value = decode(key, raw)
+    if value is None:
+        return raw
+    if isinstance(entry.codec, Ref):
+        return encode(key, ids.get(_REF_MODELS[targets[entry.fields[0]]], value))
+    if "last_heat" in entry.fields:
+        round_id = ids.get(Round, value["round_id"])
+        return encode(
+            key, None if round_id is None else {**value, "round_id": round_id}
+        )
+    mapped = {
+        name: (
+            ids.get(_REF_MODELS[targets[name]], v)
+            if name in targets and v is not None
+            else v
+        )
+        for name, v in value.items()
+    }
+    return encode(key, mapped)
 
 
 def _stamp(moment):
@@ -140,7 +188,9 @@ def tables(
                     g.name,
                     g.sort_order,
                     _csv(constituents.get(g.pk, [])),
-                    int(g.durable),
+                    # PHP leaves it NULL unless the class is made durable
+                    # (create_class, website/inc/aggregate_round.inc:115-133).
+                    1 if g.durable else None,
                     _csv(filters.get(g.pk, [])),
                 ]
                 for n, g in enumerate(groups, 1)
@@ -196,9 +246,11 @@ def tables(
                     n,
                     a.name,
                     a.award_type_id,
-                    ids(Group, a.group_id),
-                    ids(Subgroup, a.subgroup_id),
-                    ids(Racer, a.racer_id),
+                    # PHP stores 0 for none (website/ajax/action.award.edit.inc:68-73,
+                    # and racerid's DEFAULT 0 in website/sql/sqlite/schema.inc:23).
+                    ids(Group, a.group_id) or 0,
+                    ids(Subgroup, a.subgroup_id) or 0,
+                    ids(Racer, a.racer_id) or 0,
                     a.sort,
                 ]
                 for n, a in enumerate(awards, 1)
@@ -261,7 +313,10 @@ def tables(
                 [n, key, value]
                 for n, (key, value) in enumerate(
                     [
-                        *race_settings.all_keys(event).items(),
+                        *(
+                            (key, _raceinfo_value(key, value, ids))
+                            for key, value in race_settings.all_keys(event).items()
+                        ),
                         ("schema", str(LATEST_SCHEMA)),
                     ],
                     1,
@@ -318,16 +373,14 @@ def tables(
         "BallotAwards": (
             ["ballotid", "awardid", "depth"],
             [
-                [n, ids(Award, b.award_id), b.depth]
-                for n, b in enumerate(
-                    BallotAward.objects.filter(**mine).order_by("pk"), 1
-                )
+                [_BALLOT, ids(Award, b.award_id), b.depth]
+                for b in BallotAward.objects.filter(**mine).order_by("pk")
             ],
         ),
         "Voters": (
             ["voterid", "ballotid", "when_cast", "ip_addr", "identifier"],
             [
-                [n, None, _stamp(v.cast_at), v.ip_address, v.identifier]
+                [n, _BALLOT, _stamp(v.cast_at), v.ip_address, v.identifier]
                 for n, v in enumerate(voters, 1)
             ],
         ),

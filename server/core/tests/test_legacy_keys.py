@@ -59,7 +59,10 @@ def test_every_legacy_key_has_a_target_or_a_dropped_reason():
 
 
 def test_no_registry_entry_names_a_key_outside_the_file():
-    assert set(REGISTRY) <= set(LEGACY_KEYS)
+    # Bar the Django-only settings' keys, which PHP never names.
+    assert set(REGISTRY) - legacy_keys.DJANGO_ONLY_KEYS <= set(LEGACY_KEYS)
+    assert legacy_keys.DJANGO_ONLY_KEYS <= set(REGISTRY)
+    assert legacy_keys.DJANGO_ONLY_KEYS.isdisjoint(LEGACY_KEYS)
 
 
 def _targets():
