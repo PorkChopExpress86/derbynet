@@ -19,6 +19,41 @@ def _data_dir(settings, tmp_path_factory):
     settings.DATA_DIR = tmp_path_factory.mktemp("derbynet-data")
 
 
+ID_OFFSET_STEP = 1000
+
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, django_db_blocker):
+    """Each table's ids start at their own multiple of ID_OFFSET_STEP, never
+    at 1, on SQLite as on Postgres. In a fresh SQLite test database a row's
+    id equalled its position, so an export that wrote a database id where
+    the importer reads a position passed every SQLite test and failed only
+    on Postgres (#221's RaceInfo ids, #221 retro). A start of its own per
+    table also fails a test that passes one table's id as another's."""
+    from django.apps import apps
+    from django.db import connection, models
+
+    tables = sorted(
+        (model._meta.db_table, model._meta.pk.column)
+        for model in apps.get_models(include_auto_created=True)
+        if model._meta.managed and isinstance(model._meta.pk, models.AutoField)
+    )
+    with django_db_blocker.unblock(), connection.cursor() as cursor:
+        for n, (table, column) in enumerate(tables, start=1):
+            start = n * ID_OFFSET_STEP
+            if connection.vendor == "sqlite":
+                cursor.execute("DELETE FROM sqlite_sequence WHERE name = %s", [table])
+                cursor.execute(
+                    "INSERT INTO sqlite_sequence (name, seq) VALUES (%s, %s)",
+                    [table, start],
+                )
+            else:
+                cursor.execute(
+                    "SELECT setval(pg_get_serial_sequence(%s, %s), %s)",
+                    [table, column, start],
+                )
+
+
 def pytest_collection_modifyitems(items):
     from racing.engine.tests.golden import reads_golden_fixtures
 

@@ -80,6 +80,33 @@ def test_every_target_names_real_model_fields(key, entry):
         model._meta.get_field(field)
 
 
+# Fields of the RaceInfo models that no key stores, so a snapshot or an
+# export loses them. Each needs a reason.
+UNKEYED = {
+    ("core.RaceState", "waiting_entry"): "playlist intermission, Django-only state",
+    ("core.RaceState", "ended_round"): "playlist intermission, Django-only state",
+}
+
+
+def test_every_raceinfo_model_field_has_a_key_or_a_reason():
+    """#221 retro: three settings the settings page wrote through
+    `model_field` had no key, so a round trip reset them, and nothing tied
+    the models' fields to the registry. A new field on these models fails
+    here until a key stores it or UNKEYED gives the reason it is lost."""
+    entries = [entry for _, entry in _targets()]
+    keyed = {(entry.model, field) for entry in entries for field in entry.fields}
+    # A key with no fields, `replay_queue`, holds every row of its model.
+    whole = {entry.model for entry in entries if not entry.fields}
+    fields = {
+        (label, field.name)
+        for label in {entry.model for entry in entries} - whole
+        for field in apps.get_model(label)._meta.concrete_fields
+        if field.name not in ("id", "event")
+    }
+    assert fields - keyed == set(UNKEYED)
+    assert all(UNKEYED.values())
+
+
 @pytest.mark.parametrize(
     ("key", "field"), [("tt-lane3", "test_results"), ("tt-place12", "test_results")]
 )
