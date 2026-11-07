@@ -16,9 +16,10 @@
 # (#54 retro).  --loops sets the number
 # of busy loops (default 8).  Results go to var/load-runs/<time>/ under
 # server/, or DERBYNET_LOAD_RUN_DIR, which must be new or empty: pytest.log
-# and junit.xml.  At the end it prints pytest's summary lines, with -rf's
-# list of failures, and the log's path.  It exits with pytest's status.  Run it with the Bash tool's
-# run_in_background rather than under `timeout`, which loses the run.
+# and junit.xml.  At the end it prints pytest's summary lines, with -rfE's
+# list of failures and errors, and the log's path.  It exits with pytest's
+# status.  Run it with the Bash tool's run_in_background rather than under
+# `timeout`, which loses the run.
 
 set -e -E -o pipefail
 
@@ -79,7 +80,7 @@ echo "Log: $OUT/pytest.log"
 READY="$OUT/postgres-ready"
 rm -f "$READY"
 DERBYNET_PG_READY_FILE="$READY" \
-  "${RUNNER[@]}" -rf --junitxml="$OUT/junit.xml" "$@" >"$OUT/pytest.log" 2>&1 &
+  "${RUNNER[@]}" -rfE --junitxml="$OUT/junit.xml" "$@" >"$OUT/pytest.log" 2>&1 &
 RUN_PID=$!
 if [ "${RUNNER[0]}" != uv ]; then
   while [ ! -e "$READY" ] && kill -0 "$RUN_PID" 2>/dev/null; do sleep 1; done
@@ -93,8 +94,9 @@ wait "$RUN_PID" || status=$?
 RUN_PID=
 stop_loops
 
-# The short test summary (-rf) and the final line, which names an error such
-# as a wrong path as well as the counts.
+# The short test summary (-rfE: errors too, such as a teardown's, which -rf
+# left unnamed in the #220 retro's run) and the final line, which names an
+# error such as a wrong path as well as the counts.
 sed -n '/short test summary info/,$p' "$OUT/pytest.log"
 grep -q 'short test summary info' "$OUT/pytest.log" || tail -n 5 "$OUT/pytest.log"
 echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml"

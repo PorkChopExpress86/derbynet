@@ -4,6 +4,8 @@ starts anything: #47 and #48 each lost a 25-repeat run to
 that already holds files: #220 reused one, and a wait for its `junit.xml`
 fired on an earlier session's results (#220 retro)."""
 
+import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -52,3 +54,26 @@ def test_an_output_folder_with_files_is_refused(tmp_path):
     assert "already holds files" in result.stderr
     assert (tmp_path / "junit.xml").read_text() == "an earlier run's results"
     assert not (tmp_path / "pytest.log").exists()
+
+
+def test_the_summary_names_an_error_as_well_as_a_failure(tmp_path):
+    """#220's retro run ended "1 error" with no test named: `-rf` lists only
+    failures, and the error was a teardown (#220 retro)."""
+    (tmp_path / "test_breaks.py").write_text(
+        "import pytest\n\n\n"
+        "@pytest.fixture\ndef broken():\n    raise RuntimeError\n\n\n"
+        "def test_errors_at_setup(broken):\n    pass\n\n\n"
+        "def test_fails():\n    assert False\n"
+    )
+    result = subprocess.run(
+        ["bash", "-c", f"'{SCRIPT}' --loops 0 -p no:cacheprovider '{tmp_path}' >out"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=tmp_path,
+        env={**os.environ, "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run")},
+    )
+    summary = (tmp_path / "out").read_text()
+    assert result.returncode == 1, summary
+    assert re.search(r"^ERROR \S*test_breaks.py::test_errors_at_setup", summary, re.M)
+    assert re.search(r"^FAILED \S*test_breaks.py::test_fails", summary, re.M)
