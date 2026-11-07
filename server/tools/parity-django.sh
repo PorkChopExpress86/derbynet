@@ -11,7 +11,9 @@
 # DATABASE_URL picks Postgres; unset, the server uses SQLite in its data folder.
 # The data folder is <leg-dir>/data, or DERBYNET_PARITY_DATA_DIR, which CI sets to
 # /var/lib/derbynet, where the PHP image keeps its data, so that the folder
-# settings of the two servers differ only as D57 says.
+# settings of the two servers differ only as D57 says.  The gate compares that
+# folder, so a leg on <leg-dir>/data differs from PHP's wherever a reply names
+# it; testing/README.md says how to run the legs locally.
 # The harness image must be built (run-suite.sh harness), with the same
 # DERBYNET_TEST_PREFIX.  The server's log is <leg-dir>/server.log.
 

@@ -8,7 +8,9 @@
 # only after a 25-minute capture, and the paths the ADRs cite, which
 # plan-checks.yml checks (#70 retro: a path without its server/ prefix failed
 # CI twice), and the tests that read only the source
-# (server/tools/source-checks.sh, #48 retro).  Turn it on once per clone:
+# (server/tools/source-checks.sh, #48 retro).  It runs plan/tests on every
+# push, as plan-checks.yml does: #222 changed the parity gate a plan test read,
+# and only CI found it (#218 retro).  Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
 #
@@ -19,6 +21,13 @@ set -e -o pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 ZERO=0000000000000000000000000000000000000000
+
+# Under a second, and plan/bin reads server/ and .github/, so on every push.
+echo "pre-push: plan/tests" >&2
+if ! out="$(python3 -I -m unittest discover -s "$ROOT/plan/tests" 2>&1 </dev/null)"; then
+  printf '%s\n' "$out" >&2
+  exit 1
+fi
 
 # Git sends one "<local ref> <local sha> <remote ref> <remote sha>" line per
 # ref it pushes.  A new branch has no remote sha; compare it with master.
