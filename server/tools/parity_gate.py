@@ -83,11 +83,10 @@ class Waiting:
 # The Django leg's steps that wait on another ticket, by label. Remove an
 # entry when its ticket lands; the gate fails while a listed step passes, so
 # the list can't go stale. A waiting step may fail and stop early, but only
-# after its request, and a reply it gets is still compared.
-_PAGES = (
-    "the legacy pages: #40, #41, #42, #43, #44, #45, #46, #47, #48, #49, #50,"
-    " #52, #53, #54"
-)
+# after its request, and a reply it gets is still compared. `_PAGES` names the
+# open page tickets; drop a ticket from it when it closes (#40, #44 and #47
+# stayed after closing until the #218 retro).
+_PAGES = "the legacy pages: #41, #42, #43, #45, #46, #48, #49, #50, #52, #53, #54"
 # test-visit-each-page.sh opens about.php first.
 _EACH_ROLE = Waiting(f"{_PAGES} (test-visit-each-page.sh)", "about.php")
 WAITING: dict[str, Waiting] = {

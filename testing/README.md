@@ -230,18 +230,26 @@ The gate runs nightly, on demand, and on a push to a branch named
 `parity-check/<anything>`.  It does not run on pull requests, because it can't
 pass yet and `plan/bin/pr-merge` merges only when every check passed, so push a
 change to the gate to `parity-check/<name>` too.  Its checks then show on the
-pull request, and `pr-merge` leaves them out.  To run it locally, from a
-regular checkout with the images built (`run-suite.sh harness assets`):
+pull request, and `pr-merge` leaves them out.
 
+To judge a change to the gate or to its allowances, rerun the gate on the legs
+of a finished run (below), or push the change to `parity-check/<name>` for new
+legs; neither needs root.  To run the legs locally, from a regular checkout
+with the images built (`run-suite.sh harness assets`), the Django server needs
+`/var/lib/derbynet`, PHP's data folder, since the gate compares the data folder
+in front of an event's (`server/tools/transcript_diff.py`).  Making it needs
+root once:
+
+    sudo install -d -o "$(id -u)" -g "$(id -g)" /var/lib/derbynet
     DERBYNET_PARITY_DIR=/tmp/leg-php \
         testing/docker/run-suite.sh server timeout parity
-    server/tools/parity-django.sh /tmp/leg-django
+    DERBYNET_PARITY_DATA_DIR=/var/lib/derbynet \
+        server/tools/parity-django.sh /tmp/leg-django
     cd server && uv run python -m tools.parity_gate \
         /tmp/leg-php/steps /tmp/leg-django/suite/steps
 
-A change to the gate or to its allowances needs no new run: judge the legs of
-a finished run again, from its `leg-php` and `leg-django-<database>`
-artifacts:
+To judge the legs of a finished run again, from its `leg-php` and
+`leg-django-<database>` artifacts:
 
     gh run download <run> --repo PorkChopExpress86/derbynet \
         -n leg-php -D /tmp/php

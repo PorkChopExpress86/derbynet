@@ -776,3 +776,14 @@ def test_the_differ_carries_the_logged_in_role(tmp_path):
     as_coordinator = run.replace("RaceCrew", "RaceCoordinator")
     refused_coordinator = refused.replace("RaceCrew", "RaceCoordinator")
     assert not td.diff(as_coordinator, refused_coordinator, allow=allow).ok
+
+
+def test_a_parity_path_takes_its_roles_as_a_tuple():
+    """A frozenset's order changes with each process's hash seed, so test ids
+    built from it differ between pytest-xdist workers and collection fails
+    (#218 retro)."""
+    with pytest.raises(TypeError, match="sorted tuple"):
+        ParityPath(
+            "query class.list", "$.outcome", "D5", roles=frozenset({"", "Timer"})
+        )
+    assert ParityPath("query class.list", "$.outcome", "D5", roles=("", "Timer")).roles

@@ -47,6 +47,12 @@ class ParityPath:
     # the same in every pytest-xdist worker.
     roles: tuple[str, ...] | None = None
 
+    def __post_init__(self):
+        if self.roles is not None and not isinstance(self.roles, tuple):
+            raise TypeError(
+                f"ParityPath roles must be a sorted tuple, not {self.roles!r}"
+            )
+
     def covers(
         self, endpoint: str, path: str, php=ANY, django=ANY, role: str | None = None
     ) -> bool:
