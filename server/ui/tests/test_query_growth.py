@@ -25,6 +25,7 @@ from awards.editing import set_ad_hoc_award, set_winner
 from awards.models import Award, BallotAward, Vote, Voter
 from awards.services import set_partition_list
 from core.models import RaceState
+from kiosks import services as kiosk_services
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from racing.models import PlaylistEntry
 from roster.models import Racer
@@ -143,7 +144,7 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
     partition recording weights with a maximum and its first racer weighed
     over it (#70), and each group's kiosk, checking in and
     named in the first scene, showing please-check-in for its group, with a
-    kiosk each on standings, results, now racing and awards (#237). With
+    kiosk on each other page in `kiosks.services.kiosk_pages()` (#237). With
     `race`, the first round races a heat, and the kiosk presents the first
     award."""
     rounds = list(race_setup(event, groups=groups).values())
@@ -175,19 +176,17 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
             params=f'{{"classids":[{round.group.pk}]}}',
             last_contact=timezone.now(),
         )
-        # A kiosk per group on each page whose thumbnail reads the race
-        # (#237): reads they share are made once per request
-        # (`ui.kiosk_pages.state.once`), so they do not grow with the kiosks.
-        for page in (
-            "standings",
-            "results-by-racer",
-            "now-racing",
-            "award-presentations",
-        ):
+        # A kiosk per group on every other page, since the dashboard draws
+        # each kiosk's page as a thumbnail (#237): reads they share are made
+        # once per request (`ui.kiosk_pages.state.once`), so they do not grow
+        # with the kiosks. A page added to the list is counted here too.
+        for page in kiosk_services.kiosk_pages():
+            if page["full"] == "kiosks/please-check-in.kiosk":
+                continue
             Kiosk.objects.create(
                 event=event,
-                address=f"10.0.{round.group.pk}.{page}",
-                page=f"kiosks/{page}.kiosk",
+                address=f"10.0.{round.group.pk}.{page['brief']}",
+                page=page["full"],
                 last_contact=timezone.now(),
             )
         first_scene = Scene.objects.filter(event=event).order_by("sort_order").first()
