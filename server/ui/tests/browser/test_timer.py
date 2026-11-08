@@ -198,6 +198,16 @@ def test_plain_http_away_from_localhost_links_to_https(login, live_server, page_
 # ----- the fake timer --------------------------------------------------------------
 
 
+def test_the_fake_timer_page_at_both_sizes(login, event):
+    """The screenshots of the fake timer, ready for a 4-lane heat (#238)."""
+    page = login("RaceCoordinator")
+    scheduled(race_setup(event, groups=(("Wolves", 4),), lanes=4)["Wolves"])
+    page.goto("/timer/fake/")
+    expect(page.locator("[data-summary]")).to_contain_text("Ready for heat 1 of")
+    expect(page.locator("[data-lanes] li")).to_have_count(4)
+    shoot(page, "fake-timer")
+
+
 def test_the_fake_timer_races_a_heat_in_auto_mode(login, event):
     """Acceptance: the fake timer in auto mode races a 4-lane heat against
     Django, and the race dashboard shows the result."""
@@ -207,7 +217,6 @@ def test_the_fake_timer_races_a_heat_in_auto_mode(login, event):
     page.goto("/timer/fake/")
     expect(page.locator("[data-summary]")).to_contain_text("Ready for heat 1 of")
     expect(page.locator("[data-lanes] li")).to_have_count(4)
-    shoot(page, "fake-timer")
     page.locator("[data-auto-mode]").click()
     expect(page.locator("[data-auto-mode]")).to_have_attribute("aria-checked", "true")
     # 1 s for the heat to settle, 5 s for the crew, under 4 s down the track.
