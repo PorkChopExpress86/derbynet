@@ -322,22 +322,39 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     assert video.stat().st_size > 0
 
 
-def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event):
+@pytest.mark.parametrize("hold_ms", [0, 900], ids=["no_hold", "held_900ms"])
+def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event, hold_ms):
     """RACE_STARTS replays `skipback` ms after the gate opens, and a REPLAY
-    after that is ignored until the next START (replay.php:111-158)."""
+    after that is ignored until the next START (replay.php:111-158).
+
+    The page starts its timer inside the RACE_STARTS call (replay.js
+    `handle_replay_message`), so the 1000 ms bound counts from a time taken
+    just before the call. A time taken after it returns is late by however
+    long the page was busy in between: CI once read 999.4 ms (#236). With
+    `hold_ms` the page stays busy that long after the call, and the clip
+    comes less than 1000 ms after the call returns. The hold is 900 ms
+    because that bound gives a late timer as much slack as the hold, and a
+    hold under 1000 ms still ends before the timer is due."""
     fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
     page = login("RaceCoordinator")
     desktop_only(page)
     open_replay(page)
-    sent = page.evaluate(
-        "() => { handle_replay_message('START Wolves_Round1_Heat02');"
+    before, returned = page.evaluate(
+        "(hold) => { handle_replay_message('START Wolves_Round1_Heat02');"
+        " const before = performance.now();"
         " handle_replay_message('RACE_STARTS 1000 1 100');"
-        " return performance.now(); }"
+        " const until = performance.now() + hold;"
+        " while (performance.now() < until) {}"
+        " return [before, performance.now()]; }",
+        hold_ms,
     )
     page.wait_for_function("g_last_clip !== null")
     timed_out = page.evaluate("g_last_clip")
     assert timed_out["root"] == "Wolves_Round1_Heat02"
-    assert timed_out["finish"] - sent >= 1000
+    assert timed_out["finish"] - before >= 1000, (before, returned, timed_out)
+    if hold_ms:
+        # Only a timer that started before the hold can end this soon after it.
+        assert timed_out["finish"] - returned < 1000, (before, returned, timed_out)
     expect(replay_state(page)).to_have_attribute(
         "data-replay-state", "setup", timeout=5000
     )
