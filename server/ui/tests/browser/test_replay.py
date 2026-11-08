@@ -322,7 +322,7 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     assert video.stat().st_size > 0
 
 
-@pytest.mark.parametrize("hold_ms", [0, 300])
+@pytest.mark.parametrize("hold_ms", [0, 900], ids=["no_hold", "held_900ms"])
 def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event, hold_ms):
     """RACE_STARTS replays `skipback` ms after the gate opens, and a REPLAY
     after that is ignored until the next START (replay.php:111-158).
@@ -332,7 +332,9 @@ def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event, hold
     just before the call. A time taken after it returns is late by however
     long the page was busy in between: CI once read 999.4 ms (#236). With
     `hold_ms` the page stays busy that long after the call, and the clip
-    comes less than 1000 ms after the call returns."""
+    comes less than 1000 ms after the call returns. The hold is 900 ms
+    because that bound gives a late timer as much slack as the hold, and a
+    hold under 1000 ms still ends before the timer is due."""
     fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
     page = login("RaceCoordinator")
     desktop_only(page)
