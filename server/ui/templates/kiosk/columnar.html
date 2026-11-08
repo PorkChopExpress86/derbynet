@@ -10,12 +10,13 @@
   <div class="k-column" data-lane="{{ l.lane }}" data-color="{{ l.color }}">
     <div class="k-lane-no">{{ l.lane }}</div>
     <div class="k-entry" data-entry>
-      <div class="k-time" data-time></div>
-      <div class="k-place" data-place></div>
+      {# l.racer is a thumbnail's lineup (D84, ui.kiosk_pages.snapshots); the kiosk's script fills these from its poll. #}
+      <div class="k-time" data-time>{{ l.racer.finishtime }}</div>
+      <div class="k-place" data-place>{{ l.racer.finishplace }}</div>
       <span data-photo></span>
-      <div class="k-racer" data-name></div>
+      <div class="k-racer" data-name>{{ l.racer.name }}</div>
       <span data-car-photo></span>
-      <div class="k-car" data-car></div>
+      <div class="k-car" data-car>{{ l.racer.carnumber|default_if_none:"" }}</div>
     </div>
   </div>
   {% endfor %}

@@ -28,12 +28,47 @@ ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
 ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
 
 
+def drop_thumbnail_aborts(page, page_errors) -> list[str]:
+    """A board swap replaces every card and its thumbnail frame (#237), and
+    the browser reports a stylesheet or image a replaced frame was still
+    loading as a failed request, `net::ERR_ABORTED`. Such a failure from a
+    thumbnail frame is dropped from the page's errors; the same failure
+    from the page itself still fails the test
+    (`test_kiosk_thumbnails.py::test_a_board_swap_while_a_thumbnail_loads`).
+    Returns the failures dropped."""
+    dropped = []
+
+    def failed(request):
+        if request.failure == "net::ERR_ABORTED" and request.frame != page.main_frame:
+            dropped.append(f"request failed: {request.url} {request.failure}")
+
+    page.on("requestfailed", failed)
+    final = page_errors.final
+
+    def without_thumbnails() -> list[str]:
+        errors = final()
+        for message in dropped:
+            if message in errors:
+                errors.remove(message)
+        return errors
+
+    page_errors.final = without_thumbnails
+    return dropped
+
+
+@pytest.fixture
+def thumbnail_aborts(page, page_errors) -> list[str]:
+    return drop_thumbnail_aborts(page, page_errors)
+
+
 @pytest.fixture(autouse=True)
-def _polls_may_be_cut_short(page_errors):
+def _polls_may_be_cut_short(page_errors, thumbnail_aborts):
     """A change aborts a board poll still in flight
     (`hx-sync="#kiosk-board:replace"`), so the tap is sent at once and no
     stale poll swaps after its reply. The browser reports the aborted poll
-    as a failed request."""
+    as a failed request. Every test here opens the board or the scene
+    editor with thumbnails and changes it, or lets a kiosk go quiet, which
+    swaps them (`thumbnail_aborts`)."""
     page_errors.allow(ABORTED_POLL)
 
 
@@ -251,7 +286,9 @@ def test_kiosk_dashboard_parity(login, event):
     tap(page, card(page, "10.0.0.2").locator('[data-action="page"]'))
     picker = ready(page, sheet(page, "kiosks").locator("[data-page-sheet]"))
     expect(picker.locator("[data-page-choice]")).to_have_count(15)
-    expect(picker.locator("[data-page-choice] svg[data-thumbnail]")).to_have_count(15)
+    expect(picker.locator("[data-page-choice] [data-thumbnail] iframe")).to_have_count(
+        15
+    )
     with htmx_post(page, "/kiosks/page/"):
         picker.locator('[data-page-choice="qrcode"]').click()
     expect(sheet(page, "kiosks")).to_be_hidden()
@@ -333,7 +370,7 @@ def test_scene_editor_parity(login, event):
     expect(page.locator('a[aria-label="Back"]')).to_have_attribute("href", "/setup/")
     entries = page.locator("#scene-entries [data-entry]")
     expect(entries).to_have_count(3)
-    expect(page.locator("#scene-entries svg[data-thumbnail]")).to_have_count(1)
+    expect(page.locator("#scene-entries [data-thumbnail] iframe")).to_have_count(1)
     shoot(page, "scenes-editor")
     assert_accessible(page)
 

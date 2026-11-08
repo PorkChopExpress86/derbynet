@@ -1,4 +1,4 @@
-{# The page picker (#46): tap a page and the kiosk shows it. Each page has a thumbnail of its type. #}
+{% load ui %}{# The page picker (#46): tap a page and the kiosk shows it. Each page has a thumbnail of that page as this kiosk would show it, with no parameters (#237). #}
 <div x-data x-init="kioskSheet.show('Page for {{ label|escapejs }}')" data-page-sheet>
   <form hx-post="{% url 'kiosks-page' %}" hx-target="#kiosks-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="#kiosk-board:replace">
     <input type="hidden" name="address" value="{{ kiosk.address }}">
@@ -7,7 +7,7 @@
       {% for p in pages %}
       <li>
         <button type="submit" name="page" value="{{ p.full }}" data-page-choice="{{ p.brief }}"{% if p.full == shown.full %} aria-current="true"{% endif %} class="flex w-full flex-col gap-1 rounded-xl border p-1.5 text-left text-sm font-medium {% if p.full == shown.full %}border-accent ring-2 ring-accent{% else %}border-line{% endif %}">
-          {% include "ui/kiosks/thumbnail.html" with brief=p.brief cls="w-full" %}
+          {% kiosk_thumbnail p.full address=kiosk.address name=kiosk.name size="choice" %}
           <span class="px-1">{{ p.label }}</span>
         </button>
       </li>

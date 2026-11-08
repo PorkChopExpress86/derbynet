@@ -10,10 +10,11 @@
   {% for l in lanes %}
   <div class="k-lane" data-lane="{{ l.lane }}" data-color="{{ l.color }}">
     <span class="k-lane-no">{{ l.lane }}</span>
-    <span class="k-car" data-car></span>
-    <div class="k-who"><span data-photo></span><div class="k-names"><div class="k-racer" data-name></div><div class="k-carname" data-carname></div><div class="k-note" data-note></div></div></div>
-    {% if not use_points %}<span class="k-time" data-time></span><span class="k-speed" data-speed></span>{% endif %}
-    <span class="k-place" data-place></span>
+    {# l.racer is a thumbnail's lineup (D84, ui.kiosk_pages.snapshots); the kiosk's script fills these from its poll. #}
+    <span class="k-car" data-car>{{ l.racer.carnumber|default_if_none:"" }}</span>
+    <div class="k-who"><span data-photo></span><div class="k-names"><div class="k-racer" data-name>{{ l.racer.name }}</div><div class="k-carname" data-carname>{{ l.racer.carname|default_if_none:"" }}</div><div class="k-note" data-note>{{ l.racer.note|default_if_none:"" }}</div></div></div>
+    {% if not use_points %}<span class="k-time" data-time>{{ l.racer.finishtime }}</span><span class="k-speed" data-speed></span>{% endif %}
+    <span class="k-place" data-place>{{ l.racer.finishplace }}</span>
   </div>
   {% endfor %}
   <div class="k-test" data-timer-test hidden>Timer testing</div>

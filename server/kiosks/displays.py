@@ -53,17 +53,28 @@ class Waiting:
     names: tuple[str, ...]
 
 
-def to_check_in(event, group_ids: tuple[int, ...] = ()) -> list[Waiting]:
+def not_checked_in(event) -> list[Racer]:
+    """Every racer who has not passed inspection, with the group."""
+    return list(
+        Racer.objects.filter(event=event, passed_inspection=False).select_related(
+            "group"
+        )
+    )
+
+
+def to_check_in(
+    event, group_ids: tuple[int, ...] = (), racers: list[Racer] | None = None
+) -> list[Waiting]:
     """The racers who have not passed inspection, by group in the groups'
     order and name, then by last and first name, as the SQL of
     please-check-in.kiosk:96-106 orders them. `group_ids` narrows the list;
     empty lists every group. Sorted here, so Postgres collation plays no
-    part."""
-    racers = Racer.objects.filter(event=event, passed_inspection=False).select_related(
-        "group"
-    )
+    part. `racers` is `not_checked_in(event)` read already, so several
+    lists drawn at once read it once (#237's thumbnails)."""
+    if racers is None:
+        racers = not_checked_in(event)
     if group_ids:
-        racers = racers.filter(group_id__in=group_ids)
+        racers = [r for r in racers if r.group_id in group_ids]
     by_group: dict[tuple, list[Racer]] = {}
     for racer in racers:
         group = racer.group

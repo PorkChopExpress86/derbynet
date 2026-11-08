@@ -21,12 +21,25 @@ def _scale(request, event, settings, params, address):
     return {"track": displays.scaled_track(settings)}
 
 
+def once(request, key, compute):
+    """`compute()`, once per request for each `key`: the kiosk dashboard
+    draws a thumbnail of each kiosk's page in one request (#237), and reads
+    what they share once, so its reads do not grow with its kiosks."""
+    cache = request.__dict__.setdefault("_kiosk_page_reads", {})
+    if key not in cache:
+        cache[key] = compute()
+    return cache[key]
+
+
 def _check_in(request, event, settings, params, address):
-    return {"waiting": displays.to_check_in(event, params["classids"])}
+    racers = once(request, "not-checked-in", lambda: displays.not_checked_in(event))
+    return {"waiting": displays.to_check_in(event, params["classids"], racers)}
 
 
 def _standings(request, event, settings, params, address):
-    return {"standings": standings_state.build(event, params["key"])}
+    key = params["key"]
+    found = once(request, ("standings", key), lambda: standings_state.build(event, key))
+    return {"standings": found}
 
 
 def _lanes(request, event, settings, params, address):
@@ -59,7 +72,7 @@ def _ondeck(request, event, settings, params, address):
 def _results(request, event, settings, params, address):
     from ui.results.views import rounds_html
 
-    html, _ = rounds_html(request)
+    html, _ = once(request, "rounds", lambda: rounds_html(request))
     return {"rounds_html": html}
 
 
@@ -77,7 +90,7 @@ BUILDERS = {
 
 
 def context(request, event, page: pages.KioskPage, params_text: str, address):
-    settings = RaceSettings.objects.get(event=event)
+    settings = once(request, "settings", lambda: RaceSettings.objects.get(event=event))
     params = displays.read_parameters(page, params_text)
     build = BUILDERS.get(page.name)
     found = build(request, event, settings, params, address) if build else {}

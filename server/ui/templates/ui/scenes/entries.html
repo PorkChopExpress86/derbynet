@@ -1,10 +1,10 @@
-{# The kiosk names of the scene shown (#46): each with a thumbnail of the page this scene gives it, a page picker and a Configure sheet. Each change answers with this template again, out of band into #scene-entries. #}
+{% load ui %}{# The kiosk names of the scene shown (#46): each with a thumbnail of the page this scene gives it, with its parameters (#237), a page picker and a Configure sheet. Each change answers with this template again, out of band into #scene-entries. #}
 {% if editor.entries %}
 <ul role="list" aria-label="Kiosk names in {{ editor.scene_name }}" class="grid grid-cols-1 gap-3 lg:grid-cols-2" data-entries>
   {% for e in editor.entries %}
   <li data-entry="{{ e.kiosk_name }}" class="flex flex-col rounded-xl border border-line bg-bg">
     <div class="flex gap-3 p-3">
-      {% if e.page %}{% include "ui/kiosks/thumbnail.html" with brief=e.page.brief cls="w-28 shrink-0 sm:w-36" %}{% else %}<div aria-hidden="true" class="aspect-video w-28 shrink-0 rounded-lg border border-dashed border-line sm:w-36"></div>{% endif %}
+      {% if e.page %}{% kiosk_thumbnail e.page.full e.params name=e.kiosk_name %}{% else %}<div aria-hidden="true" class="aspect-video w-28 shrink-0 rounded-lg border border-dashed border-line sm:w-36"></div>{% endif %}
       <div class="min-w-0 flex-1">
         <h3 class="truncate text-lg font-semibold">{{ e.kiosk_name }}</h3>
         {% if e.page %}

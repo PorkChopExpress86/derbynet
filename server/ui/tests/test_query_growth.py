@@ -142,7 +142,8 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
     given to its first racer and on the ballot with two votes, each group's
     partition recording weights with a maximum and its first racer weighed
     over it (#70), and each group's kiosk, checking in and
-    named in the first scene, showing please-check-in for its group. With
+    named in the first scene, showing please-check-in for its group, with a
+    kiosk each on standings, results, now racing and awards (#237). With
     `race`, the first round races a heat, and the kiosk presents the first
     award."""
     rounds = list(race_setup(event, groups=groups).values())
@@ -174,6 +175,21 @@ def race_day(event, groups: list[tuple[str, int]], race: bool) -> None:
             params=f'{{"classids":[{round.group.pk}]}}',
             last_contact=timezone.now(),
         )
+        # A kiosk per group on each page whose thumbnail reads the race
+        # (#237): reads they share are made once per request
+        # (`ui.kiosk_pages.state.once`), so they do not grow with the kiosks.
+        for page in (
+            "standings",
+            "results-by-racer",
+            "now-racing",
+            "award-presentations",
+        ):
+            Kiosk.objects.create(
+                event=event,
+                address=f"10.0.{round.group.pk}.{page}",
+                page=f"kiosks/{page}.kiosk",
+                last_contact=timezone.now(),
+            )
         first_scene = Scene.objects.filter(event=event).order_by("sort_order").first()
         SceneKiosk.objects.create(
             event=event, scene=first_scene, kiosk_name=name, page="kiosks/flag.kiosk"
