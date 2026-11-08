@@ -3,7 +3,8 @@
 # Runs the tests that read only the source, not a database or a page: the PHP
 # cites and claims, the QUIRK_DECISIONS records, copied helpers, the rules in
 # services, read-then-act views, browser tab closes, empty 200s a browser test
-# answers (#224 retro), the registry, tests that
+# answers (#224 retro), one reader of legacy ids in transfer (#231
+# retro), the registry, tests that
 # flush the seeded rows, frozen exception classes, and the parity gate's
 # entries for the suites server.yml runs, fixtures only xdist provides (#220
 # retro), and plan/tests, the plan tools' tests
@@ -27,6 +28,7 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_pytest_under_load.py \
   tests/test_no_xdist_fixtures.py \
   tests/test_transactional_tests.py \
+  transfer/tests/test_id_readers.py \
   ui/tests/test_no_copied_helpers.py \
   ui/tests/test_rules_in_services.py \
   ui/tests/test_read_then_act.py \

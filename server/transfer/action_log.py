@@ -15,6 +15,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
 from core.models import ActionLog, in_order
+from transfer.legacy.values import legacy_id
 from transfer.models import LegacyId
 
 # The request keys that hold an id, by the model of the row they name.
@@ -47,20 +48,9 @@ class Unmapped:
         return f"{self.legacy_id} (old id, not imported)"
 
 
-def _legacy_int(value) -> int | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value if value > 0 else None
-    if isinstance(value, str) and value.strip().isdigit():
-        number = int(value.strip())
-        return number if number > 0 else None
-    return None
-
-
 def _resolve(value, model: str, maps: Mapping[str, Mapping[int, int]]):
-    legacy = _legacy_int(value)
-    if legacy is None:
+    legacy = legacy_id(value)
+    if legacy is None or legacy <= 0:
         return value
     new = maps.get(model, {}).get(legacy)
     if new is None:

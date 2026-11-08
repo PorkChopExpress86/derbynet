@@ -3,6 +3,8 @@
 plan/AGENT-BRIEF.md asks for the PHP file and line (`kiosks.inc:27-31`) or
 the test beside the comment. #50's, #52's and #53's reviews each sent back
 "as replay.php does" comments with neither, so this test finds them first.
+It reads Markdown too, since #231's README said "shows nobody, as PHP does"
+with neither (#231 retro).
 """
 
 import re
@@ -22,7 +24,7 @@ LINES_AFTER = 2
 
 def sources():
     for path in sorted(SERVER.rglob("*")):
-        if path.suffix not in (".py", ".js", ".html") or path == Path(__file__):
+        if path.suffix not in (".py", ".js", ".html", ".md") or path == Path(__file__):
             continue
         if SKIP.intersection(path.relative_to(SERVER).parts[:-1]):
             continue
