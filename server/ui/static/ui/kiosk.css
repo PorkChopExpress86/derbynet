@@ -38,6 +38,10 @@ body.kiosk-page {
 }
 
 [hidden] { display: none !important; }
+/* A thumbnail (#237) runs no script: it shows the standings rows the
+   script reveals, and holds every animation at its end. */
+body[data-thumbnail] *, body[data-thumbnail] *::before, body[data-thumbnail] *::after { animation: none !important; transition: none !important; }
+body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 
 .k-banner {
   flex: none;

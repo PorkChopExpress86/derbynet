@@ -4,9 +4,10 @@ services of #34.
 Pick a scene, and every kiosk name the scenes use shows as a card with a
 thumbnail of the page that scene gives it, a page picker, and a Configure
 sheet. New scene, Delete scene and Add kiosk name are sheets. A thumbnail is
-a picture of the page type, never the page itself: `scenes.php`'s live
-previews loaded the award kiosk, which cleared the award being presented.
-So opening the editor changes nothing, and no GET writes anything.
+the page drawn on the server with no script (#237,
+`ui.kiosk_pages.snapshots`): `scenes.php`'s live previews ran the award
+kiosk, which cleared the award being presented. So opening the editor
+changes nothing, and no GET writes anything.
 
 Each change is one service call under the `RaceState` lock, and answers with
 the scene's cards again, out of band. A new or deleted scene loads the page

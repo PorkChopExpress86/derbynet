@@ -26,6 +26,11 @@ from ui.tests.browser.conftest import (
 
 ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
 ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
+# What a thumbnail loads (#237): its stylesheets and images.
+ABORTED_THUMBNAIL = (
+    r"request failed: \S*/(static/ui/\S+\.(css|png)|(image|slide|photo)\.php/\S+)"
+    r" net::ERR_ABORTED$"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -33,8 +38,12 @@ def _polls_may_be_cut_short(page_errors):
     """A change aborts a board poll still in flight
     (`hx-sync="#kiosk-board:replace"`), so the tap is sent at once and no
     stale poll swaps after its reply. The browser reports the aborted poll
-    as a failed request."""
+    as a failed request. Each swap also replaces every thumbnail, and the
+    browser reports a stylesheet or image a replaced thumbnail was still
+    loading as failed too
+    (`test_kiosk_thumbnails.py::test_a_board_swap_while_a_thumbnail_loads`)."""
     page_errors.allow(ABORTED_POLL)
+    page_errors.allow(ABORTED_THUMBNAIL)
 
 
 def phone_only(page):
@@ -251,7 +260,9 @@ def test_kiosk_dashboard_parity(login, event):
     tap(page, card(page, "10.0.0.2").locator('[data-action="page"]'))
     picker = ready(page, sheet(page, "kiosks").locator("[data-page-sheet]"))
     expect(picker.locator("[data-page-choice]")).to_have_count(15)
-    expect(picker.locator("[data-page-choice] svg[data-thumbnail]")).to_have_count(15)
+    expect(picker.locator("[data-page-choice] [data-thumbnail] iframe")).to_have_count(
+        15
+    )
     with htmx_post(page, "/kiosks/page/"):
         picker.locator('[data-page-choice="qrcode"]').click()
     expect(sheet(page, "kiosks")).to_be_hidden()
@@ -333,7 +344,7 @@ def test_scene_editor_parity(login, event):
     expect(page.locator('a[aria-label="Back"]')).to_have_attribute("href", "/setup/")
     entries = page.locator("#scene-entries [data-entry]")
     expect(entries).to_have_count(3)
-    expect(page.locator("#scene-entries svg[data-thumbnail]")).to_have_count(1)
+    expect(page.locator("#scene-entries [data-thumbnail] iframe")).to_have_count(1)
     shoot(page, "scenes-editor")
     assert_accessible(page)
 

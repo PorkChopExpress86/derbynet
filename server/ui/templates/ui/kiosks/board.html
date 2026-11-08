@@ -28,7 +28,7 @@
   {% for k in board.kiosks %}
   <li data-kiosk="{{ k.address }}" class="flex flex-col rounded-2xl border border-line bg-surface">
     <div class="flex gap-3 p-3">
-      {% include "ui/kiosks/thumbnail.html" with brief=k.page.brief cls="w-28 shrink-0 sm:w-36" %}
+      {% kiosk_thumbnail k.page.full k.params address=k.address name=k.name %}
       <div class="min-w-0 flex-1">
         <h3 class="truncate text-lg font-semibold" data-name>{% if k.name %}{{ k.name }}{% else %}<span class="text-ink-muted">No name</span>{% endif %}</h3>
         <p class="truncate text-sm text-ink-muted" data-madlib>{{ k.madlib }}</p>

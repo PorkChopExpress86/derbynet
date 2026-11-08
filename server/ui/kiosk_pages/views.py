@@ -49,34 +49,40 @@ def address_for_current_kiosk(request) -> str:
     return address
 
 
-def _render(request, page: pages.KioskPage, params_text: str, **config):
-    event = active_event(request)
+def page_context(request, event, page: pages.KioskPage, params_text: str, **config):
+    """What `page.template` renders. `config` sets the `kiosk` keys:
+    `address` (the kiosk's; None in preview and standalone), `loaded`,
+    `name`, `standalone`, and `thumbnail`, which leaves out every script
+    (`ui.kiosk_pages.snapshots`)."""
     found = state.context(request, event, page, params_text, config.get("address"))
     kiosk = {
         "address": None,
         "loaded": page.key,
         "name": "",
         "standalone": False,
+        "thumbnail": False,
         **config,
     }
-    return render(
-        request,
-        page.template,
-        {
-            "page": page,
-            "kiosk": kiosk,
-            # What kiosk.js reads: the poll.kiosk address (none in preview
-            # and standalone), the page string to compare, the parameters.
-            "kiosk_config": {
-                "address": kiosk["address"],
-                "loaded": kiosk["loaded"],
-                "parameters": found["params"],
-                "action": reverse("action-php"),
-                "home": reverse("home"),
-            },
-            **found,
+    return {
+        "page": page,
+        "kiosk": kiosk,
+        # What kiosk.js reads: the poll.kiosk address (none in preview,
+        # standalone and a thumbnail, which draws the kiosk's address but
+        # must never poll as it), the page string to compare, the parameters.
+        "kiosk_config": {
+            "address": None if kiosk["thumbnail"] else kiosk["address"],
+            "loaded": kiosk["loaded"],
+            "parameters": found["params"],
+            "action": reverse("action-php"),
+            "home": reverse("home"),
         },
-    )
+        **found,
+    }
+
+
+def _render(request, page: pages.KioskPage, params_text: str, **config):
+    context = page_context(request, active_event(request), page, params_text, **config)
+    return render(request, page.template, context)
 
 
 @require_GET

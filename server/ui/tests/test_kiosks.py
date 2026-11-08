@@ -2,9 +2,9 @@
 
 import re
 from datetime import timedelta
+from html import unescape
 
 import pytest
-from django.template.loader import render_to_string
 from django.test import Client
 from django.utils import timezone
 
@@ -13,10 +13,12 @@ from accounts.permissions import Perm
 from awards.models import Award
 from core.models import RaceState
 from kiosks import services
+from kiosks.madlib import madlib
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from kiosks.pages import PAGES
-from roster.models import Group
+from roster.models import Group, Racer
 from ui.kiosks import state
+from ui.tests.race import race_setup
 
 pytestmark = pytest.mark.django_db
 
@@ -36,6 +38,33 @@ def scene(event, name) -> Scene:
 def board(client, sig=None):
     params = {"sig": sig} if sig else {}
     return client.get("/kiosks/board/", params, HTTP_HX_REQUEST="true")
+
+
+FRAME = re.compile(r'<iframe srcdoc="([^"]*)" sandbox="([^"]*)"')
+CARD = re.compile(r'<li data-kiosk="([^"]+)"')
+
+
+def thumbnails(html: str) -> list[dict]:
+    """Each thumbnail frame's sandbox and the page it draws."""
+    return [
+        {"html": unescape(doc), "sandbox": sandbox}
+        for doc, sandbox in FRAME.findall(html)
+    ]
+
+
+def card_thumbnails(html: str) -> list[tuple[str, dict]]:
+    """Each board card's address and its one thumbnail."""
+    found = []
+    parts = CARD.split(html)
+    for address, rest in zip(parts[1::2], parts[2::2], strict=True):
+        frames = thumbnails(rest)
+        assert len(frames) == 1, address
+        found.append((address, frames[0]))
+    return found
+
+
+def shown_page(html: str) -> str:
+    return re.search(r'<body class="kiosk-page" data-page="([^"]+)"', html).group(1)
 
 
 def pressed(html: str) -> list[str]:
@@ -62,16 +91,93 @@ def presenter(event):
 # ----- the dashboard -----------------------------------------------------------------
 
 
-def test_every_built_in_page_has_a_label_and_its_own_thumbnail():
+def test_every_built_in_page_has_a_label():
     assert set(state.PAGE_LABELS) == {p.name for p in PAGES.values()}
-    fallback = render_to_string("ui/kiosks/thumbnail.html", {"brief": "?"})
-    drawn = {
-        brief: render_to_string("ui/kiosks/thumbnail.html", {"brief": brief})
-        for brief in (p.name for p in PAGES.values())
-    }
-    others = {b: svg for b, svg in drawn.items() if b != "identify"}
-    assert all(svg != fallback for svg in others.values())
-    assert len({svg.split("</rect>", 1)[-1] for svg in drawn.values()}) == len(drawn)
+
+
+# ----- thumbnails (#237) -------------------------------------------------------------
+
+
+def test_each_card_draws_its_kiosks_page_in_a_frame_that_runs_no_script(
+    coordinator, event
+):
+    for i, key in enumerate(PAGES):
+        kiosk(event, f"tv{i:02d}", page=key, name=f"TV {i}")
+    html = board(coordinator).content.decode()
+
+    drawn = {address: frame for address, frame in card_thumbnails(html)}
+    assert len(drawn) == len(PAGES)
+    for i, key in enumerate(PAGES):
+        frame = drawn[f"tv{i:02d}"]
+        assert frame["sandbox"] == "allow-same-origin"
+        assert shown_page(frame["html"]) == key
+        assert "data-thumbnail" in frame["html"]
+        assert "<script" not in frame["html"]
+        assert "hx-" not in frame["html"]
+
+
+def test_a_thumbnail_draws_with_the_kiosks_parameters_name_and_address(
+    coordinator, event
+):
+    race_setup(event, groups=(("Lions", 2), ("Tigers", 2)))
+    Racer.objects.filter(event=event, car_number__in=[101, 201]).update(
+        passed_inspection=False
+    )
+    tigers = Group.objects.get(event=event, name="Tigers")
+    kiosk(
+        event,
+        "check-in",
+        page="kiosks/please-check-in.kiosk",
+        params=f'{{"classids":[{tigers.pk}]}}',
+    )
+    kiosk(event, "qr", page="kiosks/qrcode.kiosk", params='{"title":"Vote here"}')
+    kiosk(event, "who", page="kiosks/identify.kiosk", name="Gym TV")
+    drawn = dict(card_thumbnails(board(coordinator).content.decode()))
+
+    assert re.findall(r"<h2>(\w+)</h2>", drawn["check-in"]["html"]) == ["Tigers"]
+    assert ">Vote here</h2>" in drawn["qr"]["html"]
+    assert ">Gym TV</p>" in drawn["who"]["html"]
+    assert madlib("who") in drawn["who"]["html"]
+
+
+def test_a_page_that_is_not_built_in_draws_identify(coordinator, event):
+    kiosk(event, "tv", page="local/kiosks/mine.kiosk")
+    drawn = dict(card_thumbnails(board(coordinator).content.decode()))
+
+    assert shown_page(drawn["tv"]["html"]) == "kiosks/identify.kiosk"
+
+
+def test_the_poll_answers_204_until_a_thumbnails_data_changes(coordinator, event):
+    """The board's signature covers its thumbnails, so a racer checking in
+    redraws the please-check-in thumbnail at the next poll."""
+    race_setup(event, groups=(("Lions", 2),))
+    Racer.objects.filter(event=event, car_number=101).update(passed_inspection=False)
+    kiosk(event, "tv", page="kiosks/please-check-in.kiosk")
+    sig = SIG.search(board(coordinator).content.decode()).group(1)
+    assert board(coordinator, sig).status_code == 204
+
+    Racer.objects.filter(event=event, car_number=101).update(passed_inspection=True)
+    reply = board(coordinator, sig)
+
+    assert reply.status_code == 200
+    assert "data-all-in" in dict(card_thumbnails(reply.content.decode()))["tv"]["html"]
+
+
+def test_the_page_pickers_draw_each_page(coordinator, event):
+    kiosk(event, "tv", name="Gym TV")
+    sheets = [
+        coordinator.get("/kiosks/page/", {"address": "tv"}),
+        coordinator.get(
+            "/kiosks/scenes/page/",
+            {"scene": scene(event, "Racing").pk, "name": "Main"},
+        ),
+    ]
+    for sheet in sheets:
+        assert sheet.status_code == 200
+        frames = thumbnails(sheet.content.decode())
+        assert [shown_page(f["html"]) for f in frames] == list(PAGES)
+        assert all(f["sandbox"] == "allow-same-origin" for f in frames)
+        assert all("<script" not in f["html"] for f in frames)
 
 
 def test_the_board_lists_kiosks_heard_from_in_the_last_minute(coordinator, event):
@@ -295,7 +401,11 @@ def test_opening_the_scene_editor_does_not_change_the_award_on_the_kiosk(
     for found in Scene.objects.filter(event=event):
         page = coordinator.get("/kiosks/scenes/", {"scene": found.pk})
         assert page.status_code == 200
-        assert "<iframe" not in page.content.decode()
+        # A thumbnail is a frame that runs no script (#237).
+        frames = thumbnails(page.content.decode())
+        assert all(f["sandbox"] == "allow-same-origin" for f in frames)
+        assert all("<script" not in f["html"] for f in frames)
+        assert page.content.decode().count("<iframe") == len(frames)
     after = coordinator.get("/action.php", {"query": "award.current"}).json()
     assert after == before
     assert RaceState.objects.get(event=event).current_award_key == f"award-{award.pk}"

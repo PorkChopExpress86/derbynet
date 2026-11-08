@@ -11,6 +11,7 @@ which pauses while a sheet is open or a field of the section has focus.
 
 from django import template
 from django.template.base import token_kwargs
+from django.template.loader import render_to_string
 from django.utils.html import format_html
 
 register = template.Library()
@@ -66,3 +67,20 @@ def car_filter(number) -> str:
 @register.simple_tag
 def poll_trigger(seconds):
     return format_html('hx-trigger="every {}s [derbynet.pollable(this)]"', seconds)
+
+
+@register.simple_tag(takes_context=True)
+def kiosk_thumbnail(context, page, params="", address=None, name="", size="card"):
+    """`{% kiosk_thumbnail page params address=... name=... size=... %}`: the
+    thumbnail of the kiosk page string `page` with its parameters text, as
+    the kiosk at `address` named `name` shows it (#237)."""
+    from kiosks import pages
+    from ui.kiosk_pages import snapshots
+
+    html = snapshots.render(
+        context["request"], page, params, address=address, name=name or ""
+    )
+    return render_to_string(
+        "ui/kiosks/thumbnail.html",
+        {"html": html, "brief": pages.page_for(page).name, "size": size},
+    )

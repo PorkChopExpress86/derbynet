@@ -113,6 +113,8 @@ class Card:
     # The query of `kiosk.php` that previews the kiosk's page with its
     # parameters, registering nothing (#52).
     preview: str = ""
+    # The page's parameters text, which its thumbnail draws with (#237).
+    params: str = ""
 
 
 @dataclass(frozen=True)
@@ -151,6 +153,7 @@ def board(event, now) -> Board:
             summary=summary(k.page, parameters.stored(k.params), groups),
             reload=k.reload_requested,
             preview=urlencode({"page": k.page, "parameters": k.params or "{}"}),
+            params=k.params,
         )
         for k in listed
     ]
@@ -243,6 +246,9 @@ class Entry:
     kiosk_name: str
     page: Shown | None
     summary: str
+    # The page's parameters text in this scene, which its thumbnail draws
+    # with (#237).
+    params: str = ""
 
 
 @dataclass(frozen=True)
@@ -277,6 +283,7 @@ def editor(event, scene_id: int | None) -> Editor:
                 summary=summary(row.page, parameters.stored(row.params), groups)
                 if row
                 else "",
+                params=row.params if row else "",
             )
         )
     current = (

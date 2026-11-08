@@ -5,5 +5,5 @@
 {% block scripts %}<script src="{% static 'ui/kiosk-slideshow.js' %}"></script>{% endblock %}
 {% block main %}
 {# slide.next every 10 s: the title slide, the slides, the subdir's slides, then the racers with photos, as slideshow.js shows them. #}
-<div class="k-slides" data-slides data-title-slide="{% url 'slide-php' 'title' %}"></div>
+<div class="k-slides" data-slides data-title-slide="{% url 'slide-php' 'title' %}">{% if kiosk.thumbnail %}{# A thumbnail shows the title slide, the first slide kiosk-slideshow.js shows. #}<div class="k-slide"><img class="k-photo" alt="" src="{% url 'slide-php' 'title' %}">{% if params.title %}<p class="k-maintitle">{{ params.title }}</p>{% endif %}</div>{% endif %}</div>
 {% endblock %}

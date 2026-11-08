@@ -5,7 +5,7 @@
 {% block main %}
 {# Polls award.current 500 ms after each reply. It clears no award on load: PHP posted award.present with an empty key, under a permission kiosk.php granted every visitor (S28). Confetti plays on a reveal unless the confetti parameter is false; confetti.mov, missing from the repository, is gone (C34). #}
 <div class="k-award" data-award>
-  <video muted loop playsinline preload="auto" data-confetti hidden><source src="{% static 'ui/kiosk/confetti.webm' %}" type="video/webm"></video>
+  {% if not kiosk.thumbnail %}<video muted loop playsinline preload="auto" data-confetti hidden><source src="{% static 'ui/kiosk/confetti.webm' %}" type="video/webm"></video>{% endif %}
   <p class="k-award-name" data-award-name>Award Presentation</p>
   <div class="k-reveal" data-reveal hidden>
     <p class="k-carno" data-carnumber></p>
