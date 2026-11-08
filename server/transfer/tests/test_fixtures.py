@@ -446,3 +446,40 @@ def test_one_source_imports_under_two_names_with_separate_ids(tmp_path):
     assert map_one.keys() == map_two.keys()
     assert all(map_one[key] != map_two[key] for key in map_one)
     assert check_invariants(one) == {} and check_invariants(two) == {}
+
+
+@pytest.mark.parametrize(
+    ("field", "dead"),
+    [
+        ("params", lambda pk: json.dumps({"classids": [pk]})),
+        ("current_award_key", lambda pk: f"award-{pk}"),
+    ],
+    ids=["classids", "award key"],
+)
+def test_two_imports_whose_text_names_different_dead_rows_dump_differently(
+    tmp_path, field, dead
+):
+    """#231 review: `legacy_dump` shows an id inside text that names no
+    imported row as `site:<id>`, as it shows a relation, so two events wrong
+    in different ways never compare equal."""
+    from core.models import RaceState
+    from kiosks.models import Kiosk
+
+    database = legacy_folder(tmp_path, "v10")
+    first, _ = _import(tmp_path, database, "--event", "Pack 1")
+    second, _ = _import(tmp_path, database, "--event", "Pack 2")
+    one, two = _event(first), _event(second)
+    gone = [
+        Group.objects.create(event=one, name=f"Gone {n}", sort_order=90 + n)
+        for n in (1, 2)
+    ]
+    for event, row in ((one, gone[0]), (two, gone[1])):
+        if field == "params":
+            Kiosk.objects.filter(event=event, address="fixture-kiosk-1").update(
+                params=dead(row.pk)
+            )
+        else:
+            RaceState.objects.filter(event=event).update(current_award_key=dead(row.pk))
+    Group.objects.filter(pk__in=[g.pk for g in gone]).delete()
+
+    assert legacy_dump(one) != legacy_dump(two)

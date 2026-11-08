@@ -421,7 +421,11 @@ def test_kiosk_pages_split_into_page_params_and_reload(tmp_path):
     report, _ = _import(tmp_path, legacy_folder(tmp_path, "v10"))
     kiosks = {k.address: k for k in Kiosk.objects.filter(event=_event(report))}
     assert kiosks["fixture-kiosk-1"].page == "kiosks/please-check-in.kiosk"
-    assert kiosks["fixture-kiosk-1"].params == '{"classids":[1,2]}'
+    # Legacy classids 1 and 2, mapped to the imported groups (#231).
+    groups = dict(Group.objects.filter(event=_event(report)).values_list("pk", "name"))
+    assert [
+        groups[pk] for pk in json.loads(kiosks["fixture-kiosk-1"].params)["classids"]
+    ] == ["Lions & Tigers", "White's Wolves"]
     assert kiosks["fixture-kiosk-1"].name == "Main"
     assert kiosks["fixture-kiosk-3"].page == "kiosks/standings.kiosk"
     assert kiosks["fixture-kiosk-3"].reload_requested
@@ -1160,3 +1164,157 @@ def test_an_import_has_no_weigh_in(tmp_path, source):
     assert set(racers.values_list("weigh_in_passed", "weight_grams", "weighed_at")) == {
         (None, None, None)
     }
+
+
+def _php_snapshot(tmp_path, pages=(), raceinfo=()):
+    """The v10 snapshot, whose class, rank and round ids have a gap at 6,
+    with SceneKiosk `pages` ({scenekioskid: page}) and extra RaceInfo rows."""
+    text = SNAPSHOT.read_text()
+    entries = json.loads(text[text.index("<![CDATA[") + 9 : text.rindex("]]>")])
+    tables = {entry.get("table"): entry for entry in entries}
+    for row in tables["SceneKiosk"]["rows"]:
+        row["page"] = dict(pages).get(row["scenekioskid"], row["page"])
+    info = tables["RaceInfo"]["rows"]
+    for n, (key, value) in enumerate(raceinfo, len(info) + 1):
+        info.append({"raceinfoid": n, "itemkey": key, "itemvalue": value})
+    source = tmp_path / "php" / "snapshot.json"
+    source.parent.mkdir(exist_ok=True)
+    source.write_text(json.dumps(entries))
+    return source
+
+
+def _names(model, event):
+    return dict(model.objects.filter(event=event).values_list("pk", "name"))
+
+
+def test_a_php_snapshots_kiosk_ids_name_the_same_rows(tmp_path):
+    """#231: classids and a standings key are PHP's ids, mapped to the
+    imported rows. An id the file holds no row for is dropped and reported."""
+    from kiosks.models import SceneKiosk
+    from racing.models import Round
+    from roster.models import Subgroup
+
+    source = _php_snapshot(
+        tmp_path,
+        pages={
+            6: 'kiosks/please-check-in.kiosk#{"classids":[7,3,6]}',
+            5: 'kiosks/slideshow.kiosk#{"title":"Hi","subdir":"","classids":[6]}',
+            12: 'kiosks/standings.kiosk#{"key":"st-rr7-7"}',
+            1: 'kiosks/standings.kiosk#{"key":"st-q6"}',
+        },
+    )
+
+    report, _ = _import(tmp_path, source)
+
+    event = _event(report)
+    kiosks = {
+        k.kiosk_name + "@" + k.scene.name: json.loads(k.params or "{}")
+        for k in SceneKiosk.objects.filter(event=event).select_related("scene")
+    }
+    groups = _names(Group, event)
+    assert [groups[pk] for pk in kiosks["Aux1@Check-In"]["classids"]] == [
+        "TheLastClass",
+        "Bears and Frères",
+    ]
+    # D83: no class is left, so the kiosk shows nobody, not every class.
+    assert kiosks["Main@Check-In"] == {"title": "Hi", "subdir": "", "classids": [0]}
+    round_id, subgroup_id = kiosks["Main@Wrap-Up"]["key"][5:].split("-")
+    found = Round.objects.get(pk=round_id, event=event)
+    assert (found.group.name, found.number) == ("TheLastClass", 1)
+    assert _names(Subgroup, event)[int(subgroup_id)] == "TheLastClass"
+    assert kiosks["Main@Welcome"] == {"key": ""}
+    changed = {
+        (f["table"], f["legacy_id"]): f["detail"]
+        for f in _findings(report, "changed-value")
+        if f["table"] == "scenekiosk"
+    }
+    assert set(changed) == {("scenekiosk", 6), ("scenekiosk", 5), ("scenekiosk", 1)}
+    assert "6" in changed[("scenekiosk", 6)]
+    assert "shows nobody" in changed[("scenekiosk", 5)]
+    assert "st-q6" in changed[("scenekiosk", 1)]
+
+
+# A PHP current_award_key, and what it names in the imported event by name:
+# the award, or the speed award's place, tie letter, group and subgroup.
+PHP_AWARD_KEYS = {
+    "award-3": ("award", "Best Bear"),
+    "speed-2": ("speed", "2", None, None),
+    "speed-1b-7": ("speed", "1b", "TheLastClass", None),
+    "speed-3-3-3": ("speed", "3", "Bears and Frères", "Bears and Frères"),
+}
+
+
+@pytest.mark.parametrize("key", PHP_AWARD_KEYS)
+def test_a_php_snapshots_current_award_names_the_same_award(tmp_path, key):
+    from roster.models import Subgroup
+
+    report, _ = _import(
+        tmp_path, _php_snapshot(tmp_path, raceinfo=[("current_award_key", key)])
+    )
+
+    event = _event(report)
+    got = RaceState.objects.get(event=event).current_award_key.split("-")
+    if got[0] == "award":
+        named = ("award", _names(Award, event)[int(got[1])])
+    else:
+        groups, subgroups = _names(Group, event), _names(Subgroup, event)
+        named = (
+            "speed",
+            got[1],
+            groups[int(got[2])] if len(got) > 2 else None,
+            subgroups[int(got[3])] if len(got) > 3 else None,
+        )
+    assert named == PHP_AWARD_KEYS[key]
+    assert not [f for f in report["findings"] if f["legacy_id"] == "current_award_key"]
+
+
+@pytest.mark.parametrize(
+    "key", ["award-6", "speed-1-6", "speed-1-3-6", "speed-1-03", "bogus-1"]
+)
+def test_a_php_award_key_that_names_no_row_is_cleared_and_reported(tmp_path, key):
+    report, _ = _import(
+        tmp_path, _php_snapshot(tmp_path, raceinfo=[("current_award_key", key)])
+    )
+
+    assert RaceState.objects.get(event=_event(report)).current_award_key == ""
+    [finding] = [f for f in report["findings"] if f["legacy_id"] == "current_award_key"]
+    assert finding["kind"] == "changed-value"
+    assert key in finding["detail"]
+
+
+def test_a_php_snapshots_ids_given_as_text_name_the_same_rows(tmp_path):
+    """#231 review: a PHP on MySQL or older PDO writes ids as text. PHP's SQL
+    (please-check-in.kiosk:101-102) and standings-kiosk.js:127-132 read
+    "7" as 7, so the import maps them as it maps numbers."""
+    from kiosks.models import SceneKiosk
+
+    source = _php_snapshot(
+        tmp_path,
+        pages={
+            6: 'kiosks/please-check-in.kiosk#{"classids":["7","3"]}',
+            12: 'kiosks/standings.kiosk#{"classid":"7","rankid":"3"}',
+        },
+    )
+
+    report, _ = _import(tmp_path, source)
+
+    event = _event(report)
+    kiosks = {
+        k.kiosk_name + "@" + k.scene.name: json.loads(k.params or "{}")
+        for k in SceneKiosk.objects.filter(event=event).select_related("scene")
+    }
+    groups = _names(Group, event)
+    assert [groups[pk] for pk in kiosks["Aux1@Check-In"]["classids"]] == [
+        "TheLastClass",
+        "Bears and Frères",
+    ]
+    from roster.models import Subgroup
+
+    standings = kiosks["Main@Wrap-Up"]
+    assert groups[standings["classid"]] == "TheLastClass"
+    assert _names(Subgroup, event)[standings["rankid"]] == "Bears and Frères"
+    assert not [
+        f
+        for f in report["findings"]
+        if f["table"] == "scenekiosk" and f["kind"] == "changed-value"
+    ]

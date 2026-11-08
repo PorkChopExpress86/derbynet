@@ -279,12 +279,14 @@ jobs:
       # run from the repository root, where testing/common.sh keeps its
       # scratch files.  test-racer-query.sh needs test-basic-racing.sh and
       # test-awards.sh (#33), and later suites that #34 and #36 serve, first.
+      # test-kiosk-classids.sh (#231, D83) reads the roster and changes nothing.
       - name: Run the racer and check-in suites against Django
         if: matrix.group == 1
         working-directory: .
         run: |
           bash testing/reset-database.sh http://127.0.0.1:8080
           bash testing/import-roster.sh http://127.0.0.1:8080
+          bash testing/test-kiosk-classids.sh http://127.0.0.1:8080
           bash testing/test-den-changes.sh http://127.0.0.1:8080
           bash testing/test-basic-checkins.sh http://127.0.0.1:8080
           bash testing/reset-database.sh http://127.0.0.1:8080

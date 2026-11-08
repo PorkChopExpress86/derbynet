@@ -524,3 +524,25 @@ def test_scale_mph_shows_a_fractional_track_length_as_typed(event):
     track = displays.scaled_track(RaceSettings.for_event(event))
     assert track["length"] == "32.5"
     assert track["mph"] == f"{32.5 / 3.0 * 3600 * 25 / 5280:4.1f}"
+
+
+def test_d83_a_kiosk_whose_classes_are_all_gone_lists_nobody(event):
+    """An import leaves `[0]` when every class a kiosk listed is gone (D83,
+    `transfer.legacy.embedded.NO_CLASS`): no group has id 0, so the kiosk
+    lists nobody, where an empty list lists every class."""
+    from transfer.legacy.embedded import NO_CLASS
+
+    _check_in_day(event)
+    Kiosk.objects.create(
+        event=event,
+        address="tv",
+        page="kiosks/please-check-in.kiosk",
+        params=json.dumps({"classids": [NO_CLASS]}),
+    )
+
+    html = body(Client().get("/kiosk.php", {"address": "tv"}))
+
+    assert shown_page(html) == "kiosks/please-check-in.kiosk"
+    assert re.findall(r"<h2>(\w+)</h2>", html) == []
+    every = body(Client().get("/kiosk/check-in/", {"parameters": '{"classids":[]}'}))
+    assert re.findall(r"<h2>(\w+)</h2>", every) == ["Lions", "Tigers"]

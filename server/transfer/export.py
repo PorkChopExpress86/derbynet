@@ -36,6 +36,7 @@ from kiosks import pages
 from kiosks.models import Kiosk
 from roster.models import Group, Racer, Subgroup
 from transfer import snapshot
+from transfer.legacy import embedded
 
 DATABASE = "derbynet.sqlite3"
 # The zip's folder for each RaceSettings directory.
@@ -80,11 +81,11 @@ def _seconds(moment) -> int | None:
     return None if moment is None else int(moment.timestamp())
 
 
-def _beyond_the_snapshot(event: Event, tables: dict) -> dict:
+def _beyond_the_snapshot(event: Event, tables: dict, ids: snapshot.Numbering) -> dict:
     """`snapshot.tables` plus the columns and the table the importer reads
     from a PHP database (`transfer.legacy.tables`) and a snapshot omits. The
     snapshot numbers each table's rows in primary key order, so the rows
-    here line up with its rows."""
+    here line up with its rows, and a kiosk's ids are its numbers (`ids`)."""
 
     def add(name, columns, values):
         old_columns, rows = tables[name]
@@ -121,7 +122,9 @@ def _beyond_the_snapshot(event: Event, tables: dict) -> dict:
             [
                 k.address,
                 k.name,
-                pages.legacy_string(k.page, k.params),
+                pages.legacy_string(
+                    k.page, embedded.kiosk_params(k.page, k.params, ids.lookup).text
+                ),
                 _seconds(k.last_contact),
             ]
             for k in Kiosk.objects.filter(**mine).order_by("pk")
@@ -166,7 +169,8 @@ def export_event(event: Event, target: Path) -> Path:
     target = Path(target)
     with transaction.atomic():
         lock_race_state(event.pk, writable=False)
-        tables = _beyond_the_snapshot(event, snapshot.tables(event))
+        ids = snapshot.Numbering()
+        tables = _beyond_the_snapshot(event, snapshot.tables(event, ids=ids), ids)
         media = _media(event)
     target.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="derbynet-export-") as work:

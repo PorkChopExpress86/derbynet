@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from django.db import transaction
 
 from awards.editing import AwardFailure, present
-from awards.listing import AD_HOC, sort_key
+from awards.listing import AD_HOC, award_key, sort_key
 from awards.models import Award, AwardType
 from core import race_settings
 from core.models import RaceSettings, RaceState
@@ -179,7 +179,7 @@ def presentation(event) -> Presentation:
     )
     rows += [
         listed(
-            f"award-{a.pk}",
+            award_key(a.pk),
             a.name,
             a.award_type_id,
             a.group_id,

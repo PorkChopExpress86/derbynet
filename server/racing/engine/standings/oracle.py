@@ -23,6 +23,7 @@ list marks only the ladder its awards read; award settings mark every
 ladder.
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import cached_property
@@ -57,6 +58,49 @@ def round_subgroup_key(round_id: int, subgroup_id: int) -> str:
 
 def qualifier_key(group_id: int) -> str:
     return f"st-q{group_id}"
+
+
+@dataclass(frozen=True)
+class StandingsKey:
+    """A standings catalog key read back: `FULL_FIELD` has no id,
+    `round_key` a round, `round_subgroup_key` a round and a subgroup, and
+    `qualifier_key` a group."""
+
+    round_id: int | None = None
+    subgroup_id: int | None = None
+    group_id: int | None = None
+
+    @property
+    def text(self) -> str:
+        if self.group_id is not None:
+            return qualifier_key(self.group_id)
+        if self.subgroup_id is not None:
+            return round_subgroup_key(self.round_id, self.subgroup_id)
+        if self.round_id is not None:
+            return round_key(self.round_id)
+        return FULL_FIELD
+
+
+_ID = "([1-9][0-9]*)"
+_STANDINGS_KEYS = (
+    (re.compile(f"st-r{_ID}"), ("round_id",)),
+    (re.compile(f"st-rr{_ID}-{_ID}"), ("round_id", "subgroup_id")),
+    (re.compile(f"st-q{_ID}"), ("group_id",)),
+)
+
+
+def parse_standings_key(key: str) -> StandingsKey | None:
+    """The inverse of the key builders above: None for text none of them
+    writes."""
+    if key == FULL_FIELD:
+        return StandingsKey()
+    for pattern, fields in _STANDINGS_KEYS:
+        found = pattern.fullmatch(key)
+        if found:
+            return StandingsKey(
+                **dict(zip(fields, map(int, found.groups()), strict=True))
+            )
+    return None
 
 
 @dataclass(frozen=True)

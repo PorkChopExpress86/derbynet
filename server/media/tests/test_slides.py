@@ -131,3 +131,18 @@ def test_image_php_follows_the_event_then_the_image_set(client, folders, event):
 @pytest.mark.parametrize("tail", ["*", "../emblem", "emblem/x", "nothing"])
 def test_image_php_serves_only_a_named_image(client, folders, tail):
     assert client.get(f"/image.php/{tail}").status_code == 404
+
+
+def test_d83_classids_0_names_no_class_so_no_racer_shows(client, folders, event):
+    """The slideshow sends `[0]`, an import's list for a kiosk whose classes
+    are all gone (D83), as `classids=0` (server/ui/static/ui/kiosk-slideshow.js)."""
+    from transfer.legacy.embedded import NO_CLASS
+
+    RacerFactory(group__event=event, passed_inspection=True, headshot="a.jpg")
+
+    every = next_slide(client, mode="racer", racerid="0")
+    none = next_slide(client, mode="racer", racerid="0", classids=str(NO_CLASS))
+
+    assert every["photo"]["next"]["mode"] == "racer"
+    assert none["photo"]["next"] == {"mode": "slide", "file": ""}
+    assert none["photo"]["title"] is True

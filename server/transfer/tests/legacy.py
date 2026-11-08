@@ -9,6 +9,7 @@ from pathlib import Path
 from django.core.management import call_command
 
 from core.models import RaceSettings, event_scoped_models
+from transfer.legacy import embedded
 from transfer.models import LegacyId
 
 FIXTURES = Path(__file__).parent / "fixtures" / "legacy"
@@ -108,6 +109,18 @@ def legacy_dump(event, *, omit=()):
                         **value,
                         "round_id": mapping[("racing.round", value["round_id"])],
                     }
+                elif field.name in ("params", "current_award_key"):
+                    # Ids inside text, as the legacy ids (#231), and an id
+                    # no row was imported for as `site:<id>`, as a relation
+                    # shows it, so a dead id still tells two dumps apart.
+                    def back(target, new_id):
+                        return mapping.get((target, new_id), f"site:{new_id}")
+
+                    value = (
+                        embedded.kiosk_params(obj.page, value, back)
+                        if field.name == "params"
+                        else embedded.award_key(value, back)
+                    ).text
                 elif isinstance(value, str) and value.startswith(folder):
                     value = "<event>" + value[len(folder) :]
                 row[field.name] = value
