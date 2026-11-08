@@ -16,7 +16,7 @@ from playwright.sync_api import expect
 
 from core.models import RaceSettings
 from kiosks.models import Kiosk, Scene
-from racing.models import TimerStatus
+from racing.models import HeatLane, TimerStatus
 from racing.services import heats
 from roster.models import Racer
 from ui.tests.browser.conftest import close_tab, shoot
@@ -140,6 +140,9 @@ def test_please_check_in_refreshes_at_the_nudge(page, event, day):
 
 
 def test_standings_change_key_at_the_nudge(page, event, day):
+    """The rows reveal one every 1.5 s, last place first (kiosk-standings.js).
+    The last catalog entry here lists the 4 Lions, so the shot waits for
+    4 x 1.5 s = 6 s of reveals, within a 20 s bound: 14 s of slack."""
     from racing.services.standings import standings_snapshot
     from ui.tests.race import race_round
 
@@ -154,8 +157,7 @@ def test_standings_change_key_at_the_nudge(page, event, day):
     expect(page.locator("[data-shown-key]")).to_have_attribute(
         "data-shown-key", keys[-1], timeout=NUDGE_MS
     )
-    # The rows reveal one every 1.5 s, last place first (kiosk-standings.js),
-    # and `day` has 8 racers: 8 x 1.5 s = 12 s, plus 8 s of slack.
+    expect(page.locator("[data-racer]")).to_have_count(4)
     expect(page.locator("[data-racer][hidden]")).to_have_count(0, timeout=20_000)
     settled(page)
     shoot(page, "kiosk-standings")
@@ -255,6 +257,9 @@ def test_each_page_with_no_other_test_draws_at_rest(page, event, day, name):
     expect(page.locator(READY[name]).first).to_be_visible()
     if name.startswith("now-racing-columnar"):
         expect(page.locator('[data-lane="1"] [data-car]')).not_to_be_empty()
+        heat_1 = HeatLane.objects.filter(round=day["Lions"], heat=1)
+        for time in heat_1.values_list("finish_time", flat=True):
+            expect(page.locator("[data-best]")).to_contain_text(f"{time:.3f}")
     page.wait_for_function(
         "[...document.images].every(i => i.complete && i.naturalWidth > 0)"
     )
