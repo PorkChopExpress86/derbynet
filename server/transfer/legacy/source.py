@@ -11,6 +11,8 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import values
+
 SQLITE_MAGIC = b"SQLite format 3\0"
 
 
@@ -49,7 +51,7 @@ class Source:
                 for row in self.tables.get("raceinfo", [])
                 if row.get("itemkey") == "schema"
             ),
-            key=lambda row: _int_or_zero(row.get("raceinfoid")),
+            key=lambda row: values.id_order(row.get("raceinfoid")),
         )
         try:
             return int(rows[-1]["itemvalue"]) if rows else 1
@@ -57,13 +59,6 @@ class Source:
             raise SourceError(
                 f"unreadable schema version {rows[-1]['itemvalue']!r}"
             ) from None
-
-
-def _int_or_zero(value):
-    try:
-        return int(value)
-    except TypeError, ValueError:
-        return 0
 
 
 def read_source(path):
@@ -194,7 +189,9 @@ def _snapshot_photos(path, entry):
         try:
             photos.append(
                 SnapshotPhoto(
-                    racerid=int(entry["racerid"]),
+                    # PHP binds it into SQL (action.snapshot.put.inc:120-123),
+                    # so it reads as the RegistrationInfo column does.
+                    racerid=values.integer(entry["racerid"]),
                     column=column,
                     basename=str(photo["basename"]),
                     displayed=bytes.fromhex(photo.get("displayed", "")),

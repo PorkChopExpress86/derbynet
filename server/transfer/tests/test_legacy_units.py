@@ -7,8 +7,9 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from transfer.legacy.photos import relative_parts
+from transfer.legacy.source import SourceError, read_source
 from transfer.legacy.upgrade import upgrade
-from transfer.legacy.values import BadValue, local_time
+from transfer.legacy.values import BadValue, integer, legacy_id, local_time
 
 
 def _v1_tables():
@@ -192,7 +193,9 @@ STANDINGS = "kiosks/standings.kiosk"
         # standings-kiosk.js's == still read as the id (#231 review).
         (CHECK_IN, '{"classids":["7","3"]}', '{"classids":[1007,1003]}', 0),
         (CHECK_IN, '{"classids":["0"]}', '{"classids":[0]}', 0),
-        (CHECK_IN, '{"classids":["3x"," 3","",3.0,null]}', '{"classids":[0]}', 6),
+        (CHECK_IN, '{"classids":["3x","",3.0,null]}', '{"classids":[0]}', 5),
+        # PHP's SQL reads " 3" as 3 too (#231 retro).
+        (CHECK_IN, '{"classids":[" 3"]}', '{"classids":[1003]}', 0),
         (
             STANDINGS,
             '{"classid":"3","rankid":"5"}',
@@ -226,3 +229,57 @@ def test_a_kiosks_parameters_map_their_ids(page, params, mapped, dropped):
     found = kiosk_params(page, params, _lookup)
     assert found.text == (params if mapped is None else mapped)
     assert len(found.dropped) == dropped
+
+
+@pytest.mark.parametrize(
+    ("value", "id_"),
+    [
+        (7, 7),
+        ("7", 7),
+        (" 7 ", 7),
+        ("0", 0),
+        (True, None),
+        ("7.0", None),
+        (7.0, None),
+        ("+7", None),
+        ("\u0667", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_legacy_id_reads_whole_numbers_and_their_digits(value, id_):
+    """The reader for ids in JSON or text (#231 retro)."""
+    assert legacy_id(value) == id_
+
+
+@pytest.mark.parametrize(("value", "id_"), [(True, 1), ("7.0", 7), (" 7", 7)])
+def test_a_column_reads_as_php_stores_it_through_sqlite_affinity(value, id_):
+    """PHP binds a snapshot value as text into an INTEGER column: `true`
+    becomes 1 and `"7.0"` becomes 7 (action.snapshot.put.inc:78-91)."""
+    assert integer(value) == id_
+
+
+def _snapshot_photo_of(tmp_path, racerid):
+    path = tmp_path / "snapshot.json"
+    path.write_text(
+        json.dumps(
+            [
+                {"table": "RegistrationInfo", "rows": [{"racerid": 7}]},
+                {"racerid": racerid, "imagefile": {"basename": "a.jpg"}},
+            ]
+        )
+    )
+    return read_source(path)
+
+
+def test_a_snapshot_photo_reads_its_racerid_as_the_column_does(tmp_path):
+    """PHP binds it into `WHERE racerid = :racerid`
+    (action.snapshot.put.inc:120-123), so "7.0" is racer 7, as it is in
+    RegistrationInfo (#231 retro)."""
+    assert [p.racerid for p in _snapshot_photo_of(tmp_path, "7.0").photos] == [7]
+
+
+def test_a_snapshot_photo_whose_racerid_is_no_whole_number_is_refused(tmp_path):
+    """`int(7.9)` gave racer 7 a photo PHP gives nobody (#231 retro)."""
+    with pytest.raises(SourceError, match="unreadable imagefile"):
+        _snapshot_photo_of(tmp_path, 7.9)

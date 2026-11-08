@@ -27,6 +27,8 @@ from kiosks import pages, parameters
 from racing.engine.standings.oracle import parse_standings_key
 from racing.engine.standings.speed_awards import parse_speed_key
 
+from .values import legacy_id
+
 Lookup = Callable[[str, int], int | None]
 
 GROUP = "roster.group"
@@ -54,18 +56,6 @@ class Mapped:
     text: str
     # What was dropped, one sentence each, for the import report.
     dropped: tuple[str, ...] = ()
-
-
-def _id(value) -> int | None:
-    """An id as a kiosk's parameters hold it: a whole number, or its decimal
-    digits as text, which a PHP on MySQL or older PDO writes and PHP's SQL
-    (please-check-in.kiosk:101-102) and standings-kiosk.js:127-132 (`==`)
-    read as the number. None for anything else, `true` among them."""
-    if isinstance(value, int) and not isinstance(value, bool):
-        return value
-    if isinstance(value, str) and value.isascii() and value.isdigit():
-        return int(value)
-    return None
 
 
 def _map_fields(key, lookup: Lookup):
@@ -105,7 +95,7 @@ def _classids(value, lookup: Lookup, dropped: list[str]):
         return value
     kept = []
     for item in value:
-        legacy = _id(item)
+        legacy = legacy_id(item)
         if legacy == NO_CLASS:
             continue
         new = None if legacy is None else lookup(GROUP, legacy)
@@ -135,7 +125,7 @@ def _standings_key(value, lookup: Lookup, dropped: list[str]):
 
 def _single(model: str):
     def read(value, lookup: Lookup, dropped: list[str]):
-        legacy = _id(value)
+        legacy = legacy_id(value)
         new = None if legacy is None else lookup(model, legacy)
         if new is None:
             dropped.append(f"{model.split('.')[1]} {value!r} names no row; dropped")

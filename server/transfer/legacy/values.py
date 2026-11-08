@@ -32,6 +32,27 @@ def integer_or_none(value):
         return None
 
 
+def legacy_id(value):
+    """An id that JSON or text holds, such as a kiosk's `classids` or a
+    logged request's `racerid`: a whole number, or ASCII digits as text with
+    spaces around them allowed, which a PHP on MySQL or older PDO writes and
+    PHP's SQL reads as the number. None for anything else, `true` among them.
+
+    Each legacy id `transfer/` reads goes through `legacy_id()` when JSON or
+    text holds it, or through `integer()` and its kin when a column holds it,
+    since PHP stores a column through SQLite's affinity (`true` is 1, `"7.0"`
+    is 7). `transfer/tests/test_id_readers.py` fails on any other reader
+    (#231 retro).
+    """
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        digits = value.strip()
+        if digits.isascii() and digits.isdigit():
+            return int(digits)
+    return None
+
+
 def id_order(value):
     """A sort key for a legacy id column, which can hold anything."""
     return integer_or_none(value) or 0

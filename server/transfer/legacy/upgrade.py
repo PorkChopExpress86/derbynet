@@ -12,6 +12,8 @@ import json
 
 from core.services import KIOSK_NAMES, LEGACY_SCENES
 
+from . import values
+
 # Every column the importer reads, with its default when a source lacks it.
 COLUMNS = {
     "classes": {
@@ -206,10 +208,7 @@ def _next_id(rows, column):
 
 def _int(value):
     """An id as PHP compares it. Snapshots from PHP before 8.1 hold strings."""
-    try:
-        return int(value)
-    except TypeError, ValueError:
-        return None
+    return values.integer_or_none(value)
 
 
 def _partition_structure(tables):
