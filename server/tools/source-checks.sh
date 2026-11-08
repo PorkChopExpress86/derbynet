@@ -9,7 +9,11 @@
 # flush the seeded rows, frozen exception classes, and the parity gate's
 # entries for the suites server.yml runs, fixtures only xdist provides (#220
 # retro), and plan/tests, the plan tools' tests
-# that plan-checks.yml runs (#218 retro).  They take a few seconds, and
+# that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
+# (the browser fixture order among them, which only the full suite caught);
+# tests/test_source_checks.py now fails a test module that imports `ast` or
+# walks a tree with `rglob` and is neither listed here nor exempted.  They
+# take a few seconds, and
 # .githooks/pre-push runs them.  #48 found five of them failing
 # one full-suite round at a time (#48 retro); run this after each batch of
 # edits.
@@ -40,4 +44,17 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   legacy_api/tests/test_registry.py \
   core/tests/test_read_only_guard.py \
   core/tests/test_exception_classes.py \
+  tests/test_source_checks.py \
+  tests/test_management_commands.py \
+  tests/test_golden_marker.py \
+  ui/tests/test_browser_fixture_order.py \
+  ui/tests/test_photo_urls.py \
+  ui/tests/test_relative_urls.py \
+  ui/tests/test_vendored.py \
+  ui/tests/test_settings_bounds.py \
+  ui/tests/test_htmx.py::test_no_reply_replaces_an_element_a_trigger_listens_to \
+  ui/tests/test_htmx.py::test_no_control_queues_behind_a_poll \
+  media/tests/test_repository_paths.py \
+  racing/engine/tests/test_no_django.py \
+  legacy_api/tests/test_testing_scripts.py \
   "$@"
