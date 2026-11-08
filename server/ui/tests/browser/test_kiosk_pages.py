@@ -7,6 +7,8 @@ waits less than the page's own poll interval would take, so only the nudge
 can have fetched it. #56 calls `kioskNudge()` from the push stream."""
 
 import json
+import shutil
+from pathlib import Path
 
 import pytest
 from django.utils import timezone
@@ -14,6 +16,7 @@ from playwright.sync_api import expect
 
 from core.models import RaceSettings
 from kiosks.models import Kiosk, Scene
+from racing.models import HeatLane, TimerStatus
 from racing.services import heats
 from roster.models import Racer
 from ui.tests.browser.conftest import close_tab, shoot
@@ -21,6 +24,7 @@ from ui.tests.race import race_setup, run_heat, scheduled
 
 ADDRESS = "kiosk-test52"
 NUDGE_MS = 1500
+HEADSHOTS = Path(__file__).resolve().parents[4] / "testing" / "data" / "headshots"
 
 
 @pytest.fixture
@@ -70,18 +74,24 @@ def test_no_content_poll_the_nudge_asks_poll_kiosk_and_shows_the_name(page, even
         "Front TV", timeout=NUDGE_MS
     )
     expect(page.locator("[data-window-size]")).to_contain_text(" x ")
+    settled(page)
+    shoot(page, "kiosk-identify")
 
 
 def test_qrcode_takes_new_parameters_from_the_nudge(page, event, day):
     open_kiosk(page, event, "kiosks/qrcode.kiosk", '{"title":"One","content":"a"}')
     Kiosk.objects.filter(address=ADDRESS).update(
-        params='{"title":"Two","content":"https://example.org/b"}'
+        params='{"title":"Results online","content":"https://example.org/results"}'
     )
 
     nudge(page, "query=poll.kiosk")
 
-    expect(page.locator("[data-qr-title]")).to_have_text("Two", timeout=NUDGE_MS)
+    expect(page.locator("[data-qr-title]")).to_have_text(
+        "Results online", timeout=NUDGE_MS
+    )
     expect(page.locator("[data-qr] svg")).to_be_visible()
+    settled(page)
+    shoot(page, "kiosk-qrcode")
 
 
 def test_now_racing_shows_the_next_heat_at_the_nudge(page, event, day):
@@ -116,17 +126,23 @@ def test_ondeck_draws_the_chart_from_the_nudge(page, event, day):
 def test_please_check_in_refreshes_at_the_nudge(page, event, day):
     open_kiosk(page, event, "kiosks/please-check-in.kiosk")
     expect(page.locator("[data-all-in]")).to_be_visible()
-    racer = Racer.objects.filter(event=event).first()
-    Racer.objects.filter(pk=racer.pk).update(passed_inspection=False)
+    Racer.objects.filter(event=event, first_name__in=("Lions2", "Tigers3")).update(
+        passed_inspection=False
+    )
 
     nudge(page, "/kiosk/check-in/")
 
     expect(page.locator("[data-wanted] li")).to_have_text(
-        [f"{racer.last_name}, {racer.first_name}"], timeout=NUDGE_MS
+        ["Racer, Lions2", "Racer, Tigers3"], timeout=NUDGE_MS
     )
+    settled(page)
+    shoot(page, "kiosk-please-check-in")
 
 
 def test_standings_change_key_at_the_nudge(page, event, day):
+    """The rows reveal one every 1.5 s, last place first (kiosk-standings.js).
+    The last catalog entry here lists the 4 Lions, so the shot waits for
+    4 x 1.5 s = 6 s of reveals, within a 20 s bound: 14 s of slack."""
     from racing.services.standings import standings_snapshot
     from ui.tests.race import race_round
 
@@ -141,6 +157,10 @@ def test_standings_change_key_at_the_nudge(page, event, day):
     expect(page.locator("[data-shown-key]")).to_have_attribute(
         "data-shown-key", keys[-1], timeout=NUDGE_MS
     )
+    expect(page.locator("[data-racer]")).to_have_count(4)
+    expect(page.locator("[data-racer][hidden]")).to_have_count(0, timeout=20_000)
+    settled(page)
+    shoot(page, "kiosk-standings")
 
 
 def test_the_award_kiosk_shows_the_current_award_at_the_nudge(page, event, day):
@@ -152,7 +172,8 @@ def test_the_award_kiosk_shows_the_current_award_at_the_nudge(page, event, day):
     award = Award.objects.create(
         event=event, name="Best Paint", award_type_id=1, group=day["Lions"].group
     )
-    set_winner(event, award, Racer.objects.filter(event=event).first())
+    winner = Racer.objects.filter(event=event).first()
+    set_winner(event, award, winner)
     RaceState.objects.filter(event=event).update(current_award_key=f"award-{award.pk}")
 
     nudge(page, "query=award.current")
@@ -160,22 +181,94 @@ def test_the_award_kiosk_shows_the_current_award_at_the_nudge(page, event, day):
     expect(page.locator("[data-award-name]")).to_have_text(
         "Best Paint", timeout=NUDGE_MS
     )
+    RaceState.objects.filter(event=event).update(reveal_current_award=True)
+    expect(page.locator("[data-reveal]")).to_be_visible()
+    expect(page.locator("[data-recipient]")).to_have_text(
+        f"{winner.first_name} {winner.last_name}"
+    )
+    settled(page)
+    shoot(page, "kiosk-award-presentations")
 
 
-def test_the_slideshow_asks_slide_next_at_the_nudge(page, event, day):
+def test_the_slideshow_asks_slide_next_at_the_nudge(
+    settings, tmp_path, page, event, day
+):
+    """With no slides in the event's or the config folder, slide.next falls
+    to the racers with a photo: one headshot here."""
+    settings.DATA_DIR = tmp_path / "data"
+    settings.CONFIG_DIR = tmp_path / "config"
+    (tmp_path / "racers").mkdir()
+    shutil.copy(HEADSHOTS / "Cub-0033.jpg", tmp_path / "racers")
+    RaceSettings.objects.filter(event=event).update(
+        photo_directory=str(tmp_path / "racers")
+    )
+    Racer.objects.filter(event=event, first_name="Lions1").update(
+        headshot="Cub-0033.jpg"
+    )
     open_kiosk(page, event, "kiosks/slideshow.kiosk")
 
     nudge(page, "query=slide.next")
 
-    expect(page.locator(".k-slide")).not_to_have_count(0)
+    expect(page.locator(".k-slide").last.locator(".k-caption")).to_have_text(
+        "101: Lions1 Racer"
+    )
+    page.wait_for_function(
+        "(() => { const img = [...document.querySelectorAll('.k-slide')].pop()"
+        ".querySelector('img'); return img.complete && img.naturalWidth > 0; })()"
+    )
+    settled(page)
+    shoot(page, "kiosk-slideshow")
 
 
 def test_results_by_racer_polls_its_rounds_at_the_nudge(page, event, day):
+    run_heat(event)
+    run_heat(event)
     open_kiosk(page, event, "kiosks/results-by-racer.kiosk")
 
     nudge(page, "/results/rounds/")
 
     expect(page.locator("[data-round]").first).to_be_visible()
+    expect(page.locator("[data-result] [data-shown]").first).not_to_be_empty()
+    settled(page)
+    shoot(page, "kiosk-results-by-racer")
+
+
+# What shows that each page no other test here drives has drawn (#238).
+READY = {
+    "derbynet": ".k-center img.k-enter",
+    "flag": ".k-flag img",
+    "now-racing-columnar": "[data-best] div",
+    "now-racing-columnar-reversed": "[data-best] div",
+    "scale-MPH": "[data-scale] [data-car]",
+}
+
+
+@pytest.mark.parametrize("name", sorted(READY))
+def test_each_page_with_no_other_test_draws_at_rest(page, event, day, name):
+    """The screenshot of each kiosk page no test above drives (#238). The
+    columnar pages show heat 2 staged on a connected timer, with heat 1's
+    times among the best heat times."""
+    run_heat(event)
+    TimerStatus.objects.filter(event=event).update(
+        state=TimerStatus.State.STAGING, assume_connected_for_test=True
+    )
+    open_kiosk(page, event, f"kiosks/{name}.kiosk")
+
+    expect(page.locator(READY[name]).first).to_be_visible()
+    if name.startswith("now-racing-columnar"):
+        expect(page.locator('[data-lane="1"] [data-car]')).not_to_be_empty()
+        heat_1 = HeatLane.objects.filter(round=day["Lions"], heat=1)
+        for time in heat_1.values_list("finish_time", flat=True):
+            expect(page.locator("[data-best]")).to_contain_text(f"{time:.3f}")
+    page.wait_for_function(
+        "[...document.images].every(i => i.complete && i.naturalWidth > 0)"
+    )
+    # `settled()`, less the flag's wave, which never ends (kiosk.css `k-wave`).
+    page.wait_for_function(
+        "document.getAnimations().every(a => a.playState !== 'running'"
+        " || a.effect.getComputedTiming().iterations === Infinity)"
+    )
+    shoot(page, f"kiosk-{name}")
 
 
 def test_a_scene_reaches_the_kiosk_within_one_poll_with_no_stream(page, event, day):
@@ -183,6 +276,8 @@ def test_a_scene_reaches_the_kiosk_within_one_poll_with_no_stream(page, event, d
     from kiosks import services
 
     open_kiosk(page, event, "kiosks/welcome.kiosk")
+    settled(page)
+    shoot(page, "kiosk-welcome")
     services.choose_scene(event, Scene.objects.get(event=event, name="Racing"))
 
     expect(page.locator("body")).to_have_attribute(
