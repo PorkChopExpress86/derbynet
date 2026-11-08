@@ -51,7 +51,11 @@ def open_kiosk(page, event, key, params=""):
 
 
 def settled(page):
-    """Wait for the entry animations, so a screenshot shows the page at rest."""
+    """Wait until no animation is running, so a screenshot shows the page at
+    rest. That is every animation, not only the entry ones: on a page with an
+    `infinite` one, such as the flag's wave (kiosk.css `k-wave`), whose
+    playState stays "running", it waits until it times out (#238). The wait
+    in `test_each_page_with_no_other_test_draws_at_rest` skips those."""
     page.wait_for_function(
         "document.getAnimations().every(a => a.playState !== 'running')"
     )
