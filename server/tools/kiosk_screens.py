@@ -4,7 +4,11 @@ Django, for the PR's evidence (D63).
 Each page loads by preview, `kiosk.php?page=kiosks/<name>.kiosk`, which
 registers no kiosk on either server, at 1920x1080, 1280x800 and 390x844.
 The script fails a page that scrolls or clips text, and with `--video`
-records each page at 1920x1080 for `--seconds`.
+records each page at 1920x1080 for `--seconds`. The screenshot check runs
+once, 2.5 s after load; with `--video` the recording's tab is checked every
+second too, because a page draws most of what it shows later (a heat's
+times, an award's reveal), and a problem at any point fails the page
+(#239, `ui/tests/test_kiosk_screens_tool.py`).
 
 For the same fixture database on both servers, pass `--fixture`, which runs
 `testing/reset-database.sh`, `testing/import-roster.sh` and
@@ -75,6 +79,25 @@ def url(base: str, page: str) -> str:
     return f"{base.rstrip('/')}/kiosk.php?{urlencode(query)}"
 
 
+def watch(tab, page_name: str, seconds: float) -> list[str]:
+    """Waits `seconds` on the recording's tab, checking it every second,
+    and returns each distinct problem seen, with the second it first
+    showed."""
+    problems, seen = [], set()
+    for second in range(int(seconds) + 1):
+        wait = min(1.0, seconds - second)
+        if wait > 0:
+            tab.wait_for_timeout(wait * 1000)
+        found = ["scrollbars"] if tab.evaluate(SCROLLS) else []
+        found += [f"clipped {el}" for el in tab.evaluate(CLIPPED)]
+        for problem in found:
+            if problem not in seen:
+                seen.add(problem)
+                at = min(second + 1, seconds)
+                problems.append(f"{page_name} in the recording at {at:g} s: {problem}")
+    return problems
+
+
 def fixture(base: str) -> None:
     for script in FIXTURE:
         subprocess.run(["bash", f"testing/{script}", base], cwd=REPO, check=True)
@@ -121,7 +144,7 @@ def main(argv=None) -> int:
                 )
                 tab = context.new_page()
                 tab.goto(url(args.base, page_name))
-                tab.wait_for_timeout(args.seconds * 1000)
+                problems += watch(tab, page_name, args.seconds)
                 video = tab.video
                 context.close()
                 video.save_as(args.out / f"{page_name}-1920x1080.webm")
