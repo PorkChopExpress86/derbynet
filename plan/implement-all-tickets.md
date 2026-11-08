@@ -42,7 +42,7 @@ Spawn a general-purpose agent with `model: opus`, briefed per plan/AGENT-BRIEF.m
 1. Run `plan/bin/pr-wait <pr>` in the background and wait for its notification.
 2. When a check fails, send its name and link to the implementer, which reads the log with `gh run view --log-failed`, fixes the cause, and pushes. Then wait again.
 3. When every check is green, run `plan/bin/pr-merge <pr>`, which squashes and deletes the branch. It refuses a PR whose body would close an issue that has a `## Still open` section; change the PR body to `Part of #N`. If it reports the issue still open, close it, or add a `## Still open` section and move the frontier again (Pick a ticket, step 1), because that section unblocks the tickets that depend on it.
-4. When the ticket has a screenshot box, post the screenshots (D75). Download the `ui-screenshots` artifact of the passing `ui (sqlite)` run with `gh run download <run> -n ui-screenshots`, into an empty scratchpad folder. Commit the ticket's PNGs to `N/` on the orphan `screenshots` branch, from a separate clone. Then comment on the ticket, embedding each image by its `raw.githubusercontent.com` URL at that commit's SHA. Tick the box only when every view it names is shot at both sizes; otherwise name the missing views under `## Still open`.
+4. When the ticket has a screenshot box, post the screenshots (D75). Download the `ui-screenshots` artifact of the passing `ui (sqlite)` run with `gh run download <run> -n ui-screenshots`, into an empty scratchpad folder. Commit the ticket's PNGs to `N/` on the orphan `screenshots` branch, from a fresh clone of that branch alone in the scratchpad: `git clone --single-branch --branch screenshots --depth 1 https://github.com/PorkChopExpress86/derbynet.git <scratchpad>/shots-N`. Make a new one for each ticket, since a clone kept in /tmp did not survive #237's reboot. Commit with the owner's identity (plan/AGENT-BRIEF.md), push with `git push origin screenshots`, and remove the clone. Then comment on the ticket, embedding each image by its `raw.githubusercontent.com` URL at that commit's SHA. Tick the box only when every view it names is shot at both sizes; otherwise name the missing views under `## Still open`.
 
 ## 5. Reset
 
@@ -59,6 +59,19 @@ Run `git worktree remove ../derbynet-wt-N`, `git branch -D issue-N-<slug>`, and 
    - It returns the low findings, and creates no branch when nothing is high or medium.
 3. If it returned a PR body, open the PR, then merge and reset as in steps 4 and 5.
 4. Give a 4-line summary: the ticket PR link and what landed, the low review findings left over, the retro fixes (with PR link) and any proposed ~/.claude/CLAUDE.md change, and the low retro findings left over. Then go back to Pick a ticket with new subagents.
+
+## Pausing mid-ticket
+
+When the loop must stop inside a ticket (a reboot, a stop condition), write `~/.claude/projects/-home-specter-dev-projects-derbynet/resume-N.md` from the implementer's last report, and a memory note pointing at it. After #237's reboot, its file gave a skip count without the skips, which the second implementer guessed wrong in the PR body; listed full-suite commands without a `DERBYNET_TEST_PREFIX`; and called a load run unstarted that had begun (`server/var/load-runs/20261108-120936-2056795`). The file holds:
+
+- the worktree, the branch, the pushed head, and each commit that holds real work;
+- each finished step with its result, every skip named (`25 skipped: <test ids or the reason>`);
+- each step left, as the exact command to run, with its folder and its `DERBYNET_TEST_PREFIX`;
+- each folder under `server/var/load-runs/` or elsewhere that a stopped run left half-written, marked to ignore or remove;
+- where the PR body draft lives, outside /tmp;
+- what is still running, or "nothing is running".
+
+Delete the file and the memory note once the ticket's PR merges.
 
 ## Stop and report
 
