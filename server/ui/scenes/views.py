@@ -4,7 +4,7 @@ services of #34.
 Pick a scene, and every kiosk name the scenes use shows as a card with a
 thumbnail of the page that scene gives it, a page picker, and a Configure
 sheet. New scene, Delete scene and Add kiosk name are sheets. A thumbnail is
-the page drawn on the server with no script (#237,
+the page drawn on the server with no script (#237, D84,
 `ui.kiosk_pages.snapshots`): `scenes.php`'s live previews ran the award
 kiosk, which cleared the award being presented. So opening the editor
 changes nothing, and no GET writes anything.

@@ -6,13 +6,16 @@
 {# Polls award.current 500 ms after each reply. It clears no award on load: PHP posted award.present with an empty key, under a permission kiosk.php granted every visitor (S28). Confetti plays on a reveal unless the confetti parameter is false; confetti.mov, missing from the repository, is gone (C34). #}
 <div class="k-award" data-award>
   {% if not kiosk.thumbnail %}<video muted loop playsinline preload="auto" data-confetti hidden><source src="{% static 'ui/kiosk/confetti.webm' %}" type="video/webm"></video>{% endif %}
-  <p class="k-award-name" data-award-name>Award Presentation</p>
-  <div class="k-reveal" data-reveal hidden>
-    <p class="k-carno" data-carnumber></p>
-    <p class="k-recipient" data-recipient></p>
-    <p class="k-detail" data-carname></p>
-    <p class="k-detail" data-subgroup></p>
+  {# award is a thumbnail's award (D84, ui.kiosk_pages.snapshots); the kiosk's script fills these from award.current. #}
+  {% with shown=award.shown %}
+  <p class="k-award-name" data-award-name>{% if shown %}{{ shown.awardname }}{% else %}Award Presentation{% endif %}</p>
+  <div class="k-reveal{% if shown and award.reveal %} k-shown{% endif %}" data-reveal{% if not shown or not award.reveal %} hidden{% endif %}>
+    <p class="k-carno" data-carnumber{% if not shown.carnumber %} hidden{% endif %}>{{ shown.carnumber|default_if_none:"" }}</p>
+    <p class="k-recipient" data-recipient{% if not shown.recipient %} hidden{% endif %}>{{ shown.recipient|default_if_none:"" }}</p>
+    <p class="k-detail" data-carname{% if not shown.carname %} hidden{% endif %}>{{ shown.carname|default_if_none:"" }}</p>
+    <p class="k-detail" data-subgroup{% if not shown.subgroup %} hidden{% endif %}>{{ shown.subgroup|default_if_none:"" }}</p>
   </div>
+  {% endwith %}
   <div class="k-photos" data-photos hidden></div>
 </div>
 {% endblock %}

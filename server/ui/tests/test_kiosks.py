@@ -10,15 +10,17 @@ from django.utils import timezone
 
 from accounts.models import Role
 from accounts.permissions import Perm
+from awards.editing import set_winner
 from awards.models import Award
 from core.models import RaceState
 from kiosks import services
 from kiosks.madlib import madlib
 from kiosks.models import Kiosk, Scene, SceneKiosk
 from kiosks.pages import PAGES
+from racing.services import polls
 from roster.models import Group, Racer
 from ui.kiosks import state
-from ui.tests.race import race_setup
+from ui.tests.race import race_setup, scheduled
 
 pytestmark = pytest.mark.django_db
 
@@ -138,6 +140,81 @@ def test_a_thumbnail_draws_with_the_kiosks_parameters_name_and_address(
     assert ">Vote here</h2>" in drawn["qr"]["html"]
     assert ">Gym TV</p>" in drawn["who"]["html"]
     assert madlib("who") in drawn["who"]["html"]
+
+
+RACING_PAGES = (
+    "kiosks/now-racing.kiosk",
+    "kiosks/now-racing-columnar.kiosk",
+    "kiosks/now-racing-columnar-reversed.kiosk",
+)
+
+
+def test_d84_a_racing_thumbnail_shows_the_heat_being_raced(coordinator, event):
+    """D84: the lineup of `current_racers()`, which the kiosk's first poll
+    answers, by lane, in each now-racing layout."""
+    round = race_setup(event, groups=(("Lions", 4),))["Lions"]
+    scheduled(round)
+    for i, key in enumerate(RACING_PAGES):
+        kiosk(event, f"tv{i}", page=key)
+    run = polls.running(event)
+    lineup = polls.current_racers(run, run.settings.name_style)
+    assert len(lineup) == 4
+    drawn = dict(card_thumbnails(board(coordinator).content.decode()))
+
+    for i, key in enumerate(RACING_PAGES):
+        html = drawn[f"tv{i}"]["html"]
+        for racer in lineup:
+            lane = re.search(
+                rf'data-lane="{racer["lane"]}".*?</div>\s*</div>', html, re.S
+            ).group(0)
+            assert f">{racer['carnumber']}<" in lane, (key, racer)
+            assert f">{racer['name']}<" in lane, (key, racer)
+
+
+def test_d84_an_award_thumbnail_shows_the_award_being_presented(coordinator, event):
+    """D84: the award of `query=award.current` (`ui.presenter.state`), and
+    its recipient once revealed."""
+    race_setup(event, groups=(("Lions", 2),))
+    winner = Racer.objects.filter(event=event).order_by("pk").first()
+    award = Award.objects.create(
+        event=event, name="Best Paint", award_type_id=1, sort=1
+    )
+    set_winner(event, award, winner)
+    RaceState.objects.filter(event=event).update(
+        current_award_key=f"award-{award.pk}", reveal_current_award=False
+    )
+    kiosk(event, "tv", page="kiosks/award-presentations.kiosk")
+
+    html = dict(card_thumbnails(board(coordinator).content.decode()))["tv"]["html"]
+    assert ">Best Paint</p>" in html
+    assert re.search(r"data-reveal[^>]* hidden", html)
+
+    RaceState.objects.filter(event=event).update(reveal_current_award=True)
+    html = dict(card_thumbnails(board(coordinator).content.decode()))["tv"]["html"]
+    assert ">Best Paint</p>" in html
+    assert not re.search(r"data-reveal[^>]* hidden", html)
+    assert f">{winner.first_name} {winner.last_name}</p>" in html
+
+
+def test_d84_no_award_shows_the_pages_own_title(coordinator, event):
+    kiosk(event, "tv", page="kiosks/award-presentations.kiosk")
+    html = dict(card_thumbnails(board(coordinator).content.decode()))["tv"]["html"]
+    assert ">Award Presentation</p>" in html
+
+
+@pytest.mark.parametrize(
+    ("key", "label"),
+    [
+        ("kiosks/ondeck.kiosk", "The heat chart shows on the kiosk."),
+        ("kiosks/qrcode.kiosk", "The QR code shows on the kiosk."),
+    ],
+)
+def test_d84_ondeck_and_qr_thumbnails_say_what_shows_on_the_kiosk(
+    coordinator, event, key, label
+):
+    kiosk(event, "tv", page=key)
+    html = dict(card_thumbnails(board(coordinator).content.decode()))["tv"]["html"]
+    assert f'<p class="k-thumb-note" data-thumb-note>{label}</p>' in html
 
 
 def test_a_page_that_is_not_built_in_draws_identify(coordinator, event):

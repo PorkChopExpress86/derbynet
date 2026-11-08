@@ -39,9 +39,13 @@ body.kiosk-page {
 
 [hidden] { display: none !important; }
 /* A thumbnail (#237) runs no script: it shows the standings rows the
-   script reveals, and holds every animation at its end. */
+   script reveals, and turns animations and transitions off, so each
+   element shows its own style, with no entrance replayed at each board
+   swap. The on-deck and QR thumbnails say their chart or code shows on
+   the kiosk (D84). */
 body[data-thumbnail] *, body[data-thumbnail] *::before, body[data-thumbnail] *::after { animation: none !important; transition: none !important; }
 body[data-thumbnail] .k-row[hidden] { display: grid !important; }
+.k-thumb-note { margin: 4vh auto 0; width: fit-content; max-width: 90vw; padding: 2vh 3vw; border-radius: 2vh; background: var(--k-surface); color: var(--k-ink); font-size: 9vh; font-weight: 800; text-align: center; }
 
 .k-banner {
   flex: none;

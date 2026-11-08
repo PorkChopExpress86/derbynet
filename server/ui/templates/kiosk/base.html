@@ -13,7 +13,7 @@
   {% block scripts %}{% endblock %}
   {% endif %}
 </head>
-{# A thumbnail (#237, ui.kiosk_pages.snapshots) is the page with no script: kiosk.css shows what a script would reveal and stops the entrance animations, which would replay at each board swap. #}
+{# A thumbnail (#237, ui.kiosk_pages.snapshots) is the page with no script: kiosk.css shows what a script would reveal and turns animations off, which would replay at each board swap. What the script would fetch is filled on the server, or named in a note (D84). #}
 <body class="kiosk-page" data-page="{{ page.key }}"{% if kiosk.standalone %} data-standalone{% endif %}{% if kiosk.thumbnail %} data-thumbnail{% endif %}>
   {% block banner %}
   <header class="k-banner">

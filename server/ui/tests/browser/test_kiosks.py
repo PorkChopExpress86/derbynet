@@ -26,24 +26,50 @@ from ui.tests.browser.conftest import (
 
 ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
 ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
-# What a thumbnail loads (#237): its stylesheets and images.
-ABORTED_THUMBNAIL = (
-    r"request failed: \S*/(static/ui/\S+\.(css|png)|(image|slide|photo)\.php/\S+)"
-    r" net::ERR_ABORTED$"
-)
+
+
+def drop_thumbnail_aborts(page, page_errors) -> list[str]:
+    """A board swap replaces every card and its thumbnail frame (#237), and
+    the browser reports a stylesheet or image a replaced frame was still
+    loading as a failed request, `net::ERR_ABORTED`. Such a failure from a
+    thumbnail frame is dropped from the page's errors; the same failure
+    from the page itself still fails the test
+    (`test_kiosk_thumbnails.py::test_a_board_swap_while_a_thumbnail_loads`).
+    Returns the failures dropped."""
+    dropped = []
+
+    def failed(request):
+        if request.failure == "net::ERR_ABORTED" and request.frame != page.main_frame:
+            dropped.append(f"request failed: {request.url} {request.failure}")
+
+    page.on("requestfailed", failed)
+    final = page_errors.final
+
+    def without_thumbnails() -> list[str]:
+        errors = final()
+        for message in dropped:
+            if message in errors:
+                errors.remove(message)
+        return errors
+
+    page_errors.final = without_thumbnails
+    return dropped
+
+
+@pytest.fixture
+def thumbnail_aborts(page, page_errors) -> list[str]:
+    return drop_thumbnail_aborts(page, page_errors)
 
 
 @pytest.fixture(autouse=True)
-def _polls_may_be_cut_short(page_errors):
+def _polls_may_be_cut_short(page_errors, thumbnail_aborts):
     """A change aborts a board poll still in flight
     (`hx-sync="#kiosk-board:replace"`), so the tap is sent at once and no
     stale poll swaps after its reply. The browser reports the aborted poll
-    as a failed request. Each swap also replaces every thumbnail, and the
-    browser reports a stylesheet or image a replaced thumbnail was still
-    loading as failed too
-    (`test_kiosk_thumbnails.py::test_a_board_swap_while_a_thumbnail_loads`)."""
+    as a failed request. Every test here opens the board or the scene
+    editor with thumbnails and changes it, or lets a kiosk go quiet, which
+    swaps them (`thumbnail_aborts`)."""
     page_errors.allow(ABORTED_POLL)
-    page_errors.allow(ABORTED_THUMBNAIL)
 
 
 def phone_only(page):
