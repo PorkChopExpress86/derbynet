@@ -189,7 +189,7 @@ def test_the_award_kiosk_shows_the_current_award_at_the_nudge(page, event, day):
 
 
 def test_the_slideshow_asks_slide_next_at_the_nudge(
-    page, event, day, settings, tmp_path
+    settings, tmp_path, page, event, day
 ):
     """With no slides in the event's or the config folder, slide.next falls
     to the racers with a photo: one headshot here."""
