@@ -435,8 +435,8 @@ jobs:
       # The page permissions suite (#204), which testing/exercise-one-database.sh
       # runs after the photo suites and test-each-role.sh, and before
       # test-basic-racing.sh, on the roster it has imported by then.
-      # test-each-role.sh still waits on the legacy pages (WAITING in
-      # server/tools/parity_gate.py), so it is not run here.  DERBYNET_BACKEND makes it follow each
+      # test-each-role.sh runs in the exercise job below, in its place in the
+      # whole suite.  DERBYNET_BACKEND makes it follow each
       # old page's 301 (D20) and read the pages Django decided otherwise from
       # testing/fixtures/role-pages-django.json (testing/README.md).
       - name: Run the permissions suite against Django
@@ -526,6 +526,85 @@ jobs:
       - name: Show the derby-timer.jar log
         if: failure()
         run: cat ../testing/derby-timer.log || true
+
+      - name: Show the Django server log
+        if: failure()
+        run: cat "$RUNNER_TEMP/server.log"
+
+  # testing/exercise-one-database.sh from start to end against Django (#240):
+  # every suite in its real order on one database, so a step that leaks into
+  # the next fails here, where the shell groups above reset between suites.
+  # It starts as a first-time user does (setup.nodata with ez-new), on a
+  # server with no event, as server/tools/parity-django.sh starts the parity
+  # gate's Django leg.  No PARITY_DIR, so the first failed step ends the run.
+  # DERBYNET_BACKEND picks each suite's Django branch, and skips the Puppeteer
+  # steps, which drive PHP's pages, naming the test that replaces each.
+  exercise:
+    name: exercise-one-database.sh (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        # An empty image skips the service on the SQLite run.
+        image: ${{ matrix.database == 'postgres' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: derbynet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgres://postgres:postgres@localhost:5432/derbynet' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: |
+          uv sync --locked
+          command -v xmllint >/dev/null && command -v identify >/dev/null \
+            && command -v convert >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
+          }
+
+      - name: Start the Django server
+        env:
+          DERBYNET_ENABLE_TEST_ENDPOINTS: '1'
+          DERBYNET_DATA_DIR: ${{ runner.temp }}/data
+          DERBYNET_CONFIG_DIR: ${{ runner.temp }}/config
+        run: |
+          mkdir -p "$DERBYNET_DATA_DIR" "$DERBYNET_CONFIG_DIR"
+          uv run python manage.py migrate
+          uv run python manage.py runserver 127.0.0.1:8080 --noreload \
+            > "$RUNNER_TEMP/server.log" 2>&1 &
+          for _ in $(seq 60); do
+            curl -sf -o /dev/null 'http://127.0.0.1:8080/health/' && break
+            sleep 1
+          done
+
+      - name: Run testing/exercise-one-database.sh against Django
+        working-directory: .
+        env:
+          DERBYNET_BACKEND: django
+        run: |
+          bash testing/exercise-one-database.sh http://127.0.0.1:8080 ez
+
+      # As in the shell job: a suite must not leave a file in the checkout.
+      - name: Check the suite left the checkout clean
+        working-directory: .
+        run: |
+          status="$(git status --porcelain)"
+          [ -z "$status" ] || { echo "$status"; exit 1; }
 
       - name: Show the Django server log
         if: failure()

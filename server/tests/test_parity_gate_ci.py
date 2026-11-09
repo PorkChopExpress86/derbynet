@@ -8,7 +8,9 @@ retro). This finds a stale entry in the pull request that makes it stale, not
 in the next nightly run.
 """
 
+import ast
 import re
+import sys
 from pathlib import Path
 
 from tools.parity_gate import SKIPS, WAITING
@@ -75,3 +77,93 @@ def test_no_step_the_workflow_runs_against_django_waits_or_is_skipped():
         "KNOWN_STALE lists a step that is no longer stale; remove it:"
         f" {sorted(set(KNOWN_STALE) - set(found))}"
     )
+
+
+# testing/exercise-one-database.sh's Puppeteer steps: `puppeteer_step <file.js>
+# <replacement> ...`, which skips the test under DERBYNET_BACKEND=django,
+# naming the tests that replace it (#240).
+EXERCISE = ROOT / "testing" / "exercise-one-database.sh"
+PUPPETEER_STEP = re.compile(r"^\s*puppeteer_step (\S+)((?: +\S+)+) *$", re.M)
+
+
+def puppeteer_skips(script: str) -> dict[str, list[str]]:
+    """Each Puppeteer step's label and the replacements it names, with the
+    script's continued lines joined."""
+    joined = re.sub(r"\\\n\s*", " ", script)
+    return {
+        f"puppeteer_test {name}": replacements.split()
+        for name, replacements in PUPPETEER_STEP.findall(joined)
+    }
+
+
+def missing_test(replacement: str) -> str | None:
+    """Why `path[::name[::name]]` names no test, or None: the file must be
+    there, and each name a module-level class or function, then a method or
+    function of the class before it."""
+    path, *names = replacement.split("::")
+    file = ROOT / path
+    if not file.is_file():
+        return f"{path}: no such file"
+    body = ast.parse(file.read_text()).body
+    for name in names:
+        found = [
+            node
+            for node in body
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name == name
+        ]
+        if not found:
+            return f"{replacement}: no test {name} in {path}"
+        body = found[0].body if isinstance(found[0], ast.ClassDef) else []
+    return None
+
+
+def test_a_replacement_names_a_function_the_file_has(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
+    (tmp_path / "t.py").write_text(
+        "def test_a():\n    pass\n\nclass TestB:\n    def test_c(self):\n        pass\n"
+    )
+    assert missing_test("t.py") is None
+    assert missing_test("t.py::test_a") is None
+    assert missing_test("t.py::TestB::test_c") is None
+    assert (
+        missing_test("t.py::test_renamed")
+        == "t.py::test_renamed: no test test_renamed in t.py"
+    )
+    assert missing_test("t.py::TestB::test_a") is not None
+    assert missing_test("u.py") == "u.py: no such file"
+
+
+def test_it_reads_each_replacement_of_a_continued_step():
+    script = (
+        "    puppeteer_step a.js x.py\n"
+        "    puppeteer_step b.js \\\n        y.py::f \\\n        z.py::g\n"
+    )
+    assert puppeteer_skips(script) == {
+        "puppeteer_test a.js": ["x.py"],
+        "puppeteer_test b.js": ["y.py::f", "z.py::g"],
+    }
+
+
+def test_the_parity_gate_skips_exactly_the_puppeteer_steps_the_script_skips():
+    """Each skip in SKIPS is one the script makes on Django, naming the same
+    replacement tests, and each names a test that exists."""
+    skipped = puppeteer_skips(EXERCISE.read_text())
+    assert len(skipped) == 4, skipped
+    assert {label: reason.split(", ") for label, reason in SKIPS.items()} == skipped
+    problems = [
+        problem
+        for replacements in skipped.values()
+        for problem in map(missing_test, replacements)
+        if problem
+    ]
+    assert problems == []
+
+
+def test_nothing_waits_while_server_yml_runs_the_whole_suite_against_django():
+    """The exercise job fails on any failed step, so no step can wait."""
+    assert re.search(
+        r"DERBYNET_BACKEND: django\n(?:.*\n){0,12}?.*"
+        r"bash testing/exercise-one-database\.sh \S+ ez",
+        WORKFLOW.read_text(),
+    ), "server.yml no longer runs testing/exercise-one-database.sh on Django"
+    assert WAITING == {}
