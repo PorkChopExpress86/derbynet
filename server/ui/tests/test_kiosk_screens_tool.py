@@ -28,13 +28,18 @@ never stays loaded is reported unchecked, so a reload never counts as a
 pass.
 """
 
+import subprocess
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import Error
 
 from tools import kiosk_screens
+
+SERVER_DIR = Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.browser
 
@@ -87,17 +92,27 @@ def serve():
 
 
 def record(base, out, seconds):
+    """Runs the script as its own process, as it is run for real. In this
+    process, a worker that already ran a browser test holds Playwright's
+    event loop, and the script's `sync_playwright()` refuses to start
+    (#239, CI run 42540562729). Returns the exit code and stderr."""
     args = ["--out", str(out), "--page", "flag", "--video", "--seconds", str(seconds)]
-    return kiosk_screens.main([base, *args])
+    result = subprocess.run(
+        [sys.executable, "tools/kiosk_screens.py", base, *args],
+        cwd=SERVER_DIR,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return result.returncode, result.stderr
 
 
 @pytest.mark.parametrize("clip_ms", [CLIPS_AFTER_MS, CLIPS_AFTER_MS + 1500])
 def test_a_page_that_clips_after_the_screenshot_check_fails_in_the_recording(
-    serve, tmp_path, capsys, clip_ms
+    serve, tmp_path, clip_ms
 ):
     base = serve(LATE_CLIP.replace("CLIP_MS", str(clip_ms)))
-    code = record(base, tmp_path, CLIPS_AFTER_MS / 1000 + 2)
-    err = capsys.readouterr().err
+    code, err = record(base, tmp_path, CLIPS_AFTER_MS / 1000 + 2)
     # The screenshot checks, at 2.5 s, see nothing yet.
     for size in kiosk_screens.SIZES:
         assert f"flag at {size}" not in err
@@ -107,18 +122,16 @@ def test_a_page_that_clips_after_the_screenshot_check_fails_in_the_recording(
     assert (tmp_path / "flag-1920x1080.webm").stat().st_size > 0
 
 
-def test_a_recording_too_short_to_reach_the_clip_passes(serve, tmp_path, capsys):
+def test_a_recording_too_short_to_reach_the_clip_passes(serve, tmp_path):
     base = serve(LATE_CLIP.replace("CLIP_MS", str(CLIPS_AFTER_MS)))
-    code = record(base, tmp_path, 2)
-    assert capsys.readouterr().err == ""
+    code, err = record(base, tmp_path, 2)
+    assert err == ""
     assert code == 0
 
 
-def test_a_page_that_reloads_every_second_is_checked_to_the_end(
-    serve, tmp_path, capsys
-):
-    code = record(serve(RELOADS), tmp_path, 4)
-    assert capsys.readouterr().err == ""
+def test_a_page_that_reloads_every_second_is_checked_to_the_end(serve, tmp_path):
+    code, err = record(serve(RELOADS), tmp_path, 4)
+    assert err == ""
     assert code == 0
     assert (tmp_path / "flag-1920x1080.webm").stat().st_size > 0
 
