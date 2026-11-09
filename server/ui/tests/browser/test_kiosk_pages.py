@@ -233,8 +233,8 @@ def test_results_by_racer_polls_its_rounds_at_the_nudge(page, event, day):
 
     expect(page.locator("[data-round]").first).to_be_visible()
     expect(page.locator("[data-result] [data-shown]").first).not_to_be_empty()
-    settled(page)
-    shoot(page, "kiosk-results-by-racer")
+    # Its screenshot is test_kiosk_results_by_racer.py's, taken with the
+    # list's glide paused at the top (#247).
 
 
 # What shows that each page no other test here drives has drawn (#238).

@@ -324,6 +324,10 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 /* #49's rounds are sized in rem for a phone; on a TV the root font grows. */
 :root:has([data-results]) { font-size: clamp(16px, 1.9vh, 30px); }
 .k-results > section { will-change: transform; }
+/* "No heats yet" sits on the kiosk's background, not on a card, where
+   app.css's light-theme muted ink is too dark to read (#247,
+   test_kiosk_results_by_racer.py). The cards set their own ink. */
+.k-results [data-no-heats] { color: var(--k-muted); }
 
 /* ----- fullscreen.php -------------------------------------------------------- */
 .k-full { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
