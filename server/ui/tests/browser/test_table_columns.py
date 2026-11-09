@@ -21,6 +21,7 @@ tags, `data-` attribute names and classes, not by their text.
 """
 
 import pytest
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import expect
 
 from core.models import RaceSettings
@@ -59,6 +60,27 @@ HEAT_FIELDS = """() => [...document.querySelectorAll('[data-racer]')].map(card =
       child.className,
     ].join('|')).join(',')))"""
 
+# HEAT_FIELDS summed up: the cards with no heat, and the kinds of heat item.
+HEAT_SHAPE = f"""() => {{
+  const cards = ({HEAT_FIELDS})();
+  return [cards.filter(c => c.length === 0).length, new Set(cards.flat()).size];
+}}"""
+
+
+def wait_for_value(page, script: str, expected):
+    """Wait until `script` evaluates to `expected`, retrying as an `expect`
+    does, since kiosk-ondeck.js redraws the chart at each poll. On a
+    timeout the assertion shows the value it last read."""
+    try:
+        page.wait_for_function(
+            f"expected => JSON.stringify(({script})()) === JSON.stringify(expected)",
+            arg=expected,
+        )
+    except PlaywrightTimeout:
+        # one read: only to show the value in the failure.
+        assert page.evaluate(script) == expected
+        raise
+
 
 def raced(event, master=False):
     """Two groups of 3 on 4 lanes, so every heat has a bye, both scheduled,
@@ -92,12 +114,8 @@ def test_every_on_deck_row_has_a_cell_per_lane_and_its_labels(login, event, mast
     expect(page.locator("[data-chart] tr[data-heat] .k-bye")).to_have_count(8)
     expect(rows.filter(has=page.locator(".k-bye"))).to_have_count(8)
 
-    # one read: the chart is drawn (the counts above), and is redrawn only
-    # when the poll's answer changes, which nothing here does.
-    counts = page.evaluate(COLUMN_COUNTS)
-
     labels = 2 if master else 1
-    assert counts == [LANES + labels] * (8 if master else 10), counts
+    wait_for_value(page, COLUMN_COUNTS, [LANES + labels] * (8 if master else 10))
 
 
 def test_every_heat_of_every_racer_card_shows_the_same_fields(login, event):
@@ -107,9 +125,9 @@ def test_every_heat_of_every_racer_card_shows_the_same_fields(login, event):
     expect(page.locator("[data-racer]")).to_have_count(6)
     expect(page.locator("table")).to_have_count(0)
 
-    # one read: the cards are drawn (the count above), and nothing races here.
-    cards = page.evaluate(HEAT_FIELDS)
-
-    assert all(cards), cards
-    fields = {item for card in cards for item in card}
-    assert len(fields) == 1, fields
+    # No card without a heat, and one kind of heat item.
+    try:
+        wait_for_value(page, HEAT_SHAPE, [0, 1])
+    except AssertionError:
+        # one read: only to show the cards in the failure.
+        raise AssertionError(page.evaluate(HEAT_FIELDS)) from None

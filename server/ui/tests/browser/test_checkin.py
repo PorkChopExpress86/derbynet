@@ -182,6 +182,58 @@ def test_an_empty_roster_adds_the_first_racer_as_101_in_default(login, event):
     assert (racer.car_number, racer.partition.name) == (101, "Default")
 
 
+def test_an_empty_roster_refuses_a_nameless_den_and_renames_default(login, event):
+    """The rest of testing/puppeteer/checkin-empty-test.js: on an empty
+    roster a first den with no name is refused and none is made (#166);
+    then the first racer's Default den, a real partition, renamed to
+    Unique Partition, shows so on the racer's card."""
+    page = open_checkin(login("RaceCoordinator"))
+    page.get_by_role("button", name="New racer").click()
+    sheet(page).get_by_role("link", name="Edit partitions").click()
+    page.wait_for_url(re.compile(r"/groups/partitions/$"))
+    partitions = page.locator('[data-sheet="groups"] [data-partitions-sheet]')
+    expect(partitions).to_be_visible()
+    expect(partitions.locator("[data-partition-row]")).to_have_count(0)
+
+    partitions.get_by_role("button", name="Add", exact=True).click()
+
+    expect(partitions.locator('[data-error="no-name"]')).to_be_visible()
+    expect(partitions.locator("[data-partition-row]")).to_have_count(0)
+    assert not Partition.objects.filter(event=event).exists()
+
+    open_checkin(page)
+    page.get_by_role("button", name="New racer").click()
+    form = sheet(page)
+    expect(form.get_by_label("Class")).to_have_value("")
+    form.get_by_label("First name").fill("Fred")
+    form.get_by_label("Last name").fill("Flintstone")
+    form.get_by_role("button", name="Add racer").click()
+    expect(form.locator("[data-notice]")).to_have_text("Added 101 Fred Flintstone.")
+    default = Partition.objects.get(event=event)
+    assert default.name == "Default"
+
+    page.goto("/groups/partitions/")
+    partitions = page.locator('[data-sheet="groups"] [data-partitions-sheet]')
+    rows = partitions.locator("[data-partition-row]")
+    expect(rows).to_have_count(1)
+    expect(rows).to_have_attribute("data-label", "Default")
+    expect(rows.locator("[data-edit-partition]")).to_have_text("Default (1)")
+    rows.locator("[data-edit-partition]").click()
+    body = page.locator('[data-sheet="groups"]')
+    body.locator("#pe-name").fill("Unique Partition")
+    body.get_by_role("button", name="Rename").click()
+    expect(body.locator("[data-sheet-notice]")).to_have_text(
+        "Renamed to Unique Partition."
+    )
+    assert Partition.objects.get(pk=default.pk).name == "Unique Partition"
+
+    open_checkin(page)
+    racer = Racer.objects.get(event=event)
+    expect(card(page, racer).locator("[data-partition]")).to_have_text(
+        "Unique Partition"
+    )
+
+
 # ----- D36: the question at check-in ------------------------------------------------
 
 

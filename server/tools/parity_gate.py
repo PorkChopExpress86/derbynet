@@ -91,7 +91,8 @@ WAITING: dict[str, Waiting] = {}
 # The steps the Django leg skips, with the reason. The PHP leg skips none.
 # Each is a Puppeteer test that drives PHP's pages, which
 # testing/exercise-one-database.sh skips under DERBYNET_BACKEND=django
-# (`puppeteer_step`), naming the test that replaces it (#240).
+# (`puppeteer_step`), naming the tests that replace it, comma separated
+# (#240). tests/test_parity_gate_ci.py holds this list to the script's.
 SKIPS: dict[str, str] = {
     "puppeteer_test all-pages-test.js": "server/ui/tests/browser/test_smoke.py",
     "puppeteer_test coordinator-test.js": "server/ui/tests/test_dashboard_golden.py",
@@ -100,7 +101,9 @@ SKIPS: dict[str, str] = {
     ),
     "puppeteer_test checkin-empty-test.js": (
         "server/ui/tests/browser/test_checkin.py"
-        "::test_an_empty_roster_adds_the_first_racer_as_101_in_default"
+        "::test_an_empty_roster_adds_the_first_racer_as_101_in_default,"
+        " server/ui/tests/browser/test_checkin.py"
+        "::test_an_empty_roster_refuses_a_nameless_den_and_renames_default"
     ),
 }
 

@@ -39,7 +39,13 @@ prepare_for_setup() {
 # A new database named testdb, set up as a first-time user does.
 ez_setup() {
     prepare_for_setup
-    curl_postj action.php "action=setup.nodata&ez-new=testdb" > /dev/null
+    if [ "$DERBYNET_BACKEND" = django ] ; then
+        # server.yml's exercise job starts here, so a failed setup must fail
+        # it (#240).  The PHP run still ignores the reply.
+        curl_postj action.php "action=setup.nodata&ez-new=testdb" | check_jsuccess
+    else
+        curl_postj action.php "action=setup.nodata&ez-new=testdb" > /dev/null
+    fi
 }
 
 function user_login_coordinator() {
@@ -53,14 +59,17 @@ puppeteer_test() {
     node "`dirname $0`/puppeteer/$1" "$BASE_URL"
 }
 
-# puppeteer_step <file.js> <replacement>: the Puppeteer test, or on Django,
-# whose pages are rebuilt (ADR-10) with none of the PHP pages' scripts the
-# tests call (handle_login, jQuery), a skip that names the test replacing it
-# (#240).  The step's label is the same either way, for the parity gate's
+# puppeteer_step <file.js> <replacement> ...: the Puppeteer test, or on
+# Django, whose pages are rebuilt (ADR-10) with none of the PHP pages' scripts
+# the tests call (handle_login, jQuery), a skip that names the tests replacing
+# it (#240).  The step's label is the same either way, for the parity gate's
 # SKIPS (server/tools/parity_gate.py).
 puppeteer_step() {
     if [ "$DERBYNET_BACKEND" = django ] ; then
-        skip_step "puppeteer_test $1" "drives PHP's pages; replaced by $2"
+        local file=$1 tests
+        shift
+        tests=$(printf '%s, ' "$@")
+        skip_step "puppeteer_test $file" "drives PHP's pages; replaced by ${tests%, }"
     else
         step puppeteer_test "$1"
     fi
@@ -152,7 +161,8 @@ run_tests() {
     # the Puppeteer tests are outside the shifted-ID run, so this reset doesn't shift
     DERBYNET_SHIFT_IDS= RESET_SOURCE=ex1 step reset-database.sh
     puppeteer_step checkin-empty-test.js \
-        server/ui/tests/browser/test_checkin.py::test_an_empty_roster_adds_the_first_racer_as_101_in_default
+        server/ui/tests/browser/test_checkin.py::test_an_empty_roster_adds_the_first_racer_as_101_in_default \
+        server/ui/tests/browser/test_checkin.py::test_an_empty_roster_refuses_a_nameless_den_and_renames_default
 
     # Resets database
     step --resets test-partitions.sh
