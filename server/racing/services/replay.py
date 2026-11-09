@@ -113,8 +113,56 @@ def ice_servers(text: str) -> list[dict]:
     server entry with every URL in it, or none for an empty setting, which
     leaves the replay page and the camera to host candidates on a LAN with
     no internet (#53)."""
-    urls = [url for url in _ICE_SEPARATORS.split(text) if url]
+    urls = ice_urls(text)
     return [{"urls": urls}] if urls else []
+
+
+def ice_urls(text: str) -> list[str]:
+    """The URLs of the `replay_ice_servers` text, in order."""
+    return [url for url in _ICE_SEPARATORS.split(text) if url]
+
+
+# A STUN URL Chromium's `RTCPeerConnection` takes: `stun:` or `stuns:` in
+# any case, a host or a bracketed IPv6 address, and a port from 1 to 65535.
+# `test_the_field_takes_what_chromium_takes` in
+# `ui/tests/browser/test_settings_ice_servers.py` checks a list of URLs
+# against Chromium's own parsing.
+_STUN_URL = re.compile(
+    r"stuns?:(?:\[[0-9a-f:.]+\]|[^\s,:/?#\[\]@]+)(?::(?P<port>\d{1,5}))?",
+    re.IGNORECASE,
+)
+_TURN_URL = re.compile(r"turns?:", re.IGNORECASE)
+
+
+class IceServersRefused(ValueError):
+    pass
+
+
+def ice_servers_text(lines: str) -> str:
+    """The stored `replay_ice_servers` text of the settings page's field,
+    one URL per line: the URLs separated by spaces, as the setting has
+    always held them (D76, #241). Raises `IceServersRefused` for a URL the
+    replay page's `RTCPeerConnection` would throw on. A `turn:` or `turns:`
+    URL is refused: Chromium requires a username and credential for it,
+    which `ice_servers()` does not send."""
+    urls = ice_urls(lines)
+    for url in urls:
+        if _TURN_URL.match(url):
+            raise IceServersRefused(
+                "TURN servers need a username and password, which this field"
+                " cannot hold yet; list STUN servers only."
+            )
+        found = _STUN_URL.fullmatch(url)
+        port = found and found["port"]
+        if not found or (port is not None and not 1 <= int(port) <= 65535):
+            raise IceServersRefused(
+                f"{url} is not a STUN server URL, such as stun:stun.l.google.com:19302."
+            )
+    text = " ".join(urls)
+    limit = RaceSettings._meta.get_field("replay_ice_servers").max_length
+    if len(text) > limit:
+        raise IceServersRefused(f"at most {limit} characters in all.")
+    return text
 
 
 def page_settings(settings: RaceSettings) -> dict:

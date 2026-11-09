@@ -210,11 +210,106 @@ def test_replay_saves_all_five_and_the_replay_service_reads_them(coordinator, ev
     assert replay.clip_length_ms(RaceSettings.for_event(event)) == 5000
 
 
-def test_the_page_has_no_ice_server_editor(coordinator):
-    """D76's replay_ice_servers waits on the owner (#48 report)."""
-    assert "ice" not in html(coordinator.get("/settings/")).lower().replace(
-        "device", ""
+ICE = "replay-ice-servers"
+
+
+def ice_field(body: str) -> str:
+    """The text area's text, as the page shows it."""
+    start = body.index('id="set-replay-ice-servers"')
+    return body[body.index(">", start) + 1 : body.index("</textarea>", start)]
+
+
+def test_two_lines_save_and_the_replay_pages_get_both(coordinator, event):
+    """#241: one URL per line, stored as `ice_servers()` reads them."""
+    response = save(coordinator, ICE, "stun:a.example:3478\r\n stuns:b.example \n\n")
+    assert "data-saved" in html(response), html(response)
+    row = RaceSettings.for_event(event)
+    assert row.replay_ice_servers == "stun:a.example:3478 stuns:b.example"
+    assert replay.page_settings(row)["ice_servers"] == [
+        {"urls": ["stun:a.example:3478", "stuns:b.example"]}
+    ]
+    assert ice_field(html(response)) == "stun:a.example:3478\nstuns:b.example"
+    camera = coordinator.get("/replay/camera/")
+    assert "stun:a.example:3478" in html(camera) and "stuns:b.example" in html(camera)
+
+
+def test_a_legacy_value_shows_one_url_per_line(coordinator, event):
+    """A value stored under the legacy key (a snapshot import, D82) may
+    separate its URLs with spaces or commas, as `ice_servers()` reads it."""
+    race_settings.write(event, ICE, "stun:a.example, stun:b.example stun:c.example")
+    body = html(coordinator.get("/settings/"))
+    assert ice_field(body) == "stun:a.example\nstun:b.example\nstun:c.example"
+
+
+def test_the_default_shows_googles_stun_server(coordinator, event):
+    assert ice_field(html(coordinator.get("/settings/"))) == (
+        "stun:stun.l.google.com:19302"
     )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "stun:a.example\nhttp://b.example",
+        "stun:a.example\nturn:b.example",
+        "TURNS:b.example",
+        "Turn:b.example",
+        "stun:",
+        "stun:a.example:99999",
+        "stun:a.example?transport=udp",
+        "a.example",
+    ],
+)
+def test_a_line_that_is_no_stun_url_is_refused(coordinator, event, value):
+    response = save(coordinator, ICE, value)
+    body = html(response)
+    assert "data-error" in body and "data-saved" not in body
+    assert RaceSettings.for_event(event).replay_ice_servers == (
+        "stun:stun.l.google.com:19302"
+    )
+    # The refused text stays in the field, to be corrected.
+    assert ice_field(body) == value.replace(">", "&gt;")
+
+
+@pytest.mark.parametrize(
+    "value", ["STUN:a.example", "Stuns:a.example:5349", "stun:[::1]:3478"]
+)
+def test_a_stun_url_in_any_case_is_taken(coordinator, event, value):
+    """Chromium takes the scheme in any case
+    (`browser/test_settings_ice_servers.py`)."""
+    assert "data-saved" in html(save(coordinator, ICE, value))
+    assert RaceSettings.for_event(event).replay_ice_servers == value
+
+
+def test_a_turn_line_says_why(coordinator, event):
+    body = html(save(coordinator, ICE, "turn:b.example"))
+    assert "username and password" in body
+
+
+def test_too_long_a_list_is_refused(coordinator, event):
+    lines = "\n".join(f"stun:server{n}.example.org:3478" for n in range(20))
+    body = html(save(coordinator, ICE, lines))
+    assert "data-error" in body
+    assert RaceSettings.for_event(event).replay_ice_servers == (
+        "stun:stun.l.google.com:19302"
+    )
+
+
+def test_clearing_the_field_stores_empty_and_the_camera_gets_none(coordinator, event):
+    response = save(coordinator, ICE, " \n ")
+    assert "data-saved" in html(response)
+    row = RaceSettings.for_event(event)
+    assert row.replay_ice_servers == ""
+    assert replay.page_settings(row)["ice_servers"] == []
+    assert race_settings.read(event, ICE) == ""
+
+
+def test_the_help_line_says_what_empty_does(coordinator, event):
+    body = html(coordinator.get("/settings/"))
+    start = body.index('id="help-replay-ice-servers"')
+    help_line = body[start : body.index("</p>", start)]
+    assert "no internet" in help_line and "empty" in help_line
+    assert "TURN" in help_line
 
 
 def test_drop_slowest_is_no_setting(event):

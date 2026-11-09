@@ -1,4 +1,4 @@
-{% load ui %}{# One settings field (#48). It saves on change through settings-save (Enter fires change and submit; the second is dropped while the first is out) and comes back as itself, with Saved or the refusal. The help line replaces settings.php's title= tooltips. A number outside the field's range comes back refused, where PHP stores any (D80). #}
+{% load ui %}{# One settings field (#48). It saves on change through settings-save (Enter fires change and submit; the second is dropped while the first is out) and comes back as itself, with Saved or the refusal. The help line replaces settings.php's title= tooltips. A text area (the ICE servers, #241) saves on change, which fires when it loses focus; Enter starts a new line. A number outside the field's range comes back refused, where PHP stores any (D80). #}
 <div id="field-{{ fv.key }}" data-field="{{ fv.key }}" data-kind="{{ fv.kind }}" class="border-b border-line py-3 last:border-b-0">
   <form hx-post="{% url 'settings-save' %}" hx-trigger="change, submit" hx-target="#field-{{ fv.key }}" hx-swap="outerHTML" hx-include="this" hx-sync="this:drop" class="flex flex-col gap-2{% if fv.kind == 'switch' %} sm:flex-row sm:items-center sm:justify-between{% endif %}">
     <input type="hidden" name="key" value="{{ fv.key }}">
@@ -42,6 +42,10 @@
     </div>
     <span id="badge-{{ fv.key }}" aria-live="polite">{% include "ui/settings_page/folder_badge.html" with status=fv.status %}</span>
     {% endif %}
+    {% elif fv.kind == "lines" %}
+    <label for="set-{{ fv.key }}" class="font-medium">{{ fv.field.label }}</label>
+    <p id="help-{{ fv.key }}" class="text-sm text-ink-muted">{{ fv.field.help }}</p>
+    <textarea id="set-{{ fv.key }}" name="value" rows="3" autocomplete="off" spellcheck="false" aria-describedby="help-{{ fv.key }}" class="min-w-0 rounded-xl border border-field bg-surface px-3 py-2 font-mono text-sm sm:max-w-md">{{ fv.value }}</textarea>
     {% else %}
     <label for="set-{{ fv.key }}" class="font-medium">{{ fv.field.label }}</label>
     <p id="help-{{ fv.key }}" class="text-sm text-ink-muted">{{ fv.field.help }}</p>

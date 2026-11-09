@@ -9,11 +9,12 @@ here are the `min` and `max` of its inputs (`settings.php`), and the
 replay fields the choices of `coordinator.php`'s replay settings dialog
 (D80).
 
-Three things differ from `settings.php`, each for #48's scope:
+Three things differ from `settings.php`, each for #48's or #241's scope:
 
 - a folder must be under the data folder (S25), where PHP takes any path;
 - the replay post-roll and the longest clip are Django-only settings (D18),
-  written to `RaceSettings` directly, since no legacy key holds them;
+  written to `RaceSettings` directly, since no legacy key holds them, and
+  so are the ICE servers (D76, #241), one URL per line, STUN only;
 - the car numbering's two controls each save on their own, where PHP's
   page posts both as one `car-numbering` value.
 """
@@ -32,6 +33,7 @@ from core.services import lock_race_state
 from core.settings_form import FORM_SETTINGS, SETTINGS_WRITE, apply_form
 from core.setup_event import inside
 from media.slides import DEFAULT_IMAGE_SET, IMAGE_SETS
+from racing.services import replay
 
 
 class Kind(Enum):
@@ -43,6 +45,8 @@ class Kind(Enum):
     SELECT = "select"
     TEXT = "text"
     DIRECTORY = "directory"
+    # A text area, one item per line.
+    LINES = "lines"
 
 
 class Section(Enum):
@@ -345,7 +349,7 @@ FIELDS: tuple[Field, ...] = (
         "Average every heat time, drop each car's slowest, or take its fastest.",
         options=SCORING,
     ),
-    # Replay (D9, D18). #53 reads all five.
+    # Replay (D9, D18, D76). #53 reads all six.
     Field(
         "replay-rate",
         Section.REPLAY,
@@ -396,6 +400,17 @@ FIELDS: tuple[Field, ...] = (
         maximum=Decimal("30"),
         step=Decimal("0.5"),
         model_field="replay_max_clip_ms",
+    ),
+    # D76: the owner put it here, one URL per line (#241).
+    Field(
+        "replay-ice-servers",
+        Section.REPLAY,
+        Kind.LINES,
+        "STUN servers for the remote camera",
+        "One server per line. Leave it empty on a LAN with no internet: the"
+        " camera then connects directly, on the local network only. TURN"
+        " servers are not taken yet, since they need a password.",
+        model_field="replay_ice_servers",
     ),
 )
 
@@ -521,6 +536,14 @@ def save_field(event: Event, key: str, raw: str) -> None:
         lock_race_state(event.pk)
         if key in CAR_NUMBERING_KEYS:
             _save_car_numbering(event, setting, raw)
+        elif setting.kind is Kind.LINES:
+            try:
+                text = replay.ice_servers_text(raw)
+            except replay.IceServersRefused as refused:
+                raise SaveRefused("bad-server", f"{setting.label}: {refused}") from None
+            RaceSettings.objects.filter(event=event).update(
+                **{setting.model_field: text}
+            )
         elif setting.model_field:
             ms = int(_milliseconds(_decimal(raw, setting)))
             RaceSettings.objects.filter(event=event).update(**{setting.model_field: ms})
@@ -551,6 +574,9 @@ def value_of(
     event_settings: RaceSettings, values: dict[str, str | None], setting: Field
 ):
     """The field's value as the page shows it."""
+    if setting.kind is Kind.LINES:
+        # One URL per line, however the stored text separates them.
+        return "\n".join(replay.ice_urls(getattr(event_settings, setting.model_field)))
     if setting.model_field:
         return _seconds(getattr(event_settings, setting.model_field))
     if setting.key in CAR_NUMBERING_KEYS:

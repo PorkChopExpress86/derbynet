@@ -67,9 +67,10 @@ def save(request):
         return HttpResponse(status=400)
     view = state.field_view(event, setting)
     view.saved, view.error = not error, error
-    if error and setting.kind is Kind.DIRECTORY:
-        # The refused path stays in the field, with its own badge.
+    if error and setting.kind in (Kind.DIRECTORY, Kind.LINES):
+        # The refused text stays in the field, to be corrected.
         view.value = request.POST.get("value", "")
+    if error and setting.kind is Kind.DIRECTORY:
         view.status = diagnostics.folder_status(view.value)
     html = render_to_string("ui/settings_page/field.html", {"fv": view}, request)
     if key in LANE_KEYS and not error:
