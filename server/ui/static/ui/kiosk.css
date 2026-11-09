@@ -204,10 +204,16 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 .k-lane .k-lane-no { color: var(--lane-ink); font-weight: 800; text-align: center; }
 .k-lane .k-car { font-weight: 800; font-variant-numeric: tabular-nums; }
 .k-lane .k-who { display: flex; align-items: center; gap: 1vw; min-width: 0; }
-.k-lane .k-who img { height: calc(var(--row-h, 10vh) * .8); width: auto; border-radius: .8vh; }
+/* The photo takes at most 40% of the racer's column, scaled down whole, so
+   on a phone it leaves the name room (#250, D10). */
+.k-lane .k-who [data-photo] { flex: none; max-width: 40%; }
+.k-lane .k-who img { display: block; height: calc(var(--row-h, 10vh) * .8); width: auto; max-width: 100%; object-fit: contain; border-radius: .8vh; }
 .k-lane .k-names { min-width: 0; }
-.k-lane .k-racer { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
-.k-lane .k-carname, .k-lane .k-note { font-size: .5em; color: var(--k-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A long name wraps and kiosk-now-racing.js `fit()` shrinks the lane font
+   until it fits its row, where PHP's cell wraps and its FontAdjuster shrinks
+   (#250, now-racing-adjust-fonts.js:42-66). */
+.k-lane .k-racer { overflow-wrap: anywhere; font-weight: 650; }
+.k-lane .k-carname, .k-lane .k-note { font-size: .5em; color: var(--k-muted); overflow-wrap: anywhere; }
 .k-lane .k-time, .k-lane .k-speed { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
 .k-lane .k-speed { color: var(--k-muted); }
 .k-lane .k-place { text-align: center; font-weight: 900; }
@@ -243,7 +249,9 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 .k-deck th.k-divider { color: var(--k-accent); font-size: 1.2em; padding-top: 1vh; }
 .k-deck td { padding: .8vh .6vw; background: var(--k-surface); border-top: .5vh solid var(--lane, var(--k-line)); vertical-align: top; overflow: hidden; }
 .k-deck td .k-car { font-weight: 800; }
-.k-deck td .k-racer { font-size: .8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A long name wraps in its cell, as in PHP's ondeck.css, which sets no
+   white-space rule (#250). */
+.k-deck td .k-racer { font-size: .8em; overflow-wrap: anywhere; }
 .k-deck td .k-time { font-size: .8em; color: var(--k-muted); }
 .k-deck td img { max-width: 100%; max-height: 22vh; border-radius: .6vh; cursor: zoom-in; }
 .k-deck td.k-bye { color: var(--k-muted); font-style: italic; }
