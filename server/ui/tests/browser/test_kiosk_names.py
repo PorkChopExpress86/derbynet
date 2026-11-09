@@ -5,16 +5,18 @@ has no white-space rule), and its `FontAdjuster`
 (now-racing-adjust-fonts.js:42-66) shrinks every cell's font
 by 0.9 until the table fits the window. Django's rows page wraps a name too
 and steps the board's one `--row-font` down by 0.9 until every lane's names
-fit their row (kiosk-now-racing.js `fit()`), within kiosk.css's clamp:
-16 to 96 px above 640 px wide, 14.4 to 32 px at 640 px or less (D10). The
+fit their row (kiosk-now-racing.js `fit()`), within kiosk.css's `.k-lane`
+clamp, whose bounds server/README.md states and
+`test_the_lane_font_stays_within_the_clamp` checks (D10, ADR-10). The
 columnar pages and the on-deck chart wrap a name in its column.
 
-The roster's longest names (testing/import-roster.sh:12, :36, :44, :30) race
+Four long names from testing/import-roster.sh (:12, :36, :44, :30) race
 Lions' heat, with headshots, so each lane's photo narrows the name's column
-when it loads. The desktop size runs at 1920x1080, the size #239 saw names
-cut at. `tools/kiosk_screens.py` reports a racer's name cut with an
-ellipsis, which its clipped-text check skips for other text."""
+when it loads. The desktop size runs at 1920x1080, the size #250 names.
+`tools/kiosk_screens.py` reports a racer's name cut with an ellipsis, which
+its clipped-text check skips for other text."""
 
+import math
 import shutil
 from pathlib import Path
 
@@ -41,8 +43,8 @@ LONG = {
 }
 CAR_NAME = "The Lightning Bolt Special"
 NOTE = "Anywhere"
-# kiosk.css's `.k-lane` clamp: 1rem to 6rem above 640 px wide, .9rem to
-# 2rem at 640 px or less.
+# kiosk.css's `.k-lane` clamp as server/README.md states it, [floor, cap]
+# by window width; test_the_lane_font_stays_within_the_clamp checks it.
 BOUNDS = "(innerWidth <= 640 ? [14.4, 32] : [16, 96])"
 
 # What keeps each lane's names, car name and note from fitting their row:
@@ -94,16 +96,18 @@ IMAGES_LOADED = (
 # task throws, which ends the loop, and records the count in
 # `window.runawayFit`, which the fixture asserts unset after the test. The
 # throw alone fails nothing: kiosk.js's `run()` ends each poll with
-# `.then(done, done)`, which swallows it. One fit
-# sets it once to start and once a step; from the cap to the floor is at
-# most ceil(log(14.4 / 96) / log(0.9)) = 19 steps, so 50 leaves room for
-# more than two fits in one task.
+# `.then(done, done)`, which swallows it. One fit sets it once to start and
+# once a step, and from the highest cap to the lowest floor takes FIT_SETS
+# sets at most; the fixture asserts RUNAWAY leaves room for two fits.
+FIT_SETS = 1 + math.ceil(math.log(14.4 / 96) / math.log(0.9))
 RUNAWAY = 50
 RUNAWAY_GUARD = """(limit) => {
   const set = CSSStyleDeclaration.prototype.setProperty;
   let count = 0;
+  window.rowFontSets = 0;
   CSSStyleDeclaration.prototype.setProperty = function (name, ...rest) {
     if (name === '--row-font') {
+      window.rowFontSets += 1;
       if (count === 0) setTimeout(() => { count = 0; });
       count += 1;
       if (count > limit) {
@@ -118,8 +122,11 @@ RUNAWAY_GUARD = """(limit) => {
 
 @pytest.fixture(autouse=True)
 def runaway_guard(page):
+    assert 2 * FIT_SETS < RUNAWAY
     page.context.add_init_script(f"({RUNAWAY_GUARD})({RUNAWAY})")
     yield
+    # One read: the test has ended, and the guard records a runaway loop
+    # once, when it stops it.
     assert page.evaluate("window.runawayFit || null") is None
 
 
@@ -170,7 +177,8 @@ def test_long_names_show_whole(page, event, long_names):
     they need, at 1920x1080 and 390x844. At 1920x1080 the board's font ends
     below where `fit()` starts, so it shrank for them, and every word is
     whole. At 390x844 each photo takes at most 40% of the racer's column
-    (kiosk.css `.k-lane .k-who [data-photo]`), and the names box at least
+    (kiosk.css `.k-lane .k-who [data-photo]`, at 640 px or less), and the
+    names box at least
     half of it; a word such as "Delaughter" is wider than the box even at
     the floor, 14.4 px, so the font stops there and the word breaks."""
     open_rows(page, event)
@@ -238,13 +246,22 @@ PHOTOS = """() => [...document.querySelectorAll('[data-now-racing] [data-lane] i
   }))"""
 
 
-@pytest.mark.parametrize("window", [TV, {"width": 1280, "height": 800}])
+WIDE_WINDOWS = [
+    TV,
+    {"width": 1280, "height": 800},
+    {"width": 1024, "height": 768},
+    {"width": 800, "height": 600},
+]
+
+
+@pytest.mark.parametrize("window", WIDE_WINDOWS)
 def test_on_a_wide_window_each_photo_keeps_its_full_size(
     page, event, long_names, window
 ):
-    """The 40% cap changes no photo that already fits: at 1920x1080 and
-    1280x800 each photo is the row height x 0.8 tall (kiosk.css
-    `.k-lane .k-who img`), as on master, and as wide as its shape makes it."""
+    """The 40% cap applies at 640 px or less, so at TV and projector sizes,
+    1920x1080, 1280x800, 1024x768 and 800x600, each photo is the row height
+    x 0.8 tall (kiosk.css `.k-lane .k-who img`), as on master, and as wide
+    as its shape makes it."""
     if page.size == "phone":
         pytest.skip("the phone's photos are capped (test_long_names_show_whole)")
     page.set_viewport_size(window)
@@ -293,7 +310,7 @@ def test_the_font_shrinks_again_when_the_window_narrows(page, event, long_names)
 
 
 def test_at_the_floor_a_name_taller_than_its_row_is_cut_at_its_foot(page, event):
-    """The limit of the floor (D10). With eight lanes at 390x844, a name of
+    """The limit of the floor (D10, ADR-10). With eight lanes at 390x844, a name of
     four 30-letter words needs more lines than its row holds at 14.4 px. The
     font stops at the floor, the name still wraps so no line is cut
     sideways, and the lines past the row's foot are hidden by the lane
@@ -350,19 +367,19 @@ FLOOR_STATE = """() => {
 def test_columnar_and_ondeck_show_each_long_name_whole(page, event, long_names, name):
     """Each `.k-racer` holds the whole name, with no line wider than its
     box, and the box inside its column or its cell: in a column the box
-    grows with a name that does not wrap, and the column cuts it. PHP's columnar page
-    clips a name to one line (now-racing-columnar.css:122-131), where
-    Django's wraps it (D10); PHP's on-deck chart wraps it in its cell
-    (ondeck.css has no white-space rule)."""
+    grows with a name that does not wrap, and the column cuts it. Car 103's
+    30-letter word wraps only by `overflow-wrap`, where the other names
+    wrap at their spaces. PHP's columnar page clips a name to one line
+    (now-racing-columnar.css:122-131), where Django's wraps it (D10,
+    ADR-10); PHP's on-deck chart wraps it in its cell (ondeck.css has no
+    white-space rule)."""
+    Racer.objects.filter(event=event, car_number=103).update(last_name=WORD)
+    shown = {car: full_name(car) for car in LONG} | {103: f"{LONG[103][0]} {WORD}"}
     if page.size == "desktop":
         page.set_viewport_size(TV)
     open_kiosk(page, event, f"kiosks/{name}.kiosk")
-    names = page.locator(".k-racer").filter(has_text=full_name(102))
-    expect(names.first).to_have_text(full_name(102))
-    for car in LONG:
-        expect(
-            page.locator(".k-racer").filter(has_text=full_name(car)).first
-        ).to_be_visible()
+    for text in shown.values():
+        expect(page.locator(".k-racer").filter(has_text=text).first).to_have_text(text)
     page.wait_for_function(
         """() => [...document.querySelectorAll('.k-racer')].every(n => {
           const box = n.closest('.k-column, td').getBoundingClientRect();
@@ -372,6 +389,49 @@ def test_columnar_and_ondeck_show_each_long_name_whole(page, event, long_names, 
         })""",
         timeout=5000,
     )
+
+
+def test_the_lane_font_stays_within_the_clamp(page, event, long_names):
+    """kiosk.css's `.k-lane` clamp holds the bounds server/README.md states:
+    16 to 96 px above 640 px wide, 14.4 to 32 px at 640 px or less. A
+    `--row-font` far below and far above them computes to the floor and
+    the cap."""
+    open_rows(page, event)
+    assert_fits(page)
+    # One read: both values are read in one task, so no fit() runs between
+    # them.
+    found = page.evaluate(
+        """() => {
+          const board = document.querySelector('[data-now-racing]');
+          const lane = board.querySelector('.k-lane');
+          const at = (px) => {
+            board.style.setProperty('--row-font', px + 'px');
+            return parseFloat(getComputedStyle(lane).fontSize);
+          };
+          return [at(1), at(1000)];
+        }"""
+    )
+    assert found == page.evaluate(BOUNDS)
+
+
+def test_steady_polls_do_not_fit_again(page, event, long_names):
+    """`fit()` runs for a new lineup, a photo that loads or a resize, never
+    on PHP's 75 ms timer (now-racing-adjust-fonts.js:9-10) or at each poll:
+    six polls of an unchanged lineup set `--row-font` no more times. Two
+    polls pass first, so the photos' load events have run."""
+    open_rows(page, event)
+    assert_fits(page)
+    for _ in range(2):
+        with page.expect_request(lambda r: "query=poll&" in r.url, timeout=5000):
+            pass
+    # One read: the count before the polls, compared with the count after.
+    before = page.evaluate("window.rowFontSets")
+    for _ in range(6):
+        with page.expect_request(lambda r: "query=poll&" in r.url, timeout=5000):
+            pass
+    # One read: the count after six polls, each sent once the reply before
+    # it was drawn (kiosk.js `run()`).
+    assert page.evaluate("window.rowFontSets") == before
 
 
 ELLIPSES = """<!doctype html><html><body>

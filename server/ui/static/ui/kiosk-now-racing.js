@@ -68,17 +68,14 @@
   // The row height follows the lane count and the window. The board's one
   // lane font starts from the row height and the window, and steps down by
   // 0.9 while a lane's names run past their row or hold a word wider than
-  // their box (overflows(), above), as PHP's FontAdjuster
-  // shrinks every cell until the table fits (now-racing-adjust-fonts.js:42-66).
-  // PHP shrinks on a 75 ms timer; this runs only for a new lineup, a photo
-  // that loads, or a resize (#250). The font stays within kiosk.css's
-  // `.k-lane` clamp, which holds the bounds: 16 to 96 px above 640 px wide
-  // (kiosk.css line 201), 14.4 to 32 px at 640 px or less (its
-  // `@media (max-width: 640px)` rule, line 351) (D10).
-  // PHP has no floor, and reached 103 px at 1920x1080. The loop stops once
-  // the computed font stops falling. At the floor, a word wider than its box
-  // breaks, and a name with more lines than its row holds is cut at the
-  // row's foot (test_kiosk_names.py).
+  // their box (overflows(), above), as PHP's FontAdjuster shrinks every cell
+  // until the table fits (now-racing-adjust-fonts.js:42-66). PHP shrinks on a
+  // 75 ms timer; this runs only for a new lineup, a photo that loads, or a
+  // resize (#250). The loop stops once the computed font stops falling, so
+  // kiosk.css's `.k-lane` clamp holds the bounds (server/README.md, the kiosk
+  // pages; D10, ADR-10), where PHP's loop sets no minimum. At the floor, a
+  // word wider than its box breaks, and a name with more lines than its row
+  // holds is cut at the row's foot (test_kiosk_names.py).
   function fit() {
     if (columns) return;
     var rows = lanes().length;

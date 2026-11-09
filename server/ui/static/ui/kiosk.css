@@ -204,10 +204,7 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 .k-lane .k-lane-no { color: var(--lane-ink); font-weight: 800; text-align: center; }
 .k-lane .k-car { font-weight: 800; font-variant-numeric: tabular-nums; }
 .k-lane .k-who { display: flex; align-items: center; gap: 1vw; min-width: 0; }
-/* The photo takes at most 40% of the racer's column, scaled down whole, so
-   on a phone it leaves the name room (#250, D10). */
-.k-lane .k-who [data-photo] { flex: none; max-width: 40%; }
-.k-lane .k-who img { display: block; height: calc(var(--row-h, 10vh) * .8); width: auto; max-width: 100%; object-fit: contain; border-radius: .8vh; }
+.k-lane .k-who img { height: calc(var(--row-h, 10vh) * .8); width: auto; border-radius: .8vh; }
 .k-lane .k-names { min-width: 0; }
 /* A long name wraps and kiosk-now-racing.js `fit()` shrinks the lane font
    until it fits its row, where PHP's cell wraps and its FontAdjuster shrinks
@@ -351,6 +348,10 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
   .k-head { font-size: 2.6vw; letter-spacing: .02em; padding: 0 1vw; }
   .k-points .k-head, .k-points .k-lane { grid-template-columns: 10vw 14vw minmax(0, 1fr) 14vw; }
   .k-lane { background: linear-gradient(90deg, var(--lane) 0 10vw, var(--k-surface) 10vw); font-size: clamp(.9rem, var(--row-font, 4vw), 2rem); }
+  /* On a phone the photo takes at most 40% of the racer's column, scaled
+     down whole, so it leaves the name room (#250, D10, ADR-10). */
+  .k-lane .k-who [data-photo] { flex: none; max-width: 40%; }
+  .k-lane .k-who img { display: block; max-width: 100%; object-fit: contain; }
   .k-row { grid-template-columns: 5vh 16vw minmax(0, 1fr) auto; font-size: 2.2vh; }
   .k-row .k-place { width: 4.5vh; height: 4.5vh; }
   .k-deck col.k-label { width: 15vw; }
