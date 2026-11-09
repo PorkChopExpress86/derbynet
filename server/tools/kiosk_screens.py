@@ -4,7 +4,13 @@ Django, for the PR's evidence (D63).
 Each page loads by preview, `kiosk.php?page=kiosks/<name>.kiosk`, which
 registers no kiosk on either server, at 1920x1080, 1280x800 and 390x844.
 The script fails a page that scrolls or clips text, and with `--video`
-records each page at 1920x1080 for `--seconds`.
+records each page at 1920x1080 for `--seconds`. The screenshot check runs
+once, 2.5 s after load; with `--video` the recording's tab is checked every
+second too, because a page draws some of what it shows later (a heat's
+times, an award's reveal), and a problem at any point fails the page. A
+check that a reload interrupts is tried again once the page loads, and a
+page that never stays loaded is reported unchecked (#239,
+`ui/tests/test_kiosk_screens_tool.py`).
 
 For the same fixture database on both servers, pass `--fixture`, which runs
 `testing/reset-database.sh`, `testing/import-roster.sh` and
@@ -75,6 +81,46 @@ def url(base: str, page: str) -> str:
     return f"{base.rstrip('/')}/kiosk.php?{urlencode(query)}"
 
 
+# How many times a check that a reload interrupts is tried.
+TRIES = 3
+
+
+def check(tab) -> list[str]:
+    """Scrollbars and up to 3 clipped elements on `tab` now. A reload or
+    navigation that destroys the page's script context in the middle of the
+    check (`kiosk-now-racing.js` reloads every 5 s with no lane count) is
+    waited out and the check tried again, up to `TRIES` times; a page that
+    never stays loaded is reported unchecked, never passed."""
+    from playwright.sync_api import Error
+
+    for _ in range(TRIES):
+        try:
+            found = ["scrollbars"] if tab.evaluate(SCROLLS) else []
+            return found + [f"clipped {el}" for el in tab.evaluate(CLIPPED)[:3]]
+        except Error as error:
+            if "context was destroyed" not in str(error):
+                raise
+            tab.wait_for_load_state()
+    return [f"not checked, the page reloaded through {TRIES} tries"]
+
+
+def watch(tab, page_name: str, seconds: float) -> list[str]:
+    """Waits `seconds` on the recording's tab, checking it every second,
+    and returns each distinct problem seen, with the second it first
+    showed."""
+    problems, seen = [], set()
+    for second in range(int(seconds) + 1):
+        wait = min(1.0, seconds - second)
+        if wait > 0:
+            tab.wait_for_timeout(wait * 1000)
+        for problem in check(tab):
+            if problem not in seen:
+                seen.add(problem)
+                at = min(second + 1, seconds)
+                problems.append(f"{page_name} in the recording at {at:g} s: {problem}")
+    return problems
+
+
 def fixture(base: str) -> None:
     for script in FIXTURE:
         subprocess.run(["bash", f"testing/{script}", base], cwd=REPO, check=True)
@@ -108,10 +154,7 @@ def main(argv=None) -> int:
                 tab.goto(url(args.base, page_name))
                 tab.wait_for_timeout(2500)
                 tab.screenshot(path=args.out / f"{page_name}-{size}.png")
-                if tab.evaluate(SCROLLS):
-                    problems.append(f"{page_name} at {size}: scrollbars")
-                if clipped := tab.evaluate(CLIPPED):
-                    problems.append(f"{page_name} at {size}: clipped {clipped[:3]}")
+                problems += [f"{page_name} at {size}: {p}" for p in check(tab)]
                 context.close()
             if args.video:
                 context = browser.new_context(
@@ -121,7 +164,7 @@ def main(argv=None) -> int:
                 )
                 tab = context.new_page()
                 tab.goto(url(args.base, page_name))
-                tab.wait_for_timeout(args.seconds * 1000)
+                problems += watch(tab, page_name, args.seconds)
                 video = tab.video
                 context.close()
                 video.save_as(args.out / f"{page_name}-1920x1080.webm")
