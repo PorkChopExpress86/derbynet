@@ -188,17 +188,16 @@ def test_long_names_show_whole(page, event, long_names):
     shoot(page, "kiosk-now-racing-long-names")
 
 
-# The lines of names that hold a word wider than their box: measured with
-# words kept whole, as `fit()` measures (kiosk.css `.k-fitting`).
-TOO_WIDE = """() => {
-  const board = document.querySelector('[data-now-racing]');
-  board.classList.add('k-fitting');
-  const wide = [...board.querySelectorAll('.k-names > *')]
-    .filter(line => line.scrollWidth > line.clientWidth)
-    .map(line => line.textContent);
-  board.classList.remove('k-fitting');
-  return wide;
-}"""
+# The lines of names that hold a word wider than their box: each measured
+# with words kept whole, set here rather than through kiosk.css's
+# `.k-fitting`, which this checks.
+TOO_WIDE = """() => [...document.querySelectorAll('[data-now-racing] .k-names > *')]
+  .filter(line => {
+    line.style.overflowWrap = 'normal';
+    const wide = line.scrollWidth > line.clientWidth;
+    line.style.overflowWrap = '';
+    return wide;
+  }).map(line => line.textContent)"""
 WORD = "Wolfeschlegelsteinhausenberger"
 
 
