@@ -8,7 +8,8 @@
 # retro), the registry, tests that
 # flush the seeded rows, frozen exception classes, and the parity gate's
 # entries for the suites server.yml runs, fixtures only xdist provides (#220
-# retro), and plan/tests, the plan tools' tests
+# retro), a test that starts Playwright in the pytest process (#239 retro),
+# and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
 # tests/test_source_checks.py now fails a test module that imports `ast` or
@@ -32,6 +33,7 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_parity_gate_ci.py \
   tests/test_pytest_under_load.py \
   tests/test_no_xdist_fixtures.py \
+  tests/test_playwright_in_process.py \
   tests/test_transactional_tests.py \
   transfer/tests/test_id_readers.py \
   ui/tests/test_no_copied_helpers.py \
