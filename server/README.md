@@ -469,7 +469,7 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`, `UNDECIDED
 - `kiosk.php` grants no permission, and the award kiosk clears no award on load (S28).
 - `please-check-in` reads `classids` as whole numbers (S12). The award kiosk plays only `confetti.webm` (C34). The standings kiosk is public on purpose (S29, D5) and lists racers not eligible for its speed awards marked, with no place (D33, D35), and dropped times struck through (D37), from #49's `ui.standings.state`.
 - While the playlist waits for the operator, the racing pages (now racing in its three layouts, on deck, results by racer) show the leaders of the round that ended, from `racing.services.playlist.intermission()` through `query=poll`'s Django-only `intermission` value, until the next round starts (D12).
-- The on-deck page counts the race's lanes, not the lanes of the results (D73). Its running heat glides near the top in place of the Just Finished and Now Staging animation (D10). Results by racer glide up where PHP moves a row every 2 s (D10).
+- The on-deck page counts the race's lanes, not the lanes of the results (D73). Its running heat glides near the top in place of the Just Finished and Now Staging animation (D10). Results by racer glide up where PHP moves a row every 2 s (D10). Its racer cards are #49's, with dark ink on a white card in the light theme and light on dark in the dark theme, where PHP draws a table: the running round's racer headers white on blue, the other rounds' headers and every time in the browser's default black, and every other row cream (D10, #247).
 
 ## The replay page and the remote camera (#53)
 

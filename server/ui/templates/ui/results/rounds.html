@@ -2,6 +2,7 @@
 {% if not results.rounds %}
 <p class="rounded-xl border border-line bg-surface p-6 text-center text-ink-muted" data-empty>No round has been set up yet.</p>
 {% endif %}
+{# Each card sets its own ink, text-ink, so its racer header and times read inside the results-by-racer kiosk, whose body sets the kiosk's light ink (#247). PHP's kiosk draws a table instead: only the running round's racer headers are white on blue (website/css/racer-results.css:39-43, on the tbody that common-update.js:13-17 marks curgroup), every other row's cells are cream (main-table.css:5-7), and PHP sets no ink for the times or the other rounds' headers, which take the browser's default black (#247's PHP run with two rounds scheduled, its PR body). The cards are #49's, kept on the kiosk (D10). #}
 {% for round in results.rounds %}
 <section aria-labelledby="rr-{{ round.round_id }}-h" class="mb-5" data-round="{{ round.round_id }}">
   <h2 id="rr-{{ round.round_id }}-h" class="mb-2 flex flex-wrap items-center gap-2 text-lg font-semibold">
@@ -11,7 +12,7 @@
   {% if round.racers %}
   <ul role="list" aria-label="{% if results.use_groups %}{{ round.group_name }}, {% endif %}Round {{ round.number }}" class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
     {% for r in round.racers %}
-    <li class="flex min-w-0 gap-3 rounded-xl border border-line bg-surface p-3" data-racer="{{ r.racer_id }}">
+    <li class="flex min-w-0 gap-3 rounded-xl border border-line bg-surface p-3 text-ink" data-racer="{{ r.racer_id }}">
       {% if r.headshot or r.car_photo %}
       <span class="flex shrink-0 flex-col gap-1">
         {% if r.headshot %}<img src="{{ prefix }}{{ r.headshot }}" alt="" loading="lazy" class="size-16 rounded-lg object-cover" data-headshot>{% endif %}
