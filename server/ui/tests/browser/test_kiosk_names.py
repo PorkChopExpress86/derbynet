@@ -86,6 +86,40 @@ IMAGES_LOADED = (
 )
 
 
+# Fails a `fit()` loop that never ends, which would hang the tab and every
+# Playwright call after it: `--row-font` set more than RUNAWAY times in one
+# task throws, which ends the loop, and records the count in
+# `window.runawayFit`, which the fixture asserts unset after the test. The
+# throw alone fails nothing: kiosk.js's `run()` ends each poll with
+# `.then(done, done)`, which swallows it. One fit
+# sets it once to start and once a step; from the cap to the floor is at
+# most ceil(log(14.4 / 96) / log(0.9)) = 19 steps, so 50 leaves room for
+# more than two fits in one task.
+RUNAWAY = 50
+RUNAWAY_GUARD = """(limit) => {
+  const set = CSSStyleDeclaration.prototype.setProperty;
+  let count = 0;
+  CSSStyleDeclaration.prototype.setProperty = function (name, ...rest) {
+    if (name === '--row-font') {
+      if (count === 0) setTimeout(() => { count = 0; });
+      count += 1;
+      if (count > limit) {
+        window.runawayFit = count;
+        throw new Error(`fit() set --row-font ${count} times`);
+      }
+    }
+    return set.call(this, name, ...rest);
+  };
+}"""
+
+
+@pytest.fixture(autouse=True)
+def runaway_guard(page):
+    page.context.add_init_script(f"({RUNAWAY_GUARD})({RUNAWAY})")
+    yield
+    assert page.evaluate("window.runawayFit || null") is None
+
+
 def full_name(car: int) -> str:
     return " ".join(LONG[car])
 
@@ -276,7 +310,8 @@ FLOOR_STATE = """() => {
 )
 def test_columnar_and_ondeck_show_each_long_name_whole(page, event, long_names, name):
     """Each `.k-racer` holds the whole name, with no line wider than its
-    box and, on the columnar pages, inside its column. PHP's columnar page
+    box, and the box inside its column or its cell: in a column the box
+    grows with a name that does not wrap, and the column cuts it. PHP's columnar page
     clips a name to one line (now-racing-columnar.css:122-131), where
     Django's wraps it (D10); PHP's on-deck chart wraps it in its cell
     (ondeck.css has no white-space rule)."""
@@ -291,10 +326,10 @@ def test_columnar_and_ondeck_show_each_long_name_whole(page, event, long_names, 
         ).to_be_visible()
     page.wait_for_function(
         """() => [...document.querySelectorAll('.k-racer')].every(n => {
-          const column = n.closest('.k-column');
-          const foot = column ? column.getBoundingClientRect().bottom : Infinity;
-          return n.scrollWidth <= n.clientWidth
-            && n.getBoundingClientRect().bottom <= foot;
+          const box = n.closest('.k-column, td').getBoundingClientRect();
+          const r = n.getBoundingClientRect();
+          return n.scrollWidth <= n.clientWidth && r.left >= box.left - 0.5
+            && r.right <= box.right + 0.5 && r.bottom <= box.bottom + 0.5;
         })""",
         timeout=5000,
     )
