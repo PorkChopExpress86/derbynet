@@ -24,12 +24,12 @@
       <div id="track-lanes" class="border-b border-line py-3">{% include "ui/playlist/scheduling.html" with scheduling=page.scheduling part="lanes" %}</div>
       <div id="track-lane-colors">{% include "ui/settings_page/lane_colors.html" with lane_colors=page.lane_colors %}</div>
       {% endif %}
+      {% if fv.key == "replay-max-clip" %}
+      <p data-clip-note class="border-b border-line py-3 text-sm text-ink-muted">Each clip runs from the time recorded before the last car finishes to the time after it, and never longer than the longest clip (D18).</p>
+      {% endif %}
       {% endfor %}
       {% if section.key == "rules" %}
       <div class="py-3">{% include "ui/playlist/scheduling.html" with scheduling=page.scheduling part="method" %}</div>
-      {% endif %}
-      {% if section.key == "replay" %}
-      <p class="py-3 text-sm text-ink-muted">Each clip runs from the time recorded before the last car finishes to the time after it, and never longer than the longest clip (D18).</p>
       {% endif %}
     </div>
   </details>

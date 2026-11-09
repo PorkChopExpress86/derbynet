@@ -1,8 +1,8 @@
 """The settings page's ICE servers field in a browser (#241), at 390x844 and
 1280x800: two lines save and reach the remote camera's `RTCPeerConnection`,
-a line Chromium would throw on is refused with the field's error, clearing
-the field leaves the camera no ICE server, and the field's rule agrees with
-Chromium's own parsing. The Replay section's screenshot, for D75."""
+a turn: line is refused with the field's error, clearing the field leaves
+the camera no ICE server, and the field takes no URL Chromium's own parsing
+throws on. The Replay section's screenshot, for D75."""
 
 from playwright.sync_api import expect
 
@@ -92,7 +92,8 @@ def test_clearing_the_field_leaves_the_camera_no_ice_server(login, event):
     assert camera_ice_servers(page) == []
 
 
-# Each URL, and whether Chromium's RTCPeerConnection takes it on its own.
+# URLs that Chromium's RTCPeerConnection and the field agree on: True for
+# taken, False for refused (Chromium throws).
 URLS = (
     ("stun:a.example", True),
     ("stuns:a.example", True),
@@ -101,6 +102,8 @@ URLS = (
     ("sTuN:a.example:3478", True),
     ("stun:a.example:65535", True),
     ("stun:[::1]:3478", True),
+    ("stun:[fe80::1%25eth0]:3478", True),
+    ("stun:[fe80::1%eth0]", True),
     ("stun:1.2.3.4", True),
     ("stun:a_b.example", True),
     ("turn:a.example", False),
@@ -112,12 +115,31 @@ URLS = (
     ("stun:a.example:abc", False),
     ("stun:a.example:0", False),
     ("stun:a.example:99999", False),
+    ("stun:[::1]:65536", False),
     ("stun:a.example?transport=udp", False),
     ("stun:a.example:3478/x", False),
     ("stun://a.example", False),
     ("http://a.example", False),
     ("a.example", False),
+    # Review round 1's host characters (#241).
+    *((f"stun:a{c}b", False) for c in '"<>\\^`{|}'),
 )
+
+# URLs Chromium takes and the field refuses: refusing more is safe.
+OVER_REFUSED = (
+    "stun:a.example:000001",
+    "stun:[::1]x",
+    "stun:[gg::1]",
+    "stun:ünï.example",
+)
+
+# `stun:a<c>b` for every printable ASCII character but the space.
+SWEEP = tuple(chr(code) for code in range(33, 127))
+
+CHROMIUM_TAKES = """urls => urls.map(u => {
+  try { new RTCPeerConnection({iceServers: [{urls: [u]}]}); return true; }
+  catch (e) { return false; }
+})"""
 
 
 def _taken(url: str) -> bool:
@@ -129,21 +151,30 @@ def _taken(url: str) -> bool:
 
 
 def test_the_field_takes_what_chromium_takes(login, event):
-    """The field refuses a URL exactly when Chromium's `RTCPeerConnection`
-    throws on it, so a saved value never stops the replay page or the
-    camera: a `turn:` URL throws for want of a credential, which
-    `ice_servers()` does not send."""
+    """The field takes no URL that makes Chromium's `RTCPeerConnection`
+    throw, over every printable ASCII character in a host and the listed
+    URLs, and takes each listed URL Chromium takes but the over-refused
+    ones. A `turn:` URL throws for want of a credential, which
+    `ice_servers()` does not send. The field takes every host character
+    Chromium takes but the comma, which separates URLs."""
     page = login("RaceCoordinator")
     page.goto("/settings/")
-    chromium = page.evaluate(
-        """urls => urls.map(u => {
-             try { new RTCPeerConnection({iceServers: [{urls: [u]}]}); return true; }
-             catch (e) { return false; }
-           })""",
-        [url for url, _ in URLS],
+
+    listed = [url for url, _ in URLS]
+    chromium = page.evaluate(CHROMIUM_TAKES, listed)
+    assert dict(zip(listed, chromium, strict=True)) == dict(URLS)
+    assert {url: _taken(url) for url in listed} == dict(URLS)
+
+    assert page.evaluate(CHROMIUM_TAKES, list(OVER_REFUSED)) == [True] * len(
+        OVER_REFUSED
     )
-    assert dict(zip([u for u, _ in URLS], chromium, strict=True)) == dict(URLS)
-    assert {url: _taken(url) for url, _ in URLS} == dict(URLS)
+    assert [_taken(url) for url in OVER_REFUSED] == [False] * len(OVER_REFUSED)
+
+    swept = page.evaluate(CHROMIUM_TAKES, [f"stun:a{c}b" for c in SWEEP])
+    chromium_chars = {c for c, ok in zip(SWEEP, swept, strict=True) if ok}
+    field_chars = {c for c in SWEEP if _taken(f"stun:a{c}b")}
+    assert field_chars <= chromium_chars, sorted(field_chars - chromium_chars)
+    assert chromium_chars - field_chars == {","}
 
 
 def test_a_stored_value_shows_one_url_per_line(login, event):

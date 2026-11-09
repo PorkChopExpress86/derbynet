@@ -45,8 +45,9 @@ class Kind(Enum):
     SELECT = "select"
     TEXT = "text"
     DIRECTORY = "directory"
-    # A text area, one item per line.
-    LINES = "lines"
+    # The replay ICE servers' text area, one URL per line, checked by
+    # `replay.ice_servers_text` (#241).
+    ICE_SERVERS = "ice-servers"
 
 
 class Section(Enum):
@@ -405,7 +406,7 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "replay-ice-servers",
         Section.REPLAY,
-        Kind.LINES,
+        Kind.ICE_SERVERS,
         "STUN servers for the remote camera",
         "One server per line. Leave it empty on a LAN with no internet: the"
         " camera then connects directly, on the local network only. TURN"
@@ -525,6 +526,16 @@ def _save_car_numbering(event: Event, setting: Field, raw: str) -> None:
     _apply(event, {"car-numbering": f"{'100' if by_partition else '0'}+{smallest}"})
 
 
+def _model_value(setting: Field, raw: str):
+    """The `RaceSettings` value of a Django-only field."""
+    if setting.kind is Kind.ICE_SERVERS:
+        try:
+            return replay.ice_servers_text(raw)
+        except replay.IceServersRefused as refused:
+            raise SaveRefused("bad-server", f"{setting.label}: {refused}") from None
+    return int(_milliseconds(_decimal(raw, setting)))
+
+
 def save_field(event: Event, key: str, raw: str) -> None:
     """Save one field of the settings page. Raises `SaveRefused` with
     `settings.write`'s code (`locked`, `already-scheduled`, `not-written`)
@@ -536,17 +547,10 @@ def save_field(event: Event, key: str, raw: str) -> None:
         lock_race_state(event.pk)
         if key in CAR_NUMBERING_KEYS:
             _save_car_numbering(event, setting, raw)
-        elif setting.kind is Kind.LINES:
-            try:
-                text = replay.ice_servers_text(raw)
-            except replay.IceServersRefused as refused:
-                raise SaveRefused("bad-server", f"{setting.label}: {refused}") from None
-            RaceSettings.objects.filter(event=event).update(
-                **{setting.model_field: text}
-            )
         elif setting.model_field:
-            ms = int(_milliseconds(_decimal(raw, setting)))
-            RaceSettings.objects.filter(event=event).update(**{setting.model_field: ms})
+            RaceSettings.objects.filter(event=event).update(
+                **{setting.model_field: _model_value(setting, raw)}
+            )
         else:
             _apply(event, _post_for(setting, raw))
 
@@ -574,7 +578,7 @@ def value_of(
     event_settings: RaceSettings, values: dict[str, str | None], setting: Field
 ):
     """The field's value as the page shows it."""
-    if setting.kind is Kind.LINES:
+    if setting.kind is Kind.ICE_SERVERS:
         # One URL per line, however the stored text separates them.
         return "\n".join(replay.ice_urls(getattr(event_settings, setting.model_field)))
     if setting.model_field:

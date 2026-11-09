@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from django.test import override_settings
+from django.utils.html import escape
 
 from core import race_settings, settings_form
 from core.models import RaceSettings
@@ -258,6 +259,8 @@ def test_the_default_shows_googles_stun_server(coordinator, event):
         "stun:a.example:99999",
         "stun:a.example?transport=udp",
         "a.example",
+        "stun:a|b",
+        "stun:a<b",
     ],
 )
 def test_a_line_that_is_no_stun_url_is_refused(coordinator, event, value):
@@ -268,7 +271,7 @@ def test_a_line_that_is_no_stun_url_is_refused(coordinator, event, value):
         "stun:stun.l.google.com:19302"
     )
     # The refused text stays in the field, to be corrected.
-    assert ice_field(body) == value.replace(">", "&gt;")
+    assert ice_field(body) == escape(value)
 
 
 @pytest.mark.parametrize(
@@ -302,6 +305,15 @@ def test_clearing_the_field_stores_empty_and_the_camera_gets_none(coordinator, e
     assert row.replay_ice_servers == ""
     assert replay.page_settings(row)["ice_servers"] == []
     assert race_settings.read(event, ICE) == ""
+
+
+def test_the_clip_note_stays_under_the_clip_fields(coordinator, event):
+    body = html(coordinator.get("/settings/"))
+    assert (
+        body.index('id="field-replay-max-clip"')
+        < body.index("data-clip-note")
+        < body.index('id="field-replay-ice-servers"')
+    )
 
 
 def test_the_help_line_says_what_empty_does(coordinator, event):

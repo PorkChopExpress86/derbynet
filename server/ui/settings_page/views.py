@@ -67,7 +67,7 @@ def save(request):
         return HttpResponse(status=400)
     view = state.field_view(event, setting)
     view.saved, view.error = not error, error
-    if error and setting.kind in (Kind.DIRECTORY, Kind.LINES):
+    if error and setting.kind in (Kind.DIRECTORY, Kind.ICE_SERVERS):
         # The refused text stays in the field, to be corrected.
         view.value = request.POST.get("value", "")
     if error and setting.kind is Kind.DIRECTORY:

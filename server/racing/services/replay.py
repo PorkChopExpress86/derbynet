@@ -122,20 +122,25 @@ def ice_urls(text: str) -> list[str]:
     return [url for url in _ICE_SEPARATORS.split(text) if url]
 
 
-# A STUN URL Chromium's `RTCPeerConnection` takes: `stun:` or `stuns:` in
-# any case, a host or a bracketed IPv6 address, and a port from 1 to 65535.
-# `test_the_field_takes_what_chromium_takes` in
-# `ui/tests/browser/test_settings_ice_servers.py` checks a list of URLs
-# against Chromium's own parsing.
+# A STUN URL: `stun:` or `stuns:` in any case; a host of the printable
+# ASCII characters Chromium's `RTCPeerConnection` takes in one, or a
+# bracketed IPv6 address with an optional zone id; and a port from 1 to
+# 65535. It refuses some URLs Chromium takes (a non-ASCII host, a port
+# written with six digits). `test_the_field_takes_what_chromium_takes` in
+# `ui/tests/browser/test_settings_ice_servers.py` asserts that the field
+# takes no URL Chromium throws on, over every printable ASCII character in a
+# host and a list of URLs, and that the listed accepted URLs agree.
 _STUN_URL = re.compile(
-    r"stuns?:(?:\[[0-9a-f:.]+\]|[^\s,:/?#\[\]@]+)(?::(?P<port>\d{1,5}))?",
+    r"stuns?:(?:\[[0-9a-f:.]+(?:%[0-9a-z._~%-]*)?\]|[0-9a-z!$%&'()*+.;=_~-]+)"
+    r"(?::(?P<port>\d{1,5}))?",
     re.IGNORECASE,
 )
 _TURN_URL = re.compile(r"turns?:", re.IGNORECASE)
 
 
 class IceServersRefused(ValueError):
-    pass
+    """A URL or a text the `replay_ice_servers` field does not take; the
+    message says why."""
 
 
 def ice_servers_text(lines: str) -> str:
