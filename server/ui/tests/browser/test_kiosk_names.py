@@ -12,7 +12,8 @@ columnar pages and the on-deck chart wrap a name in its column.
 The roster's longest names (testing/import-roster.sh:12, :36, :44, :30) race
 Lions' heat, with headshots, so each lane's photo narrows the name's column
 when it loads. The desktop size runs at 1920x1080, the size #239 saw names
-cut at."""
+cut at. `tools/kiosk_screens.py` reports a racer's name cut with an
+ellipsis, which its clipped-text check skips for other text."""
 
 import shutil
 from pathlib import Path
@@ -23,6 +24,7 @@ from playwright.sync_api import Error, expect
 from core.models import RaceSettings
 from racing.services import heats
 from roster.models import Racer
+from tools import kiosk_screens
 from ui.tests.browser.conftest import shoot
 from ui.tests.browser.test_kiosk_pages import open_kiosk, settled
 from ui.tests.race import race_setup, scheduled
@@ -255,7 +257,7 @@ def test_the_font_shrinks_again_when_the_window_narrows(page, event, long_names)
 
 def test_at_the_floor_a_name_taller_than_its_row_is_cut_at_its_foot(page, event):
     """The limit of the floor (D10). With eight lanes at 390x844, a name of
-    five 30-letter words needs more lines than its row holds at 14.4 px. The
+    four 30-letter words needs more lines than its row holds at 14.4 px. The
     font stops at the floor, the name still wraps so no line is cut
     sideways, and the lines past the row's foot are hidden by the lane
     (kiosk.css `.k-lane { overflow: hidden }`). The other seven lanes fit."""
@@ -264,7 +266,7 @@ def test_at_the_floor_a_name_taller_than_its_row_is_cut_at_its_foot(page, event)
     rounds = race_setup(event, groups=(("Lions", 8),), lanes=8)
     word = "Delaughter" * 3
     Racer.objects.filter(event=event, car_number=101).update(
-        first_name=" ".join([word] * 4), last_name=word
+        first_name=" ".join([word] * 3), last_name=word
     )
     scheduled(rounds["Lions"])
     open_kiosk(page, event, "kiosks/now-racing.kiosk")
@@ -333,3 +335,24 @@ def test_columnar_and_ondeck_show_each_long_name_whole(page, event, long_names, 
         })""",
         timeout=5000,
     )
+
+
+ELLIPSES = """<!doctype html><html><body>
+<div class="k-racer" style="width:60px;overflow:hidden;white-space:nowrap;
+  text-overflow:ellipsis">Darrell &amp; Darrell Delaughter</div>
+<div class="k-name" style="width:60px;overflow:hidden;white-space:nowrap;
+  text-overflow:ellipsis">The banner's kiosk name</div>
+<div class="k-racer" style="width:300px;overflow:hidden;white-space:nowrap;
+  text-overflow:ellipsis">Kelvin Kinman</div>
+</body></html>"""
+
+
+def test_a_racer_name_cut_with_an_ellipsis_is_reported(page):
+    """Of three boxes that cut text with an ellipsis, the check reports
+    only the racer's name that does not fit (#250): another text cut with
+    an ellipsis is cut on purpose, and a name that fits is not cut."""
+    page.set_content(ELLIPSES)
+    # One read: the stand-in page has no script, so nothing changes it.
+    clipped = page.evaluate(kiosk_screens.CLIPPED)
+    assert len(clipped) == 1
+    assert clipped[0].startswith('<div class="k-racer" style="width:60px;')

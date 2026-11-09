@@ -172,24 +172,3 @@ def test_a_page_that_never_stays_loaded_is_reported_not_passed():
         "flag in the recording at 1 s: not checked, the page reloaded through "
         f"{kiosk_screens.TRIES} tries"
     ]
-
-
-ELLIPSES = """<!doctype html><html><body>
-<div class="k-racer" style="width:60px;overflow:hidden;white-space:nowrap;
-  text-overflow:ellipsis">Darrell &amp; Darrell Delaughter</div>
-<div class="k-name" style="width:60px;overflow:hidden;white-space:nowrap;
-  text-overflow:ellipsis">The banner's kiosk name</div>
-<div class="k-racer" style="width:600px;overflow:hidden;white-space:nowrap;
-  text-overflow:ellipsis">Kelvin Kinman</div>
-</body></html>"""
-
-
-def test_a_racer_name_cut_with_an_ellipsis_is_reported(page):
-    """Of three boxes that cut text with an ellipsis, the check reports
-    only the racer's name that does not fit (#250): another text cut with
-    an ellipsis is cut on purpose, and a name that fits is not cut."""
-    page.set_content(ELLIPSES)
-    # One read: the stand-in page has no script, so nothing changes it.
-    clipped = page.evaluate(kiosk_screens.CLIPPED)
-    assert len(clipped) == 1
-    assert clipped[0].startswith('<div class="k-racer" style="width:60px;')
