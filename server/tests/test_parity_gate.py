@@ -331,7 +331,7 @@ def test_the_gate_runs_as_the_parity_workflow_starts_it(tmp_path):
         text=True,
     )
 
-    # The real WAITING entries no leg ran fail the verdict; the gate judged.
+    # Whatever the verdict on the real lists, the gate judged.
     assert "Traceback" not in result.stderr, result.stderr
     assert "`test-balloting.sh`" in result.stdout
 

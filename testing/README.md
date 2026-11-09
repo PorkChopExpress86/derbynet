@@ -108,7 +108,17 @@ usual ID.
 
 `test-ab-initio-setup.sh` is PHP only.  Set `DERBYNET_BACKEND=django` to skip it.
 With `DERBYNET_BACKEND=django`, `test-visit-each-page.sh` expects `print.php` to
-answer 404, since the Django server drops the printables (#55).
+answer 404, since the Django server drops the printables (#55).  Given the role
+as its second argument, as `test-each-role.sh` gives it, it also expects
+`replay.message` refused as `notauthorized` for RaceCrew and the anonymous
+role, which lack `CONTROL_RACE` (D16); PHP serves it to anyone.
+
+With `DERBYNET_BACKEND=django`, `exercise-one-database.sh` skips its four
+Puppeteer steps, which drive PHP's pages, and names the test that replaces
+each (#240).  The `exercise` job of `.github/workflows/server.yml` runs the
+whole script that way against Django, on SQLite and on Postgres, from
+`setup.nodata` (`ez`) to the snapshot round trip, and fails on the first
+failed step.
 
 `test-permissions.sh` holds each server to the page access it decided on.  By
 default it checks PHP's: every page in `fixtures/role-pages.json`, where an

@@ -75,3 +75,32 @@ def test_no_step_the_workflow_runs_against_django_waits_or_is_skipped():
         "KNOWN_STALE lists a step that is no longer stale; remove it:"
         f" {sorted(set(KNOWN_STALE) - set(found))}"
     )
+
+
+# testing/exercise-one-database.sh's Puppeteer steps: `puppeteer_step <file.js>
+# <replacement>`, which skips the test under DERBYNET_BACKEND=django (#240).
+EXERCISE = ROOT / "testing" / "exercise-one-database.sh"
+PUPPETEER_STEP = re.compile(r"^\s*puppeteer_step (\S+)\s+(?:\\\n\s*)?(\S+)\s*$", re.M)
+
+
+def test_the_parity_gate_skips_exactly_the_puppeteer_steps_the_script_skips():
+    """Each skip in SKIPS is one the script makes on Django, with the
+    replacement test the script names, and the replacement exists."""
+    skipped = {
+        f"puppeteer_test {name}": replacement
+        for name, replacement in PUPPETEER_STEP.findall(EXERCISE.read_text())
+    }
+    assert len(skipped) == 4, skipped
+    assert SKIPS == skipped
+    for replacement in skipped.values():
+        assert (ROOT / replacement.split("::")[0]).is_file(), replacement
+
+
+def test_nothing_waits_while_server_yml_runs_the_whole_suite_against_django():
+    """The exercise job fails on any failed step, so no step can wait."""
+    assert re.search(
+        r"DERBYNET_BACKEND: django\n(?:.*\n){0,12}?.*"
+        r"bash testing/exercise-one-database\.sh \S+ ez",
+        WORKFLOW.read_text(),
+    ), "server.yml no longer runs testing/exercise-one-database.sh on Django"
+    assert WAITING == {}

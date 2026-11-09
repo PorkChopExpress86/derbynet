@@ -83,27 +83,26 @@ class Waiting:
 # The Django leg's steps that wait on another ticket, by label. Remove an
 # entry when its ticket lands; the gate fails while a listed step passes, so
 # the list can't go stale. A waiting step may fail and stop early, but only
-# after its request, and a reply it gets is still compared. `_PAGES` names the
-# open page tickets; drop a ticket from it when it closes (#40, #44 and #47
-# stayed after closing until the #218 retro).
-_PAGES = "the legacy pages: #41, #42, #43, #45, #46, #48, #49, #50, #52, #53, #54"
-# test-visit-each-page.sh opens about.php first.
-_EACH_ROLE = Waiting(f"{_PAGES} (test-visit-each-page.sh)", "about.php")
-WAITING: dict[str, Waiting] = {
-    "test-each-role.sh": _EACH_ROLE,
-    "puppeteer_test all-pages-test.js": Waiting(_PAGES),
-    "puppeteer_test coordinator-test.js": Waiting("#41 (coordinator.php)"),
-    "puppeteer_test ondeck-columns-test.js": Waiting("#52 (ondeck.php)"),
-    "test-each-role.sh (2)": _EACH_ROLE,
-    "test-each-role.sh (3)": _EACH_ROLE,
-    "puppeteer_test checkin-empty-test.js": Waiting("#42 (checkin.php)"),
-    "test-each-role.sh (4)": _EACH_ROLE,
-    "test-each-role.sh (5)": _EACH_ROLE,
-    "test-each-role.sh (6)": _EACH_ROLE,
-}
+# after its request, and a reply it gets is still compared. None waits since
+# #240: server.yml's exercise job runs the whole suite against Django and
+# fails on any failed step.
+WAITING: dict[str, Waiting] = {}
 
 # The steps the Django leg skips, with the reason. The PHP leg skips none.
-SKIPS: dict[str, str] = {}
+# Each is a Puppeteer test that drives PHP's pages, which
+# testing/exercise-one-database.sh skips under DERBYNET_BACKEND=django
+# (`puppeteer_step`), naming the test that replaces it (#240).
+SKIPS: dict[str, str] = {
+    "puppeteer_test all-pages-test.js": "server/ui/tests/browser/test_smoke.py",
+    "puppeteer_test coordinator-test.js": "server/ui/tests/test_dashboard_golden.py",
+    "puppeteer_test ondeck-columns-test.js": (
+        "server/ui/tests/browser/test_table_columns.py"
+    ),
+    "puppeteer_test checkin-empty-test.js": (
+        "server/ui/tests/browser/test_checkin.py"
+        "::test_an_empty_roster_adds_the_first_racer_as_101_in_default"
+    ),
+}
 
 # The steps whose requests differ between the legs on purpose, because the
 # script asks Django other questions when DERBYNET_BACKEND=django. Their
