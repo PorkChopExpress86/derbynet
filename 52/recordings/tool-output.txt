@@ -1,0 +1,68 @@
+# kiosk_screens.py output for the #239 recordings
+
+Tool: server/tools/kiosk_screens.py at commit e8d044d0, which checks each
+page once 2.5 s after load at tv (1920x1080), laptop (1280x800) and phone
+(390x844), and with --video checks the recording's tab every second.
+Server: Django runserver at 127.0.0.1:8239, DERBYNET_DEBUG=1.
+Each page ran as its own call:
+  uv run python tools/kiosk_screens.py http://127.0.0.1:8239 --out <dir> \
+      --video --seconds <N> --page <page>
+stdout and stderr together (2>&1). The tool prints a problem line, such as
+"<page> at phone: clipped ..." or "<page> in the recording at 5 s: ...", for
+each problem it finds, and exits 1. No page printed one, and every call
+exited 0.
+
+The standings .webm comes from a second, 195 s take (section 2), recorded
+after the list grew to 50 rows. The 135 s take in section 1 was replaced.
+
+## 1. The run that made the recordings (17:45-18:00)
+== now-racing 40 s 17:45:43
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit now-racing 0
+== now-racing-columnar 40 s 17:46:33
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit now-racing-columnar 0
+== now-racing-columnar-reversed 40 s 17:47:23
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit now-racing-columnar-reversed 0
+== ondeck 40 s 17:48:12
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit ondeck 0
+== scale-MPH 18 s 17:49:03
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit scale-MPH 0
+== award-presentations 32 s 17:49:31
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit award-presentations 0
+== derbynet 14 s 17:50:12
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit derbynet 0
+== flag 12 s 17:50:37
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit flag 0
+== identify 10 s 17:50:58
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit identify 0
+== please-check-in 16 s 17:51:17
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit please-check-in 0
+== qrcode 10 s 17:51:44
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit qrcode 0
+== welcome 14 s 17:52:03
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit welcome 0
+== slideshow 75 s 17:52:27
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit slideshow 0
+== standings 135 s 17:53:52
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit standings 0
+== results-by-racer 240 s 17:56:18
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit results-by-racer 0
+record done 18:00:31
+
+## 2. The 195 s standings take (18:09-18:12)
+wrote /tmp/claude-1000/-home-specter-dev-projects-derbynet/7c8ba00d-303d-4034-936d-36cb99188207/scratchpad/rec/final
+exit 0
