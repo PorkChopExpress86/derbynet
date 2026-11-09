@@ -26,9 +26,11 @@ Spawn a general-purpose agent with `model: opus`, briefed per plan/AGENT-BRIEF.m
 - Run `server/tools/pytest-postgres.sh` on the affected tests, and the verify skill for any page or action.php change.
 - Commit with a message that references #N, push, and return the commit SHA, what you built, and what origin/master already had.
 
+While a subagent runs, read its notifications: when they show the same background wait for over an hour with no new tool uses, list its processes with `ps -eo pid,etime,args` instead of waiting on. #247's implementer waited about 10 h on a probe that had hung, and the lead looked only when the owner asked, after about 6 h.
+
 ## 2. Code review
 
-1. Run /mattpocock-skills:code-review on ../derbynet-wt-N with origin/master as the fixed point. The spec is ticket #N, and the standards are CONTRIBUTING.md and plan/AGENT-BRIEF.md. Spawn its Standards reviewer with `model: sonnet` and its Spec reviewer with `model: opus`.
+1. Run /mattpocock-skills:code-review on ../derbynet-wt-N with origin/master as the fixed point. The spec is ticket #N, and the standards are CONTRIBUTING.md and plan/AGENT-BRIEF.md. Spawn its Standards reviewer with `model: sonnet` and its Spec reviewer with `model: opus`. A reviewer that mutates code does it in its own copy (`git worktree add --detach ../derbynet-wt-N-rv<axis> <head>`, removed after), and a reviewer leaves a change it didn't make as it is: #247's Spec reviewer reset a mutation the Standards reviewer had running in the shared worktree.
 2. Rank every finding.
 3. Send the high and medium findings to the implementer. It reproduces each one with a test, the suite, or a server run, and reports the ones it can't reproduce (CLAUDE.md). It fixes each reproduced finding with a test that goes red before the fix, reruns the affected tests and then the full suite, and commits with a message that references #N.
 

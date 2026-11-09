@@ -1,4 +1,15 @@
+import os
+
 import pytest
+
+# Each browser test, fixtures included, fails after this many seconds, so a
+# hang ends the run. #247's probe awaited axe on a paused Playwright clock;
+# `page.evaluate` has no timeout, and the run sat for about 10 hours. The
+# slowest browser test took 31 s with 8 workers (test_smoke.py, phone), so
+# this leaves about ten times that for CI's smaller runners and
+# tools/pytest-under-load.sh. `--timeout N` or PYTEST_TIMEOUT sets every
+# test's bound instead, and `--timeout 0` turns it off (#247 retro).
+BROWSER_TIMEOUT = 300
 
 
 def pytest_configure():
@@ -66,3 +77,17 @@ def pytest_collection_modifyitems(items):
             golden[module.__name__] = reads_golden_fixtures(module)
         if golden[module.__name__]:
             item.add_marker(pytest.mark.golden)
+
+
+def pytest_collection_finish(session):
+    """After every conftest's pytest_collection_modifyitems, so the browser
+    marker that ui/tests/browser/conftest.py adds is on."""
+    if (
+        session.config.getoption("timeout") is not None
+        or "PYTEST_TIMEOUT" in os.environ
+    ):
+        return
+    for item in session.items:
+        bounded = item.get_closest_marker("timeout")
+        if item.get_closest_marker("browser") and not bounded:
+            item.add_marker(pytest.mark.timeout(BROWSER_TIMEOUT))
