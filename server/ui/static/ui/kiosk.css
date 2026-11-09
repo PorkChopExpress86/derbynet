@@ -214,6 +214,8 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
    (#250, now-racing-adjust-fonts.js:42-66). */
 .k-lane .k-racer { overflow-wrap: anywhere; font-weight: 650; }
 .k-lane .k-carname, .k-lane .k-note { font-size: .5em; color: var(--k-muted); overflow-wrap: anywhere; }
+/* While fit() measures, words stay whole, so a word too wide shrinks the font. */
+.k-fitting .k-lane .k-names > * { overflow-wrap: normal; }
 .k-lane .k-time, .k-lane .k-speed { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
 .k-lane .k-speed { color: var(--k-muted); }
 .k-lane .k-place { text-align: center; font-weight: 900; }

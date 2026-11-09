@@ -41,13 +41,23 @@
     });
   }
 
-  // Whether a lane's names (name, car name, note) run past its row's foot.
-  // They wrap (kiosk.css `.k-lane .k-racer`), so none is wider than its box.
+  // Whether a lane's names (name, car name, note) run past its row's foot,
+  // or hold a word wider than their box. They are measured with words kept
+  // whole (kiosk.css `.k-fitting`), so the font shrinks for a long word, as
+  // PHP's does for a table too wide (now-racing-adjust-fonts.js:53-61), and
+  // a word breaks only at the floor.
   function overflows() {
-    return Array.prototype.some.call(lanes(), function (el) {
+    board.classList.add('k-fitting');
+    var over = Array.prototype.some.call(lanes(), function (el) {
       var names = el.querySelector('.k-names');
-      return names && names.offsetTop + names.offsetHeight > el.clientHeight;
+      if (!names) return false;
+      if (names.offsetTop + names.offsetHeight > el.clientHeight) return true;
+      return Array.prototype.some.call(names.children, function (line) {
+        return line.scrollWidth > line.clientWidth;
+      });
     });
+    board.classList.remove('k-fitting');
+    return over;
   }
 
   function laneFont() {
@@ -57,7 +67,8 @@
 
   // The row height follows the lane count and the window. The board's one
   // lane font starts from the row height and the window, and steps down by
-  // 0.9 while a lane's names run past their row, as PHP's FontAdjuster
+  // 0.9 while a lane's names run past their row or hold a word wider than
+  // their box (overflows(), above), as PHP's FontAdjuster
   // shrinks every cell until the table fits (now-racing-adjust-fonts.js:42-66).
   // PHP shrinks on a 75 ms timer; this runs only for a new lineup, a photo
   // that loads, or a resize (#250). The font stays within kiosk.css's
@@ -65,9 +76,9 @@
   // (kiosk.css line 201), 14.4 to 32 px at 640 px or less (its
   // `@media (max-width: 640px)` rule, line 351) (D10).
   // PHP has no floor, and reached 103 px at 1920x1080. The loop stops once
-  // the computed font stops falling. At the
-  // floor, a name with more lines than its row holds is cut at the row's
-  // foot (test_kiosk_names.py).
+  // the computed font stops falling. At the floor, a word wider than its box
+  // breaks, and a name with more lines than its row holds is cut at the
+  // row's foot (test_kiosk_names.py).
   function fit() {
     if (columns) return;
     var rows = lanes().length;

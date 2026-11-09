@@ -22,6 +22,7 @@ import pytest
 from playwright.sync_api import Error, expect
 
 from core.models import RaceSettings
+from racing.models import TimerStatus
 from racing.services import heats
 from roster.models import Racer
 from tools import kiosk_screens
@@ -148,6 +149,10 @@ def long_names(settings, tmp_path, event):
     )
     scheduled(rounds["Tigers"], race=False)
     scheduled(rounds["Lions"])
+    # A connected timer, so no "Check timer" overlay covers the names.
+    TimerStatus.objects.filter(event=event).update(
+        state=TimerStatus.State.STAGING, assume_connected_for_test=True
+    )
     return rounds
 
 
@@ -163,22 +168,55 @@ def open_rows(page, event):
 def test_long_names_show_whole(page, event, long_names):
     """Each name, the car name and the note show whole, on as many lines as
     they need, at 1920x1080 and 390x844. At 1920x1080 the board's font ends
-    below where `fit()` starts, so it shrank for them. At 390x844 the lane
-    starts at 15.6 px (4% of the width), 1.2 px above the floor, and the
-    names fit there; each photo takes at most 40% of the racer's column
+    below where `fit()` starts, so it shrank for them, and every word is
+    whole. At 390x844 each photo takes at most 40% of the racer's column
     (kiosk.css `.k-lane .k-who [data-photo]`), and the names box at least
-    half of it."""
+    half of it; a word such as "Delaughter" is wider than the box even at
+    the floor, 14.4 px, so the font stops there and the word breaks."""
     open_rows(page, event)
     assert_fits(page)
     if page.size == "desktop":
         page.wait_for_function(f"({START_PX})() - {LANE_PX} >= 1", timeout=5000)
+        page.wait_for_function(f"({TOO_WIDE})().length === 0", timeout=5000)
     else:
-        page.wait_for_function(f"Math.abs({LANE_PX} - 15.6) < 0.01", timeout=5000)
+        page.wait_for_function(f"{LANE_PX} === 14.4", timeout=5000)
         page.wait_for_function(f"({PHONE_ROOM})().length === 0", timeout=5000)
+        page.wait_for_function(f"({TOO_WIDE})().length > 0", timeout=5000)
     expect(page.locator("[data-lane] [data-carname]").first).to_have_text(CAR_NAME)
     expect(page.locator("[data-lane] [data-note]").first).to_have_text(NOTE)
     settled(page)
     shoot(page, "kiosk-now-racing-long-names")
+
+
+# The lines of names that hold a word wider than their box: measured with
+# words kept whole, as `fit()` measures (kiosk.css `.k-fitting`).
+TOO_WIDE = """() => {
+  const board = document.querySelector('[data-now-racing]');
+  board.classList.add('k-fitting');
+  const wide = [...board.querySelectorAll('.k-names > *')]
+    .filter(line => line.scrollWidth > line.clientWidth)
+    .map(line => line.textContent);
+  board.classList.remove('k-fitting');
+  return wide;
+}"""
+WORD = "Wolfeschlegelsteinhausenberger"
+
+
+def test_a_word_too_wide_for_its_box_shrinks_the_font(page, event, long_names):
+    """At 1920x1080 a racer with a 30-letter word in the name: the font
+    ends below the starting size with the word whole, as PHP shrinks a
+    table too wide (now-racing-adjust-fonts.js:53-61), rather than break
+    it."""
+    if page.size == "phone":
+        pytest.skip("the phone breaks a long word at the floor")
+    Racer.objects.filter(event=event, car_number=103).update(last_name=WORD)
+    page.set_viewport_size(TV)
+    open_kiosk(page, event, "kiosks/now-racing.kiosk")
+    expect(page.locator("[data-now-racing]")).to_contain_text(WORD)
+    page.wait_for_function(IMAGES_LOADED, timeout=10_000)
+    assert_fits(page)
+    page.wait_for_function(f"({TOO_WIDE})().length === 0", timeout=5000)
+    page.wait_for_function(f"({START_PX})() - {LANE_PX} >= 1", timeout=5000)
 
 
 # The lanes whose photo takes more than 40% of the racer's column, or whose
