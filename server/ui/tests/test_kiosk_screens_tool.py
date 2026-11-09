@@ -120,6 +120,7 @@ def test_a_page_that_clips_after_the_screenshot_check_fails_in_the_recording(
     assert "A racer name" in err
     assert code == 1
     assert (tmp_path / "flag-1920x1080.webm").stat().st_size > 0
+    assert (tmp_path / "problems.txt").read_text() == err
 
 
 def test_a_recording_too_short_to_reach_the_clip_passes(serve, tmp_path):
@@ -127,6 +128,7 @@ def test_a_recording_too_short_to_reach_the_clip_passes(serve, tmp_path):
     code, err = record(base, tmp_path, 2)
     assert err == ""
     assert code == 0
+    assert (tmp_path / "problems.txt").read_text() == "no problems\n"
 
 
 def test_a_page_that_reloads_every_second_is_checked_to_the_end(serve, tmp_path):

@@ -10,7 +10,9 @@ second too, because a page draws some of what it shows later (a heat's
 times, an award's reveal), and a problem at any point fails the page. A
 check that a reload interrupts is tried again once the page loads, and a
 page that never stays loaded is reported unchecked (#239,
-`ui/tests/test_kiosk_screens_tool.py`).
+`ui/tests/test_kiosk_screens_tool.py`). The problems also go to
+`problems.txt` in `--out`, or "no problems", so the run's report sits with
+the shots it judged (#239 retro).
 
 For the same fixture database on both servers, pass `--fixture`, which runs
 `testing/reset-database.sh`, `testing/import-roster.sh` and
@@ -170,8 +172,9 @@ def main(argv=None) -> int:
                 video.save_as(args.out / f"{page_name}-1920x1080.webm")
                 video.delete()
         browser.close()
-    for problem in problems:
-        print(problem, file=sys.stderr)
+    report = "".join(f"{problem}\n" for problem in problems)
+    sys.stderr.write(report)
+    (args.out / "problems.txt").write_text(report or "no problems\n")
     print(f"wrote {args.out}")
     return 1 if problems else 0
 
