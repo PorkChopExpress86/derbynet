@@ -45,12 +45,15 @@
       time.textContent = t.toFixed(1);
       speed.textContent = (length / t * 3600 * 25 / 5280).toFixed(1);
     }
+    // `fill: 'forwards'` holds the car at 100vw, off the screen, through the
+    // wait, and each drive starts again from 45vw, as PHP's animate_car()
+    // does (scale-MPH.kiosk:11-18, #252; test_kiosk_scale_mph.py).
     function drive() {
       var a = car.animate([
         {left: '45vw', maxWidth: '10vw'},
         {left: '5vw', maxWidth: '90vw', offset: 0.71},
         {left: '100vw', maxWidth: '90vw'},
-      ], {duration: 2800, easing: 'ease-in-out'});
+      ], {duration: 2800, easing: 'ease-in-out', fill: 'forwards'});
       a.onfinish = function () { setTimeout(drive, 10000); };
     }
     step();
