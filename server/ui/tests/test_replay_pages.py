@@ -26,6 +26,21 @@ def config(response) -> dict:
     return json.loads(CONFIG.search(response.content.decode())[1])
 
 
+def warnings_from(caplog) -> list[str]:
+    """The warnings `replay.ice_servers()` logged."""
+    return [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == replay.__name__ and r.levelname == "WARNING"
+    ]
+
+
+def dropped(url: str, why: str) -> str:
+    return (
+        f"replay_ice_servers: {url} is not sent to the replay page or the camera: {why}"
+    )
+
+
 @pytest.mark.parametrize(
     ("php", "page"), [("/replay.php", "/replay/"), ("/camera.php", "/replay/camera/")]
 )
@@ -98,10 +113,10 @@ def test_the_replay_page_gets_its_settings(login, event, caplog):
     }
     assert 'href="/settings/#replay"' in html
     assert 'id="debug" class="replay-log-panel" hidden' in html
-    assert [r.getMessage() for r in caplog.records if r.name == replay.__name__] == [
+    assert warnings_from(caplog) == [
         "replay_ice_servers: turn:b.example is not sent to the replay page or"
-        " the camera: TURN servers need a username and password, which this"
-        " field cannot hold yet; list STUN servers only."
+        " the camera: a TURN URL needs a username and password, which the"
+        " setting cannot hold yet"
     ]
 
 
@@ -155,14 +170,16 @@ def test_an_ice_url_the_field_refuses_is_dropped_with_a_warning(url, caplog):
     assert replay.ice_servers(text) == [
         {"urls": ["stun:a.example:3478", "STUN:c.example:65535"]}
     ]
-    warnings = [r for r in caplog.records if r.name == replay.__name__]
-    found = [(r.levelname, r.getMessage().split(" is not sent")[0]) for r in warnings]
-    assert found == [("WARNING", f"replay_ice_servers: {url}")]
+    why = replay.TURN_REFUSED if url.lower().startswith("turn") else replay.NOT_STUN
+    assert warnings_from(caplog) == [dropped(url, why)]
 
 
 def test_a_setting_of_only_refused_urls_sends_no_ice_server(caplog):
     assert replay.ice_servers("turn:b.example stun:") == []
-    assert len([r for r in caplog.records if r.name == replay.__name__]) == 2
+    assert warnings_from(caplog) == [
+        dropped("turn:b.example", replay.TURN_REFUSED),
+        dropped("stun:", replay.NOT_STUN),
+    ]
 
 
 def test_the_camera_and_the_replay_page_get_the_same_ice_servers(login, event):
@@ -202,9 +219,7 @@ def test_a_turn_url_stored_under_the_legacy_key_and_imported_is_dropped(
     found = config(client.get("/replay/"))["ice_servers"]
 
     assert found == [{"urls": ["stun:a.example"]}]
-    warnings = [r.getMessage() for r in caplog.records if r.name == replay.__name__]
-    assert len(warnings) == 1
-    assert warnings[0].startswith("replay_ice_servers: turn:b.example is not sent")
+    assert warnings_from(caplog) == [dropped("turn:b.example", replay.TURN_REFUSED)]
 
 
 def test_the_default_ice_server_is_phps_stun_server(event):

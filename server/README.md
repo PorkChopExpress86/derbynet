@@ -484,7 +484,7 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`:
 - The operator's delay counts from the end of the post-roll, where recording stops (D18).
 - A right-click replay names its clip after the current START, where PHP uploads `undefined.mkv` (C53). The camera sends one offer per solicitation and offers again to a viewer that nags while not connected, and the replay page handles signaling messages one at a time (C54).
 - `g_websocket_url` renders empty, so both pages poll (#56). The websocket path's flush calls `ws.send` (C32).
-- `replay_ice_servers` (D76; default `stun:stun.l.google.com:19302`, PHP's hardcoded server) lists the STUN or TURN URLs, separated by spaces or commas; empty means host candidates only, for a LAN with no internet. The settings field takes STUN URLs only (#241); a URL it refuses but the legacy API or a snapshot import stored, such as a `turn:` URL with no credential, is not sent to either page and is logged as a warning, because Chromium's `RTCPeerConnection` throws on it and the remote camera would never connect (#259).
+- `replay_ice_servers` (D76; default `stun:stun.l.google.com:19302`, PHP's hardcoded server) lists the ICE server URLs, separated by spaces or commas; empty means host candidates only, for a LAN with no internet. The replay page and the remote camera get its STUN URLs only. The settings field takes STUN URLs only (#241); a URL it refuses but the legacy API or a snapshot import stored, such as a `turn:` URL, which needs credentials the setting cannot hold yet, or a malformed URL, is not sent to either page and is logged as a warning, because Chromium's `RTCPeerConnection` throws on it and the remote camera would never connect (#259).
 
 ## Settings
 

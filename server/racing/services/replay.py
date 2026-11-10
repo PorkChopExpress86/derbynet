@@ -113,7 +113,7 @@ _ICE_SEPARATORS = re.compile(r"[\s,]+")
 
 def ice_servers(text: str) -> list[dict]:
     """The WebRTC `iceServers` of the `replay_ice_servers` setting: one
-    server entry with every URL the settings field takes in it, or none
+    server entry with every STUN URL the settings field takes in it, or none
     when no URL is left, which leaves the replay page and the camera to
     host candidates on a LAN with no internet (#53). Both pages get this
     list from `page_settings()`, so they stay in step.
@@ -122,6 +122,8 @@ def ice_servers(text: str) -> list[dict]:
     through `race_settings.write` or a snapshot import; sent as it is,
     `new RTCPeerConnection` throws on the replay page and the remote camera
     never connects. Each one is dropped and logged as a warning (#259).
+    Every `turn:` or `turns:` URL is dropped, until the setting can hold
+    TURN credentials.
     The field's rule refuses a few URLs Chromium takes, such as a non-ASCII
     host or a six-digit port (`OVER_REFUSED` in
     `ui/tests/browser/test_settings_ice_servers.py`), so those are dropped
@@ -167,19 +169,23 @@ class IceServersRefused(ValueError):
     message says why."""
 
 
+TURN_REFUSED = (
+    "a TURN URL needs a username and password, which the setting cannot hold yet"
+)
+NOT_STUN = "not a STUN server URL"
+
+
 def ice_url_refusal(url: str) -> str | None:
-    """Why the settings field refuses one URL, or None when it takes it.
-    A `turn:` or `turns:` URL is refused: Chromium requires a username and
-    credential for it, which `ice_servers()` does not send."""
+    """Why the settings field refuses one URL (`TURN_REFUSED` or
+    `NOT_STUN`), or None when it takes it. A `turn:` or `turns:` URL is
+    refused: Chromium requires a username and credential for it, which
+    `ice_servers()` does not send."""
     if _TURN_URL.match(url):
-        return (
-            "TURN servers need a username and password, which this field"
-            " cannot hold yet; list STUN servers only."
-        )
+        return TURN_REFUSED
     found = _STUN_URL.fullmatch(url)
     port = found and found["port"]
     if not found or (port is not None and not 1 <= int(port) <= 65535):
-        return f"{url} is not a STUN server URL, such as stun:stun.l.google.com:19302."
+        return NOT_STUN
     return None
 
 
@@ -191,8 +197,15 @@ def ice_servers_text(lines: str) -> str:
     urls = ice_urls(lines)
     for url in urls:
         refusal = ice_url_refusal(url)
+        if refusal == TURN_REFUSED:
+            raise IceServersRefused(
+                "TURN servers need a username and password, which this field"
+                " cannot hold yet; list STUN servers only."
+            )
         if refusal is not None:
-            raise IceServersRefused(refusal)
+            raise IceServersRefused(
+                f"{url} is not a STUN server URL, such as stun:stun.l.google.com:19302."
+            )
     text = " ".join(urls)
     limit = RaceSettings._meta.get_field("replay_ice_servers").max_length
     if len(text) > limit:
