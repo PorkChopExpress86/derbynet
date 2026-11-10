@@ -381,3 +381,79 @@ def test_d12_two_racing_kiosks_show_the_leaders_through_the_intermission(
     for tab in tabs.values():
         if tab is not page:
             close_tab(page, tab)
+
+
+# Lanes 2 and 3 tie. The server stores both as place 1, and the columnar
+# pages number places by finish order (`i + 1` after a sort by place,
+# now-racing-columnar.js:58-74), so the tied lanes show 1 and 2 in lane
+# order.
+TIED_TIMES = (3.1, 2.5, 2.5, 3.3)
+FINISH_ORDER = {2: "1", 3: "2", 1: "3", 4: "4"}
+# The places land 400 ms apart (kiosk-now-racing.js `results()`), the last
+# 1.2 s after the first, which comes with the first poll reply after the
+# result, at most 500 ms after the reply before it plus a round trip:
+# about 1.7 s plus two round trips against 10 s, about 8 s of slack.
+LAND_MS = 10_000
+# A poll request goes out 500 ms after the page has handled the reply before
+# it (kiosk-now-racing.js `Kiosk.poll(poll, 500, 'after')`); the first after
+# the landing also waits out its last 400 ms: 900 ms plus a round trip
+# against 5 s, about 4 s of slack.
+POLL_MS = 5_000
+# The places' changes while they are watched, one batch per MutationObserver
+# callback: the changes made in one task, each as [lane, text, class].
+WATCH_PLACES = """() => {
+  window.placeBatches = [];
+  const observer = new MutationObserver(records => window.placeBatches.push(
+    records.map(r => (r.target.nodeType === 1 ? r.target : r.target.parentNode)
+      .closest('[data-place]'))
+      .map(p => [p.closest('[data-lane]').dataset.lane, p.textContent, p.className])));
+  document.querySelectorAll('[data-place]').forEach(el => observer.observe(el,
+    {childList: true, characterData: true, subtree: true, attributes: true}));
+}"""
+
+
+@pytest.mark.parametrize(
+    "name", ("now-racing-columnar", "now-racing-columnar-reversed")
+)
+def test_a_columnar_page_keeps_the_places_through_the_linger(page, event, day, name):
+    """#251: the columnar pages kept a heat's places for one poll, then
+    blanked them while its times stayed. PHP keeps them until the next heat's
+    lineup replaces them (`results_written`, now-racing-columnar.js:52-54).
+
+    The heat finishes with a tie and the places land, one lane at a time.
+    Then three poll requests go by, each sent 500 ms after the page has
+    handled the reply before it (kiosk.js `queue()`), the first after the
+    landing. Each reply handled since writes every lane's place in one task,
+    with the same finish-order number, so none blanks or changes, and the
+    landing doesn't run again: it would write them one lane per task. The
+    linger is 60 s, so the next lineup can't clear them first."""
+    RaceSettings.objects.filter(event=event).update(now_racing_linger_ms=60_000)
+    open_kiosk(page, event, f"kiosks/{name}.kiosk")
+    expect(page.locator('[data-lane="1"] [data-car]')).not_to_be_empty()
+
+    run_heat(event, times=TIED_TIMES)
+    stored = HeatLane.objects.filter(round=day["Lions"], heat=1).order_by("lane")
+    assert [row.finish_place for row in stored] == [3, 1, 1, 4]
+
+    def place(lane):
+        return page.locator(f'[data-lane="{lane}"] [data-place]')
+
+    for lane, shown in FINISH_ORDER.items():
+        expect(place(lane)).to_have_text(shown, timeout=LAND_MS)
+    page.evaluate(WATCH_PLACES)
+
+    for _ in range(3):
+        with page.expect_request(lambda r: "query=poll&" in r.url, timeout=POLL_MS):
+            pass
+
+    for lane, shown in FINISH_ORDER.items():
+        expect(place(lane)).to_have_text(shown)
+        expect(page.locator(f'[data-lane="{lane}"] [data-time]')).not_to_be_empty()
+    # one read: every change made to a place while the polls went by.
+    batches = page.evaluate("window.placeBatches")
+    assert len(batches) >= 2
+    for batch in batches:
+        assert sorted({lane for lane, _, _ in batch}) == ["1", "2", "3", "4"]
+        for lane, text, cls in batch:
+            assert text == FINISH_ORDER[int(lane)]
+            assert "k-shown" in cls.split()
