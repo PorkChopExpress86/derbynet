@@ -20,6 +20,10 @@
   --k-silver: #d9dee8;
   --k-bronze: #e39b5b;
   --k-banner: clamp(2.75rem, 8vh, 6rem);
+  --k-banner-rule: 0.4vh;
+  /* 70% of the banner inside its rule, set as a length so a phone's banner,
+     whose height is a minimum, gives the logo the same size (#272). */
+  --k-logo: calc((var(--k-banner) - var(--k-banner-rule)) * 0.7);
   color-scheme: dark;
 }
 
@@ -55,9 +59,9 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
   gap: 1.5vw;
   padding: 0 2.5vw;
   background: linear-gradient(90deg, #08122a, #142a57);
-  border-bottom: 0.4vh solid var(--k-accent);
+  border-bottom: var(--k-banner-rule) solid var(--k-accent);
 }
-.k-banner img { height: 70%; width: auto; }
+.k-banner img { height: var(--k-logo); width: auto; }
 .k-banner h1 {
   flex: 1;
   min-width: 0;
@@ -348,16 +352,11 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
   /* On a phone the banner's title wraps at a smaller font instead of being
      cut with an ellipsis, and a title of three or more lines grows the
      banner, whose height becomes a minimum (#272, D10, ADR-10;
-     test_kiosk_banner.py). Two lines fit the banner's own height. The
-     title's `overflow: visible` and the banner's padding matter only on a
-     font whose glyphs stand outside the line box (Noto Sans here): the
-     first keeps such glyphs from being clipped, the second keeps a grown
-     banner's first line on the screen. On a font whose glyphs stay in the
-     line, removing either passes the tests. The logo keeps the height its
-     70% gives it on a TV, which a banner with no set height would not
-     resolve. */
+     test_kiosk_banner.py). Two lines fit the banner's own height. On this
+     machine's Noto Sans the glyphs stand outside a 1.2 line: the title's
+     `overflow: visible` keeps them whole, and the banner's padding keeps a
+     grown banner's first line on the screen. */
   .k-banner { height: auto; min-height: var(--k-banner); padding-block: 0.3vh; }
-  .k-banner img { height: calc((var(--k-banner) - 0.4vh) * 0.7); }
   .k-banner h1 { white-space: normal; overflow: visible; overflow-wrap: anywhere; font-size: calc(var(--k-banner) * 0.36); line-height: 1.2; }
   .k-head, .k-lane { grid-template-columns: 10vw 14vw minmax(0, 1fr) 22vw 14vw; }
   .k-head .k-speed, .k-lane .k-speed { display: none; }
