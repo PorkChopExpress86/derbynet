@@ -400,13 +400,17 @@ LAND_MS = 10_000
 # against 5 s, about 4 s of slack.
 POLL_MS = 5_000
 # The places' changes while they are watched, one batch per MutationObserver
-# callback: the changes made in one task, each as [lane, text, class].
+# callback: the changes made in one task, each as [lane, text, class, the
+# MutationRecord's type].
 WATCH_PLACES = """() => {
   window.placeBatches = [];
   const observer = new MutationObserver(records => window.placeBatches.push(
-    records.map(r => (r.target.nodeType === 1 ? r.target : r.target.parentNode)
-      .closest('[data-place]'))
-      .map(p => [p.closest('[data-lane]').dataset.lane, p.textContent, p.className])));
+    records.map(r => {
+      const p = (r.target.nodeType === 1 ? r.target : r.target.parentNode)
+        .closest('[data-place]');
+      const lane = p.closest('[data-lane]').dataset.lane;
+      return [lane, p.textContent, p.className, r.type];
+    })));
   document.querySelectorAll('[data-place]').forEach(el => observer.observe(el,
     {childList: true, characterData: true, subtree: true, attributes: true}));
 }"""
@@ -425,8 +429,9 @@ def test_a_columnar_page_keeps_the_places_through_the_linger(page, event, day, n
     handled the reply before it (kiosk.js `queue()`), the first after the
     landing. Each reply handled since writes every lane's place in one task,
     with the same finish-order number, so none blanks or changes, and the
-    landing doesn't run again: it would write them one lane per task. The
-    linger is 60 s, so the next lineup can't clear them first."""
+    landing doesn't run again: it would write them one lane per task. No
+    place's class changes either, so none takes `k-shown` off and on again.
+    The linger is 60 s, so the next lineup can't clear them first."""
     RaceSettings.objects.filter(event=event).update(now_racing_linger_ms=60_000)
     open_kiosk(page, event, f"kiosks/{name}.kiosk")
     expect(page.locator('[data-lane="1"] [data-car]')).not_to_be_empty()
@@ -453,7 +458,64 @@ def test_a_columnar_page_keeps_the_places_through_the_linger(page, event, day, n
     batches = page.evaluate("window.placeBatches")
     assert len(batches) >= 2
     for batch in batches:
-        assert sorted({lane for lane, _, _ in batch}) == ["1", "2", "3", "4"]
-        for lane, text, cls in batch:
+        assert sorted({lane for lane, _, _, _ in batch}) == ["1", "2", "3", "4"]
+        for lane, text, cls, kind in batch:
             assert text == FINISH_ORDER[int(lane)]
             assert "k-shown" in cls.split()
+            assert kind == "childList"
+
+
+@pytest.mark.parametrize(
+    "name", ("now-racing-columnar", "now-racing-columnar-reversed")
+)
+def test_a_columnar_page_shows_no_place_before_every_lane_has_a_result(
+    page, event, day, name
+):
+    """#251: a columnar page shows a lane's time as soon as it comes, but no
+    place until every racer of the heat has a result and the places land
+    (kiosk-now-racing.js `results()`).
+
+    Lanes 2 and 3 get their tied times first, written on the heat's rows so
+    the heat stays current while the other two have none. Their times show,
+    and three poll requests go by, each sent 500 ms after the page has
+    handled the reply before it (kiosk.js `queue()`), so the page has handled
+    at least two replies with two results of four: no place took any text
+    meanwhile.
+    Then the whole heat's result comes, and the places land in finish
+    order."""
+    RaceSettings.objects.filter(event=event).update(now_racing_linger_ms=60_000)
+    open_kiosk(page, event, f"kiosks/{name}.kiosk")
+    expect(page.locator('[data-lane="1"] [data-car]')).not_to_be_empty()
+    page.evaluate(WATCH_PLACES)
+
+    def time(lane):
+        return page.locator(f'[data-lane="{lane}"] [data-time]')
+
+    def place(lane):
+        return page.locator(f'[data-lane="{lane}"] [data-place]')
+
+    heat_1 = HeatLane.objects.filter(round=day["Lions"], heat=1)
+    heat_1.filter(lane__in=(2, 3)).update(finish_time=2.5)
+    timed = heat_1.exclude(finish_time=None).values_list("lane", flat=True)
+    assert sorted(timed) == [2, 3]
+    expect(time(2)).to_have_text("2.500", timeout=POLL_MS)
+    expect(time(3)).to_have_text("2.500")
+    for _ in range(3):
+        with page.expect_request(lambda r: "query=poll&" in r.url, timeout=POLL_MS):
+            pass
+
+    expect(page.locator("[data-banner-title]")).to_have_text("Lions, Heat 1 of 4")
+    for lane in FINISH_ORDER:
+        expect(place(lane)).to_have_text("")
+    # one read: every change made to a place while only two lanes had times.
+    written = [
+        (lane, text)
+        for batch in page.evaluate("window.placeBatches")
+        for lane, text, _, _ in batch
+        if text
+    ]
+    assert written == []
+
+    run_heat(event, times=TIED_TIMES)
+    for lane, shown in FINISH_ORDER.items():
+        expect(place(lane)).to_have_text(shown, timeout=LAND_MS)
