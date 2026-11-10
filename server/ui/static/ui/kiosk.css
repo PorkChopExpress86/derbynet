@@ -349,10 +349,13 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
      cut with an ellipsis, and a title of three or more lines grows the
      banner, whose height becomes a minimum (#272, D10, ADR-10;
      test_kiosk_banner.py). Two lines fit the banner's own height. The
-     title does not clip, so a font whose glyphs stand taller than the line
-     keeps them, and the padding keeps a grown banner's first line on the
-     screen. The logo keeps the height its 70% gives it on a TV, which a
-     banner with no set height would not resolve. */
+     title's `overflow: visible` and the banner's padding matter only on a
+     font whose glyphs stand outside the line box (Noto Sans here): the
+     first keeps such glyphs from being clipped, the second keeps a grown
+     banner's first line on the screen. On a font whose glyphs stay in the
+     line, removing either passes the tests. The logo keeps the height its
+     70% gives it on a TV, which a banner with no set height would not
+     resolve. */
   .k-banner { height: auto; min-height: var(--k-banner); padding-block: 0.3vh; }
   .k-banner img { height: calc((var(--k-banner) - 0.4vh) * 0.7); }
   .k-banner h1 { white-space: normal; overflow: visible; overflow-wrap: anywhere; font-size: calc(var(--k-banner) * 0.36); line-height: 1.2; }

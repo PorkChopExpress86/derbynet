@@ -21,16 +21,21 @@ kiosk's name), and the master branch cut it: each phone test of a long
 title here failed there (#272's PR).
 
 Whether the title's glyphs stand taller than its line depends on the font.
-Only on such a font (Noto Sans here) does
-`test_a_title_of_three_lines_grows_the_banner_on_a_phone` fail without the
-banner's padding, and every phone test without the title's
-`overflow: visible`."""
+Only on such a font (Noto Sans here) do the tests of a title of three or
+more lines fail without the banner's padding, and every phone test without
+the title's `overflow: visible`."""
 
 import pytest
 from playwright.sync_api import Error, expect
 
 from racing.services import heats
+from roster.models import Group
 from ui.tests.browser.conftest import shoot
+from ui.tests.browser.test_kiosk_names import (  # noqa: F401
+    assert_fits,
+    long_names,
+    open_rows,
+)
 from ui.tests.browser.test_kiosk_pages import open_kiosk
 from ui.tests.race import race_setup, scheduled
 
@@ -106,15 +111,15 @@ def whole_title(page) -> dict:
     return m
 
 
-def racing(event, group: str):
-    """`group`'s 17 racers on 4 lanes, 17 heats, with heat 12 racing, so the
+def racing(event, group: str, heat: int = HEAT):
+    """`group`'s 17 racers on 4 lanes, 17 heats, with `heat` racing, so the
     title reads "<group>, Heat 12 of 17". The poll names the class only
     when the event has more than one group (`polls.current_heat`), so
     Tigers is a second."""
     rounds = race_setup(event, groups=((group, HEATS), ("Tigers", 4)))
     scheduled(rounds[group])
     failure = heats.select_heat(
-        event, round_id=rounds[group].pk, heat=HEAT, now_racing=True
+        event, round_id=rounds[group].pk, heat=heat, now_racing=True
     )
     assert failure is None, failure
 
@@ -195,13 +200,22 @@ def test_a_one_line_title_keeps_the_banner_height_on_a_phone(page, event):
     ), m
 
 
-@pytest.mark.parametrize("group", (LONGER, UNBREAKABLE))
-def test_a_title_of_three_lines_grows_the_banner_on_a_phone(page, event, group):
+@pytest.mark.parametrize(
+    "key, group",
+    (
+        ("kiosks/now-racing.kiosk", LONGER),
+        ("kiosks/now-racing.kiosk", UNBREAKABLE),
+        ("kiosks/now-racing-columnar.kiosk", LONGER),
+    ),
+)
+def test_a_title_of_three_lines_grows_the_banner_on_a_phone(page, event, key, group):
     """A title that needs three or more lines grows the banner, the logo
-    keeps its size (`logo()`), and the lanes below still fit the
-    page. The unbreakable name breaks inside the title's box."""
+    keeps its size (`logo()`), and the lanes below, rows or columns, still
+    end inside the page. The unbreakable name breaks inside the title's
+    box. The columnar layouts share columnar.html and kiosk.css's
+    `.k-column`, so the reversed one is not run again."""
     phone_only(page)
-    open_titled(page, event, "kiosks/now-racing.kiosk", group)
+    open_titled(page, event, key, group)
 
     m = whole_title(page)
 
@@ -216,7 +230,7 @@ def test_a_title_of_three_lines_grows_the_banner_on_a_phone(page, event, group):
         }""",
         timeout=5000,
     )
-    shoot(page, f"kiosk-banner-grows-{len(group)}")
+    shoot(page, f"kiosk-banner-grows-{key.split('/')[1].split('.')[0]}-{len(group)}")
 
 
 @pytest.mark.parametrize(
@@ -265,3 +279,53 @@ def test_wider_windows_keep_the_one_line_title(page, event, window):
         )
         == "ellipsis"
     )
+
+
+# Each lane's photo and names box, against the lane's own box.
+LANE_FIT = """() => [...document.querySelectorAll('[data-now-racing] [data-lane]')]
+  .map(lane => {
+    const l = lane.getBoundingClientRect();
+    const img = lane.querySelector('.k-who img');
+    const p = img ? img.getBoundingClientRect() : null;
+    const n = lane.querySelector('.k-names').getBoundingClientRect();
+    return {lane: l.height, photo: p ? [p.top - l.top, l.bottom - p.bottom] : null,
+            names: [n.top - l.top, l.bottom - n.bottom]};
+  })"""
+
+
+def test_a_title_that_grows_with_the_same_lineup_keeps_the_lanes_fitted(
+    page,
+    event,
+    long_names,  # noqa: F811
+):
+    """Lions' name grows while its heat races test_kiosk_names' four long
+    names with headshots, so the title goes from 1 line to 3 or more with
+    no new lineup, and `fit()`, which runs only for a new lineup, a photo
+    or a resize, does not run. The rows are `minmax(0, 1fr)` and shrink
+    with the board, and each lane's names (test_kiosk_names.MISFITS) and
+    photo still fit inside it."""
+    phone_only(page)
+    open_rows(page, event)
+    assert_fits(page)
+    before = whole_title(page)
+    assert before["lines"] == 1, before
+
+    Group.objects.filter(event=event, name="Lions").update(name=LONGER)
+
+    expect(page.locator("[data-banner-title]")).to_have_text(
+        f"{LONGER}, Heat 1 of 4", timeout=8000
+    )
+    after = whole_title(page)
+    assert after["lines"] >= 3, after
+    grown = (after["banner"]["bottom"] - after["banner"]["top"]) - (
+        before["banner"]["bottom"] - before["banner"]["top"]
+    )
+    assert grown > 20, (before, after)
+    assert_fits(page)
+    # One read: the title is in (expect above) and assert_fits waited for
+    # the names; this reads each lane's photo and names box to report.
+    lanes = page.evaluate(LANE_FIT)
+    for lane in lanes:
+        assert lane["photo"] is not None and min(lane["photo"]) >= -0.5, lanes
+        assert min(lane["names"]) >= -0.5, lanes
+    shoot(page, "kiosk-banner-grows-in-place")
