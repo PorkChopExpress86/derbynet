@@ -305,9 +305,9 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 .k-award video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 5; mix-blend-mode: screen; }
 
 /* ----- slideshow ------------------------------------------------------------- */
-.k-slides { flex: 1; min-height: 0; position: relative; }
-.k-slide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vh; animation: k-fade 1200ms both; }
-.k-slide.k-leaving { animation: k-fade-out 1200ms both; }
+.k-slides { flex: 1; min-height: 0; position: relative; --k-slide-fade: 1200ms; }
+.k-slide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vh; animation: k-fade var(--k-slide-fade) both; }
+.k-slide.k-leaving { animation: k-fade-out var(--k-slide-fade) both; }
 .k-slide img.k-photo { max-width: 100%; min-height: 0; flex: 0 1 auto; max-height: 88%; object-fit: contain; }
 .k-slide img.k-inset { position: absolute; right: 2vw; bottom: 2vh; max-width: 20vw; max-height: 25vh; border-radius: 1vh; }
 .k-slide .k-caption { margin: 0; font-size: 4.5vh; font-weight: 700; text-align: center; }

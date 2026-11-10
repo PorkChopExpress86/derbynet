@@ -514,7 +514,9 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " lanes of the results (get_lane_count_from_results).",
     ),
     "slideshow.php": (
-        "D10: rebuilt (ADR-10); each slide fades in over the one before.",
+        "D10: rebuilt (ADR-10); a 1.2 s crossfade from one slide to the next,"
+        " the old slide removed when its fade ends, where PHP cuts at once"
+        " (slideshow.js:51-52).",
     ),
     "replay.php": (
         "D20: a 301 to /replay/, the query string kept.",
