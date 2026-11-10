@@ -38,6 +38,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import pytest_timeout
 
 pytest.importorskip("playwright", reason="install the browser dependency group")
 
@@ -445,6 +446,27 @@ def _settle(page) -> list[str]:
     return page.in_flight.drain(page)
 
 
+# pytest-timeout's failure, "Timeout (>300.0s) from pytest-timeout.".
+TIMED_OUT = re.compile(
+    re.escape(pytest_timeout.PYTEST_FAILURE_MESSAGE).replace(re.escape("%s"), ".+")
+)
+
+
+def _timed_out(page, error: BaseException) -> bool:
+    """Whether `error` is the browser timeout firing, and if so mark `page`
+    so its teardown reads nothing from it. The timer fires once: a read of a
+    page frozen in a script loop after that waits for ever. #250's fit() loop
+    with no floor hung the settle's evaluate, and with the timer spent, the
+    teardown's no_sideways_scroll hung too, until the renderer was killed
+    (#250 retro)."""
+    timed_out = isinstance(error, pytest.fail.Exception) and bool(
+        TIMED_OUT.fullmatch(str(error))
+    )
+    if timed_out and page is not None:
+        page.timed_out = True
+    return timed_out
+
+
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_call(item):
     """After the test body and before any fixture's teardown, stop every
@@ -456,8 +478,8 @@ def pytest_runtest_call(item):
     in_flight = getattr(page, "in_flight", None)
     try:
         result = yield
-    except BaseException:
-        if in_flight is not None:
+    except BaseException as error:
+        if in_flight is not None and not _timed_out(page, error):
             try:
                 _settle(page)
             except Exception:  # noqa: BLE001, S110 - the test's own error wins
@@ -465,7 +487,11 @@ def pytest_runtest_call(item):
         raise
     if in_flight is None:
         return result
-    stuck = _settle(page)
+    try:
+        stuck = _settle(page)
+    except BaseException as error:
+        _timed_out(page, error)
+        raise
     if in_flight.closed_with:
         raise AssertionError(
             f"a tab closed with requests out: {in_flight.closed_with}; "
@@ -505,7 +531,7 @@ def page(browser, live_server, size, page_errors):
     page.on("dialog", lambda dialog: page_errors.add(f"dialog: {dialog.message}"))
     yield page
     try:
-        if page.url.startswith("http"):
+        if page.url.startswith("http") and not getattr(page, "timed_out", False):
             no_sideways_scroll(page)
     finally:
         context.close()
