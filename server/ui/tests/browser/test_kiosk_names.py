@@ -450,7 +450,8 @@ def test_a_racer_name_cut_with_an_ellipsis_is_reported(page):
     not fit, since #256 reports every text cut with one; a name that fits
     is not cut."""
     page.set_content(ELLIPSES)
-    # One read: the stand-in page has no script, so nothing changes it.
+    # One read: the stand-in page has no script and no animation; its
+    # layout is set once set_content() returns.
     cut = page.evaluate(kiosk_screens.ELLIPSIS)
     assert len(cut) == 2
     assert cut[0].startswith('<div class="k-racer" style="width:60px;')

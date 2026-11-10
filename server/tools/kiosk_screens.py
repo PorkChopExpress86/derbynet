@@ -6,9 +6,9 @@ registers no kiosk on either server, at 1920x1080, 1280x800 and 390x844.
 The script fails a page that scrolls, clips text, cuts text short with an
 ellipsis, or draws text over another element (#256; CLIPPED, ELLIPSIS and
 OVERLAPS below say what each counts), and with `--video` records each page
-at 1920x1080 for `--seconds`. The two #256 checks skip an element while it
+at 1920x1080 for `--seconds`. The overlap check skips an element while it
 or an ancestor runs an animation of a set length, such as a slide's
-crossfade or the scale-MPH car's drive, and judge it once it rests. So an
+crossfade or the scale-MPH car's drive, and judges it once it rests. So an
 overlap that exists only in the middle of such an animation is never
 reported. The screenshot check runs
 once, 2.5 s after load; with `--video` the recording's tab is checked every
@@ -86,14 +86,9 @@ CLIPPED = """() => [...document.querySelectorAll('body *')].filter(el => {
 # fragment's height is cut to its `line-height`, centred, as CSS lays it
 # out: its own box is the font's taller content area, so two lines with a
 # tight line-height would otherwise overlap. A table's `<col>` and
-# `<colgroup>` hold no content and are left out. So is an element while it
-# or an ancestor runs an animation of a set length, such as a slide's
-# crossfade or the scale-MPH car's drive: it is judged once it rests. An
-# endless animation, such as the flag's wave, never rests, so it is judged
-# as it moves.
+# `<colgroup>` hold no content and are left out. `seen(el, skip)` also
+# leaves out an element when `skip` holds for it or an ancestor.
 VISIBLE = """
-const moving = new Set(document.getAnimations().filter(a => a.playState === 'running'
-  && isFinite(a.effect.getComputedTiming().endTime)).map(a => a.effect.target));
 const cut = (a, b) => ({left: Math.max(a.left, b.left), top: Math.max(a.top, b.top),
   right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom)});
 const area = r => r.right > r.left && r.bottom > r.top;
@@ -104,13 +99,13 @@ const line = (r, style) => {
   return {left: r.left, right: r.right,
     top: middle - height / 2, bottom: middle + height / 2};
 };
-const seen = el => {
+const seen = (el, skip = () => false) => {
   const style = getComputedStyle(el);
   if (style.visibility !== 'visible' || /^table-column/.test(style.display)) return [];
   let clip = {left: 0, top: 0, right: innerWidth, bottom: innerHeight};
   for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
     const s = a === el ? style : getComputedStyle(a);
-    if (parseFloat(s.opacity) === 0 || moving.has(a)) return [];
+    if (parseFloat(s.opacity) === 0 || skip(a)) return [];
     const hides = s.overflowX + s.overflowY !== 'visiblevisible';
     if (a !== el && hides) clip = cut(clip, a.getBoundingClientRect());
   }
@@ -143,6 +138,12 @@ return [...document.querySelectorAll('body *')].filter(el => {
 # leaving out the element's ancestors and descendants. Boxes that only
 # touch do not overlap. Each pair is reported once, text first.
 #
+# It leaves out an element while it or an ancestor runs an animation of a
+# set length (`moving`), such as a slide's crossfade or the scale-MPH car's
+# drive: it is judged once it rests, filled at its end or not. An endless
+# animation, such as the flag's wave, never rests, so it is judged as it
+# moves. ELLIPSIS judges every element as it is.
+#
 # DRAWN_OVER lists the pairs drawn over each other on purpose, as (the
 # text's selector, the other element's selector, why):
 DRAWN_OVER = (
@@ -158,6 +159,8 @@ OVERLAPS = (
     + VISIBLE
     + """
 const drawnOver = DRAWN_OVER;
+const moving = new Set(document.getAnimations().filter(a => a.playState === 'running'
+  && isFinite(a.effect.getComputedTiming().endTime)).map(a => a.effect.target));
 const lines = (el, boxes) => {
   const style = getComputedStyle(el), found = [];
   for (const node of el.childNodes) {
@@ -165,15 +168,14 @@ const lines = (el, boxes) => {
     const range = document.createRange();
     range.selectNodeContents(node);
     for (const r of range.getClientRects()) {
-      for (const box of boxes) {
-        if (area(cut(line(r, style), box))) found.push(cut(line(r, style), box));
-      }
+      const textLine = line(r, style);
+      found.push(...boxes.map(box => cut(textLine, box)).filter(area));
     }
   }
   return found;
 };
 const shown = [...document.querySelectorAll('body *')]
-  .map(el => [el, seen(el)]).filter(e => e[1].length);
+  .map(el => [el, seen(el, a => moving.has(a))]).filter(e => e[1].length);
 const found = [], pairs = new Set();
 shown.forEach(([el, boxes], i) => {
   const text = lines(el, boxes);

@@ -67,25 +67,28 @@ setTimeout(function () {
   document.body.appendChild(car);
 }, CLIP_MS);
 </script></body></html>"""
-# The overlap and ellipsis checks (#256) on three stand-in pages, each
+# The overlap and ellipsis checks (#256) on four stand-in pages, each
 # checked once 2.5 s after load at tv, laptop and phone. Every page is laid
 # out in px within 390x844, so it shows the same at each size and never
 # scrolls.
 #
-# OVERLAPPING draws text over another element, two ways the check must
+# OVERLAPPING draws text over another element, three ways the check must
 # report:
 # - two captions printed over each other (#253), one line for the pair;
 # - text under a flag that waves for ever: an endless animation never
 #   rests, so the check judges it as it moves. The text's box under the
 #   flag holds no text of its own, so it gets no line;
 # - text under a car whose drive, an animation of a set length, ends
-#   PARKS_MS after load and leaves it over the text. The check skips it
-#   while it drives (the near misses' car drives for 600 s) and judges it
-#   once it rests. The screenshot checks run 2500 ms after load, so the car
-#   rests 2500 - PARKS_MS = 1000 ms before them: the should-pass mutation
-#   parks it at 2400 ms, 100 ms before the checks, and the page still
-#   reports it.
-PARKS_MS = 1500
+#   PARKS_MS after load and, filled forwards, leaves it over the text. A
+#   finished animation that fills its end stays in `getAnimations()`, as
+#   kiosk.css's `both` fills do, so the check must tell it from a running
+#   one. The check skips the car while it drives (the near misses' car
+#   drives for 600 s) and judges it once it rests. The screenshot checks run
+#   2500 ms after load, so the car rests 2500 - PARKS_MS = 1500 ms before
+#   them, the slack the recording tests' clip gives the same checks: the
+#   should-pass mutation parks it at 2400 ms, 100 ms before the checks, and
+#   the page still reports it.
+PARKS_MS = 1000
 OVERLAPPING = """<!doctype html><html><body style="margin:0;font:16px sans-serif">
 <style>
   @keyframes wave { 50% { transform: rotate(3deg); } }
@@ -93,7 +96,7 @@ OVERLAPPING = """<!doctype html><html><body style="margin:0;font:16px sans-serif
 </style>
 <p id="under-car" style="position:absolute;left:10px;top:150px;margin:0">Parked over</p>
 <div id="car" style="position:absolute;left:10px;top:146px;width:60px;height:30px;
-  background:#c00;animation:drive PARKS_MSms linear"></div>
+  background:#c00;animation:drive PARKS_MSms linear forwards"></div>
 <p id="first" style="position:absolute;left:10px;top:10px;margin:0">First caption</p>
 <p id="second" style="position:absolute;left:14px;top:14px;margin:0">Second caption</p>
 <div id="pole" style="position:absolute;left:0;top:70px;width:200px;height:40px">
@@ -123,16 +126,22 @@ CONFETTI_ELSEWHERE = """<!doctype html>
   <p id="award-2" style="margin:0">Best in Show</p>
   <div><video id="nested-confetti" data-confetti></video></div></div>
 </body></html>"""
-# CUT_SHORT cuts a racer's name with "…" (#250).
+# CUT_SHORT cuts a racer's name with "…" (#250), twice: once still, and
+# once inside a box that glows for 600 s, as a winning lane's `k-glow`
+# does. The overlap check's skip of a moving element does not apply to
+# text cut short, which shows however its box moves.
 CUT_SHORT = """<!doctype html><html><body style="margin:0;font:16px sans-serif">
 <style>
-  #name { width: 100px; white-space: nowrap; overflow: hidden;
+  .cut { width: 100px; white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; }
+  @keyframes glow { to { box-shadow: 0 0 1px #fc0; } }
 </style>
-<div id="name">A racer name far too long for its box</div>
+<div id="name" class="cut">A racer name far too long for its box</div>
+<div style="animation:glow 600s linear">
+  <div id="glowing-name" class="cut">Another name far too long for its box</div></div>
 </body></html>"""
 # NEAR_MISSES holds a case of each kind the checks must pass, one per band
-# 60 px tall, so an over-eager check fails the page:
+# (most 60 px tall), so an over-eager check fails the page:
 # - text and a box that only touch, side by side;
 # - an ancestor's text under its descendant's, and the other way round;
 # - text under elements nobody sees: `visibility: hidden`, inside an
@@ -329,6 +338,7 @@ def test_overlapping_text_and_text_cut_with_an_ellipsis_fail_their_pages(
         ("identify", "overlaps", "award", "other-video"),
         ("identify", "overlaps", "award-2", "nested-confetti"),
         ("welcome", "cut with an ellipsis", "name", ""),
+        ("welcome", "cut with an ellipsis", "glowing-name", ""),
     ]
     assert found == sorted(
         (page, size, kind, first, second)
