@@ -53,6 +53,14 @@ up itself, such as `exercise-one-database.sh`. A fresh PHP server has no event,
 so a script that logs in first fails with `parse error: Invalid numeric literal`
 until `setup.nodata` has created one.
 
+Most suite scripts expect the state an earlier script left. A probe that needs
+racers runs a setup script first, without `--no-event`, since `reset-database.sh`
+needs the event: `setup-single-group-operation.sh` leaves 14 racers checked in
+and the first heat racing, and `setup-basic-no-photos.sh` imports the roster
+that `test-basic-checkins.sh` checks in. #251 lost two tries to
+`test-basic-checkins.sh` with no roster and to `--no-event` before
+`reset-database.sh` (#251 retro).
+
 A server database can't be reused: setup (`ez-new=testdb`) fails with
 `already_exists` the second time, so each run needs a fresh data volume.  The
 script always makes one.
