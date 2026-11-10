@@ -3,8 +3,14 @@ Django, for the PR's evidence (D63).
 
 Each page loads by preview, `kiosk.php?page=kiosks/<name>.kiosk`, which
 registers no kiosk on either server, at 1920x1080, 1280x800 and 390x844.
-The script fails a page that scrolls or clips text, and with `--video`
-records each page at 1920x1080 for `--seconds`. The screenshot check runs
+The script fails a page that scrolls, clips text, cuts text short with an
+ellipsis, or draws text over another element (#256; CLIPPED, ELLIPSIS and
+OVERLAPS below say what each counts), and with `--video` records each page
+at 1920x1080 for `--seconds`. The overlap check skips an element while it
+or an ancestor runs an animation of a set length, such as a slide's
+crossfade or the scale-MPH car's drive, and judges it once it rests. So an
+overlap that exists only in the middle of such an animation is never
+reported. The screenshot check runs
 once, 2.5 s after load; with `--video` the recording's tab is checked every
 second too, because a page draws some of what it shows later (a heat's
 times, an award's reveal), and a problem at any point fails the page. A
@@ -32,6 +38,7 @@ script drives the pages with `--headed`.
 """
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -60,16 +67,132 @@ PARAMETERS = {"qrcode": '{"title":"Scan for results","content":"https://example.
 
 # Elements whose text is cut off: wider or taller content than their box,
 # where the box does not scroll on purpose. Text cut with an ellipsis is
-# cut on purpose, except a racer's name (`.k-racer` on the now-racing,
-# columnar and on-deck pages), which each of them shows whole (#250).
+# left to ELLIPSIS (#256).
 CLIPPED = """() => [...document.querySelectorAll('body *')].filter(el => {
   if (!el.offsetParent || !el.childElementCount && !el.textContent.trim()) return false;
   const style = getComputedStyle(el);
-  if (style.textOverflow === 'ellipsis' && !el.matches('.k-racer')) return false;
+  if (style.textOverflow === 'ellipsis') return false;
   const hides = /hidden|clip/.test(style.overflowX + style.overflowY);
   return hides && el.childElementCount === 0
     && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
 }).map(el => el.outerHTML.slice(0, 80))"""
+
+# What ELLIPSIS and OVERLAPS call visible (#256): an element with a box,
+# not `visibility: hidden`, whose own and ancestors' opacity are all above
+# 0, and whose box keeps some area once cut to the window and to each
+# ancestor that hides its overflow. `seen(el)` is the list of those cut
+# boxes, one per fragment (`getClientRects()`: an inline element's line, a
+# block's piece in each column of a multi-column list). An inline
+# fragment's height is cut to its `line-height`, centred, as CSS lays it
+# out: its own box is the font's taller content area, so two lines with a
+# tight line-height would otherwise overlap. A table's `<col>` and
+# `<colgroup>` hold no content and are left out. `seen(el, skip)` also
+# leaves out an element when `skip` holds for it or an ancestor.
+VISIBLE = """
+const cut = (a, b) => ({left: Math.max(a.left, b.left), top: Math.max(a.top, b.top),
+  right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom)});
+const area = r => r.right > r.left && r.bottom > r.top;
+const line = (r, style) => {
+  const height = parseFloat(style.lineHeight);
+  if (!(height < r.bottom - r.top)) return r;
+  const middle = (r.top + r.bottom) / 2;
+  return {left: r.left, right: r.right,
+    top: middle - height / 2, bottom: middle + height / 2};
+};
+const seen = (el, skip = () => false) => {
+  const style = getComputedStyle(el);
+  if (style.visibility !== 'visible' || /^table-column/.test(style.display)) return [];
+  let clip = {left: 0, top: 0, right: innerWidth, bottom: innerHeight};
+  for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
+    const s = a === el ? style : getComputedStyle(a);
+    if (parseFloat(s.opacity) === 0 || skip(a)) return [];
+    const hides = s.overflowX + s.overflowY !== 'visiblevisible';
+    if (a !== el && hides) clip = cut(clip, a.getBoundingClientRect());
+  }
+  const inline = style.display === 'inline';
+  return [...el.getClientRects()]
+    .map(r => cut(inline ? line(r, style) : r, clip)).filter(area);
+};
+"""
+
+# Text cut short with "…": a visible element whose `text-overflow` is
+# `ellipsis` and whose content is wider than its box (#256). An inline
+# element, which text-overflow does not apply to, is never reported, since
+# its scrollWidth and clientWidth are both 0 (the near misses in
+# `ui/tests/test_kiosk_screens_tool.py`).
+ELLIPSIS = (
+    "() => {"
+    + VISIBLE
+    + """
+return [...document.querySelectorAll('body *')].filter(el => {
+  const style = getComputedStyle(el);
+  return style.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth
+    && seen(el).length;
+}).map(el => el.outerHTML.slice(0, 80));
+}"""
+)
+
+# Text drawn over another element (#256): a visible element's own text
+# (each line of each text node it holds, cut to its line-height and to its
+# visible boxes) that overlaps one of another visible element's boxes,
+# leaving out the element's ancestors and descendants. Boxes that only
+# touch do not overlap. Each pair is reported once, text first.
+#
+# It leaves out an element while it or an ancestor runs an animation of a
+# set length (`moving`), such as a slide's crossfade or the scale-MPH car's
+# drive: it is judged once it rests, filled at its end or not. An endless
+# animation, such as the flag's wave, never rests, so it is judged as it
+# moves. ELLIPSIS judges every element as it is.
+#
+# DRAWN_OVER lists the pairs drawn over each other on purpose, as (the
+# text's selector, the other element's selector, why):
+DRAWN_OVER = (
+    (
+        ".k-award *",
+        ".k-award > video[data-confetti]",
+        "The award's confetti plays over the whole award, text included, as "
+        "PHP's `video.confetti` does (award-presentations-kiosk.css:54-61).",
+    ),
+)
+OVERLAPS = (
+    "() => {"
+    + VISIBLE
+    + """
+const drawnOver = DRAWN_OVER;
+const moving = new Set(document.getAnimations().filter(a => a.playState === 'running'
+  && isFinite(a.effect.getComputedTiming().endTime)).map(a => a.effect.target));
+const lines = (el, boxes) => {
+  const style = getComputedStyle(el), found = [];
+  for (const node of el.childNodes) {
+    if (node.nodeType !== Node.TEXT_NODE || !node.textContent.trim()) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const r of range.getClientRects()) {
+      const textLine = line(r, style);
+      found.push(...boxes.map(box => cut(textLine, box)).filter(area));
+    }
+  }
+  return found;
+};
+const shown = [...document.querySelectorAll('body *')]
+  .map(el => [el, seen(el, a => moving.has(a))]).filter(e => e[1].length);
+const found = [], pairs = new Set();
+shown.forEach(([el, boxes], i) => {
+  const text = lines(el, boxes);
+  if (!text.length) return;
+  shown.forEach(([other, otherBoxes], j) => {
+    if (other === el || other.contains(el) || el.contains(other)) return;
+    if (pairs.has(j + ' ' + i)) return;
+    if (drawnOver.some(([t, o]) => el.matches(t) && other.matches(o))) return;
+    if (text.some(t => otherBoxes.some(box => area(cut(t, box))))) {
+      pairs.add(i + ' ' + j);
+      found.push(el.outerHTML.slice(0, 60) + ' and ' + other.outerHTML.slice(0, 60));
+    }
+  });
+});
+return found;
+}""".replace("DRAWN_OVER", json.dumps([pair[:2] for pair in DRAWN_OVER]))
+)
 SCROLLS = """() => {
   const root = document.documentElement;
   return root.scrollWidth > innerWidth || root.scrollHeight > innerHeight;
@@ -90,7 +213,8 @@ TRIES = 3
 
 
 def check(tab) -> list[str]:
-    """Scrollbars and up to 3 clipped elements on `tab` now. A reload or
+    """Scrollbars, and up to 3 each of clipped elements, elements cut short
+    with an ellipsis and overlapping pairs, on `tab` now. A reload or
     navigation that destroys the page's script context in the middle of the
     check (`kiosk-now-racing.js` reloads every 5 s with no lane count) is
     waited out and the check tried again, up to `TRIES` times; a page that
@@ -100,7 +224,9 @@ def check(tab) -> list[str]:
     for _ in range(TRIES):
         try:
             found = ["scrollbars"] if tab.evaluate(SCROLLS) else []
-            return found + [f"clipped {el}" for el in tab.evaluate(CLIPPED)[:3]]
+            found += [f"clipped {el}" for el in tab.evaluate(CLIPPED)[:3]]
+            found += [f"cut with an ellipsis {el}" for el in tab.evaluate(ELLIPSIS)[:3]]
+            return found + [f"overlaps {pair}" for pair in tab.evaluate(OVERLAPS)[:3]]
         except Error as error:
             if "context was destroyed" not in str(error):
                 raise

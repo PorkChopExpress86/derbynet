@@ -13,8 +13,8 @@ columnar pages and the on-deck chart wrap a name in its column.
 Four long names from testing/import-roster.sh (:12, :36, :44, :30) race
 Lions' heat, with headshots, so each lane's photo narrows the name's column
 when it loads. The desktop size runs at 1920x1080, the size #250 names.
-`tools/kiosk_screens.py` reports a racer's name cut with an ellipsis, which
-its clipped-text check skips for other text."""
+`tools/kiosk_screens.py` reports a racer's name cut with an ellipsis, as it
+reports any text cut with one (#256)."""
 
 import math
 import shutil
@@ -446,10 +446,13 @@ ELLIPSES = """<!doctype html><html><body>
 
 def test_a_racer_name_cut_with_an_ellipsis_is_reported(page):
     """Of three boxes that cut text with an ellipsis, the check reports
-    only the racer's name that does not fit (#250): another text cut with
-    an ellipsis is cut on purpose, and a name that fits is not cut."""
+    the racer's name that does not fit (#250) and the other text that does
+    not fit, since #256 reports every text cut with one; a name that fits
+    is not cut."""
     page.set_content(ELLIPSES)
-    # One read: the stand-in page has no script, so nothing changes it.
-    clipped = page.evaluate(kiosk_screens.CLIPPED)
-    assert len(clipped) == 1
-    assert clipped[0].startswith('<div class="k-racer" style="width:60px;')
+    # One read: the stand-in page has no script and no animation; its
+    # layout is set once set_content() returns.
+    cut = page.evaluate(kiosk_screens.ELLIPSIS)
+    assert len(cut) == 2
+    assert cut[0].startswith('<div class="k-racer" style="width:60px;')
+    assert cut[1].startswith('<div class="k-name" style="width:60px;')
