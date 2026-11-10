@@ -62,12 +62,13 @@ def open_paused(page, event):
 
 def test_the_car_waits_off_screen_between_drives(page, event, day):  # noqa: F811
     """Once a drive ends the car stays off the screen for the whole wait,
-    and the next drive starts from `45vw`, as PHP's does. The next drive
-    starts `WAIT_MS` (kiosk-simple.js's 10 s) after the last one ended,
-    within `SLACK_MS`; PHP's starts about 9.2 s after its car reaches
-    100vw, since its 10 s timer starts when the 2 s phase ends
-    (`scale-MPH.kiosk:11-18`; measured in the #252 PR's `cycle-php.json`),
-    a difference #252 leaves open.
+    and the next drive starts from `45vw`, as PHP's does
+    (`scale-MPH.kiosk:11-18`). The next drive starts `WAIT_MS`
+    (kiosk-simple.js's 10 s) after the last one ended, within `SLACK_MS`;
+    PHP's starts about 9.2 s after its car reaches 100vw, since its 10 s
+    timer starts when the 2 s phase ends (`scale-MPH.kiosk:11-18`;
+    measured in the #252 PR's `cycle-php.json`), a difference #252 leaves
+    open.
 
     The clock runs to `WAIT_MS - SLACK_MS` after the drive's end and the
     car must still be off the screen with no new drive started; it then
