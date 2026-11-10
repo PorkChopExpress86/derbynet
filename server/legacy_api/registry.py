@@ -506,6 +506,13 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " speed awards marked with no place, and a time a closed lane dropped"
         " struck through, from #49's standings list; PHP leaves them out with"
         " a footnote.",
+        "D10: at 640 px wide or less the banner's title wraps at 0.36 of the"
+        " banner's height, and a title of three or more lines grows the"
+        " banner, where wider windows keep one line cut with an ellipsis"
+        " (#272, ui/tests/browser/test_kiosk_banner.py); PHP wraps it in a"
+        " 64 px banner (global.css:25-34) and only now racing shrinks it"
+        " (now-racing-adjust-fonts.js:34-40), so on a phone scale-MPH's and"
+        " the columnar pages' wrapped lines fall below the banner.",
     ),
     "ondeck.php": (
         "D10: rebuilt (ADR-10); the running heat glides near the top where"

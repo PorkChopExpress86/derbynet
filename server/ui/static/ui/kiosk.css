@@ -345,6 +345,17 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 .k-setup button { font: inherit; padding: 1vh 2vw; border-radius: 1vh; border: 0; background: var(--k-accent); color: var(--k-accent-ink); font-weight: 700; }
 
 @media (max-width: 640px) {
+  /* On a phone the banner's title wraps at a smaller font instead of being
+     cut with an ellipsis, and a title of three or more lines grows the
+     banner, whose height becomes a minimum (#272, D10, ADR-10;
+     test_kiosk_banner.py). Two lines fit the banner's own height. The
+     title does not clip, so a font whose glyphs stand taller than the line
+     keeps them, and the padding keeps a grown banner's first line on the
+     screen. The logo keeps the height its 70% gives it on a TV, which a
+     banner with no set height would not resolve. */
+  .k-banner { height: auto; min-height: var(--k-banner); padding-block: 0.3vh; }
+  .k-banner img { height: calc((var(--k-banner) - 0.4vh) * 0.7); }
+  .k-banner h1 { white-space: normal; overflow: visible; overflow-wrap: anywhere; font-size: calc(var(--k-banner) * 0.36); line-height: 1.2; }
   .k-head, .k-lane { grid-template-columns: 10vw 14vw minmax(0, 1fr) 22vw 14vw; }
   .k-head .k-speed, .k-lane .k-speed { display: none; }
   .k-head { font-size: 2.6vw; letter-spacing: .02em; padding: 0 1vw; }
