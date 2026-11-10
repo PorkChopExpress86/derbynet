@@ -4,7 +4,7 @@
 # checkout or a git worktree, and removes the server afterwards.  Use it to see
 # what PHP does.  See testing/README.md.
 #
-# Usage: testing/docker/php-scratch.sh [--no-event] <script> [argument ...]
+# Usage: testing/docker/php-scratch.sh [--no-event] [--keep] <script> [argument ...]
 #
 # <script> is a path under testing/, such as test-points-racing.sh.  The base
 # URL, http://localhost, is its first argument, followed by any others.  It
@@ -14,6 +14,12 @@
 # creates one.  The script does that first (ez-new=testdb), unless --no-event
 # is given.  Pass --no-event for a script that sets the event up itself, such as
 # exercise-one-database.sh, because a second setup fails with already_exists.
+#
+# --keep leaves the server running after the script, on a port of localhost
+# that it prints with the command that removes it, so a browser can measure
+# PHP's page in the state the script left.  #247 and #250 each ran the
+# containers by hand to keep one, and each lost tries to the cwd, a login the
+# next harness run no longer had, and default.passwords (#250 retro).
 #
 # The images must exist already: the harness and the server image that
 # run-suite.sh builds, named after DERBYNET_TEST_PREFIX (default
@@ -31,10 +37,15 @@ SERVER="$PREFIX-scratch-$$"
 VOLUME="$PREFIX-scratch-$$"
 
 CREATE_EVENT=1
-if [ "$1" = "--no-event" ]; then
-  CREATE_EVENT=
+KEEP=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-event) CREATE_EVENT= ;;
+    --keep) KEEP=1 ;;
+    *) break ;;
+  esac
   shift
-fi
+done
 [ $# -gt 0 ] || { sed -n '2,/^[^#]/{/^#/p}' "$0" >&2; exit 2; }
 
 for image in "$HARNESS_IMAGE" "$SERVER_IMAGE"; do
@@ -49,7 +60,12 @@ clean() {
   docker rm -f "$SERVER" >/dev/null 2>&1 || true
   docker volume rm -f "$VOLUME" >/dev/null 2>&1 || true
 }
-trap clean EXIT
+# A kept server is named even when the script fails, so it can be removed.
+kept() {
+  echo "PHP is at http://$(docker port "$SERVER" 80/tcp 2>/dev/null | head -n 1)/" >&2
+  echo "Remove it with: docker rm -f $SERVER && docker volume rm $VOLUME" >&2
+}
+if [ -n "$KEEP" ]; then trap kept EXIT; else trap clean EXIT; fi
 
 # The harness shares the server's network namespace, so the script reaches the
 # server at http://localhost as it does on a developer machine.
@@ -59,7 +75,10 @@ harness_run() {
 }
 
 docker volume create "$VOLUME" >/dev/null
-docker run -d --name "$SERVER" -v "$VOLUME:/var/lib/derbynet" "$SERVER_IMAGE" >/dev/null
+PUBLISH=()
+[ -z "$KEEP" ] || PUBLISH=(-p 127.0.0.1::80)
+docker run -d --name "$SERVER" "${PUBLISH[@]}" -v "$VOLUME:/var/lib/derbynet" \
+       "$SERVER_IMAGE" >/dev/null
 for _ in $(seq 1 60); do
   harness_run curl -sf --location -o /dev/null http://localhost/index.php && break
   sleep 1

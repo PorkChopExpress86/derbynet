@@ -57,6 +57,14 @@ A server database can't be reused: setup (`ez-new=testdb`) fails with
 `already_exists` the second time, so each run needs a fresh data volume.  The
 script always makes one.
 
+To measure a PHP page in a browser, pass `--keep`: the server stays up on a
+port of localhost, in the state the script left, and the script prints that
+URL and the command that removes the server.  Put a probe script in `testing/`
+(such as `testing/zz-probe-250.sh`, deleted afterwards), where `common.sh`
+finds `default.passwords`.  #250 ran the containers by hand to keep a server,
+and lost three tries to the working folder, a login the next harness run no
+longer had, and the passwords file (#250 retro).
+
 ## Run individual scripts from the host
 
 The scripts need `bash`, `curl`, `jq`, `perl`, `xmllint` (Debian and Ubuntu
