@@ -59,11 +59,13 @@ FIXTURE = ("reset-database.sh", "import-roster.sh", "test-den-changes.sh")
 PARAMETERS = {"qrcode": '{"title":"Scan for results","content":"https://example.org"}'}
 
 # Elements whose text is cut off: wider or taller content than their box,
-# where the box does not scroll on purpose.
+# where the box does not scroll on purpose. Text cut with an ellipsis is
+# cut on purpose, except a racer's name (`.k-racer` on the now-racing,
+# columnar and on-deck pages), which each of them shows whole (#250).
 CLIPPED = """() => [...document.querySelectorAll('body *')].filter(el => {
   if (!el.offsetParent || !el.childElementCount && !el.textContent.trim()) return false;
   const style = getComputedStyle(el);
-  if (style.textOverflow === 'ellipsis') return false;
+  if (style.textOverflow === 'ellipsis' && !el.matches('.k-racer')) return false;
   const hides = /hidden|clip/.test(style.overflowX + style.overflowY);
   return hides && el.childElementCount === 0
     && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);

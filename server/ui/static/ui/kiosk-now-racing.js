@@ -41,15 +41,55 @@
     });
   }
 
-  // Row height and font follow the lane count and the window, so a name
-  // fits its row (now-racing-adjust-fonts.js).
+  // Whether a lane's names (name, car name, note) run past its row's foot,
+  // or hold a word wider than their box. They are measured with words kept
+  // whole (kiosk.css `.k-fitting`), so the font shrinks for a long word, as
+  // PHP's does for a table too wide (now-racing-adjust-fonts.js:53-61), and
+  // a word breaks only at the floor.
+  function overflows() {
+    board.classList.add('k-fitting');
+    var over = Array.prototype.some.call(lanes(), function (el) {
+      var names = el.querySelector('.k-names');
+      if (!names) return false;
+      if (names.offsetTop + names.offsetHeight > el.clientHeight) return true;
+      return Array.prototype.some.call(names.children, function (line) {
+        return line.scrollWidth > line.clientWidth;
+      });
+    });
+    board.classList.remove('k-fitting');
+    return over;
+  }
+
+  function laneFont() {
+    var first = lanes()[0];
+    return first ? parseFloat(getComputedStyle(first).fontSize) : 0;
+  }
+
+  // The row height follows the lane count and the window. The board's one
+  // lane font starts from the row height and the window, and steps down by
+  // 0.9 while a lane's names run past their row or hold a word wider than
+  // their box (overflows(), above), as PHP's FontAdjuster shrinks every cell
+  // until the table fits (now-racing-adjust-fonts.js:42-66). PHP shrinks on a
+  // 75 ms timer; this runs only for a new lineup, a photo that loads, or a
+  // resize (#250). The loop stops once the computed font stops falling, so
+  // kiosk.css's `.k-lane` clamp holds the bounds (server/README.md, the kiosk
+  // pages; D10, ADR-10), where PHP's loop sets no minimum. At the floor, a
+  // word wider than its box breaks, and a name with more lines than its row
+  // holds is cut at the row's foot (test_kiosk_names.py).
   function fit() {
     if (columns) return;
     var rows = lanes().length;
     if (!rows) return;
     var height = board.getBoundingClientRect().height / (rows + 0.6);
     board.style.setProperty('--row-h', height + 'px');
-    board.style.setProperty('--row-font', Math.max(14, Math.min(height * 0.42, window.innerWidth * 0.04)) + 'px');
+    board.style.setProperty('--row-font', Math.min(height * 0.42, window.innerWidth * 0.04) + 'px');
+    var size = laneFont();
+    while (overflows()) {
+      board.style.setProperty('--row-font', size * 0.9 + 'px');
+      var smaller = laneFont();
+      if (smaller >= size) return;  // held by the clamp's floor
+      size = smaller;
+    }
   }
 
   function photo(slot, url, alt) {
@@ -62,6 +102,8 @@
     if (!img) {
       img = document.createElement('img');
       img.alt = alt || '';
+      // A photo narrows its lane's names, so they are fitted again.
+      img.addEventListener('load', fit);
       slot.appendChild(img);
     }
     if (img.getAttribute('src') !== url) img.setAttribute('src', url);
@@ -140,6 +182,7 @@
         void moving.offsetWidth;
         moving.classList.add('k-new');
       });
+      fit();
     } else {
       list.forEach(function (r) {
         var el = lane(r.lane);
