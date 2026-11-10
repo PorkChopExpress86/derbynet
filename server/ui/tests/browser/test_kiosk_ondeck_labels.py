@@ -23,14 +23,14 @@ from ui.tests.browser.conftest import shoot
 from ui.tests.browser.test_kiosk_pages import open_kiosk
 from ui.tests.race import race_setup, scheduled
 
-# Three-digit heats: a group of HEATS racers on 4 lanes, one run, races
-# HEATS heats (asserted where it is used).
-HEATS = 100
-# A class name wider than the wide label column at every size, which only
-# overflow-wrap breaks.
+# Three-digit heats: a group of HEATS racers on LANES lanes, one run,
+# races HEATS heats (asserted where it is used).
+HEATS, LANES = 100, 4
+# A class name of one word, which only overflow-wrap breaks (mutation m01
+# in #273's PR).
 UNBREAKABLE = "Supercalifragilisticexpialidocious"
-# A class name whose label takes more lines than a lane cell's two at
-# 1920x1080 (asserted where it is used, by the row's growth).
+# A class name whose label grows its row at 1920x1080 (asserted where it
+# is used).
 LONGER = "White's Wolves of the Arrow of Light Den Seven"
 
 # Each row label (`th` but the round divider): its text, its lines, and
@@ -135,7 +135,7 @@ def test_each_heat_label_shows_whole(page, event):
     of its text's line boxes. At 1920x1080 and 1280x800 each label keeps
     one line, and each row the height it had with the label held on one
     line."""
-    rounds = race_setup(event, groups=(("Lions", HEATS),))
+    rounds = race_setup(event, groups=(("Lions", HEATS),), lanes=LANES)
     scheduled(rounds["Lions"])
     connected(event)
     texts = [f"Heat {n}" for n in range(1, HEATS + 1)]
@@ -143,8 +143,9 @@ def test_each_heat_label_shows_whole(page, event):
     for size in windows(page):
         open_kiosk(page, event, "kiosks/ondeck.kiosk")
         labels = whole_labels(page, texts)
-        # One read: whole_labels saw the chart drawn; this compares each
-        # row with its labels on one line, in one task.
+        # One read: AS_MASTER toggles the labels' nowrap and reads back in
+        # one task, so no retrying wait can hold its comparison;
+        # whole_labels has already waited for the chart.
         rows = {row["text"]: row for row in page.evaluate(AS_MASTER)}
 
         width = page.evaluate("innerWidth")
@@ -167,6 +168,27 @@ def test_each_heat_label_shows_whole(page, event):
         shoot(page, f"kiosk-ondeck-labels-{size}")
 
 
+COLUMNS = """() => [...document.querySelectorAll('.k-deck colgroup col')]
+  .map(c => c.getBoundingClientRect().width)"""
+
+
+def column_widths(page, master: float, label: float) -> list[float]:
+    """Wait up to 5 s for the master heat's and the label's columns to be
+    `master` and `label` of the window's width, then read them once for
+    the asserts to name."""
+    try:
+        page.wait_for_function(
+            f"""() => {{ const w = ({COLUMNS})();
+              return Math.abs(w[0] - {master} * innerWidth) <= 0.5
+                && Math.abs(w[1] - {label} * innerWidth) <= 0.5; }}""",
+            timeout=5000,
+        )
+    except Error:
+        pass
+    # One read: the wait above has either seen both widths or given up.
+    return page.evaluate(COLUMNS)
+
+
 def test_each_master_schedule_label_shows_whole(page, event):
     """Under the master schedule each label names its round, "Lions, Round
     1, Heat 14", and shows whole at every window size; the unbreakable
@@ -176,9 +198,10 @@ def test_each_master_schedule_label_shows_whole(page, event):
     the same as with the labels held on one line. At 1920x1080 the rows of
     the two long class names grow past the height they have with the
     label on one line. The classes are renamed after their racers are
-    made, so the racers keep short names ("Bears1 Racer") and two-line
-    lane cells."""
-    rounds = race_setup(event, groups=(("Lions", 14), ("Bears", 4), ("Tigers", 4)))
+    made, so the racers keep their short names, such as "Bears1 Racer"."""
+    rounds = race_setup(
+        event, groups=(("Lions", 14), ("Bears", 4), ("Tigers", 4)), lanes=LANES
+    )
     RaceSettings.objects.filter(event=event).update(use_master_sched=True)
     for r in rounds.values():
         scheduled(r, race=False)
@@ -195,17 +218,18 @@ def test_each_master_schedule_label_shows_whole(page, event):
         assert "Lions, Round 1, Heat 14" in texts, texts
         assert f"{UNBREAKABLE}, Round 1, Heat 4" in texts, texts
         assert f"{LONGER}, Round 1, Heat 4" in texts, texts
+        expect(
+            page.locator(".k-deck td .k-racer", has_text="Bears1 Racer").first
+        ).to_have_text("Bears1 Racer")
         whole_labels(page, texts)
-        # One read: whole_labels saw the chart drawn; this reads the
-        # columns and compares each row with its labels on one line.
-        widths = page.evaluate(
-            """() => [...document.querySelectorAll('.k-deck colgroup col')]
-              .map(c => c.getBoundingClientRect().width)"""
-        )
+        master, label = (0.10, 0.24) if page.size == "phone" else (0.06, 0.14)
+        widths = column_widths(page, master, label)
+        # One read: AS_MASTER toggles the labels' nowrap and reads back in
+        # one task, so no retrying wait can hold its comparison;
+        # whole_labels has already waited for the chart.
         rows = page.evaluate(AS_MASTER)
 
         width = page.evaluate("innerWidth")
-        master, label = (0.10, 0.24) if page.size == "phone" else (0.06, 0.14)
         assert widths[0] == pytest.approx(master * width, abs=0.5), (size, widths)
         assert widths[1] == pytest.approx(label * width, abs=0.5), (size, widths)
         assert all(row["nowrapCut"] for row in rows), (size, rows)
@@ -245,7 +269,8 @@ def divider_lines(page) -> int:
 def test_the_round_divider_stays_on_one_line(page, event):
     """A round's divider, outside the master schedule, stays on one line
     at every window size, cut with an ellipsis past its box, as before
-    #273: the lead kept it so on #273, since it is no heat label."""
+    #273: the divider is no heat label (the lead's ruling under D10/ADR-10,
+    #273)."""
     rounds = race_setup(event, groups=(("Lions", 4), ("Tigers", 4)))
     for r in rounds.values():
         scheduled(r, race=False)
