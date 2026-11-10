@@ -3,6 +3,7 @@ D16), the 301 from the PHP paths (D20), and what each page is given: the
 empty websocket URL, `upload-videos`, the ICE servers, the clip window's
 settings (D18) and the kiosk frame's URL."""
 
+import io
 import json
 import re
 
@@ -10,7 +11,8 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from core.models import RaceSettings
+from core import race_settings
+from core.models import RaceSettings, SiteState
 from racing.services import replay
 
 pytestmark = pytest.mark.django_db
@@ -175,6 +177,34 @@ def test_the_camera_and_the_replay_page_get_the_same_ice_servers(login, event):
     camera = config(client.get("/replay/camera/"))["ice_servers"]
 
     assert viewer == camera == [{"urls": ["stun:a.example:3478"]}]
+
+
+def test_a_turn_url_stored_under_the_legacy_key_and_imported_is_dropped(
+    login, event, caplog
+):
+    """#259: the settings field refuses a turn: URL, but the legacy key's
+    writer stores it, and a snapshot carries it (DJANGO_ONLY_KEYS) into the
+    event it imports. The replay page of that event gets the STUN URL
+    only, with a warning for the other."""
+    race_settings.write(event, "replay-ice-servers", "turn:b.example stun:a.example")
+    client = login("RaceCoordinator")
+    snapshot = client.get("/action.php?query=snapshot.get").content
+    put = client.post(
+        "/action.php", {"action": "snapshot.put", "snapshot": io.BytesIO(snapshot)}
+    )
+    assert "<success/>" in put.content.decode()
+    imported = SiteState.objects.get(pk=1).active_event
+    assert imported.pk != event.pk
+    stored = RaceSettings.objects.get(event=imported).replay_ice_servers
+    assert stored == "turn:b.example stun:a.example"
+    caplog.clear()
+
+    found = config(client.get("/replay/"))["ice_servers"]
+
+    assert found == [{"urls": ["stun:a.example"]}]
+    warnings = [r.getMessage() for r in caplog.records if r.name == replay.__name__]
+    assert len(warnings) == 1
+    assert warnings[0].startswith("replay_ice_servers: turn:b.example is not sent")
 
 
 def test_the_default_ice_server_is_phps_stun_server(event):
