@@ -203,6 +203,9 @@
     if (!found.length) return Promise.resolve();
     var precision = data.hasOwnProperty('precision') ? data.precision : 3;
     var byPlace = found.slice().sort(function (a, b) { return a.place - b.place; });
+    // The columnar pages number places by finish order (`i + 1`,
+    // now-racing-columnar.js:58-74), the rows page by the place stored.
+    function number(hr) { return columns ? byPlace.indexOf(hr) + 1 : hr.place; }
     var land = animate && found.length >= racers;
     found.forEach(function (hr) {
       var el = lane(hr.lane);
@@ -213,16 +216,18 @@
         var speed = set(el, '[data-speed]', hr.speed);
         if (speed && land) speed.classList.add('k-shown');
       }
-      if (!land) set(el, '[data-place]', columns ? '' : hr.place);
+      // A columnar place shows once the places have landed, and each later
+      // poll of the linger writes the same number again (#251).
+      if (!land) set(el, '[data-place]', columns && animate ? '' : number(hr));
     });
     if (!land) return Promise.resolve();
     animate = false;
     var chain = Promise.resolve();
-    byPlace.forEach(function (hr, i) {
+    byPlace.forEach(function (hr) {
       chain = chain.then(function () {
         var el = lane(hr.lane);
         if (!el) return;
-        var place = set(el, '[data-place]', columns ? i + 1 : hr.place);
+        var place = set(el, '[data-place]', number(hr));
         if (place) place.classList.add('k-shown');
         if (hr.place <= 3) el.classList.add('k-p' + hr.place);
         return wait(400);
