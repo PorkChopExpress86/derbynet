@@ -53,7 +53,9 @@ def test_a_role_without_race_control_cannot_run_replay(login, page, role):
     assert response["Location"].startswith(reverse("login"))
 
 
-def test_the_replay_page_gets_its_settings(login, event):
+def test_the_replay_page_gets_its_settings(login, event, caplog):
+    """The stored settings reach the page. The turn: URL, which Chromium
+    refuses with no credential, is dropped with a warning (#259)."""
     RaceSettings.objects.filter(event=event).update(
         upload_videos=False,
         replay_skipback_ms=3000,
@@ -75,7 +77,7 @@ def test_the_replay_page_gets_its_settings(login, event):
         "post_roll_ms": 1500,
         "max_clip_ms": 4000,
         "upload_videos": False,
-        "ice_servers": [{"urls": ["stun:a.example:3478", "turn:b.example"]}],
+        "ice_servers": [{"urls": ["stun:a.example:3478"]}],
         # v1 polls whatever the websocket setting holds (#56).
         "websocket_url": "",
         "action": "/action.php",
@@ -94,6 +96,11 @@ def test_the_replay_page_gets_its_settings(login, event):
     }
     assert 'href="/settings/#replay"' in html
     assert 'id="debug" class="replay-log-panel" hidden' in html
+    assert [r.getMessage() for r in caplog.records if r.name == replay.__name__] == [
+        "replay_ice_servers: turn:b.example is not sent to the replay page or"
+        " the camera: TURN servers need a username and password, which this"
+        " field cannot hold yet; list STUN servers only."
+    ]
 
 
 def test_the_kiosk_frame_url_passes_the_address_on(login):
@@ -120,6 +127,54 @@ def test_the_camera_page_gets_the_ice_servers_and_debug(login, event):
     assert 'id="log" class="camera-log" role="log" aria-label="Camera log">' in (
         client.get("/replay/camera/?debug").content.decode()
     )
+
+
+# One URL for each way the settings field refuses one (#241), which the
+# server then drops (#259). `URLS` and `OVER_REFUSED` in
+# `browser/test_settings_ice_servers.py` show Chromium throwing on each but
+# the last, which it takes and the field refuses.
+DROPPED = (
+    "turn:b.example",
+    "TURNS:b.example",
+    "stun:",
+    "stun:a.example:0",
+    "stun:a.example:65536",
+    "stun:a.example?transport=udp",
+    "stun://a.example",
+    "stun:a|b",
+    "stun:ünï.example",
+)
+
+
+@pytest.mark.parametrize("url", DROPPED)
+def test_an_ice_url_the_field_refuses_is_dropped_with_a_warning(url, caplog):
+    text = f"stun:a.example:3478, {url} STUN:c.example:65535"
+
+    assert replay.ice_servers(text) == [
+        {"urls": ["stun:a.example:3478", "STUN:c.example:65535"]}
+    ]
+    warnings = [r for r in caplog.records if r.name == replay.__name__]
+    found = [(r.levelname, r.getMessage().split(" is not sent")[0]) for r in warnings]
+    assert found == [("WARNING", f"replay_ice_servers: {url}")]
+
+
+def test_a_setting_of_only_refused_urls_sends_no_ice_server(caplog):
+    assert replay.ice_servers("turn:b.example stun:") == []
+    assert len([r for r in caplog.records if r.name == replay.__name__]) == 2
+
+
+def test_the_camera_and_the_replay_page_get_the_same_ice_servers(login, event):
+    """#259: both pages drop the same URLs, so neither offers a server the
+    other never heard of."""
+    RaceSettings.objects.filter(event=event).update(
+        replay_ice_servers="turn:b.example stun:a.example:3478 stun:"
+    )
+    client = login("RaceCoordinator")
+
+    viewer = config(client.get("/replay/"))["ice_servers"]
+    camera = config(client.get("/replay/camera/"))["ice_servers"]
+
+    assert viewer == camera == [{"urls": ["stun:a.example:3478"]}]
 
 
 def test_the_default_ice_server_is_phps_stun_server(event):

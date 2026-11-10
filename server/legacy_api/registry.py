@@ -535,7 +535,9 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " finish, where its recording stopped.",
         "D76: the replay_ice_servers setting lists the STUN or TURN servers,"
         " PHP's hardcoded Google STUN server by default; empty means host"
-        " candidates only, for a LAN with no internet.",
+        " candidates only, for a LAN with no internet. A URL the settings"
+        " field refuses, such as turn: with no credential, is dropped with a"
+        " logged warning (#259).",
         "C53: a right-click replay names its clip after the current START;"
         " PHP's passes no name and uploads undefined.mkv.",
         "C54: the remote camera's signaling messages are handled one at a"
