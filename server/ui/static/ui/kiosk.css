@@ -102,6 +102,7 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 .k-enter-3 { animation: k-rise 700ms 400ms cubic-bezier(.2,.8,.2,1) both; }
 @keyframes k-rise { from { opacity: 0; transform: translateY(4vh) scale(.98); } }
 @keyframes k-fade { from { opacity: 0; } }
+@keyframes k-fade-out { to { opacity: 0; } }
 @keyframes k-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
 @keyframes k-slide-in { from { transform: translateX(-12vw); opacity: 0; } }
 @keyframes k-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 210, 63, 0); } 50% { box-shadow: 0 0 3vh 0.5vh rgba(255, 210, 63, .55); } }
@@ -306,6 +307,7 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 /* ----- slideshow ------------------------------------------------------------- */
 .k-slides { flex: 1; min-height: 0; position: relative; }
 .k-slide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vh; animation: k-fade 1200ms both; }
+.k-slide.k-leaving { animation: k-fade-out 1200ms both; }
 .k-slide img.k-photo { max-width: 100%; min-height: 0; flex: 0 1 auto; max-height: 88%; object-fit: contain; }
 .k-slide img.k-inset { position: absolute; right: 2vw; bottom: 2vh; max-width: 20vw; max-height: 25vh; border-radius: 1vh; }
 .k-slide .k-caption { margin: 0; font-size: 4.5vh; font-weight: 700; text-align: center; }
