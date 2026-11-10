@@ -7,7 +7,8 @@ Chromium's two fake cameras.
   clip cut to the longest-clip setting (D18), posts `replay-started` and
   `replay-ended` to the kiosk frame, and uploads the first showing.
 - The parity boxes of `replay.php` and `camera.php`, the remote camera over
-  WebRTC with no ICE server, and C32's websocket flush.
+  WebRTC with no ICE server, and with only ICE URLs Chromium refuses
+  stored, which the server drops (#259), and C32's websocket flush.
 - The screenshots of the setup screen and the camera page at both sizes.
 """
 
@@ -493,6 +494,41 @@ def test_the_remote_camera_streams_to_the_replay_page_with_no_ice_server(login, 
         # Chromium gives an ideal value back bare.
         " return c && c.width == 1280 && c.height == 720; }"
     )
+    close_tab(page, camera)
+
+
+@pytest.mark.parametrize(
+    "stored",
+    [
+        # Chromium: "Both username and credential are required when the URL
+        # scheme is "turn" or "turns"".
+        "turn:b.example",
+        # Chromium throws on each of these (`URLS` in
+        # test_settings_ice_servers.py).
+        "stun: stun:a.example:99999 stun:a.example?transport=udp",
+    ],
+    ids=["turn", "malformed"],
+)
+def test_the_remote_camera_streams_with_an_ice_url_chromium_refuses_stored(
+    login, event, stored
+):
+    """#259: a value the settings field refuses (#241) can still be stored
+    through `race_settings.write` or a snapshot import. Sent as it is,
+    `new RTCPeerConnection` throws on the replay page and the camera never
+    gets an offer. The server drops each such URL (`replay.ice_servers`),
+    so the camera connects on host candidates, at both sizes."""
+    RaceSettings.objects.filter(event=event).update(replay_ice_servers=stored)
+    page = login("RaceCoordinator")
+    camera = page.context.new_page()
+    camera.goto("/replay/camera/?debug")
+    expect(camera.locator("[data-stream-size]")).to_have_text(re.compile(r" × "))
+
+    open_replay(page, "/replay/?debug")
+    page.get_by_label("Camera", exact=True).select_option("remote")
+
+    expect(page.locator("#waiting-for-remote")).to_be_hidden(timeout=20000)
+    expect(stream_info(page)).to_have_text(re.compile(r"^[1-9]\d*x[1-9]\d*$"))
+    expect(page.locator("#log")).to_contain_text("ontrack")
     close_tab(page, camera)
 
 

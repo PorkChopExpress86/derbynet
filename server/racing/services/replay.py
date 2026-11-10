@@ -5,6 +5,7 @@ changes only it. Commands are rows written in the caller's transaction, so
 a rollback drops them with the race-state change that sent them.
 """
 
+import logging
 import re
 from datetime import datetime, timedelta
 
@@ -14,6 +15,8 @@ from django.utils import timezone
 from core.models import RaceSettings
 from core.services import lock_race_state
 from kiosks.models import ReplayCommand, ReplayStatus
+
+logger = logging.getLogger(__name__)
 
 REPLAY_TIMEOUT = timedelta(seconds=10)
 """PHP's `REPLAY_TIMEOUT_LIMIT`: a replay client that has not polled for
@@ -110,11 +113,34 @@ _ICE_SEPARATORS = re.compile(r"[\s,]+")
 
 def ice_servers(text: str) -> list[dict]:
     """The WebRTC `iceServers` of the `replay_ice_servers` setting: one
-    server entry with every URL in it, or none for an empty setting, which
-    leaves the replay page and the camera to host candidates on a LAN with
-    no internet (#53)."""
-    urls = ice_urls(text)
-    return [{"urls": urls}] if urls else []
+    server entry with every STUN URL the settings field takes in it, or none
+    when no URL is left, which leaves the replay page and the camera to
+    host candidates on a LAN with no internet (#53). Both pages get this
+    list from `page_settings()`, so they stay in step.
+
+    A URL the field refuses (`ice_url_refusal`) can still be stored
+    through `race_settings.write` or a snapshot import; sent as it is,
+    `new RTCPeerConnection` throws on the replay page and the remote camera
+    never connects. Each one is dropped and logged as a warning (#259).
+    Every `turn:` or `turns:` URL is dropped, until the setting can hold
+    TURN credentials.
+    The field's rule refuses a few URLs Chromium takes, such as a non-ASCII
+    host or a six-digit port (`OVER_REFUSED` in
+    `ui/tests/browser/test_settings_ice_servers.py`), so those are dropped
+    too."""
+    kept = []
+    for url in ice_urls(text):
+        refusal = ice_url_refusal(url)
+        if refusal is None:
+            kept.append(url)
+        else:
+            logger.warning(
+                "replay_ice_servers: %s is not sent to the replay page or the"
+                " camera: %s",
+                url,
+                refusal,
+            )
+    return [{"urls": kept}] if kept else []
 
 
 def ice_urls(text: str) -> list[str]:
@@ -143,23 +169,40 @@ class IceServersRefused(ValueError):
     message says why."""
 
 
+TURN_REFUSED = (
+    "a TURN URL needs a username and password, which the setting cannot hold yet"
+)
+NOT_STUN = "not a STUN server URL"
+
+
+def ice_url_refusal(url: str) -> str | None:
+    """Why the settings field refuses one URL (`TURN_REFUSED` or
+    `NOT_STUN`), or None when it takes it. A `turn:` or `turns:` URL is
+    refused: Chromium requires a username and credential for it, which
+    `ice_servers()` does not send."""
+    if _TURN_URL.match(url):
+        return TURN_REFUSED
+    found = _STUN_URL.fullmatch(url)
+    port = found and found["port"]
+    if not found or (port is not None and not 1 <= int(port) <= 65535):
+        return NOT_STUN
+    return None
+
+
 def ice_servers_text(lines: str) -> str:
     """The stored `replay_ice_servers` text of the settings page's field,
     one URL per line: the URLs separated by spaces, as the setting has
     always held them (D76, #241). Raises `IceServersRefused` for a URL the
-    replay page's `RTCPeerConnection` would throw on. A `turn:` or `turns:`
-    URL is refused: Chromium requires a username and credential for it,
-    which `ice_servers()` does not send."""
+    replay page's `RTCPeerConnection` would throw on (`ice_url_refusal`)."""
     urls = ice_urls(lines)
     for url in urls:
-        if _TURN_URL.match(url):
+        refusal = ice_url_refusal(url)
+        if refusal == TURN_REFUSED:
             raise IceServersRefused(
                 "TURN servers need a username and password, which this field"
                 " cannot hold yet; list STUN servers only."
             )
-        found = _STUN_URL.fullmatch(url)
-        port = found and found["port"]
-        if not found or (port is not None and not 1 <= int(port) <= 65535):
+        if refusal is not None:
             raise IceServersRefused(
                 f"{url} is not a STUN server URL, such as stun:stun.l.google.com:19302."
             )
