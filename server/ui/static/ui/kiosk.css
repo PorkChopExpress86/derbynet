@@ -249,8 +249,16 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 /* ----- on deck --------------------------------------------------------------- */
 .k-deck { flex: 1; min-height: 0; overflow: hidden; }
 .k-deck table { width: 100%; border-collapse: separate; border-spacing: 0 .8vh; table-layout: fixed; }
-.k-deck th { text-align: left; padding: 0 1vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--k-muted); font-weight: 600; }
-.k-deck th.k-divider { color: var(--k-accent); font-size: 1.2em; padding-top: 1vh; }
+/* A heat's label ("Heat 100", "Lions, Round 1, Heat 12") wraps in its
+   column at every size, as PHP's does (ondeck.css:49-51 sets no
+   white-space or overflow rule); the column's width and font stay, so the
+   lanes keep theirs. The lead's ruling under D10/ADR-10, #273
+   (test_kiosk_ondeck_labels.py). The label does not clip: on this
+   machine's Noto Sans the glyphs of a label taller than its lane cells
+   stand outside the th. The round's divider stays on one line, cut with
+   an ellipsis. */
+.k-deck th { text-align: left; padding: 0 1vw; overflow-wrap: anywhere; color: var(--k-muted); font-weight: 600; }
+.k-deck th.k-divider { color: var(--k-accent); font-size: 1.2em; padding-top: 1vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .k-deck td { padding: .8vh .6vw; background: var(--k-surface); border-top: .5vh solid var(--lane, var(--k-line)); vertical-align: top; overflow: hidden; }
 .k-deck td .k-car { font-weight: 800; }
 /* A long name wraps in its cell, as in PHP's ondeck.css, which sets no
@@ -342,6 +350,14 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
    test_kiosk_results_by_racer.py). The cards set their own ink. */
 .k-results [data-no-heats] { color: var(--k-muted); }
 
+/* Between the phone and the projector a heat's label keeps half the side
+   padding, so "Heat" fits its 9vw column whole at 641x844 on DejaVu Sans,
+   which reproduces CI's fonts; with 1vw it broke "Hea" / "t". The column's width and the font stay. The lead's ruling under
+   D10/ADR-10, #273 (test_kiosk_ondeck_labels.py; the DejaVu run in #273's
+   PR). */
+@media (min-width: 641px) and (max-width: 1023px) {
+  .k-deck th:not(.k-divider) { padding: 0 .5vw; }
+}
 /* ----- fullscreen.php -------------------------------------------------------- */
 .k-full { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
 .k-setup { display: flex; flex-wrap: wrap; gap: 1vw; align-items: center; justify-content: center; padding: 10vh 4vw; }
