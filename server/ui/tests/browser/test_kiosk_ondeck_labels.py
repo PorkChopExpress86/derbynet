@@ -388,9 +388,11 @@ def test_each_master_schedule_label_shows_whole(page, event):
         shoot(page, f"kiosk-ondeck-master-labels-{size}")
 
 
-# A class name of one word wider than a phone's divider, which only
-# overflow-wrap breaks (asserted where it is used).
+# A class name of one word, which only overflow-wrap breaks: wider than
+# its divider's box in each window but the landscape ones, where it fits
+# (both asserted where it is used).
 UNBREAKABLE_ROUND = UNBREAKABLE * 2
+LANDSCAPE = {"1024x768", "1280x800", "1920x1080"}
 DIVIDERS = ".k-deck th.k-divider"
 # Each divider's text, its lines by their tops, its content box's width,
 # and the width of its text held on one line (`white-space: nowrap`, set
@@ -416,8 +418,9 @@ def test_the_round_divider_shows_whole(page, event):
     line keeps one line, and one that does not takes more. At 390x844 the
     long class's divider does not fit on one line, so the wrap is tested
     on every font. Each word of it and of "Lions, Round 1" fits its box at
-    every size; at 390x844 the unbreakable class's name is the one word
-    wider than its box, and shows whole, so it breaks inside."""
+    every size. The unbreakable class's name is the one word wider than
+    its box in each window but the three landscape ones, where it fits;
+    where it is wider it shows whole, so it breaks inside."""
     rounds = race_setup(event, groups=(("Lions", 4), ("Tigers", 4), ("Bears", 4)))
     for r in rounds.values():
         scheduled(r, race=False)
@@ -439,7 +442,8 @@ def test_the_round_divider_shows_whole(page, event):
                 assert d["lines"] == 1, (size, d)
             else:
                 assert d["lines"] >= 2, (size, d)
+        wide = [] if size in LANDSCAPE else [f"{UNBREAKABLE_ROUND},"]
+        assert measured[texts[2]]["wide"] == wide, (size, measured)
         if size == "390x844":
             assert dividers[texts[1]]["oneLine"] > dividers[texts[1]]["box"], dividers
-            assert measured[texts[2]]["wide"] == [f"{UNBREAKABLE_ROUND},"], measured
         shoot(page, f"kiosk-ondeck-dividers-{size}")
