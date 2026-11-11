@@ -1,7 +1,7 @@
 """The on-deck chart's heat labels and round dividers show whole (#273,
 #283).
 
-Each row's label ("Heat 12", or "Lions, Round 1, Heat 12" under the master
+Each row's label ("Heat 14", or "Lions, Round 1, Heat 14" under the master
 schedule) wraps in its column at every size, where #273's master held it
 on one line and cut it with an ellipsis. The tests below hold the labels
 on one line again (`AS_MASTER`) to show which they cut. PHP's ondeck.css
@@ -73,7 +73,6 @@ MEASURE = """(sel) => {
       at += word.length + 1;
       const pieces = [...range.getClientRects()];
       const width = pieces.reduce((sum, x) => sum + x.width, 0);
-      if (!word) continue;
       if (width > right - left - 0.5) {
         wide.push(word);
         continue;
@@ -107,8 +106,6 @@ MEASURE = """(sel) => {
 # (master's ellipsis), and `fits` that each label's text fits its content
 # box, inside the padding: a label that runs into its padding is not cut
 # on one line but wraps ("Heat 100" at 1280x800 on CI's fonts, #273's PR).
-# `wordsFit` is that each word of each label fits that box on its own: a
-# word that does not breaks inside, so the label may take more lines.
 AS_MASTER = """() => {
   const rows = [...document.querySelectorAll('.k-deck tbody tr')]
     .filter(tr => !tr.querySelector('.k-divider'));
@@ -122,19 +119,6 @@ AS_MASTER = """() => {
       const pad = parseFloat(s.paddingLeft) + parseFloat(s.paddingRight);
       const box = th.getBoundingClientRect().width - pad;
       return range.getBoundingClientRect().width <= box;
-    }),
-    wordsFit: [...tr.querySelectorAll('th')].every(th => {
-      const s = getComputedStyle(th), text = th.firstChild;
-      const range = document.createRange();
-      const pad = parseFloat(s.paddingLeft) + parseFloat(s.paddingRight);
-      const box = th.getBoundingClientRect().width - pad;
-      let at = 0;
-      return text.data.split(' ').every(word => {
-        range.setStart(text, at);
-        range.setEnd(text, at + word.length);
-        at += word.length + 1;
-        return range.getBoundingClientRect().width <= box;
-      });
     })}));
   const wrapped = read();
   const ths = rows.flatMap(tr => [...tr.querySelectorAll('th')]);
@@ -144,7 +128,7 @@ AS_MASTER = """() => {
   return rows.map((tr, i) => ({
     text: tr.querySelector('th:last-of-type').textContent,
     wrapped: wrapped[i], nowrap: nowrap[i], nowrapCut: nowrap[i].cut,
-    fits: nowrap[i].fits, wordsFit: nowrap[i].wordsFit}));
+    fits: nowrap[i].fits}));
 }"""
 
 
@@ -170,6 +154,9 @@ WINDOWS = {
         {"width": 800, "height": 1280},
         {"width": 1024, "height": 1366},
         {"width": 1080, "height": 1920},
+        # Between 641 and 1023 px a window whose row font is smaller than
+        # the 2.85vw cap, so the label keeps its row's font.
+        {"width": 1000, "height": 700},
     ),
 }
 # The label font's cap, a share of the window's width, by the window's
@@ -236,34 +223,31 @@ def windows(page):
         yield f"{window['width']}x{window['height']}"
 
 
-def bounded(labels: list[dict], rows: dict) -> None:
-    """Each label whose words each fit its column takes at most two lines,
-    and at least one label is so, so the bound never goes vacuous."""
-    held = [label for label in labels if rows[label["text"]]["wordsFit"]]
-    assert held, labels
-    for label in held:
+def bounded(labels: list[dict]) -> None:
+    """Each label takes at most two lines."""
+    for label in labels:
         assert label["lines"] <= 2, label
 
 
 def test_each_heat_label_shows_whole(page, event):
     """ "Heat 1" to "Heat 100" each show whole, with each word fitting its
     box on one line and none broken across lines, at 390 and 640 px wide
-    on the phone, and at TV, laptop, projector, 641 px and the four tall
-    windows on the desktop (`WINDOWS`). Held on one line as #273's master drew them,
-    "Heat 100" is cut on the phone and "Heat 1" at 641 px. On a phone the
-    label's column stays 15vw and its font 3.6vw (kiosk.css phone block).
-    From 641 px the font is its row's or the cap, 2.85vw to 1023 px and
-    2.5vw from 1024 px, whichever is smaller, and the cap is the smaller
-    in the `CAPPED` windows only (`capped_font`). A label's side padding
-    is 0.5vw from 641 to 1023 px, and 1vw on the phone and from 1024 px. A
-    label whose words each fit its column takes at most two lines ("Heat"
-    over "100"), counted by the tops of its text's line boxes, and at
-    least one label is held so (`bounded`). At 1920x1080 and 1280x800
-    "Heat 1" fits its column on one line, and each
-    label that fits keeps one line, and its row the height it had with the
-    label held on one line. A label that fits only by running into its
-    padding may wrap: on CI's fonts "Heat 100" took two lines at 1280x800
-    (#273's PR)."""
+    on the phone, and on the desktop at each of `WINDOWS`: TV, laptop,
+    projector, 641 px, the four tall windows and 1000x700. Held on one
+    line as #273's master drew them, "Heat 100" is cut on the phone and
+    "Heat 1" at 641 px. On a phone the label's column stays 15vw and its
+    font 3.6vw (kiosk.css phone block). From 641 px the font is its row's
+    or the cap, 2.85vw to 1023 px and 2.5vw from 1024 px, whichever is
+    smaller, and the cap is the smaller in the `CAPPED` windows only
+    (`capped_font`). A label's side padding is 0.5vw from 641 to 1023 px,
+    and 1vw on the phone and from 1024 px. Each label takes at most two
+    lines ("Heat" over "100"), counted by the tops of its text's line
+    boxes (`bounded`). At 1920x1080 and 1280x800 "Heat 1" fits its column
+    on one line, and each label that fits keeps one line, and its row the
+    height it had with the label held on one line. A label that fits only
+    by running into its padding may wrap, which #273's PR saw for "Heat
+    100" at 1280x800 on CI's fonts; this test skips such a label in the
+    one-line rule and asserts nothing more of it."""
     rounds = race_setup(event, groups=(("Lions", HEATS),), lanes=LANES)
     scheduled(rounds["Lions"])
     connected(event)
@@ -280,7 +264,7 @@ def test_each_heat_label_shows_whole(page, event):
         width = page.evaluate("innerWidth")
         for label in labels:
             assert label["wide"] == [], (size, label)
-        bounded(labels, rows)
+        bounded(labels)
         capped_font(labels, size, width)
         pad = 0.01 if 641 <= width <= 1023 else 0.02
         for label in labels:
@@ -392,7 +376,7 @@ def test_each_master_schedule_label_shows_whole(page, event):
 # its divider's box in each window but the landscape ones, where it fits
 # (both asserted where it is used).
 UNBREAKABLE_ROUND = UNBREAKABLE * 2
-LANDSCAPE = {"1024x768", "1280x800", "1920x1080"}
+LANDSCAPE = {"1000x700", "1024x768", "1280x800", "1920x1080"}
 DIVIDERS = ".k-deck th.k-divider"
 # Each divider's text, its lines by their tops, its content box's width,
 # and the width of its text held on one line (`white-space: nowrap`, set
@@ -419,7 +403,7 @@ def test_the_round_divider_shows_whole(page, event):
     long class's divider does not fit on one line, so the wrap is tested
     on every font. Each word of it and of "Lions, Round 1" fits its box at
     every size. The unbreakable class's name is the one word wider than
-    its box in each window but the three landscape ones, where it fits;
+    its box in each window but the four landscape ones, where it fits;
     where it is wider it shows whole, so it breaks inside."""
     rounds = race_setup(event, groups=(("Lions", 4), ("Tigers", 4), ("Bears", 4)))
     for r in rounds.values():

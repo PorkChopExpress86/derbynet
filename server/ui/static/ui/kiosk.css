@@ -357,16 +357,17 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
    column's width stays. The lead's ruling under D10/ADR-10, #273
    (test_kiosk_ondeck_labels.py; the DejaVu run in #273's PR).
    From 641 px a heat's label font is capped by the window's width, as
-   PHP's label font is 1.5vw (ondeck.css:49-51), so a tall window's 2.2vh
-   font no longer outgrows the 9vw column and breaks "Hea" / "t". The
+   PHP's label font is 1.5vw (ondeck.css:49-51), so a tall window's row
+   font, clamp(1rem, 2.2vh, 2rem) (the kiosk's body font, 32px at
+   1080x1920), no longer outgrows the 9vw column and breaks "Hea" / "t". The
    bound: DejaVu Sans's "Heat" is 2.665em wide (49.48 px at 18.568px,
    measured in #273's PR), and the column's content box is 9vw less its
    padding, 8vw from 641 to 1023 px (0.5vw a side) and
    7vw from 1024 px (1vw a side), so the font may be at most 8 / 2.665 =
-   3.0vw and 7 / 2.665 = 2.63vw. 2.85vw and 2.5vw are 95% of those, so a
-   face whose "Heat" is up to about 5% wider than DejaVu's, 2.665 / 0.95 =
-   2.8em, keeps it whole, and a wider face breaks it again. A landscape
-   window keeps its 2.2vh font, which is the smaller.
+   3.0vw and 7 / 2.665 = 2.63vw. 2.85vw and 2.5vw are 95% of those, so by
+   that arithmetic, not a measured face, a face whose "Heat" is up to
+   2.665 / 0.95 = 2.8em wide keeps it whole, and a wider face breaks it
+   again. A landscape window keeps its row font, which is the smaller.
    D10/ADR-10, #283 (test_kiosk_ondeck_labels.py). */
 @media (min-width: 641px) and (max-width: 1023px) {
   .k-deck th:not(.k-divider) { padding: 0 .5vw; font-size: min(1em, 2.85vw); }
