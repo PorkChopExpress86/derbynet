@@ -12,7 +12,11 @@ with the reason it is not. A guard that reads its files another way, such as
 """
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 SERVER = Path(__file__).resolve().parents[1]
 SCRIPT = SERVER / "tools" / "source-checks.sh"
@@ -75,3 +79,21 @@ def test_the_sign_finds_a_guard():
     assert SIGN.search('"""A guard."""\n\nimport ast\n')
     assert SIGN.search("SOURCES = sorted(UI.rglob('*.py'))\n")
     assert not SIGN.search("import asterisk\nfiles = folder.glob('*')\n")
+
+
+@pytest.mark.skipif(
+    not (shutil.which("timeout") and shutil.which("ps")), reason="no timeout or ps"
+)
+def test_source_checks_refuses_a_timeout():
+    """Under `timeout`, the under-load script's tests are refused and fail,
+    which cost #282 a rerun (#282 retro)."""
+    result = subprocess.run(
+        ["timeout", "50", str(SCRIPT)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        stdin=subprocess.DEVNULL,
+    )
+    assert result.returncode == 2, result.stderr
+    assert "it runs under timeout" in result.stderr
+    assert result.stdout == ""

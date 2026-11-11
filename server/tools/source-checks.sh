@@ -23,6 +23,20 @@
 
 set -e -o pipefail
 
+# Under `timeout`, tests/test_pytest_under_load.py's runs of that script see
+# the timeout above them, are refused, and fail: #282 lost a round to it.
+# These take seconds, so they refuse it too.
+pid=$PPID
+while [ "${pid:-0}" -gt 1 ]; do
+  if [ "$(ps -o comm= -p "$pid" || true)" = timeout ]; then
+    echo "source-checks.sh: it runs under timeout, which" \
+         "tests/test_pytest_under_load.py's tests would take for their own." \
+         "It takes seconds: run it with no timeout." >&2
+    exit 2
+  fi
+  pid=$(ps -o ppid= -p "$pid" | tr -d ' ') || pid=1
+done
+
 cd "$(dirname "$0")/.."
 # plan/bin reads the parity gate and the workflows; #222 broke a plan test.
 python3 -I -m unittest discover -s ../plan/tests </dev/null

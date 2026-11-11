@@ -11,8 +11,19 @@ N failed runs on master. Prints one line per failing test:
     known  <test id>  master <sha> run <id>
     new    <test id>
 
-and a `no test id` line for a failed check whose log names none (a lint or a
-build step). Exits 1 when a test is new or a check has no test id, 0 when
+and, for the failed jobs of a run whose log names no test (a lint or a setup
+step), a `no test id` line, then one line per job with the first step that
+failed and the last error line it printed, and the error line most of those
+jobs share:
+
+    no test id  run <id>: 2 jobs
+      ui (sqlite)  step "Install Chromium": Error: Installation process ...
+      shell (sqlite, group 1)  step "Start the Django server": E: Unable ...
+      2 of 2 jobs printed: Temporary failure resolving 'azure.archive...'
+
+PR #284's run 43054997286 failed 10 jobs at apt, and the lead read their
+logs by hand to find the mirror they all timed out on, which #285 fixed
+(#282 retro). Exits 1 when a test is new or a job has no test id, 0 when
 every failure is known from master. #212's `test_vote.py` sort test failed
 on ui (postgres), and the same test had failed on master's push of 0141fa3b;
 only a 50-run local repro showed it was no regression (#212 retro).
@@ -33,9 +44,77 @@ def gh(*args: str) -> str:
     return subprocess.run(command, check=True, capture_output=True, text=True).stdout
 
 
+# A `--log-failed` line is "<job>\t<step>\t<timestamp> <text>".
+STAMP = re.compile(r"^\ufeff?\d{4}-\d\d-\d\dT[\d:.]+Z ?")
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+ERROR_LINE = re.compile(
+    r"(?i)\b(error|fail\w*|unable|fatal|denied|refused|timed out|not found)\b"
+)
+
+
 def failed_tests(run_id: str, repo: str) -> set[str]:
-    log = gh("run", "view", run_id, "--repo", repo, "--log-failed")
-    return set(TEST_ID.findall(log))
+    return set(TEST_ID.findall(failed_log(run_id, repo)))
+
+
+def failed_log(run_id: str, repo: str) -> str:
+    return gh("run", "view", run_id, "--repo", repo, "--log-failed")
+
+
+def jobs_of(log: str) -> dict[str, list[tuple[str, str]]]:
+    """Each job's (step, text) lines, in log order."""
+    jobs: dict[str, list[tuple[str, str]]] = {}
+    for raw in log.splitlines():
+        job, step, text = raw.split("\t", 2) if raw.count("\t") >= 2 else ("", "", raw)
+        jobs.setdefault(job, []).append(
+            (step, ANSI.sub("", STAMP.sub("", text)).strip())
+        )
+    return jobs
+
+
+def failed_step(lines: list[tuple[str, str]]) -> tuple[str, list[str]]:
+    """The first step that printed `##[error]`, and its error lines. A later
+    step that fails only because that one did (a log dump) is left out."""
+    steps = [step for step, text in lines if text.startswith("##[error]")]
+    step = steps[0] if steps else lines[-1][0]
+    errors = [
+        text
+        for s, text in lines
+        if s == step and ERROR_LINE.search(text) and not text.startswith("##[")
+    ]
+    return step, errors
+
+
+def no_test_id(run_id: str, log: str, names: str) -> list[str]:
+    """The report for the jobs of `log` that name no test id."""
+    if not log.strip():
+        return [
+            f"no test id  run {run_id} ({names}): its log is empty; read it on GitHub"
+        ]
+    jobs = {
+        job: lines
+        for job, lines in jobs_of(log).items()
+        if not any(TEST_ID.search(text) for _, text in lines)
+    }
+    if not jobs:
+        return []
+    out = [f"no test id  run {run_id}: {len(jobs)} job{'s' * (len(jobs) > 1)}"]
+    # Each error line's (jobs that printed it, times printed), so the cause
+    # the jobs share outranks each job's own last line.
+    shared: dict[str, tuple[int, int]] = {}
+    for job, lines in jobs.items():
+        step, errors = failed_step(lines)
+        last = errors[-1] if errors else "no error line; read its log"
+        out.append(f'  {job or names}  step "{step}": {last}')
+        for text in set(errors):
+            shared[text] = (
+                shared.get(text, (0, 0))[0] + 1,
+                shared.get(text, (0, 0))[1] + errors.count(text),
+            )
+    if len(jobs) > 1 and shared:
+        text, (n, _) = max(shared.items(), key=lambda kv: kv[1])
+        if n > 1:
+            out.append(f"  {n} of {len(jobs)} jobs printed: {text}")
+    return out
 
 
 def main(argv: list[str]) -> int:
@@ -56,11 +135,12 @@ def main(argv: list[str]) -> int:
     tests: set[str] = set()
     status = 0
     for run_id in sorted({m.group(1) for c in failed if (m := RUN.search(c["link"]))}):
-        found = failed_tests(run_id, repo)
-        tests |= found
-        if not found:
-            names = ", ".join(c["name"] for c in failed if f"/runs/{run_id}/" in c["link"])
-            print(f"no test id  run {run_id} ({names}): read its log")
+        log = failed_log(run_id, repo)
+        tests |= set(TEST_ID.findall(log))
+        names = ", ".join(c["name"] for c in failed if f"/runs/{run_id}/" in c["link"])
+        report = no_test_id(run_id, log, names)
+        if report:
+            print("\n".join(report))
             status = 1
 
     known: dict[str, str] = {}
