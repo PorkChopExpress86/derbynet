@@ -132,7 +132,9 @@ jobs:
         run: uv sync --locked
 
       - name: Install Chromium
-        run: uv run playwright install --with-deps chromium
+        run: |
+          sudo sh "$GITHUB_WORKSPACE/.github/ubuntu-mirror.sh"
+          uv run playwright install --with-deps chromium
 
       # The browser timer's scripts and profiles.js for /timer.php (#50).
       # The runner's JDK compiles the timer's Java sources for AllProfiles;
@@ -246,6 +248,7 @@ jobs:
           DERBYNET_CONFIG_DIR: ${{ runner.temp }}/config
         run: |
           command -v xmllint >/dev/null || {
+            sudo sh "$GITHUB_WORKSPACE/.github/ubuntu-mirror.sh"
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends libxml2-utils
           }
@@ -418,6 +421,7 @@ jobs:
           DERBYNET_BACKEND: django
         run: |
           command -v identify >/dev/null && command -v convert >/dev/null || {
+            sudo sh "$GITHUB_WORKSPACE/.github/ubuntu-mirror.sh"
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends imagemagick
           }
@@ -573,6 +577,7 @@ jobs:
           uv sync --locked
           command -v xmllint >/dev/null && command -v identify >/dev/null \
             && command -v convert >/dev/null || {
+            sudo sh "$GITHUB_WORKSPACE/.github/ubuntu-mirror.sh"
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
           }

@@ -187,6 +187,7 @@ jobs:
           DERBYNET_CONFIG_DIR: ${{ runner.temp }}/leg/config
         run: |
           command -v xmllint >/dev/null || {
+            sudo sh "$GITHUB_WORKSPACE/.github/ubuntu-mirror.sh"
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends libxml2-utils
           }
