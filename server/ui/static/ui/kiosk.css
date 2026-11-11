@@ -251,14 +251,15 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 .k-deck table { width: 100%; border-collapse: separate; border-spacing: 0 .8vh; table-layout: fixed; }
 /* A heat's label ("Heat 100", "Lions, Round 1, Heat 12") wraps in its
    column at every size, as PHP's does (ondeck.css:49-51 sets no
-   white-space or overflow rule); the column's width and font stay, so the
-   lanes keep theirs. The lead's ruling under D10/ADR-10, #273
+   white-space or overflow rule); the column's width stays, so the lanes
+   keep theirs. The lead's ruling under D10/ADR-10, #273
    (test_kiosk_ondeck_labels.py). The label does not clip: on this
    machine's Noto Sans the glyphs of a label taller than its lane cells
-   stand outside the th. The round's divider stays on one line, cut with
-   an ellipsis. */
+   stand outside the th. The round's divider wraps between words too, at
+   its 1.2em font, and is never cut (D10/ADR-10, #283); a word wider than
+   its row breaks inside, as a label's does. */
 .k-deck th { text-align: left; padding: 0 1vw; overflow-wrap: anywhere; color: var(--k-muted); font-weight: 600; }
-.k-deck th.k-divider { color: var(--k-accent); font-size: 1.2em; padding-top: 1vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-deck th.k-divider { color: var(--k-accent); font-size: 1.2em; padding-top: 1vh; }
 .k-deck td { padding: .8vh .6vw; background: var(--k-surface); border-top: .5vh solid var(--lane, var(--k-line)); vertical-align: top; overflow: hidden; }
 .k-deck td .k-car { font-weight: 800; }
 /* A long name wraps in its cell, as in PHP's ondeck.css, which sets no
@@ -352,11 +353,24 @@ body[data-thumbnail] .k-row[hidden] { display: grid !important; }
 
 /* Between the phone and the projector a heat's label keeps half the side
    padding, so "Heat" fits its 9vw column whole at 641x844 on DejaVu Sans,
-   which reproduces CI's fonts; with 1vw it broke "Hea" / "t". The column's width and the font stay. The lead's ruling under
-   D10/ADR-10, #273 (test_kiosk_ondeck_labels.py; the DejaVu run in #273's
-   PR). */
+   which reproduces CI's fonts; with 1vw it broke "Hea" / "t". The
+   column's width stays. The lead's ruling under D10/ADR-10, #273
+   (test_kiosk_ondeck_labels.py; the DejaVu run in #273's PR).
+   From 641 px a heat's label font is capped by the window's width, as
+   PHP's label font is 1.5vw (ondeck.css:49-51), so a tall window's 2.2vh
+   font no longer outgrows the 9vw column and breaks "Hea" / "t". The
+   bound: DejaVu Sans's "Heat" is 2.665em wide (49.48 px at 18.568px,
+   measured in #273's PR), and the column's content box is 9vw less its
+   padding, 8vw from 641 to 1023 px (0.5vw a side) and
+   7vw from 1024 px (1vw a side), so the font may be at most 8 / 2.665 =
+   3.0vw and 7 / 2.665 = 2.63vw; 2.85vw and 2.5vw leave about 5% for other
+   fonts. A landscape window keeps its 2.2vh font, which is the smaller.
+   D10/ADR-10, #283 (test_kiosk_ondeck_labels.py). */
 @media (min-width: 641px) and (max-width: 1023px) {
-  .k-deck th:not(.k-divider) { padding: 0 .5vw; }
+  .k-deck th:not(.k-divider) { padding: 0 .5vw; font-size: min(1em, 2.85vw); }
+}
+@media (min-width: 1024px) {
+  .k-deck th:not(.k-divider) { font-size: min(1em, 2.5vw); }
 }
 /* ----- fullscreen.php -------------------------------------------------------- */
 .k-full { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
