@@ -10,7 +10,8 @@
 # CI twice), and the tests that read only the source
 # (server/tools/source-checks.sh, #48 retro).  It runs plan/tests on every
 # push, as plan-checks.yml does: #222 changed the parity gate a plan test read,
-# and only CI found it (#218 retro).  Turn it on once per clone:
+# and only CI found it (#218 retro).  It refuses a push typed in the same
+# command after a pytest run (#282 retro).  Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
 #
@@ -21,6 +22,50 @@ set -e -o pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 ZERO=0000000000000000000000000000000000000000
+
+# A push in the same shell command as a pytest run goes out before anyone
+# reads that run's result: #238 and #282 each pushed a red head that way
+# (plan/AGENT-BRIEF.md, Evidence).  It reads the `-c` script of each shell
+# above the hook, through /proc, so it checks nothing off Linux.
+# Quoted words, heredoc bodies and comments are left out, so a commit
+# message that says pytest does not count.
+python3 -I - "$PPID" <<'EOF' || exit 1
+import re, sys
+
+
+def code_of(script):
+    # The Bash tool runs a command as `... && eval '<command>' && ...`.
+    wrapped = re.search(r"\beval '((?:[^']|'\"'\"')*)'", script)
+    if wrapped:
+        script = wrapped.group(1).replace("'\"'\"'", "'")
+    script = re.sub(
+        r"<<-?\s*(['\"]?)(\w+)\1([^\n]*)\n.*?\n\s*\2(?=\n|$)", r"\3", script, flags=re.S
+    )
+    script = re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", "''", script)
+    return re.sub(r"(^|\s)#[^\n]*", r"\1", script)
+
+
+pid = int(sys.argv[1])
+while pid > 1:
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            argv = [a.decode(errors="replace") for a in f.read().split(b"\0")]
+        with open(f"/proc/{pid}/stat") as f:
+            ppid = int(f.read().rsplit(")", 1)[1].split()[1])
+    except (OSError, ValueError, IndexError):
+        break
+    flags = [i for i, a in enumerate(argv[1:-1], 1) if re.fullmatch(r"-[a-z]*c[a-z]*", a)]
+    script = code_of(argv[flags[0] + 1]) if flags else ""
+    # `git -C dir push`, `git -c k=v push` and the like count too.
+    push = re.search(r"\bgit\b[^;&|\n]*?\spush\b", script)
+    if push and re.search(r"\bpytest\b", script[: push.start()]):
+        sys.exit(
+            "pre-push: this push runs in the same command as a pytest run "
+            "before it. Read that run's exit code, then push in a command of "
+            "its own (plan/AGENT-BRIEF.md, Evidence)."
+        )
+    pid = ppid
+EOF
 
 # Under a second, and plan/bin reads server/ and .github/, so on every push.
 echo "pre-push: plan/tests" >&2
