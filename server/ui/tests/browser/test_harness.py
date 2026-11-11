@@ -1,9 +1,12 @@
 """The page fixture's own rules (#42 retro)."""
 
+import os
+import subprocess
+
 import pytest
 from playwright.sync_api import expect
 
-from ui.tests.browser.conftest import InFlight, _settle, close_tab
+from ui.tests.browser.conftest import InFlight, _settle, close_tab, font_config
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -207,3 +210,55 @@ def test_the_settle_stops_the_polls_of_a_page_on_a_fake_clock(page, event):
     page.wait_for_timeout(100)
     # One read after the wait: the point is that nothing more was sent.
     assert sent == []
+
+
+# kiosk.css's font stack, and the name of the font Chromium draws it in.
+KIOSK_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+
+
+def drawn_font(page) -> list[str]:
+    page.set_content(f"<p style='font-family: {KIOSK_FONT}'>Heat 100</p>")
+    cdp = page.context.new_cdp_session(page)
+    cdp.send("DOM.enable")
+    cdp.send("CSS.enable")
+    root = cdp.send("DOM.getDocument")["root"]["nodeId"]
+    node = cdp.send("DOM.querySelector", {"nodeId": root, "selector": "p"})
+    fonts = cdp.send("CSS.getPlatformFontsForNode", {"nodeId": node["nodeId"]})
+    return [font["familyName"] for font in fonts["fonts"]]
+
+
+@pytest.mark.parametrize("family", ["DejaVu Sans", "Liberation Sans"])
+def test_a_forced_font_draws_the_kiosk(
+    browser_type, browser_type_launch_args, tmp_path, family
+):
+    """`DERBYNET_BROWSER_FONT` draws kiosk.css's stack in the font it names,
+    whatever this machine's own sans-serif is. Two families, so one of them
+    differs from the machine's default."""
+    env = font_config(family, tmp_path)
+    browser = browser_type.launch(**{**browser_type_launch_args, "env": env})
+    try:
+        assert drawn_font(browser.new_page()) == [family]
+    finally:
+        browser.close()
+
+
+def test_a_font_not_installed_is_refused(tmp_path):
+    """fontconfig falls back without a word, so a misspelt family would run
+    the suite in this machine's font."""
+    with pytest.raises(pytest.UsageError, match="not installed"):
+        font_config("No Such Font Sans", tmp_path)
+
+
+def test_the_page_draws_the_font_asked_for(page):
+    """The `page` fixture draws kiosk.css's stack in `DERBYNET_BROWSER_FONT`
+    when it is set, and in this machine's fontconfig sans-serif when not."""
+    family = (
+        os.environ.get("DERBYNET_BROWSER_FONT")
+        or subprocess.run(
+            ["fc-match", "-f", "%{family[0]}", "sans-serif"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+    assert drawn_font(page) == [family]
