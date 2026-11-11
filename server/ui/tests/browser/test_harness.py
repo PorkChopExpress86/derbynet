@@ -323,16 +323,34 @@ def test_a_browser_file_named_after_one_outside_keeps_the_harness():
 
 
 def collected(path, *fixtures):
-    return SimpleNamespace(fspath=path, nodeid=f"{path}::t", fixturenames=fixtures)
+    return SimpleNamespace(
+        fspath=path,
+        nodeid=f"{path.name}::t",
+        fixturenames=fixtures,
+        add_marker=lambda mark: None,
+    )
 
 
 def test_a_browser_test_without_the_harness_fails_the_run():
     """`check_harness` turns #282's setup errors into one usage error at
-    collection, for a test under browser/ only."""
+    collection, for a test under browser/ only, and names the first test
+    that lost the harness."""
     here = Path(__file__).parent
     kept = collected(here / "test_a.py", "page", "_async_unsafe")
     lost = collected(here / "test_b.py", "page")
+    later = collected(here / "test_d.py", "page")
     outside = collected(here.parent / "test_c.py", "page")
     check_harness([kept, outside], here)
-    with pytest.raises(pytest.UsageError, match=r"test_b\.py::t lost .*#14635"):
-        check_harness([kept, outside, lost], here)
+    with pytest.raises(pytest.UsageError, match=r"^test_b\.py::t lost .*#14635"):
+        check_harness([kept, outside, lost, later], here)
+
+
+def test_the_collection_hook_runs_the_harness_check():
+    """The browser conftest's `pytest_collection_modifyitems` calls
+    `check_harness` on the items it marks, so a collection that lost the
+    harness stops there."""
+    from ui.tests.browser import conftest
+
+    here = Path(conftest.__file__).parent
+    with pytest.raises(pytest.UsageError, match=r"^test_b\.py::t lost "):
+        conftest.pytest_collection_modifyitems([collected(here / "test_b.py", "page")])

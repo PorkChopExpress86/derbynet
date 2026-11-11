@@ -107,8 +107,8 @@ def check_harness(items, here):
     """Raises `HARNESS_LOST` for the first test under `here` that lacks
     `_async_unsafe`, which every test there has as an autouse fixture."""
     for item in items:
-        if here in Path(item.fspath).parents and "_async_unsafe" not in getattr(
-            item, "fixturenames", ()
+        if here in Path(item.fspath).parents and "_async_unsafe" not in (
+            item.fixturenames
         ):
             raise pytest.UsageError(HARNESS_LOST.format(item.nodeid))
 
