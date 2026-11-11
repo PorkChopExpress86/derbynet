@@ -84,8 +84,8 @@ PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
 
 
 class ChainedPush(unittest.TestCase):
-    """#238 and #282 each ran pytest and `git push` in one command and pushed
-    a red head before anyone read the run (#282 retro). The hook reads every
+    """#238 chained `git push` after the full suite, and #282 after printing
+    a red run's output, and each pushed a red head (#282 retro). The hook reads every
     shell above it, so these fail when the command that runs them names a
     pytest run before a push, which the hook would refuse anyway."""
 
@@ -100,6 +100,18 @@ class ChainedPush(unittest.TestCase):
     def test_a_push_with_options_before_push_is_refused(self):
         self.refused(push('plan/README.md', PASSING,
                           ': uv run pytest -q; : git -c core.hooksPath=.githooks push'))
+
+    def test_a_push_after_reading_a_background_runs_output_is_refused(self):
+        """#282's push, from its session log, with the paths shortened: the
+        `.output` file it printed held a red Postgres browser run."""
+        self.refused(push('plan/README.md', PASSING,
+                          'cat /tmp/x/tasks/bcz7l8rxe.output; tail -2 /tmp/x/browser-pg.txt; '
+                          'cd . && git status --short; : git push -q -u origin issue-282 2>&1 '
+                          '| tail -3; git log --oneline -2'))
+
+    def test_a_push_after_reading_a_junit_file_is_refused(self):
+        self.refused(push('plan/README.md', PASSING,
+                          'grep -c failure var/load-runs/a/junit.xml; : git push'))
 
     def test_a_push_after_a_postgres_run_is_refused(self):
         self.refused(push('plan/README.md', PASSING,

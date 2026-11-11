@@ -11,7 +11,7 @@
 # (server/tools/source-checks.sh, #48 retro).  It runs plan/tests on every
 # push, as plan-checks.yml does: #222 changed the parity gate a plan test read,
 # and only CI found it (#218 retro).  It refuses a push typed in the same
-# command after a pytest run (#282 retro).  Turn it on once per clone:
+# command after a pytest run or a read of its output (#282 retro).  Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
 #
@@ -23,12 +23,13 @@ set -e -o pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 ZERO=0000000000000000000000000000000000000000
 
-# A push in the same shell command as a pytest run goes out before anyone
-# reads that run's result: #238 and #282 each pushed a red head that way
-# (plan/AGENT-BRIEF.md, Evidence).  It reads the `-c` script of each shell
+# A push in the same shell command as a pytest run, or as a read of a run's
+# output, goes out before anyone reads that result: #238 chained it after
+# the full suite, and #282 after `cat .../tasks/<id>.output` showed a red
+# Postgres run (plan/AGENT-BRIEF.md, Evidence).  It reads the `-c` script of each shell
 # above the hook, through /proc, so it checks nothing off Linux.
 # Quoted words, heredoc bodies and comments are left out, so a commit
-# message that says pytest does not count.
+# message that names pytest does not count.
 python3 -I - "$PPID" <<'EOF' || exit 1
 import re, sys
 
@@ -58,11 +59,14 @@ while pid > 1:
     script = code_of(argv[flags[0] + 1]) if flags else ""
     # `git -C dir push`, `git -c k=v push` and the like count too.
     push = re.search(r"\bgit\b[^;&|\n]*?\spush\b", script)
-    if push and re.search(r"\bpytest\b", script[: push.start()]):
+    # pytest itself (tools/pytest-postgres.sh too, and pytest.log), a
+    # background task's output file, or a junit file.
+    run = r"\bpytest\b|/tasks/[\w-]+\.output\b|\bjunit\.xml\b"
+    if push and re.search(run, script[: push.start()]):
         sys.exit(
-            "pre-push: this push runs in the same command as a pytest run "
-            "before it. Read that run's exit code, then push in a command of "
-            "its own (plan/AGENT-BRIEF.md, Evidence)."
+            "pre-push: this push runs in the same command as a pytest run, or "
+            "a read of a run's output, before it. Read that run's exit code, "
+            "then push in a command of its own (plan/AGENT-BRIEF.md, Evidence)."
         )
     pid = ppid
 EOF

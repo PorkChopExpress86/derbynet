@@ -113,9 +113,10 @@ class CiFailures(unittest.TestCase):
                          'no test id  run 3: 1 job\n  lint  step "Run ruff": Found 1 error.\n')
 
     def test_jobs_that_failed_at_setup_name_the_error_they_share(self):
-        """PR #284's run 43054997286 failed 10 jobs at apt in three different
-        steps; the lead read the logs by hand to find the mirror they all
-        timed out on (#282 retro). These lines are cut from that log."""
+        """PR #284's run 43054997286 failed jobs at apt in different steps,
+        and the lead read the logs by hand to find the mirror they all timed
+        out on (#282 retro). Two of its jobs, with lines taken from that log,
+        some shortened."""
         result = run([check('fail', 4, 'ui (sqlite)'), check('fail', 4, 'shell (sqlite, group 1)')],
                      {'4': APT_LOG}, [])
         self.assertEqual(result.returncode, 1, result.stderr)
