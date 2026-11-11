@@ -248,9 +248,8 @@ def bounded(labels: list[dict], rows: dict) -> None:
 def test_each_heat_label_shows_whole(page, event):
     """ "Heat 1" to "Heat 100" each show whole, with each word fitting its
     box on one line and none broken across lines, at 390 and 640 px wide
-    on the phone, and at
-    TV, laptop, projector, 641 px and the four tall windows on the
-    desktop (`WINDOWS`). Held on one line as #273's master drew them,
+    on the phone, and at TV, laptop, projector, 641 px and the four tall
+    windows on the desktop (`WINDOWS`). Held on one line as #273's master drew them,
     "Heat 100" is cut on the phone and "Heat 1" at 641 px. On a phone the
     label's column stays 15vw and its font 3.6vw (kiosk.css phone block).
     From 641 px the font is its row's or the cap, 2.85vw to 1023 px and
@@ -259,9 +258,8 @@ def test_each_heat_label_shows_whole(page, event):
     is 0.5vw from 641 to 1023 px, and 1vw on the phone and from 1024 px. A
     label whose words each fit its column takes at most two lines ("Heat"
     over "100"), counted by the tops of its text's line boxes, and at
-    least one label is held so (`bounded`); a word wider than its column
-    breaks inside, so its label may take more. At
-    1920x1080 and 1280x800 "Heat 1" fits its column on one line, and each
+    least one label is held so (`bounded`). At 1920x1080 and 1280x800
+    "Heat 1" fits its column on one line, and each
     label that fits keeps one line, and its row the height it had with the
     label held on one line. A label that fits only by running into its
     padding may wrap: on CI's fonts "Heat 100" took two lines at 1280x800
@@ -417,10 +415,9 @@ def test_the_round_divider_shows_whole(page, event):
     ellipsis (D10/ADR-10, #283). A divider whose text fits its box on one
     line keeps one line, and one that does not takes more. At 390x844 the
     long class's divider does not fit on one line, so the wrap is tested
-    on every font, and each word of it and of "Lions, Round 1" fits its
-    box at every size; the
-    unbreakable class's name is the one word wider than its box there, and
-    shows whole, so it breaks inside."""
+    on every font. Each word of it and of "Lions, Round 1" fits its box at
+    every size; at 390x844 the unbreakable class's name is the one word
+    wider than its box, and shows whole, so it breaks inside."""
     rounds = race_setup(event, groups=(("Lions", 4), ("Tigers", 4), ("Bears", 4)))
     for r in rounds.values():
         scheduled(r, race=False)
