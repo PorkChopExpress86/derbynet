@@ -2,7 +2,8 @@
 # Waits until every check on PR <number>'s current head has finished, then prints
 # one "<bucket> <name> <link>" line per check.  Exits 0 only if all passed or
 # were skipped.  On a failure it also prints `plan/bin/ci-failures`: each
-# failing test, and whether it failed on master lately.  Waits for checks to
+# failing test, and whether it failed on master lately, and for a job that
+# names no test, the step that failed and its error line.  Waits for checks to
 # appear first, because GitHub creates the runs a few seconds after a push.
 #
 # Usage: plan/bin/pr-wait <pr> [--timeout-min N]   (default 90)
