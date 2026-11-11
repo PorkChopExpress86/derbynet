@@ -327,7 +327,7 @@ def collected(path, *fixtures):
 
 
 def test_a_browser_test_without_the_harness_fails_the_run():
-    """`check_harness` turns #282's 52 setup errors into one usage error at
+    """`check_harness` turns #282's setup errors into one usage error at
     collection, for a test under browser/ only."""
     here = Path(__file__).parent
     kept = collected(here / "test_a.py", "page", "_async_unsafe")
