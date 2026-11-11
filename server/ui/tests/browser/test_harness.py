@@ -1,12 +1,22 @@
 """The page fixture's own rules (#42 retro)."""
 
 import os
+import re
 import subprocess
+import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from playwright.sync_api import expect
 
-from ui.tests.browser.conftest import InFlight, _settle, close_tab, font_config
+from ui.tests.browser.conftest import (
+    InFlight,
+    _settle,
+    check_harness,
+    close_tab,
+    font_config,
+)
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -262,3 +272,85 @@ def test_the_page_draws_the_font_asked_for(page):
         ).stdout
     )
     assert drawn_font(page) == [family]
+
+
+SERVER_DIR = Path(__file__).resolve().parents[3]
+# #282's command: a test outside browser/ named between two browser files.
+SPLIT_ARGS = [
+    "ui/tests/browser/test_shell.py",
+    "ui/tests/test_kiosk_screens_tool.py",
+    "ui/tests/browser/test_kiosk_names.py",
+]
+
+
+def test_a_browser_file_named_after_one_outside_keeps_the_harness():
+    """pytest 9.1 bound a conftest's fixtures to the first collector of its
+    folder, so a browser file named after a file outside browser/ lost all
+    of them (pytest-dev/pytest#14635, fixed in 9.2.0): no phone and desktop
+    sizes, and no `_async_unsafe`, so every test errored at setup with
+    `SynchronousOnlyOperation` (#282). `--setup-plan` collects and plans the
+    fixtures without running a test, in its own process, as #282's command
+    was run."""
+    env = {k: v for k, v in os.environ.items() if k != "PYTEST_ADDOPTS"}
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "browser",
+            "-p",
+            "no:xdist",
+            "-p",
+            "no:cacheprovider",
+            "--setup-plan",
+            "-k",
+            "test_long_names_show_whole",
+            *SPLIT_ARGS,
+        ],
+        cwd=SERVER_DIR,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    out = result.stdout
+    assert result.returncode == 0, out + result.stderr
+    names = "ui/tests/browser/test_kiosk_names.py::test_long_names_show_whole"
+    assert f"{names}[phone-chromium]" in out
+    assert f"{names}[desktop-chromium]" in out
+    assert re.search(r"^ *SETUP +S _async_unsafe$", out, re.M), out
+
+
+def collected(path, *fixtures):
+    return SimpleNamespace(
+        fspath=path,
+        nodeid=f"{path.name}::t",
+        fixturenames=fixtures,
+        add_marker=lambda mark: None,
+    )
+
+
+def test_a_browser_test_without_the_harness_fails_the_run():
+    """`check_harness` turns #282's setup errors into one usage error at
+    collection, for a test under browser/ only, and names the first test
+    that lost the harness."""
+    here = Path(__file__).parent
+    kept = collected(here / "test_a.py", "page", "_async_unsafe")
+    lost = collected(here / "test_b.py", "page")
+    later = collected(here / "test_d.py", "page")
+    outside = collected(here.parent / "test_c.py", "page")
+    check_harness([kept, outside], here)
+    with pytest.raises(pytest.UsageError, match=r"^test_b\.py::t lost .*#14635"):
+        check_harness([kept, outside, lost, later], here)
+
+
+def test_the_collection_hook_runs_the_harness_check():
+    """The browser conftest's `pytest_collection_modifyitems` calls
+    `check_harness` on the items it marks, so a collection that lost the
+    harness stops there."""
+    from ui.tests.browser import conftest
+
+    here = Path(conftest.__file__).parent
+    with pytest.raises(pytest.UsageError, match=r"^test_b\.py::t lost "):
+        conftest.pytest_collection_modifyitems([collected(here / "test_b.py", "page")])
