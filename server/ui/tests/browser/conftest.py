@@ -91,11 +91,34 @@ SCREENSHOTS = Path(
 )
 
 
+# pytest 9.1 bound a conftest's fixtures to the first collector of its
+# folder, so a browser file named on the command line after a file outside
+# browser/ lost every fixture here, and each of its tests failed at setup
+# with `SynchronousOnlyOperation` (pytest-dev/pytest#14635, #282). A pytest
+# that drops them again fails the run at collection instead.
+HARNESS_LOST = (
+    "{} lost the browser harness's fixtures; pytest-dev/pytest#14635 drops a "
+    "conftest's fixtures when a file outside its folder is named between two "
+    "of its files: use pytest 9.2 or later, or name the browser files together"
+)
+
+
+def check_harness(items, here):
+    """Raises `HARNESS_LOST` for the first test under `here` that lacks
+    `_async_unsafe`, which every test there has as an autouse fixture."""
+    for item in items:
+        if here in Path(item.fspath).parents and "_async_unsafe" not in getattr(
+            item, "fixturenames", ()
+        ):
+            raise pytest.UsageError(HARNESS_LOST.format(item.nodeid))
+
+
 def pytest_collection_modifyitems(items):
     here = Path(__file__).parent
     for item in items:
         if here in Path(item.fspath).parents:
             item.add_marker(pytest.mark.browser)
+    check_harness(items, here)
 
 
 # A host name that reaches the live server over plain HTTP. `localhost` is a

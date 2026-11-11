@@ -5,11 +5,18 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from playwright.sync_api import expect
 
-from ui.tests.browser.conftest import InFlight, _settle, close_tab, font_config
+from ui.tests.browser.conftest import (
+    InFlight,
+    _settle,
+    check_harness,
+    close_tab,
+    font_config,
+)
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -313,3 +320,19 @@ def test_a_browser_file_named_after_one_outside_keeps_the_harness():
     assert f"{names}[phone-chromium]" in out
     assert f"{names}[desktop-chromium]" in out
     assert re.search(r"^ *SETUP +S _async_unsafe$", out, re.M), out
+
+
+def collected(path, *fixtures):
+    return SimpleNamespace(fspath=path, nodeid=f"{path}::t", fixturenames=fixtures)
+
+
+def test_a_browser_test_without_the_harness_fails_the_run():
+    """`check_harness` turns #282's 52 setup errors into one usage error at
+    collection, for a test under browser/ only."""
+    here = Path(__file__).parent
+    kept = collected(here / "test_a.py", "page", "_async_unsafe")
+    lost = collected(here / "test_b.py", "page")
+    outside = collected(here.parent / "test_c.py", "page")
+    check_harness([kept, outside], here)
+    with pytest.raises(pytest.UsageError, match=r"test_b\.py::t lost .*#14635"):
+        check_harness([kept, outside, lost], here)
