@@ -59,21 +59,47 @@ MEASURE = """() => {
         problems.push(`clipped: [${x.top}, ${x.bottom}] in [${r.top}, ${r.bottom}]`);
     }
     const lines = new Set(rects.map(x => Math.round(x.top))).size;
-    return {text: th.textContent, lines,
-            fontSize: parseFloat(s.fontSize), width: r.width, problems};
+    return {text: th.textContent, lines, fontSize: parseFloat(s.fontSize),
+            width: r.width, pad: parseFloat(s.paddingLeft) + parseFloat(s.paddingRight),
+            problems};
   });
 }"""
 # Each heat row's height and lane widths as drawn, and again with its
 # labels held on one line as master drew them (`white-space: nowrap`), in
 # one task, so nothing redraws in between; the inline style is removed
-# before it returns.
+# before it returns. Held on one line, `cut` is a label wider than its box
+# (master's ellipsis), and `fits` that each label's text fits its content
+# box, inside the padding: a label that runs into its padding is not cut
+# on one line but wraps ("Heat 100" at 1280x800 on CI's fonts, #273's PR).
+# `wordsFit` is that each word of each label fits that box on its own: a
+# word that does not breaks inside, so the label may take more lines.
 AS_MASTER = """() => {
   const rows = [...document.querySelectorAll('.k-deck tbody tr')]
     .filter(tr => !tr.querySelector('.k-divider'));
   const read = () => rows.map(tr => ({
     height: tr.getBoundingClientRect().height,
     lanes: [...tr.querySelectorAll('td')].map(td => td.getBoundingClientRect().width),
-    cut: [...tr.querySelectorAll('th')].some(th => th.scrollWidth > th.clientWidth)}));
+    cut: [...tr.querySelectorAll('th')].some(th => th.scrollWidth > th.clientWidth),
+    fits: [...tr.querySelectorAll('th')].every(th => {
+      const s = getComputedStyle(th), range = document.createRange();
+      range.selectNodeContents(th);
+      const pad = parseFloat(s.paddingLeft) + parseFloat(s.paddingRight);
+      const box = th.getBoundingClientRect().width - pad;
+      return range.getBoundingClientRect().width <= box;
+    }),
+    wordsFit: [...tr.querySelectorAll('th')].every(th => {
+      const s = getComputedStyle(th), text = th.firstChild;
+      const range = document.createRange();
+      const pad = parseFloat(s.paddingLeft) + parseFloat(s.paddingRight);
+      const box = th.getBoundingClientRect().width - pad;
+      let at = 0;
+      return text.data.split(' ').every(word => {
+        range.setStart(text, at);
+        range.setEnd(text, at + word.length);
+        at += word.length + 1;
+        return range.getBoundingClientRect().width <= box;
+      });
+    })}));
   const wrapped = read();
   const ths = rows.flatMap(tr => [...tr.querySelectorAll('th')]);
   ths.forEach(th => { th.style.whiteSpace = 'nowrap'; });
@@ -81,7 +107,8 @@ AS_MASTER = """() => {
   ths.forEach(th => { th.style.whiteSpace = ''; });
   return rows.map((tr, i) => ({
     text: tr.querySelector('th:last-of-type').textContent,
-    wrapped: wrapped[i], nowrap: nowrap[i], nowrapCut: nowrap[i].cut}));
+    wrapped: wrapped[i], nowrap: nowrap[i], nowrapCut: nowrap[i].cut,
+    fits: nowrap[i].fits, wordsFit: nowrap[i].wordsFit}));
 }"""
 PROBLEMS = f"({MEASURE})().flatMap(l => l.problems.map(p => `${{l.text}}: ${{p}}`))"
 
@@ -125,16 +152,31 @@ def windows(page):
         yield f"{window['width']}x{window['height']}"
 
 
+def bounded(labels: list[dict], rows: dict) -> None:
+    """Each label whose words each fit its column takes at most two lines,
+    and at least one label is so, so the bound never goes vacuous."""
+    held = [label for label in labels if rows[label["text"]]["wordsFit"]]
+    assert held, labels
+    for label in held:
+        assert label["lines"] <= 2, label
+
+
 def test_each_heat_label_shows_whole(page, event):
     """ "Heat 1" to "Heat 100" each show whole, at 390 and 640 px wide on
     the phone, and at TV, laptop, projector and 641 px on the desktop.
     Held on one line as master drew them, "Heat 100" is cut on the phone
     and "Heat 1" at 641 px. On a phone the label's column stays 15vw and
-    its font 3.6vw (kiosk.css phone block). On a phone and at 641 px a
-    label takes at most two lines ("Heat" over "100"), counted by the tops
-    of its text's line boxes. At 1920x1080 and 1280x800 each label keeps
-    one line, and each row the height it had with the label held on one
-    line."""
+    its font 3.6vw (kiosk.css phone block). A label's side padding is
+    0.5vw at 641 px, and 1vw on the phone and from 1024 px. On a phone and
+    at 641 px a label whose words each fit its column takes at most two
+    lines ("Heat" over "100"), counted by the tops of its text's line
+    boxes, and at least one label is held so (`bounded`); a word wider
+    than its column breaks inside, so its label may take more. At
+    1920x1080 and 1280x800 "Heat 1" fits its column on one line, and each
+    label that fits keeps one line, and its row the height it had with the
+    label held on one line. A label that fits only by running into its
+    padding may wrap: on CI's fonts "Heat 100" took two lines at 1280x800
+    (#273's PR)."""
     rounds = race_setup(event, groups=(("Lions", HEATS),), lanes=LANES)
     scheduled(rounds["Lions"])
     connected(event)
@@ -151,17 +193,26 @@ def test_each_heat_label_shows_whole(page, event):
         width = page.evaluate("innerWidth")
         if page.size == "phone":
             assert rows["Heat 100"]["nowrapCut"], rows["Heat 100"]
+            bounded(labels, rows)
             for label in labels:
-                assert label["lines"] <= 2, label
+                assert label["pad"] == pytest.approx(0.02 * width, abs=0.05), label
                 assert label["width"] == pytest.approx(0.15 * width, abs=0.5), label
                 assert label["fontSize"] == pytest.approx(0.036 * width, abs=0.05)
         elif width == 641:
             assert rows["Heat 1"]["nowrapCut"], rows["Heat 1"]
+            bounded(labels, rows)
             for label in labels:
-                assert label["lines"] <= 2, label
-        elif width >= 1280:
-            assert {label["lines"] for label in labels} == {1}, (size, labels)
-            for row in rows.values():
+                assert label["pad"] == pytest.approx(0.01 * width, abs=0.05), label
+        else:
+            for label in labels:
+                assert label["pad"] == pytest.approx(0.02 * width, abs=0.05), label
+        if width >= 1280:
+            assert rows["Heat 1"]["fits"], (size, rows["Heat 1"])
+            lines = {label["text"]: label["lines"] for label in labels}
+            for text, row in rows.items():
+                if not row["fits"]:
+                    continue
+                assert lines[text] == 1, (size, text, row)
                 assert row["wrapped"]["height"] == pytest.approx(
                     row["nowrap"]["height"], abs=0.5
                 ), (size, row)
