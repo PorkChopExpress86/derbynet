@@ -33,9 +33,11 @@ control unbound once its task ends fails the test (#46 retro).
 
 import os
 import re
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
+from xml.sax.saxutils import escape
 
 import pytest
 import pytest_timeout
@@ -102,11 +104,52 @@ def pytest_collection_modifyitems(items):
 PLAIN_HTTP_HOST = "derbynet.test"
 
 
+# Puts a family first for fontconfig's `sans-serif` (`font_config`).
+FONTS_CONF = """<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <match target="pattern">
+    <test name="family"><string>sans-serif</string></test>
+    <edit name="family" mode="prepend" binding="strong"><string>{family}</string></edit>
+  </match>
+</fontconfig>
+"""
+
+
+def font_config(family: str, folder: Path) -> dict[str, str]:
+    """The environment that makes Chromium draw `system-ui`, which
+    kiosk.css's stack starts with, in `family`: a fontconfig file that puts
+    it first for fontconfig's `sans-serif`, which Chromium asks for
+    `system-ui` (`test_a_forced_font_draws_the_kiosk`). A CSS `sans-serif`
+    goes to Chromium's own default, Arial, and stays. It fails when
+    `family` is not installed, since fontconfig would fall back silently."""
+    found = subprocess.run(
+        ["fc-match", "-f", "%{family}", family],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    if family not in found.split(","):
+        raise pytest.UsageError(f"font {family!r} is not installed: {found!r}")
+    conf = folder / "fonts.conf"
+    conf.write_text(FONTS_CONF.format(family=escape(family)))
+    return {**os.environ, "FONTCONFIG_FILE": str(conf)}
+
+
 @pytest.fixture(scope="session")
-def browser_type_launch_args(browser_type_launch_args):
+def browser_type_launch_args(browser_type_launch_args, tmp_path_factory):
     """Chromium resolves `PLAIN_HTTP_HOST` to the live server, and offers
     two fake cameras that need no permission prompt, so the replay setup can
-    choose between them (#53)."""
+    choose between them (#53). `DERBYNET_BROWSER_FONT="DejaVu Sans"` draws
+    `system-ui` as Ubuntu 24.04 does (`font_config`, #273 retro)."""
+    family = os.environ.get("DERBYNET_BROWSER_FONT")
+    if family:
+        folder = tmp_path_factory.mktemp("fonts")
+        browser_type_launch_args = {
+            **browser_type_launch_args,
+            "env": font_config(family, folder),
+        }
     return {
         **browser_type_launch_args,
         "args": [
