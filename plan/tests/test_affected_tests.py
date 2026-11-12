@@ -160,11 +160,11 @@ class Everything(unittest.TestCase):
         out = run('server/ui/tests/browser/conftest.py')
         self.assertIn('Postgres: not needed', out)
 
-    def test_a_conftest_runs_everything(self):
+    def test_a_conftest_leaves_the_full_run_to_ci(self):
         out = run('server/ui/tests/browser/conftest.py')
         self.assertIn('[everything] a shared conftest', out)
 
-    def test_a_workflow_runs_everything(self):
+    def test_a_workflow_leaves_the_full_run_to_ci(self):
         out = run('.github/workflows/server.yml')
         self.assertIn('[everything] a CI workflow', out)
 
@@ -276,16 +276,19 @@ class TestHelper(unittest.TestCase):
         out = run('server/core/tests/factories.py')
         self.assertIn('-m browser ui/tests', commands(out))
 
-    def test_a_helper_the_root_conftest_imports_runs_everything(self):
+    def test_a_helper_the_root_conftest_imports_leaves_the_full_run_to_ci(self):
         out = run('server/racing/engine/tests/golden.py')
         self.assertIn('the root conftest imports it', out)
+        self.assertIn('CI runs the full suites on both databases (D85)', out)
+        self.assertIn('  uv run pytest -n auto racing/engine/tests', commands(out))
+        self.assertNotIn('  uv run pytest -n auto\n', commands(out))
 
 
 class TestData(unittest.TestCase):
     def test_a_fixture_maps_to_the_test_that_names_it(self):
         out = run('server/racing/engine/tests/data/tables.json')
         self.assertIn('[test-data]', out)
-        self.assertIn('racing/engine/tests/test_tables.py', commands(out))
+        self.assertIn('  uv run pytest -n auto racing/engine/tests', commands(out))
 
 
 class Model(unittest.TestCase):

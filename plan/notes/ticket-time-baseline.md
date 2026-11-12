@@ -10,7 +10,7 @@ Where a ticket's wall-clock time went, from the implementer's start to the merge
 - `gh run list` / `gh pr view` for PRs #284, #285, #287 and #288.
 - Timed runs on master `4ea65152`, 2026-11-12, 8 cores, `-n auto`.
 
-All times are UTC on 2026-11-11 unless they say otherwise. This machine's journal is UTC−6: its local 07:22 is 13:22 UTC.
+All times are UTC on 2026-11-11 unless they say otherwise; the journal's times below are converted to UTC.
 
 **Critical path** means the step delayed the merge. A step marked n ran beside one that did.
 
@@ -35,7 +35,7 @@ All times are UTC on 2026-11-11 unless they say otherwise. This machine's journa
 | Lead edits the issue body, starts reviewers | 13:11 | 13:12 | 1 | y | lead 13:11:40–13:12:25 |
 | Standards review (sonnet) | 13:12 | 13:17 | 5 | n | af1ddbb handback 13:16:42 |
 | Spec review (opus): its own checks and collections | 13:12 | 13:22 | 10 | y | a20eda1 13:12–13:21 |
-| **Machine suspended.** Spec's full non-browser suite (9.2.0, then 9.1.1) was running and never finished; Spec stopped it at 14:01 | 13:22 | 14:01 | 39 | y | journal: suspend 07:22:44 local, "slept 37m41s" at 08:00:25; `nb92.txt` reached 19%; a20eda1 TaskStop 14:01:34 |
+| **Machine suspended.** Spec's full non-browser suite (9.2.0, then 9.1.1) was running and never finished; Spec stopped it at 14:01 | 13:22 | 14:01 | 39 | y | journal: suspend 13:22:44, "slept 37m41s" at 14:00:25; `nb92.txt` reached 19%; a20eda1 TaskStop 14:01:34 |
 | Spec: collection-order check | 14:01 | 14:03 | 2 | y | a20eda1 14:01–14:03 |
 | Spec: test_replay 5× under load on Postgres, pytest 9.2.0 then 9.1.1 | 14:03 | 14:55 | 52.4 | y | `rv/load92.out` "1 failed, 204 passed … in 1719.72s"; `rv/load911.out` "205 passed … in 1425.01s" |
 | Spec: remote-camera test 25× under load on Postgres, both versions | 14:56 | 15:21 | 25 | y | `rv/cam92.out` "125 passed … in 758.37s"; `rv/cam911.out` |
@@ -82,7 +82,7 @@ All times are UTC on 2026-11-11 unless they say otherwise. This machine's journa
 | Final: 25-count load run, DejaVu | 22:02 | 22:13 | 11.2 | y | `f-load-dejavu.out` "150 passed in 674.08s" |
 | Final: `-n 0` names test, then this file | 22:13 | 22:14 | 1.4 | y | `f-n0.log` "in 81.73s" |
 | Final: full non-browser suite, SQLite (pytest 9:22) | 22:14 | 22:17 | 3 | y | `f-full.log` "in 562.49s", last write 23:27 |
-| **Machine suspended** during that suite | 22:17 | 23:20 | 63 | y | journal: suspend 16:17:18 local, "slept 1h3m23s" at 17:20:40 |
+| **Machine suspended** during that suite | 22:17 | 23:20 | 63 | y | journal: suspend 22:17:18, "slept 1h3m23s" at 23:20:40 |
 | Final: the rest of that suite | 23:20 | 23:27 | 6 | y | `f-full.log` |
 | Final: full browser suite, SQLite | 23:27 | 23:44 | 16.6 | y | `f-browser.log` "in 997.86s", last write 23:44:06 |
 | Final: Postgres full suite, stopped under the new rules | 23:44 | 23:46 | 2 | y | `final.log` "Terminated"; TaskStop 23:46:08 |
@@ -127,7 +127,7 @@ The agents spent most of their time waiting on serial runs. They didn't run the 
 | — | The lead's own time between steps | ~5 | ~3 | ~8 | 1–2% |
 
 - **Test runs and CI, not counting the suspends:** 256 of #282's 336 min (76%) and 239 of #283's 360 min (66%).
-- **The suspends add 39 and 63 min.** Both were the owner closing the lid to leave (section 6).
+- **The suspends add 39 and 63 min.** Both were the owner closing the lid (section 6).
 - **The lead was not a bottleneck.** Rulings and relays took seconds: the 18:17 ruling came 11 s after the question.
 - **Diagnosis was fast:** #282 went red and its cause was named in 4 min.
 - **The owner's waits are outside the loop:** 5 h 46 min for ticket approval overnight, and 11 min at the outage stop.
@@ -210,12 +210,12 @@ A PR waits 11–14 min on CI: #284 took 11 min, #287 took 13 min. CI runs the wh
 
 ## 6. The machine slept during runs: the owner's lid
 
-The journal shows two lid closes while agents were running tests: logind's "Lid closed" at 07:19:09 and 16:17:15 local time (13:19 and 22:17 UTC). The machine was asleep:
+The journal shows two lid closes while agents were running tests: logind's "Lid closed" at 13:19:09 and 22:17:15. The machine was asleep:
 - 13:19–13:22 UTC: several short suspends, the lid still shut;
 - 13:22–14:00 UTC: 37 min 41 s;
 - 22:17–23:20 UTC: 63 min 23 s.
 
-The owner closed the lid to take the laptop on leaving work, so these are owner time, not loop waste. The background runs froze with the machine and carried on after it woke. Pytest's own clock (monotonic) left the sleep out, so `f-full.log` says 9:22 for a suite that took 73 min of wall clock.
+The owner closed the lid, so these are owner time, not loop waste. The background runs froze with the machine and carried on after it woke. Pytest's own clock (monotonic) left the sleep out, so `f-full.log` says 9:22 for a suite that took 73 min of wall clock.
 
 ## 7. Candidates (inputs for `/grill-with-docs`, not decisions)
 
