@@ -2,13 +2,17 @@
 sheet. The browser flow is in `ui/tests/browser/test_vote.py`."""
 
 import json
+import uuid
 
 import pytest
+from django.test import Client
 
-from accounts.permissions import Perm
+from accounts.views import make_mcheckin_token
+from awards import balloting
 from awards.models import BallotAward, Vote
 from awards.tests.factories import AwardFactory, BallotAwardFactory, VoterFactory
 from core.models import RaceSettings, RaceState, SiteState
+from core.tests.factories import EventFactory
 from roster.tests.factories import GroupFactory, RacerFactory, SubgroupFactory
 from ui.tests.db import no_db_writes
 from ui.tests.sessions import no_session_writes
@@ -225,18 +229,159 @@ def test_a_depth_for_no_award_is_refused(login, event):
     assert response.status_code == 422
 
 
-def test_the_password_needs_set_up(login, event):
-    """`judging.js:398` writes it with settings.write, which needs SET_UP."""
-    crew = login("RaceCrew")
-    assert not Perm.SET_UP & 8687
-    response = post(crew, "/judging/ballot/password/", {"ballot_password": "acorn"})
-    assert response.status_code == 422
-    assert RaceSettings.objects.get(event=event).ballot_password == ""
+def test_the_ballot_sheet_has_no_password_field(login, event):
+    """D86: a voting token, not the ballot password, lets a voter in, so the
+    sheet drops the field and its URL; the stored setting is left as it
+    is, for settings.list and snapshots."""
+    RaceSettings.objects.filter(event=event).update(ballot_password="acorn")
+    coordinator = login("RaceCoordinator")
 
+    sheet = coordinator.get("/judging/ballot/").content.decode()
     response = post(
-        login("RaceCoordinator"),
-        "/judging/ballot/password/",
-        {"ballot_password": "acorn"},
+        coordinator, "/judging/ballot/password/", {"ballot_password": "oak"}
     )
-    assert response.status_code == 200
+
+    assert "ballot_password" not in sheet
+    assert "acorn" not in sheet
+    assert "Ballot password" not in sheet
+    assert response.status_code == 404
     assert RaceSettings.objects.get(event=event).ballot_password == "acorn"
+
+
+# ----- the vote link and the voting code (#206, D86) -----
+
+
+def test_the_vote_link_keeps_the_token_in_the_session_only(client, event, pack):
+    token = pack["wolf"].voting_token
+
+    response = client.get(f"/vote/code/{token}")
+
+    assert response.status_code == 302
+    assert response["Location"] == "/vote/"
+    assert client.session[balloting.SESSION_TOKEN] == str(token)
+    page = client.get("/vote/")
+    assert str(token) not in page.content.decode()
+    assert config(page)["hasToken"] is True
+
+
+def bad_codes(event):
+    gone = RacerFactory(group=GroupFactory(event=event, name="Gone"))
+    gone_token = gone.voting_token
+    gone.delete()
+    elsewhere = RacerFactory(group=GroupFactory(event=EventFactory()))
+    return {
+        "unknown": str(uuid.uuid4()),
+        "malformed": "not-a-token",
+        "empty": "",
+        "slashes": "a/b/c",
+        "percent-nul": "%00" + str(uuid.uuid4()),
+        "other-event": str(elsewhere.voting_token),
+        "deleted": str(gone_token),
+    }
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "unknown",
+        "malformed",
+        "empty",
+        "slashes",
+        "percent-nul",
+        "other-event",
+        "deleted",
+    ],
+)
+def test_a_bad_vote_link_answers_one_page_and_drops_the_sessions_token(
+    client, event, pack, kind
+):
+    """The same 404 page for every bad code, so it never says whether a
+    code was a deleted racer's, and the phone's earlier token is gone."""
+    client.get(f"/vote/code/{pack['wolf'].voting_token}")
+    code = bad_codes(event)[kind]
+
+    response = client.get(f"/vote/code/{code}")
+
+    assert response.status_code == 404
+    text = response.content.decode()
+    assert "This voting code is not valid" in text
+    assert "Ask the check-in table for your racer's code." in text
+    assert "deleted" not in text.lower()
+    assert balloting.SESSION_TOKEN not in client.session
+    assert config(client.get("/vote/"))["hasToken"] is False
+
+
+def test_the_page_with_no_token_asks_for_a_code(client, event, pack):
+    RaceState.objects.filter(event=event).update(balloting_open=True)
+
+    page = client.get("/vote/").content.decode()
+
+    assert 'data-vote-state="code"' in page
+    assert "Scan a racer&#x27;s voting code to vote" in page or (
+        "Scan a racer's voting code to vote" in page
+    )
+    assert config(client.get("/vote/"))["hasToken"] is False
+
+
+def voting_code_url(racer):
+    return f"/checkin/racer/{racer.pk}/voting-code/"
+
+
+def test_the_voting_code_sheet_shows_the_racers_vote_link(login, event, pack):
+    crew = login("RaceCrew")
+
+    with no_db_writes(), no_session_writes():
+        response = crew.get(voting_code_url(pack["wolf"]))
+
+    text = response.content.decode()
+    link = f"http://testserver/vote/code/{pack['wolf'].voting_token}"
+    assert response.status_code == 200
+    assert f"data-voting-url>{link}</p>" in text
+    assert "checkin.show('Voting code')" in text
+    assert pack["wolf"].first_name in text and "Zed" in text
+    # The link opens the racer's ballot on a phone.
+    phone = Client()
+    assert phone.get(link.removeprefix("http://testserver")).status_code == 302
+    assert phone.session[balloting.SESSION_TOKEN] == str(pack["wolf"].voting_token)
+
+
+def test_the_card_offers_the_voting_code_and_holds_no_token(login, event, pack):
+    page = login("RaceCrew").get("/checkin/").content.decode()
+
+    assert voting_code_url(pack["wolf"]) in page
+    assert 'data-action="voting-code"' in page
+    for racer in (pack["wolf"], pack["bear"]):
+        assert str(racer.voting_token) not in page
+
+
+def test_a_check_in_phone_without_a_login_sees_no_voting_code(event, pack):
+    """The check-in link's grant (#16) opens the page but not the sheet: it
+    is for a logged-in crew role (D5)."""
+    phone = Client()
+    assert phone.get(f"/checkin/?tok={make_mcheckin_token()}").status_code == 302
+
+    page = phone.get("/checkin/").content.decode()
+    response = phone.get(voting_code_url(pack["wolf"]), HTTP_HX_REQUEST="true")
+
+    assert page.count("data-racer=") >= 4
+    assert 'data-action="voting-code"' not in page
+    assert response.status_code == 422
+    assert str(pack["wolf"].voting_token) not in response.content.decode()
+
+
+def test_a_role_without_check_in_sees_no_voting_code(login, event, pack):
+    """A logged-in role whose own bits lack CHECK_IN_RACERS, even with the
+    check-in link's grant added to its session, does not see the sheet."""
+    photo = login("Photo")
+    photo.get(f"/checkin/?tok={make_mcheckin_token()}")
+
+    response = photo.get(voting_code_url(pack["wolf"]), HTTP_HX_REQUEST="true")
+
+    assert response.status_code == 422
+    assert str(pack["wolf"].voting_token) not in response.content.decode()
+
+
+def test_the_voting_code_of_another_events_racer_is_not_found(login, event):
+    elsewhere = RacerFactory(group=GroupFactory(event=EventFactory()))
+    response = login("RaceCrew").get(voting_code_url(elsewhere))
+    assert response.status_code == 404

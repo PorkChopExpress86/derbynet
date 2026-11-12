@@ -1,14 +1,16 @@
 """The ballot endpoints (#54): `ballot.open`, `query=ballot.get`,
 `vote.cast` and `query=ballot.results`, over `awards.balloting`.
 
-`ballot.get` and `vote.cast` answer anyone, as PHP's do (neither
+`ballot.get` and `vote.cast` need no login, as PHP's do (neither
 `query.ballot.get.inc` nor `action.vote.cast.inc` checks a permission): a
-voter's login is the ballot password (ADR-07, D5). `ballot.get` writes the
-session, as PHP's does (`query.ballot.get.inc:16`), and adds the voter's row
-on a GET (`voterid.inc:18` to `:23`).
+voter's credential is a racer's voting token (#206, D86). The vote link
+(`ui.vote.views.token_link`) puts the token in the session, and so does
+`ballot.get` given `voting_token=<GUID>`; `vote.cast` and later
+`ballot.get` calls in the same session use it. A call whose session holds no
+valid token of the active event is refused with `no-token`, and a refused
+token leaves the session. `ballot.get` adds the voter's row on a GET
+(`voterid.inc:18` to `:23`).
 """
-
-import secrets
 
 from accounts.permissions import Access, Perm
 from awards import balloting
@@ -16,15 +18,23 @@ from awards.balloting import BallotFailure
 from awards.models import Award
 from legacy_api.registry import LegacyContext, action, query
 
-# The session keys. PHP's flag is `$_SESSION['ok-to-vote']`; its voter is the
-# PHP session id.
-OK_TO_VOTE = "ok-to-vote"
-VOTER = "ballot-voter"
+# The session key that holds the voting token. PHP's flag is
+# `$_SESSION['ok-to-vote']`, set by the ballot password; its voter is the PHP
+# session id.
+TOKEN = balloting.SESSION_TOKEN
+# The `ballot.get` parameter that names a token.
+TOKEN_PARAM = "voting_token"
 
 S15 = (
-    "S15: the voter is a random identifier kept in the session, and a"
-    " ballot_code the caller sends is ignored; PHP names the voter by the"
-    " session id or by any ballot_code."
+    "S15: the voter is the racer whose voting token the session holds (D86),"
+    " and a ballot_code or voter id the caller sends is ignored; PHP names"
+    " the voter by the session id or by any ballot_code."
+)
+D86 = (
+    "D86: refused with no-token while the session holds no voting token of"
+    " a racer of the active event (voting_token on ballot.get puts one"
+    " there); the ballot password gates nothing. PHP lets in whoever gives"
+    " the ballot password."
 )
 
 
@@ -32,13 +42,12 @@ def _fail(ctx: LegacyContext, failure: BallotFailure) -> None:
     ctx.failure(failure.code, failure.description)
 
 
-def _voter_identifier(ctx: LegacyContext) -> str:
-    """The session's voter, made on its first ballot request."""
-    found = ctx.session.get(VOTER)
-    if not isinstance(found, str) or not found:
-        found = secrets.token_hex(16)
-        ctx.session[VOTER] = found
-    return found
+def _refuse(ctx: LegacyContext, failure: BallotFailure) -> None:
+    """A refusal; a refused token leaves the session, so the next call
+    does not try it again."""
+    if failure is balloting.NO_TOKEN:
+        ctx.session.pop(TOKEN, None)
+    _fail(ctx, failure)
 
 
 @action(
@@ -63,24 +72,22 @@ def ballot_open(ctx: LegacyContext) -> None:
     permission=Access.ANONYMOUS,
     session_write=True,
     get_writes=True,
-    divergences=(S15,),
+    divergences=(S15, D86),
 )
 def ballot_get(ctx: LegacyContext) -> None:
-    given = ctx.args.get("password", "")
-    if not isinstance(given, str):
-        given = ""
-    if not ctx.session.get(OK_TO_VOTE) and not balloting.password_matches(
-        ctx.event, given
-    ):
-        _fail(ctx, balloting.PASSWORD)
+    if TOKEN_PARAM in ctx.args:
+        given = ctx.args.get(TOKEN_PARAM)
+        ctx.session[TOKEN] = given if isinstance(given, str) else ""
+    try:
+        found = balloting.ballot(ctx.event, ctx.session.get(TOKEN), ctx.remote_addr)
+    except BallotFailure as failure:
+        _refuse(ctx, failure)
         return
-    ctx.session[OK_TO_VOTE] = 1
-    voter_row = balloting.voter(ctx.event, _voter_identifier(ctx), ctx.remote_addr)
     ctx.put(
         "ballot",
         {
             str(award_id): {"max_votes": entry.max_votes, "votes": entry.votes}
-            for award_id, entry in balloting.ballot(ctx.event, voter_row).items()
+            for award_id, entry in found.items()
         },
     )
 
@@ -91,9 +98,7 @@ def ballot_get(ctx: LegacyContext) -> None:
     session_write=True,
     divergences=(
         S15,
-        "S14: refused with password, after PHP's closed, no-award and"
-        " too-many checks, while a ballot password is set and this session"
-        " has not given it; PHP never checks.",
+        D86 + " The check comes after PHP's closed, no-award and too-many checks.",
         "S14: refused with ineligible for a racer who has not passed"
         " check-in, is not eligible for any award, cannot win the award"
         " (D33, D35), or is named twice, and for votes that are not a JSON"
@@ -105,14 +110,13 @@ def vote_cast(ctx: LegacyContext) -> None:
     try:
         summary = balloting.cast(
             ctx.event,
-            _voter_identifier(ctx),
+            ctx.session.get(TOKEN),
             award.pk if award is not None else None,
             ctx.args.get("votes"),
-            allowed=bool(ctx.session.get(OK_TO_VOTE)),
             ip_address=ctx.remote_addr,
         )
     except BallotFailure as failure:
-        _fail(ctx, failure)
+        _refuse(ctx, failure)
         return
     ctx.put("votes", summary)
     ctx.success()

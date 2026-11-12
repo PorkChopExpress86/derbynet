@@ -111,6 +111,11 @@ SKIPS: dict[str, str] = {
 # script asks Django other questions when DERBYNET_BACKEND=django. Their
 # transcripts are compared up to where the requests part.
 STEP_DIVERGENCES: dict[str, str] = {
+    "test-balloting.sh": (
+        "D86: with DERBYNET_BACKEND=django the script votes with two racers'"
+        " voting tokens, read from the Voting code sheet, where PHP's run gives"
+        " the ballot password and deletes the cookie jar to change voters"
+    ),
     "test-reschedule.sh": (
         "D34, D39: with DERBYNET_BACKEND=django the script checks Django's"
         " charts and refusals, and races other heats (testing/README.md)"

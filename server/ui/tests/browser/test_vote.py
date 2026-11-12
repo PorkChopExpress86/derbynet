@@ -1,8 +1,12 @@
 """The vote page in a browser (#54), on a phone and a desktop.
 
-- A wrong ballot password shows the message, the right one opens the
-  ballot, two votes fill a depth-2 award, and the third car's toggle is
-  disabled with its reason.
+- With no voting code the page asks for one, a bad vote link says the code
+  is not valid, a racer's vote link opens the ballot (#206, D86), two
+  votes fill a depth-2 award, and the third car's toggle is disabled with
+  its reason.
+- The Voting code sheet on the check-in page shows the racer's QR code and
+  link; a phone opening the link votes, and a second phone (a new browser
+  context) opening it shows the same choices (#206, D86).
 - Closing balloting from another session turns the page to its closed state
   within 6 s with no reload, and opening it again brings the ballot back.
 - A racer outside an award's group is not in that award's grid.
@@ -12,7 +16,7 @@
 - A status poll sent before an award opened and answered after leaves the
   award open (#220).
 - The judging page's ballot sheet opens balloting and sets an award's votes
-  per ballot.
+  per ballot, and has no ballot password field (D86).
 - The screenshots of every state at both sizes.
 """
 
@@ -25,11 +29,17 @@ from django.test import Client
 from playwright.sync_api import expect
 
 from awards.models import Award, BallotAward, Vote
-from core.models import RaceSettings, RaceState
+from core.models import RaceState
 from roster.models import Group, Racer
 from roster.services import groups
 from roster.services.racers import insert_new_racer, pass_racer
-from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
+from ui.tests.browser.conftest import (
+    SIZES,
+    assert_accessible,
+    htmx_post,
+    shoot,
+    stop_timers,
+)
 from ui.tests.roles import PASSWORDS
 
 DESIGN = 1
@@ -69,16 +79,34 @@ def racer(event, name, partition, car):
 
 
 def pack(event):
-    """Wolves and Bears, a group each (by partition)."""
-    for name in ("Wolves", "Bears"):
+    """Wolves and Bears, a group each (by partition), and a voter: a racer of
+    a group of its own who has not passed check-in, so no award grid shows
+    it, whose voting token the page votes with (#206)."""
+    for name in ("Wolves", "Bears", "Families"):
         groups.add_partition(event, name)
     return {
         "w1": racer(event, "Ava", "Wolves", 101),
         "w2": racer(event, "Ben", "Wolves", 102),
         "w3": racer(event, "Cal", "Wolves", 103),
         "b1": racer(event, "Dee", "Bears", 201),
+        "voter": insert_new_racer(
+            event,
+            first_name="Vera",
+            last_name="Voter",
+            car_number=301,
+            partition_name="Families",
+        ).racer,
         "wolves": Group.objects.get(event=event, name="Wolves"),
     }
+
+
+def enter(page, found, query=""):
+    """Open the vote page as a QR code does: the voter's vote link, which
+    keeps the token in the session and redirects to /vote/ (#206)."""
+    page.goto(f"/vote/code/{found['voter'].voting_token}")
+    expect(page).to_have_url(re.compile(r"/vote/$"))
+    if query:
+        page.goto(f"/vote/{query}")
 
 
 def ballot_award(event, name, depth, group=None, sort=0):
@@ -144,27 +172,20 @@ def judge_session() -> Client:
     return client
 
 
-def test_password_then_two_votes_fill_a_depth_two_award(page, event):
+def test_a_vote_link_then_two_votes_fill_a_depth_two_award(page, event):
     """The phone acceptance check, at both sizes."""
     found = pack(event)
     best = ballot_award(event, "Best in Show", 2)
-    RaceSettings.objects.filter(event=event).update(ballot_password="acorn")
     set_open(event)
 
     page.goto("/vote/")
-    expect(state(page)).to_have_attribute("data-vote-state", "password")
-    expect(page.locator("[data-wrong-password]")).to_be_hidden()
+    expect(state(page)).to_have_attribute("data-vote-state", "code")
+    expect(
+        page.get_by_role("heading", name="Scan a racer's voting code to vote")
+    ).to_be_visible()
     assert_accessible(page)
-    shoot(page, "vote-password")
-    page.get_by_label("Ballot password").fill("oak")
-    page.get_by_role("button", name="Open the ballot").click()
-    expect(page.locator("[data-wrong-password]")).to_be_visible()
-    expect(page.locator("[data-wrong-password]")).to_have_text(
-        "The password you entered is incorrect. Please try again."
-    )
-    shoot(page, "vote-wrong-password")
-    page.get_by_label("Ballot password").fill("acorn")
-    page.get_by_role("button", name="Open the ballot").click()
+    shoot(page, "vote-code")
+    enter(page, found)
 
     expect(state(page)).to_have_attribute("data-vote-state", "open")
     expect(award_card(page, best)).to_contain_text("Vote for up to 2")
@@ -202,11 +223,33 @@ def test_password_then_two_votes_fill_a_depth_two_award(page, event):
     assert sorted(Vote.objects.values_list("racer__car_number", flat=True)) == [101]
 
 
+def test_a_bad_vote_link_says_the_code_is_not_valid(page, event, page_errors):
+    """The page answers 404, which Chromium logs to the console; that log is
+    allowed here only, and the one 404 must be the bad link's."""
+    page_errors.allow(r"status of 404 \(Not Found\)$")
+    missing = []
+    page.on("response", lambda r: r.status == 404 and missing.append(r.url))
+
+    page.goto("/vote/code/not-a-code")
+
+    expect(
+        page.get_by_role("heading", name="This voting code is not valid")
+    ).to_be_visible()
+    expect(
+        page.get_by_text("Ask the check-in table for your racer's code.")
+    ).to_be_visible()
+    assert_accessible(page)
+    shoot(page, "vote-bad-code")
+    assert [url.removeprefix(page.url.split("/vote/")[0]) for url in missing] == [
+        "/vote/code/not-a-code"
+    ]
+
+
 def test_closing_from_another_session_shows_closed_within_six_seconds(page, event):
     found = pack(event)
     best = ballot_award(event, "Best in Show", 1)
     set_open(event)
-    page.goto("/vote/")
+    enter(page, found)
     expect(award_card(page, best)).to_be_visible()
     award_card(page, best).click()
     car_card(page, found["w1"]).click()
@@ -235,7 +278,7 @@ def test_a_racer_outside_the_awards_group_is_not_listed(page, event):
     wolf = ballot_award(event, "Best Wolf", 1, group=found["wolves"])
     best = ballot_award(event, "Best in Show", 1, sort=1)
     set_open(event)
-    page.goto("/vote/")
+    enter(page, found)
 
     award_card(page, wolf).click()
     for car in ("w1", "w2", "w3"):
@@ -250,7 +293,7 @@ def test_earlier_votes_show_on_the_award_card(page, event):
     found = pack(event)
     best = ballot_award(event, "Best in Show", 2)
     set_open(event)
-    page.goto("/vote/")
+    enter(page, found)
     award_card(page, best).click()
     vote_for(page, found["w3"])
 
@@ -281,7 +324,7 @@ def test_the_sort_control_orders_the_grid_and_keeps_the_url(page, event):
     w1, w2, w3, b1 = (found[key] for key in ("w1", "w2", "w3", "b1"))
     best = ballot_award(event, "Best in Show", 1)
     set_open(event)
-    page.goto("/vote/?order=name")
+    enter(page, found, "?order=name")
     award_card(page, best).click()
 
     # Alpine shows the award view on the next animation frame, after the
@@ -338,7 +381,7 @@ def test_a_status_poll_sent_before_the_award_opened_leaves_it_open(page, event):
         "**/ballot/status",
         lambda route: route.continue_() if held else held.append(route),
     )
-    page.goto("/vote/")
+    enter(page, found)
     # The first poll goes out 5 s after Alpine starts, well after this.
     page.evaluate(WATCH_POLLS)
     expect(award_card(page, best)).to_be_visible()
@@ -374,7 +417,7 @@ def test_a_refused_vote_names_the_reason(page, event):
     found = pack(event)
     best = ballot_award(event, "Best in Show", 1)
     set_open(event)
-    page.goto("/vote/")
+    enter(page, found)
     award_card(page, best).click()
     car_card(page, found["w1"]).click()
 
@@ -409,9 +452,9 @@ def test_a_refused_vote_names_the_reason(page, event):
 
 
 def test_no_award_on_the_ballot_says_so(page, event):
-    pack(event)
+    found = pack(event)
     set_open(event)
-    page.goto("/vote/")
+    enter(page, found)
 
     expect(state(page)).to_have_attribute("data-vote-state", "none")
     expect(
@@ -436,10 +479,7 @@ def test_the_judging_ballot_sheet_opens_balloting_and_sets_depths(
     with htmx_post(page, f"/judging/ballot/award/{award.pk}/depth/"):
         sheet.locator(f"#ballot-depth-{award.pk}").select_option("3")
     assert BallotAward.objects.get(award=award).depth == 3
-    with htmx_post(page, "/judging/ballot/password/"):
-        page.get_by_label("Ballot password").fill("acorn")
-        page.get_by_label("Ballot password").press("Tab")
-    assert RaceSettings.objects.get(event=event).ballot_password == "acorn"
+    expect(sheet.get_by_label("Ballot password")).to_have_count(0)
     assert_accessible(page)
     shoot(page, "judging-ballot-sheet", full_page=False)
 
@@ -452,7 +492,7 @@ def test_a_choice_that_can_no_longer_win_never_locks_the_award(page, event):
     found = pack(event)
     wolf = ballot_award(event, "Best Wolf", 2, group=found["wolves"])
     set_open(event)
-    page.goto("/vote/")
+    enter(page, found)
     award_card(page, wolf).click()
     vote_for(page, found["w1"])
     bear = found["b1"]
@@ -466,3 +506,67 @@ def test_a_choice_that_can_no_longer_win_never_locks_the_award(page, event):
     vote_for(page, found["w2"])
 
     assert list(Vote.objects.values_list("racer_id", flat=True)) == [found["w2"].pk]
+
+
+def phone_context(browser, live_server, page_errors):
+    """A phone of its own, as a parent's is: a new browser context, which
+    shares no cookie with the page or with another phone."""
+    context = browser.new_context(**SIZES["phone"], base_url=live_server.url)
+    phone = context.new_page()
+    phone.on("pageerror", lambda error: page_errors.add(f"pageerror: {error}"))
+    return context, phone
+
+
+def put_away(context, phone):
+    """Stop the phone's polls and let what is out land before it closes."""
+    stop_timers(phone)
+    phone.wait_for_load_state("networkidle")
+    context.close()
+
+
+def test_the_voting_code_opens_one_ballot_on_every_phone(
+    page, event, live_server, browser, page_errors
+):
+    """#206 acceptance: the check-in card's Voting code sheet shows the QR
+    code and its link; a phone opening the link votes, and a second phone
+    opening the same link shows that vote and edits the same ballot."""
+    found = pack(event)
+    best = ballot_award(event, "Best in Show", 2)
+    set_open(event)
+    logged_in_as(page, live_server, "RaceCrew")
+    page.goto("/checkin/")
+    page.locator(
+        f'[data-racer="{found["voter"].pk}"] [data-action="voting-code"]'
+    ).click()
+    sheet = page.locator("[data-voting-code]")
+    expect(sheet).to_be_visible()
+    expect(sheet.locator("svg")).to_be_visible()
+    link = sheet.locator("[data-voting-url]")
+    expect(link).to_have_text(
+        f"{live_server.url}/vote/code/{found['voter'].voting_token}"
+    )
+    assert_accessible(page)
+    shoot(page, "checkin-voting-code", full_page=False)
+    url = link.inner_text()
+
+    first_context, first = phone_context(browser, live_server, page_errors)
+    first.goto(url)
+    expect(first).to_have_url(re.compile(r"/vote/$"))
+    award_card(first, best).click()
+    vote_for(first, found["w1"])
+    put_away(first_context, first)
+
+    second_context, second = phone_context(browser, live_server, page_errors)
+    second.goto(url)
+    card = award_card(second, best)
+    expect(card).to_contain_text("1 chosen")
+    expect(card.locator(f'[data-chosen-racer="{found["w1"].pk}"]')).to_have_text("101")
+    card.click()
+    vote_for(second, found["w2"])
+    put_away(second_context, second)
+
+    assert sorted(Vote.objects.values_list("racer__car_number", flat=True)) == [
+        101,
+        102,
+    ]
+    assert Vote.objects.values("voter").distinct().count() == 1

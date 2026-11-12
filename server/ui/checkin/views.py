@@ -20,7 +20,7 @@ from django.template.loader import render_to_string
 from django.urls import get_script_prefix, reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from accounts.permissions import Perm, allows, granted
+from accounts.permissions import Perm, allows, granted, role_allows
 from accounts.views import MCHECKIN, grant_mcheckin_token, make_mcheckin_token
 from awards.editing import toggle_xbs_award
 from media import photos
@@ -111,6 +111,13 @@ def _need(request, perm: Perm, message: str):
     return None
 
 
+def _can_show_voting_code(request) -> bool:
+    """The Voting code sheet is for a logged-in crew role that checks racers
+    in (#206, D5, D86); a phone holding only the check-in link's grant
+    (#16) does not see it."""
+    return role_allows(request, Perm.CHECK_IN_RACERS)
+
+
 def _perms(request) -> dict:
     return {
         "can_add": allows(request, Perm.REGISTER_NEW_RACER),
@@ -120,6 +127,7 @@ def _perms(request) -> dict:
         "can_crop": allows(request, Perm.ASSIGN_RACER_IMAGE),
         "can_set_up": allows(request, Perm.SET_UP),
         "can_qr": all(allows(request, bit) for bit in MCHECKIN),
+        "can_voting_code": _can_show_voting_code(request),
         "can_edit_partitions": allows(request, Perm.SET_UP),
     }
 
@@ -900,6 +908,30 @@ def rotate(request, racer_id, repo, direction):
     except photos.Refused as failure:
         return refused(request, failure)
     return sheet_reply(request, _crop_sheet(request, racer, repository, name))
+
+
+# ----- a racer's voting code ---------------------------------------------------------
+
+
+@require_GET
+@guard
+def voting_code(request, racer_id):
+    """The racer's voting code (#206, D86): a QR code of the vote link that
+    holds the racer's voting token, beside the check-in link's QR code. The
+    token is read here only, never in the card or its poll."""
+    if not _can_show_voting_code(request):
+        return service_error(
+            request, "Only a logged-in role that checks racers in sees voting codes."
+        )
+    racer = _racer(request, racer_id)
+    url = request.build_absolute_uri(
+        reverse("vote-code", kwargs={"token": str(racer.voting_token)})
+    )
+    return render(
+        request,
+        "ui/checkin/sheets/voting_code.html",
+        {"racer": racer, "car": state.car(racer.car_number), "url": url},
+    )
 
 
 # ----- the QR code for other phones --------------------------------------------------

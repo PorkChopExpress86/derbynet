@@ -274,15 +274,15 @@ class BallotRow:
 @dataclass
 class BallotSheet:
     is_open: bool
-    password: str
     rows: list[BallotRow]
 
 
 def ballot_sheet(event) -> BallotSheet:
     """`judging.php`'s Manage Ballot dialog (`website/judging.php:160` to
     `:177`) and its tallies (`on_votes_click()`, `website/js/judging.js:93`):
-    the open switch, the password, each judged award's votes per ballot and
-    its votes."""
+    the open switch, each judged award's votes per ballot and its votes.
+    The dialog's ballot password field is gone: a voting token, not the
+    password, lets a voter in (#206, D86)."""
     found = _Event(event)
     depths = dict(
         BallotAward.objects.filter(event=event).values_list("award_id", "depth")
@@ -290,7 +290,6 @@ def ballot_sheet(event) -> BallotSheet:
     tallied = {t.award_id: t.candidates for t in balloting.tallies(event)}
     return BallotSheet(
         is_open=balloting.is_open(event),
-        password=balloting.password(event),
         rows=[
             BallotRow(found.award_card(a), depths.get(a.pk, 0), tallied.get(a.pk, []))
             for a in found.judged()

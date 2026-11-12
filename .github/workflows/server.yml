@@ -401,11 +401,14 @@ jobs:
           bash testing/test-preferences.sh http://127.0.0.1:8080
 
       # The balloting suite (#54).  It resets the database and builds its own
-      # roster and ballot.  The parity gate still skips it (tools/parity_gate.py
-      # SKIPS).
+      # roster and ballot.  DERBYNET_BACKEND votes with racers' voting tokens
+      # (D86, #206); the parity gate compares the step up to where the two
+      # legs part (tools/parity_gate.py STEP_DIVERGENCES).
       - name: Run the balloting suite against Django
         if: matrix.group == 1
         working-directory: .
+        env:
+          DERBYNET_BACKEND: django
         run: |
           bash testing/test-balloting.sh http://127.0.0.1:8080
 

@@ -76,12 +76,14 @@ def legacy_ids(event):
     }
 
 
-def legacy_dump(event, *, omit=()):
+def legacy_dump(event, *, omit=(), tokens=False):
     """Every event-scoped row of `event`, with ids replaced by legacy ids.
 
     Two imports of the same rows give equal dumps, whatever ids they got.
     `omit` names fields to leave out, as `"<model label>.<field>"`. Paths
-    into the event's folder name it `<event>`.
+    into the event's folder name it `<event>`. A racer's voting token, which
+    an import of a file without one makes at random (#206), shows as
+    `<token>` unless `tokens` keeps it.
     """
     mapping = legacy_ids(event)
     folder = str(event_folder(event))
@@ -121,6 +123,8 @@ def legacy_dump(event, *, omit=()):
                         if field.name == "params"
                         else embedded.award_key(value, back)
                     ).text
+                elif field.name == "voting_token" and not tokens:
+                    value = "<token>"
                 elif isinstance(value, str) and value.startswith(folder):
                     value = "<event>" + value[len(folder) :]
                 row[field.name] = value

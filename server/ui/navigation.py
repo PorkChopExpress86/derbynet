@@ -84,7 +84,7 @@ BEFORE, DURING, AFTER, OTHER = Section
 # #15's "Page permissions": the race dashboard needs CONTROL_RACE (D16),
 # standings, slideshow, on deck, results by racer and about are anonymous (D5,
 # D70, S10, S30), and timer-test needs CONTROL_RACE (S21). Printables are removed
-# (D6). Vote is anonymous: its login is the ballot password (ADR-07, #54).
+# (D6). Vote is anonymous: its login is a racer's voting code (D86, #206).
 # Phone ranks are the D20 table of #39.
 ENTRIES: tuple[NavEntry, ...] = (
     NavEntry(
@@ -235,7 +235,7 @@ ENTRIES: tuple[NavEntry, ...] = (
         view="ui.results.views.page",
     ),
     # `index.php:137` shows Vote! to VIEW_RACE_RESULTS, which the anonymous
-    # role has; the voter's login is the ballot password (#54, ADR-07).
+    # role has; the voter's login is a racer's voting code (D86, #206).
     NavEntry(
         "vote",
         "Vote",

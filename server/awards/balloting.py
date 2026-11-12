@@ -8,17 +8,25 @@ There is one ballot, PHP's `BALLOTID` 1 (`voterid.inc:6`): every award with
 a `BallotAward` row is on it, `depth` votes deep. A voter is a `Voter` row
 named by its identifier. PHP names a voter by its PHP session id
 (`query.ballot.get.inc:17`), or by any `ballot_code` the caller sends
-(S15). Here the caller never names the voter: the legacy handler keeps a
-random identifier in the session, so a login's `cycle_key` keeps the same
-voter.
+(S15), and lets in whoever gives the ballot password
+(`query.ballot.get.inc:13`).
 
-`cast()` adds the checks PHP leaves out (S14): a ballot password that was
-never given refuses the vote, and so does a racer who has not passed check-in,
-is not eligible for any award, cannot win the award (`Eligibility`, D33,
-D35), or is named twice.
+Here the voter is a racer's voting token (#206, D86): whoever holds the
+token votes, and every phone that holds it edits the same one ballot. The
+`Voter` row is named by a digest of the token (`voter_identifier()`), so a
+snapshot, which exports `Voters.identifier`, carries no token that votes.
+A token is good while its racer is in the event; one that is malformed,
+unknown, from another event or of a deleted racer is refused alike. The
+ballot password gates nothing.
+
+`cast()` adds the checks PHP leaves out (S14): a racer who has not passed
+check-in, is not eligible for any award, cannot win the award
+(`Eligibility`, D33, D35), or is named twice is refused.
 """
 
+import hashlib
 import json
+import uuid
 from collections import Counter
 from dataclasses import dataclass
 
@@ -28,9 +36,8 @@ from django.utils import timezone
 from awards.eligibility import Eligibility
 from awards.models import Award, BallotAward, Vote, Voter
 from core import race_settings
-from core.models import RaceSettings, RaceState
+from core.models import RaceState
 from core.services import lock_race_state
-from racing.engine.phpcompat import php_numeric
 from roster.models import Racer
 
 OPEN = "open"
@@ -51,7 +58,13 @@ class BallotFailure(Exception):
         self.description = description
 
 
-PASSWORD = BallotFailure("password", "Wrong password for ballot")
+# The session key that holds the voting token, written by the vote link
+# (`ui.vote.views.token_link`) and by `ballot.get`'s `voting_token`.
+SESSION_TOKEN = "voting-token"
+
+NO_TOKEN = BallotFailure(
+    "no-token", "This phone has no valid voting code. Scan a racer's voting code."
+)
 CLOSED_NOW = BallotFailure("closed", "Voting is not open at this time")
 NO_AWARD = BallotFailure("no-award", "No such award")
 TOO_MANY = BallotFailure("too-many", "Too many choices offered")
@@ -63,24 +76,6 @@ def is_open(event) -> bool:
     return RaceState.objects.filter(event=event, balloting_open=True).exists()
 
 
-def password(event) -> str:
-    return RaceSettings.objects.get(event=event).ballot_password
-
-
-def password_matches(event, given: str) -> bool:
-    """PHP's `$pwd != read_raceinfo('ballot_password', '')` turned around
-    (`query.ballot.get.inc:13`): two numeric strings compare as numbers."""
-    stored = password(event)
-    given_number, stored_number = php_numeric(given), php_numeric(stored)
-    if given_number is not None and stored_number is not None:
-        return given_number == stored_number
-    return given == stored
-
-
-def needs_password(event) -> bool:
-    return password(event) != ""
-
-
 def set_open(event, state) -> None:
     """`ballot.open`. PHP stores any text as the state
     (`action.ballot.open.inc:8`); only `open` and `closed` are kept here."""
@@ -89,8 +84,34 @@ def set_open(event, state) -> None:
     race_settings.write(event, "balloting", state)
 
 
-def set_password(event, text: str) -> None:
-    race_settings.write(event, "ballot_password", text)
+def parse_token(text) -> uuid.UUID | None:
+    """A voting token as the link or `voting_token` gives it: a GUID in any
+    of the forms `uuid.UUID` reads, or None for anything else."""
+    if not isinstance(text, str) or len(text) > 64:
+        return None
+    try:
+        return uuid.UUID(text)
+    except ValueError:
+        return None
+
+
+def token_racer(event, text) -> Racer | None:
+    """The event's racer whose voting token `text` is, or None. A deleted
+    racer's token and another event's are as unknown as a made-up one."""
+    token = parse_token(text)
+    if token is None:
+        return None
+    return Racer.objects.filter(event=event, voting_token=token).first()
+
+
+def is_valid_token(event, text) -> bool:
+    return token_racer(event, text) is not None
+
+
+def voter_identifier(racer: Racer) -> str:
+    """The `Voter.identifier` of a racer's token: a SHA-256 digest, so the
+    voter is the token (D86) and an exported snapshot holds no token."""
+    return "token:" + hashlib.sha256(racer.voting_token.bytes).hexdigest()
 
 
 def voter(event, identifier: str, ip_address: str = "") -> Voter:
@@ -115,9 +136,22 @@ class BallotEntry:
     votes: list[int]
 
 
-def ballot(event, voter_row: Voter) -> dict[int, BallotEntry]:
-    """`query.ballot.get.inc:27` to `:45`: each award on the ballot with its
-    depth and this voter's choices, or nothing while balloting is closed."""
+def ballot(event, token, ip_address: str = "") -> dict[int, BallotEntry]:
+    """`query.ballot.get.inc`: the token's voter row, added on its first
+    visit (`voterid.inc:14` to `:28`), and each award on the ballot with its
+    depth and this voter's choices, or nothing while balloting is closed
+    (`query.ballot.get.inc:27` to `:45`). A token that is not a racer's of
+    this event is refused with NO_TOKEN, before anything is written, where
+    PHP asks for the ballot password (D86).
+
+    The voter row is added under the race-state lock, so two phones that
+    open the same token at once still make one voter."""
+    with transaction.atomic():
+        lock_race_state(event.id)
+        racer = token_racer(event, token)
+        if racer is None:
+            raise NO_TOKEN
+        voter_row = voter(event, voter_identifier(racer), ip_address)
     if not is_open(event):
         return {}
     found = {
@@ -163,21 +197,20 @@ def _racer_ids(posted) -> list[int] | None:
 
 def cast(
     event,
-    voter_identifier: str,
+    token,
     award_id: int | None,
     posted_votes,
     *,
-    allowed,
     ip_address: str = "",
 ):
-    """`vote.cast`: the voter's choices for one award replace any before.
+    """`vote.cast`: the token's choices for one award replace any before.
     `award_id` is the posted id resolved to the event's award, or None.
 
-    `allowed` says the voter gave the ballot password in this session, or
-    that none is set. Refusals come in PHP's order (`action.vote.cast.inc`):
-    closed, no-award, too-many, and then this port's password (S14) and
-    ineligible (S14) checks. Returns `voterid awardid racerid` for each vote,
-    PHP's `votes` reply."""
+    Refusals come in PHP's order (`action.vote.cast.inc`): closed,
+    no-award, too-many, and then this port's no-token (D86) and ineligible
+    (S14) checks. The token is read again here, under the lock, so a racer
+    deleted since the ballot opened votes no more. Returns
+    `voterid awardid racerid` for each vote, PHP's `votes` reply."""
     with transaction.atomic():
         lock_race_state(event.id)
         if not is_open(event):
@@ -199,8 +232,9 @@ def cast(
         # so only an empty list passes (`action.vote.cast.inc:35` to `:40`).
         if racer_ids is not None and len(racer_ids) > (depth or 0):
             raise TOO_MANY
-        if not allowed and needs_password(event):
-            raise PASSWORD
+        token_holder = token_racer(event, token)
+        if token_holder is None:
+            raise NO_TOKEN
         if racer_ids is None or len(set(racer_ids)) != len(racer_ids):
             raise INELIGIBLE
         racers = Racer.objects.filter(
@@ -211,7 +245,7 @@ def cast(
             eligibility.refusal(award, racer) for racer in racers
         ):
             raise INELIGIBLE
-        voter_row = voter(event, voter_identifier, ip_address)
+        voter_row = voter(event, voter_identifier(token_holder), ip_address)
         Vote.objects.filter(event=event, voter=voter_row, award=award).delete()
         Vote.objects.bulk_create(
             Vote(event=event, voter=voter_row, award=award, racer_id=racer_id)

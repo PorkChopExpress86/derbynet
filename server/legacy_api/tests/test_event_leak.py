@@ -15,8 +15,10 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from accounts.permissions import SESSION_PERMISSIONS, SESSION_ROLE
+from awards.models import Voter
+from awards.tests.factories import BallotAwardFactory
 from core.invariants import check_invariants
-from core.models import SiteState
+from core.models import RaceState, SiteState
 from core.tests.factories import EventFactory
 from legacy_api.registry import REGISTRY, Format
 from racing.models import Round
@@ -145,7 +147,9 @@ LEAK_REQUESTS: dict[tuple[str, str], dict] = {
     ("query", "award.current"): {},
     ("query", "award.list"): {},
     ("action", "ballot.open"): {"state": "open"},
-    ("query", "ballot.get"): {"password": ""},
+    # A token of no racer; test_a_voting_token_answers_in_its_own_event_only
+    # sends the first event's racers' tokens (#206).
+    ("query", "ballot.get"): {"voting_token": "00000000-0000-4000-8000-000000000000"},
     ("action", "vote.cast"): {"awardid": "1", "votes": "[1]"},
     ("query", "ballot.results"): {},
     ("query", "standings"): {},
@@ -336,3 +340,40 @@ def test_the_check_catches_a_write_into_the_other_event(client, two_events, endp
             Format.JSON,
             two_events,
         )
+
+
+def test_a_voting_token_answers_in_its_own_event_only(client, two_events):
+    """#206, D86: every endpoint and page that takes a voting token refuses
+    one of a racer of another event, as it refuses a made-up one, and adds
+    no row; the active event's racer's token is taken."""
+    first, active = two_events
+    theirs = Racer.objects.filter(event=first).order_by("pk").first()
+    ours = Racer.objects.filter(event=active).order_by("pk").first()
+    award = BallotAwardFactory(award__event=active).award
+    RaceState.objects.filter(event=active).update(balloting_open=True)
+
+    got = call(
+        client, "query", "ballot.get", {"voting_token": str(theirs.voting_token)}
+    )
+    cast = call(
+        client, "action", "vote.cast", {"awardid": str(award.pk), "votes": "[]"}
+    )
+    link = client.get(f"/vote/code/{theirs.voting_token}")
+    sheet = client.get(f"/checkin/racer/{theirs.pk}/voting-code/")
+
+    assert json.loads(got.content)["outcome"]["code"] == "no-token"
+    assert json.loads(cast.content)["outcome"]["code"] == "no-token"
+    assert link.status_code == 404
+    assert sheet.status_code == 404
+    assert str(theirs.voting_token) not in sheet.content.decode()
+    for event in two_events:
+        assert "cross-event" not in check_invariants(event)
+        assert not Voter.objects.filter(event=event).exists()
+
+    mine = call(client, "query", "ballot.get", {"voting_token": str(ours.voting_token)})
+    assert "ballot" in json.loads(mine.content)
+    assert client.get(f"/vote/code/{ours.voting_token}").status_code == 302
+    assert (
+        str(ours.voting_token)
+        in client.get(f"/checkin/racer/{ours.pk}/voting-code/").content.decode()
+    )

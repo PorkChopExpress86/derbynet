@@ -421,6 +421,14 @@ PARITY_PATHS: tuple[ParityPath, ...] = (
         django=DIGITS,
         between=NO_FEWER,
     ),
+    # Each racer's voting token, a column Django's snapshot adds (D87, #206).
+    ParityPath(
+        "query snapshot.get",
+        "$.RegistrationInfo.rows[*].votingtoken",
+        "D87",
+        php=MISSING,
+        django=str,
+    ),
     # PHP counts each table after wiping the database, Django the rows of the
     # event the restore replaces (D57).
     ParityPath(
@@ -572,6 +580,9 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
     "vote.php": (
         "D20: a 301 to /vote/, the query string kept, so a printed link still"
         " opens the ballot.",
+        "D86: a racer's voting code (the vote link /vote/code/<token>, shown"
+        " as a QR code on the check-in page) lets a voter in, and without one"
+        " the page asks for a code; vote.php asks for the ballot password.",
         "S2: polls /ballot/status, which answers only whether balloting is"
         " open; vote.js polls settings.list, which answers ballot_password to"
         " anyone who asks for it.",
