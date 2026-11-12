@@ -148,8 +148,8 @@ WINDOWS = {
         {"width": 1280, "height": 800},
         {"width": 1024, "height": 768},
         {"width": 641, "height": 844},
-        # Tall windows, where the label's 2.2vh font outgrew its 9vw column
-        # and broke "Hea" / "t" before #283's cap.
+        # Tall windows, where the label's row font, clamp(1rem, 2.2vh, 2rem),
+        # outgrew its 9vw column and broke "Hea" / "t" before #283's cap.
         {"width": 641, "height": 1024},
         {"width": 800, "height": 1280},
         {"width": 1024, "height": 1366},
@@ -162,9 +162,9 @@ WINDOWS = {
 # The label font's cap, a share of the window's width, by the window's
 # width (kiosk.css, D10/ADR-10, #283); a phone's label font is 3.6vw.
 CAP = ((640, 0.036), (1023, 0.0285), (10**6, 0.025))
-# The windows where the cap is smaller than the row's 2.2vh font, so it
-# sets the label's font; in every other window the label keeps its row's
-# font.
+# The windows where the cap is smaller than the row's font, clamp(1rem,
+# 2.2vh, 2rem), so it sets the label's font; in every other window the
+# label keeps its row's font.
 CAPPED = {"641x844", "641x1024", "800x1280", "1024x1366", "1080x1920"}
 
 
