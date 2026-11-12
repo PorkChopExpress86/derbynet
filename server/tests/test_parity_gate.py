@@ -821,6 +821,26 @@ def test_the_raceinfo_allowance_covers_a_setting_only_django_has():
         assert allowed_by(endpoint, path, php, django) is None, path
 
 
+def test_the_voting_token_allowance_covers_djangos_token_column_only():
+    """D87: Django's RegistrationInfo rows carry a votingtoken PHP's lack."""
+    get = "query snapshot.get"
+    token = "6f1c2c1e-7c55-4a8e-9a43-2f0d3b6a1b11"
+    path = "$.RegistrationInfo.rows[3].votingtoken"
+    assert allowed_by(get, path, MISSING, token).startswith("D87")
+    # A token PHP has too, a token missing from Django's row, a value that is
+    # not text, another column, another table, or another endpoint, still
+    # fails.
+    for endpoint, where, php, django in (
+        (get, path, token, "another"),
+        (get, path, token, MISSING),
+        (get, path, MISSING, 5),
+        (get, "$.RegistrationInfo.rows[3].carname", MISSING, token),
+        (get, "$.Voters.rows[0].votingtoken", MISSING, token),
+        ("query racer.list", path, MISSING, token),
+    ):
+        assert allowed_by(endpoint, where, php, django) is None, where
+
+
 def test_the_rows_before_allowance_covers_rows_before_counts_only():
     before = PUT_TABLE.format("RegistrationInfo") + "/@rows-before"
     assert allowed_by(PUT, before, "0", "24").startswith("D57")

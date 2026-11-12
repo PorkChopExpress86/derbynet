@@ -38,8 +38,8 @@ if [ "$DERBYNET_BACKEND" = django ] ; then
             sed -n 's|.*data-voting-url>[^<]*/vote/code/\([0-9a-f-]*\)<.*|\1|p'
     }
     TOKEN_101=$(voting_token_of 101)
-    TOKEN_102=$(voting_token_of 102)
-    [ -n "$TOKEN_101" ] && [ -n "$TOKEN_102" ] && [ "$TOKEN_101" != "$TOKEN_102" ] || \
+    TOKEN_161=$(voting_token_of 161)
+    [ -n "$TOKEN_101" ] && [ -n "$TOKEN_161" ] && [ "$TOKEN_101" != "$TOKEN_161" ] || \
         test_fails no voting tokens on the Voting code sheet
 
     function refused_for_no_token() {
@@ -86,7 +86,7 @@ if [ "$DERBYNET_BACKEND" = django ] ; then
     curl_postj action.php "action=vote.cast&awardid=$SORE_LOSER&votes=[]" | refused_for_no_token
 
     # The second voter's token, in place of a new session
-    curl_getj "action.php?query=ballot.get&voting_token=$TOKEN_102" | jq -e 'has("ballot")' >/dev/null || test_fails
+    curl_getj "action.php?query=ballot.get&voting_token=$TOKEN_161" | jq -e 'has("ballot")' >/dev/null || test_fails
 else
 # Delete the session cookie in order to change voters
 rm $COOKIES_CURL

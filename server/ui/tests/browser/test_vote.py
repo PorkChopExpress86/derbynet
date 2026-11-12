@@ -22,6 +22,7 @@
 
 import json
 import re
+import uuid
 
 import pytest
 from django.conf import settings
@@ -570,3 +571,29 @@ def test_the_voting_code_opens_one_ballot_on_every_phone(
         102,
     ]
     assert Vote.objects.values("voter").distinct().count() == 1
+
+
+def test_a_code_refused_mid_visit_asks_for_a_code_again(page, event):
+    """The session's code stops naming a racer while the page is open (here
+    its racer's token changes, as a deleted racer's code names none): the
+    next vote is refused with no-token (D86), the toast says the code is no longer
+    valid, and the page asks for a code; no vote is stored."""
+    found = pack(event)
+    best = ballot_award(event, "Best in Show", 1)
+    set_open(event)
+    enter(page, found)
+    award_card(page, best).click()
+    car_card(page, found["w1"]).click()
+    Racer.objects.filter(pk=found["voter"].pk).update(voting_token=uuid.uuid4())
+
+    with page.expect_response(lambda r: r.request.method == "POST") as reply:
+        toggle(page).click()
+
+    assert reply.value.json()["outcome"]["code"] == "no-token"
+    expect(page.locator("[data-toast]")).to_contain_text(
+        "This voting code is no longer valid. Scan a racer's voting code again."
+    )
+    expect(state(page)).to_have_attribute("data-vote-state", "code")
+    expect(page.locator('[data-sheet="vote-racer"]')).to_be_hidden()
+    expect(page.locator("[data-award-view]")).to_be_hidden()
+    assert not Vote.objects.exists()
