@@ -2,6 +2,7 @@
 read as a visitor's and a race official's browser reads them."""
 
 import re
+from datetime import datetime
 
 import pytest
 from django.utils import timezone
@@ -58,6 +59,34 @@ def test_a_dnf_time_shows_dnf_beside_it(login, event, raced):
     html = login("anonymous").get("/results/").content.decode()
 
     assert re.search(r"data-dnf>DNF</span>9\.999", html)
+
+
+@pytest.mark.parametrize(
+    ("racer_photos", "car_photos"),
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+def test_photos_show_per_the_two_settings(
+    login, event, raced, racer_photos, car_photos
+):
+    """`show-racer-photos-rr` and `show-car-photos-rr` each turn one photo
+    on, as `racer-results.php` reads them. The photos are missing on disk,
+    so each URL's cache breaker is 0 (`photo_url`)."""
+    racer = Racer.objects.get(event=event, car_number=101)
+    Racer.objects.filter(pk=racer.pk).update(headshot="head.jpg", car_photo="car.jpg")
+    RaceSettings.objects.filter(event=event).update(
+        show_racer_photos_rr=racer_photos, show_car_photos_rr=car_photos
+    )
+
+    html = login("anonymous").get("/results/").content.decode()
+
+    shown = re.search(rf'data-racer="{racer.pk}">(.*?)</li>', html, re.S).group(1)
+    head = re.findall(r'src="([^"]*)"[^>]*data-headshot', shown)
+    car = re.findall(r'src="([^"]*)"[^>]*data-car-photo', shown)
+    assert head == (["/photo.php/head/file/200x200/head.jpg/0"] if racer_photos else [])
+    assert car == (["/photo.php/car/file/200x200/car.jpg/0"] if car_photos else [])
+    # The other racers have no photo, so their cards draw none.
+    assert html.count("data-headshot") == len(head)
+    assert html.count("data-car-photo") == len(car)
 
 
 def test_racerid_keeps_one_racer(login, event, raced):
@@ -226,6 +255,33 @@ def test_the_retrospective_shows_lane_bias_and_the_timeline(login, event):
     assert "Heat finished: lane1: 3.1s" in html
     assert "Delete racer <b>Wolves1 Racer</b>, 101, Wolves" in html
     assert "data-debug-link" not in html
+
+
+def test_the_timeline_groups_events_by_the_hour(login, event):
+    """Each local clock hour of each day heads its own group, in the order
+    the events happened: 10:05 and 10:55 share one, 11:01 starts the next,
+    and 10:30 the next day starts a third."""
+    local = timezone.get_current_timezone()
+    for day, hour, minute in ((7, 10, 5), (7, 10, 55), (7, 11, 1), (8, 10, 30)):
+        ActionLog.objects.create(
+            event=event,
+            received=datetime(2026, 3, day, hour, minute, tzinfo=local),
+            request={"action": "timer-message", "message": "FINISHED", "lane1": "3.1"},
+        )
+
+    html = login("RaceCrew").get("/history/").content.decode()
+
+    hours = re.findall(
+        r'<section aria-label="([^"]+)"[^>]*data-hour>(.*?)</section>', html, re.S
+    )
+    assert [
+        (label, re.findall(r"<time data-time>([^<]+)</time>", events))
+        for label, events in hours
+    ] == [
+        ("Sat 7 Mar 2026, 10:00", ["10:05:00", "10:55:00"]),
+        ("Sat 7 Mar 2026, 11:00", ["11:01:00"]),
+        ("Sun 8 Mar 2026, 10:00", ["10:30:00"]),
+    ]
 
 
 def test_the_debug_view_is_for_set_up(login, event):

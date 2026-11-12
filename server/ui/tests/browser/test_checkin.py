@@ -12,6 +12,7 @@ from playwright.sync_api import expect
 
 from awards.models import Award
 from core.models import RaceSettings
+from media.models import PhotoRotation
 from racing.models import FinalRequest, HeatLane, Round
 from racing.services import rounds
 from racing.services.rounds import FollowOn
@@ -24,6 +25,7 @@ from ui.tests.browser.conftest import (
     SIZES,
     assert_accessible,
     dismiss_toasts,
+    htmx_post,
     htmx_settled,
     log_in,
     no_sideways_scroll,
@@ -567,6 +569,48 @@ def test_an_exif_6_photo_renders_upright(login, event, folders):
         """img => img.decode().then(() => [img.naturalWidth, img.naturalHeight])"""
     )
     assert natural[0] > natural[1]
+
+
+def test_the_crop_sheet_turns_the_photo_left_and_right(login, event, folders):
+    """Turn left and Turn right on the crop sheet turn the stored photo a
+    quarter each way, and the sheet redraws it turned."""
+    racer = add_racers(event, "Scouts", 1, 101)[0]
+    landscape = folders / "wide.jpg"
+    Image.new("RGB", (600, 450), (30, 120, 200)).save(landscape, "JPEG")
+    page = open_checkin(login("RaceCrew"))
+    phone_only(page)
+    card(page, racer).get_by_role("button", name="Car photo of Scouts1 Racer").click()
+    take_photo(page, landscape)
+    crop_sheet = sheet(page).locator("[data-crop-sheet]")
+    expect(crop_sheet).to_be_visible()
+
+    def drawn(shape):
+        """Wait until the sheet draws the photo in `shape`."""
+        page.wait_for_function(
+            """shape => {
+                const img = document.querySelector('[data-crop-image]');
+                if (!img || !img.complete || !img.naturalWidth) return false;
+                return (img.naturalWidth > img.naturalHeight
+                        ? 'landscape' : 'portrait') === shape;
+            }""",
+            arg=shape,
+        )
+
+    drawn("landscape")
+    for button, degrees, turned in (
+        ("Turn left", 90, "portrait"),
+        ("Turn right", None, "landscape"),
+    ):
+        with htmx_post(page, f"/checkin/racer/{racer.pk}/photo/car/rotate/"):
+            crop_sheet.get_by_role("button", name=button).click()
+        # A rotation of 0 degrees is never kept (`PhotoRotation`).
+        assert (
+            PhotoRotation.objects.filter(name="wide.jpg")
+            .values_list("degrees", flat=True)
+            .first()
+            == degrees
+        )
+        drawn(turned)
 
 
 def test_the_live_camera_captures_with_autocrop(login, event, folders):
