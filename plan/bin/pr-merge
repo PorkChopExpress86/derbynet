@@ -3,11 +3,26 @@
 # merge to that head SHA so a push after the check can't slip in. Then prints
 # each issue the PR closes with its state, and exits 1 if one is still open.
 #
-# Usage: plan/bin/pr-merge <pr> [--squash|--rebase|--merge] [--delete-branch]
+# It also refuses when origin/master has commits since the PR head's merge
+# base that touch an area the PR touches too: plan/, .githooks/,
+# server/tools/, .github/, a conftest.py (any folder), server/pyproject.toml
+# or server/uv.lock. CI then ran on a base without them. #289 passed CI on a
+# base without #288, both changing plan/, and merged after it; the lead
+# checked the combination by hand. It prints the overlapping paths and what
+# plan/bin/affected-tests maps the combined diff to. After that run on the
+# PR merged with origin/master, --base-checked merges anyway.
+#
+# Usage: plan/bin/pr-merge <pr> [--base-checked] [--squash|--rebase|--merge] [--delete-branch]
 # With no merge method it squashes and deletes the branch, as the plan's PRs do.
 set -euo pipefail
-PR=${1:?usage: pr-merge <pr> [--squash|--rebase|--merge] [--delete-branch]}
+PR=${1:?usage: pr-merge <pr> [--base-checked] [--squash|--rebase|--merge] [--delete-branch]}
 shift
+base_checked=0
+rest=()
+for arg in "$@"; do
+  if [ "$arg" = --base-checked ]; then base_checked=1; else rest+=("$arg"); fi
+done
+set -- ${rest[@]+"${rest[@]}"}
 case " $* " in
   *" --squash "*|*" --rebase "*|*" --merge "*|*" -s "*|*" -r "*|*" -m "*) ;;
   *) set -- --squash --delete-branch "$@" ;;
@@ -29,6 +44,44 @@ if [ -n "$not_passed" ]; then
   echo "not merging #$PR; checks on $head not passed:" >&2
   echo "$not_passed" >&2
   exit 1
+fi
+# The areas whose change on master since the merge base the PR's CI never saw:
+# each path printed as "<area>\t<path>".
+areas() {
+  awk '{
+    if ($0 ~ /^(plan|\.githooks|\.github)\//) { split($0, p, "/"); a = p[1] "/" }
+    else if ($0 ~ /^server\/tools\//) a = "server/tools/"
+    else if ($0 ~ /(^|\/)conftest\.py$/) a = "conftest.py"
+    else if ($0 == "server/pyproject.toml" || $0 == "server/uv.lock") a = $0
+    else next
+    print a "\t" $0
+  }'
+}
+if [ "$base_checked" = 0 ]; then
+  if ! git fetch -q origin master "refs/pull/$PR/head" 2>/dev/null ||
+     ! git cat-file -e "$head^{commit}" 2>/dev/null ||
+     ! base=$(git merge-base "$head" origin/master 2>/dev/null); then
+    echo "not merging #$PR; could not fetch origin/master and its head $head to check whether master moved since its merge base; fetch them, or check by hand and pass --base-checked" >&2
+    exit 1
+  fi
+  pr_paths=$(git diff --name-only "$base" "$head" | areas)
+  master_paths=$(git diff --name-only "$base" origin/master | areas)
+  shared=$(comm -12 <(cut -f1 <<<"$pr_paths" | sort -u) <(cut -f1 <<<"$master_paths" | sort -u) | grep . || true)
+  if [ -n "$shared" ]; then
+    {
+      echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, in an area the PR also changes, so CI ran without these commits:"
+      git log --format='  %h %s' "$base..origin/master" -- $(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
+      for area in $shared; do
+        echo "$area"
+        awk -F'\t' -v a="$area" '$1 == a { print "  master:  " $2 }' <<<"$master_paths"
+        awk -F'\t' -v a="$area" '$1 == a { print "  this PR: " $2 }' <<<"$pr_paths"
+      done
+      echo "Run what plan/bin/affected-tests prints for the combined diff on the PR merged with origin/master, then rerun with --base-checked; or update the branch (gh pr update-branch $PR) and wait for CI again. For the combined diff it prints:"
+      { git diff --name-only "$base" "$head"; git diff --name-only "$base" origin/master; } | sort -u |
+        "${AFFECTED:-$(dirname "$0")/affected-tests}" --stdin || echo "(affected-tests failed)"
+    } >&2
+    exit 1
+  fi
 fi
 # An issue whose body has a "## Still open" section stays open for what that
 # section names (plan/README.md), so a PR that would close it is refused here

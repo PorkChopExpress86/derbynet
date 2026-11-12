@@ -125,7 +125,10 @@ class CiFailures(unittest.TestCase):
             '  ui (sqlite)  step "Install Chromium": Error: Installation process exited with code: 100\n'
             '  shell (sqlite, group 1)  step "Start the Django server": '
             'E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?\n'
-            "  2 of 2 jobs printed: Temporary failure resolving 'azure.archive.ubuntu.com'\n"))
+            "  2 of 2 jobs printed: Temporary failure resolving 'azure.archive.ubuntu.com'\n"
+            'outage: every failure is in a setup step, before any test; probe the dependency '
+            'the shared line names, and work around it in a PR of its own or report it '
+            '(plan/implement-all-tickets.md, Stop and report)\n'))
 
     def test_a_job_that_failed_at_setup_beside_a_failed_test_is_reported(self):
         log = line(VOTE) + APT_LOG
@@ -134,6 +137,57 @@ class CiFailures(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('no test id  run 5: 2 jobs\n', result.stdout)
         self.assertIn(f'new    {VOTE}\n', result.stdout)
+        self.assertNotIn('outage', result.stdout)
+
+    def test_jobs_that_share_a_line_outside_setup_are_no_outage(self):
+        """Two jobs that fail the same lint step print the same line, but a
+        lint step is no setup step."""
+        lint = ''.join(apt(job, 'Run ruff', 'E501 Line too long (110 > 88)', 'Found 1 error.',
+                           '##[error]Process completed with exit code 1.')
+                       for job in ('lint (a)', 'lint (b)'))
+        result = run([check('fail', 6, 'lint (a)'), check('fail', 6, 'lint (b)')],
+                     {'6': lint}, [])
+        self.assertIn('2 of 2 jobs printed', result.stdout)
+        self.assertNotIn('outage', result.stdout)
+
+    def test_a_build_step_that_compares_is_no_setup_step(self):
+        log = APT_LOG.replace('Install Chromium', 'Build the CSS offline, with no Node, and compare it')
+        result = run([check('fail', 7, 'ui (sqlite)'), check('fail', 7, 'shell (sqlite, group 1)')],
+                     {'7': log}, [])
+        self.assertIn('2 of 2 jobs printed', result.stdout)
+        self.assertNotIn('outage', result.stdout)
+
+    def test_each_setup_step_name_counts(self):
+        for step in ('Set up job', 'Install dependencies', 'Fetch the pinned Tailwind CLI',
+                     'Start the Django server', 'Build the test harness image',
+                     'Initialize containers', 'Checkout', 'Run actions/checkout@v4'):
+            with self.subTest(step=step):
+                log = APT_LOG.replace('Install Chromium', step)
+                result = run([check('fail', 8, 'ui (sqlite)'),
+                              check('fail', 8, 'shell (sqlite, group 1)')], {'8': log}, [])
+                self.assertIn('outage:', result.stdout)
+
+    def test_a_line_fewer_than_every_job_printed_is_no_outage(self):
+        third = apt('pytest (sqlite)', 'Install dependencies',
+                    "E: Package 'libxml2-utils' has no installation candidate",
+                    '##[error]Process completed with exit code 100.')
+        result = run([check('fail', 9, 'ui (sqlite)'), check('fail', 9, 'shell (sqlite, group 1)'),
+                      check('fail', 9, 'pytest (sqlite)')], {'9': APT_LOG + third}, [])
+        self.assertIn('no test id  run 9: 3 jobs\n', result.stdout)
+        self.assertIn('2 of 3 jobs printed', result.stdout)
+        self.assertNotIn('outage', result.stdout)
+
+    def test_one_job_at_setup_is_no_outage(self):
+        one = ''.join(ln + '\n' for ln in APT_LOG.splitlines() if ln.startswith('ui (sqlite)'))
+        result = run([check('fail', 10, 'ui (sqlite)')], {'10': one}, [])
+        self.assertIn('no test id  run 10: 1 job\n', result.stdout)
+        self.assertNotIn('outage', result.stdout)
+
+    def test_a_failed_test_in_another_run_is_no_outage(self):
+        result = run([check('fail', 4, 'ui (sqlite)'), check('fail', 4, 'shell (sqlite, group 1)'),
+                      check('fail', 11)], {'4': APT_LOG, '11': line(VOTE), '1': ''}, MASTER)
+        self.assertIn(f'new    {VOTE}\n', result.stdout)
+        self.assertNotIn('outage', result.stdout)
 
     def test_no_failed_check(self):
         result = run([check('pass', 2)], {}, [])

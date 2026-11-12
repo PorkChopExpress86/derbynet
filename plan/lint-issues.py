@@ -5,6 +5,9 @@ Usage: python3 -I plan/lint-issues.py [--repo OWNER/NAME] [--labels L,...] [--fi
 Reads every issue labeled django-migration, then checks each body for:
 - style: no em or en dashes, curly quotes, mid-sentence colons, or filler words
 - section order for kind:spec and kind:ticket issues
+- an open kind:ticket whose Goal asserts a cause or scope ("can land",
+  "because", "caused by", "always") while another section marks a fact
+  unverified ("not yet verified", "observed once", "not reproduced")
 - cited repository paths that exist in this checkout
 - #N references that name an existing issue
 - forward-only ## Dependencies, with no cycles across the plan
@@ -144,6 +147,49 @@ def check_path(n, tok):
     findings.append(f'#{n}: missing path `{p}`')
 
 
+# A fact the body marks as not yet checked, in a section other than Goal, and
+# the words a Goal uses to assert a cause or scope as fact. #282's Goal said
+# CI's run "can land it on one worker", while its Current PHP behavior said
+# the failure was "observed once and has not been reproduced since" and its
+# suspect "not yet verified"; the mechanism proved false (#282 retro).
+UNVERIFIED = re.compile(
+    r'\bnot yet (?:been )?(?:verified|confirmed|measured|reproduced)\b|\bunverified\b'
+    r'|\bunconfirmed\b|\bobserved once\b|\bnot (?:been )?reproduced\b|\bonly estimated\b',
+    re.I)
+ASSERTS = re.compile(
+    r'\bcan(?:not)? (?:land|hit|fail|break|cause|trigger|happen)\b|\bbecause\b'
+    r'|\bcaused by\b|\bdue to\b|\bthe cause is\b|\balways\b', re.I)
+
+
+def unverified_cause(n, text):
+    """Each Goal line of an open ticket that asserts a cause or scope while
+    another section marks a fact unverified. Code spans and quoted text are
+    left out, as for the style checks."""
+    marks, goal, head, in_fence = [], [], None, False
+    for ln, line in enumerate(text.splitlines(), 1):
+        if line.startswith('```'):
+            in_fence = not in_fence
+            continue
+        if line.startswith('## ') and not in_fence:
+            head = line[3:].strip()
+            continue
+        if in_fence or head is None:
+            continue
+        bare = strip_code(line)
+        if head == 'Goal':
+            goal += [(ln, m.group(0)) for m in ASSERTS.finditer(bare)]
+        elif (m := UNVERIFIED.search(bare)):
+            marks.append((ln, head, m.group(0)))
+    if not marks:
+        return
+    mark_ln, mark_head, mark = marks[0]
+    for ln, words in goal:
+        findings.append(
+            f'#{n}:{ln}: the Goal asserts a cause or scope ("{words}") while line {mark_ln} '
+            f'of "{mark_head}" says "{mark}"; a Goal states the symptom to make pass and '
+            'leaves the mechanism to the first box')
+
+
 def kind(issue):
     names = {l['name'] for l in issue['labels']}
     return 'spec' if 'kind:spec' in names else 'ticket' if 'kind:ticket' in names else 'epic'
@@ -159,6 +205,8 @@ for n, issue in sorted(issues.items()):
         want = SPEC if k == 'spec' else TICKET
         if heads != want:
             findings.append(f'#{n}: sections {heads} != {want}')
+        if k == 'ticket':
+            unverified_cause(n, text)
     in_fence = False
     for ln, line in enumerate(text.splitlines(), 1):
         if line.startswith('```'):

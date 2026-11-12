@@ -11,7 +11,10 @@ targets, then:
 
 - whether the diff needs Postgres locally: models, migrations, services,
   querysets or raw SQL, the database settings, or `core/tests/populated.py`.
-  Otherwise CI's Postgres jobs cover it;
+  A module outside the tests that imports a models module or django.db,
+  makes an ORM write call or runs raw SQL counts whatever lines changed;
+  in any other file only the changed lines count. Otherwise CI's Postgres
+  jobs cover it;
 - which browser tests measure text, and so also run with
   `DERBYNET_BROWSER_FONT="DejaVu Sans"`, which draws `system-ui` as CI does
   (#273's "Heat 100" failed only there);
@@ -23,7 +26,8 @@ A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
 means every suite on both databases: #282's browser conftest hook ran in
 every collection. A file no rule maps falls back to its app's tests, and the
 output says so; outside server/ it falls back to everything. It never maps
-a file to nothing without saying why (docs, the frozen PHP).
+a file to nothing without saying why (docs, the frozen PHP, a server tool
+no test names or imports).
 
 `--stdin` reads the file list instead of git, for a back-test
 (`git diff --name-only SHA^ SHA | plan/bin/affected-tests --stdin`); it then
@@ -57,6 +61,7 @@ REPLAY_SUITES = (  # plan/AGENT-BRIEF.md, Django handlers
     'racing/tests/test_finalists.py',
 )
 BROWSER_DIR = 'ui/tests/browser'
+COMMANDS_GUARD = 'tests/test_management_commands.py'
 
 # A ui subpackage, template folder or static stem, and the words its tests'
 # file names carry. The default is the name, and the name less a final "s".
@@ -189,7 +194,12 @@ class Tree:
 
     def imports(self):
         """Each test-folder module's imported names: `import a.b` gives a.b,
-        `from a import b` gives a and a.b; relative imports are resolved."""
+        `from a import b` gives a and a.b; relative imports are resolved. A
+        dotted path a `patch` or `setattr` call names counts too:
+        `mock.patch("core.database_scripts.call_command")` in
+        test_database_execute.py and `monkeypatch.setattr(
+        "legacy_api.handlers.race_control.poll_coordinator", ...)` in
+        test_dashboard.py reach their modules without an import."""
         if self._imports is None:
             self._imports = {}
             for rel in self.python_in_tests():
@@ -212,6 +222,12 @@ class Tree:
                             mod = '.'.join(parts + ([mod] if mod else []))
                         names.add(mod)
                         names.update(f'{mod}.{a.name}' for a in node.names)
+                    elif isinstance(node, ast.Call) and node.args \
+                            and call_name(node.func) in PATCH_CALLS \
+                            and isinstance(node.args[0], ast.Constant) \
+                            and isinstance(node.args[0].value, str) \
+                            and DOTTED.fullmatch(node.args[0].value):
+                        names.add(node.args[0].value)
                 self._imports[rel] = names
         return self._imports
 
@@ -297,6 +313,18 @@ class Tree:
                     new.add(('template', name))
             frontier = new
         return users
+
+
+PATCH_CALLS = {'patch', 'setattr', 'delattr'}
+DOTTED = re.compile(r'[A-Za-z_]\w*(\.[A-Za-z_]\w*)+')
+
+
+def call_name(func):
+    """`patch` for `mock.patch(...)`, `patch(...)` and `monkeypatch.setattr`'s
+    `setattr`."""
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return func.id if isinstance(func, ast.Name) else None
 
 
 def module_name(rel):
@@ -563,11 +591,31 @@ def cover_handler(plan, tree, path):
              [*REGISTRY_CHECKS, *REPLAY_SUITES, *named])
 
 
+def match_command(path):
+    rel = s(path)
+    return rel is not None and not in_tests(rel) and \
+        re.fullmatch(r'\w+/management/commands/\w+\.py', rel) is not None and \
+        Path(rel).stem != '__init__'
+
+
+def cover_command(plan, tree, path):
+    """A management command runs by name (`call_command("build_css")`), not
+    by an import, so the import rule misses its tests, and
+    tests/test_management_commands.py checks that a test names each one."""
+    name = re.escape(Path(path).stem)
+    named = re.compile(rf"[\"']{name}[\"']|commands(\.|\s+import\s+){name}\b")
+    targets = [rel for rel in tree.test_files() if named.search(tree.text(rel))]
+    if tree.exists(COMMANDS_GUARD):
+        targets.append(COMMANDS_GUARD)
+    plan.add(path, 'command', 'a management command: the tests that name it, as '
+             f'{COMMANDS_GUARD} does', sorted(set(targets)))
+
+
 def match_ui_python(path):
     rel = s(path)
     return rel is not None and rel.startswith('ui/') and rel.endswith('.py') \
         and not in_tests(rel) and 'migrations' not in Path(rel).parts \
-        and not rel.startswith(SHARED_UI)
+        and not rel.startswith(SHARED_UI) and not rel.startswith('ui/management/')
 
 
 def cover_ui_python(plan, tree, path):
@@ -611,8 +659,49 @@ def match_db_code(path):
     return rel is not None and rel.endswith('.py')
 
 
+# Write calls that are the ORM's by name, and those that are when they take no
+# positional argument: `award.save()`, `qs.update(slug=...)`, not
+# `book.save(out)` (openpyxl) or `params.update({...})`.
+ORM_WRITES = {'bulk_create', 'bulk_update', 'get_or_create', 'update_or_create'}
+ORM_KEYWORD_WRITES = {'save', 'create', 'update', 'delete'}
+
+
+def database_module(text):
+    """Why a module is database code as a whole, or None: it imports a models
+    module or django.db, makes an ORM write call, or runs raw SQL. Any edit to
+    it then needs Postgres, whatever lines changed: #288's diff-line rule
+    said "not needed" for a non-ORM edit to awards/editing.py or
+    transfer/importer.py, which both write the database."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            mod = node.module or ''
+            names = [mod] + [f'{mod}.{a.name}' if mod else a.name for a in node.names]
+        for name in names:
+            parts = name.split('.')
+            if 'models' in parts or parts[:2] == ['django', 'db']:
+                return f'imports {name}'
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            attr = node.func.attr
+            if attr in ORM_WRITES or (attr in ORM_KEYWORD_WRITES and not node.args):
+                return f'calls .{attr}()'
+    hit = RAW_SQL.search(text)
+    return f'raw SQL ({hit.group(0)!r})' if hit else None
+
+
 def cover_db_code(plan, tree, path):
     rel = s(path)
+    if not in_tests(rel):
+        why = database_module(tree.text(rel))
+        if why:
+            plan.postgres.append(f'{path}: database code, as a whole module ({why})')
+            return
     pattern = RAW_SQL if in_tests(rel) else DB_CODE
     text = diff_text(plan, path) if plan.from_git else tree.text(rel)
     hit = pattern.search(text)
@@ -698,10 +787,20 @@ def cover_server_tools(plan, tree, path):
     rel = s(path)
     if rel == 'tools/pytest-postgres.sh':
         plan.postgres.append(f'{path}: the Postgres runner itself')
-    stem = Path(rel).stem
-    targets = tree.mentions([Path(rel).name, f'tools.{stem}', f'tools/{stem}'])
+    # A tool in a package, such as tools/standings_differential/, is named and
+    # imported as the package (an import's text names it too): its
+    # __main__.py has no test of its own.
+    stems = [Path(rel).stem]
+    if len(Path(rel).parts) > 2:
+        stems.append(Path(rel).parts[1])
+    words = [Path(rel).name] + [f'tools{sep}{stem}' for stem in stems for sep in './']
+    targets = tree.mentions(words)
     if rel.endswith('.py'):
         targets += tree.importers(module_name(rel))[0]
+    if not targets:
+        plan.add(path, 'server-tools', 'a server tool no test names or imports: no '
+                 'pytest target. Run it by hand on the change')
+        return
     plan.add(path, 'server-tools', 'a server tool: the tests that name or import it',
              sorted(set(targets)))
 
@@ -719,6 +818,7 @@ RULES = (
     ('model', match_model, cover_model),
     ('service', match_service, cover_service),
     ('handler', match_handler, cover_handler),
+    ('command', match_command, cover_command),
     ('ui-python', match_ui_python, cover_ui_python),
     ('app-python', match_app_python, cover_app_python),
     ('importers', match_importers, cover_importers),
@@ -753,6 +853,7 @@ def map_file(plan, tree, path):
             cover(plan, tree, path)
     entries = plan.covers.get(path, [])
     if not any(targets or rule in ('everything', 'docs', 'website', 'plan-tools')
+               or note.startswith('a server tool no test')
                or note.startswith('deleted')
                for rule, note, targets in entries):
         fallback(plan, tree, path)
@@ -857,13 +958,14 @@ def report(plan, tree):
 
     if plan.postgres:
         say('Postgres: needed (owner, 2026-11-11: models, migrations, services, '
-            'querysets, raw SQL, the database settings or populated.py):')
+            'modules that import models or write the database, querysets, raw SQL, '
+            'the database settings or populated.py):')
         for why in dict.fromkeys(plan.postgres):
             say(f'  {why}')
     else:
         say('Postgres: not needed; the diff touches no model, migration, service, '
-            'queryset, raw SQL, database setting or populated.py, and CI runs it '
-            '(owner, 2026-11-11).')
+            'module that imports models or writes the database, queryset, raw SQL, '
+            'database setting or populated.py, and CI runs it (owner, 2026-11-11).')
     say('')
     if measured:
         say('Measures text, so also run with DERBYNET_BROWSER_FONT="DejaVu Sans", '

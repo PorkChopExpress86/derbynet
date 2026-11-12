@@ -7,12 +7,12 @@ The plan lives in GitHub issues on PorkChopExpress86/derbynet, labeled `django-m
 | `HANDOFF.md` | Where to find the plan's state, how the work is run, open questions, and new-machine setup |
 | `implement-all-tickets.md` | Prompt for a lead session that works through every `ready-for-agent` ticket in a loop, giving each step to fresh Opus or Sonnet subagents: implement, code review, PR, merge, retro |
 | `owner-decisions.md` | Every owner decision, with the issues and ADRs that record it |
-| `lint-issues.py` | Checks every plan issue body: style, section order, cited paths, `#N` references, and forward-only dependencies with no cycles. Checks that issue state matches the code: no open ticket or spec that a merged PR closes, no `ready-for-agent` with an open dependency, no `blocked` with every dependency closed |
+| `lint-issues.py` | Checks every plan issue body: style, section order, a ticket's Goal that asserts a cause the body marks unverified, cited paths, `#N` references, and forward-only dependencies with no cycles. Checks that issue state matches the code: no open ticket or spec that a merged PR closes, no `ready-for-agent` with an open dependency, no `blocked` with every dependency closed |
 | `bin/pr-wait` | Waits for every check on a PR's current head and prints one line per check |
-| `bin/ci-failures` | Lists each test that failed on a PR's checks, `known` when it also failed on a recent master run (a flake already on master) and `new` otherwise; `pr-wait` prints it on a failure |
+| `bin/ci-failures` | Lists each test that failed on a PR's checks, `known` when it also failed on a recent master run (a flake already on master) and `new` otherwise, and for a job with no test id its failed step and the error line the jobs share, with an `outage:` line when every job died in setup on that line; `pr-wait` prints it on a failure |
 | `bin/issue` | Prints an issue's title, body, and comments, because `gh issue view --comments` prints nothing on some gh versions |
 | `bin/ci-suites` | Lists each `testing/` suite an issue names and whether `.github/workflows/server.yml` runs it; exits 1 when one is missing |
-| `bin/pr-merge` | Merges a PR only if every check on its current head passed, pinned to that head SHA, and refuses one that would close an issue with a `## Still open` section; then prints each issue the PR closes with its state and exits 1 if one is still open |
+| `bin/pr-merge` | Merges a PR only if every check on its current head passed, pinned to that head SHA. Refuses one that would close an issue with a `## Still open` section, and one whose area (plan/, .githooks/, server/tools/, .github/, a conftest.py, server/pyproject.toml, server/uv.lock) origin/master changed since its merge base, until `--base-checked` says the combined diff's affected tests ran; then prints each issue the PR closes with its state and exits 1 if one is still open |
 
 ## Edit an issue body
 
@@ -22,6 +22,8 @@ gh issue view N --repo PorkChopExpress86/derbynet --json body --jq .body > /tmp/
 python3 -I plan/lint-issues.py --file N=/tmp/bodyN.md
 gh issue edit N --repo PorkChopExpress86/derbynet --body-file /tmp/bodyN.md
 ```
+
+A ticket's Goal states the symptom to make pass, and leaves the mechanism to the first Scope box. When another section marks a fact unverified ("not yet verified", "unverified", "observed once", "not reproduced", "only estimated"), the lint flags each Goal line that asserts a cause or scope as fact ("can land", "because", "caused by", "due to", "always"). #282's Goal said CI's run "can land it on one worker" while its Current PHP behavior called the failure "observed once" and its suspect "not yet verified", and the mechanism proved false.
 
 A body for an issue not created yet lints with `--file 0=PATH`, as a new open issue with the labels `--labels kind:ticket,ready-for-agent` names (default `kind:ticket`). `plan/tests/` tests the lint against a fake `gh`; CI runs it.
 
