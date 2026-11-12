@@ -317,8 +317,30 @@ class Importers(unittest.TestCase):
         importers = section(out, 'server/racing/services/heats.py').split('[importers]')[1]
         self.assertIn('ui/tests/browser/test_dashboard.py', importers)
 
+    def test_a_test_this_python_cannot_parse_still_counts_its_imports(self):
+        """The server is 3.14 and plan-checks' python3 was 3.12, which reads
+        `except A, B:` as a SyntaxError; such a test keeps its importers."""
+        tree = {**TREE, 'server/ui/tests/test_unparsed.py':
+                'from racing.services import heats\n'
+                'mock.patch("racing.engine.scheduling.plan")\n'
+                'def broken(:\n    pass\n'}
+        heats = section(run('server/racing/services/heats.py', tree=tree),
+                        'server/racing/services/heats.py')
+        self.assertIn('ui/tests/test_unparsed.py', heats)
+        plan = section(run('server/racing/engine/scheduling.py', tree=tree),
+                       'server/racing/engine/scheduling.py')
+        self.assertIn('ui/tests/test_unparsed.py', plan)
+
 
 class DbCode(unittest.TestCase):
+    def test_a_module_this_python_cannot_parse_counts_as_database_code(self):
+        """plan-checks on 3.12 read awards/editing.py's 3.14 `except A, B:`
+        as a SyntaxError and said Postgres was not needed."""
+        tree = {**TREE, 'server/awards/editing.py': 'def broken(:\n    pass\n'}
+        out = run('server/awards/editing.py', tree=tree)
+        self.assertIn('cannot be parsed by this Python, so counted as database code', out)
+        self.assertNotIn('Postgres: not needed', out)
+
     def test_a_queryset_needs_postgres(self):
         tree = {**TREE, 'server/awards/editing.py': 'Award.objects.filter(id=1)\n'}
         out = run('server/awards/editing.py', tree=tree)

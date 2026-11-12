@@ -47,9 +47,18 @@ jobs:
         if: github.event_name != 'issues'
         run: bash server/docs/adr/check-paths.sh
 
+      # The plan tools parse server/ code, which is Python 3.14 (`except A, B:`);
+      # the runner's python3 is older, so the tools run on 3.14 as the server
+      # jobs do. affected-tests also counts a module it cannot parse as
+      # database code (lead retro, PR #290).
+      - uses: astral-sh/setup-uv@v10.3.2
+        if: github.event_name != 'issues'
+        with:
+          python-version: '3.14'
+
       - name: Test the plan tools
         if: github.event_name != 'issues'
-        run: python3 -I -m unittest discover -s plan/tests
+        run: uv run --no-project --python 3.14 python -I -m unittest discover -s plan/tests
 
       - name: Decide whether to lint the issues
         id: scope

@@ -207,7 +207,11 @@ class Tree:
                 try:
                     tree = ast.parse(self.text(rel))
                 except SyntaxError:
+                    # Syntax newer than this Python (the server needs 3.14):
+                    # read the imports and patch paths as text instead of
+                    # dropping them.
                     tree = ast.Module(body=[], type_ignores=[])
+                    names.update(text_imports(self.text(rel)))
                 package = module_name(rel).rsplit('.', 1)[0]
                 if Path(rel).name == '__init__.py':
                     package = module_name(rel)
@@ -666,6 +670,26 @@ ORM_WRITES = {'bulk_create', 'bulk_update', 'get_or_create', 'update_or_create'}
 ORM_KEYWORD_WRITES = {'save', 'create', 'update', 'delete'}
 
 
+TEXT_IMPORT = re.compile(
+    r'^\s*(?:from\s+([A-Za-z_][\w.]*)\s+import\s+([\w, ]+)|import\s+([A-Za-z_][\w.]*))',
+    re.M)
+TEXT_PATCH = re.compile(r'\b(?:patch|setattr|delattr)\(\s*[\'"]([A-Za-z_][\w.]*\.[\w.]+)[\'"]')
+
+
+def text_imports(text):
+    """The absolute imports and patch paths of a module ast cannot parse."""
+    names = set()
+    for m in TEXT_IMPORT.finditer(text):
+        if m.group(3):
+            names.add(m.group(3))
+        else:
+            mod = m.group(1)
+            names.add(mod)
+            names.update(f'{mod}.{a.strip()}' for a in m.group(2).split(',') if a.strip())
+    names.update(TEXT_PATCH.findall(text))
+    return names
+
+
 def database_module(text):
     """Why a module is database code as a whole, or None: it imports a models
     module or django.db, makes an ORM write call, or runs raw SQL. Any edit to
@@ -675,7 +699,11 @@ def database_module(text):
     try:
         tree = ast.parse(text)
     except SyntaxError:
-        return None
+        # The server is Python 3.14 (`except A, B:` is 3.14 syntax), and a
+        # runner's python3 can be older. A module this Python cannot read is
+        # counted as database code, never passed over: plan-checks on 3.12
+        # said "not needed" for awards/editing.py.
+        return 'cannot be parsed by this Python, so counted as database code'
     for node in ast.walk(tree):
         names = []
         if isinstance(node, ast.Import):
