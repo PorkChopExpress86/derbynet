@@ -257,6 +257,11 @@ class Service(unittest.TestCase):
         self.assertIn('roster/tests/test_group_scenarios.py', commands(out))
         self.assertIn('server/racing/services/heats.py: a service', out)
 
+    def test_a_service_runs_the_event_leak_check(self):
+        out = run('server/racing/services/heats.py')
+        self.assertIn('legacy_api/tests/test_event_leak.py',
+                      section(out, 'server/racing/services/heats.py'))
+
 
 class Handler(unittest.TestCase):
     def test_a_handler_runs_the_registry_and_its_named_tests(self):
@@ -423,7 +428,13 @@ class RealTree(unittest.TestCase):
             with self.subTest(path=path):
                 block = section(out, path)
                 self.assertNotIn('[fallback]', block)
-                self.assertRegex(block, r'\n {6}\S', 'no test target')
+                named = [ln.strip() for ln in block.splitlines()
+                         if ln.startswith(' ' * 6)]
+                page_wide = {f'ui/tests/{n}' for n in (
+                    'test_navigation.py', 'test_every_view.py',
+                    'test_query_growth.py', 'test_photo_urls.py')}
+                self.assertTrue(set(named) - page_wide,
+                                'no test target beyond the page-wide checks')
 
 
 if __name__ == '__main__':

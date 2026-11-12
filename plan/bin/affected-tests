@@ -543,8 +543,9 @@ def match_service(path):
 
 def cover_service(plan, tree, path):
     plan.postgres.append(f'{path}: a service')
-    plan.add(path, 'service', 'a service: the replay suites, which hold PHP\'s '
-             'state after each step', REPLAY_SUITES)
+    plan.add(path, 'service', 'a service: the registry and event-leak checks, '
+             'and the replay suites, which hold PHP\'s state after each step',
+             [*REGISTRY_CHECKS, *REPLAY_SUITES])
 
 
 def match_handler(path):

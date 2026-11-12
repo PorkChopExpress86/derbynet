@@ -32,7 +32,7 @@ While a subagent runs, read its notifications: when they show the same backgroun
 
 1. Run /mattpocock-skills:code-review on ../derbynet-wt-N with origin/master as the fixed point. The spec is ticket #N, and the standards are CONTRIBUTING.md and plan/AGENT-BRIEF.md. Spawn its Standards reviewer with `model: sonnet` and its Spec reviewer with `model: opus`. A reviewer runs only what confirms or refutes a finding (the test, the `-k` mutant, the server run), never the full suites (owner, 2026-11-11). A reviewer that mutates code does it in its own copy (`git worktree add --detach ../derbynet-wt-N-rv<axis> <head>`, removed after), and a reviewer leaves a change it didn't make as it is: #247's Spec reviewer reset a mutation the Standards reviewer had running in the shared worktree.
 2. Rank every finding.
-3. Send the high and medium findings to the implementer. It reproduces each one with a test, a server run, or the affected tests, and reports the ones it can't reproduce (CLAUDE.md). It fixes each reproduced finding with a test that goes red before the fix, reruns what `plan/bin/affected-tests` prints for the new head, mutates only the asserts or rules the round changed, and commits with a message that references #N.
+3. Send the high and medium findings to the implementer. It reproduces each one with a test, a server run, or the affected tests (owner, 2026-11-11), and reports the ones it can't reproduce (CLAUDE.md). It fixes each reproduced finding with a test that goes red before the fix, reruns what `plan/bin/affected-tests` prints for the new head, mutates only the asserts or rules the round changed (owner, 2026-11-11), and commits with a message that references #N.
 
 ## 3. PR
 
