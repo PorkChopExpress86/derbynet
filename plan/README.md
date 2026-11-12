@@ -23,7 +23,7 @@ python3 -I plan/lint-issues.py --file N=/tmp/bodyN.md
 gh issue edit N --repo PorkChopExpress86/derbynet --body-file /tmp/bodyN.md
 ```
 
-A ticket's Goal states the symptom to make pass, and leaves the mechanism to the first Scope box. When another section marks a fact unverified ("not yet verified", "unverified", "observed once", "not reproduced", "only estimated"), the lint flags each Goal line that asserts a cause or scope as fact ("can land", "because", "caused by", "due to", "always"). #282's Goal said CI's run "can land it on one worker" while its Current PHP behavior called the failure "observed once" and its suspect "not yet verified", and the mechanism proved false.
+A ticket's Goal states the symptom to make pass, and leaves the mechanism to the first Scope box. When Current PHP behavior or Scope marks an observation or a cause unverified ("not yet verified", "observed once", "not reproduced", "suspect"), the lint flags each Goal line that asserts a cause as fact ("can land", "because", "caused by", "due to"). #282's Goal said CI's run "can land it on one worker" while its Current PHP behavior called the failure "observed once" and its suspect "not yet verified", and the mechanism proved false.
 
 A body for an issue not created yet lints with `--file 0=PATH`, as a new open issue with the labels `--labels kind:ticket,ready-for-agent` names (default `kind:ticket`). `plan/tests/` tests the lint against a fake `gh`; CI runs it.
 

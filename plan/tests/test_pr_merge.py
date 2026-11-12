@@ -143,6 +143,37 @@ class PrMerge(unittest.TestCase):
                 self.assertIn(f'\n{area}\n  master:  {master}\n  this PR: {pr}\n', done.stderr)
                 self.assertEqual(self.merged(), '')
 
+    def test_master_moved_from_another_clone_is_fetched(self):
+        """The local origin/master is stale: #288 merged from elsewhere. The
+        Standards review of 4d459525 dropped the fetch and every other test
+        here passed."""
+        head = self.pr('plan/AGENT-BRIEF.md')
+        other = self.tmp / 'other'
+        self.git('clone', '-q', str(self.tmp / 'origin.git'), str(other), cwd=self.tmp)
+        (other / 'plan' / 'bin').mkdir(parents=True, exist_ok=True)
+        (other / 'plan' / 'bin' / 'affected-tests').write_text('#288\n')
+        self.git('add', '.', cwd=other)
+        self.git('commit', '-q', '-m', '#288: master moved', cwd=other)
+        self.git('push', '-q', 'origin', 'HEAD:master', cwd=other)
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('plan/\n  master:  plan/bin/affected-tests\n', done.stderr)
+        self.assertEqual(self.merged(), '')
+
+    def test_a_moved_path_with_a_space_names_its_commit(self):
+        head = self.pr('plan/AGENT-BRIEF.md')
+        self.master('plan/Quick Reference.md')
+        done = self.merge(head)
+        self.assertIn('#288: master moved\nplan/\n', done.stderr)
+
+    def test_a_failed_fetch_refuses_with_the_head_local(self):
+        head = self.pr('plan/AGENT-BRIEF.md')
+        self.git('remote', 'set-url', 'origin', str(self.tmp / 'gone.git'))
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('could not fetch origin/master and its head', done.stderr)
+        self.assertEqual(self.merged(), '')
+
     def test_a_head_it_cannot_fetch_refuses(self):
         self.pr('plan/AGENT-BRIEF.md')
         done = self.merge('0' * 40)

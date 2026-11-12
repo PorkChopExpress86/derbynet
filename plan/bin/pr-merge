@@ -70,7 +70,8 @@ if [ "$base_checked" = 0 ]; then
   if [ -n "$shared" ]; then
     {
       echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, in an area the PR also changes, so CI ran without these commits:"
-      git log --format='  %h %s' "$base..origin/master" -- $(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
+      mapfile -t moved < <(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
+      git log --format='  %h %s' "$base..origin/master" -- "${moved[@]}"
       for area in $shared; do
         echo "$area"
         awk -F'\t' -v a="$area" '$1 == a { print "  master:  " $2 }' <<<"$master_paths"

@@ -34,8 +34,9 @@ PHP_282 = (
     "`DJANGO_ALLOW_ASYNC_UNSAFE` in its `_async_unsafe` fixture.")
 
 
-def ticket(goal='Text.', php='Text.', risks='Text.'):
-    texts = {'Goal': goal, 'Current PHP behavior': php, 'Risks and notes': risks}
+def ticket(goal='Text.', php='Text.', risks='Text.', scope='Text.'):
+    texts = {'Goal': goal, 'Current PHP behavior': php, 'Risks and notes': risks,
+             'Scope': scope}
     return '\n\n'.join(f'## {name}\n\n{texts.get(name, "Text.")}' for name in (
         'Goal', 'Current PHP behavior', 'Scope', 'Out of scope', 'Acceptance criteria',
         'Risks and notes', 'Dependencies', 'References'))
@@ -98,13 +99,13 @@ class LintIssues(Lint):
 
 
 class UnverifiedCause(Lint):
-    """A Goal that asserts a cause or scope while another section marks a
-    fact unverified (#282 retro)."""
+    """A Goal that asserts a cause while Current PHP behavior or Scope marks
+    an observation or a cause unverified (#282 retro)."""
 
     def test_282s_first_body_is_flagged_on_its_goal_line(self):
         done = self.lint(ticket(GOAL_282, PHP_282))
         self.assertEqual(done.returncode, 1, done.stderr)
-        self.assertIn('#0:3: the Goal asserts a cause or scope ("can land") while line 8 of '
+        self.assertIn('#0:3: the Goal asserts a cause ("can land") while line 8 of '
                       '"Current PHP behavior" says "observed once"; a Goal states the symptom '
                       'to make pass and leaves the mechanism to the first box', done.stdout)
         self.assertIn('1 findings', done.stdout)
@@ -122,9 +123,29 @@ class UnverifiedCause(Lint):
         done = self.lint(ticket(GOAL_282 + ' It was observed once.'))
         self.assertIn('0 findings', done.stdout, done.stdout)
 
-    def test_a_mark_in_any_other_section_counts(self):
-        done = self.lint(ticket(GOAL_282, risks='- The count is only estimated.'))
-        self.assertIn('of "Risks and notes" says "only estimated"', done.stdout)
+    def test_a_mark_in_scope_counts(self):
+        done = self.lint(ticket(GOAL_282, scope='- [ ] Check the suspect first.'))
+        self.assertIn('of "Scope" says "suspect"', done.stdout)
+
+    def test_a_mark_in_risks_is_not_counted(self):
+        """The Standards review of 4d459525: a Risks line is no fact the
+        Goal rests on."""
+        done = self.lint(ticket(GOAL_282, risks='- The fault was not yet reproduced.'))
+        self.assertIn('0 findings', done.stdout, done.stdout)
+
+    def test_the_reviews_false_positives_pass(self):
+        """Three bodies the Standards review of 4d459525 linted with
+        `--file 0=`, each giving a finding before."""
+        for body in (
+                ticket('The kiosk always shows the heat name, as PHP does.',
+                       risks='- The Chrome 90 behaviour is unverified.'),
+                ticket('Reject bad input because the PHP does.',
+                       php='- PHP rejects unverified input.'),
+                ticket('A heat can fail to load due to a missing lane.',
+                       risks='- Timing is only estimated at 2 s.')):
+            with self.subTest(body=body.split('\n')[2]):
+                done = self.lint(body)
+                self.assertIn('0 findings', done.stdout, done.stdout)
 
     def test_quoted_and_code_words_are_left_out(self):
         goal = ('Make the `because` field and the "always on" switch save.\n\n'
@@ -139,14 +160,13 @@ class UnverifiedCause(Lint):
     def test_each_assertion_and_each_mark(self):
         for words in ('can land', 'can hit', 'cannot hit', 'can fail', 'can break',
                       'can cause', 'can trigger', 'can happen', 'because', 'is caused by',
-                      'due to', 'the cause is', 'always'):
+                      'due to', 'the cause is'):
             with self.subTest(words=words):
                 done = self.lint(ticket(f'Fix the run, which {words} it.', PHP_282))
                 self.assertIn(f'("{words.removeprefix("is ")}")', done.stdout)
         for words in ('not yet verified', 'not yet been verified', 'not yet confirmed',
-                      'not yet measured', 'not yet reproduced', 'unverified', 'unconfirmed',
-                      'observed once', 'not reproduced', 'not been reproduced',
-                      'only estimated'):
+                      'not yet measured', 'not yet reproduced', 'observed once',
+                      'not reproduced', 'not been reproduced', 'suspect', 'suspected'):
             with self.subTest(words=words):
                 done = self.lint(ticket(GOAL_282, f'- The fault is {words}.'))
                 self.assertIn(f'says "{words}"', done.stdout)

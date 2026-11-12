@@ -83,6 +83,10 @@ TREE = {
         'def test_a(monkeypatch):\n'
         '    monkeypatch.setattr("legacy_api.handlers.race_control.poll", None)\n'
         '    print("racing.services.heats")\n'),
+    'server/core/database_scripts_gone.py': 'X = 1\n',
+    'server/core/tests/test_delattr.py': (
+        'def test_a(monkeypatch):\n'
+        '    monkeypatch.delattr("core.database_scripts_gone.X")\n'),
     'server/ui/management/commands/build_css.py': 'class Command: pass\n',
     'server/ui/tests/test_build_css_command.py': 'call_command("build_css", "--check")\n',
     'server/tests/test_management_commands.py': 'APPS = []\n',
@@ -425,6 +429,11 @@ class PatchedPaths(unittest.TestCase):
         out = run('server/legacy_api/handlers/race_control.py')
         self.assertIn('ui/tests/test_dashboard_poll.py',
                       section(out, 'server/legacy_api/handlers/race_control.py'))
+
+    def test_a_monkeypatch_delattr_path_counts_as_an_import(self):
+        out = run('server/core/database_scripts_gone.py')
+        self.assertIn('core/tests/test_delattr.py',
+                      section(out, 'server/core/database_scripts_gone.py').split('[importers]')[1])
 
     def test_a_dotted_string_in_another_call_does_not(self):
         out = run('server/racing/services/heats.py')

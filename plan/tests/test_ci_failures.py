@@ -189,6 +189,55 @@ class CiFailures(unittest.TestCase):
         self.assertIn(f'new    {VOTE}\n', result.stdout)
         self.assertNotIn('outage', result.stdout)
 
+    def test_a_shared_code_failure_at_setup_is_no_outage(self):
+        """The Standards review of 4d459525: a stale uv.lock and conflicting
+        migrations fail every job's setup with one shared line, and are code
+        failures."""
+        uv = ''.join(apt(job, 'Install dependencies',
+                         'error: The lockfile at `uv.lock` needs to be updated, but `--locked` '
+                         'was provided. To update the lockfile, run `uv lock`.',
+                         '##[error]Process completed with exit code 2.')
+                     for job in ('ui (sqlite)', 'pytest (sqlite)', 'lint'))
+        migrations = ''.join(apt(job, 'Start the Django server',
+                                 'CommandError: Conflicting migrations detected; multiple leaf '
+                                 'nodes in the migration graph: (0012_a, 0012_b in core).',
+                                 'Error: Process completed with exit code 1.',
+                                 '##[error]Process completed with exit code 1.')
+                             for job in ('shell (sqlite, group 1)', 'shell (postgres, group 1)'))
+        for log, jobs in ((uv, ('ui (sqlite)', 'pytest (sqlite)', 'lint')),
+                          (migrations, ('shell (sqlite, group 1)', 'shell (postgres, group 1)'))):
+            with self.subTest(jobs=jobs):
+                result = run([check('fail', 12, job) for job in jobs], {'12': log}, [])
+                self.assertIn(f'{len(jobs)} of {len(jobs)} jobs printed', result.stdout)
+                self.assertNotIn('outage', result.stdout)
+
+    def test_each_network_line_counts(self):
+        for text in ("Temporary failure resolving 'azure.archive.ubuntu.com'",
+                     'curl: (6) Could not resolve host: github.com',
+                     'Connection timed out', 'Connection refused', 'Connection reset by peer',
+                     'E: Failed to fetch http://archive.ubuntu.com/a.deb',
+                     'Error: HTTP 502 from the registry', 'Error: 503 Service Unavailable',
+                     'Error: API rate limit exceeded', 'Error: TLS handshake timeout'):
+            with self.subTest(text=text):
+                log = ''.join(apt(job, 'Install dependencies', text,
+                                  '##[error]Process completed with exit code 1.')
+                              for job in ('ui (sqlite)', 'pytest (sqlite)'))
+                result = run([check('fail', 13, 'ui (sqlite)'), check('fail', 13, 'pytest (sqlite)')],
+                             {'13': log}, [])
+                self.assertIn('outage:', result.stdout)
+
+    def test_a_failed_check_with_no_run_is_no_outage(self):
+        """A failed check whose link names no run (an external status) gives
+        no run to call an outage."""
+        result = run([{'bucket': 'fail', 'name': 'external', 'link': 'https://example.com/x'}],
+                     {}, [])
+        self.assertNotIn('outage', result.stdout)
+
+    def test_a_run_with_an_empty_log_is_no_outage(self):
+        result = run([check('fail', 14, 'ui (sqlite)')], {'14': ''}, [])
+        self.assertIn('its log is empty', result.stdout)
+        self.assertNotIn('outage', result.stdout)
+
     def test_no_failed_check(self):
         result = run([check('pass', 2)], {}, [])
         self.assertEqual(result.returncode, 0, result.stderr)
