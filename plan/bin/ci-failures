@@ -21,6 +21,22 @@ jobs share:
       shell (sqlite, group 1)  step "Start the Django server": E: Unable ...
       2 of 2 jobs printed: Temporary failure resolving 'azure.archive...'
 
+and when every failed job of every failed run stopped in a setup step, all
+of a run's jobs printed that one line, the line names the network or a
+service failing (a name that does not resolve, a connection timed out or
+refused, a failed fetch, an HTTP 5xx, a rate limit, a TLS handshake), and no
+test id appears anywhere, a last line says it is an outage, not a code
+failure:
+
+    outage: every failure is in a setup step, before any test; ...
+
+A setup step is one whose name starts with Set up, Install, Fetch, Start,
+Build, Initialize, Checkout or Run actions/, and names no check or
+comparison ("Build the CSS offline, with no Node, and compare it" is a
+check). A run of one failed job never counts, since one job shares a line
+with nobody. A stale uv.lock or conflicting migrations fail every job's
+setup with one line too, and are code failures.
+
 PR #284's run 43054997286 failed 10 jobs at apt, and the lead read their
 logs by hand to find the mirror they all timed out on, which #285 fixed
 (#282 retro). Exits 1 when a test is new or a job has no test id, 0 when
@@ -79,30 +95,56 @@ def failed_step(lines: list[tuple[str, str]]) -> tuple[str, list[str]]:
     errors = [
         text
         for s, text in lines
-        if s == step and ERROR_LINE.search(text) and not text.startswith("##[")
+        if s == step
+        and (ERROR_LINE.search(text) or NETWORK.search(text))
+        and not text.startswith("##[")
     ]
     return step, errors
 
 
-def no_test_id(run_id: str, log: str, names: str) -> list[str]:
-    """The report for the jobs of `log` that name no test id."""
+SETUP_STEP = re.compile(
+    r"^(?!.*\b(?:check(?:s|ed|ing)?|compar(?:e|es|ed|ing))\b)"
+    r"(?:Set up|Install|Fetch|Start|Build|Initialize|Checkout|Run actions/)",
+    re.I,
+)
+NETWORK = re.compile(
+    r"(?i)temporary failure resolving|could not resolve|name or service not known"
+    r"|connection (?:timed out|refused|reset)|timed out|failed to fetch"
+    r"|unable to fetch|\b(?:HTTP\S*|status|error) ?5\d\d\b|\b50[234]\b"
+    r"|service unavailable|bad gateway|rate limit|tls handshake"
+    r"|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN"
+)
+OUTAGE = (
+    "outage: every failure is in a setup step, before any test; probe the "
+    "dependency the shared line names, and work around it in a PR of its own "
+    "or report it (plan/implement-all-tickets.md, Stop and report)"
+)
+
+
+def no_test_id(run_id: str, log: str, names: str) -> tuple[list[str], bool]:
+    """The report for the jobs of `log` that name no test id, and whether
+    the run is an outage: no test id in the log, every failed job stopped in
+    a setup step, and every one printed the shared line, a network or
+    service failure."""
     if not log.strip():
         return [
             f"no test id  run {run_id} ({names}): its log is empty; read it on GitHub"
-        ]
+        ], False
     jobs = {
         job: lines
         for job, lines in jobs_of(log).items()
         if not any(TEST_ID.search(text) for _, text in lines)
     }
     if not jobs:
-        return []
+        return [], False
     out = [f"no test id  run {run_id}: {len(jobs)} job{'s' * (len(jobs) > 1)}"]
     # Each error line's (jobs that printed it, times printed), so the cause
     # the jobs share outranks each job's own last line.
     shared: dict[str, tuple[int, int]] = {}
+    setup = True
     for job, lines in jobs.items():
         step, errors = failed_step(lines)
+        setup = setup and SETUP_STEP.match(step) is not None
         last = errors[-1] if errors else "no error line; read its log"
         out.append(f'  {job or names}  step "{step}": {last}')
         for text in set(errors):
@@ -110,11 +152,18 @@ def no_test_id(run_id: str, log: str, names: str) -> list[str]:
                 shared.get(text, (0, 0))[0] + 1,
                 shared.get(text, (0, 0))[1] + errors.count(text),
             )
+    outage = False
     if len(jobs) > 1 and shared:
         text, (n, _) = max(shared.items(), key=lambda kv: kv[1])
         if n > 1:
             out.append(f"  {n} of {len(jobs)} jobs printed: {text}")
-    return out
+        outage = (
+            setup
+            and n == len(jobs)
+            and NETWORK.search(text) is not None
+            and not TEST_ID.search(log)
+        )
+    return out, outage
 
 
 def main(argv: list[str]) -> int:
@@ -134,11 +183,13 @@ def main(argv: list[str]) -> int:
         return 0
     tests: set[str] = set()
     status = 0
+    outages = []
     for run_id in sorted({m.group(1) for c in failed if (m := RUN.search(c["link"]))}):
         log = failed_log(run_id, repo)
         tests |= set(TEST_ID.findall(log))
         names = ", ".join(c["name"] for c in failed if f"/runs/{run_id}/" in c["link"])
-        report = no_test_id(run_id, log, names)
+        report, outage = no_test_id(run_id, log, names)
+        outages.append(outage)
         if report:
             print("\n".join(report))
             status = 1
@@ -161,6 +212,8 @@ def main(argv: list[str]) -> int:
         else:
             print(f"new    {test}")
             status = 1
+    if outages and all(outages):
+        print(OUTAGE)
     return status
 
 

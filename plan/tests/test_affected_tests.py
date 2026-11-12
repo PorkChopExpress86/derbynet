@@ -74,6 +74,29 @@ TREE = {
     'server/ui/static/ui/kiosk.css': '',
     'server/ui/static/ui/kiosk-ondeck.js': '',
     'server/manage.py': '',
+    'server/core/database_scripts.py': 'def migrate(): pass\n',
+    'server/legacy_api/tests/test_database_execute.py': (
+        'from unittest import mock\n\n\ndef test_a():\n'
+        '    mock.patch("core.database_scripts.call_command")\n'),
+    'server/legacy_api/handlers/race_control.py': 'def poll(ctx): pass\n',
+    'server/ui/tests/test_dashboard_poll.py': (
+        'def test_a(monkeypatch):\n'
+        '    monkeypatch.setattr("legacy_api.handlers.race_control.poll", None)\n'
+        '    print("racing.services.heats")\n'),
+    'server/core/database_scripts_gone.py': 'X = 1\n',
+    'server/core/tests/test_delattr.py': (
+        'def test_a(monkeypatch):\n'
+        '    monkeypatch.delattr("core.database_scripts_gone.X")\n'),
+    'server/ui/management/commands/build_css.py': 'class Command: pass\n',
+    'server/ui/tests/test_build_css_command.py': 'call_command("build_css", "--check")\n',
+    'server/tests/test_management_commands.py': 'APPS = []\n',
+    'server/tools/standings_differential/__main__.py': 'from .compare import compare\n',
+    'server/tools/standings_differential/compare.py': 'def compare(): pass\n',
+    'server/racing/engine/tests/test_differential_controls.py': (
+        'from tools.standings_differential.compare import compare\n'),
+    'server/racing/engine/tests/test_recorded.py': (
+        '"""Recorded by `tools/standings_differential` from PHP."""\n'),
+    'server/tools/time_standings.py': 'def main(): pass\n',
     'testing/test-groups.sh': '',
     'website/settings.php': '',
     'website/css/ondeck.css': '',
@@ -294,8 +317,30 @@ class Importers(unittest.TestCase):
         importers = section(out, 'server/racing/services/heats.py').split('[importers]')[1]
         self.assertIn('ui/tests/browser/test_dashboard.py', importers)
 
+    def test_a_test_this_python_cannot_parse_still_counts_its_imports(self):
+        """The server is 3.14 and plan-checks' python3 was 3.12, which reads
+        `except A, B:` as a SyntaxError; such a test keeps its importers."""
+        tree = {**TREE, 'server/ui/tests/test_unparsed.py':
+                'from racing.services import heats\n'
+                'mock.patch("racing.engine.scheduling.plan")\n'
+                'def broken(:\n    pass\n'}
+        heats = section(run('server/racing/services/heats.py', tree=tree),
+                        'server/racing/services/heats.py')
+        self.assertIn('ui/tests/test_unparsed.py', heats)
+        plan = section(run('server/racing/engine/scheduling.py', tree=tree),
+                       'server/racing/engine/scheduling.py')
+        self.assertIn('ui/tests/test_unparsed.py', plan)
+
 
 class DbCode(unittest.TestCase):
+    def test_a_module_this_python_cannot_parse_counts_as_database_code(self):
+        """plan-checks on 3.12 read awards/editing.py's 3.14 `except A, B:`
+        as a SyntaxError and said Postgres was not needed."""
+        tree = {**TREE, 'server/awards/editing.py': 'def broken(:\n    pass\n'}
+        out = run('server/awards/editing.py', tree=tree)
+        self.assertIn('cannot be parsed by this Python, so counted as database code', out)
+        self.assertNotIn('Postgres: not needed', out)
+
     def test_a_queryset_needs_postgres(self):
         tree = {**TREE, 'server/awards/editing.py': 'Award.objects.filter(id=1)\n'}
         out = run('server/awards/editing.py', tree=tree)
@@ -303,6 +348,47 @@ class DbCode(unittest.TestCase):
 
     def test_css_needs_no_postgres(self):
         self.assertIn('Postgres: not needed', run('server/ui/static/ui/kiosk.css'))
+
+    def test_a_module_that_imports_models_is_database_code(self):
+        for text, name in (('from awards.models import Award\n', 'awards.models'),
+                           ('from .models import Award\n', 'models'),
+                           ('from . import models\n', 'models'),
+                           ('import roster.models\n', 'roster.models'),
+                           ('from django.db import transaction\n', 'django.db')):
+            with self.subTest(text=text):
+                tree = {**TREE, 'server/awards/editing.py': text}
+                out = run('server/awards/editing.py', tree=tree)
+                self.assertIn('server/awards/editing.py: database code, as a whole module '
+                              f'(imports {name})', out)
+
+    def test_an_orm_write_call_is_database_code(self):
+        for call, attr in (('award.save()', 'save'), ('award.save(update_fields=["a"])', 'save'),
+                           ('Award.create(name="a")', 'create'), ('qs.update(slug="a")', 'update'),
+                           ('award.delete()', 'delete'), ('Vote.bulk_create(votes)', 'bulk_create'),
+                           ('Vote.bulk_update(votes, ["a"])', 'bulk_update'),
+                           ('Vote.get_or_create(a=1)', 'get_or_create'),
+                           ('Vote.update_or_create(a=1)', 'update_or_create')):
+            with self.subTest(call=call):
+                tree = {**TREE, 'server/awards/editing.py': f'def edit(award, qs):\n    {call}\n'}
+                out = run('server/awards/editing.py', tree=tree)
+                self.assertIn(f'(calls .{attr}())', out)
+
+    def test_a_call_with_a_positional_argument_is_not_an_orm_write(self):
+        """openpyxl's `book.save(out)` and a dict's `.update({...})`."""
+        tree = {**TREE, 'server/awards/editing.py':
+                'def edit(book, out, params):\n    book.save(out)\n    params.update({})\n'
+                '    params.delete(1)\n    params.create(2)\n'}
+        self.assertIn('Postgres: not needed', run('server/awards/editing.py', tree=tree))
+
+    def test_a_test_file_that_imports_models_needs_no_postgres(self):
+        """Every test imports models; in a test only raw SQL counts."""
+        tree = {**TREE, 'server/awards/tests/test_editing.py': 'from awards.models import Award\n'}
+        self.assertIn('Postgres: not needed', run('server/awards/tests/test_editing.py', tree=tree))
+
+    def test_raw_sql_is_database_code(self):
+        tree = {**TREE, 'server/awards/editing.py': 'def f(c):\n    c.cursor()\n'}
+        out = run('server/awards/editing.py', tree=tree)
+        self.assertIn("as a whole module (raw SQL ('cursor('))", out)
 
 
 class SharedUi(unittest.TestCase):
@@ -355,6 +441,52 @@ class ServerTools(unittest.TestCase):
         self.assertIn('tests/test_pytest_under_load.py', commands(out))
 
 
+class PatchedPaths(unittest.TestCase):
+    def test_a_mock_patch_path_counts_as_an_import(self):
+        out = run('server/core/database_scripts.py')
+        self.assertIn('legacy_api/tests/test_database_execute.py',
+                      section(out, 'server/core/database_scripts.py').split('[importers]')[1])
+
+    def test_a_monkeypatch_setattr_path_counts_as_an_import(self):
+        out = run('server/legacy_api/handlers/race_control.py')
+        self.assertIn('ui/tests/test_dashboard_poll.py',
+                      section(out, 'server/legacy_api/handlers/race_control.py'))
+
+    def test_a_monkeypatch_delattr_path_counts_as_an_import(self):
+        out = run('server/core/database_scripts_gone.py')
+        self.assertIn('core/tests/test_delattr.py',
+                      section(out, 'server/core/database_scripts_gone.py').split('[importers]')[1])
+
+    def test_a_dotted_string_in_another_call_does_not(self):
+        out = run('server/racing/services/heats.py')
+        self.assertNotIn('test_dashboard_poll.py', out)
+
+
+class Command(unittest.TestCase):
+    def test_a_command_runs_the_tests_that_name_it_and_the_guard(self):
+        out = run('server/ui/management/commands/build_css.py')
+        block = section(out, 'server/ui/management/commands/build_css.py')
+        self.assertIn('[command]', block)
+        self.assertIn('\n      ui/tests/test_build_css_command.py', block)
+        self.assertIn('\n      tests/test_management_commands.py', block)
+        self.assertNotIn('[fallback]', block)
+        self.assertNotIn('[ui-python]', block)
+
+
+class ToolPackage(unittest.TestCase):
+    def test_a_packages_main_runs_the_tests_that_import_or_name_the_package(self):
+        out = run('server/tools/standings_differential/__main__.py')
+        block = section(out, 'server/tools/standings_differential/__main__.py')
+        self.assertIn('racing/engine/tests/test_differential_controls.py', block)
+        self.assertIn('racing/engine/tests/test_recorded.py', block)
+        self.assertNotIn('[fallback]', block)
+
+    def test_a_tool_no_test_names_says_so(self):
+        out = run('server/tools/time_standings.py')
+        self.assertIn('a server tool no test names or imports: no pytest target', out)
+        self.assertNotIn('[fallback]', out)
+
+
 class Fallback(unittest.TestCase):
     def test_an_unmapped_server_file_falls_back_to_its_app_and_says_so(self):
         out = run('server/ui/middleware.py')
@@ -374,7 +506,8 @@ class Fallback(unittest.TestCase):
 
 class GitDiff(unittest.TestCase):
     def test_it_reads_database_code_from_the_diff_only(self):
-        """A CSS-like edit to a file that holds a queryset elsewhere needs no
+        """In a module that imports no models module and makes no ORM write,
+        only the changed lines count: an edit beside a queryset needs no
         Postgres; adding a queryset does."""
         env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
         env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
@@ -410,6 +543,43 @@ class GitDiff(unittest.TestCase):
             out = affected()
             self.assertIn('Postgres: needed', out)
 
+    def edit_the_real_module(self, rel):
+        """The tool's output for a comment added to the real `rel`, an edit
+        that touches no ORM line."""
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
+                   GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
+                   GIT_CONFIG_NOSYSTEM='1')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def git(*argv):
+                subprocess.run(['git', *argv], cwd=root, env=env, check=True,
+                               capture_output=True)
+
+            for path, text in {**TREE, rel: (REPO / rel).read_text()}.items():
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text(text)
+            git('init', '-q', '-b', 'master')
+            git('add', '.')
+            git('commit', '-q', '-m', 'base')
+            with open(root / rel, 'a') as f:
+                f.write('# A comment.\n')
+            git('commit', '-q', '-am', 'comment')
+            return subprocess.run(
+                [sys.executable, '-I', str(AFFECTED), 'HEAD~1'], cwd=root, env=env,
+                capture_output=True, text=True, check=True).stdout
+
+    def test_a_non_orm_edit_to_awards_editing_needs_postgres(self):
+        """#288's known limit: a module that writes the database counts
+        whatever lines changed."""
+        out = self.edit_the_real_module('server/awards/editing.py')
+        self.assertIn('server/awards/editing.py: database code, as a whole module', out)
+
+    def test_a_non_orm_edit_to_transfer_importer_needs_postgres(self):
+        out = self.edit_the_real_module('server/transfer/importer.py')
+        self.assertIn('server/transfer/importer.py: database code, as a whole module', out)
+
 
 class RealTree(unittest.TestCase):
     """Every page file of the real tree reaches a test by a rule, not the
@@ -435,6 +605,17 @@ class RealTree(unittest.TestCase):
                     'test_query_growth.py', 'test_photo_urls.py')}
                 self.assertTrue(set(named) - page_wide,
                                 'no test target beyond the page-wide checks')
+
+    def test_every_command_and_server_tool_maps(self):
+        server = REPO / 'server'
+        files = [str(p.relative_to(REPO)) for p in server.glob('*/management/commands/*.py')
+                 if p.stem != '__init__']
+        files += [str(p.relative_to(REPO)) for p in (server / 'tools').rglob('*')
+                  if p.is_file() and '__pycache__' not in p.parts]
+        out = run(*files, root=REPO)
+        for path in files:
+            with self.subTest(path=path):
+                self.assertNotIn('[fallback]', section(out, path))
 
 
 if __name__ == '__main__':
