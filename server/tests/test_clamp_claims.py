@@ -1,15 +1,16 @@
 """Prose that names a clamped font by its viewport term names the clamp.
 
 A font declared `clamp(1rem, 2.2vh, 2rem)` is 2.2vh only between its
-bounds, and a tall window reaches its 2rem cap. #283's README and
+bounds. #283's README and
 `kiosk.css` comments called the row font "2.2vh" with the clamp in the
 implementer's own grep output, and its test file's comments kept "the
 label's 2.2vh font" after review (#283 retro). This test reads each `font`
 and `font-size` declaration with a `clamp()` in the port's stylesheets,
 takes the viewport terms of its middle value (2.2vh; 9vh and 11vw of
 `min(9vh, 11vw)`), and fails a line of a comment, docstring or README
-that calls one of them a font ("the row's 2.2vh font", "font of 11vw")
-with no `clamp(` on that line. Name the clamp, or a declaration such as
+that calls one of them a font ("the row's 2.2vh font", "font of 11vw", #287's
+commit message's "font is its row's 2.2vh") with no `clamp(` on that
+line. Name the clamp, or a declaration such as
 `font-size: 2.2vh` that sets the term alone.
 """
 
@@ -49,7 +50,8 @@ def claims(text: str, terms: set[str]) -> list[tuple[int, str]]:
         return []
     alt = "|".join(re.escape(t) for t in sorted(terms))
     said = re.compile(
-        rf"(?<![\w.])(?:{alt})(?:'s)?\s+font\b|\bfont(?:-size)?(?:\s+is|\s+of)?\s+(?:{alt})(?![\w.])"
+        rf"(?<![\w.])(?:{alt})(?:'s)?\s+font\b"
+        rf"|\bfont(?:-size)?\b[^.;:\n]{{0,30}}?(?<![\w.])(?:{alt})(?![\w.])"
     )
     return [
         (n, line.strip())
@@ -100,8 +102,9 @@ def test_it_flags_283s_comments_and_passes_the_fixed_ones():
         "# Tall windows, where the label's 2.2vh font outgrew its 9vw column\n"
         "# The windows where the cap is smaller than the row's 2.2vh font, so it\n"
         "the title's font of 11vw\n"
+        "From 641 px its font is its row's 2.2vh or a width cap\n"
     )
-    assert [n for n, _ in claims(flagged, terms)] == [1, 2, 3]
+    assert [n for n, _ in claims(flagged, terms)] == [1, 2, 3, 4]
     kept = (
         "# the row's font, clamp(1rem, 2.2vh, 2rem), outgrew its column\n"
         ".k-row { font-size: 2.2vh; }\n"

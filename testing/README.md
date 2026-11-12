@@ -79,9 +79,9 @@ it is empty. A schedule generated with the master schedule already on makes its
 first heat current (`action.schedule.generate.inc:55-57`); turning the setting
 on after generating leaves no current heat, and the chart empty until
 `heat.select`. #283's probe waited on an empty chart until it timed out. The
-#283 retro's run, 8 racers in two classes on 4 lanes: Lions scheduled with the
-setting off, 16 chart rows; the setting turned on, 0; White's Wolves scheduled
-with it on, 32, round 1 current.
+#283 retro's runs, 8 racers in two classes on 4 lanes: Lions scheduled with
+the setting off, 16 chart rows; the setting turned on, 0; then `heat.select
+next-up`, 16, or White's Wolves scheduled with it on, 32, round 1 current.
 
 ## Run individual scripts from the host
 
