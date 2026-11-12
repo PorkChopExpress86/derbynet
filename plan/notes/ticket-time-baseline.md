@@ -1,6 +1,6 @@
 # Ticket time baseline: #282 and #283 (2026-11-11)
 
-Where a ticket's wall-clock time went, from the implementer's start to the merged PR, measured for the perf branch of `/diagnosing-bugs` (measure first, fix second). Nothing here changes code or rules. Section 7 lists inputs for `/grill-with-docs`, not decisions.
+Where a ticket's wall-clock time went, from the implementer's start to the merged PR, measured for the perf branch of `/diagnosing-bugs` (measure first, fix second). Nothing here changes code or rules. Section 7 lists the inputs `/grill-with-docs` took; the owner decided them as D85 (`plan/owner-decisions.md`).
 
 **Sources.**
 - The lead's session log, `4216c3f5-a6ed-4fa9-b4d3-b3652b7241da.jsonl` (called "lead" below).
@@ -120,14 +120,14 @@ The agents spent most of their time waiting on serial runs. They didn't run the 
 |---|---|---|---|---|---|
 | 1 | Local full suites | 93 | 89 (60 + 29 at the final head) | 182 | 28% / 25% |
 | 2 | Repeats: load runs and mutation rounds | 0 by the implementer | load 82, mutation ~54 | 136 | — / 38% |
-| 3 | Machine suspend while tests ran | 39 | 63 | 102 | 12% / 18% |
-| 4 | Reviewer test runs | 87 (Spec) | 13 (whole review) | 100 | 26% / 4% |
-| 5 | CI | 76 (64 of it the outage, now fixed) | 14 | 90 | 23% / 4% |
+| — | Machine asleep while tests ran: the owner's lid (section 6), owner time | 39 | 63 | 102 | 12% / 18% |
+| 3 | Reviewer test runs | 87 (Spec) | 13 (whole review) | 100 | 26% / 4% |
+| 4 | CI | 76 (64 of it the outage, now fixed) | 14 | 90 | 23% / 4% |
 | — | Writing code, design, diagnosis | ~30 | ~45 | ~75 | 9% / 13% |
 | — | The lead's own time between steps | ~5 | ~3 | ~8 | 1–2% |
 
 - **Test runs and CI, not counting the suspends:** 256 of #282's 336 min (76%) and 239 of #283's 360 min (66%).
-- **The suspends add 39 and 63 min.** Both happened while an agent was waiting on a run.
+- **The suspends add 39 and 63 min.** Both were the owner closing the lid to leave (section 6).
 - **The lead was not a bottleneck.** Rulings and relays took seconds: the 18:17 ruling came 11 s after the question.
 - **Diagnosis was fast:** #282 went red and its cause was named in 4 min.
 - **The owner's waits are outside the loop:** 5 h 46 min for ticket approval overnight, and 11 min at the outage stop.
@@ -156,7 +156,6 @@ All of #282 and #283 ran before PR #288. These figures are estimates from the me
   - load runs 82 → about 14, at three heads.
 
   Mutation rounds (~54 min) barely change, because `-k` on the target test is the same file they already ran.
-- **Neither rule touches the suspends** (102 min).
 
 ## 4. The slowest tests and CI jobs
 
@@ -201,14 +200,14 @@ A PR waits 11–14 min on CI: #284 took 11 min, #287 took 13 min. CI runs the wh
 - **Idle minutes:** these come from gaps between an agent's turns, so a short read during a run is counted as active.
 - **Where the run logs are:** the session scratchpad, which goes away with the session. The numbers above are copied from them.
 
-## 6. The machine sleeps during runs
+## 6. The machine slept during runs: the owner's lid
 
-The journal shows three suspends while agents were running tests:
-- 13:19–13:22 UTC: several short ones;
+The journal shows two lid closes while agents were running tests: logind's "Lid closed" at 07:19:09 and 16:17:15 local time (13:19 and 22:17 UTC). The machine was asleep:
+- 13:19–13:22 UTC: several short suspends, the lid still shut;
 - 13:22–14:00 UTC: 37 min 41 s;
 - 22:17–23:20 UTC: 63 min 23 s.
 
-The background runs froze with the machine. Pytest's own clock (monotonic) left the sleep out, so `f-full.log` says 9:22 for a suite that took 73 min of wall clock. Nothing in the loop noticed.
+The owner closed the lid to take the laptop on leaving work, so these are owner time, not loop waste. The background runs froze with the machine and carried on after it woke. Pytest's own clock (monotonic) left the sleep out, so `f-full.log` says 9:22 for a suite that took 73 min of wall clock.
 
 ## 7. Candidates (inputs for `/grill-with-docs`, not decisions)
 
@@ -219,14 +218,10 @@ The background runs froze with the machine. Pytest's own clock (monotonic) left 
 2. **Repeats (#283: load 82 min, mutation ~54 min).**
    - (a) PR #288 already cut load runs on deterministic tests to 5 per font, measured at 2.3 min per font.
    - (b) Run each mutation round in one pytest process with `-n`, or mutate only the asserts changed since the last round. Round 3's 45 mutants took 26.8 min, at 18–43 s each.
-3. **The machine suspends during runs (102 min).**
-   - (a) Wrap long runs in `systemd-inhibit --what=sleep`, in `pytest-under-load.sh`, `pytest-postgres.sh` and the loop's run commands.
-   - (b) The owner turns off suspend on AC power while the loop runs.
-   - (c) Either way, a loop check that compares wall clock with pytest's own time would catch the next one.
-4. **Reviewer test runs (#282 Spec: 87 min).**
+3. **Reviewer test runs (#282 Spec: 87 min).**
    - (a) PR #288's reviewer rule covers it. Check on the next ticket that a reviewer's runs stay under 25 min.
    - (b) A reviewer asks the lead before any run over 10 min, naming the finding it would confirm.
-5. **Slow fixtures, if tests become the main cost.**
+4. **Slow fixtures, if tests become the main cost.**
    - Live and parity setups take 30–68 s each: `test_transcript_diff_live`, `test_load_test_live`, `test_reschedule_parity`.
    - `test_smoke`'s 8 registry-page cases take ~207 s of browser time.
    - These are candidates for `/improve-codebase-architecture` or a CI-only marker.
