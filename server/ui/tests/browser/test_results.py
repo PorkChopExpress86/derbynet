@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from openpyxl import load_workbook
+from PIL import Image
 from playwright.sync_api import expect
 
 from core.models import RaceSettings, RaceState
@@ -62,16 +63,32 @@ def test_results_by_racer_updates_within_2_s_of_a_finished_heat(
     shoot(page, "results-by-racer")
 
 
-def test_results_show_places_photos_and_the_racerid_filter(login, event):
+def test_results_show_places_photos_and_the_racerid_filter(login, event, tmp_path):
     rounds = race_setup(event, groups=(("Wolves", 4),))
     scheduled(rounds["Wolves"])
     run_heat(event)
-    RaceSettings.objects.filter(event=event).update(use_points=True)
+    RaceSettings.objects.filter(event=event).update(
+        use_points=True,
+        photo_directory=str(tmp_path / "racers"),
+        car_photo_directory=str(tmp_path / "cars"),
+    )
     racer = Racer.objects.filter(event=event).order_by("car_number").first()
+    for folder, name in (("racers", "head.jpg"), ("cars", "car.jpg")):
+        (tmp_path / folder).mkdir()
+        Image.new("RGB", (300, 400), (30, 120, 200)).save(tmp_path / folder / name)
+    Racer.objects.filter(pk=racer.pk).update(headshot="head.jpg", car_photo="car.jpg")
     page = login("anonymous")
 
     page.goto("/results/")
     expect(page.locator("[data-shown]").filter(has_text="1st")).to_have_count(1)
+    # The head and car photos load.
+    for photo in ("data-headshot", "data-car-photo"):
+        image = page.locator(f'[data-racer="{racer.pk}"] [{photo}]')
+        expect(image).to_have_count(1)
+        image.scroll_into_view_if_needed()
+        page.wait_for_function(
+            "img => img.complete && img.naturalWidth > 0", arg=image.element_handle()
+        )
     page.locator(f'[data-racer="{racer.pk}"] a').click()
 
     expect(page).to_have_url(re.compile(rf"/results/\?racerid={racer.pk}$"))
@@ -315,6 +332,80 @@ def test_the_header_switch_and_the_combined_name_field(login, event, tmp_path):
     assert racer_rows(event) == [
         ("Ann", "Able", 101, "Lions"),
         ("Bob", "Baker", 102, "Tigers"),
+    ]
+
+
+def test_the_car_name_from_and_award_eligibility_fields(login, event, tmp_path):
+    """The roster fields beside the names, the partition and the car number,
+    each picked from its header."""
+    page = login("RaceCoordinator")
+    phone_only(page)
+    path = tmp_path / "roster.csv"
+    path.write_text(
+        "First Name,Last Name,Den,Car Number,Car Name,From,Ineligible\n"
+        "Ann,Able,Lions,101,Zoom,Pack 1,no\n"
+        "Bob,Baker,Lions,102,Bolt,Pack 2,yes\n"
+    )
+    page.goto("/import/roster/")
+    choose_file(page, path)
+    for column, field in enumerate(["carname", "note_from", "exclude"], start=4):
+        expect(page.locator(f'[data-column="{column}"]')).to_have_value(field)
+
+    import_now(page)
+
+    expect(page.locator("[data-imported]")).to_contain_text("Imported 2 racers")
+    assert sorted(
+        Racer.objects.filter(event=event).values_list(
+            "first_name", "car_name", "note", "exclude"
+        )
+    ) == [("Ann", "Zoom", "Pack 1", False), ("Bob", "Bolt", "Pack 2", True)]
+
+
+def test_the_award_subgroup_and_winning_car_fields(login, event, tmp_path):
+    """An award for a subgroup takes its group from the subgroup, and the
+    winning car number names the racer, as `award.import` reads them
+    (`action.award.import.inc:70-83`, `:109-116`)."""
+    from awards.models import Award
+
+    page = login("RaceCoordinator")
+    phone_only(page)
+    insert_new_racer(
+        event,
+        first_name="Lion",
+        last_name="One",
+        car_number=101,
+        partition_name="Lions",
+    )
+    insert_new_racer(
+        event,
+        first_name="Tiger",
+        last_name="One",
+        car_number=201,
+        partition_name="Tigers",
+    )
+    path = tmp_path / "awards.csv"
+    path.write_text(
+        "Award Name,Award Type,Den,Rank,Winner\n"
+        "Lion Paint,Design Trophy,Lions,,101\n"
+        "Tiger Stripes,Design General,,Tigers,201\n"
+    )
+    page.goto("/import/awards/")
+    choose_file(page, path)
+    for column, field in enumerate(
+        ["awardname", "awardtype", "classname", "subgroup", "carnumber"]
+    ):
+        expect(page.locator(f'[data-column="{column}"]')).to_have_value(field)
+
+    import_now(page)
+
+    expect(page.locator("[data-imported]")).to_contain_text("Imported 2 awards")
+    assert sorted(
+        Award.objects.filter(event=event).values_list(
+            "name", "group__name", "subgroup__name", "racer__first_name"
+        )
+    ) == [
+        ("Lion Paint", "Lions", None, "Lion"),
+        ("Tiger Stripes", "Tigers", "Tigers", "Tiger"),
     ]
 
 
