@@ -571,35 +571,59 @@ def test_an_exif_6_photo_renders_upright(login, event, folders):
     assert natural[0] > natural[1]
 
 
+# The corner of the crop sheet's photo that is red, read from its pixels.
+RED_CORNER = """() => {
+    const img = document.querySelector('[data-crop-image]');
+    if (!img || !img.complete || !img.naturalWidth) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(img, 0, 0);
+    const red = (x, y) => {
+        const [r, g, b] = context.getImageData(x, y, 1, 1).data;
+        return r > 180 && g < 90 && b < 90;
+    };
+    const w = canvas.width, h = canvas.height;
+    const found = [
+        ['top-left', w * 0.05, h * 0.05], ['top-right', w * 0.95, h * 0.05],
+        ['bottom-left', w * 0.05, h * 0.95], ['bottom-right', w * 0.95, h * 0.95],
+    ].filter(([, x, y]) => red(Math.floor(x), Math.floor(y)));
+    return found.length === 1 ? found[0][0] : null;
+}"""
+
+
 def test_the_crop_sheet_turns_the_photo_left_and_right(login, event, folders):
-    """Turn left and Turn right on the crop sheet turn the stored photo a
-    quarter each way, and the sheet redraws it turned."""
+    """Turn left turns the stored photo a quarter counterclockwise and Turn
+    right a quarter clockwise (PHP's `photo.rotate` takes its angle
+    counterclockwise, `action.photo.rotate.inc:5`), and the sheet redraws the
+    turned photo in a cropper that can crop it. A red top-left corner shows
+    which way each turn went."""
     racer = add_racers(event, "Scouts", 1, 101)[0]
-    landscape = folders / "wide.jpg"
-    Image.new("RGB", (600, 450), (30, 120, 200)).save(landscape, "JPEG")
+    photo = Image.new("RGB", (600, 450), (30, 120, 200))
+    photo.paste((220, 20, 20), (0, 0, 120, 120))
+    photo.save(folders / "wide.jpg", "JPEG")
     page = open_checkin(login("RaceCrew"))
     phone_only(page)
     card(page, racer).get_by_role("button", name="Car photo of Scouts1 Racer").click()
-    take_photo(page, landscape)
+    take_photo(page, folders / "wide.jpg")
     crop_sheet = sheet(page).locator("[data-crop-sheet]")
     expect(crop_sheet).to_be_visible()
 
-    def drawn(shape):
-        """Wait until the sheet draws the photo in `shape`."""
-        page.wait_for_function(
-            """shape => {
-                const img = document.querySelector('[data-crop-image]');
-                if (!img || !img.complete || !img.naturalWidth) return false;
-                return (img.naturalWidth > img.naturalHeight
-                        ? 'landscape' : 'portrait') === shape;
-            }""",
-            arg=shape,
-        )
+    def drawn(corner):
+        """Wait until the sheet draws the red corner at `corner`, in a cropper
+        that has started."""
+        page.wait_for_function(f"({RED_CORNER})() === {corner!r}")
+        expect(crop_sheet.locator(".cropper-canvas img")).to_have_count(1)
+        expect(
+            crop_sheet.get_by_role("button", name="Crop", exact=True)
+        ).to_be_enabled()
 
-    drawn("landscape")
-    for button, degrees, turned in (
-        ("Turn left", 90, "portrait"),
-        ("Turn right", None, "landscape"),
+    drawn("top-left")
+    for button, degrees, corner in (
+        ("Turn left", 90, "bottom-left"),
+        ("Turn right", None, "top-left"),
+        ("Turn right", 270, "top-right"),
     ):
         with htmx_post(page, f"/checkin/racer/{racer.pk}/photo/car/rotate/"):
             crop_sheet.get_by_role("button", name=button).click()
@@ -610,7 +634,7 @@ def test_the_crop_sheet_turns_the_photo_left_and_right(login, event, folders):
             .first()
             == degrees
         )
-        drawn(turned)
+        drawn(corner)
 
 
 def test_the_live_camera_captures_with_autocrop(login, event, folders):

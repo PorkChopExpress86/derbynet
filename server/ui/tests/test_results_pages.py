@@ -69,8 +69,9 @@ def test_photos_show_per_the_two_settings(
     login, event, raced, racer_photos, car_photos
 ):
     """`show-racer-photos-rr` and `show-car-photos-rr` each turn one photo
-    on, as `racer-results.php` reads them. The photos are missing on disk,
-    so each URL's cache breaker is 0 (`photo_url`)."""
+    on, as `racer-results.php` reads them (`racer-results.php:70-71`,
+    `:180-185`). The photos are missing on disk, so each URL's cache breaker
+    is 0 (`photo_url`)."""
     racer = Racer.objects.get(event=event, car_number=101)
     Racer.objects.filter(pk=racer.pk).update(headshot="head.jpg", car_photo="car.jpg")
     RaceSettings.objects.filter(event=event).update(

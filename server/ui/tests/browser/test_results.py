@@ -363,7 +363,8 @@ def test_the_car_name_from_and_award_eligibility_fields(login, event, tmp_path):
 
 def test_the_award_subgroup_and_winning_car_fields(login, event, tmp_path):
     """An award for a subgroup takes its group from the subgroup, and the
-    winning car number names the racer, as `award.import` reads them."""
+    winning car number names the racer, as `award.import` reads them
+    (`action.award.import.inc:70-83`, `:109-116`)."""
     from awards.models import Award
 
     page = login("RaceCoordinator")
