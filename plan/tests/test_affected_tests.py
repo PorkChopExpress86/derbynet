@@ -134,17 +134,37 @@ def commands(out):
 
 
 class Everything(unittest.TestCase):
-    def test_pyproject_runs_every_suite_on_both_databases(self):
-        out = run('server/pyproject.toml')
+    def test_pyproject_leaves_the_full_suites_to_ci(self):
+        """D85: an "everything" diff runs its targeted tests locally, and CI's
+        full run on both databases is the check (#284's 48-60 min serial run)."""
+        out = run('server/pyproject.toml',
+                  'server/ui/tests/browser/test_kiosk_ondeck_labels.py')
         self.assertIn('[everything]', out)
-        self.assertIn('Run everything, on both databases', out)
-        self.assertIn('  tools/pytest-postgres.sh -n auto -m browser ui', out)
+        self.assertIn('CI runs the full suites on both databases (D85)', out)
+        cmds = commands(out)
+        self.assertIn('  uv run pytest -n auto -m browser '
+                      'ui/tests/browser/test_kiosk_ondeck_labels.py\n', cmds)
+        self.assertNotIn('  uv run pytest -n auto\n', cmds)
+        self.assertNotIn('-m browser ui\n', cmds)
+        self.assertNotIn('tools/pytest-postgres.sh', cmds)
+        self.assertNotIn('ui/tests/test_screens_tool.py', cmds)
 
-    def test_a_conftest_runs_everything(self):
+    def test_the_settings_still_need_postgres_for_the_targeted_tests(self):
+        """D85 keeps a local Postgres run for database code, and the settings
+        hold the database settings; a conftest or pyproject.toml does not."""
+        out = run('server/derbynet/settings.py',
+                  'server/ui/tests/browser/test_kiosk_ondeck_labels.py')
+        self.assertIn('server/derbynet/settings.py: the database settings', out)
+        self.assertIn('  tools/pytest-postgres.sh -n auto -m browser '
+                      'ui/tests/browser/test_kiosk_ondeck_labels.py', commands(out))
+        out = run('server/ui/tests/browser/conftest.py')
+        self.assertIn('Postgres: not needed', out)
+
+    def test_a_conftest_leaves_the_full_run_to_ci(self):
         out = run('server/ui/tests/browser/conftest.py')
         self.assertIn('[everything] a shared conftest', out)
 
-    def test_a_workflow_runs_everything(self):
+    def test_a_workflow_leaves_the_full_run_to_ci(self):
         out = run('.github/workflows/server.yml')
         self.assertIn('[everything] a CI workflow', out)
 
@@ -158,6 +178,11 @@ class Docs(unittest.TestCase):
 
 
 class Website(unittest.TestCase):
+    def test_a_diff_with_no_target_leaves_it_to_the_checks(self):
+        out = run('plan/README.md')
+        self.assertIn('(no pytest target: the checks below cover the diff)', commands(out))
+        self.assertNotIn('D85', out)
+
     def test_php_is_frozen_and_maps_to_the_tests_that_read_it(self):
         out = run('website/settings.php')
         self.assertIn('[website] the PHP server is frozen', section(out, 'website/settings.php'))
@@ -251,16 +276,19 @@ class TestHelper(unittest.TestCase):
         out = run('server/core/tests/factories.py')
         self.assertIn('-m browser ui/tests', commands(out))
 
-    def test_a_helper_the_root_conftest_imports_runs_everything(self):
+    def test_a_helper_the_root_conftest_imports_leaves_the_full_run_to_ci(self):
         out = run('server/racing/engine/tests/golden.py')
         self.assertIn('the root conftest imports it', out)
+        self.assertIn('CI runs the full suites on both databases (D85)', out)
+        self.assertIn('  uv run pytest -n auto racing/engine/tests', commands(out))
+        self.assertNotIn('  uv run pytest -n auto\n', commands(out))
 
 
 class TestData(unittest.TestCase):
     def test_a_fixture_maps_to_the_test_that_names_it(self):
         out = run('server/racing/engine/tests/data/tables.json')
         self.assertIn('[test-data]', out)
-        self.assertIn('racing/engine/tests/test_tables.py', commands(out))
+        self.assertIn('  uv run pytest -n auto racing/engine/tests', commands(out))
 
 
 class Model(unittest.TestCase):
@@ -498,10 +526,13 @@ class Fallback(unittest.TestCase):
         self.assertIn('[fallback]', out)
         self.assertIn('uv run pytest -n auto tests', commands(out))
 
-    def test_an_unmapped_file_outside_server_runs_everything(self):
+    def test_an_unmapped_file_outside_server_leaves_everything_to_ci(self):
         out = run('.gitattributes')
-        self.assertIn('[fallback] no rule maps it and it is outside server/', out)
-        self.assertIn('Run everything', out)
+        self.assertIn('[fallback] no rule maps it and it is outside server/: '
+                      "CI's full run covers it", out)
+        self.assertIn('CI runs the full suites on both databases (D85)', out)
+        self.assertIn("(no pytest target: CI's full run covers the diff, D85)",
+                      commands(out))
 
 
 class GitDiff(unittest.TestCase):

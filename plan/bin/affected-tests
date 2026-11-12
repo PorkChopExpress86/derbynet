@@ -23,9 +23,10 @@ targets, then:
 - the commands, from server/.
 
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
-means every suite on both databases: #282's browser conftest hook ran in
-every collection. A file no rule maps falls back to its app's tests, and the
-output says so; outside server/ it falls back to everything. It never maps
+reaches every suite on both databases (#282's browser conftest hook ran in
+every collection), so CI's full run is the check, and the commands are the
+targeted tests (D85). A file no rule maps falls back to its app's tests, and
+the output says so; outside server/ it falls back to CI's full run. It never maps
 a file to nothing without saying why (docs, the frozen PHP, a server tool
 no test names or imports).
 
@@ -403,6 +404,9 @@ def s(path):
     return path[len(SERVER) + 1:] if path.startswith(SERVER + '/') else None
 
 
+SETTINGS = re.compile(r'derbynet/settings\w*\.py')
+
+
 def match_everything(path):
     rel = s(path)
     if path.startswith('.github/'):
@@ -410,7 +414,7 @@ def match_everything(path):
     if rel is None:
         return False
     return (Path(rel).name == 'conftest.py' or rel in EVERYTHING
-            or re.fullmatch(r'derbynet/settings\w*\.py', rel) is not None)
+            or SETTINGS.fullmatch(rel) is not None)
 
 
 def cover_everything(plan, tree, path):
@@ -425,7 +429,8 @@ def cover_everything(plan, tree, path):
     else:
         why = 'the settings every test runs with, the database settings among them'
     plan.everything.append(f'{path}: {why}')
-    plan.postgres.append(f'{path}: everything runs on both databases')
+    if rel is not None and SETTINGS.fullmatch(rel):
+        plan.postgres.append(f'{path}: the database settings')
     plan.add(path, 'everything', why)
 
 
@@ -860,7 +865,7 @@ RULES = (
 def fallback(plan, tree, path):
     rel = s(path)
     if rel is None:
-        why = 'no rule maps it and it is outside server/: run everything'
+        why = 'no rule maps it and it is outside server/: CI\'s full run covers it'
         plan.everything.append(f'{path}: {why}')
         plan.add(path, 'fallback', why)
         return
@@ -961,27 +966,23 @@ def report(plan, tree):
     say('')
 
     if plan.everything:
-        say('Run everything, on both databases:')
+        say('CI runs the full suites on both databases (D85): push and let its run '
+            'be the check, and run the targeted tests below locally:')
         for why in dict.fromkeys(plan.everything):
             say(f'  {why}')
-        targets = ['.']
-    else:
-        targets = [t for t in set(all_targets) if tree.exists(t)]
-        checked = sorted(set(targets) & tree.source_checks())
-        if checked:
-            say('tools/source-checks.sh runs these, so the commands leave them out: '
-                + ', '.join(checked))
-            targets = [t for t in targets if t not in checked]
+    targets = [t for t in set(all_targets) if tree.exists(t)]
+    checked = sorted(set(targets) & tree.source_checks())
+    if checked:
+        say('tools/source-checks.sh runs these, so the commands leave them out: '
+            + ', '.join(checked))
+        targets = [t for t in targets if t not in checked]
     say('')
 
     # Each command folds a file into a folder it runs: a plain run of ui/tests
     # runs none of ui/tests/browser, so the browser run keeps those.
-    browser = [] if plan.everything else collapse(
-        [t for t in targets if run_kind(tree, t) != 'plain'])
-    plain = [] if plan.everything else collapse(
-        [t for t in targets if run_kind(tree, t) != 'browser'])
-    measured = browser_files(tree, [BROWSER_DIR, 'ui/tests'] if plan.everything
-                             else browser)
+    browser = collapse([t for t in targets if run_kind(tree, t) != 'plain'])
+    plain = collapse([t for t in targets if run_kind(tree, t) != 'browser'])
+    measured = browser_files(tree, browser)
     measured = [r for r in measured if first_hit(tree, r, MEASURES)]
 
     if plan.postgres:
@@ -1024,24 +1025,18 @@ def report(plan, tree):
     say('')
 
     say('Run from server/ (start a run longer than a minute in the background):')
-    if plan.everything:
-        runs = ['uv run pytest -n auto', 'uv run pytest -n auto -m browser ui']
-        say(f'  {runs[0]}')
-        say(f'  {runs[1]}')
-        say('  tools/pytest-postgres.sh -n auto')
-        say('  tools/pytest-postgres.sh -n auto -m browser ui')
-    else:
+    if plain:
+        say(f'  uv run pytest -n auto {" ".join(plain)}')
+    if browser:
+        say(f'  uv run pytest -n auto -m browser {" ".join(browser)}')
+    if plan.postgres:
         if plain:
-            say(f'  uv run pytest -n auto {" ".join(plain)}')
+            say(f'  tools/pytest-postgres.sh -n auto {" ".join(plain)}')
         if browser:
-            say(f'  uv run pytest -n auto -m browser {" ".join(browser)}')
-        if plan.postgres:
-            if plain:
-                say(f'  tools/pytest-postgres.sh -n auto {" ".join(plain)}')
-            if browser:
-                say(f'  tools/pytest-postgres.sh -n auto -m browser {" ".join(browser)}')
-        if not plain and not browser:
-            say('  (no pytest target: the checks below cover the diff)')
+            say(f'  tools/pytest-postgres.sh -n auto -m browser {" ".join(browser)}')
+    if not plain and not browser:
+        say('  (no pytest target: CI\'s full run covers the diff, D85)' if plan.everything
+            else '  (no pytest target: the checks below cover the diff)')
     if measured:
         say(f'  DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -n auto -m browser '
             f'{" ".join(measured)}')
