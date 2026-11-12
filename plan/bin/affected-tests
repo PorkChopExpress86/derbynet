@@ -1,0 +1,956 @@
+#!/usr/bin/env python3
+"""Maps a branch's changed files to the tests that cover them, and prints the
+commands to run before a push (owner, 2026-11-11).
+
+Usage: plan/bin/affected-tests [BASE]          # BASE defaults to origin/master
+       plan/bin/affected-tests --stdin < FILES  # one repo-relative path a line
+
+It reads `git diff --name-only BASE...HEAD`, plus the uncommitted and
+untracked files, and prints for each file the rule that maps it and its
+targets, then:
+
+- whether the diff needs Postgres locally: models, migrations, services,
+  querysets or raw SQL, the database settings, or `core/tests/populated.py`.
+  Otherwise CI's Postgres jobs cover it;
+- which browser tests measure text, and so also run with
+  `DERBYNET_BROWSER_FONT="DejaVu Sans"`, which draws `system-ui` as CI does
+  (#273's "Heat 100" failed only there);
+- the repeats under load each changed browser test file takes: 25 for one
+  that involves timing, 5 per font for a deterministic one;
+- the commands, from server/.
+
+A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
+means every suite on both databases: #282's browser conftest hook ran in
+every collection. A file no rule maps falls back to its app's tests, and the
+output says so; outside server/ it falls back to everything. It never maps
+a file to nothing without saying why (docs, the frozen PHP).
+
+`--stdin` reads the file list instead of git, for a back-test
+(`git diff --name-only SHA^ SHA | plan/bin/affected-tests --stdin`); it then
+looks for database code in each whole file rather than in its diff.
+`--root DIR` reads the tree at DIR instead of the repository's top level.
+"""
+
+import ast
+import re
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+SERVER = 'server'
+
+PAGE_WIDE = (  # plan/AGENT-BRIEF.md, UI pages
+    'ui/tests/test_navigation.py',
+    'ui/tests/test_every_view.py',
+    'ui/tests/test_query_growth.py',
+    'ui/tests/test_photo_urls.py',
+)
+REGISTRY_CHECKS = (  # plan/AGENT-BRIEF.md, Django handlers
+    'legacy_api/tests/test_registry.py',
+    'legacy_api/tests/test_event_leak.py',
+)
+REPLAY_SUITES = (  # plan/AGENT-BRIEF.md, Django handlers
+    'roster/tests/test_group_scenarios.py',
+    'legacy_api/tests/test_groups_parity.py',
+    'racing/tests/test_round_scenarios.py',
+    'racing/tests/test_finalists.py',
+)
+BROWSER_DIR = 'ui/tests/browser'
+
+# A ui subpackage, template folder or static stem, and the words its tests'
+# file names carry. The default is the name, and the name less a final "s".
+UI_KEYS = {
+    'presenter': ('award',),            # /awards/present/
+    'judging': ('vote', 'award'),       # /judging/
+    'kiosk_pages': ('kiosk',),
+    'scenes': ('kiosk',),               # /kiosks/scenes/
+    'standings': ('result', 'standing'),
+    'history': ('history', 'result'),
+    'exports': ('export', 'result'),
+    'imports': ('import', 'result'),
+    'events': ('event', 'setup'),       # /setup/events/
+    'settings_page': ('settings',),
+    'components_gallery': ('components',),
+    'camera': ('replay',),              # /replay/camera/
+}
+# Files every page loads: they run the whole browser suite.
+SHARED_UI = (
+    'ui/templates/ui/base.html',
+    'ui/templates/ui/components/',
+    'ui/templates/ui/shell/',
+    'ui/static/ui/app.css',
+    'ui/static/ui/app.js',
+    'ui/static/ui/vendor/',
+    'ui/tailwind/',
+    'ui/templatetags/',
+)
+EVERYTHING = {
+    'pyproject.toml': 'changes the dependencies and the pytest options',
+    'uv.lock': 'changes the dependencies',
+}
+TIMER_BUILD = ('templates/timer.html', 'templates/timer-profiles.js', 'timer/')
+
+TIMING = re.compile(
+    r'clock|setTimeout|setInterval|requestAnimationFrame|wait_for_timeout|'
+    r'time\.sleep|monotonic|animation|NUDGE_MS|kioskNudge|\.route\(|'
+    r'expect_request|expect_response|expect_event')
+MEASURES = re.compile(
+    r'bounding_box\(|getBoundingClientRect|getClientRects|scrollWidth|'
+    r'scrollHeight|clientWidth|clientHeight|offsetWidth|offsetHeight|'
+    r'fontSize|font-size|font_size')
+DB_CODE = re.compile(
+    r'django\.db|\.objects\b|transaction\.|select_for_update|\.raw\(|'
+    r'cursor\(|RawSQL|connection\.|\.filter\(|\.exclude\(|\.annotate\(|'
+    r'\.aggregate\(|\.values(_list)?\(|\.order_by\(|\bF\(|\bQ\(|Subquery|'
+    r'OuterRef|bulk_create|bulk_update|update_or_create|get_or_create')
+RAW_SQL = re.compile(r'cursor\(|\.raw\(|RawSQL|connection\.vendor')
+BROWSER_MARK = re.compile(r'^pytestmark\s*=.*mark\.browser', re.MULTILINE)
+BROWSER_DECORATOR = re.compile(r'^@pytest\.mark\.browser\b', re.MULTILINE)
+TEMPLATE_TAG = re.compile(
+    r'''\{%\s*(extends|include|static|component)\s+['"]([^'"]+)['"]''')
+
+
+@dataclass
+class Plan:
+    root: Path
+    from_git: bool
+    base: str
+    covers: dict = field(default_factory=dict)  # file -> [(rule, note, [targets])]
+    everything: list = field(default_factory=list)
+    postgres: list = field(default_factory=list)
+    commands: list = field(default_factory=list)
+    changed_browser_tests: list = field(default_factory=list)
+    untracked: list = field(default_factory=list)
+
+    def add(self, path, rule, note, targets=()):
+        self.covers.setdefault(path, []).append((rule, note, list(targets)))
+
+    def command(self, line):
+        if line not in self.commands:
+            self.commands.append(line)
+
+
+# --- the tree --------------------------------------------------------------
+
+class Tree:
+    """What the rules read: the test files, their imports, the templates."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.server = root / SERVER
+        self._tests = None
+        self._imports = None
+        self._graph = None
+        self._website = None
+        self._users = {}
+
+    def exists(self, rel):
+        return (self.server / rel).exists()
+
+    def text(self, rel):
+        try:
+            return (self.server / rel).read_text(errors='replace')
+        except OSError:
+            return ''
+
+    def test_dirs_under(self, rel_dir):
+        """The `tests` folders under `rel_dir`, but not one inside another."""
+        base = self.server / rel_dir
+        found = []
+        for p in sorted(base.rglob('tests')) if base.is_dir() else []:
+            rel = p.relative_to(self.server)
+            if p.is_dir() and 'tests' not in rel.parts[:-1] and '.venv' not in rel.parts:
+                found.append(str(rel))
+        return found
+
+    def website_names(self):
+        if self._website is None:
+            web = self.root / 'website'
+            self._website = {p.name for p in web.rglob('*')} if web.is_dir() else set()
+        return self._website
+
+    def python_in_tests(self):
+        """Every .py under a `tests` folder of server/, and every conftest,
+        as a relative path."""
+        if self._tests is None:
+            out = []
+            for p in self.server.rglob('*.py'):
+                rel = p.relative_to(self.server)
+                if '.venv' in rel.parts or (
+                        'tests' not in rel.parts[:-1] and rel.name != 'conftest.py'):
+                    continue
+                out.append(str(rel))
+            self._tests = sorted(out)
+        return self._tests
+
+    def test_files(self):
+        return [p for p in self.python_in_tests() if Path(p).name.startswith('test_')]
+
+    def imports(self):
+        """Each test-folder module's imported names: `import a.b` gives a.b,
+        `from a import b` gives a and a.b; relative imports are resolved."""
+        if self._imports is None:
+            self._imports = {}
+            for rel in self.python_in_tests():
+                names = set()
+                try:
+                    tree = ast.parse(self.text(rel))
+                except SyntaxError:
+                    tree = ast.Module(body=[], type_ignores=[])
+                package = module_name(rel).rsplit('.', 1)[0]
+                if Path(rel).name == '__init__.py':
+                    package = module_name(rel)
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        names.update(a.name for a in node.names)
+                    elif isinstance(node, ast.ImportFrom):
+                        mod = node.module or ''
+                        if node.level:
+                            parts = package.split('.')
+                            parts = parts[:len(parts) - node.level + 1]
+                            mod = '.'.join(parts + ([mod] if mod else []))
+                        names.add(mod)
+                        names.update(f'{mod}.{a.name}' for a in node.names)
+                self._imports[rel] = names
+        return self._imports
+
+    def importers(self, module):
+        """The test files that import `module`, directly or through a helper
+        module in a test folder, and the conftests that do."""
+        def hits(names, mods):
+            return any(n == m or n.startswith(m + '.') for n in names for m in mods)
+
+        imports = self.imports()
+        reached = {module}
+        changed = True
+        while changed:
+            changed = False
+            for rel, names in imports.items():
+                mod = module_name(rel)
+                if not Path(rel).name.startswith('test_') and mod not in reached \
+                        and hits(names, reached):
+                    reached.add(mod)
+                    changed = True
+        tests = sorted(rel for rel, names in imports.items()
+                       if Path(rel).name.startswith('test_') and hits(names, reached))
+        conftests = sorted(rel for rel in imports if Path(rel).name == 'conftest.py'
+                           and module_name(rel) in reached)
+        return tests, conftests
+
+    def mentions(self, words):
+        """The test files whose text names one of `words`, as a whole word:
+        kiosk.js is not named by kiosk.json."""
+        found = [re.compile(rf'(?<![\w-]){re.escape(w)}(?![\w-])') for w in words if w]
+        return sorted(rel for rel in self.test_files()
+                      if any(f.search(self.text(rel)) for f in found))
+
+    def source_checks(self):
+        """The test files tools/source-checks.sh runs."""
+        text = self.text('tools/source-checks.sh')
+        return set(re.findall(r'^\s+"?([\w/]+\.py)', text, re.MULTILINE))
+
+    def named(self, tokens, dirs=('ui/tests', BROWSER_DIR)):
+        """The test files in `dirs` whose file name carries one of `tokens`."""
+        out = []
+        for rel in self.test_files():
+            if str(Path(rel).parent) in dirs and \
+                    any(t in Path(rel).stem for t in tokens):
+                out.append(rel)
+        return sorted(out)
+
+    def graph(self):
+        """Template name -> the templates and static paths it names."""
+        if self._graph is None:
+            self._graph = {}
+            for p in self.server.rglob('templates/**/*.html'):
+                rel = p.relative_to(self.server)
+                if '.venv' in rel.parts:
+                    continue
+                name = template_name(str(rel))
+                uses = set()
+                for kind, ref in TEMPLATE_TAG.findall(p.read_text(errors='replace')):
+                    if kind == 'static':
+                        uses.add(('static', ref))
+                    elif kind == 'component':
+                        uses.add(('template', f'ui/components/{ref}.html'))
+                    else:
+                        uses.add(('template', ref))
+                self._graph[name] = (str(rel), uses)
+        return self._graph
+
+    def pages_using(self, kind, ref):
+        """The templates that load `ref`, through their extends and includes."""
+        if (kind, ref) not in self._users:
+            self._users[kind, ref] = frozenset(self._pages_using(kind, ref))
+        return self._users[kind, ref]
+
+    def _pages_using(self, kind, ref):
+        graph = self.graph()
+        users = set()
+        frontier = {(kind, ref)}
+        while frontier:
+            new = set()
+            for name, (_, uses) in graph.items():
+                if name not in users and uses & frontier:
+                    users.add(name)
+                    new.add(('template', name))
+            frontier = new
+        return users
+
+
+def module_name(rel):
+    parts = list(Path(rel).with_suffix('').parts)
+    if parts[-1] == '__init__':
+        parts = parts[:-1]
+    return '.'.join(parts)
+
+
+def template_name(rel):
+    parts = Path(rel).parts
+    return '/'.join(parts[parts.index('templates') + 1:])
+
+
+def static_name(rel):
+    parts = Path(rel).parts
+    return '/'.join(parts[parts.index('static') + 1:])
+
+
+def tokens_for(name):
+    if name in UI_KEYS:
+        return UI_KEYS[name]
+    return (name, name[:-1]) if name.endswith('s') else (name,)
+
+
+def in_tests(rel):
+    return 'tests' in Path(rel).parts[:-1]
+
+
+def run_kind(tree, target):
+    """'browser' for a target only `-m browser` runs, 'both' for a file with
+    browser tests beside others (test_browser_timeout.py), else 'plain'."""
+    if target == BROWSER_DIR or target.startswith(BROWSER_DIR + '/'):
+        return 'browser'
+    if not target.endswith('.py'):
+        inside = [r for r in tree.test_files() if r.startswith(target + '/')
+                  or target == '.']
+        return 'both' if any(run_kind(tree, r) != 'plain' for r in inside) else 'plain'
+    text = tree.text(target)
+    if BROWSER_MARK.search(text):
+        return 'browser'
+    return 'both' if BROWSER_DECORATOR.search(text) else 'plain'
+
+
+def is_browser_test(tree, rel):
+    return run_kind(tree, rel) != 'plain'
+
+
+def nearest_tests(tree, rel):
+    """The `tests` folder nearest above `rel`: racing/engine/x.py gives
+    racing/engine/tests."""
+    path = Path(rel).parent
+    while str(path) not in ('.', ''):
+        if (tree.server / path / 'tests').is_dir():
+            return str(path / 'tests')
+        path = path.parent
+    return 'tests'
+
+
+def app_of(rel):
+    return Path(rel).parts[0] if len(Path(rel).parts) > 1 else None
+
+
+# --- the rules -------------------------------------------------------------
+# Each rule is (name, matches(path), cover(plan, tree, path)). `path` is
+# repo-relative. A rule that matches and maps the file to nothing on purpose
+# says why with a note; one that finds no target leaves the file to the
+# fallback.
+
+def s(path):
+    """The path under server/, or None."""
+    return path[len(SERVER) + 1:] if path.startswith(SERVER + '/') else None
+
+
+def match_everything(path):
+    rel = s(path)
+    if path.startswith('.github/'):
+        return True
+    if rel is None:
+        return False
+    return (Path(rel).name == 'conftest.py' or rel in EVERYTHING
+            or re.fullmatch(r'derbynet/settings\w*\.py', rel) is not None)
+
+
+def cover_everything(plan, tree, path):
+    rel = s(path)
+    if path.startswith('.github/'):
+        why = 'a CI workflow or its script: CI runs what this file says'
+    elif rel in EVERYTHING:
+        why = EVERYTHING[rel]
+    elif Path(rel).name == 'conftest.py':
+        why = ('a shared conftest: its fixtures and hooks run in every test it '
+               'collects (#282: the browser conftest hook ran in every collection)')
+    else:
+        why = 'the settings every test runs with, the database settings among them'
+    plan.everything.append(f'{path}: {why}')
+    plan.postgres.append(f'{path}: everything runs on both databases')
+    plan.add(path, 'everything', why)
+
+
+def match_docs(path):
+    p = Path(path)
+    if s(path) is not None and in_tests(s(path)):
+        return False
+    return p.suffix in ('.md', '.rst', '.txt') or p.name in ('LICENSE', 'COPYING') \
+        or path.startswith('docs/')
+
+
+def cover_docs(plan, tree, path):
+    plan.add(path, 'docs', 'docs only: no pytest target. tools/source-checks.sh '
+             "reads its PHP claims and cites (test_php_claims.py, "
+             "test_php_cite_lines.py), and the pre-push hook its ADR paths")
+
+
+def match_website(path):
+    return path.startswith('website/') or path == 'build.xml' or (
+        path.startswith('templates/') and not path.startswith(TIMER_BUILD))
+
+
+def cover_website(plan, tree, path):
+    name = Path(path).name
+    note = ('the PHP server is frozen (CLAUDE.md): fix the defect in the port '
+            'instead. Tests that name the file:')
+    targets = tree.mentions([name])
+    if path.startswith('website/inc/generators/'):
+        plan.command('uv run python tools/convert_generators.py --check')
+        targets.append('racing/engine/tests/test_generator_tables.py')
+    if not targets:
+        note = ('the PHP server is frozen (CLAUDE.md): fix the defect in the port '
+                'instead. No test names it; tools/source-checks.sh reads PHP cites')
+    plan.add(path, 'website', note, targets)
+
+
+def match_plan_tools(path):
+    return (path.startswith('plan/') and not path.endswith('.md')) \
+        or path.startswith('.githooks/')
+
+
+def cover_plan_tools(plan, tree, path):
+    plan.command('python3 -I -m unittest discover -s ../plan/tests')
+    plan.add(path, 'plan-tools', 'plan/tests, which test the plan tools and the '
+             'pre-push hook (tools/source-checks.sh runs them too)')
+
+
+def match_timer_build(path):
+    return path.startswith(TIMER_BUILD)
+
+
+def cover_timer_build(plan, tree, path):
+    plan.add(path, 'timer-build', 'built into /timer.php (server/README.md, '
+             '"The browser timer")',
+             [f'{BROWSER_DIR}/test_timer.py', 'ui/tests/test_timer_pages.py'])
+
+
+def match_testing(path):
+    return path.startswith('testing/')
+
+
+def cover_testing(plan, tree, path):
+    targets = tree.mentions([Path(path).name])
+    note = ('a shell suite or its data: the tests that name it. CI runs the '
+            'shell suites against Django; testing/README.md runs one locally')
+    if not targets:
+        targets = ['legacy_api/tests/test_testing_scripts.py',
+                   'tests/test_golden_inputs.py']
+        note = ('no test names it: the tests that read testing/ as a whole. CI '
+                'runs the shell suites against Django')
+    plan.add(path, 'testing', note, targets)
+
+
+def match_test_file(path):
+    rel = s(path)
+    return rel is not None and in_tests(rel) and Path(rel).name.startswith('test_') \
+        and rel.endswith('.py')
+
+
+def cover_test_file(plan, tree, path):
+    rel = s(path)
+    if not tree.exists(rel):
+        plan.add(path, 'test-file', 'deleted: nothing of its own to run')
+        return
+    if is_browser_test(tree, rel):
+        plan.changed_browser_tests.append(rel)
+    plan.add(path, 'test-file', 'the test file itself', [rel])
+
+
+def match_test_helper(path):
+    rel = s(path)
+    return rel is not None and in_tests(rel) and rel.endswith('.py') \
+        and not Path(rel).name.startswith('test_') and Path(rel).name != 'conftest.py'
+
+
+def cover_test_helper(plan, tree, path):
+    rel = s(path)
+    if rel == 'core/tests/populated.py':
+        plan.postgres.append(f'{path}: the populated event every event-scoped '
+                             'model needs a row in')
+    tests, conftests = tree.importers(module_name(rel))
+    dirs = [str(Path(c).parent) for c in conftests]
+    if '.' in dirs:
+        plan.everything.append(f'{path}: the root conftest imports it')
+    targets = tests + [d for d in dirs if d != '.']
+    plan.add(path, 'test-helper', 'a test helper: the tests and conftest folders '
+             'that import it', targets)
+
+
+def match_test_data(path):
+    rel = s(path)
+    return rel is not None and in_tests(rel) and not rel.endswith('.py')
+
+
+def cover_test_data(plan, tree, path):
+    rel = Path(s(path))
+    words = [rel.name]
+    targets = tree.mentions(words)
+    for parent in rel.parents:
+        if targets or parent.name in ('tests', ''):
+            break
+        targets = tree.mentions([f'{parent.name}/', f'"{parent.name}"'])
+    plan.add(path, 'test-data', 'test data: the tests that name it or its folder',
+             targets)
+
+
+def match_model(path):
+    rel = s(path)
+    return rel is not None and not in_tests(rel) and (
+        Path(rel).name == 'models.py' or 'models' in Path(rel).parts[:-1]
+        or 'migrations' in Path(rel).parts[:-1])
+
+
+def cover_model(plan, tree, path):
+    plan.postgres.append(f'{path}: a model or a migration')
+    plan.command('uv run python manage.py makemigrations --check --dry-run')
+    plan.add(path, 'model', 'a model or migration: core/tests (populated.py, the '
+             'invariants) and the registry and event-leak checks',
+             ['core/tests', *REGISTRY_CHECKS])
+
+
+def match_service(path):
+    rel = s(path)
+    return rel is not None and not in_tests(rel) and rel.endswith('.py') and (
+        Path(rel).name == 'services.py' or 'services' in Path(rel).parts[:-1])
+
+
+def cover_service(plan, tree, path):
+    plan.postgres.append(f'{path}: a service')
+    plan.add(path, 'service', 'a service: the registry and event-leak checks, '
+             'and the replay suites, which hold PHP\'s state after each step',
+             [*REGISTRY_CHECKS, *REPLAY_SUITES])
+
+
+def match_handler(path):
+    rel = s(path)
+    return rel is not None and rel.startswith('legacy_api/handlers/') \
+        and rel.endswith('.py')
+
+
+def cover_handler(plan, tree, path):
+    stem = Path(path).stem
+    named = [] if stem == '__init__' else tree.named(
+        [stem], dirs=('legacy_api/tests',))
+    plan.add(path, 'handler', 'a legacy_api handler: the registry, event-leak '
+             'and replay suites, and the legacy_api tests named after it',
+             [*REGISTRY_CHECKS, *REPLAY_SUITES, *named])
+
+
+def match_ui_python(path):
+    rel = s(path)
+    return rel is not None and rel.startswith('ui/') and rel.endswith('.py') \
+        and not in_tests(rel) and 'migrations' not in Path(rel).parts \
+        and not rel.startswith(SHARED_UI)
+
+
+def cover_ui_python(plan, tree, path):
+    parts = Path(s(path)).parts
+    key = parts[1] if len(parts) > 2 else Path(parts[1]).stem
+    targets = tree.named(tokens_for(key))
+    if not targets:
+        plan.add(path, 'ui-python', f'ui code ("{key}"): no ui test is named '
+                 'after it')
+        return
+    plan.add(path, 'ui-python', f'ui code ("{key}"): the ui and browser tests '
+             'named after it, and the page-wide checks', [*targets, *PAGE_WIDE])
+
+
+def match_app_python(path):
+    rel = s(path)
+    return rel is not None and rel.endswith('.py') and not in_tests(rel) \
+        and app_of(rel) not in (None, 'ui') and not rel.startswith(
+            ('legacy_api/handlers/', 'tools/')) and 'migrations' not in Path(rel).parts
+
+
+def cover_app_python(plan, tree, path):
+    rel = s(path)
+    plan.add(path, 'app-python', 'app code: its nearest tests folder',
+             [nearest_tests(tree, rel)])
+
+
+def match_importers(path):
+    rel = s(path)
+    return rel is not None and rel.endswith('.py') and not in_tests(rel)
+
+
+def cover_importers(plan, tree, path):
+    tests, _ = tree.importers(module_name(s(path)))
+    if tests:
+        plan.add(path, 'importers', 'the tests that import it', tests)
+
+
+def match_db_code(path):
+    rel = s(path)
+    return rel is not None and rel.endswith('.py')
+
+
+def cover_db_code(plan, tree, path):
+    rel = s(path)
+    pattern = RAW_SQL if in_tests(rel) else DB_CODE
+    text = diff_text(plan, path) if plan.from_git else tree.text(rel)
+    hit = pattern.search(text)
+    if hit:
+        plan.postgres.append(f'{path}: database code ({hit.group(0)!r})')
+
+
+def match_shared_ui(path):
+    rel = s(path)
+    return rel is not None and rel.startswith(SHARED_UI)
+
+
+def cover_shared_ui(plan, tree, path):
+    plan.command('python3 -I ui/css_build.py check')
+    plan.add(path, 'shared-ui', 'a file every page loads: the whole browser '
+             'suite and the page-wide checks', [BROWSER_DIR, *PAGE_WIDE])
+
+
+def match_ui_page(path):
+    rel = s(path)
+    return rel is not None and not rel.startswith(SHARED_UI) and (
+        '/templates/' in f'/{rel}' or '/static/' in f'/{rel}')
+
+
+def cover_ui_page(plan, tree, path):
+    rel = s(path)
+    unique = []
+    if '/templates/' in f'/{rel}':
+        name = template_name(rel)
+        pages = tree.pages_using('template', name) | {name}
+        unique = [name]
+        plan.command('python3 -I ui/css_build.py check')
+    else:
+        name = static_name(rel)
+        pages = tree.pages_using('static', name)
+        # A file loaded only on pages that load this one counts as this one:
+        # a test that names it opens one of them. test_table_columns.py names
+        # kiosk-ondeck.js, which loads only on pages that load kiosk.css.
+        refs = {name}
+        for _, uses in tree.graph().values():
+            for kind, ref in uses:
+                others = tree.pages_using('static', ref) if kind == 'static' else ()
+                if others and others <= pages:
+                    refs.add(ref)
+        for ref in refs:
+            unique.append(ref)
+            # A bare name counts only where PHP has no file of that name, since
+            # tests cite PHP's ondeck.css and now-racing.js.
+            if Path(ref).name not in tree.website_names():
+                unique.append(Path(ref).name)
+    keys = set()
+    for page in pages | {name}:
+        first = page.split('/')
+        if first[0] == 'ui' and len(first) > 2:
+            keys.add(first[1])
+        elif first[0] == 'ui' and len(first) == 2:
+            keys.add(re.split(r'[-_.]', first[1])[0] if not first[1].endswith(
+                '.html') else Path(first[1]).stem)
+        elif first[0] == 'timer':
+            keys.add('timer')
+        else:
+            keys.add(first[0])
+    tokens = sorted({t for k in keys for t in tokens_for(k)})
+    targets = tree.named(tokens) + tree.mentions(sorted(set(unique)))
+    if app_of(rel) != 'ui':
+        targets.append(nearest_tests(tree, rel))
+    note = (f'a page\'s template or static file ({", ".join(sorted(keys))}): the '
+            'ui and browser tests named after the pages that load it, and the '
+            'tests that name it')
+    if '/templates/' in f'/{rel}':
+        note += ', and the page-wide checks'
+        targets += PAGE_WIDE
+    if targets:
+        plan.add(path, 'ui-page', note, sorted(set(targets)))
+
+
+def match_server_tools(path):
+    rel = s(path)
+    return rel is not None and rel.startswith('tools/')
+
+
+def cover_server_tools(plan, tree, path):
+    rel = s(path)
+    if rel == 'tools/pytest-postgres.sh':
+        plan.postgres.append(f'{path}: the Postgres runner itself')
+    stem = Path(rel).stem
+    targets = tree.mentions([Path(rel).name, f'tools.{stem}', f'tools/{stem}'])
+    if rel.endswith('.py'):
+        targets += tree.importers(module_name(rel))[0]
+    plan.add(path, 'server-tools', 'a server tool: the tests that name or import it',
+             sorted(set(targets)))
+
+
+RULES = (
+    ('everything', match_everything, cover_everything),
+    ('docs', match_docs, cover_docs),
+    ('website', match_website, cover_website),
+    ('plan-tools', match_plan_tools, cover_plan_tools),
+    ('timer-build', match_timer_build, cover_timer_build),
+    ('testing', match_testing, cover_testing),
+    ('test-file', match_test_file, cover_test_file),
+    ('test-helper', match_test_helper, cover_test_helper),
+    ('test-data', match_test_data, cover_test_data),
+    ('model', match_model, cover_model),
+    ('service', match_service, cover_service),
+    ('handler', match_handler, cover_handler),
+    ('ui-python', match_ui_python, cover_ui_python),
+    ('app-python', match_app_python, cover_app_python),
+    ('importers', match_importers, cover_importers),
+    ('db-code', match_db_code, cover_db_code),
+    ('shared-ui', match_shared_ui, cover_shared_ui),
+    ('ui-page', match_ui_page, cover_ui_page),
+    ('server-tools', match_server_tools, cover_server_tools),
+)
+
+
+def fallback(plan, tree, path):
+    rel = s(path)
+    if rel is None:
+        why = 'no rule maps it and it is outside server/: run everything'
+        plan.everything.append(f'{path}: {why}')
+        plan.add(path, 'fallback', why)
+        return
+    app = app_of(rel)
+    if app is None or not (tree.server / app).is_dir():
+        targets = ['tests']
+        where = 'server/tests'
+    else:
+        targets = tree.test_dirs_under(app) or [nearest_tests(tree, rel)]
+        where = f"{app}'s tests"
+    plan.add(path, 'fallback', f'no rule maps it to a test: {where}, the app it '
+             'is in', targets)
+
+
+def map_file(plan, tree, path):
+    for _name, matches, cover in RULES:
+        if matches(path):
+            cover(plan, tree, path)
+    entries = plan.covers.get(path, [])
+    if not any(targets or rule in ('everything', 'docs', 'website', 'plan-tools')
+               or note.startswith('deleted')
+               for rule, note, targets in entries):
+        fallback(plan, tree, path)
+
+
+# --- git -------------------------------------------------------------------
+
+def git(root, *argv):
+    return subprocess.run(['git', *argv], cwd=root, check=True,
+                          capture_output=True, text=True).stdout
+
+
+def changed_files(plan):
+    root, base = plan.root, plan.base
+    files = git(root, 'diff', '--name-only', f'{base}...HEAD').splitlines()
+    files += git(root, 'diff', '--name-only', 'HEAD').splitlines()
+    plan.untracked = git(root, 'ls-files', '--others', '--exclude-standard').splitlines()
+    return list(dict.fromkeys(files + plan.untracked))
+
+
+def diff_text(plan, path):
+    """The lines the branch and the working tree add or remove in `path`; an
+    untracked file's whole text."""
+    if path in plan.untracked:
+        return (plan.root / path).read_text(errors='replace')
+    out = git(plan.root, 'diff', '-U0', f'{plan.base}...HEAD', '--', path)
+    out += git(plan.root, 'diff', '-U0', 'HEAD', '--', path)
+    return '\n'.join(ln[1:] for ln in out.splitlines()
+                     if ln[:1] in '+-' and not ln.startswith(('+++', '---')))
+
+
+# --- output ----------------------------------------------------------------
+
+def collapse(targets):
+    """Drops a target inside a folder target."""
+    folders = [t for t in targets if not t.endswith('.py')]
+    return sorted(t for t in set(targets)
+                  if not any(t != f and t.startswith(f + '/') for f in folders))
+
+
+def browser_files(tree, targets):
+    out = set()
+    for t in targets:
+        if t.endswith('.py'):
+            out.add(t)
+        else:
+            out.update(r for r in tree.test_files() if r.startswith(t + '/'))
+    return sorted(r for r in out if tree.exists(r) and is_browser_test(tree, r))
+
+
+def first_hit(tree, rel, pattern):
+    for number, line in enumerate(tree.text(rel).splitlines(), 1):
+        hit = pattern.search(line)
+        if hit:
+            return f'line {number}: {hit.group(0)}'
+    return None
+
+
+def report(plan, tree):
+    out = []
+    say = out.append
+    source = f'{plan.base}...HEAD and the working tree' if plan.from_git else 'stdin'
+    say(f'affected-tests: {len(plan.covers)} changed files ({source}); '
+        'owner, 2026-11-11: run what the diff can reach, and leave the full '
+        'suites to CI.')
+    say('')
+    all_targets = []
+    for path, entries in plan.covers.items():
+        say(path)
+        for rule, note, targets in entries:
+            say(f'  [{rule}] {note}')
+            shown = collapse([t for t in targets if run_kind(tree, t) != 'browser'])
+            shown += collapse([t for t in targets if run_kind(tree, t) != 'plain'])
+            for t in sorted(set(shown)):
+                say(f'      {t}')
+            all_targets += targets
+    say('')
+
+    if plan.everything:
+        say('Run everything, on both databases:')
+        for why in dict.fromkeys(plan.everything):
+            say(f'  {why}')
+        targets = ['.']
+    else:
+        targets = [t for t in set(all_targets) if tree.exists(t)]
+        checked = sorted(set(targets) & tree.source_checks())
+        if checked:
+            say('tools/source-checks.sh runs these, so the commands leave them out: '
+                + ', '.join(checked))
+            targets = [t for t in targets if t not in checked]
+    say('')
+
+    # Each command folds a file into a folder it runs: a plain run of ui/tests
+    # runs none of ui/tests/browser, so the browser run keeps those.
+    browser = [] if plan.everything else collapse(
+        [t for t in targets if run_kind(tree, t) != 'plain'])
+    plain = [] if plan.everything else collapse(
+        [t for t in targets if run_kind(tree, t) != 'browser'])
+    measured = browser_files(tree, [BROWSER_DIR, 'ui/tests'] if plan.everything
+                             else browser)
+    measured = [r for r in measured if first_hit(tree, r, MEASURES)]
+
+    if plan.postgres:
+        say('Postgres: needed (owner, 2026-11-11: models, migrations, services, '
+            'querysets, raw SQL, the database settings or populated.py):')
+        for why in dict.fromkeys(plan.postgres):
+            say(f'  {why}')
+    else:
+        say('Postgres: not needed; the diff touches no model, migration, service, '
+            'queryset, raw SQL, database setting or populated.py, and CI runs it '
+            '(owner, 2026-11-11).')
+    say('')
+    if measured:
+        say('Measures text, so also run with DERBYNET_BROWSER_FONT="DejaVu Sans", '
+            'CI\'s font (#273):')
+        for r in measured:
+            say(f'  {r} ({first_hit(tree, r, MEASURES)})')
+    else:
+        say('Measures text: none of the browser tests it runs.')
+    say('')
+    if plan.changed_browser_tests:
+        say('Repeats under load, on the changed test files only (owner, 2026-11-11; '
+            'a flake ticket keeps 25 on the database it failed on):')
+        for r in plan.changed_browser_tests:
+            timing = first_hit(tree, r, TIMING)
+            measures = first_hit(tree, r, MEASURES)
+            count = 25 if timing else 5
+            kind = (f'involves timing ({timing})' if timing
+                    else 'deterministic: check that it waits on no poll, timer or '
+                    'animation')
+            say(f'  {r}: {count} repeats, {kind}')
+            pg = '--postgres ' if plan.postgres else ''
+            run = f'tools/pytest-under-load.sh {pg}-m browser -n 4 --count {count} {r}'
+            say(f'      {run}')
+            if measures:
+                say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
+    else:
+        say('Repeats under load: no browser test file changed.')
+    say('')
+
+    say('Run from server/ (start a run longer than a minute in the background):')
+    if plan.everything:
+        runs = ['uv run pytest -n auto', 'uv run pytest -n auto -m browser ui']
+        say(f'  {runs[0]}')
+        say(f'  {runs[1]}')
+        say('  tools/pytest-postgres.sh -n auto')
+        say('  tools/pytest-postgres.sh -n auto -m browser ui')
+    else:
+        if plain:
+            say(f'  uv run pytest -n auto {" ".join(plain)}')
+        if browser:
+            say(f'  uv run pytest -n auto -m browser {" ".join(browser)}')
+        if plan.postgres:
+            if plain:
+                say(f'  tools/pytest-postgres.sh -n auto {" ".join(plain)}')
+            if browser:
+                say(f'  tools/pytest-postgres.sh -n auto -m browser {" ".join(browser)}')
+        if not plain and not browser:
+            say('  (no pytest target: the checks below cover the diff)')
+    if measured:
+        say(f'  DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -n auto -m browser '
+            f'{" ".join(measured)}')
+    for line in plan.commands:
+        say(f'  {line}')
+    say('  tools/source-checks.sh')
+    say('  uv run ruff check && uv run ruff format --check')
+    return '\n'.join(out) + '\n'
+
+
+def main(argv):
+    args = list(argv)
+    root = None
+    from_stdin = '--stdin' in args
+    if from_stdin:
+        args.remove('--stdin')
+    if '--root' in args:
+        i = args.index('--root')
+        root = Path(args[i + 1]).resolve()
+        del args[i:i + 2]
+    if len(args) > 1 or any(a.startswith('-') for a in args):
+        print(__doc__, file=sys.stderr)
+        return 2
+    base = args[0] if args else 'origin/master'
+    if root is None:
+        root = Path(git(Path.cwd(), 'rev-parse', '--show-toplevel').strip())
+    if from_stdin:
+        files = [ln.strip() for ln in sys.stdin if ln.strip()]
+    else:
+        files = None
+    plan = Plan(root=root, from_git=not from_stdin, base=base)
+    if files is None:
+        files = changed_files(plan)
+    tree = Tree(root)
+    for path in files:
+        map_file(plan, tree, path)
+    sys.stdout.write(report(plan, tree))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
