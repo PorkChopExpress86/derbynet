@@ -20,6 +20,7 @@ from django.test import Client
 from awards.models import Award
 from core.models import RaceSettings
 from core.tests.factories import EventFactory
+from legacy_api.tests.test_racers_parity import _exchange_text
 from racing.engine.tests.golden import GOLDEN_DIR, write_deviation_entries
 from racing.engine.tests.standings_fixtures import php_json
 from racing.models import HeatLane, RosterEntry, Round
@@ -183,13 +184,7 @@ def test_write_import_page_deviation():
         racer["partition"], racer["partitionid"] = partition, ids[partition]
     body = php_json(data) + (b"\n" if php["body"].endswith(b"\n") else b"")
     expected = "deviations/D34/sample-names-plurals.http"
-    head = [f"### {key}"] + [
-        f"{k}: {php[k]}"
-        for k in ("request", "status", "content-type", "cache-control")
-        if k in php
-    ]
-    head += [f"length: {len(body)}", "body:"]
-    (GOLDEN_DIR / expected).write_bytes("\n".join(head).encode() + b"\n" + body + b"\n")
+    (GOLDEN_DIR / expected).write_bytes(_exchange_text(key, php, body))
     write_deviation_entries(
         DEVIATION_CLAIM,
         [

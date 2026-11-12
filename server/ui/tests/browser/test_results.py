@@ -245,7 +245,7 @@ def test_a_roster_file_imports_in_its_encoding(login, event, name):
     page = login("RaceCoordinator")
     phone_only(page)
     page.goto("/import/roster/")
-    choose_file(page, import_golden.data_file(name))
+    choose_file(page, import_golden.DATA / name)
     page.locator("[data-encoding]").select_option(codepage)
 
     if any(r[5] == "Bears and Frères" for r in expected):

@@ -8,7 +8,6 @@ are compared by name, never by id (ADR-12).
 """
 
 import json
-from pathlib import Path
 from urllib.parse import parse_qsl
 
 from racing.engine.tests.golden import (
@@ -115,7 +114,3 @@ def racers(event) -> list[tuple]:
             "subgroup__name",
         )
     )
-
-
-def data_file(name: str) -> Path:
-    return DATA / name
