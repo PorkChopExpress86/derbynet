@@ -1,0 +1,52 @@
+award-presentations at tv: overlaps <div class="award-trophy" id="awardname">Award Presentation< and <video class="confetti" muted="true" loop="true">
+    <sourc
+award-presentations at laptop: overlaps <div class="award-trophy" id="awardname">Award Presentation< and <video class="confetti" muted="true" loop="true">
+    <sourc
+award-presentations at phone: scrollbars
+award-presentations at phone: overlaps <div class="award-trophy" id="awardname">Award Presentation< and <video class="confetti" muted="true" loop="true">
+    <sourc
+derbynet at phone: scrollbars
+identify at phone: overlaps <div class="banner_title">DerbyNet Kiosk</div> and <p class="kiosk_title">obnoxious riddle</p>
+now-racing-columnar at tv: overlaps <div class="label">Best heat times</div> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar at tv: overlaps <p>Check timer.</p> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar at laptop: overlaps <div class="label">Best heat times</div> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar at laptop: overlaps <p>Check timer.</p> and <div class="bottom-banner">
+    <div class="label">Best heat
+now-racing-columnar at laptop: overlaps <p>Check timer.</p> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar at phone: overlaps <div class="label">Best heat times</div> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar at phone: overlaps <div class="label">Best heat times</div> and <div id="timer_overlay" class="overlay_foreground" style="op
+now-racing-columnar at phone: overlaps <div class="label">Best heat times</div> and <p>Check timer.</p>
+now-racing-columnar-reversed at tv: overlaps <div class="label">Best heat times</div> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar-reversed at tv: overlaps <p>Check timer.</p> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar-reversed at laptop: overlaps <div class="label">Best heat times</div> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar-reversed at laptop: overlaps <p>Check timer.</p> and <div class="bottom-banner">
+    <div class="label">Best heat
+now-racing-columnar-reversed at laptop: overlaps <p>Check timer.</p> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar-reversed at phone: overlaps <div class="label">Best heat times</div> and <div id="overlay_background" style="display: block; opacity:
+now-racing-columnar-reversed at phone: overlaps <div class="label">Best heat times</div> and <div id="timer_overlay" class="overlay_foreground" style="op
+now-racing-columnar-reversed at phone: overlaps <div class="label">Best heat times</div> and <p>Check timer.</p>
+ondeck at phone: overlaps <div class="banner_title">Racers On Deck</div> and <table id="schedule" class="main_table curgroup">
+<tbody><tr
+ondeck at phone: overlaps <div class="banner_title">Racers On Deck</div> and <tbody><tr style="height: 0; border: none;"><th style="width
+ondeck at phone: overlaps <div class="banner_title">Racers On Deck</div> and <tr style="height: 0; border: none;"><th style="width: 4vw; 
+please-check-in at laptop: scrollbars
+please-check-in at phone: scrollbars
+please-check-in at phone: overlaps <div class="banner_title">Please Check In</div> and <div class="kiosk_heading">The following participants have N
+please-check-in at phone: overlaps <div class="kiosk_heading">The following participants have N and <div class="wanted_container">
+<div class="wanted_group">
+<p
+please-check-in at phone: overlaps <div class="kiosk_heading">The following participants have N and <div class="wanted_group">
+<p class="class_heading">Lions &a
+qrcode at tv: scrollbars
+qrcode at laptop: scrollbars
+results-by-racer at phone: overlaps <div class="banner_title">Results By Racer</div> and <h2 class="now_running">Now racing: <a href="#tbody_-1">Roun
+results-by-racer at phone: overlaps <div class="banner_title">Results By Racer</div> and <a href="#tbody_-1">Round null</a>
+scale-MPH at tv: scrollbars
+scale-MPH at laptop: scrollbars
+scale-MPH at phone: scrollbars
+scale-MPH at phone: overlaps <div class="banner_title">Scale Miles Per Hour</div> and <div id="text">
+  <p>If a 7-inch pinewood derby car</p>
+  <p
+scale-MPH at phone: overlaps <div class="banner_title">Scale Miles Per Hour</div> and <p>If a 7-inch pinewood derby car</p>
+scale-MPH at phone: overlaps <div class="banner_title">Scale Miles Per Hour</div> and <p>were scaled up 25x (to ~14.5 feet)</p>
+standings at phone: scrollbars
