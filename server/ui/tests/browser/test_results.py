@@ -4,7 +4,6 @@ screenshots the PR attaches."""
 
 import csv
 import re
-import uuid
 from pathlib import Path
 
 import pytest
@@ -17,7 +16,7 @@ from racing.services.standings import standings_snapshot
 from racing.services.workbook import export_all
 from roster.models import Partition, Racer
 from roster.services.racers import insert_new_racer
-from transfer.batch_import import Row, import_rows
+from transfer.tests import import_golden
 from ui.tests.browser.conftest import assert_accessible, htmx_settled, shoot
 from ui.tests.browser.test_playlist import Timer
 from ui.tests.race import car_times, race_setup, run_heat, scheduled, standings_day
@@ -237,50 +236,27 @@ def import_now(page):
     htmx_settled(page)
 
 
-def expected_roster(name: str, encoding: str):
-    """The racers the batch import makes from the file read in Python, as
-    `transfer/tests/test_batch_import.py` holds them to `racer.import`."""
-    from core.tests.factories import EventFactory
-
-    text = (DATA / name).read_bytes().decode(encoding)
-    table = list(csv.reader(text.splitlines()))
-    fields = {
-        "First Name": "firstname",
-        "Last Name": "lastname",
-        "Den": "partition",
-        "Car Number": "carnumber",
-    }
-    mapping = [fields[h] for h in table[0]]
-    rows = [
-        Row(i + 2, dict(zip(mapping, cells, strict=True)))
-        for i, cells in enumerate(table[1:])
-        if cells
-    ]
-    other = EventFactory()
-    assert import_rows(other, "roster", rows, token=uuid.uuid4().hex).ok
-    return racer_rows(other)
-
-
 @pytest.mark.parametrize(
-    ("name", "codepage", "encoding"),
-    [
-        ("sample-names-MS-DOS.csv", "437", "cp437"),
-        ("sample-names-Mac.csv", "10000", "mac_roman"),
-        ("sample-names-Windows.csv", "1252", "cp1252"),
-    ],
+    "name", sorted(n for n in import_golden.ROSTERS if n.endswith(".csv"))
 )
-def test_a_roster_file_imports_in_its_encoding(login, event, name, codepage, encoding):
+def test_a_roster_file_imports_in_its_encoding(login, event, name):
+    codepage = import_golden.ROSTERS[name][1]
+    expected = import_golden.expected_racers(name)
     page = login("RaceCoordinator")
     phone_only(page)
     page.goto("/import/roster/")
-    choose_file(page, DATA / name)
+    choose_file(page, import_golden.DATA / name)
     page.locator("[data-encoding]").select_option(codepage)
 
-    expect(page.locator("[data-preview-table]")).to_contain_text("Bears and Frères")
+    if any(r[5] == "Bears and Frères" for r in expected):
+        expect(page.locator("[data-preview-table]")).to_contain_text("Bears and Frères")
     import_now(page)
 
-    expect(page.locator("[data-imported]")).to_contain_text("Imported 82 racers")
-    assert racer_rows(event) == expected_roster(name, encoding)
+    expect(page.locator("[data-imported]")).to_contain_text(
+        f"Imported {len(expected)} racers"
+    )
+    # The racers PHP's import page made from the same file (#242).
+    assert import_golden.racers(event) == import_golden.expected_racers(name)
 
 
 def test_the_xlsx_roster_imports_from_the_chosen_sheet(login, event):
@@ -313,7 +289,9 @@ def test_the_xlsx_roster_imports_from_the_chosen_sheet(login, event):
     import_now(page)
     expect(page.locator("[data-imported]")).to_contain_text("Imported 82 racers")
     shoot(page, "import-4-done")
-    assert racer_rows(event) == expected_roster("sample-names-Mac.csv", "mac_roman")
+    assert import_golden.racers(event) == import_golden.expected_racers(
+        "sample-names.xlsx"
+    )
     assert RaceSettings.objects.get(event=event).partition_label == "Patrol"
 
 

@@ -2117,6 +2117,15 @@
       ],
       "reason": "The poll after a late racer joins under the master schedule shows the chart Django made, which keeps the running and staged heats (D34, Q20 on the reschedule before it); PHP's chart changed them.",
       "expected": "deviations/D34/master-schedule.http"
+    },
+    {
+      "quirk": "D34",
+      "fixture": "http/import/sample-names-plurals.http",
+      "exchanges": [
+        "017 racer.list"
+      ],
+      "reason": "PHP's import page makes a partition for each case variant in the plurals roster, such as wolves beside Wolves. Django's batch import and racer.import join the existing partition, named with case ignored (D34).",
+      "expected": "deviations/D34/sample-names-plurals.http"
     }
   ]
 }

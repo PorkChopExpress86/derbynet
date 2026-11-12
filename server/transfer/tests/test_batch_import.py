@@ -9,6 +9,8 @@ PHP, a file with a failing row imports nothing.
 """
 
 import csv
+import json
+import os
 import uuid
 from pathlib import Path
 
@@ -18,11 +20,15 @@ from django.test import Client
 from awards.models import Award
 from core.models import RaceSettings
 from core.tests.factories import EventFactory
+from legacy_api.tests.test_racers_parity import _exchange_text
+from racing.engine.tests.golden import GOLDEN_DIR, write_deviation_entries
+from racing.engine.tests.standings_fixtures import php_json
 from racing.models import HeatLane, RosterEntry, Round
 from roster.models import Partition, Racer
 from roster.services.racers import insert_new_racer
 from transfer import batch_import
 from transfer.batch_import import Row, parse_rows, preview
+from transfer.tests import import_golden
 from ui.tests.roles import PASSWORDS
 
 pytestmark = pytest.mark.django_db
@@ -117,22 +123,92 @@ def roster_file(name, encoding) -> list[Row]:
     return mapped(table[1:], [ROSTER_HEADERS[h] for h in table[0]])
 
 
-@pytest.mark.parametrize(("name", "encoding"), ROSTER_FILES)
-def test_a_roster_file_imports_the_racers_racer_import_makes(name, encoding):
-    rows = roster_file(name, encoding)
-    assert len(rows) > 10
-
-    legacy = EventFactory()
-    active(legacy)
-    one_by_one("racer.import", rows)
-    expected = racer_rows(legacy)
+@pytest.mark.parametrize("name", sorted(import_golden.ROSTERS))
+def test_the_rows_php_posted_import_as_the_racers_php_made(name):
+    """The rows PHP's import page posted for each sample roster, through the
+    batch import, make the racers PHP made from them (#242)."""
+    rows = import_golden.page_rows(name)
+    expected = import_golden.expected_racers(name)
+    assert len(rows) == len(expected) > 10
 
     event = EventFactory()
     outcome = import_rows(event, "roster", rows)
 
     assert outcome.ok and outcome.imported == len(rows)
-    assert racer_rows(event) == expected
-    assert len(expected) == len(rows)
+    assert import_golden.racers(event) == expected
+
+
+@pytest.mark.parametrize("name", sorted(import_golden.ROSTERS))
+def test_the_rows_php_posted_make_the_same_racers_through_racer_import(name):
+    """The legacy per-row endpoint the PHP page posts to agrees too."""
+    event = EventFactory()
+    active(event)
+    one_by_one("racer.import", import_golden.page_rows(name))
+    assert import_golden.racers(event) == import_golden.expected_racers(name)
+
+
+# D34: PHP makes a partition for a case variant of an existing one, such as
+# " wolves " beside Wolves; Django's import joins the existing partition.
+PLURALS = "sample-names-plurals.csv"
+DEVIATION_CLAIM = {("D34", import_golden.fixture(PLURALS))}
+
+
+def test_the_plurals_roster_differs_from_php_only_by_d34():
+    """Each racer whose partition Django names differently from PHP joined a
+    partition PHP also made, named the same with case and spaces ignored."""
+    expected = import_golden.expected_racers(PLURALS)
+    php = import_golden.php_racers(PLURALS)
+    assert expected != php
+    partitions = {r[5] for r in php}
+    for mine, theirs in zip(expected, php, strict=True):
+        assert mine[:5] == theirs[:5] and mine[6:] == theirs[6:]
+        if mine[5] != theirs[5]:
+            assert mine[5] in partitions
+            assert mine[5].casefold() == theirs[5].strip().casefold()
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the #242 D34 entry"
+)
+def test_write_import_page_deviation():
+    """The D34 entry: PHP's racer.list after the plurals roster, with each
+    racer in the partition Django's batch import put them in."""
+    event = EventFactory()
+    assert import_rows(event, "roster", import_golden.page_rows(PLURALS)).ok
+    joined = {r[:2]: r[5] for r in import_golden.racers(event)}
+    key, php = import_golden.listing(PLURALS)
+    data = json.loads(php["body"])
+    ids = {r["partition"]: r["partitionid"] for r in data["racers"]}
+    for racer in data["racers"]:
+        partition = joined[racer["firstname"], racer["lastname"]]
+        racer["partition"], racer["partitionid"] = partition, ids[partition]
+    body = php_json(data) + (b"\n" if php["body"].endswith(b"\n") else b"")
+    expected = "deviations/D34/sample-names-plurals.http"
+    (GOLDEN_DIR / expected).write_bytes(_exchange_text(key, php, body))
+    write_deviation_entries(
+        DEVIATION_CLAIM,
+        [
+            {
+                "quirk": "D34",
+                "fixture": import_golden.fixture(PLURALS),
+                "exchanges": [key],
+                "reason": "PHP's import page makes a partition for each case"
+                " variant in the plurals roster, such as wolves beside Wolves."
+                " Django's batch import and racer.import join the existing"
+                " partition, named with case ignored (D34).",
+                "expected": expected,
+            }
+        ],
+    )
+
+
+@pytest.mark.parametrize(("name", "encoding"), ROSTER_FILES)
+def test_each_file_read_here_is_the_rows_php_posted(name, encoding):
+    """`roster_file`, which the tests below import from, reads each file as
+    PHP's page read it."""
+    assert [r.fields for r in roster_file(name, encoding)] == [
+        r.fields for r in import_golden.page_rows(name)
+    ]
 
 
 def test_the_encoding_variants_read_the_same_racers():

@@ -363,6 +363,27 @@ record_script() {
   fi
 }
 
+# record_import_page <name> <file> <codepage> <fields> [sheet]
+# Imports <file>, a path under $ROOT/testing, through PHP's roster import page in a
+# browser, capture/import-page.cjs, by way of the recording proxy, and writes the
+# page's racer.import requests and the racer.list after them to http/<name>.http.
+record_import_page() {
+  local name="$1" file="$2"
+  shift 2
+  local tag="${name//\//__}"
+  echo "  recording $name: import-roster.php with ${file##*/}" >&2
+  curl -sf "http://127.0.0.1:$RECORDER_PORT/__control/begin?tag=$tag&record=racer.import,racer.list&steps=0" >/dev/null
+  local status=0
+  node "$HERE/import-page.cjs" "http://localhost:$RECORDER_PORT/$tag" "$file" "$@" \
+       >"$RAW/.script.log" 2>&1 || status=$?
+  curl -sf "http://127.0.0.1:$RECORDER_PORT/__control/end?tag=$tag" >/dev/null
+  if [ $status -ne 0 ]; then
+    echo "import-page.cjs failed ($status):" >&2
+    tail -n 30 "$RAW/.script.log" >&2
+    return 1
+  fi
+}
+
 # run_script <script> [args...]: a script from testing/, not recorded.
 run_script() {
   local script="$1"
