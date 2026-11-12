@@ -9,6 +9,7 @@
 # flush the seeded rows, frozen exception classes, and the parity gate's
 # entries for the suites server.yml runs, fixtures only xdist provides (#220
 # retro), a test that starts Playwright in the pytest process (#239 retro),
+# prose that calls a clamped font by its viewport term (#283 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -43,6 +44,7 @@ python3 -I -m unittest discover -s ../plan/tests </dev/null
 exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_php_claims.py \
   tests/test_php_cite_lines.py \
+  tests/test_clamp_claims.py \
   tests/test_deviations.py \
   tests/test_parity_gate_ci.py \
   tests/test_pytest_under_load.py \
