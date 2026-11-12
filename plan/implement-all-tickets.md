@@ -23,16 +23,16 @@ In the main clone, run `git fetch origin`, then `git worktree add ../derbynet-wt
 Spawn a general-purpose agent with `model: opus`, briefed per plan/AGENT-BRIEF.md for ticket #N in ../derbynet-wt-N on branch issue-N-<slug>. Add to the brief:
 
 - Follow ~/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/*/skills/engineering/implement/SKILL.md, and leave its code-review step to the lead.
-- Run `server/tools/pytest-postgres.sh` on the affected tests, and the verify skill for any page or action.php change.
+- Before each push, run what `plan/bin/affected-tests` prints: the tests the diff can reach, `tools/source-checks.sh` and ruff, with `server/tools/pytest-postgres.sh` only when it says the diff touches database code, and the repeats under load at the count it gives. Leave the full suites to CI, which runs them on every push; the tool prints "Run everything" for a shared conftest, the dependencies, the settings or a workflow (owner, 2026-11-11). Run the verify skill for any page or action.php change.
 - Commit with a message that references #N, push, and return the commit SHA, what you built, and what origin/master already had.
 
 While a subagent runs, read its notifications: when they show the same background wait for over an hour with no new tool uses, list its processes with `ps -eo pid,etime,args` instead of waiting on. #247's implementer waited about 10 h on a probe that had hung, and the lead looked only when the owner asked, after about 6 h.
 
 ## 2. Code review
 
-1. Run /mattpocock-skills:code-review on ../derbynet-wt-N with origin/master as the fixed point. The spec is ticket #N, and the standards are CONTRIBUTING.md and plan/AGENT-BRIEF.md. Spawn its Standards reviewer with `model: sonnet` and its Spec reviewer with `model: opus`. A reviewer that mutates code does it in its own copy (`git worktree add --detach ../derbynet-wt-N-rv<axis> <head>`, removed after), and a reviewer leaves a change it didn't make as it is: #247's Spec reviewer reset a mutation the Standards reviewer had running in the shared worktree.
+1. Run /mattpocock-skills:code-review on ../derbynet-wt-N with origin/master as the fixed point. The spec is ticket #N, and the standards are CONTRIBUTING.md and plan/AGENT-BRIEF.md. Spawn its Standards reviewer with `model: sonnet` and its Spec reviewer with `model: opus`. A reviewer runs only what confirms or refutes a finding (the test, the `-k` mutant, the server run), never the full suites (owner, 2026-11-11). A reviewer that mutates code does it in its own copy (`git worktree add --detach ../derbynet-wt-N-rv<axis> <head>`, removed after), and a reviewer leaves a change it didn't make as it is: #247's Spec reviewer reset a mutation the Standards reviewer had running in the shared worktree.
 2. Rank every finding.
-3. Send the high and medium findings to the implementer. It reproduces each one with a test, the suite, or a server run, and reports the ones it can't reproduce (CLAUDE.md). It fixes each reproduced finding with a test that goes red before the fix, reruns the affected tests and then the full suite, and commits with a message that references #N.
+3. Send the high and medium findings to the implementer. It reproduces each one with a test, a server run, or the affected tests, and reports the ones it can't reproduce (CLAUDE.md). It fixes each reproduced finding with a test that goes red before the fix, reruns what `plan/bin/affected-tests` prints for the new head, mutates only the asserts or rules the round changed, and commits with a message that references #N.
 
 ## 3. PR
 
