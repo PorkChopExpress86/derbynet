@@ -18,7 +18,12 @@ const fields = fieldList.split(',');
 const TIMEOUT = 120000;
 
 // A real drag, so jQuery UI's draggable and droppable run as they do for a user.
+// Both boxes are measured just before the drag; the page shows the file's
+// statistics a short while after loading it, which moves the table.
 async function drag(page, from, to) {
+  for (const selector of [from, to]) {
+    await page.$eval(selector, (e) => e.scrollIntoView({ block: 'center', inline: 'center' }));
+  }
   const a = await (await page.$(from)).boundingBox();
   const b = await (await page.$(to)).boundingBox();
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
@@ -64,9 +69,19 @@ async function drag(page, from, to) {
       if (!field) continue;
       const label = `.fields .field[data-field="${field}"]`;
       const target = `#csv_content th.label_target[data-column="${column}"]`;
+      const landed = `${target} .field[data-field="${field}"]`;
       await page.waitForSelector(label, { visible: true });
-      await drag(page, label, target);
-      await page.waitForSelector(`${target} .field[data-field="${field}"]`);
+      // A drag that misses, as one did on a loaded machine, is tried again.
+      for (let tries = 1; ; ++tries) {
+        await drag(page, label, target);
+        try {
+          await page.waitForSelector(landed, { timeout: 3000 });
+          break;
+        } catch (e) {
+          if (tries === 5) throw e;
+          console.error(`drag of ${field} to column ${column} missed, try ${tries}`);
+        }
+      }
     }
 
     await page.waitForSelector('#import_button:not([disabled])');
