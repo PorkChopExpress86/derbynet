@@ -73,6 +73,7 @@ SERVER_DIR = Path(__file__).resolve().parents[1]
 # DEVIATION_CLAIM, the (quirk, fixture) pairs it rewrites and keeps no others.
 WRITERS = [
     "legacy_api.tests.test_racers_parity",
+    "transfer.tests.test_batch_import",
     "legacy_api.tests.test_race_control_parity",
     "legacy_api.tests.test_awards_parity",
     "legacy_api.tests.test_kiosks_parity",

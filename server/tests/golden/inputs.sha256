@@ -1,4 +1,4 @@
-56f937b1111776f4ece8d8f006f7561977c9a1ddfcd2185db02adb12b7dc4e91  server/tests/golden/capture/capture-http.sh
+0eeb82247b2c803ed4acabfde27192d1d20777aa2262172c9e693e156e664ca8  server/tests/golden/capture/capture-http.sh
 2e361ad008d5122d8d58e731f9ada17d38188634778278036d2788953e78a4b6  server/tests/golden/capture/normalize.mjs
 dd840e3915aa115c67b0bafda5e0be6ceee1ed61d537e830006467c184f66d9f  server/tests/golden/capture/recorder.mjs
 fef3a20b72ee7b9ebd579b498564b767386d5b8ed99e9b71da43827c2f458961  server/tests/golden/capture/scenarios/00-setup.sh

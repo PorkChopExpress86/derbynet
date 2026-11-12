@@ -1,0 +1,668 @@
+### 001 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Arica+Archey+&partition=Tigers&carnumber=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 278
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Arica Archey ",
+        "partition": "Tigers",
+        "carnumber": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 1
+}
+
+### 002 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Nevada+Narron+&partition=Wolves&carnumber=2
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 279
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Nevada Narron ",
+        "partition": "Wolves",
+        "carnumber": 2
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 2
+}
+
+### 003 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Hassan+Holtzclaw+&partition=Bears&carnumber=3
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 281
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Hassan Holtzclaw ",
+        "partition": "Bears",
+        "carnumber": 3
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 3
+}
+
+### 004 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Leandra+Leitch+&partition=Lions&carnumber=4
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 279
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Leandra Leitch ",
+        "partition": "Lions",
+        "carnumber": 4
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 4
+}
+
+### 005 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Geoffrey+Galan+&partition=Webelos&carnumber=5
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 281
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Geoffrey Galan ",
+        "partition": "Webelos",
+        "carnumber": 5
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 5
+}
+
+### 006 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Hayden+Haverland+&partition=Wolf&carnumber=6
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 280
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Hayden Haverland ",
+        "partition": "Wolf",
+        "carnumber": 6
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 6
+}
+
+### 007 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Austin+Aispuro+&partition=Bear&carnumber=7
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 278
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Austin Aispuro ",
+        "partition": "Bear",
+        "carnumber": 7
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 7
+}
+
+### 008 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Maximo+Maez+&partition=Tiger&carnumber=8
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 276
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Maximo Maez ",
+        "partition": "Tiger",
+        "carnumber": 8
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 8
+}
+
+### 009 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Exie+Esper+&partition=Lion&carnumber=9
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 274
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Exie Esper ",
+        "partition": "Lion",
+        "carnumber": 9
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 9
+}
+
+### 010 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Marcelo+Mcmiller+&partition=Tigers&carnumber=10
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 284
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Marcelo Mcmiller ",
+        "partition": "Tigers",
+        "carnumber": 10
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 10
+}
+
+### 011 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Angelic+Auslander+&partition=+wolves+&carnumber=11
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Angelic Auslander ",
+        "partition": " wolves ",
+        "carnumber": 11
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 11
+}
+
+### 012 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Erik+Ehrman+&partition=+lIons++&carnumber=12
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 281
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Erik Ehrman ",
+        "partition": " lIons  ",
+        "carnumber": 12
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 12
+}
+
+### 013 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Cira+Coblentz+&partition=+bear+&carnumber=13
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 281
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Cira Coblentz ",
+        "partition": " bear ",
+        "carnumber": 13
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 13
+}
+
+### 014 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Ida+Inskeep+&partition=+lion&carnumber=+14
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 278
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Ida Inskeep ",
+        "partition": " lion",
+        "carnumber": 14
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 14
+}
+
+### 015 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Adelina+Alba+&partition=+webelo&carnumber=+15
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 281
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Adelina Alba ",
+        "partition": " webelo",
+        "carnumber": 15
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 15
+}
+
+### 016 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Xiao+Xie+&partition=tiger&carnumber=16
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 275
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Xiao Xie ",
+        "partition": "tiger",
+        "carnumber": 16
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 16
+}
+
+### 017 racer.list
+request: GET action.php?query=racer.list&order=name
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 7749
+body:
+{
+    "racers": [
+        {
+            "racerid": 7,
+            "firstname": "Austin",
+            "lastname": "Aispuro",
+            "carnumber": 7,
+            "carname": "",
+            "partitionid": 7,
+            "partition": "Bear",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 7,
+            "class": "Bear",
+            "rankid": 7,
+            "rank": "Bear",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 15,
+            "firstname": "Adelina",
+            "lastname": "Alba",
+            "carnumber": 15,
+            "carname": "",
+            "partitionid": 14,
+            "partition": "webelo",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 10,
+            "class": "webelo",
+            "rankid": 10,
+            "rank": "webelo",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 1,
+            "firstname": "Arica",
+            "lastname": "Archey",
+            "carnumber": 1,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Tigers",
+            "rankid": 1,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 11,
+            "firstname": "Angelic",
+            "lastname": "Auslander",
+            "carnumber": 11,
+            "carname": "",
+            "partitionid": 10,
+            "partition": "wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Wolves",
+            "rankid": 2,
+            "rank": "Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 13,
+            "firstname": "Cira",
+            "lastname": "Coblentz",
+            "carnumber": 13,
+            "carname": "",
+            "partitionid": 12,
+            "partition": "bear",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 7,
+            "class": "Bear",
+            "rankid": 7,
+            "rank": "Bear",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 12,
+            "firstname": "Erik",
+            "lastname": "Ehrman",
+            "carnumber": 12,
+            "carname": "",
+            "partitionid": 11,
+            "partition": "lIons",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Lions",
+            "rankid": 4,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 9,
+            "firstname": "Exie",
+            "lastname": "Esper",
+            "carnumber": 9,
+            "carname": "",
+            "partitionid": 9,
+            "partition": "Lion",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 9,
+            "class": "Lion",
+            "rankid": 9,
+            "rank": "Lion",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Geoffrey",
+            "lastname": "Galan",
+            "carnumber": 5,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Webelos",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Webelos",
+            "rankid": 5,
+            "rank": "Webelos",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Hayden",
+            "lastname": "Haverland",
+            "carnumber": 6,
+            "carname": "",
+            "partitionid": 6,
+            "partition": "Wolf",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 6,
+            "class": "Wolf",
+            "rankid": 6,
+            "rank": "Wolf",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 3,
+            "firstname": "Hassan",
+            "lastname": "Holtzclaw",
+            "carnumber": 3,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears",
+            "rankid": 3,
+            "rank": "Bears",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 14,
+            "firstname": "Ida",
+            "lastname": "Inskeep",
+            "carnumber": 14,
+            "carname": "",
+            "partitionid": 13,
+            "partition": "lion",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 9,
+            "class": "Lion",
+            "rankid": 9,
+            "rank": "Lion",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Leandra",
+            "lastname": "Leitch",
+            "carnumber": 4,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Lions",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Lions",
+            "rankid": 4,
+            "rank": "Lions",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 8,
+            "firstname": "Maximo",
+            "lastname": "Maez",
+            "carnumber": 8,
+            "carname": "",
+            "partitionid": 8,
+            "partition": "Tiger",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 8,
+            "class": "Tiger",
+            "rankid": 8,
+            "rank": "Tiger",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 10,
+            "firstname": "Marcelo",
+            "lastname": "Mcmiller",
+            "carnumber": 10,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Tigers",
+            "rankid": 1,
+            "rank": "Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Nevada",
+            "lastname": "Narron",
+            "carnumber": 2,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "Wolves",
+            "rankid": 2,
+            "rank": "Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 16,
+            "firstname": "Xiao",
+            "lastname": "Xie",
+            "carnumber": 16,
+            "carname": "",
+            "partitionid": 15,
+            "partition": "tiger",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 8,
+            "class": "Tiger",
+            "rankid": 8,
+            "rank": "Tiger",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+

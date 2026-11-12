@@ -1,0 +1,3374 @@
+### 001 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Adolfo+%22Dolf%22+Asher&partition=Lions+%26+Tigers&carnumber=101
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 296
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Adolfo \"Dolf\" Asher",
+        "partition": "Lions & Tigers",
+        "carnumber": 101
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 1
+}
+
+### 002 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Angelo+Alas&partition=White's+Wolves&carnumber=102
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 286
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Angelo Alas",
+        "partition": "White's Wolves",
+        "carnumber": 102
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 2
+}
+
+### 003 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Antoine+Akiyama&partition=Bears+and+Fr%EF%BF%BDres&carnumber=103
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 297
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Antoine Akiyama",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 103
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 3
+}
+
+### 004 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Arden+Aziz&partition=Webelos+(%22Webes%22)&carnumber=104
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Arden Aziz",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 104
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 4
+}
+
+### 005 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Barney+Bainter&partition=Arrows+%3C%3C--%3C%3C&carnumber=105
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Barney Bainter",
+        "partition": "Arrows <<--<<",
+        "carnumber": 105
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 5
+}
+
+### 006 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Ben+Bittinger&partition=Lions+%26+Tigers&carnumber=106
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Ben Bittinger",
+        "partition": "Lions & Tigers",
+        "carnumber": 106
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 6
+}
+
+### 007 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Blake+Burling&partition=White's+Wolves&carnumber=107
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Blake Burling",
+        "partition": "White's Wolves",
+        "carnumber": 107
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 7
+}
+
+### 008 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Bruce+Boissonneault&partition=Bears+and+Fr%EF%BF%BDres&carnumber=108
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 301
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Bruce Boissonneault",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 108
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 8
+}
+
+### 009 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Byron+Billy&partition=Webelos+(%22Webes%22)&carnumber=109
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 291
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Byron Billy",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 109
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 9
+}
+
+### 010 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Carey+Craney&partition=Arrows+%3C%3C--%3C%3C&carnumber=110
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Carey Craney",
+        "partition": "Arrows <<--<<",
+        "carnumber": 110
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 10
+}
+
+### 011 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Carroll+Cybulski&partition=Lions+%26+Tigers&carnumber=111
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Carroll Cybulski",
+        "partition": "Lions & Tigers",
+        "carnumber": 111
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 11
+}
+
+### 012 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Christoper+Chauncey&partition=White's+Wolves&carnumber=112
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 295
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Christoper Chauncey",
+        "partition": "White's Wolves",
+        "carnumber": 112
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 12
+}
+
+### 013 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Clark+Chesnutt&partition=Bears+and+Fr%EF%BF%BDres&carnumber=113
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 297
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Clark Chesnutt",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 113
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 13
+}
+
+### 014 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Cletus+Creager&partition=Webelos+(%22Webes%22)&carnumber=114
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 295
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Cletus Creager",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 114
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 14
+}
+
+### 015 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Ca%EF%BF%BDumil+Calero&partition=Arrows+%3C%3C--%3C%3C&carnumber=115
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 294
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Ca\ufffdumil Calero",
+        "partition": "Arrows <<--<<",
+        "carnumber": 115
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 15
+}
+
+### 016 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Danial+Depaolo&partition=Lions+%26+Tigers&carnumber=116
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Danial Depaolo",
+        "partition": "Lions & Tigers",
+        "carnumber": 116
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 16
+}
+
+### 017 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Darrell+%26+Darrell+Delaughter&partition=White's+Wolves&carnumber=117
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 304
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Darrell & Darrell Delaughter",
+        "partition": "White's Wolves",
+        "carnumber": 117
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 17
+}
+
+### 018 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Darrin+Denny&partition=Bears+and+Fr%EF%BF%BDres&carnumber=118
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 295
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Darrin Denny",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 118
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 18
+}
+
+### 019 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Denny+Deering&partition=Webelos+(%22Webes%22)&carnumber=119
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 294
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Denny Deering",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 119
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 19
+}
+
+### 020 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Derek+Dantonio&partition=Arrows+%3C%3C--%3C%3C&carnumber=120
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Derek Dantonio",
+        "partition": "Arrows <<--<<",
+        "carnumber": 120
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 20
+}
+
+### 021 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Derick+Dreier&partition=Lions+%26+Tigers&carnumber=121
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Derick Dreier",
+        "partition": "Lions & Tigers",
+        "carnumber": 121
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 21
+}
+
+### 022 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Dexter+Dawes&partition=White's+Wolves&carnumber=122
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Dexter Dawes",
+        "partition": "White's Wolves",
+        "carnumber": 122
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 22
+}
+
+### 023 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Domingo+Doles&partition=Bears+and+Fr%EF%BF%BDres&carnumber=123
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 296
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Domingo Doles",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 123
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 23
+}
+
+### 024 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Dorian+Dunkle&partition=Webelos+(%22Webes%22)&carnumber=124
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 294
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Dorian Dunkle",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 124
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 24
+}
+
+### 025 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Earnest+Evangelista&partition=Arrows+%3C%3C--%3C%3C&carnumber=125
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 294
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Earnest Evangelista",
+        "partition": "Arrows <<--<<",
+        "carnumber": 125
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 25
+}
+
+### 026 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Edgardo+Easterwood&partition=Lions+%26+Tigers&carnumber=126
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 294
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Edgardo Easterwood",
+        "partition": "Lions & Tigers",
+        "carnumber": 126
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 26
+}
+
+### 027 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Elliot+Eastman&partition=White's+Wolves&carnumber=127
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Elliot Eastman",
+        "partition": "White's Wolves",
+        "carnumber": 127
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 27
+}
+
+### 028 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Ethan+Enye&partition=Bears+and+Fr%EF%BF%BDres&carnumber=128
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 293
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Ethan Enye",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 128
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 28
+}
+
+### 029 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Emory+Ertel&partition=Webelos+(%22Webes%22)&carnumber=129
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Emory Ertel",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 129
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 29
+}
+
+### 030 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Enoch+Eccles&partition=Arrows+%3C%3C--%3C%3C&carnumber=130
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Enoch Eccles",
+        "partition": "Arrows <<--<<",
+        "carnumber": 130
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 30
+}
+
+### 031 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Felton+Fouche&partition=Lions+%26+Tigers&carnumber=131
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Felton Fouche",
+        "partition": "Lions & Tigers",
+        "carnumber": 131
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 31
+}
+
+### 032 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Freddie+Font&partition=White's+Wolves&carnumber=132
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Freddie Font",
+        "partition": "White's Wolves",
+        "carnumber": 132
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 32
+}
+
+### 033 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Freeman+Fizer&partition=Bears+and+Fr%EF%BF%BDres&carnumber=133
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 296
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Freeman Fizer",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 133
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 33
+}
+
+### 034 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Gregg+Grove&partition=Webelos+(%22Webes%22)&carnumber=134
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Gregg Grove",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 134
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 34
+}
+
+### 035 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Harley+Howell&partition=Arrows+%3C%3C--%3C%3C&carnumber=135
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Harley Howell",
+        "partition": "Arrows <<--<<",
+        "carnumber": 135
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 35
+}
+
+### 036 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Herb+Halfacre&partition=Lions+%26+Tigers&carnumber=136
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Herb Halfacre",
+        "partition": "Lions & Tigers",
+        "carnumber": 136
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 36
+}
+
+### 037 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Ian+Ives&partition=White's+Wolves&carnumber=137
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 284
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Ian Ives",
+        "partition": "White's Wolves",
+        "carnumber": 137
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 37
+}
+
+### 038 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Jackson+Juliano&partition=Bears+and+Fr%EF%BF%BDres&carnumber=138
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 298
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Jackson Juliano",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 138
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 38
+}
+
+### 039 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Jamison+Jeffress&partition=Webelos+(%22Webes%22)&carnumber=139
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 297
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Jamison Jeffress",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 139
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 39
+}
+
+### 040 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Jed+Jaquez&partition=Arrows+%3C%3C--%3C%3C&carnumber=140
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 285
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Jed Jaquez",
+        "partition": "Arrows <<--<<",
+        "carnumber": 140
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 40
+}
+
+### 041 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Jesse+Jara&partition=Lions+%26+Tigers&carnumber=141
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 286
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Jesse Jara",
+        "partition": "Lions & Tigers",
+        "carnumber": 141
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 41
+}
+
+### 042 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Josh+Jose&partition=White's+Wolves&carnumber=142
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 285
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Josh Jose",
+        "partition": "White's Wolves",
+        "carnumber": 142
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 42
+}
+
+### 043 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Juan+Jacobsen&partition=Bears+and+Fr%EF%BF%BDres&carnumber=143
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 296
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Juan Jacobsen",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 143
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 43
+}
+
+### 044 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Judson+Joynt&partition=Webelos+(%22Webes%22)&carnumber=144
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 293
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Judson Joynt",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 144
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 44
+}
+
+### 045 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Julian+Jarrard&partition=Arrows+%3C%3C--%3C%3C&carnumber=145
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Julian Jarrard",
+        "partition": "Arrows <<--<<",
+        "carnumber": 145
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 45
+}
+
+### 046 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Kelvin+Kinman&partition=Lions+%26+Tigers&carnumber=146
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Kelvin Kinman",
+        "partition": "Lions & Tigers",
+        "carnumber": 146
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 46
+}
+
+### 047 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Kelvin+Knapp&partition=White's+Wolves&carnumber=147
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Kelvin Knapp",
+        "partition": "White's Wolves",
+        "carnumber": 147
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 47
+}
+
+### 048 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Kory+Kilgo&partition=Bears+and+Fr%EF%BF%BDres&carnumber=148
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 293
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Kory Kilgo",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 148
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 48
+}
+
+### 049 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Kris+Kaba&partition=Webelos+(%22Webes%22)&carnumber=149
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Kris Kaba",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 149
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 49
+}
+
+### 050 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Lanny+Lavigne&partition=Arrows+%3C%3C--%3C%3C&carnumber=150
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Lanny Lavigne",
+        "partition": "Arrows <<--<<",
+        "carnumber": 150
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 50
+}
+
+### 051 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Levi+Lahr&partition=Lions+%26+Tigers&carnumber=151
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 285
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Levi Lahr",
+        "partition": "Lions & Tigers",
+        "carnumber": 151
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 51
+}
+
+### 052 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Lewis+Levitsky&partition=White's+Wolves&carnumber=152
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Lewis Levitsky",
+        "partition": "White's Wolves",
+        "carnumber": 152
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 52
+}
+
+### 053 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Lyman+Liller&partition=Bears+and+Fr%EF%BF%BDres&carnumber=153
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 295
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Lyman Liller",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 153
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 53
+}
+
+### 054 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Markus+Muncy&partition=Webelos+(%22Webes%22)&carnumber=154
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 293
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Markus Muncy",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 154
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 54
+}
+
+### 055 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Marlon+McGray&partition=Arrows+%3C%3C--%3C%3C&carnumber=155
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Marlon McGray",
+        "partition": "Arrows <<--<<",
+        "carnumber": 155
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 55
+}
+
+### 056 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Michal+Melendrez&partition=Lions+%26+Tigers&carnumber=156
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Michal Melendrez",
+        "partition": "Lions & Tigers",
+        "carnumber": 156
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 56
+}
+
+### 057 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Mohamed+McGrew&partition=White's+Wolves&carnumber=157
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Mohamed McGrew",
+        "partition": "White's Wolves",
+        "carnumber": 157
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 57
+}
+
+### 058 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Nelson+No&partition=Bears+and+Fr%EF%BF%BDres&carnumber=158
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Nelson No",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 158
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 58
+}
+
+### 059 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Norbert+Nightingale&partition=Webelos+(%22Webes%22)&carnumber=159
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 300
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Norbert Nightingale",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 159
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 59
+}
+
+### 060 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Numbers+Nish&partition=Arrows+%3C%3C--%3C%3C&carnumber=160
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Numbers Nish",
+        "partition": "Arrows <<--<<",
+        "carnumber": 160
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 60
+}
+
+### 061 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Owen+O'Leary&partition=Lions+%26+Tigers&carnumber=161
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Owen O'Leary",
+        "partition": "Lions & Tigers",
+        "carnumber": 161
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 61
+}
+
+### 062 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Pat+Petrone&partition=White's+Wolves&carnumber=162
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Pat Petrone",
+        "partition": "White's Wolves",
+        "carnumber": 162
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 62
+}
+
+### 063 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Pete+Pinkney&partition=Bears+and+Fr%EF%BF%BDres&carnumber=163
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 295
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Pete Pinkney",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 163
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 63
+}
+
+### 064 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Philip+Prum&partition=Webelos+(%22Webes%22)&carnumber=164
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Philip Prum",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 164
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 64
+}
+
+### 065 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Porter+Papke&partition=Arrows+%3C%3C--%3C%3C&carnumber=165
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Porter Papke",
+        "partition": "Arrows <<--<<",
+        "carnumber": 165
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 65
+}
+
+### 066 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Raymon+Ruffner&partition=Lions+%26+Tigers&carnumber=166
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Raymon Ruffner",
+        "partition": "Lions & Tigers",
+        "carnumber": 166
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 66
+}
+
+### 067 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Renaldo+Raposo&partition=White's+Wolves&carnumber=167
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 290
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Renaldo Raposo",
+        "partition": "White's Wolves",
+        "carnumber": 167
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 67
+}
+
+### 068 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Reuben+Rockhill&partition=Bears+and+Fr%EF%BF%BDres&carnumber=168
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 298
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Reuben Rockhill",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 168
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 68
+}
+
+### 069 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Rex+Rosalez&partition=Webelos+(%22Webes%22)&carnumber=169
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Rex Rosalez",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 169
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 69
+}
+
+### 070 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Robbie+Roush&partition=Arrows+%3C%3C--%3C%3C&carnumber=170
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 287
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Robbie Roush",
+        "partition": "Arrows <<--<<",
+        "carnumber": 170
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 70
+}
+
+### 071 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Rodrigo+Rencher&partition=Lions+%26+Tigers&carnumber=171
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 291
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Rodrigo Rencher",
+        "partition": "Lions & Tigers",
+        "carnumber": 171
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 71
+}
+
+### 072 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Royce+Rohman&partition=White's+Wolves&carnumber=172
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Royce Rohman",
+        "partition": "White's Wolves",
+        "carnumber": 172
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 72
+}
+
+### 073 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Scottie+Servais&partition=Bears+and+Fr%EF%BF%BDres&carnumber=173
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 298
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Scottie Servais",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 173
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 73
+}
+
+### 074 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Sean+Strasburg&partition=Webelos+(%22Webes%22)&carnumber=174
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 295
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Sean Strasburg",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 174
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 74
+}
+
+### 075 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Timmy+Tomei&partition=Arrows+%3C%3C--%3C%3C&carnumber=175
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 286
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Timmy Tomei",
+        "partition": "Arrows <<--<<",
+        "carnumber": 175
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 75
+}
+
+### 076 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Toby+Teed&partition=Lions+%26+Tigers&carnumber=176
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 285
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Toby Teed",
+        "partition": "Lions & Tigers",
+        "carnumber": 176
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 76
+}
+
+### 077 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Tracey+Trapp&partition=White's+Wolves&carnumber=177
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Tracey Trapp",
+        "partition": "White's Wolves",
+        "carnumber": 177
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 77
+}
+
+### 078 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Travis+Toothaker&partition=Bears+and+Fr%EF%BF%BDres&carnumber=178
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 299
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Travis Toothaker",
+        "partition": "Bears and Fr\ufffdres",
+        "carnumber": 178
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 78
+}
+
+### 079 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Vincent+Vinci&partition=Webelos+(%22Webes%22)&carnumber=179
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 294
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Vincent Vinci",
+        "partition": "Webelos (\"Webes\")",
+        "carnumber": 179
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 79
+}
+
+### 080 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Weston+Whigham&partition=Arrows+%3C%3C--%3C%3C&carnumber=180
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 289
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Weston Whigham",
+        "partition": "Arrows <<--<<",
+        "carnumber": 180
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 80
+}
+
+### 081 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Willard+Wile&partition=Lions+%26+Tigers&carnumber=181
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 288
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Willard Wile",
+        "partition": "Lions & Tigers",
+        "carnumber": 181
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 81
+}
+
+### 082 racer.import
+request: POST action.php
+request-body: action=racer.import&first-last=Willard+Woolfolk&partition=White's+Wolves&carnumber=182
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 292
+body:
+{
+    "action": {
+        "action": "racer.import",
+        "first-last": "Willard Woolfolk",
+        "partition": "White's Wolves",
+        "carnumber": 182
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "racerid": 82
+}
+
+### 083 racer.list
+request: GET action.php?query=racer.list&order=name
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 42469
+body:
+{
+    "racers": [
+        {
+            "racerid": 3,
+            "firstname": "Antoine",
+            "lastname": "Akiyama",
+            "carnumber": 103,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 2,
+            "firstname": "Angelo",
+            "lastname": "Alas",
+            "carnumber": 102,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 1,
+            "firstname": "Adolfo \"Dolf\"",
+            "lastname": "Asher",
+            "carnumber": 101,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 4,
+            "firstname": "Arden",
+            "lastname": "Aziz",
+            "carnumber": 104,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 5,
+            "firstname": "Barney",
+            "lastname": "Bainter",
+            "carnumber": 105,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 9,
+            "firstname": "Byron",
+            "lastname": "Billy",
+            "carnumber": 109,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 6,
+            "firstname": "Ben",
+            "lastname": "Bittinger",
+            "carnumber": 106,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 8,
+            "firstname": "Bruce",
+            "lastname": "Boissonneault",
+            "carnumber": 108,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 7,
+            "firstname": "Blake",
+            "lastname": "Burling",
+            "carnumber": 107,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 15,
+            "firstname": "Ca\ufffdumil",
+            "lastname": "Calero",
+            "carnumber": 115,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 12,
+            "firstname": "Christoper",
+            "lastname": "Chauncey",
+            "carnumber": 112,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 13,
+            "firstname": "Clark",
+            "lastname": "Chesnutt",
+            "carnumber": 113,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 10,
+            "firstname": "Carey",
+            "lastname": "Craney",
+            "carnumber": 110,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 14,
+            "firstname": "Cletus",
+            "lastname": "Creager",
+            "carnumber": 114,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 11,
+            "firstname": "Carroll",
+            "lastname": "Cybulski",
+            "carnumber": 111,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 20,
+            "firstname": "Derek",
+            "lastname": "Dantonio",
+            "carnumber": 120,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 22,
+            "firstname": "Dexter",
+            "lastname": "Dawes",
+            "carnumber": 122,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 19,
+            "firstname": "Denny",
+            "lastname": "Deering",
+            "carnumber": 119,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 17,
+            "firstname": "Darrell & Darrell",
+            "lastname": "Delaughter",
+            "carnumber": 117,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 18,
+            "firstname": "Darrin",
+            "lastname": "Denny",
+            "carnumber": 118,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 16,
+            "firstname": "Danial",
+            "lastname": "Depaolo",
+            "carnumber": 116,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 23,
+            "firstname": "Domingo",
+            "lastname": "Doles",
+            "carnumber": 123,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 21,
+            "firstname": "Derick",
+            "lastname": "Dreier",
+            "carnumber": 121,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 24,
+            "firstname": "Dorian",
+            "lastname": "Dunkle",
+            "carnumber": 124,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 26,
+            "firstname": "Edgardo",
+            "lastname": "Easterwood",
+            "carnumber": 126,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 27,
+            "firstname": "Elliot",
+            "lastname": "Eastman",
+            "carnumber": 127,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 30,
+            "firstname": "Enoch",
+            "lastname": "Eccles",
+            "carnumber": 130,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 28,
+            "firstname": "Ethan",
+            "lastname": "Enye",
+            "carnumber": 128,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 29,
+            "firstname": "Emory",
+            "lastname": "Ertel",
+            "carnumber": 129,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 25,
+            "firstname": "Earnest",
+            "lastname": "Evangelista",
+            "carnumber": 125,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 33,
+            "firstname": "Freeman",
+            "lastname": "Fizer",
+            "carnumber": 133,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 32,
+            "firstname": "Freddie",
+            "lastname": "Font",
+            "carnumber": 132,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 31,
+            "firstname": "Felton",
+            "lastname": "Fouche",
+            "carnumber": 131,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 34,
+            "firstname": "Gregg",
+            "lastname": "Grove",
+            "carnumber": 134,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 36,
+            "firstname": "Herb",
+            "lastname": "Halfacre",
+            "carnumber": 136,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 35,
+            "firstname": "Harley",
+            "lastname": "Howell",
+            "carnumber": 135,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 37,
+            "firstname": "Ian",
+            "lastname": "Ives",
+            "carnumber": 137,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 43,
+            "firstname": "Juan",
+            "lastname": "Jacobsen",
+            "carnumber": 143,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 40,
+            "firstname": "Jed",
+            "lastname": "Jaquez",
+            "carnumber": 140,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 41,
+            "firstname": "Jesse",
+            "lastname": "Jara",
+            "carnumber": 141,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 45,
+            "firstname": "Julian",
+            "lastname": "Jarrard",
+            "carnumber": 145,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 39,
+            "firstname": "Jamison",
+            "lastname": "Jeffress",
+            "carnumber": 139,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 42,
+            "firstname": "Josh",
+            "lastname": "Jose",
+            "carnumber": 142,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 44,
+            "firstname": "Judson",
+            "lastname": "Joynt",
+            "carnumber": 144,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 38,
+            "firstname": "Jackson",
+            "lastname": "Juliano",
+            "carnumber": 138,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 49,
+            "firstname": "Kris",
+            "lastname": "Kaba",
+            "carnumber": 149,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 48,
+            "firstname": "Kory",
+            "lastname": "Kilgo",
+            "carnumber": 148,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 46,
+            "firstname": "Kelvin",
+            "lastname": "Kinman",
+            "carnumber": 146,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 47,
+            "firstname": "Kelvin",
+            "lastname": "Knapp",
+            "carnumber": 147,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 51,
+            "firstname": "Levi",
+            "lastname": "Lahr",
+            "carnumber": 151,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 50,
+            "firstname": "Lanny",
+            "lastname": "Lavigne",
+            "carnumber": 150,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 52,
+            "firstname": "Lewis",
+            "lastname": "Levitsky",
+            "carnumber": 152,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 53,
+            "firstname": "Lyman",
+            "lastname": "Liller",
+            "carnumber": 153,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 55,
+            "firstname": "Marlon",
+            "lastname": "McGray",
+            "carnumber": 155,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 57,
+            "firstname": "Mohamed",
+            "lastname": "McGrew",
+            "carnumber": 157,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 56,
+            "firstname": "Michal",
+            "lastname": "Melendrez",
+            "carnumber": 156,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 54,
+            "firstname": "Markus",
+            "lastname": "Muncy",
+            "carnumber": 154,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 59,
+            "firstname": "Norbert",
+            "lastname": "Nightingale",
+            "carnumber": 159,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 60,
+            "firstname": "Numbers",
+            "lastname": "Nish",
+            "carnumber": 160,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 58,
+            "firstname": "Nelson",
+            "lastname": "No",
+            "carnumber": 158,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 61,
+            "firstname": "Owen",
+            "lastname": "O'Leary",
+            "carnumber": 161,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 65,
+            "firstname": "Porter",
+            "lastname": "Papke",
+            "carnumber": 165,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 62,
+            "firstname": "Pat",
+            "lastname": "Petrone",
+            "carnumber": 162,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 63,
+            "firstname": "Pete",
+            "lastname": "Pinkney",
+            "carnumber": 163,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 64,
+            "firstname": "Philip",
+            "lastname": "Prum",
+            "carnumber": 164,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 67,
+            "firstname": "Renaldo",
+            "lastname": "Raposo",
+            "carnumber": 167,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 71,
+            "firstname": "Rodrigo",
+            "lastname": "Rencher",
+            "carnumber": 171,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 68,
+            "firstname": "Reuben",
+            "lastname": "Rockhill",
+            "carnumber": 168,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 72,
+            "firstname": "Royce",
+            "lastname": "Rohman",
+            "carnumber": 172,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 69,
+            "firstname": "Rex",
+            "lastname": "Rosalez",
+            "carnumber": 169,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 70,
+            "firstname": "Robbie",
+            "lastname": "Roush",
+            "carnumber": 170,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 66,
+            "firstname": "Raymon",
+            "lastname": "Ruffner",
+            "carnumber": 166,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 73,
+            "firstname": "Scottie",
+            "lastname": "Servais",
+            "carnumber": 173,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 74,
+            "firstname": "Sean",
+            "lastname": "Strasburg",
+            "carnumber": 174,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 76,
+            "firstname": "Toby",
+            "lastname": "Teed",
+            "carnumber": 176,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 75,
+            "firstname": "Timmy",
+            "lastname": "Tomei",
+            "carnumber": 175,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 78,
+            "firstname": "Travis",
+            "lastname": "Toothaker",
+            "carnumber": 178,
+            "carname": "",
+            "partitionid": 3,
+            "partition": "Bears and Fr\ufffdres",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 3,
+            "class": "Bears and Fr\ufffdres",
+            "rankid": 3,
+            "rank": "Bears and Fr\ufffdres",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 77,
+            "firstname": "Tracey",
+            "lastname": "Trapp",
+            "carnumber": 177,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 79,
+            "firstname": "Vincent",
+            "lastname": "Vinci",
+            "carnumber": 179,
+            "carname": "",
+            "partitionid": 4,
+            "partition": "Webelos (\"Webes\")",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 4,
+            "class": "Webelos (\"Webes\")",
+            "rankid": 4,
+            "rank": "Webelos (\"Webes\")",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 80,
+            "firstname": "Weston",
+            "lastname": "Whigham",
+            "carnumber": 180,
+            "carname": "",
+            "partitionid": 5,
+            "partition": "Arrows <<--<<",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 5,
+            "class": "Arrows <<--<<",
+            "rankid": 5,
+            "rank": "Arrows <<--<<",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 81,
+            "firstname": "Willard",
+            "lastname": "Wile",
+            "carnumber": 181,
+            "carname": "",
+            "partitionid": 1,
+            "partition": "Lions & Tigers",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 1,
+            "class": "Lions & Tigers",
+            "rankid": 1,
+            "rank": "Lions & Tigers",
+            "passed": false,
+            "seq": 0
+        },
+        {
+            "racerid": 82,
+            "firstname": "Willard",
+            "lastname": "Woolfolk",
+            "carnumber": 182,
+            "carname": "",
+            "partitionid": 2,
+            "partition": "White's Wolves",
+            "note_from": "",
+            "headshot": "",
+            "car_photo": "",
+            "classid": 2,
+            "class": "White's Wolves",
+            "rankid": 2,
+            "rank": "White's Wolves",
+            "passed": false,
+            "seq": 0
+        }
+    ]
+}
+
