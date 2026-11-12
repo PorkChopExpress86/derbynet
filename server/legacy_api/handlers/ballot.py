@@ -7,9 +7,10 @@ voter's credential is a racer's voting token (#206, D86). The vote link
 (`ui.vote.views.token_link`) puts the token in the session, and so does
 `ballot.get` given `voting_token=<GUID>`; `vote.cast` and later
 `ballot.get` calls in the same session use it. A call whose session holds no
-valid token of the active event is refused with `no-token`, and a refused
-token leaves the session. `ballot.get` adds the voter's row on a GET
-(`voterid.inc:18` to `:23`).
+valid token of the active event is refused with `no-token`. A token named
+to `ballot.get` replaces the session's even when it is refused, so a phone
+given a bad code votes no more with an earlier one. `ballot.get` adds the
+voter's row on a GET (`voterid.inc:18` to `:23`).
 """
 
 from accounts.permissions import Access, Perm
@@ -40,14 +41,6 @@ D86 = (
 
 def _fail(ctx: LegacyContext, failure: BallotFailure) -> None:
     ctx.failure(failure.code, failure.description)
-
-
-def _refuse(ctx: LegacyContext, failure: BallotFailure) -> None:
-    """A refusal; a refused token leaves the session, so the next call
-    does not try it again."""
-    if failure is balloting.NO_TOKEN:
-        ctx.session.pop(TOKEN, None)
-    _fail(ctx, failure)
 
 
 @action(
@@ -81,7 +74,7 @@ def ballot_get(ctx: LegacyContext) -> None:
     try:
         found = balloting.ballot(ctx.event, ctx.session.get(TOKEN), ctx.remote_addr)
     except BallotFailure as failure:
-        _refuse(ctx, failure)
+        _fail(ctx, failure)
         return
     ctx.put(
         "ballot",
@@ -116,7 +109,7 @@ def vote_cast(ctx: LegacyContext) -> None:
             ip_address=ctx.remote_addr,
         )
     except BallotFailure as failure:
-        _refuse(ctx, failure)
+        _fail(ctx, failure)
         return
     ctx.put("votes", summary)
     ctx.success()

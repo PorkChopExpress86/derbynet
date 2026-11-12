@@ -542,7 +542,7 @@ def test_a_call_with_no_valid_token_is_refused_and_changes_no_vote(
     event, wolves, pack_award, kind
 ):
     """D86: on ballot.get and on vote.cast alike, with the same code, and
-    no Voter row is added. A bad token also leaves the session, so a
+    no Voter row is added. A bad token also replaces the session's, so a
     phone that held a good one votes no more."""
     a = racer(wolves)
     open_ballot(event)
