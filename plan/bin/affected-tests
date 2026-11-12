@@ -404,6 +404,9 @@ def s(path):
     return path[len(SERVER) + 1:] if path.startswith(SERVER + '/') else None
 
 
+SETTINGS = re.compile(r'derbynet/settings\w*\.py')
+
+
 def match_everything(path):
     rel = s(path)
     if path.startswith('.github/'):
@@ -411,7 +414,7 @@ def match_everything(path):
     if rel is None:
         return False
     return (Path(rel).name == 'conftest.py' or rel in EVERYTHING
-            or re.fullmatch(r'derbynet/settings\w*\.py', rel) is not None)
+            or SETTINGS.fullmatch(rel) is not None)
 
 
 def cover_everything(plan, tree, path):
@@ -426,7 +429,7 @@ def cover_everything(plan, tree, path):
     else:
         why = 'the settings every test runs with, the database settings among them'
     plan.everything.append(f'{path}: {why}')
-    if rel is not None and re.fullmatch(r'derbynet/settings\w*\.py', rel):
+    if rel is not None and SETTINGS.fullmatch(rel):
         plan.postgres.append(f'{path}: the database settings')
     plan.add(path, 'everything', why)
 
@@ -862,7 +865,7 @@ RULES = (
 def fallback(plan, tree, path):
     rel = s(path)
     if rel is None:
-        why = 'no rule maps it and it is outside server/: run everything'
+        why = 'no rule maps it and it is outside server/: CI\'s full run covers it'
         plan.everything.append(f'{path}: {why}')
         plan.add(path, 'fallback', why)
         return

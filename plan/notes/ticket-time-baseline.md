@@ -190,6 +190,14 @@ Under xdist, a test's "setup" time includes its worker's database setup. So the 
 
 A PR waits 11–14 min on CI: #284 took 11 min, #287 took 13 min. CI runs the whole check in 11–14 min. The same check locally, serial, took 48–60 min.
 
+**SQLite and Postgres at once** (D85's last question; master `4ea65152`, PR #287's 12 scoped browser files, 167 tests):
+
+| How | Wall clock |
+|---|---|
+| SQLite, then Postgres | 219 s + 252 s = 471 s |
+| Both at once, `-n auto` each | 429 s, 9% less |
+| Both at once, `-n 4` each | 494 s, and Postgres failed `test_kiosk_pages.py::test_now_racing_shows_the_next_heat_at_the_nudge[desktop-chromium]` (`Timeout 1500ms exceeded while waiting for event "request"`) |
+
 ## 5. Gaps
 
 - **25 repeats of `test_harness.py` on Postgres** (what `affected-tests` now asks of #284's diff): not run. #282 never ran it, and section 3 leaves it out.

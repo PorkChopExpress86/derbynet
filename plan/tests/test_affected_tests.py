@@ -178,6 +178,11 @@ class Docs(unittest.TestCase):
 
 
 class Website(unittest.TestCase):
+    def test_a_diff_with_no_target_leaves_it_to_the_checks(self):
+        out = run('plan/README.md')
+        self.assertIn('(no pytest target: the checks below cover the diff)', commands(out))
+        self.assertNotIn('D85', out)
+
     def test_php_is_frozen_and_maps_to_the_tests_that_read_it(self):
         out = run('website/settings.php')
         self.assertIn('[website] the PHP server is frozen', section(out, 'website/settings.php'))
@@ -520,7 +525,8 @@ class Fallback(unittest.TestCase):
 
     def test_an_unmapped_file_outside_server_leaves_everything_to_ci(self):
         out = run('.gitattributes')
-        self.assertIn('[fallback] no rule maps it and it is outside server/', out)
+        self.assertIn('[fallback] no rule maps it and it is outside server/: '
+                      "CI's full run covers it", out)
         self.assertIn('CI runs the full suites on both databases (D85)', out)
         self.assertIn("(no pytest target: CI's full run covers the diff, D85)",
                       commands(out))
