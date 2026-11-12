@@ -150,6 +150,17 @@ class CiFailures(unittest.TestCase):
         self.assertIn('2 of 2 jobs printed', result.stdout)
         self.assertNotIn('outage', result.stdout)
 
+    def test_a_network_line_outside_setup_is_no_outage(self):
+        """Tests that lose a connection fail in a test step, which no step
+        rule calls setup."""
+        log = ''.join(apt(job, 'Run the browser tests', 'Error: Connection refused',
+                          '##[error]Process completed with exit code 1.')
+                      for job in ('ui (sqlite)', 'ui (postgres)'))
+        result = run([check('fail', 15, 'ui (sqlite)'), check('fail', 15, 'ui (postgres)')],
+                     {'15': log}, [])
+        self.assertIn('2 of 2 jobs printed: Error: Connection refused', result.stdout)
+        self.assertNotIn('outage', result.stdout)
+
     def test_a_build_step_that_compares_is_no_setup_step(self):
         log = APT_LOG.replace('Install Chromium', 'Build the CSS offline, with no Node, and compare it')
         result = run([check('fail', 7, 'ui (sqlite)'), check('fail', 7, 'shell (sqlite, group 1)')],
