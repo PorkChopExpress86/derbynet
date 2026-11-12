@@ -133,6 +133,12 @@ class UnverifiedCause(Lint):
         done = self.lint(ticket(GOAL_282, risks='- The fault was not yet reproduced.'))
         self.assertIn('0 findings', done.stdout, done.stdout)
 
+    def test_always_is_no_asserted_cause(self):
+        """"Always" states the behaviour a Goal asks for, not a mechanism
+        (the Standards review of 4d459525)."""
+        done = self.lint(ticket('The kiosk always shows the heat name, as PHP does.', PHP_282))
+        self.assertIn('0 findings', done.stdout, done.stdout)
+
     def test_the_reviews_false_positives_pass(self):
         """Three bodies the Standards review of 4d459525 linted with
         `--file 0=`, each giving a finding before."""
