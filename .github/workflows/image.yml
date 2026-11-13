@@ -344,7 +344,8 @@ jobs:
       # The previous image: the last release tag's, or for a pull request or
       # a branch push the base commit's.  When that commit has no
       # server/docker/ yet, its server/ is built with this commit's
-      # server/docker/ (the step says so).
+      # server/docker/, settings.py and proxied_wsgi.py, which the image
+      # needs (the step says so); its models and migrations stay its own.
       - name: Build the previous image
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -358,8 +359,9 @@ jobs:
           echo "previous: $BASE $(git log -1 --format=%s "$BASE")"
           git worktree add --detach "$RUNNER_TEMP/previous" "$BASE"
           if [ ! -e "$RUNNER_TEMP/previous/server/docker/Dockerfile" ]; then
-            echo "::notice::$BASE has no server/docker/; building its server/ with this commit's server/docker/"
+            echo "::notice::$BASE has no server/docker/; building its server/ with this commit's server/docker/, settings.py and proxied_wsgi.py"
             cp -r server/docker "$RUNNER_TEMP/previous/server/docker"
+            cp server/derbynet/settings.py server/derbynet/proxied_wsgi.py "$RUNNER_TEMP/previous/server/derbynet/"
           fi
           docker buildx build --load -t derbynet_server:previous \
             -f "$RUNNER_TEMP/previous/server/docker/Dockerfile" "$RUNNER_TEMP/previous"
