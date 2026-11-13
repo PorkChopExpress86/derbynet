@@ -219,8 +219,8 @@ jobs:
             test "$(grep -c '\.sqlite3' "$RUNNER_TEMP/ls-during-suite.txt")" = 3
             compose exec -T -u derbynet server python -c \
               'import sqlite3; print("journal_mode", sqlite3.connect("/var/lib/derbynet/derbynet.sqlite3").execute("PRAGMA journal_mode").fetchone()[0])' \
-              | tee mode.txt
-            grep -qx 'journal_mode wal' mode.txt
+              | tee "$RUNNER_TEMP/mode.txt"
+            grep -qx 'journal_mode wal' "$RUNNER_TEMP/mode.txt"
           else
             echo "$services" | grep -qx postgres
             compose exec -T server sh -c '! ls /var/lib/derbynet/*.sqlite3*'
@@ -231,13 +231,13 @@ jobs:
         if: always()
         run: |
           if [ -n "$(docker ps -aq --filter name=^derbynet$)" ]; then
-            docker logs derbynet > server.log 2>&1
+            docker logs derbynet > "$RUNNER_TEMP/server.log" 2>&1
           else
-            docker compose -p derbynet -f server/docker/compose.yaml logs --no-color > server.log 2>&1
+            docker compose -p derbynet -f server/docker/compose.yaml logs --no-color > "$RUNNER_TEMP/server.log" 2>&1
           fi
-          grep -c 'role.login\|POST /action.php' server.log || true
-          grep -q 'POST /action.php' server.log
-          if grep -n 'doyourbest' server.log; then
+          # The suite's posts, under a URL prefix too.
+          grep -c 'POST /[a-z/-]*action.php' "$RUNNER_TEMP/server.log"
+          if grep -n 'doyourbest' "$RUNNER_TEMP/server.log"; then
             echo "The log holds RaceCoordinator's password." >&2
             exit 1
           fi
@@ -249,7 +249,7 @@ jobs:
 
       - name: Show the server log
         if: failure()
-        run: cat server.log || docker logs derbynet
+        run: cat "$RUNNER_TEMP/server.log" || docker logs derbynet
 
   arm64:
     name: suite (arm64)
