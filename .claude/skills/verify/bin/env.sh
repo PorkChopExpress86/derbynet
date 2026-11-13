@@ -17,6 +17,8 @@ DJANGO_STATE="$REPO/server/var/verify-$RUN"
 PIDFILE="$DJANGO_STATE/runserver.pid"
 # The https origin bin/phone serves this run at; start_django trusts it.
 ORIGIN_FILE="$DJANGO_STATE/phone-origin"
+# Written once bin/phone has started tailscale serve; cleanup stops it then.
+SERVE_FILE="$DJANGO_STATE/phone-serve"
 # tailscale serve needs root: VERIFY_SUDO names the command that grants it.
 SUDO="${VERIFY_SUDO:-sudo}"
 mkdir -p "$EVIDENCE"

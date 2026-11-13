@@ -22,7 +22,9 @@ RUNNER = (
 
 class Mirror(BaseHTTPRequestHandler):
     """/fast serves the index at once, /stall sends its headers and a few
-    bytes and then nothing, /missing has no index."""
+    bytes and then nothing, /trickle sends 200 kB/s, above the probe's
+    50 kB/s floor, for 50 s, /moved redirects, /empty answers 200 with no
+    body, /missing has no index."""
 
     requested: list[str] = []
 
@@ -41,6 +43,23 @@ class Mirror(BaseHTTPRequestHandler):
             self.wfile.write(b"x" * 100)
             self.wfile.flush()
             time.sleep(8)
+        elif self.path == "/trickle/ubuntu" + INDEX:
+            self.send_response(200)
+            self.send_header("Content-Length", "10000000")
+            self.end_headers()
+            for _ in range(500):
+                self.wfile.write(b"x" * 20_000)
+                self.wfile.flush()
+                time.sleep(0.1)
+        elif self.path == "/moved/ubuntu" + INDEX:
+            self.send_response(302)
+            self.send_header("Location", "/fast/ubuntu" + INDEX)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        elif self.path == "/empty/ubuntu" + INDEX:
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
         else:
             self.send_error(404)
 
@@ -106,16 +125,32 @@ def test_a_mirror_that_stalls_leaves_the_list_and_ends_within_its_bound(
     assert took < 5
 
 
-def test_a_mirror_with_no_index_leaves_the_list(tmp_path, server):
-    listed, printed, _ = run(tmp_path, f"{server}/missing/ubuntu/")
+def test_a_mirror_slower_than_its_whole_bound_leaves_the_list(tmp_path, server):
+    """The whole bound is 5 s, and the handler sends for 50 s at a speed
+    the stall bound passes."""
+    listed, printed, took = run(tmp_path, f"{server}/trickle/ubuntu/")
 
     assert listed == RUNNER
     assert "failed the probe" in printed
+    assert took < 8
 
 
-def test_a_list_that_has_the_mirror_is_left_unprobed(tmp_path, server):
+@pytest.mark.parametrize("answer", ["missing", "moved", "empty"])
+def test_a_mirror_with_no_index_leaves_the_list_and_prints_it(tmp_path, server, answer):
+    listed, printed, _ = run(tmp_path, f"{server}/{answer}/ubuntu/")
+
+    assert listed == RUNNER
+    assert printed.startswith(f"ubuntu-mirror.sh: {server}/{answer}/ubuntu/")
+    assert "failed the probe" in printed
+    assert printed.endswith(RUNNER)
+
+
+@pytest.mark.parametrize("scheme", ["http", "https"])
+def test_a_list_that_has_the_mirror_is_left_unprobed(tmp_path, server, scheme):
+    """By its host, whatever the scheme or path the list gives it."""
     mirror = f"{server}/fast/ubuntu/"
-    already = f"{mirror}\tpriority:1\n" + RUNNER
+    host = server.split("://")[1]
+    already = f"{scheme}://{host}/ubuntu\tpriority:1\n" + RUNNER
 
     listed, _, _ = run(tmp_path, mirror, already)
 

@@ -14,17 +14,24 @@ host=$("$tailscale" status --json \
   | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))') \
   || { echo "tailscale is not up" >&2; exit 1; }
 origin="https://$host"
+# Serve only when nothing is served, or when this run started what is.
 served=$("$tailscale" serve status 2>&1)
-if [ "$served" != "No serve config" ] && [ ! -f "$ORIGIN_FILE" ]; then
-  echo "tailscale serve already serves something; leaving it alone:" >&2
+if [ "$served" = "No serve config" ]; then
+  start=1
+elif [ -f "$SERVE_FILE" ] && [[ $served == *"proxy $BASE"* ]]; then
+  start=0
+else
+  echo "tailscale serve serves something this run did not start; leaving it alone:" >&2
   echo "$served" >&2
   exit 1
 fi
 echo "$origin" > "$ORIGIN_FILE"
-"$BIN/restart" > /dev/null
-if [[ $served != *"proxy $BASE"* ]]; then
+"$BIN/restart" >> "$EVIDENCE/phone.log" 2>&1 \
+  || { tail -15 "$EVIDENCE/phone.log" >&2; exit 1; }
+if [ $start = 1 ]; then
   "$SUDO" "$tailscale" serve --bg --https=443 "$BASE" >> "$EVIDENCE/phone.log" 2>&1 \
     || { tail -5 "$EVIDENCE/phone.log" >&2; exit 1; }
+  echo "$origin" > "$SERVE_FILE"
 fi
 # A page whose stylesheet and icons 404 shows huge icons and dead links on a
 # phone (the first #42 and #54 phone checks, a runserver with no --insecure).

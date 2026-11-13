@@ -21,18 +21,28 @@ set -eu
 list=${APT_MIRRORS_LIST:-/etc/apt/apt-mirrors.txt}
 mirror=${UBUNTU_MIRROR:-https://mirrors.edge.kernel.org/ubuntu/}
 [ -f "$list" ] || exit 0
-grep -qF "$mirror" "$list" && exit 0
+# Listed already, by any scheme or path: a rerun of the job adds nothing.
+host=${mirror#*://}
+host=${host%%/*}
+grep -qF "://$host/" "$list" && exit 0
 codename=${UBUNTU_CODENAME:-$(. /etc/os-release && echo "$VERSION_CODENAME")}
 probe="${mirror}dists/$codename-updates/main/binary-amd64/Packages.gz"
-# Slower than 50 kB/s for MIRROR_STALL_SECONDS, or longer than
-# MIRROR_PROBE_SECONDS in all, and the mirror is left out.
-if ! curl -fsS -o /dev/null --speed-limit 50000 \
+# Anything but a 200 with a body, slower than 50 kB/s for
+# MIRROR_STALL_SECONDS, or longer than MIRROR_PROBE_SECONDS in all, and the
+# mirror is left out.  On a timeout curl still prints its -w line, with
+# the status and the bytes it got, so its exit status counts too.  Its
+# error message goes to the job's log.
+rc=0
+got=$(curl -sS -o /dev/null -w '%{http_code} %{size_download}' --speed-limit 50000 \
     --speed-time "${MIRROR_STALL_SECONDS:-10}" \
-    --max-time "${MIRROR_PROBE_SECONDS:-60}" "$probe"; then
-  echo "ubuntu-mirror.sh: $probe failed the probe; the runner's mirrors stay as they are"
-  cat "$list"
-  exit 0
-fi
+    --max-time "${MIRROR_PROBE_SECONDS:-60}" "$probe") || rc=$?
+case "$rc $got" in
+  "0 200 "[1-9]*) ;;
+  *)
+    echo "ubuntu-mirror.sh: $probe failed the probe (curl exit $rc: $got); the runner's mirrors stay as they are"
+    cat "$list"
+    exit 0 ;;
+esac
 {
   printf '%s\tpriority:1\n' "$mirror"
   # The runner's lines end in priority:N; each moves down one place.
