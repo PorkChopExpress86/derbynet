@@ -57,10 +57,7 @@ def test_the_migration_gives_each_existing_racer_its_own_token():
     assert len(set(tokens)) == 3
 
 
-pytestmark_db = pytest.mark.django_db
-
-
-@pytestmark_db
+@pytest.mark.django_db
 def test_every_new_racer_has_a_token_of_its_own():
     group = GroupFactory()
     made = [RacerFactory(group=group) for _ in range(3)]
@@ -80,7 +77,7 @@ def _post(client, **fields):
     assert json.loads(reply.content)["outcome"]["summary"] == "success", reply.content
 
 
-@pytestmark_db
+@pytest.mark.django_db
 def test_racer_add_import_and_fake_make_tokens(client):
     """`racer.add`, `racer.import` (the roster import) and `racer.fake` give
     each new racer a token of its own."""

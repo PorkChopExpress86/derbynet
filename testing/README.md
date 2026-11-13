@@ -196,6 +196,17 @@ Wolves instead, so Django fits them in, and the charts are checked.  It reads it
 standings from `export-json.php`, since Django does not serve
 `query=standings`.
 
+`test-balloting.sh` votes as PHP's voters do by default: it gives the empty
+ballot password to `ballot.get` and deletes the cookie jar to change voters.
+With `DERBYNET_BACKEND=django` a racer's voting token is the voter (D86,
+#206): the coordinator reads the tokens of cars 101 and 161 from the
+check-in page's Voting code sheet, and each voter names its token to
+`ballot.get` as `voting_token`.  That branch also checks that a call with no
+token, or with one that names no racer, is refused with `no-token`, and that
+a second session holding the first token sees that voter's choices.  The
+parity gate compares the step only up to where the two legs part
+(`STEP_DIVERGENCES` in `server/tools/parity_gate.py`).
+
 ## Dev and demo scripts
 
 These are not part of the suite, and run against the PHP or the Django server.

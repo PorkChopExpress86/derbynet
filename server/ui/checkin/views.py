@@ -111,13 +111,6 @@ def _need(request, perm: Perm, message: str):
     return None
 
 
-def _can_show_voting_code(request) -> bool:
-    """The Voting code sheet is for a logged-in crew role that checks racers
-    in (#206, D5, D86); a phone holding only the check-in link's grant
-    (#16) does not see it."""
-    return role_allows(request, Perm.CHECK_IN_RACERS)
-
-
 def _perms(request) -> dict:
     return {
         "can_add": allows(request, Perm.REGISTER_NEW_RACER),
@@ -127,7 +120,9 @@ def _perms(request) -> dict:
         "can_crop": allows(request, Perm.ASSIGN_RACER_IMAGE),
         "can_set_up": allows(request, Perm.SET_UP),
         "can_qr": all(allows(request, bit) for bit in MCHECKIN),
-        "can_voting_code": _can_show_voting_code(request),
+        # A logged-in crew role's own bits, not the check-in link's grant
+        # (#206, D5): see voting_code().
+        "can_voting_code": role_allows(request, Perm.CHECK_IN_RACERS),
         "can_edit_partitions": allows(request, Perm.SET_UP),
     }
 
@@ -918,8 +913,10 @@ def rotate(request, racer_id, repo, direction):
 def voting_code(request, racer_id):
     """The racer's voting code (#206, D86): a QR code of the vote link that
     holds the racer's voting token, beside the check-in link's QR code. The
-    token is read here only, never in the card or its poll."""
-    if not _can_show_voting_code(request):
+    token is read here only, never in the card or its poll. The sheet is
+    for a logged-in crew role that checks racers in (#206, D5, D86); a
+    phone holding only the check-in link's grant (#16) does not see it."""
+    if not role_allows(request, Perm.CHECK_IN_RACERS):
         return service_error(
             request, "Only a logged-in role that checks racers in sees voting codes."
         )

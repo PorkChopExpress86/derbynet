@@ -6,7 +6,9 @@
 voter's credential is a racer's voting token (#206, D86). The vote link
 (`ui.vote.views.token_link`) puts the token in the session, and so does
 `ballot.get` given `voting_token=<GUID>`; `vote.cast` and later
-`ballot.get` calls in the same session use it. A call whose session holds no
+`ballot.get` calls in the same session use it. The vote page also sends the
+`ballot_key` of the ballot it loaded, and a key that is not the session's
+code's is refused. A call whose session holds no
 valid token of the active event is refused with `no-token`. A token named
 to `ballot.get` replaces the session's even when it is refused, so a phone
 given a bad code votes no more with an earlier one. `ballot.get` adds the
@@ -25,6 +27,18 @@ from legacy_api.registry import LegacyContext, action, query
 TOKEN = balloting.SESSION_TOKEN
 # The `ballot.get` parameter that names a token.
 TOKEN_PARAM = "voting_token"
+# The ballot a vote page loaded (`balloting.ballot_key()`): with it,
+# `ballot.get` and `vote.cast` refuse a session whose code is another
+# ballot's, so a tab opened on one racer's code never changes another's.
+KEY_PARAM = "ballot_key"
+
+
+def _key(ctx: LegacyContext) -> str | None:
+    found = ctx.args.get(KEY_PARAM)
+    if found is None:
+        return None
+    return found if isinstance(found, str) else ""
+
 
 S15 = (
     "S15: the voter is the racer whose voting token the session holds (D86),"
@@ -34,8 +48,9 @@ S15 = (
 D86 = (
     "D86: refused with no-token while the session holds no voting token of"
     " a racer of the active event (voting_token on ballot.get puts one"
-    " there); the ballot password gates nothing. PHP lets in whoever gives"
-    " the ballot password."
+    " there), or that sends a ballot_key other than that code's (the vote"
+    " page's, so a tab changes only the ballot it loaded); the ballot"
+    " password gates nothing. PHP lets in whoever gives the ballot password."
 )
 
 
@@ -72,7 +87,9 @@ def ballot_get(ctx: LegacyContext) -> None:
         given = ctx.args.get(TOKEN_PARAM)
         ctx.session[TOKEN] = given if isinstance(given, str) else ""
     try:
-        found = balloting.ballot(ctx.event, ctx.session.get(TOKEN), ctx.remote_addr)
+        found = balloting.ballot(
+            ctx.event, ctx.session.get(TOKEN), ctx.remote_addr, key=_key(ctx)
+        )
     except BallotFailure as failure:
         _fail(ctx, failure)
         return
@@ -107,6 +124,7 @@ def vote_cast(ctx: LegacyContext) -> None:
             award.pk if award is not None else None,
             ctx.args.get("votes"),
             ip_address=ctx.remote_addr,
+            key=_key(ctx),
         )
     except BallotFailure as failure:
         _fail(ctx, failure)

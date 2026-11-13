@@ -26,7 +26,6 @@ check-in, is not eligible for any award, cannot win the award
 
 import hashlib
 import json
-import uuid
 from collections import Counter
 from dataclasses import dataclass
 
@@ -39,6 +38,7 @@ from core import race_settings
 from core.models import RaceState
 from core.services import lock_race_state
 from roster.models import Racer
+from roster.voting_tokens import parse_token
 
 OPEN = "open"
 CLOSED = "closed"
@@ -84,17 +84,6 @@ def set_open(event, state) -> None:
     race_settings.write(event, "balloting", state)
 
 
-def parse_token(text) -> uuid.UUID | None:
-    """A voting token as the link or `voting_token` gives it: a GUID in any
-    of the forms `uuid.UUID` reads, or None for anything else."""
-    if not isinstance(text, str) or len(text) > 64:
-        return None
-    try:
-        return uuid.UUID(text)
-    except ValueError:
-        return None
-
-
 def token_racer(event, text) -> Racer | None:
     """The event's racer whose voting token `text` is, or None. A deleted
     racer's token and another event's are as unknown as a made-up one."""
@@ -104,8 +93,27 @@ def token_racer(event, text) -> Racer | None:
     return Racer.objects.filter(event=event, voting_token=token).first()
 
 
-def is_valid_token(event, text) -> bool:
-    return token_racer(event, text) is not None
+def ballot_key(racer: Racer) -> str:
+    """The key of a racer's ballot that the vote page holds and sends back
+    (#206 review): a tab may change only the ballot it loaded, though the
+    session's code changed in another tab since. A digest of its own, so
+    the page holds neither the token nor the voter's identifier."""
+    return hashlib.sha256(b"ballot-key:" + racer.voting_token.bytes).hexdigest()[:32]
+
+
+def page_ballot_key(event, token) -> str:
+    """The ballot key for the vote page, or "" with no valid token."""
+    racer = token_racer(event, token)
+    return ballot_key(racer) if racer is not None else ""
+
+
+def _holder(event, token, key):
+    """The racer whose token the session holds, or NO_TOKEN; with a ballot
+    key, also NO_TOKEN when the key is another ballot's."""
+    racer = token_racer(event, token)
+    if racer is None or (key is not None and key != ballot_key(racer)):
+        raise NO_TOKEN
+    return racer
 
 
 def voter_identifier(racer: Racer) -> str:
@@ -136,13 +144,16 @@ class BallotEntry:
     votes: list[int]
 
 
-def ballot(event, token, ip_address: str = "") -> dict[int, BallotEntry]:
+def ballot(
+    event, token, ip_address: str = "", key: str | None = None
+) -> dict[int, BallotEntry]:
     """`query.ballot.get.inc`: the token's voter row, added on its first
     visit (`voterid.inc:14` to `:28`), and each award on the ballot with its
     depth and this voter's choices, or nothing while balloting is closed
     (`query.ballot.get.inc:27` to `:45`). A token that is not a racer's of
     this event is refused with NO_TOKEN, before anything is written, where
-    PHP asks for the ballot password (D86).
+    PHP asks for the ballot password (D86). A `key` that is not this
+    token's `ballot_key()` is refused the same way.
 
     The voter row is added under the race-state lock, so two phones that
     open the same token at once still make one voter. The lock skips the
@@ -152,9 +163,7 @@ def ballot(event, token, ip_address: str = "") -> dict[int, BallotEntry]:
     (`test_a_read_only_event_shows_the_ballot_and_refuses_a_vote`)."""
     with transaction.atomic():
         lock_race_state(event.id, writable=False)
-        racer = token_racer(event, token)
-        if racer is None:
-            raise NO_TOKEN
+        racer = _holder(event, token, key)
         voter_row = voter(event, voter_identifier(racer), ip_address)
     if not is_open(event):
         return {}
@@ -206,6 +215,7 @@ def cast(
     posted_votes,
     *,
     ip_address: str = "",
+    key: str | None = None,
 ):
     """`vote.cast`: the token's choices for one award replace any before.
     `award_id` is the posted id resolved to the event's award, or None.
@@ -213,7 +223,8 @@ def cast(
     Refusals come in PHP's order (`action.vote.cast.inc`): closed,
     no-award, too-many, and then this port's no-token (D86) and ineligible
     (S14) checks. The token is read again here, under the lock, so a racer
-    deleted since the ballot opened votes no more. Returns
+    deleted since the ballot opened votes no more, and a `key` that is
+    another ballot's is refused with no-token. Returns
     `voterid awardid racerid` for each vote, PHP's `votes` reply."""
     with transaction.atomic():
         lock_race_state(event.id)
@@ -236,9 +247,7 @@ def cast(
         # so only an empty list passes (`action.vote.cast.inc:35` to `:40`).
         if racer_ids is not None and len(racer_ids) > (depth or 0):
             raise TOO_MANY
-        token_holder = token_racer(event, token)
-        if token_holder is None:
-            raise NO_TOKEN
+        token_holder = _holder(event, token, key)
         if racer_ids is None or len(set(racer_ids)) != len(racer_ids):
             raise INELIGIBLE
         racers = Racer.objects.filter(

@@ -17,7 +17,6 @@ from datetime import timedelta
 from django.db import connection, models
 from django.utils import timezone
 
-from awards.balloting import parse_token
 from awards.models import Award, AwardType, BallotAward, Vote, Voter
 from core.models import ActionLog
 from kiosks import pages
@@ -31,6 +30,7 @@ from roster.models import (
     Racer,
     Subgroup,
 )
+from roster.voting_tokens import parse_token
 
 from . import embedded, values
 from .photos import CAR_PHOTOS, HEADSHOTS

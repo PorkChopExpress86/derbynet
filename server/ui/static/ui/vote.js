@@ -62,7 +62,9 @@
         this.busy = true;
         let data;
         try {
-          const query = new URLSearchParams({ query: 'ballot.get' });
+          // The ballot this page loaded: a code opened in another tab
+          // since makes the server refuse it (#206 review).
+          const query = new URLSearchParams({ query: 'ballot.get', ballot_key: config.ballotKey });
           const reply = await fetch(`${config.actionUrl}?${query}`, { credentials: 'same-origin' });
           data = await reply.json();
         } catch (e) {
@@ -223,6 +225,7 @@
         try {
           const body = new URLSearchParams({
             action: 'vote.cast', awardid: awardId, votes: JSON.stringify(votes),
+            ballot_key: config.ballotKey,
           });
           const reply = await fetch(config.actionUrl, {
             method: 'POST', body, credentials: 'same-origin',

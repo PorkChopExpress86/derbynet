@@ -385,3 +385,51 @@ def test_the_voting_code_of_another_events_racer_is_not_found(login, event):
     elsewhere = RacerFactory(group=GroupFactory(event=EventFactory()))
     response = login("RaceCrew").get(voting_code_url(elsewhere))
     assert response.status_code == 404
+
+
+def test_a_tab_changes_only_the_ballot_it_loaded(client, event, pack):
+    """One browser, two racers' codes (#206 review): the tab that loaded
+    the first code keeps posting its list after the second code opened in
+    another tab. Each tab sends the ballot key its page was rendered with,
+    and a key that is not the session's code's is refused with no-token,
+    so neither ballot changes behind the voter's back."""
+    award = BallotAwardFactory(award__event=event, depth=3).award
+    RaceState.objects.filter(event=event).update(balloting_open=True)
+    first, second = pack["late"], pack["out"]
+    wolf, bear = pack["wolf"], pack["bear"]
+
+    def cast(key, *racers):
+        reply = client.post(
+            "/action.php",
+            {
+                "action": "vote.cast",
+                "awardid": award.pk,
+                "votes": json.dumps([r.pk for r in racers]),
+                "ballot_key": key,
+            },
+        )
+        return json.loads(reply.content)["outcome"]["code"]
+
+    client.get(f"/vote/code/{first.voting_token}")
+    first_key = config(client.get("/vote/"))["ballotKey"]
+    assert cast(first_key, wolf) == "success"
+    client.get(f"/vote/code/{second.voting_token}")
+    second_key = config(client.get("/vote/"))["ballotKey"]
+    assert cast(second_key, bear) == "success"
+
+    stale = cast(first_key, wolf, bear)
+    stale_get = json.loads(
+        client.get(
+            "/action.php", {"query": "ballot.get", "ballot_key": first_key}
+        ).content
+    )
+
+    assert first_key and second_key and first_key != second_key
+    assert str(first.voting_token) not in first_key
+    assert stale == "no-token"
+    assert stale_get["outcome"]["code"] == "no-token"
+    by_voter = sorted(
+        Vote.objects.values_list("voter__identifier", "racer_id"),
+    )
+    assert sorted(r for _, r in by_voter) == sorted([wolf.pk, bear.pk])
+    assert len({v for v, _ in by_voter}) == 2

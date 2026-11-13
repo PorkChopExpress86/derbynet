@@ -115,6 +115,7 @@ STEP_DIVERGENCES: dict[str, str] = {
         "D86: with DERBYNET_BACKEND=django the script votes with two racers'"
         " voting tokens, read from the Voting code sheet, where PHP's run gives"
         " the ballot password and deletes the cookie jar to change voters"
+        " (testing/README.md)"
     ),
     "test-reschedule.sh": (
         "D34, D39: with DERBYNET_BACKEND=django the script checks Django's"

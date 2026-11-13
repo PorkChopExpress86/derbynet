@@ -332,20 +332,34 @@ class PageErrors:
     browser's `net::ERR_ABORTED` for the request still needs the test's
     `allow()`. A lone `htmx:afterRequest` is a failed request and stays."""
 
+    # Chromium's console error for a page or resource answered 404; its
+    # text names no URL, which the message's location holds.
+    MISSING = "Failed to load resource: the server responded with a status of 404"
+
     def __init__(self):
         self.errors: list[str] = []
         self.allowed: list[re.Pattern] = []
+        self.allowed_missing: list[re.Pattern] = []
         self.aborts = 0
         self._after_request = False
 
     def allow(self, pattern: str):
         self.allowed.append(re.compile(pattern))
 
+    def allow_missing(self, url_pattern: str):
+        """Drop the 404 console error of a URL `url_pattern` matches, and
+        only that one: a page meant to answer 404 (#206's bad vote link)."""
+        self.allowed_missing.append(re.compile(url_pattern))
+
     def add(self, message: str):
         if not any(p.search(message) for p in self.allowed):
             self.errors.append(message)
 
-    def console_error(self, text: str):
+    def console_error(self, text: str, url: str = ""):
+        if text.startswith(self.MISSING) and any(
+            p.search(url) for p in self.allowed_missing
+        ):
+            return
         after_request, self._after_request = self._after_request, False
         if text == "htmx:sendAbort":
             self.aborts += 1
@@ -579,7 +593,10 @@ def page(browser, live_server, size, page_errors):
     page.on("pageerror", lambda error: page_errors.add(f"pageerror: {error}"))
     page.on(
         "console",
-        lambda msg: msg.type == "error" and page_errors.console_error(msg.text),
+        lambda msg: (
+            msg.type == "error"
+            and page_errors.console_error(msg.text, msg.location.get("url", ""))
+        ),
     )
     page.on(
         "requestfailed",

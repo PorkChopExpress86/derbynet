@@ -36,7 +36,9 @@ from roster.services import groups
 from roster.services.racers import insert_new_racer, pass_racer
 from ui.tests.browser.conftest import (
     SIZES,
+    PageErrors,
     assert_accessible,
+    close_tab,
     htmx_post,
     shoot,
     stop_timers,
@@ -97,14 +99,21 @@ def pack(event):
             car_number=301,
             partition_name="Families",
         ).racer,
+        "voter2": insert_new_racer(
+            event,
+            first_name="Walt",
+            last_name="Voter",
+            car_number=302,
+            partition_name="Families",
+        ).racer,
         "wolves": Group.objects.get(event=event, name="Wolves"),
     }
 
 
-def enter(page, found, query=""):
+def enter(page, found, query="", voter="voter"):
     """Open the vote page as a QR code does: the voter's vote link, which
     keeps the token in the session and redirects to /vote/ (#206)."""
-    page.goto(f"/vote/code/{found['voter'].voting_token}")
+    page.goto(f"/vote/code/{found[voter].voting_token}")
     expect(page).to_have_url(re.compile(r"/vote/$"))
     if query:
         page.goto(f"/vote/{query}")
@@ -224,12 +233,13 @@ def test_a_vote_link_then_two_votes_fill_a_depth_two_award(page, event):
     assert sorted(Vote.objects.values_list("racer__car_number", flat=True)) == [101]
 
 
+BAD_LINK = r"/vote/code/not-a-code$"
+
+
 def test_a_bad_vote_link_says_the_code_is_not_valid(page, event, page_errors):
-    """The page answers 404, which Chromium logs to the console; that log is
-    allowed here only, and the one 404 must be the bad link's."""
-    page_errors.allow(r"status of 404 \(Not Found\)$")
-    missing = []
-    page.on("response", lambda r: r.status == 404 and missing.append(r.url))
+    """The page answers 404, which Chromium logs to the console; that log
+    is allowed for the bad link's URL only (the twin below)."""
+    page_errors.allow_missing(BAD_LINK)
 
     page.goto("/vote/code/not-a-code")
 
@@ -241,9 +251,33 @@ def test_a_bad_vote_link_says_the_code_is_not_valid(page, event, page_errors):
     ).to_be_visible()
     assert_accessible(page)
     shoot(page, "vote-bad-code")
-    assert [url.removeprefix(page.url.split("/vote/")[0]) for url in missing] == [
-        "/vote/code/not-a-code"
+
+
+def test_a_404_beside_the_bad_link_still_fails(page, event, page_errors):
+    """The twin: with the bad link's allowance in place, another URL's 404
+    still reaches the errors the page fixture fails on."""
+    page_errors.allow_missing(BAD_LINK)
+    page.goto("/vote/code/not-a-code")
+    expect(
+        page.get_by_role("heading", name="This voting code is not valid")
+    ).to_be_visible()
+    assert page_errors.errors == []
+
+    page.goto("/vote/code/not-a-code-either")
+    expect(
+        page.get_by_role("heading", name="This voting code is not valid")
+    ).to_be_visible()
+
+    # The console event can land after the heading shows: wait up to 2 s.
+    for _ in range(40):
+        if page_errors.errors:
+            break
+        page.wait_for_timeout(50)
+    assert [e for e in page_errors.errors if PageErrors.MISSING in e] == [
+        f"console: {PageErrors.MISSING} (Not Found)"
     ]
+    # Handled here: the fixture fails on what is left.
+    page_errors.errors.clear()
 
 
 def test_closing_from_another_session_shows_closed_within_six_seconds(page, event):
@@ -597,3 +631,61 @@ def test_a_code_refused_mid_visit_asks_for_a_code_again(page, event):
     expect(page.locator('[data-sheet="vote-racer"]')).to_be_hidden()
     expect(page.locator("[data-award-view]")).to_be_hidden()
     assert not Vote.objects.exists()
+
+
+def test_a_tab_on_one_code_never_changes_another_codes_ballot(page, event):
+    """One browser, two racers' codes (#206 review): the first tab votes on
+    A's code, a second tab opens B's code and votes, and the first tab's
+    next tap is refused with no-token, so it neither overwrites B's ballot
+    nor loses its tap silently: the toast says so and the tab asks for a
+    code."""
+    found = pack(event)
+    best = ballot_award(event, "Best in Show", 3)
+    set_open(event)
+    enter(page, found)
+    award_card(page, best).click()
+    vote_for(page, found["w1"])
+
+    other = page.context.new_page()
+    enter(other, found, voter="voter2")
+    award_card(other, best).click()
+    vote_for(other, found["w2"])
+    close_tab(page, other)
+
+    car_card(page, found["w3"]).click()
+    with page.expect_response(lambda r: r.request.method == "POST") as reply:
+        toggle(page).click()
+
+    assert reply.value.json()["outcome"]["code"] == "no-token"
+    expect(page.locator("[data-toast]")).to_contain_text(
+        "This voting code is no longer valid. Scan a racer's voting code again."
+    )
+    expect(state(page)).to_have_attribute("data-vote-state", "code")
+    by_voter = {}
+    for voter_id, car in Vote.objects.values_list("voter_id", "racer__car_number"):
+        by_voter.setdefault(voter_id, []).append(car)
+    assert sorted(by_voter.values()) == [[101], [102]]
+
+
+def test_a_tab_on_another_code_reloading_the_ballot_asks_for_a_code(page, event):
+    """The poll path of the same case: once B's code opened in another tab,
+    balloting closing and opening again makes A's tab ask for its ballot
+    with A's key, which is refused, and the tab asks for a code rather than
+    showing B's ballot."""
+    found = pack(event)
+    best = ballot_award(event, "Best in Show", 2)
+    set_open(event)
+    enter(page, found)
+    expect(award_card(page, best)).to_be_visible()
+    other = page.context.new_page()
+    enter(other, found, voter="voter2")
+    expect(award_card(other, best)).to_be_visible()
+    close_tab(page, other)
+
+    judge_session().post("/action.php", {"action": "ballot.open", "state": "closed"})
+    expect(state(page)).to_have_attribute("data-vote-state", "closed", timeout=6000)
+    with page.expect_response(lambda r: "query=ballot.get" in r.url) as reply:
+        judge_session().post("/action.php", {"action": "ballot.open", "state": "open"})
+        expect(state(page)).to_have_attribute("data-vote-state", "code", timeout=6000)
+
+    assert reply.value.json()["outcome"]["code"] == "no-token"

@@ -2,6 +2,7 @@
 with the same racers, results and media (#212; #9, Archive)."""
 
 import json
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -300,3 +301,39 @@ def test_d83_a_kiosk_whose_classes_are_gone_still_shows_nobody_after_export(
     restored = Event.objects.get(name="Restored")
     assert Kiosk.objects.get(event=restored).params == '{"classids":[0]}'
     assert not [f for f in report["findings"] if f["table"] == "kiosks"]
+
+
+def _tokens(event) -> dict:
+    return dict(
+        Racer.objects.filter(event=event).values_list("car_number", "voting_token")
+    )
+
+
+def test_an_export_carries_the_voting_tokens_to_another_server(raced, tmp_path):
+    """D87: the zip carries each racer's voting token, and an import keeps
+    it where no racer holds it, as on another server (here the exported
+    racers' tokens change first)."""
+    exported = _tokens(raced)
+    target = tmp_path / "e.zip"
+    call_command("export_event", raced.slug, output=target)
+    for racer in Racer.objects.filter(event=raced):
+        racer.voting_token = uuid.uuid4()
+        racer.save(update_fields=["voting_token"])
+
+    call_command("import_derbynet", str(target), event="Restored")
+
+    assert _tokens(Event.objects.get(name="Restored")) == exported
+
+
+def test_an_import_beside_its_source_gives_new_tokens(raced, tmp_path):
+    """The tokens are unique across events, so an import beside the event
+    it came from gives its racers new ones."""
+    exported = _tokens(raced)
+    target = tmp_path / "e.zip"
+    call_command("export_event", raced.slug, output=target)
+
+    call_command("import_derbynet", str(target), event="Restored")
+
+    restored = _tokens(Event.objects.get(name="Restored"))
+    assert restored.keys() == exported.keys()
+    assert not set(restored.values()) & set(exported.values())

@@ -63,8 +63,9 @@ def token_link(request, token):
     token, so the phone does not go on voting with an earlier code."""
     event = active_event(request)
     text = token.removesuffix("/")
-    if balloting.is_valid_token(event, text):
-        request.session[balloting.SESSION_TOKEN] = str(balloting.parse_token(text))
+    racer = balloting.token_racer(event, text)
+    if racer is not None:
+        request.session[balloting.SESSION_TOKEN] = str(racer.voting_token)
         return redirect("vote")
     request.session.pop(balloting.SESSION_TOKEN, None)
     return render(request, "ui/vote/bad_code.html", {"page_title": "Vote"}, status=404)
