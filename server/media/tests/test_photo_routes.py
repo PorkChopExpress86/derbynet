@@ -3,6 +3,7 @@ render allowlist, the per-file lock and the no-photo pixel."""
 
 import hashlib
 import io
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -128,8 +129,13 @@ def test_a_racer_with_no_photo_gets_the_transparent_pixel(crew, folders, event):
         assert data == ONE_PIXEL.read_bytes()
 
 
-def test_a_racer_whose_file_is_missing_gets_the_transparent_pixel(crew, folders, event):
-    racer = RacerFactory(group__event=event, headshot="gone.jpg")
+@pytest.mark.parametrize("column", ["gone.jpg", "0-cropped/gone.jpg"])
+def test_a_racer_whose_file_is_missing_gets_the_transparent_pixel(
+    crew, folders, event, column
+):
+    """A crop that is gone, with no upload behind it, too: the column, read
+    again, still names it (#302)."""
+    racer = RacerFactory(group__event=event, headshot=column)
 
     for tail in (f"head/racer/{racer.pk}/1", f"head/racer/{racer.pk}/work/1"):
         response, data = get(crew, tail)
@@ -187,6 +193,50 @@ def test_bad_photo_urls_answer_404(crew, folders, tail):
     upload(crew, "p.jpg", image_bytes(), repo="car")
 
     assert crew.get(f"/photo.php/{tail}").status_code == 404
+
+
+HALF_CROP = {
+    "action": "photo.crop",
+    "repo": "head",
+    "image_name": "p.jpg",
+    "left": "0",
+    "top": "0",
+    "right": "10",
+    "bottom": "10",
+    "original_width": "20",
+    "original_height": "20",
+}
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a file of mode 000")
+@pytest.mark.parametrize(
+    ("steps", "tail", "unreadable"),
+    [
+        (["file/200x200/p.jpg"], "file/200x200/p.jpg", "200x200/p.jpg"),
+        ([], "file/original/p.jpg", "p.jpg"),
+        (["file/200x200/p.jpg"], "racer/{racer}/200x200", "200x200/p.jpg"),
+        ([], "racer/{racer}", "p.jpg"),
+        (["crop"], "racer/{racer}", "0-cropped/p.jpg"),
+    ],
+)
+def test_a_file_that_wont_open_answers_cant_read(
+    crew, act, folders, event, steps, tail, unreadable
+):
+    """#302: a file that is there but won't open answers 404 "Can't read
+    file.", from the lookup without the lock and again under it, and not the
+    transparent pixel of a racer with no photo."""
+    racer = RacerFactory(group__event=event)
+    upload(crew, "p.jpg", image_bytes((480, 320)), racerid=str(racer.pk))
+    for step in steps:
+        if step == "crop":
+            assert act(**HALF_CROP)["outcome"]["code"] == "success"
+        else:
+            assert crew.get(f"/photo.php/head/{step}/0").status_code == 200
+    (folders.head / unreadable).chmod(0)
+
+    response = crew.get(f"/photo.php/head/{tail.format(racer=racer.pk)}/1")
+
+    assert (response.status_code, response.content) == (404, b"Can't read file.\n")
 
 
 def test_fifty_sizes_make_no_folder_outside_the_allowlist(crew, folders):
