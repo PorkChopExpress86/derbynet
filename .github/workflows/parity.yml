@@ -168,11 +168,15 @@ jobs:
 
       # The PHP golden fixtures of #7 (engine outputs, timer transcripts, poll
       # payloads), replayed against Django on this leg's database engine:
-      # every test the root conftest.py marks `golden`.
+      # every test the root conftest.py marks `golden`, except the browser
+      # tests: this leg installs no Chromium, and the server workflow's ui jobs
+      # run them on every pull request.  An explicit -m replaces the default
+      # `not browser` (pyproject.toml), so it is spelled out here
+      # (server/tests/test_parity_golden_selection.py).
       - name: Replay the golden fixtures against Django
         if: ${{ !cancelled() }}
         working-directory: server
-        run: uv run pytest -rs -m 'golden and not full'
+        run: uv run pytest -rs -m 'golden and not full and not browser'
 
       # The real derby-timer.jar, with its simulated timer, races a whole round
       # (#32, ADR-02), as server.yml runs it.  The runner image ships Java and
