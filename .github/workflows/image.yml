@@ -16,9 +16,9 @@ name: image
 #   DERBYNET_BACKEND and test endpoints.
 # - arm64: the same suite against the archive's arm64 image, run natively on
 #   GitHub's ubuntu-24.04-arm runner.
-# - checks: server/docker/ci/checks.sh (TLS, secret key, user, uploads, bind
-#   mounts, client address, timeout, engine guard, upgrade, backup) and the
-#   phone check, Chromium in phone mode over https://<LAN IP>/ (D88).
+# - checks: every check of server/docker/ci/checks.sh (its header lists
+#   them), backup, upgrade, and the phone check, Chromium in phone mode over
+#   https://<LAN IP>/ (D88).
 # - publish: on a release tag only, the archive to
 #   ghcr.io/porkchopexpress86/derbynet_server with the repository's
 #   GITHUB_TOKEN (D89), and `latest` for a release that is not a prerelease
@@ -361,8 +361,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
 
-      - name: TLS, secret key, user, uploads, bind mounts, client address, timeout, engine guard
-        run: server/docker/ci/checks.sh tls secret user upload bind-mount client-ip timeout engine
+      # Every check checks.sh runs with no arguments.
+      - name: TLS, secret key, user, uploads, bind mounts, client address, proxies, stop, reload, timeout, engine guard, Postgres password, bad settings
+        run: server/docker/ci/checks.sh
 
       - name: Backup and restore, SQLite
         run: server/docker/ci/checks.sh backup
