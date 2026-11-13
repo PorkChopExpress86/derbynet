@@ -8,24 +8,25 @@ behind the gate's expected red.
 
 Each `<database>=<path>` is one gate job's `parity_gate.py --failing` file.
 A gate job that died before writing it counts as one failing entry, `(the
-leg did not report)`, so the issue still changes. `--jobs` is the run's
-`gh run view --json jobs`: a leg job (`leg (php)`, `leg (django, <database>)`)
+leg did not report)`, so the issue still changes. `--jobs` is the run's `gh
+run view --json jobs`: a leg job (`leg (php)`, `leg (django, <database>)`)
 that did not succeed counts as one failing entry per failed step, `(the
 leg's job failed: <step>)`, on its database (`leg (php)` on every one), so a
-second step that starts failing changes the list too. A leg
-uploads its steps before it replays the golden fixtures and races
-derby-timer.jar, so the gate passes when only those fail: from 2026-11-11 the
-nightly was red on a missing Chromium while this issue said no step failed
-(#206 retro). A `--jobs` file it cannot read counts as `(the leg jobs could
-not be read)`. The failing list is each
-failing step's label and the databases it fails on. The open issue labeled
-`LABEL` and titled `TITLE` carries the list it last showed, in a comment
-line at the top of its body. It is found by its label, not by a search,
-whose index can lag behind a new issue and open a second one. When
-tonight's list differs, the script rewrites the body (each failing step,
-its difference count on each database, and the WAITING entry it waits on)
-and comments with the steps that started and stopped failing. When the
-list is the same it changes nothing. With no such issue, it opens one.
+second step that starts failing changes the list too. A leg uploads its
+steps before it replays the golden fixtures and races derby-timer.jar, so
+the gate passes when only those fail: from 2026-11-11 the nightly was red on
+a missing Chromium while this issue said no step failed (#206 retro). A
+`--jobs` file it cannot read, or one that lacks `leg (php)` or a database's
+`leg (django, <database>)`, counts as `(the leg jobs could not be read)`
+there, so a renamed or missing job cannot clear the list. The failing list
+is each failing step's label and the databases it fails on. The open issue
+labeled `LABEL` and titled `TITLE` carries the list it last showed, in a
+comment line at the top of its body. It is found by its label, not by a
+search, whose index can lag behind a new issue and open a second one. When
+tonight's list differs, the script rewrites the body (each failing step, its
+difference count on each database, and the WAITING entry it waits on) and
+comments with the steps that started and stopped failing. When the list is
+the same it changes nothing. With no such issue, it opens one.
 
 Every `gh` call names `--repo PorkChopExpress86/derbynet`: the issue stays on
 the owner's fork, never upstream (CLAUDE.md). `--dry-run` prints each call
@@ -83,8 +84,11 @@ def read_jobs(legs: list[Leg], path: Path) -> list[Leg]:
     try:
         jobs = json.loads(path.read_text(encoding="utf-8"))["jobs"]
         found: dict[str, list[tuple[str, str]]] = {leg.database: [] for leg in legs}
+        seen = set()
         for job in jobs:
             leg_job = LEG_JOB.fullmatch(job["name"])
+            if leg_job:
+                seen.add(job["name"])
             if not leg_job or job["conclusion"] in ("success", "skipped"):
                 continue
             steps = [
@@ -101,6 +105,10 @@ def read_jobs(legs: list[Leg], path: Path) -> list[Leg]:
     except (OSError, ValueError, KeyError, TypeError) as error:
         why = ((JOBS_UNREAD, f"{path.name}: {error!r}"),)
         return [replace(leg, job=why) for leg in legs]
+    for database, entries in found.items():
+        for name in ("leg (php)", f"leg (django, {database})"):
+            if name not in seen:
+                entries.append((JOBS_UNREAD, f"{path.name} has no {name}"))
     return [replace(leg, job=tuple(found.get(leg.database, ()))) for leg in legs]
 
 

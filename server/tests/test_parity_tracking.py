@@ -289,7 +289,12 @@ def test_a_second_failed_step_behind_the_first_changes_the_list(tmp_path):
 
 def test_a_failed_php_leg_counts_on_every_database(tmp_path):
     php = {"name": "leg (php)", "conclusion": "cancelled", "status": "completed"}
-    saved(tmp_path, "jobs", {"jobs": [php]})
+    others = [
+        {**job, "conclusion": "success", "steps": []}
+        for job in NOV_12_JOBS["jobs"]
+        if job["name"] != "leg (php)"
+    ]
+    saved(tmp_path, "jobs", {"jobs": [php, *others]})
 
     one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
 
@@ -300,7 +305,11 @@ def test_a_failed_php_leg_counts_on_every_database(tmp_path):
 
 def test_a_failed_gate_job_is_left_to_the_gate_file(tmp_path):
     gate = {"name": "gate (django, sqlite)", "conclusion": "failure", "steps": []}
-    saved(tmp_path, "jobs", {"jobs": [gate]})
+    legs_green = [
+        {"name": name, "conclusion": "success", "steps": []}
+        for name in ("leg (php)", "leg (django, sqlite)", "leg (django, postgres)")
+    ]
+    saved(tmp_path, "jobs", {"jobs": [gate, *legs_green]})
 
     one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
 
@@ -337,3 +346,43 @@ def test_main_reads_the_jobs_file(tmp_path, capsys):
     out = capsys.readouterr().out
     assert f'"(the leg\'s job failed: {GOLDEN})": ["postgres", "sqlite"]' in out
     assert "tracking issue updated" in out
+
+
+def test_a_jobs_file_with_no_jobs_is_unread(tmp_path):
+    """An empty list must not clear #225's job entries in silence."""
+    saved(tmp_path, "jobs", {"jobs": []})
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {
+        "(the leg jobs could not be read)": ["postgres", "sqlite"]
+    }
+
+
+def test_a_renamed_leg_job_is_unread_on_its_database(tmp_path):
+    renamed = json.loads(json.dumps(NOV_12_JOBS))
+    renamed["jobs"][1]["name"] = "leg (django-sqlite)"
+    saved(tmp_path, "jobs", renamed)
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {
+        f"(the leg's job failed: {GOLDEN})": ["postgres"],
+        "(the leg jobs could not be read)": ["sqlite"],
+    }
+    assert (
+        "(the leg jobs could not be read)",
+        "jobs.json has no leg (django, sqlite)",
+    ) in one[0].job + one[1].job
+
+
+def test_a_jobs_file_with_no_php_leg_is_unread_everywhere(tmp_path):
+    no_php = {"jobs": [j for j in NOV_12_JOBS["jobs"] if j["name"] != "leg (php)"]}
+    saved(tmp_path, "jobs", no_php)
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one)["(the leg jobs could not be read)"] == [
+        "postgres",
+        "sqlite",
+    ]
