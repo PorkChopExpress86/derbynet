@@ -37,6 +37,6 @@ The lint counts a PR as merged when GitHub says so, or when GitHub shows it clos
 ## Ship a PR
 
 ```bash
-plan/bin/pr-wait 82     # exits 1 if any check failed
+plan/bin/pr-wait 82     # exits 1 if any check pr-merge counts failed
 plan/bin/pr-merge 82     # squashes and deletes the branch unless given a method
 ```

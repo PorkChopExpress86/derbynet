@@ -260,12 +260,31 @@ def test_a_leg_job_that_failed_after_the_gate_passed_changes_the_list(tmp_path):
     did = pt.track(gh, one, "https://example/run/9", "c" * 40, tmp_path)
 
     assert jobs and did == "updated"
-    assert pt.failing_list(one) == {"(the leg's job failed)": ["postgres", "sqlite"]}
+    label = f"(the leg's job failed: {GOLDEN})"
+    assert pt.failing_list(one) == {label: ["postgres", "sqlite"]}
     body = (tmp_path / "parity-tracking-body.md").read_text()
     assert (
-        "| `(the leg's job failed)` | job failed | job failed | no WAITING entry |"
-        f" leg (django, sqlite): {GOLDEN}; leg (django, postgres): {GOLDEN} |"
+        f"| `{label}` | job failed | job failed | no WAITING entry |"
+        " leg (django, sqlite); leg (django, postgres) |"
     ) in body
+
+
+def test_a_second_failed_step_behind_the_first_changes_the_list(tmp_path):
+    """Both steps after the upload run unless the run is cancelled: the
+    derby-timer race starting to fail while the replay still fails is news."""
+    saved(tmp_path, "jobs", NOV_12_JOBS)
+    night_1 = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+    gh = pt.Gh(dry_run=True, issue_body=pt.render(night_1, "https://x/1", "a" * 40))
+    race = "Race a round with derby-timer.jar against Django"
+    sqlite = json.loads(json.dumps(NOV_12_JOBS))
+    sqlite["jobs"][1]["steps"].append({"name": race, "conclusion": "failure"})
+    saved(tmp_path, "jobs", sqlite)
+
+    night_2 = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.track(gh, night_2, "https://x/2", "b" * 40, tmp_path) == "updated"
+    comment = (tmp_path / "parity-tracking-comment.md").read_text()
+    assert f"- Now fails: `(the leg's job failed: {race})` (sqlite)" in comment
 
 
 def test_a_failed_php_leg_counts_on_every_database(tmp_path):
@@ -274,8 +293,9 @@ def test_a_failed_php_leg_counts_on_every_database(tmp_path):
 
     one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
 
-    assert pt.failing_list(one) == {"(the leg's job failed)": ["postgres", "sqlite"]}
-    assert one[0].job_problems == ("leg (php): cancelled",)
+    label = "(the leg's job failed: cancelled)"
+    assert pt.failing_list(one) == {label: ["postgres", "sqlite"]}
+    assert one[0].job == ((label, "leg (php)"),)
 
 
 def test_a_failed_gate_job_is_left_to_the_gate_file(tmp_path):
@@ -314,4 +334,6 @@ def test_main_reads_the_jobs_file(tmp_path, capsys):
         ]
     )
 
-    assert "tracking issue updated" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert f'"(the leg\'s job failed: {GOLDEN})": ["postgres", "sqlite"]' in out
+    assert "tracking issue updated" in out

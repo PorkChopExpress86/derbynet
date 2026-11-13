@@ -68,8 +68,8 @@ if [ "$base_checked" = 0 ]; then
   master_paths=$(git diff --name-only "$base" origin/master | areas)
   # One collation for sort and comm: this host's comm (uutils) compares
   # bytes while sort follows en_US.UTF-8, which puts conftest.py before
-  # .github/, so #295's merge printed "comm: file 1 is not in sorted order"
-  # and an area both sides changed went unseen (#206 retro).
+  # .github/: #295's merge printed "comm: file 1 is not in sorted order",
+  # and an area both sides changed could go unseen (#206 retro).
   shared=$(LC_ALL=C comm -12 <(cut -f1 <<<"$pr_paths" | LC_ALL=C sort -u) \
              <(cut -f1 <<<"$master_paths" | LC_ALL=C sort -u) | grep . || true)
   if [ -n "$shared" ]; then
