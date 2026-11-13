@@ -18,9 +18,9 @@ adds `0-rotated` for the original of a turned photo.
 - `photo.rotate` stores the rotation (`PhotoRotation`) and leaves the upload.
 - PNG renders use Pillow's default compression, where PHP writes level 0.
 
-A render is made on first request under a per-file lock, and opened for the
-response before the lock is let go (#302), and only for the labels in
-`ALLOWED_BOXES`. Any other size gets the allowed render nearest to
+A render is made on first request, only for the labels in `ALLOWED_BOXES`,
+under a per-file lock. `photo.php` opens it before the lock is let go and
+streams it after (#302). Any other size gets the allowed render nearest to
 it, so a client cannot create folders. Sizes truncate as PHP's do: 921x299
 becomes 200x64 at `200x200`.
 
@@ -456,59 +456,54 @@ def _resized(image: Image.Image, box: Box) -> Image.Image:
 def find_or_make(repo: Repository, label: Label, name: str) -> Path | None:
     """`find_or_make_image_file()`: the file that serves `name` at `label`,
     made if it is missing, or None when there is no such photo."""
-    if repo.directory is None or not is_valid_name(name):
-        return None
-    ready = _ready(repo, label, name)
-    if ready is not None:
-        return ready
-    try:
-        with _photo_lock(repo, name):
-            return _made(repo, label, name)
-    except PhotoLockError:
-        return None
+    return _found(repo, label, name, lambda path: path)
 
 
 def open_render(repo: Repository, label: Label, name: str) -> BufferedReader | None:
     """`find_or_make()`'s file, open for reading, or None when there is no
-    such photo. A file already made is opened without the photo's lock. One
-    that isn't, or that a change unlinked before the open, is found or made
-    again and opened before the lock is let go, so a rotation or delete
-    waiting on the lock unlinks it only once it is open, and the file then
-    reads as it was (#302). The caller streams it after the lock is let go,
-    so viewers of one photo don't wait on each other. An open that fails
+    such photo. The caller streams it after the photo's lock is let go, so
+    viewers of one photo don't wait on each other (#302). An open that fails
     under the lock raises the OSError."""
+    return _found(repo, label, name, lambda path: path.open("rb"))
+
+
+def _found[T](
+    repo: Repository, label: Label, name: str, use: Callable[[Path], T]
+) -> T | None:
+    """`use(file)` for the file that serves `name` at `label`, or None when
+    there is no such photo. A file that needs no making is used without the
+    photo's lock. One that does, or that `use` finds gone because a change
+    unlinked it in between, is looked up again, made if need be, and used
+    before the lock is let go, so a change waiting on the lock unlinks it
+    only after `use` (#302)."""
     if repo.directory is None or not is_valid_name(name):
         return None
-    ready = _ready(repo, label, name)
+    ready = _lookup(repo, label, name, make=False)
     if ready is not None:
         try:
-            return ready.open("rb")
+            return use(ready)
         except OSError:
             pass
     try:
         with _photo_lock(repo, name):
-            made = _made(repo, label, name)
-            return made.open("rb") if made is not None else None
+            made = _lookup(repo, label, name, make=True)
+            return use(made) if made is not None else None
     except PhotoLockError:
         return None
 
 
-def _ready(repo: Repository, label: Label, name: str) -> Path | None:
-    """The file that serves `name` at `label` when it needs no making, found
-    without the photo's lock, so a change may unlink it before it is read: the
-    crop, the upload itself, a turned photo's render, or a render made before
-    for a fixed size."""
+def _lookup(repo: Repository, label: Label, name: str, make: bool) -> Path | None:
+    """The file that serves `name` at `label`. With `make`, the caller holds
+    the photo's lock and a missing render is made; without it, only a file
+    that needs no making is found: the crop, the upload itself, a turned
+    photo's render, or a render made before for a fixed size."""
     cropped = repo.file(name, CROPPED_FOLDER)
     if label.name == CROPPED and cropped.is_file():
         return cropped
     if label.name in (ORIGINAL, CROPPED):
-        original = repo.file(name)
-        if not original.is_file():
-            return None
-        if _is_svg(original) or not rotation_of(repo, name):
-            return original
-        rotated = repo.file(name, ROTATED_FOLDER)
-        return rotated if rotated.is_file() else None
+        return _original(repo, name, make)
+    if make:
+        return _render(repo, label, name)
     fixed = WORK_FOLDER if label.name == WORK else None
     if label.requested is not None:
         box = _ALLOWED_FOLDERS.get("x".join(f"{n:g}" for n in label.requested))
@@ -516,14 +511,6 @@ def _ready(repo: Repository, label: Label, name: str) -> Path | None:
     if fixed and repo.file(name, fixed).is_file():
         return repo.file(name, fixed)
     return None
-
-
-def _made(repo: Repository, label: Label, name: str) -> Path | None:
-    """The file that serves `name` at `label` when `_ready()` found none,
-    made if it is missing. The caller holds the photo's lock."""
-    if label.name in (ORIGINAL, CROPPED):
-        return _original(repo, name)
-    return _render(repo, label, name)
 
 
 def _render(repo: Repository, label: Label, name: str) -> Path | None:
@@ -557,27 +544,47 @@ def _render(repo: Repository, label: Label, name: str) -> Path | None:
     return _make(repo.file(name, folder), build)
 
 
-def _original(repo: Repository, name: str) -> Path | None:
-    """The upload itself, or for a turned photo, its turned render. The
-    caller holds the photo's lock."""
+def _original(repo: Repository, name: str, make: bool) -> Path | None:
+    """The upload itself, or for a turned photo, its turned render: made if
+    it is missing with `make`, when the caller holds the photo's lock, and
+    otherwise None."""
     original = repo.file(name)
-    rotation = rotation_of(repo, name)
     if not original.is_file():
         return None
+    rotation = rotation_of(repo, name)
     if _is_svg(original) or not rotation:
         return original
-    return _make(
-        repo.file(name, ROTATED_FOLDER), lambda: _open_upright(original, rotation)
-    )
+    rotated = repo.file(name, ROTATED_FOLDER)
+    if not make:
+        return rotated if rotated.is_file() else None
+    return _make(rotated, lambda: _open_upright(original, rotation))
 
 
 def open_racer_photo(
+    repo: Repository, column: Callable[[], str], label: Label | None
+) -> BufferedReader | None:
+    """The file `photo.php/<repo>/racer/<id>[/<render>]` serves for a racer,
+    open as `open_render()` opens it, or None. `column()` reads the racer's
+    photo column. With no render, the file the column names.
+
+    A crop the column names that is gone by the open was taken away by a
+    rotation or a delete, which rewrote the column before unlinking it
+    (`rotate_photo`, `delete_photo`). The column is read again and what it
+    names now is served: the turned original after a rotation, nothing after
+    a delete (#302). An open that fails otherwise raises."""
+    path = column()
+    found = _open_racer_photo(repo, path, label)
+    if found is not None or label is not None:
+        return found
+    if not path.startswith(CROPPED_FOLDER + "/"):
+        return None
+    again = column()
+    return _open_racer_photo(repo, again, label) if again != path else None
+
+
+def _open_racer_photo(
     repo: Repository, path: str, label: Label | None
 ) -> BufferedReader | None:
-    """The file `photo.php/<repo>/racer/<id>[/<render>]` serves for a racer
-    whose column holds `path`, open as `open_render()` opens it, or None. With
-    no render, the file the column names. A crop unlinked before its open is
-    None, as a missing crop is; an open that fails otherwise raises."""
     if repo.directory is None or not path:
         return None
     name = path.rsplit("/", 1)[-1]

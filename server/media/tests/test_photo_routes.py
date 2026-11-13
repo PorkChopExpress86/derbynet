@@ -129,8 +129,13 @@ def test_a_racer_with_no_photo_gets_the_transparent_pixel(crew, folders, event):
         assert data == ONE_PIXEL.read_bytes()
 
 
-def test_a_racer_whose_file_is_missing_gets_the_transparent_pixel(crew, folders, event):
-    racer = RacerFactory(group__event=event, headshot="gone.jpg")
+@pytest.mark.parametrize("column", ["gone.jpg", "0-cropped/gone.jpg"])
+def test_a_racer_whose_file_is_missing_gets_the_transparent_pixel(
+    crew, folders, event, column
+):
+    """A crop that is gone, with no upload behind it, too: the column, read
+    again, still names it (#302)."""
+    racer = RacerFactory(group__event=event, headshot=column)
 
     for tail in (f"head/racer/{racer.pk}/1", f"head/racer/{racer.pk}/work/1"):
         response, data = get(crew, tail)

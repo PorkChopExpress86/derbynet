@@ -70,6 +70,8 @@ def photo(request, rest: str):
         if label is None:
             return _not_found("No such render")
         # PHP decodes the basename a second time, as render_url() encodes it.
+        # An OSError is a file that won't open or a render that couldn't be
+        # written, under the photo's lock.
         try:
             found = photos.open_render(repo, label, unquote_plus(parts[4]))
         except OSError:
@@ -83,17 +85,22 @@ def photo(request, rest: str):
         label = photos.parse_label(parts[4])
         if label is None:
             return _not_found("No such render")
-    path = ""
     # SQLite reads PHP's text id as a number, so `065` is racer 65.
     racer_id = photos.bounded_int(parts[3])
-    if racer_id is not None:
-        path = (
+
+    def column() -> str:
+        if racer_id is None:
+            return ""
+        return (
             Racer.objects.filter(event=event, pk=racer_id)
             .values_list(repo.field, flat=True)
             .first()
         ) or ""
+
+    # An OSError is a file that won't open or a render that couldn't be
+    # written, under the photo's lock.
     try:
-        found = photos.open_racer_photo(repo, path, label)
+        found = photos.open_racer_photo(repo, column, label)
     except OSError:
         return _not_found("Can't read file.")
     # A racer with no photo, or a missing file, gets the transparent pixel,

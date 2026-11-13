@@ -1,12 +1,18 @@
 """A crop, rotation or delete that lands while a render or a crop is in
-progress (#35 review of PR #149). Each change holds the photo's lock until
-its transaction has committed and the stale renders are gone, and a render
-reads the photo's state under the same lock, so nothing made from the old
-state outlives the change.
+progress (#35 review of PR #149), or while `photo.php` serves a photo (#302).
+Each change holds the photo's lock until its transaction has committed and
+the stale renders are gone, and a render reads the photo's state under the
+same lock, so nothing made from the old state outlives the change.
 
-Each test pauses one request at the dangerous point, starts the other
-action in a second thread, and gives it time to finish before going on.
-Without the lock the second action completes inside the pause."""
+The #35 tests pause a request at the dangerous point with `interrupt()`,
+start the change in a second thread, and give it `PAUSE` to finish before
+going on: without the lock the change completes inside the pause.
+
+The #302 tests run the change in a second thread at a point where nothing
+holds it back, and wait for it to finish (`in_other_thread()`): as the
+request lets go of the photo's lock, as the view starts to serve, just
+before a file is opened, or while the response streams. The request must
+still serve a photo, never a 404."""
 
 import threading
 import time
@@ -35,6 +41,7 @@ pytestmark = pytest.mark.django_db(transaction=True, serialized_rollback=True)
 
 CREW = Perm.PHOTO_UPLOAD | Perm.ASSIGN_RACER_IMAGE
 PAUSE = 0.5
+JOIN_TIMEOUT = 30
 
 
 def body(response) -> bytes:
@@ -48,12 +55,12 @@ def crew(folders):
     return client
 
 
-def interrupt(monkeypatch, attribute, when, action, after=False, module=photos):
-    """Make `<module>.<attribute>` start `action` in another thread the first
+def interrupt(monkeypatch, attribute, when, action, after=False):
+    """Make `photos.<attribute>` start `action` in another thread the first
     time `when(*args)` holds, before the call or, with `after`, once it has
     returned, and pause long enough for the action to finish if nothing holds
     it back. Returns a list that then holds the thread, to join."""
-    real = getattr(module, attribute)
+    real = getattr(photos, attribute)
     started = []
 
     def run():
@@ -77,7 +84,7 @@ def interrupt(monkeypatch, attribute, when, action, after=False, module=photos):
             start(args)
         return result
 
-    monkeypatch.setattr(module, attribute, interrupted)
+    monkeypatch.setattr(photos, attribute, interrupted)
     return started
 
 
@@ -98,9 +105,6 @@ def _closing(action) -> None:
         action()
     finally:
         connection.close()
-
-
-JOIN_TIMEOUT = 30
 
 
 def test_a_rotation_during_a_render_leaves_no_stale_render(
@@ -240,7 +244,7 @@ def test_a_rotation_during_an_autocropped_upload_leaves_the_racer_a_photo(
 
 # Each request the view serves, after the setup that leads to it, and the
 # size of what the photo looked like before the rotation the tests start.
-# The upload is 480x320; CROP keeps its top left quarter, 240x160.
+# The upload is 480x320; CROP keeps a quarter of it, 240x160.
 SERVED = {
     "a sized render made now": ([], "file/200x200/p.jpg", (200, 133)),
     "a sized render made before": (
@@ -370,36 +374,56 @@ def test_a_made_file_unlinked_before_its_open_is_found_again(
     assert shape(body(response))[0] == after
 
 
-def test_a_racer_whose_crop_goes_before_its_open_gets_the_pixel(
-    crew, folders, event, monkeypatch
+@pytest.mark.parametrize("change", ["rotate", "delete"])
+def test_a_racer_whose_crop_goes_before_its_open_gets_what_it_shows_now(
+    crew, folders, event, monkeypatch, change
 ):
-    """#302: a racer shown by the crop gets the transparent pixel, as a racer
-    whose crop is missing does, when a rotation unlinks the crop between the
-    view's lookup and its open, where it answered 404."""
+    """#302: a racer shown by the crop, whose crop a change unlinks between
+    the view's lookup and its open, gets what its column names after the
+    change: the turned original after a rotation, the transparent pixel
+    after a delete. The view answered 404 there."""
     racer = prepare(crew, event, ["crop"])
-    rotated_before_open(monkeypatch, event, folders)
+    repo = photos.repository(event, "head")
+    changed_before_open(
+        monkeypatch,
+        folders,
+        {
+            "rotate": lambda: photos.rotate_photo(event, repo, "p.jpg", 90),
+            "delete": lambda: photos.delete_photo(event, repo, "p.jpg"),
+        }[change],
+    )
 
     response = crew.get(f"/photo.php/head/racer/{racer}/1")
 
     assert response.status_code == 200, response.content
-    assert body(response) == ONE_PIXEL.read_bytes()
+    if change == "rotate":
+        assert shape(body(response))[0] == (320, 480)
+    else:
+        assert body(response) == ONE_PIXEL.read_bytes()
 
 
 def rotated_before_open(monkeypatch, event, folders) -> None:
     """Rotate p.jpg by 90 degrees just before the first open of one of its
     renders."""
     repo = photos.repository(event, "head")
+    changed_before_open(
+        monkeypatch, folders, lambda: photos.rotate_photo(event, repo, "p.jpg", 90)
+    )
+
+
+def changed_before_open(monkeypatch, folders, change) -> None:
+    """Run `change` just before the first open of one of p.jpg's renders."""
     real = Path.open
     done = []
 
-    def rotated_first(path, mode="r", *args, **kwargs):
+    def changed_first(path, mode="r", *args, **kwargs):
         render = path.parent.parent == folders.head and path.name == "p.jpg"
         if render and not done:
             done.append(path)
-            in_other_thread(lambda: photos.rotate_photo(event, repo, "p.jpg", 90))
+            in_other_thread(change)
         return real(path, mode, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "open", rotated_first)
+    monkeypatch.setattr(Path, "open", changed_first)
 
 
 def test_a_rotation_while_the_file_streams_does_not_wait_for_it(
