@@ -65,14 +65,19 @@ def check(base: str, screenshot: str) -> None:
             expect(snap).to_be_enabled()
             snap.click()
             expect(photo.locator("[data-preview]")).to_be_visible()
-            photo.get_by_role("button", name="Capture and check in").click()
+            # Pressed with Enter, not clicked: with this roster the sheet
+            # leaves Chromium's visual viewport 46 px below the layout
+            # viewport (visualViewport.offsetTop), and Playwright's click,
+            # aimed by layout coordinates, lands on the Autocrop label above
+            # the button. A finger taps what the screen shows.
+            photo.get_by_role("button", name="Capture and check in").press("Enter")
             expect(sheet.locator("[data-crop-sheet]")).to_be_visible()
             expect(sheet.locator("[data-sheet-notice]")).to_contain_text(
                 "Racer photo saved"
             )
             print(f"ok: live-camera photo saved over {page.url}")
         finally:
-            page.screenshot(path=screenshot, full_page=True)
+            page.screenshot(path=screenshot)
             browser.close()
 
 

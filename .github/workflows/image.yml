@@ -174,11 +174,25 @@ jobs:
           done
           curl -fsS -o /dev/null -w '%{http_code} %{url_effective}\n' "$url/index.php"
 
+      # SQLite removes the -wal and -shm files when its last connection
+      # closes, and Django closes its connection after each request, so the
+      # compose-sqlite run lists the data volume while the suite runs, and
+      # keeps the first listing that shows them.
       - name: Run testing/exercise-one-database.sh against the image
         if: matrix.variant != 'timeout'
         env:
           DERBYNET_BACKEND: django
-        run: bash testing/exercise-one-database.sh "$URL" ez
+        run: |
+          if [ "${{ matrix.variant }}" = compose-sqlite ]; then
+            ( while sleep 0.2; do
+                docker exec derbynet-server-1 ls -la /var/lib/derbynet > "$RUNNER_TEMP/ls.txt" 2>/dev/null || continue
+                if grep -q 'sqlite3-wal$' "$RUNNER_TEMP/ls.txt" && grep -q 'sqlite3-shm$' "$RUNNER_TEMP/ls.txt"; then
+                  mv "$RUNNER_TEMP/ls.txt" "$RUNNER_TEMP/ls-during-suite.txt"
+                  break
+                fi
+              done ) &
+          fi
+          bash testing/exercise-one-database.sh "$URL" ez
 
       # As server.yml's shell job runs it, with no edit inside the container.
       - name: Run test-extended-scheduling.sh with DERBYNET_REQUEST_TIMEOUT=600
@@ -199,11 +213,14 @@ jobs:
           services="$(compose ps --services --status running)"
           if [ "${{ matrix.variant }}" = compose-sqlite ]; then
             ! echo "$services" | grep -qx postgres
-            # One database file, with its WAL files while the server runs.
-            compose exec -T server sh -c 'ls /var/lib/derbynet/*.sqlite3*' | tee sqlite.txt
-            test "$(grep -c '\.sqlite3$' sqlite.txt)" = 1
-            grep -q '\.sqlite3-wal$' sqlite.txt
-            grep -q '\.sqlite3-shm$' sqlite.txt
+            echo "The data volume while the suite ran:"
+            cat "$RUNNER_TEMP/ls-during-suite.txt"
+            test "$(grep -c '\.sqlite3$' "$RUNNER_TEMP/ls-during-suite.txt")" = 1
+            test "$(grep -c '\.sqlite3' "$RUNNER_TEMP/ls-during-suite.txt")" = 3
+            compose exec -T -u derbynet server python -c \
+              'import sqlite3; print("journal_mode", sqlite3.connect("/var/lib/derbynet/derbynet.sqlite3").execute("PRAGMA journal_mode").fetchone()[0])' \
+              | tee mode.txt
+            grep -qx 'journal_mode wal' mode.txt
           else
             echo "$services" | grep -qx postgres
             compose exec -T server sh -c '! ls /var/lib/derbynet/*.sqlite3*'

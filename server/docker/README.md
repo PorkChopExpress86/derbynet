@@ -60,7 +60,7 @@ The image sets these. `server/README.md`'s Settings table lists the rest, such a
 | `DJANGO_SECRET_KEY` | unset | When unset, the server makes one on first start in `/var/lib/derbynet/secret_key`, mode 0600 |
 | `DATABASE_URL` | unset | Another database. Unset, SQLite on the volume, or the compose `postgres` service when it runs |
 | `DERBYNET_DATA_DIR`, `DERBYNET_CONFIG_DIR` | `/var/lib/derbynet` | Where the data and the install's files are. Keep both on the volume |
-| `GUNICORN_RELOAD` | `0` | `1` restarts gunicorn when Python code changes, for development (README.md) |
+| `GUNICORN_RELOAD` | `0` | `1` restarts gunicorn's workers when a Python file or a template changes, for development (README.md) |
 
 ## Timers on a Mac or Windows laptop
 

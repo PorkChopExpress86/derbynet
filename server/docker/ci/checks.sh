@@ -43,9 +43,9 @@ fail() { echo "FAILED: $*" >&2; exit 1; }
 say() { echo "== $*"; }
 
 cleanup() {
-    # The bind-mount check leaves files owned by other uids.
+    # The bind-mount and backup checks leave files owned by other uids.
     [ -d "${RUNNER_TEMP_DIR:-}" ] && docker run --rm -v "$RUNNER_TEMP_DIR:/t" \
-        --entrypoint sh "$IMAGE" -c 'rm -rf /t/bind' >/dev/null 2>&1 || true
+        --entrypoint sh "$IMAGE" -c 'rm -rf /t/bind /t/backup' >/dev/null 2>&1 || true
     docker ps -aq --filter "name=^$PREFIX-" | xargs -r docker rm -f >/dev/null
     docker volume ls -q --filter "name=^$PREFIX-" | xargs -r docker volume rm >/dev/null
 }
@@ -203,8 +203,8 @@ check_user() {
 # A JPEG of exactly $2 bytes: a real photo with random bytes after its end,
 # which every decoder ignores.
 padded_jpeg() {
-    local out="$1" size="$2" photo="$TESTING/data/headshots/head-01.jpg"
-    [ -f "$photo" ] || photo="$(ls "$TESTING"/data/headshots/*.jpg | head -1)"
+    local out="$1" size="$2" photo
+    photo="$(ls "$TESTING"/data/headshots/*.jpg | head -1)"
     cp "$photo" "$out"
     head -c $((size - $(stat -c %s "$photo"))) /dev/urandom >> "$out"
 }
@@ -259,24 +259,18 @@ check_bind_mount() {
 }
 
 check_client_ip() {
-    start ip1 "$PREFIX-ip" -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 127.0.0.1::80
-    local url="http://$(docker port "$PREFIX-ip1" 80/tcp)"
-    local work="$RUNNER_TEMP_DIR/ip"
-    suite_copy "$work"
-    new_event "$url"
-    # The kiosk page names a kiosk by its client's address, as PHP did with
-    # REMOTE_ADDR (ui/kiosk_pages/views.py).
-    curl -s -o /dev/null "$url/kiosk.php"
-    local jar="$work/cookies" list
-    login "$url" "$jar" RaceCoordinator
-    list="$(curl -s -c "$jar" -b "$jar" "$url/action.php?query=poll.kiosk.all")"
-    say "poll.kiosk.all after a kiosk page from the host"
-    echo "$list" | head -c 600
-    echo
-    local gateway
+    start ip1 "$PREFIX-ip" -p 127.0.0.1::80
+    local url="http://$(docker port "$PREFIX-ip1" 80/tcp)" gateway target
+    # kiosk.php with no address answers 302 to ?address=<client address>+<port>,
+    # from REMOTE_ADDR and REMOTE_PORT, as PHP's kiosk.php:8-10 does
+    # (ui/kiosk_pages/views.py); with no port it would stand in 100 to 200.
+    target="$(curl -s -o /dev/null -w '%{redirect_url}' "$url/kiosk.php")"
     gateway="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$PREFIX-ip1")"
-    echo "$list" | grep -q "\"$gateway+\\|>$gateway+\\|$gateway+" \
+    say "kiosk.php from the host, whose address in the container's network is $gateway"
+    echo "$target"
+    [[ "$target" =~ address=${gateway//./\\.}%2B([0-9]+)$ ]] \
         || fail "the kiosk's address is not the client's ($gateway)"
+    (( BASH_REMATCH[1] > 200 )) || fail "the kiosk's port is the stand-in ${BASH_REMATCH[1]}"
 }
 
 check_timeout() {
@@ -330,7 +324,7 @@ race_some_heats() { # race_some_heats <url> <work dir>
 }
 
 counts() { # counts <container>: racers, and lanes with a finish time
-    docker exec -u derbynet "$1" python manage.py shell -c '
+    docker exec -u derbynet "$1" python manage.py shell --no-imports -c '
 from racing.models import HeatLane
 from roster.models import Racer
 print("racers", Racer.objects.count(), "results", HeatLane.objects.exclude(finish_time=None).count())'
@@ -375,7 +369,7 @@ check_backup() {
     login "$url" "$jar" RaceCoordinator
     racer="$(curl -s -b "$jar" "$url/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
     curl -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
-        -F photo=@"$TESTING/data/headshots/head-01.jpg" "$url/action.php" | grep -q success \
+        -F photo=@"$(ls "$TESTING"/data/headshots/*.jpg | head -1)" "$url/action.php" | grep -q success \
         || fail "no racer photo"
     curl -s -b "$jar" -F action=photo.upload -F repo=car -F racerid="$racer" \
         -F photo=@"$(ls "$TESTING"/data/carphotos/Car-*.jpg | head -1)" "$url/action.php" | grep -q success \

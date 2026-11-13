@@ -21,11 +21,10 @@ You need Docker (Docker Desktop on a Mac or Windows) and nothing else.
    The first visit sets up an event.
 
 2. Edit the code. `server/` is mounted read-only over the image's copy, so
-   a template edit shows on the next page load (the service sets
-   `DERBYNET_DEBUG=1`, so Django reads templates afresh), and gunicorn restarts
-   itself after a Python edit (`GUNICORN_RELOAD=1`). Static files (CSS and
-   JavaScript) are collected when the image is built, so rerun the command
-   above with `--build` after changing them, and after a change to
+   gunicorn restarts its workers after a Python or template edit
+   (`GUNICORN_RELOAD=1`), and the next page load shows it. Static files
+   (CSS and JavaScript) are collected when the image is built, so rerun the
+   command above with `--build` after changing them, and after a change to
    `server/uv.lock`.
 
 3. Your data stays in the `image-data` volume between runs, as a race's does

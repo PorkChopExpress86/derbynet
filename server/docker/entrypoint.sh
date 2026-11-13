@@ -204,8 +204,16 @@ chown derbynet:derbynet /run/derbynet
 chmod 0750 /run/derbynet
 rm -f /run/derbynet/gunicorn.sock
 
+# For development (README.md): restart the workers when a Python file or a
+# template changes.  Django caches templates even with DEBUG on, and only
+# runserver's reloader clears that cache, so each template is watched too.
 reload=()
-[ "${GUNICORN_RELOAD:-0}" = 1 ] && reload=(--reload)
+if [ "${GUNICORN_RELOAD:-0}" = 1 ]; then
+    reload=(--reload)
+    while IFS= read -r -d '' template; do
+        reload+=(--reload-extra-file "$template")
+    done < <(find /opt/derbynet/server -path '*/templates/*' -type f -print0)
+fi
 
 stopping=0
 trap 'stopping=1' TERM INT

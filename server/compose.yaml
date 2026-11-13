@@ -61,8 +61,8 @@ services:
       - uv-cache:/uv-cache
 
   # The production image (#58) running this checkout: server/ is mounted over
-  # the image's copy, gunicorn restarts on a Python edit, and DEBUG makes
-  # Django read each template afresh. `--profile image` starts it.
+  # the image's copy, and gunicorn restarts its workers on a Python or
+  # template edit. `--profile image` starts it.
   image:
     profiles: [image]
     build:
