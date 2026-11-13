@@ -6,7 +6,18 @@ set -uo pipefail
 source "$(dirname "$0")/env.sh"
 if [ "$KIND" = django ]; then
   pid=$(cat "$PIDFILE" 2>/dev/null) && kill "$pid" 2>/dev/null
-  rm -rf "$DJANGO_STATE" "$JAR"
+  rm -f "$JAR"
+  if [ -f "$SERVE_FILE" ]; then
+    off=("$SUDO" "$(command -v tailscale)" serve --https=443 off)
+    if ! "${off[@]}"; then
+      # Keep the record, so the next cleanup tries again and launch waits.
+      find "$DJANGO_STATE" -mindepth 1 -maxdepth 1 ! -name phone-serve -exec rm -rf {} +
+      echo "FAIL tailscale serve is still on; run bin/cleanup again, or: ${off[*]}" >&2
+      exit 1
+    fi
+    echo "stopped tailscale serve for $(cat "$SERVE_FILE")"
+  fi
+  rm -rf "$DJANGO_STATE"
   echo "cleaned $DJANGO_STATE; evidence kept in $EVIDENCE"
   exit 0
 fi

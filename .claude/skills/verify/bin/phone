@@ -1,0 +1,45 @@
+#!/bin/bash
+# Serves this run's django server to a real phone or tablet on the tailnet,
+# at https://<this machine's tailnet name>/, through tailscale serve.  Ready
+# when it prints "phone https://...".  Run it after bin/launch; cleanup turns
+# the serve off.  tailscale serve needs root: VERIFY_SUDO names the command
+# that grants it (default sudo).
+set -euo pipefail
+BIN="$(cd "$(dirname "$0")" && pwd)"
+source "$BIN/env.sh"
+[ "$KIND" = django ] || { echo "phone applies to VERIFY_SERVER=django" >&2; exit 2; }
+"$BIN/doctor" > /dev/null || { echo "doctor fails; run bin/launch first" >&2; exit 1; }
+tailscale=$(command -v tailscale) || { echo "no tailscale on this machine" >&2; exit 1; }
+host=$("$tailscale" status --json \
+  | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))') \
+  || { echo "tailscale is not up" >&2; exit 1; }
+origin="https://$host"
+# Serve only when nothing is served, or when this run started what is.
+served=$("$tailscale" serve status 2>&1)
+if [ "$served" = "No serve config" ]; then
+  start=1
+elif [ -f "$SERVE_FILE" ] && [[ $served == *"proxy $BASE"* ]]; then
+  start=0
+else
+  echo "tailscale serve serves something this run did not start; leaving it alone:" >&2
+  echo "$served" >&2
+  exit 1
+fi
+echo "$origin" > "$ORIGIN_FILE"
+"$BIN/restart" >> "$EVIDENCE/phone.log" 2>&1 \
+  || { tail -15 "$EVIDENCE/phone.log" >&2; exit 1; }
+if [ $start = 1 ]; then
+  "$SUDO" "$tailscale" serve --bg --https=443 "$BASE" >> "$EVIDENCE/phone.log" 2>&1 \
+    || { tail -5 "$EVIDENCE/phone.log" >&2; exit 1; }
+  echo "$origin" > "$SERVE_FILE"
+fi
+# A page whose stylesheet and icons 404 shows huge icons and dead links on a
+# phone (the first #42 and #54 phone checks, a runserver with no --insecure).
+# The first request after tailscale serve starts waits for its certificate:
+# 12.8 s on 2026-11-13.
+for path in login/ static/ui/app.css; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$origin/$path" || true)
+  echo "$origin/$path: $code" >> "$EVIDENCE/phone.log"
+  [ "$code" = 200 ] || { echo "FAIL $origin/$path answered $code" >&2; exit 1; }
+done
+echo phone "$origin/"
