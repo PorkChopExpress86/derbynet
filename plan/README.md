@@ -8,7 +8,7 @@ The plan lives in GitHub issues on PorkChopExpress86/derbynet, labeled `django-m
 | `implement-all-tickets.md` | Prompt for a lead session that works through every `ready-for-agent` ticket in a loop, giving each step to fresh Opus or Sonnet subagents: implement, code review, PR, merge, retro |
 | `owner-decisions.md` | Every owner decision, with the issues and ADRs that record it |
 | `lint-issues.py` | Checks every plan issue body: style, section order, a ticket's Goal that asserts a cause the body marks unverified, cited paths, `#N` references, and forward-only dependencies with no cycles. Checks that issue state matches the code: no open ticket or spec that a merged PR closes, no `ready-for-agent` with an open dependency, no `blocked` with every dependency closed |
-| `bin/pr-wait` | Waits for every check on a PR's current head and prints one line per check |
+| `bin/pr-wait` | Waits for every check on a PR's current head that `pr-merge` counts and prints one line per check, then the parity-check push checks it leaves out |
 | `bin/ci-failures` | Lists each test that failed on a PR's checks, `known` when it also failed on a recent master run (a flake already on master) and `new` otherwise, and for a job with no test id its failed step and the error line the jobs share, with an `outage:` line when every job died in setup on that line; `pr-wait` prints it on a failure |
 | `bin/issue` | Prints an issue's title, body, and comments, because `gh issue view --comments` prints nothing on some gh versions |
 | `bin/ci-suites` | Lists each `testing/` suite an issue names and whether `.github/workflows/server.yml` runs it; exits 1 when one is missing |
@@ -37,6 +37,6 @@ The lint counts a PR as merged when GitHub says so, or when GitHub shows it clos
 ## Ship a PR
 
 ```bash
-plan/bin/pr-wait 82     # exits 1 if any check failed
+plan/bin/pr-wait 82     # exits 1 if any check pr-merge counts failed
 plan/bin/pr-merge 82     # squashes and deletes the branch unless given a method
 ```

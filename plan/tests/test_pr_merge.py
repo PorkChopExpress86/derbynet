@@ -143,6 +143,23 @@ class PrMerge(unittest.TestCase):
                 self.assertIn(f'\n{area}\n  master:  {master}\n  this PR: {pr}\n', done.stderr)
                 self.assertEqual(self.merged(), '')
 
+    def test_areas_compare_the_same_in_any_locale(self):
+        """en_US.UTF-8 sorts conftest.py before .github/, as comm does not:
+        #295's merge printed "comm: file 1 is not in sorted order" twice, and
+        an area both sides changed could be missed (#206 retro)."""
+        for locale in ('en_US.UTF-8', 'C.UTF-8', 'C'):
+            with self.subTest(locale=locale):
+                self.setUp()
+                self.env['LC_ALL'] = locale
+                head = self.pr('server/ui/tests/conftest.py', '.github/workflows/server.yml',
+                               'plan/README.md')
+                self.master('.github/ubuntu-mirror.sh')
+                done = self.merge(head)
+                self.assertNotIn('comm:', done.stderr)
+                self.assertEqual(done.returncode, 1, done.stderr)
+                self.assertIn('\n.github/\n  master:  .github/ubuntu-mirror.sh\n', done.stderr)
+                self.assertEqual(self.merged(), '')
+
     def test_master_moved_from_another_clone_is_fetched(self):
         """The local origin/master is stale: #288 merged from elsewhere. The
         Standards review of 4d459525 dropped the fetch and every other test

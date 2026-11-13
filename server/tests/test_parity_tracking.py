@@ -219,3 +219,170 @@ def test_the_issue_is_found_by_its_label_not_by_a_search(tmp_path):
     [listing] = [call for call in gh.calls if call[1:3] == ["issue", "list"]]
     assert "--search" not in listing
     assert listing[listing.index("--label") + 1] == "parity-gate"
+
+
+# The jobs of nightly run 43254181268 (2026-11-12), as `gh run view --json
+# jobs` gives them, cut to the fields read: both Django legs failed after
+# uploading their steps, so both gates passed and the issue said no step
+# failed (#206 retro).
+GOLDEN = "Replay the golden fixtures against Django"
+NOV_12_JOBS = {
+    "jobs": [
+        {
+            "name": f"leg (django, {database})",
+            "conclusion": "failure",
+            "status": "completed",
+            "steps": [
+                {"name": "Run the suite, step by step", "conclusion": "success"},
+                {"name": GOLDEN, "conclusion": "failure"},
+            ],
+        }
+        for database in ("postgres", "sqlite")
+    ]
+    + [
+        {"name": name, "conclusion": "success", "status": "completed", "steps": []}
+        for name in (
+            "leg (php)",
+            "gate (django, sqlite)",
+            "gate (django, postgres)",
+            "track the failing steps",
+        )
+    ]
+}
+GREEN = {"short": [], "steps": []}
+
+
+def test_a_leg_job_that_failed_after_the_gate_passed_changes_the_list(tmp_path):
+    gh = pt.Gh(dry_run=True, issue_body=issue_body(tmp_path, GREEN))
+    jobs = saved(tmp_path, "jobs", NOV_12_JOBS)
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+    did = pt.track(gh, one, "https://example/run/9", "c" * 40, tmp_path)
+
+    assert jobs and did == "updated"
+    label = f"(the leg's job failed: {GOLDEN})"
+    assert pt.failing_list(one) == {label: ["postgres", "sqlite"]}
+    body = (tmp_path / "parity-tracking-body.md").read_text()
+    assert (
+        f"| `{label}` | job failed | job failed | no WAITING entry |"
+        " leg (django, sqlite); leg (django, postgres) |"
+    ) in body
+
+
+def test_a_second_failed_step_behind_the_first_changes_the_list(tmp_path):
+    """Both steps after the upload run unless the run is cancelled: the
+    derby-timer race starting to fail while the replay still fails is news."""
+    saved(tmp_path, "jobs", NOV_12_JOBS)
+    night_1 = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+    gh = pt.Gh(dry_run=True, issue_body=pt.render(night_1, "https://x/1", "a" * 40))
+    race = "Race a round with derby-timer.jar against Django"
+    sqlite = json.loads(json.dumps(NOV_12_JOBS))
+    sqlite["jobs"][1]["steps"].append({"name": race, "conclusion": "failure"})
+    saved(tmp_path, "jobs", sqlite)
+
+    night_2 = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.track(gh, night_2, "https://x/2", "b" * 40, tmp_path) == "updated"
+    comment = (tmp_path / "parity-tracking-comment.md").read_text()
+    assert f"- Now fails: `(the leg's job failed: {race})` (sqlite)" in comment
+
+
+def test_a_failed_php_leg_counts_on_every_database(tmp_path):
+    php = {"name": "leg (php)", "conclusion": "cancelled", "status": "completed"}
+    others = [
+        {**job, "conclusion": "success", "steps": []}
+        for job in NOV_12_JOBS["jobs"]
+        if job["name"] != "leg (php)"
+    ]
+    saved(tmp_path, "jobs", {"jobs": [php, *others]})
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    label = "(the leg's job failed: cancelled)"
+    assert pt.failing_list(one) == {label: ["postgres", "sqlite"]}
+    assert one[0].job == ((label, "leg (php)"),)
+
+
+def test_a_failed_gate_job_is_left_to_the_gate_file(tmp_path):
+    gate = {"name": "gate (django, sqlite)", "conclusion": "failure", "steps": []}
+    legs_green = [
+        {"name": name, "conclusion": "success", "steps": []}
+        for name in ("leg (php)", "leg (django, sqlite)", "leg (django, postgres)")
+    ]
+    saved(tmp_path, "jobs", {"jobs": [gate, *legs_green]})
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {}
+
+
+def test_a_jobs_file_it_cannot_read_is_a_failing_entry(tmp_path):
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {
+        "(the leg jobs could not be read)": ["postgres", "sqlite"]
+    }
+
+
+def test_main_reads_the_jobs_file(tmp_path, capsys):
+    saved(tmp_path, "jobs", NOV_12_JOBS)
+    body = tmp_path / "issue.md"
+    body.write_text(issue_body(tmp_path, GREEN))
+
+    pt.main(
+        [
+            "--dry-run",
+            "--issue-body",
+            str(body),
+            "--workdir",
+            str(tmp_path),
+            "--jobs",
+            str(tmp_path / "jobs.json"),
+            f"sqlite={saved(tmp_path, 'sqlite', GREEN)}",
+            f"postgres={saved(tmp_path, 'postgres', GREEN)}",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    assert f'"(the leg\'s job failed: {GOLDEN})": ["postgres", "sqlite"]' in out
+    assert "tracking issue updated" in out
+
+
+def test_a_jobs_file_with_no_jobs_is_unread(tmp_path):
+    """An empty list must not clear #225's job entries in silence."""
+    saved(tmp_path, "jobs", {"jobs": []})
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {
+        "(the leg jobs could not be read)": ["postgres", "sqlite"]
+    }
+
+
+def test_a_renamed_leg_job_is_unread_on_its_database(tmp_path):
+    renamed = json.loads(json.dumps(NOV_12_JOBS))
+    renamed["jobs"][1]["name"] = "leg (django-sqlite)"
+    saved(tmp_path, "jobs", renamed)
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {
+        f"(the leg's job failed: {GOLDEN})": ["postgres"],
+        "(the leg jobs could not be read)": ["sqlite"],
+    }
+    assert (
+        "(the leg jobs could not be read)",
+        "jobs.json has no leg (django, sqlite)",
+    ) in one[0].job + one[1].job
+
+
+def test_a_jobs_file_with_no_php_leg_is_unread_everywhere(tmp_path):
+    no_php = {"jobs": [j for j in NOV_12_JOBS["jobs"] if j["name"] != "leg (php)"]}
+    saved(tmp_path, "jobs", no_php)
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one)["(the leg jobs could not be read)"] == [
+        "postgres",
+        "sqlite",
+    ]
