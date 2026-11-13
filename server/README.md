@@ -362,7 +362,7 @@ When no rule matches, the report says nothing stood out. Without `--pid` it also
 
 ### The race-day run on a Raspberry Pi
 
-`tools/load-run.sh` serves Django as production will (ADR-08), then runs the load script against it. It uses a fresh SQLite database under `var/` and refuses to run unless SQLite is in WAL mode. It serves the database with gunicorn from the `serve` dependency group, which `uv.lock` pins, with `DEBUG` off. It starts 4 sync workers. That count is a stand-in until M6 settles the production config, and `DERBYNET_LOAD_WORKERS` changes it. On the Pi, after `uv sync`, run:
+`tools/load-run.sh` serves Django as production will (ADR-08), then runs the load script against it. It uses a fresh SQLite database under `var/` and refuses to run unless SQLite is in WAL mode. It serves the database with gunicorn from the `serve` dependency group, which `uv.lock` pins, with `DEBUG` off. It starts 4 sync workers, the Docker image's `GUNICORN_WORKERS` default (`server/docker/README.md`) until this run sets it, and `DERBYNET_LOAD_WORKERS` changes it. On the Pi, after `uv sync`, run:
 
 ```sh
 server/tools/load-run.sh 30
@@ -446,7 +446,7 @@ uv run python manage.py build_timer          # template, scripts, CSS and profil
 uv run python manage.py build_timer --check  # exits 1 if the committed template is stale; CI runs this
 ```
 
-The command writes the Django template `ui/templates/ui/timer/browser.html` from `templates/timer.html` (committed), copies `timer/derbynet-timer/src` into `ui/static/timer/js/timer/` and `css/timer.css`, and fills `profiles.js` from `org.jeffpiazza.derby.profiles.AllProfiles` (both gitignored). It compiles the timer's Java sources with `javac`, with no Ant; a host with no JDK runs that step in a pinned JDK container through docker, and `--no-profiles` skips it. The ui CI job runs the build before the browser tests. No Django image exists yet; the image ticket (#58) must run it as well, so nothing runs Java at request time. jQuery, `mobile.js`, `modal.js`, `ajax-setup.js`, `global.css`, `mobile.css` and the images the page loads are committed copies under `ui/static/timer/`, served at the relative paths the page uses (`js/`, `css/`, `img/`), so the timer outlives `website/`.
+The command writes the Django template `ui/templates/ui/timer/browser.html` from `templates/timer.html` (committed), copies `timer/derbynet-timer/src` into `ui/static/timer/js/timer/` and `css/timer.css`, and fills `profiles.js` from `org.jeffpiazza.derby.profiles.AllProfiles` (both gitignored). It compiles the timer's Java sources with `javac`, with no Ant; a host with no JDK runs that step in a pinned JDK container through docker, and `--no-profiles` skips it. The ui CI job runs the build before the browser tests, and the Docker image's static stage runs it too (`server/docker/Dockerfile`, #58), so nothing runs Java at request time. jQuery, `mobile.js`, `modal.js`, `ajax-setup.js`, `global.css`, `mobile.css` and the images the page loads are committed copies under `ui/static/timer/`, served at the relative paths the page uses (`js/`, `css/`, `img/`), so the timer outlives `website/`.
 
 How the page and the timer pages differ from PHP:
 
@@ -509,6 +509,8 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`:
 | `DERBYNET_FACEDETECT` | unset | An executable autocrop runs on the photo's path instead of OpenCV. Its last line of output is `x y width height` |
 | `DERBYNET_VERSION` | the checkout's branch and commit, else `dev` | The build version the menu shows |
 | `DERBYNET_QUICKREF_PDF` | `../docs/dist/Quick Reference.pdf` | The quick reference the help link serves at `quickref.pdf`. The docs build writes the default |
+| `DERBYNET_STATIC_ROOT` | unset | Sets `STATIC_ROOT`, where `collectstatic` writes. The Docker image collects into `/opt/derbynet/static` and its nginx serves `/static/` from there |
+| `MAX_UPLOAD_SIZE` | unset | An nginx size (`16M`, `512k`, `1G`) that sets `DATA_UPLOAD_MAX_MEMORY_SIZE`; unset, Django's default stands. The Docker image sets it to `16M` and gives nginx's `client_max_body_size` the same value |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server generates a key into `<DERBYNET_CONFIG_DIR>/secret_key` with mode 0600 on first start, and reuses it after that |
 
 SQLite runs in WAL mode with `synchronous=NORMAL`, `IMMEDIATE` transactions, and a 20 second busy timeout (ADR-05). WAL writes `-wal` and `-shm` files next to the database, so keep `DERBYNET_DATA_DIR` on a writable local disk. A database on a network share can be corrupted. A Postgres `DATABASE_URL` is used as `dj-database-url` parses it, with no extra options.

@@ -1,5 +1,6 @@
-# The PHP server and the Django server side by side, each with its own data.
-# See server/README.md.
+# The PHP server and the Django server side by side, each with its own data,
+# and, under the `image` profile, the production image on this checkout.
+# See server/README.md and README.md.
 
 services:
   php:
@@ -59,8 +60,30 @@ services:
       - django-venv:/venv
       - uv-cache:/uv-cache
 
+  # The production image (#58) running this checkout: server/ is mounted over
+  # the image's copy, gunicorn restarts on a Python edit, and DEBUG makes
+  # Django read each template afresh. `--profile image` starts it.
+  image:
+    profiles: [image]
+    build:
+      context: ..
+      dockerfile: server/docker/Dockerfile
+    ports:
+      - "${DERBYNET_IMAGE_HTTP_PORT:-8081}:80"
+      - "${DERBYNET_IMAGE_HTTPS_PORT:-8443}:443"
+    environment:
+      DERBYNET_DEBUG: "1"
+      GUNICORN_RELOAD: "1"
+    volumes:
+      - type: bind
+        source: .
+        target: /opt/derbynet/server
+        read_only: true
+      - image-data:/var/lib/derbynet
+
 volumes:
   php-data:
   django-data:
   django-venv:
   uv-cache:
+  image-data:

@@ -1,0 +1,7 @@
+# Added to server/docker/compose.yaml in CI (.github/workflows/image.yml and
+# checks.sh): the shell suites need the test endpoints (#63).  A race never
+# sets them.
+services:
+  server:
+    environment:
+      DERBYNET_ENABLE_TEST_ENDPOINTS: "1"

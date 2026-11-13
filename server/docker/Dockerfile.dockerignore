@@ -1,0 +1,18 @@
+# The build context is the repository root (Dockerfile header).  Only what
+# the stages copy goes in: server/, and the browser timer's sources for
+# build_timer.
+*
+!server/
+!templates/timer.html
+!templates/timer-profiles.js
+!timer/src/
+!timer/derbynet-timer/src/
+!lib/jssc.jar
+!lib/Java-WebSocket-1.5.2.jar
+!lib/json-20210307.jar
+server/var/
+server/.venv/
+**/__pycache__/
+**/*.pyc
+server/ui/static/timer/js/timer/
+server/ui/static/timer/css/timer.css

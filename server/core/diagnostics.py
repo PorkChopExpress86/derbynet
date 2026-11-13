@@ -147,11 +147,11 @@ def _megabytes(n: int) -> str:
 
 def upload_limit() -> Check:
     """Django's photo upload cap against the 30 MB the photo stand sends.
-    The proxy in front of Django (nginx in the image from #58) has its own
-    `client_max_body_size`, which the server cannot read, so the page says
-    to check it. `DATA_UPLOAD_MAX_MEMORY_SIZE` caps only the form fields
-    beside a file (Django streams the file itself), so it is shown, not
-    compared."""
+    The proxy in front of Django (nginx in the image from #58, whose
+    `MAX_UPLOAD_SIZE` sets it) has its own `client_max_body_size`, which the
+    server cannot read, so the page says to check it.
+    `DATA_UPLOAD_MAX_MEMORY_SIZE` caps only the form fields beside a file
+    (Django streams the file itself), so it is shown, not compared."""
     cap = settings.PHOTO_UPLOAD_MAX_BYTES
     fields = settings.DATA_UPLOAD_MAX_MEMORY_SIZE
     detail = (

@@ -195,6 +195,10 @@ USE_TZ = True
 
 # Relative, so Django puts FORCE_SCRIPT_NAME in front of it.
 STATIC_URL = "static/"
+# Where `collectstatic` writes. The Docker image (#58) collects into
+# /opt/derbynet/static, and its nginx serves `/static/` from there, since
+# Django serves static files only with DEBUG on. Unset, collectstatic refuses.
+STATIC_ROOT = os.environ.get("DERBYNET_STATIC_ROOT") or None
 
 # The quick reference the help link opens. The docs build writes it.
 QUICKREF_PDF = Path(
@@ -228,6 +232,30 @@ VIDEO_UPLOAD_MAX_BYTES = _env_millions("DERBYNET_VIDEO_UPLOAD_MAX_MB", 100)
 # dimensions can't take the server's memory. 50 MP holds the 48 and 50 MP
 # phone cameras (8064x6048, 8160x6120).
 PHOTO_MAX_PIXELS = _env_millions("DERBYNET_PHOTO_MAX_MEGAPIXELS", 50, "megapixels")
+
+
+def _nginx_size(name):
+    """An nginx size (`16M`, `512k`, `1g`, or bytes) as bytes, as nginx reads
+    `client_max_body_size`, so the image's nginx and Django share one value."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return None
+    units = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3}
+    number, unit = value[:-1], value[-1].lower()
+    if unit.isdigit():
+        number, unit = value, ""
+    if not number.isdigit() or unit not in units or int(number) <= 0:
+        raise ImproperlyConfigured(
+            f"{name} must be a size such as 16M, 512k or 1G, not {value!r}"
+        )
+    return int(number) * units[unit]
+
+
+# The Docker image's MAX_UPLOAD_SIZE (#58, default 16M) is nginx's
+# client_max_body_size and Django's cap on the form fields of one request.
+# Unset, Django's own default stands.
+if (_max_upload := _nginx_size("MAX_UPLOAD_SIZE")) is not None:
+    DATA_UPLOAD_MAX_MEMORY_SIZE = _max_upload
 
 # PHP's DERBYNET_FACEDETECT autocrop hook: an executable that takes an image
 # path and prints `x y width height`. Unset, OpenCV finds the face.

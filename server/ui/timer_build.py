@@ -14,9 +14,9 @@ build them for PHP.
 
 The copied scripts and `profiles.js` are not committed (`.gitignore`). The ui
 CI job runs `manage.py build_timer` before the browser tests, and
-`ui/tests/browser/test_timer.py` builds them when they are missing. No Django image
-exists yet; the image ticket (#58) has to run it too, so nothing runs Java at
-request time.
+`ui/tests/browser/test_timer.py` builds them when they are missing. The Docker
+image's static stage (server/docker/Dockerfile, #58) runs it too, so nothing
+runs Java at request time.
 The legacy files the page also loads, jQuery, `mobile.js`, `modal.js`,
 `ajax-setup.js`, `global.css`, `mobile.css` and the images, are committed
 copies under `ui/static/timer/`, so the page keeps working once `website/`

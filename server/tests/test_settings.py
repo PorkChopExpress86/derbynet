@@ -134,3 +134,28 @@ def test_empty_stored_secret_key_is_rejected(load_settings, tmp_path):
 
     with pytest.raises(ImproperlyConfigured, match="secret_key.*empty"):
         load_settings()
+
+
+def test_static_root_comes_from_the_environment(load_settings, tmp_path):
+    assert load_settings()["STATIC_ROOT"] is None
+    root = str(tmp_path / "static")
+    assert load_settings(DERBYNET_STATIC_ROOT=root)["STATIC_ROOT"] == root
+
+
+@pytest.mark.parametrize(
+    ("value", "size"),
+    [("16M", 16 * 1024**2), ("512k", 512 * 1024), ("1G", 1024**3), ("2000", 2000)],
+)
+def test_max_upload_size_reads_nginx_sizes(load_settings, value, size):
+    loaded = load_settings(MAX_UPLOAD_SIZE=value)
+    assert loaded["DATA_UPLOAD_MAX_MEMORY_SIZE"] == size
+
+
+def test_max_upload_size_unset_keeps_djangos_default(load_settings):
+    assert "DATA_UPLOAD_MAX_MEMORY_SIZE" not in load_settings()
+
+
+@pytest.mark.parametrize("value", ["16MB", "M", "-1M", "0", "1.5M", "sixteen"])
+def test_max_upload_size_refuses_what_nginx_would_not_read(load_settings, value):
+    with pytest.raises(ImproperlyConfigured, match="MAX_UPLOAD_SIZE"):
+        load_settings(MAX_UPLOAD_SIZE=value)
