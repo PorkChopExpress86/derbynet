@@ -17,7 +17,7 @@ from awards import balloting
 from awards.models import BallotAward, Vote, Voter
 from awards.services import set_partition_list
 from awards.tests.factories import AwardFactory, BallotAwardFactory
-from core.models import RaceSettings, RaceState
+from core.models import Event, RaceSettings, RaceState
 from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in, post
 from roster.models import Group, Racer
@@ -644,3 +644,22 @@ def test_a_racer_who_has_not_passed_check_in_still_votes(event, wolves, pack_awa
 
     assert code(vote(phone, pack_award, racer(wolves))) == "success"
     assert code(vote(phone, pack_award, voter)) == "ineligible"
+
+
+def test_a_read_only_event_shows_the_ballot_and_refuses_a_vote(
+    event, wolves, pack_award
+):
+    """A read-only event (#212) still answers ballot.get, adding the voter
+    row PHP adds on a read, and refuses vote.cast."""
+    a = racer(wolves)
+    open_ballot(event)
+    phone = voter_client(event)
+    vote(phone, pack_award, a)
+    Event.objects.filter(pk=event.pk).update(read_only=True)
+    late = voter_client(event)
+
+    assert choices(phone, pack_award) == [a.pk]
+    assert choices(late, pack_award) == []
+    assert code(vote(phone, pack_award)) == "event-read-only"
+    assert Voter.objects.filter(event=event).count() == 2
+    assert Vote.objects.count() == 1

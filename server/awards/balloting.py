@@ -145,9 +145,13 @@ def ballot(event, token, ip_address: str = "") -> dict[int, BallotEntry]:
     PHP asks for the ballot password (D86).
 
     The voter row is added under the race-state lock, so two phones that
-    open the same token at once still make one voter."""
+    open the same token at once still make one voter. The lock skips the
+    read-only refusal: the row is the bookkeeping PHP writes on every
+    ballot read, and a read-only event still answers `ballot.get`, as it
+    did before #206; `cast()` is refused
+    (`test_a_read_only_event_shows_the_ballot_and_refuses_a_vote`)."""
     with transaction.atomic():
-        lock_race_state(event.id)
+        lock_race_state(event.id, writable=False)
         racer = token_racer(event, token)
         if racer is None:
             raise NO_TOKEN

@@ -164,7 +164,7 @@ def uploads(name: str, event) -> dict:
     return {}
 
 
-def race_day(event) -> dict[str, int]:
+def race_day(event) -> dict[str, int | str]:
     """A race day in `event`: two groups with racers, round 1 of each, the
     first scheduled and one heat run, an award, a scene, a kiosk, a playlist
     step, a car number range, and a group, rank and partition with no
@@ -215,6 +215,8 @@ def race_day(event) -> dict[str, int]:
         "award": award.pk,
         "scene": Scene.objects.filter(event=event).order_by("pk").last().pk,
         "queue": queue.pk,
+        # A voter's token, which vote.cast reads from the session (#206).
+        "token": str(late.voting_token),
     }
 
 
@@ -305,6 +307,9 @@ def test_every_action_succeeds_after_reopen_for_editing(client, day, endpoint):
     event, ids = day
     events.reopen(event.pk)
     fields = request_for(endpoint.name, ids) | uploads(endpoint.name, event)
+    if endpoint.name == "vote.cast":
+        # The voter's session holds a token (D86).
+        call(client, "query", "ballot.get", {"voting_token": ids["token"]})
 
     response = call(client, endpoint.kind, endpoint.name, fields)
 

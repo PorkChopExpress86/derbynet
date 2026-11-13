@@ -19,7 +19,7 @@ BEFORE = [("roster", "0004_weigh_in")]
 AFTER = [("roster", "0005_voting_token")]
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
 def test_the_migration_gives_each_existing_racer_its_own_token():
     """`AddField` with a callable default would give every row one value;
     the migration fills each row with a GUID of its own."""
