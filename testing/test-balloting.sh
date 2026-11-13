@@ -32,9 +32,13 @@ if [ "$DERBYNET_BACKEND" = django ] ; then
     # ballot password and the session.  The coordinator reads two racers'
     # tokens from the check-in page's Voting code sheet, and each voter
     # names its token to ballot.get as voting_token; later calls in the
-    # session use it.
+    # session use it.  The sheet is read with lookup_get, which records
+    # nothing in output.curl, as racerid_of does: the parity gate takes a
+    # line there as a request only in the forms of _REQUEST in
+    # server/tools/transcript_diff.py, which a page path is not, so the
+    # sheet's body would join the reply of the request before it.
     function voting_token_of() {
-        curl_text "checkin/racer/$(racerid_of $1)/voting-code/" | \
+        lookup_get "checkin/racer/$(racerid_of $1)/voting-code/" | \
             sed -n 's|.*data-voting-url>[^<]*/vote/code/\([0-9a-f-]*\)<.*|\1|p'
     }
     TOKEN_101=$(voting_token_of 101)
