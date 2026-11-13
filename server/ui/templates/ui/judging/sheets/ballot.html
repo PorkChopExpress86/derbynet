@@ -1,15 +1,9 @@
-{# The ballot sheet (#54): judging.php's Manage Ballot dialog and its vote tallies. The open switch posts at once; the password and each award's votes per ballot post on change and answer with this sheet again; Choose gives the award to that racer with award.winner, as on_vote_choose() does (website/js/judging.js:80 to :91). #}
+{# The ballot sheet (#54): judging.php's Manage Ballot dialog and its vote tallies. The open switch posts at once; each award's votes per ballot posts on change and answers with this sheet again; the dialog's ballot password field is gone, since a voting token lets a voter in (#206, D86); Choose gives the award to that racer with award.winner, as on_vote_choose() does (website/js/judging.js:80 to :91). #}
 <div x-data x-init="judging.show('Ballot')" class="flex flex-col gap-4" data-ballot-sheet>
   <div class="flex items-center gap-3 rounded-xl border border-line p-3">
     <span id="ballot-open-l" class="min-w-0 flex-1"><span class="block font-semibold">Balloting is open</span><span class="block text-sm text-ink-muted">Voters on the vote page see the ballot within 5 s.</span></span>
     {% url 'judging-ballot-open' as open_url %}{% include "ui/components/switch.html" with labelledby="ballot-open-l" checked=sheet.is_open name="open" url=open_url include="this" sync="this:queue last" %}
   </div>
-
-  <form hx-post="{% url 'judging-ballot-password' %}" hx-trigger="change" hx-target="#judging-sheet-body" hx-swap="innerHTML" hx-include="this" hx-sync="this:queue last" class="flex flex-col gap-1" data-ballot-password>
-    <label for="ballot-password" class="font-semibold">Ballot password</label>
-    <input id="ballot-password" name="ballot_password" type="text" autocomplete="off" value="{{ sheet.password }}"{% if not can_set_password %} disabled aria-describedby="ballot-password-why"{% endif %} class="min-h-11 rounded-xl border border-field bg-bg px-3 disabled:opacity-60">
-    {% if can_set_password %}<p class="text-sm text-ink-muted">Empty means voters need no password.</p>{% else %}<p id="ballot-password-why" class="text-sm text-ink-muted">Only a role that can set up the race can change it.</p>{% endif %}
-  </form>
 
   <section aria-labelledby="ballot-awards-h">
     <h3 id="ballot-awards-h" class="font-semibold">Awards</h3>

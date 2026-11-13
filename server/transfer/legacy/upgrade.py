@@ -54,6 +54,8 @@ COLUMNS = {
         "checkin_time": None,
         "note": None,
         "exclude": 0,
+        # Django's snapshots only (D87, #206): the racer's voting token.
+        "votingtoken": None,
     },
     "rounds": {"roundid": None, "round": None, "classid": None},
     "roster": {"rosterid": None, "roundid": None, "racerid": None},

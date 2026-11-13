@@ -7,11 +7,12 @@ import re
 from pathlib import Path
 
 import pytest
+from django.test import Client
 
 from accounts.permissions import Perm
-from awards.models import Award, BallotAward, Vote
+from awards.models import Award, BallotAward, Vote, Voter
 from awards.tests.factories import AwardFactory, BallotAwardFactory, VoteFactory
-from core.models import Event, RaceSettings, SiteState
+from core.models import Event, RaceSettings, RaceState, SiteState
 from core.tests.factories import EventFactory
 from legacy_api.tests.conftest import log_in
 from racing.models import HeatLane, RosterEntry, Round
@@ -805,3 +806,129 @@ def test_a_restore_killed_before_its_folder_switch_leaves_folders_that_exist(
     recover(events_root)
 
     assert_restored(event, before, saved, others, events_root)
+
+
+# ----- voting tokens (D87, #206) -----
+
+
+def _tokens_by_name(event) -> dict:
+    return {
+        (r.first_name, r.last_name): r.voting_token
+        for r in Racer.objects.filter(event=event)
+    }
+
+
+def test_get_then_put_keeps_each_racers_token_and_its_ballot(client, coordinator):
+    """D87: a Django snapshot carries each racer's voting token, and a load
+    keeps it, so the same code still edits the same one ballot."""
+    lions = GroupFactory(event=coordinator, name="Lions")
+    RoundFactory(event=coordinator, group=lions, number=1)
+    voter = RacerFactory(group=lions, first_name="Vera", last_name="Voter")
+    first = RacerFactory(
+        group=lions, first_name="Ann", last_name="Able", passed_inspection=True
+    )
+    RacerFactory(
+        group=lions, first_name="Ben", last_name="Baker", passed_inspection=True
+    )
+    award = BallotAwardFactory(award__event=coordinator, award__name="Best").award
+    RaceState.objects.filter(event=coordinator).update(balloting_open=True)
+    token = voter.voting_token
+    phone = Client()
+    phone.get("/action.php", {"query": "ballot.get", "voting_token": str(token)})
+    phone.post(
+        "/action.php",
+        {"action": "vote.cast", "awardid": award.pk, "votes": json.dumps([first.pk])},
+    )
+    before = _tokens_by_name(coordinator)
+
+    snapshot = get(client).content
+    rows = tables_of(snapshot)["RegistrationInfo"]["rows"]
+    assert sorted(row["votingtoken"] for row in rows) == sorted(
+        str(t) for t in before.values()
+    )
+    assert "<success/>" in put(client, snapshot).content.decode()
+
+    event = active()
+    assert event.pk != coordinator.pk
+    assert _tokens_by_name(event) == before
+    [restored_award] = Award.objects.filter(event=event, name="Best")
+    restored = {r.first_name: r.pk for r in Racer.objects.filter(event=event)}
+    other_phone = Client()
+    ballot = json.loads(
+        other_phone.get(
+            "/action.php", {"query": "ballot.get", "voting_token": str(token)}
+        ).content
+    )["ballot"]
+    assert ballot[str(restored_award.pk)]["votes"] == [restored["Ann"]]
+    reply = other_phone.post(
+        "/action.php",
+        {
+            "action": "vote.cast",
+            "awardid": restored_award.pk,
+            "votes": json.dumps([restored["Ben"]]),
+        },
+    )
+    assert json.loads(reply.content)["outcome"]["summary"] == "success"
+    assert Voter.objects.filter(event=event).count() == 1
+    assert list(
+        Vote.objects.filter(event=event).values_list("racer_id", flat=True)
+    ) == [restored["Ben"]]
+
+
+def test_a_php_snapshot_gives_each_racer_a_new_token(client, coordinator):
+    """D87: PHP's file has no votingtoken column, so the model's default
+    gives each racer a token of its own."""
+    assert (
+        "votingtoken"
+        not in tables_of(GOLDEN.read_bytes())["RegistrationInfo"]["rows"][0]
+    )
+
+    put(client, GOLDEN.read_bytes())
+
+    tokens = list(
+        Racer.objects.filter(event=active()).values_list("voting_token", flat=True)
+    )
+    assert len(tokens) == len(
+        tables_of(GOLDEN.read_bytes())["RegistrationInfo"]["rows"]
+    )
+    assert None not in tokens
+    assert len(set(tokens)) == len(tokens)
+
+
+def _with_tokens(content: bytes, tokens: list) -> bytes:
+    """The snapshot with each RegistrationInfo row's votingtoken replaced, in
+    row order."""
+    text = content.decode()
+    start, end = text.index("<![CDATA[") + 9, text.rindex("]]>")
+    entries = json.loads(text[start:end])
+    for entry in entries:
+        if entry.get("table") == "RegistrationInfo":
+            for row, token in zip(entry["rows"], tokens, strict=True):
+                row["votingtoken"] = token
+    return (text[:start] + json.dumps(entries) + text[end:]).encode()
+
+
+def test_a_bad_or_taken_token_in_a_snapshot_gets_a_new_one(client, coordinator):
+    """A votingtoken that is not a GUID, that an earlier row of the file
+    took, or that a racer of another event holds is replaced by a new
+    token; a good one is kept."""
+    lions = GroupFactory(event=coordinator, name="Lions")
+    RoundFactory(event=coordinator, group=lions, number=1)
+    for name in ("Ann", "Ben", "Cal", "Dee"):
+        RacerFactory(group=lions, first_name=name, last_name="X")
+    elsewhere = RacerFactory(group=GroupFactory(event=EventFactory()))
+    kept = "6f1c2c1e-7c55-4a8e-9a43-2f0d3b6a1b11"
+    snapshot = _with_tokens(
+        get(client).content, ["not-a-guid", kept, kept, str(elsewhere.voting_token)]
+    )
+
+    assert "<success/>" in put(client, snapshot).content.decode()
+
+    tokens = {
+        r.first_name: str(r.voting_token) for r in Racer.objects.filter(event=active())
+    }
+    assert tokens["Ben"] == kept
+    assert tokens["Ann"] != "not-a-guid"
+    assert tokens["Cal"] != kept
+    assert tokens["Dee"] != str(elsewhere.voting_token)
+    assert len(set(tokens.values())) == 4

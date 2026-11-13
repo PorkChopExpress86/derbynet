@@ -96,6 +96,17 @@ def allows(request: HttpRequest, requirement: Requirement) -> bool:
             return granted(request) & requirement != 0
 
 
+def role_allows(request: HttpRequest, perm: Perm) -> bool:
+    """The role the session logged in as holds `perm` itself. Bits a link
+    added to the session (`add_bits`, the check-in phone's grant) do not
+    count, nor does a session that never logged in (D5)."""
+    name = role(request)
+    if name is None:
+        return False
+    bits = Role.objects.filter(name=name).values_list("permissions", flat=True).first()
+    return bits is not None and bits & perm != 0
+
+
 # Each writer issues a new session id, so an id fixed before a change of
 # privilege is worthless after it (S31).
 

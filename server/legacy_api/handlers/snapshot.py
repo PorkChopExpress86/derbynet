@@ -26,6 +26,9 @@ DIVERGENCES = (
     " put's rows-before counts the rows it replaces, not PHP's fresh-schema seed.",
     "D82: the snapshot's RaceInfo carries every setting Django keeps, not only"
     " the keys PHP has written.",
+    "D87: RegistrationInfo carries each racer's voting token (#206) in a"
+    " votingtoken column PHP's lacks, and a restore keeps it; a file without"
+    " it gets new tokens.",
     "D10: a new event seeds no Wrap-Up kiosk on local/kiosks/feedback.kiosk, so"
     " a snapshot of the seeded scenes has one SceneKiosk row fewer than PHP's.",
 )

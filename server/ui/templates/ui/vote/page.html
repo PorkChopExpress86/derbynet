@@ -1,12 +1,12 @@
 {% extends "ui/base.html" %}
 {% load static ui %}
-{# vote.php (#54), for a phone. One page with five states that the status poll and ballot.get switch in place: closed, password, no awards, the award list, and an award's racer grid. Tapping a racer opens its sheet, whose one toggle votes; a tap in the grid only opens the sheet, so scrolling never votes (touch-punch is gone). The racers, their photos and each award's racers come from the server; the voter's ballot comes from ballot.get. #}
+{# vote.php (#54), for a phone. One page with five states that the status poll and ballot.get switch in place: closed, code, no awards, the award list, and an award's racer grid. The code state stands where vote.php asks for the ballot password: a racer's voting code, the QR code on the check-in page, lets a voter in (#206, D86). Tapping a racer opens its sheet, whose one toggle votes; a tap in the grid only opens the sheet, so scrolling never votes (touch-punch is gone). The racers, their photos and each award's racers come from the server; the voter's ballot comes from ballot.get. #}
 {% block head %}
 {{ config|json_script:"vote-config" }}
 <script src="{% static 'ui/vote.js' %}"></script>
 {% endblock %}
 {% block main %}
-<div x-data data-vote :data-vote-state="$store.vote.state" data-vote-state="{% if page.is_open %}loading{% else %}closed{% endif %}">
+<div x-data data-vote :data-vote-state="$store.vote.state" data-vote-state="{% if not page.has_token %}code{% elif page.is_open %}loading{% else %}closed{% endif %}">
   <p x-show="$store.vote.state === 'loading'" class="py-10 text-center text-ink-muted" data-state="loading">Loading the ballot…</p>
 
   <section x-cloak x-show="$store.vote.state === 'closed'" aria-labelledby="vote-closed-h" class="mx-auto mt-6 max-w-md rounded-2xl border border-line bg-surface p-6 text-center" data-state="closed">
@@ -15,14 +15,11 @@
     <p class="mt-2 text-ink-muted">This page opens the ballot by itself when voting starts. Keep it open.</p>
   </section>
 
-  <form x-cloak x-show="$store.vote.state === 'password'" @submit.prevent="$store.vote.submitPassword()" class="mx-auto mt-6 flex max-w-md flex-col gap-3 rounded-2xl border border-line bg-surface p-6" data-state="password">
-    <h1 class="text-xl font-semibold">Enter the ballot password</h1>
-    <p class="text-ink-muted">The race crew gives it out with the ballot.</p>
-    <label for="ballot-password" class="font-medium">Ballot password</label>
-    <input id="ballot-password" type="password" autocomplete="off" x-model="$store.vote.password" :aria-invalid="$store.vote.wrongPassword.toString()" aria-describedby="wrong-password" class="min-h-12 rounded-xl border border-field bg-bg px-3 text-lg">
-    <p id="wrong-password" x-show="$store.vote.wrongPassword" role="alert" class="font-semibold text-danger-ink" data-wrong-password>The password you entered is incorrect. Please try again.</p>
-    <button type="submit" :disabled="$store.vote.busy" class="min-h-12 rounded-xl bg-accent px-4 text-lg font-semibold text-accent-ink disabled:opacity-60">Open the ballot</button>
-  </form>
+  <section x-cloak x-show="$store.vote.state === 'code'" aria-labelledby="vote-code-h" class="mx-auto mt-6 max-w-md rounded-2xl border border-line bg-surface p-6 text-center" data-state="code">
+    <span class="mx-auto grid size-14 place-items-center rounded-full bg-surface-2 text-ink-muted">{% include "ui/components/icon.html" with name="vote" cls="size-8" %}</span>
+    <h1 id="vote-code-h" class="mt-3 text-xl font-semibold">Scan a racer's voting code to vote</h1>
+    <p class="mt-2 text-ink-muted">The check-in table shows each racer's voting code. Scan it with this phone's camera, and the ballot opens here.</p>
+  </section>
 
   <section x-cloak x-show="$store.vote.state === 'none'" aria-labelledby="vote-none-h" class="mx-auto mt-6 max-w-md rounded-2xl border border-line bg-surface p-6 text-center" data-state="none">
     <h1 id="vote-none-h" class="text-xl font-semibold">No awards to vote on</h1>

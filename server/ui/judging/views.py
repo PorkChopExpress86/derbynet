@@ -21,10 +21,8 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from accounts.permissions import Perm, allows
 from awards import balloting, editing
 from awards.editing import AwardFailure
-from core.race_settings import NotWritten
 from ui.judging import state
 from ui.judging.state import Filters
 from ui.navigation import requires_page
@@ -197,10 +195,7 @@ def _ballot_body(request, message: str, level: str = "ok") -> HttpResponse:
     """The ballot sheet again, with a toast, for a control inside it."""
     html = render_to_string(
         "ui/judging/sheets/ballot.html",
-        {
-            "sheet": state.ballot_sheet(_event(request)),
-            "can_set_password": allows(request, Perm.SET_UP),
-        },
+        {"sheet": state.ballot_sheet(_event(request))},
         request,
     )
     return HttpResponse(
@@ -216,10 +211,7 @@ def ballot(request):
     return render(
         request,
         "ui/judging/sheets/ballot.html",
-        {
-            "sheet": state.ballot_sheet(_event(request)),
-            "can_set_password": allows(request, Perm.SET_UP),
-        },
+        {"sheet": state.ballot_sheet(_event(request))},
     )
 
 
@@ -233,26 +225,6 @@ def ballot_open(request):
         request,
         "Balloting is open." if is_open else "Balloting is closed.",
         level="ok" if is_open else "info",
-    )
-
-
-@require_POST
-@guard
-def ballot_password(request):
-    """The ballot password. `judging.js:398` writes it with `settings.write`,
-    which needs SET_UP, so a judge without it cannot change it here either."""
-    if not allows(request, Perm.SET_UP):
-        return service_error(
-            request, "Only a role that can set up the race can change the password."
-        )
-    text = request.POST.get("ballot_password", "")
-    try:
-        balloting.set_password(_event(request), text)
-    except NotWritten:
-        return service_error(request, "That password is too long.")
-    return _ballot_body(
-        request,
-        "Voters need this password now." if text else "Voters need no password now.",
     )
 
 

@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
@@ -228,6 +230,12 @@ class Racer(EventScoped):
         max_digits=7, decimal_places=2, null=True, blank=True
     )
     weighed_at = models.DateTimeField(null=True, blank=True)
+    # The voting token (#206, D86), Django only: a random GUID whose link,
+    # shown as a QR code on the check-in page, lets its holder vote. The
+    # token is the voter (`awards.balloting`). Every way a racer is made
+    # gets one from the default, `bulk_create` included; a random GUID is
+    # never handed out again after its racer is deleted.
+    voting_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     class Meta:
         constraints = [

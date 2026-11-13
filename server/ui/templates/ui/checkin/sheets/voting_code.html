@@ -1,0 +1,7 @@
+{# A racer's voting code (#206, D86): the QR code of the vote link that holds the racer's voting token. Whoever scans it votes as this racer, and every phone that scans it edits the one same ballot. #}
+<div x-data x-init="checkin.show('Voting code'); checkin.qr($refs.code, '{{ url|escapejs }}')" data-voting-code="{{ racer.pk }}">
+  <p class="mb-3 text-center font-semibold"><span class="font-mono">{{ car }}</span> {{ racer.first_name }} {{ racer.last_name }}</p>
+  <div x-ref="code" class="mx-auto grid size-64 place-items-center rounded-xl bg-white p-3" role="img" aria-label="QR code for {{ racer.first_name }} {{ racer.last_name }}'s voting link"></div>
+  <p class="mt-3 text-sm">Scan this with the family's phone camera to open the ballot. Every phone that scans it shares this racer's one ballot, so show it only to this racer's family.</p>
+  <p class="mt-2 break-all font-mono text-xs text-ink-muted" data-voting-url>{{ url }}</p>
+</div>

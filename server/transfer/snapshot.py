@@ -10,6 +10,9 @@ The new event keeps the old one's four folder settings, and its files move
 to those folders (#134, `transfer.legacy.folders`).
 
 A snapshot omits `ntrophies`, `note` and `checkin_time`, as PHP's does.
+Its `RegistrationInfo` rows carry one column PHP's lack, `votingtoken`, each
+racer's voting token (D87, #206), so a restore keeps every voting code and
+the ballot it edits; a file without it, PHP's, gets new tokens.
 Round trips lose them, and everything Django keeps that the legacy schema
 has no column for (lane closures, allowed racers, the timer audit).
 """
@@ -190,6 +193,7 @@ def tables(
                 int(racer.exclude),
                 racer.car_photo or None,
                 ids(Partition, racer.partition_id),
+                str(racer.voting_token),
             ]
         )
     group_of_round = {r.pk: r.group_id for r in rounds}
@@ -232,6 +236,8 @@ def tables(
                 "exclude",
                 "carphoto",
                 "partitionid",
+                # Django only (D87): the voting token, which a load keeps.
+                "votingtoken",
             ],
             racer_rows,
         ),

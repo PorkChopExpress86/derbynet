@@ -8,6 +8,9 @@
 // as `toggle_vote()` does (`website/js/vote.js:106` to `:127`).
 // `/ballot/status` is polled every 5 s, and a change swaps the state in
 // place (D77) where `vote.js` reloads (`website/js/vote.js:203` to `:220`).
+// A voter gets in with a racer's voting code, which the vote link put in
+// the session (#206, D86); without one the page asks for a code, where
+// `vote.js` asks for the ballot password.
 
 'use strict';
 
@@ -19,7 +22,7 @@
     closed: () => 'Voting is closed now.',
     'too-many': (store) => `${store.awardName()} takes no more than ${store.maxFor(store.awardId)}.`,
     'no-award': () => 'That award is no longer on the ballot.',
-    password: () => 'Enter the ballot password again.',
+    'no-token': () => 'This voting code is no longer valid. Scan a racer\'s voting code again.',
     // The page's list of the award's cars is older than the server's.
     ineligible: (store) => `A car you chose can no longer win ${store.awardName()}. Reload the page.`,
   };
@@ -32,22 +35,23 @@
     const config = JSON.parse(document.getElementById('vote-config').textContent);
 
     Alpine.store('vote', {
-      // loading, closed, password, none or open.
-      state: config.open ? 'loading' : 'closed',
+      // loading, closed, code, none or open.
+      state: !config.hasToken ? 'code' : config.open ? 'loading' : 'closed',
+      // The session holds a voting code; once ballot.get or vote.cast
+      // refuses it, the page stays on the code state.
+      hasToken: config.hasToken,
       balloting: config.open ? 'open' : 'closed',
       // {awardid: {max_votes, votes}} from ballot.get.
       ballot: {},
       awardId: null,
       racerId: null,
       order: config.order,
-      password: '',
-      wrongPassword: false,
       busy: false,
       // Bumped by each ballot.get, so a reply to an older one is dropped.
       asked: 0,
 
       init() {
-        if (config.open) this.load();
+        if (config.open && this.hasToken) this.load();
         setInterval(() => this.poll(), config.pollSeconds * 1000);
       },
 
@@ -55,11 +59,12 @@
 
       async load() {
         const asked = ++this.asked;
-        const showing = this.state === 'password';
         this.busy = true;
         let data;
         try {
-          const query = new URLSearchParams({ query: 'ballot.get', password: this.password });
+          // The ballot this page loaded: a code opened in another tab
+          // since makes the server refuse it (#206 review).
+          const query = new URLSearchParams({ query: 'ballot.get', ballot_key: config.ballotKey });
           const reply = await fetch(`${config.actionUrl}?${query}`, { credentials: 'same-origin' });
           data = await reply.json();
         } catch (e) {
@@ -70,24 +75,25 @@
         }
         if (asked !== this.asked || this.balloting !== 'open') return;
         if (data.outcome && data.outcome.summary === 'failure') {
-          if (data.outcome.code === 'password') {
-            // vote.js shows "incorrect" only for a password the voter typed.
-            this.wrongPassword = showing;
-            this.state = 'password';
+          if (data.outcome.code === 'no-token') {
+            this.lostToken();
           } else {
             derbynet.toast(data.outcome.description || 'The ballot could not be loaded.');
           }
           return;
         }
-        this.wrongPassword = false;
         this.ballot = data.ballot || {};
         const onBallot = Object.keys(this.ballot).some((id) => id in config.awards);
         this.state = onBallot ? 'open' : 'none';
         if (this.awardId !== null && !this.onBallot(this.awardId)) this.closeAward();
       },
 
-      submitPassword() {
-        this.load();
+      // The server refused the session's voting code.
+      lostToken() {
+        this.hasToken = false;
+        this.closeAward();
+        this.ballot = {};
+        this.state = 'code';
       },
 
       async poll() {
@@ -100,6 +106,7 @@
         }
         if (data.balloting === this.balloting) return;
         this.balloting = data.balloting;
+        if (!this.hasToken) return;
         if (data.balloting === 'open') {
           this.state = 'loading';
           this.load();
@@ -218,6 +225,7 @@
         try {
           const body = new URLSearchParams({
             action: 'vote.cast', awardid: awardId, votes: JSON.stringify(votes),
+            ballot_key: config.ballotKey,
           });
           const reply = await fetch(config.actionUrl, {
             method: 'POST', body, credentials: 'same-origin',
@@ -238,9 +246,8 @@
         derbynet.toast(say ? say(this) : (outcome.description || 'Your vote was not saved.'));
         if (outcome.code === 'closed') {
           this.poll();
-        } else if (outcome.code === 'password') {
-          this.closeAward();
-          this.state = 'password';
+        } else if (outcome.code === 'no-token') {
+          this.lostToken();
         } else if (outcome.code === 'no-award' || outcome.code === 'too-many') {
           this.load();
         }

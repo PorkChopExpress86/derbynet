@@ -53,6 +53,7 @@ UNDER_CALLERS_LOCK = "a step its callers run under their own lock_race_state"
 UNGUARDED = {
     "accounts/services.py:change_password": "roles are site-wide (ADR-07)",
     "awards/balloting.py:voter": "a voter's visit; vote.cast refuses",
+    "awards/balloting.py:ballot": "a voter's visit adds its row; vote.cast refuses",
     "awards/services.py:reconcile_partition_lists": UNDER_CALLERS_LOCK,
     "core/services.py:new_event": "makes an event: the lifecycle itself",
     "core/events.py:create_event": "makes an event: the lifecycle itself",

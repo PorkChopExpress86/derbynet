@@ -30,6 +30,7 @@ from roster.models import (
     Racer,
     Subgroup,
 )
+from roster.voting_tokens import parse_token
 
 from . import embedded, values
 from .photos import CAR_PHOTOS, HEADSHOTS
@@ -58,6 +59,16 @@ class Context:
         self.photos = photos
         self.ids = defaultdict(dict)  # model label -> {legacy id: new id}
         self.checkins = _checkins_from_events(self)
+        self._voting_tokens = None
+
+    def voting_tokens(self) -> set:
+        """Every voting token racers hold, in every event, and those this
+        import has given out, read once the replaced event's rows are gone."""
+        if self._voting_tokens is None:
+            self._voting_tokens = set(
+                Racer.objects.values_list("voting_token", flat=True)
+            )
+        return self._voting_tokens
 
     def ref(self, model, value, column):
         """The new id for a required legacy reference, or `Skip`."""
@@ -384,7 +395,32 @@ def _racer(row, ctx):
     # for the racers that are imported.
     fields["headshot"] = ctx.photos.rebase(racerid, HEADSHOTS, row["imagefile"])
     fields["car_photo"] = ctx.photos.rebase(racerid, CAR_PHOTOS, row["carphoto"])
+    token = _voting_token(row, ctx, racerid)
+    if token is not None:
+        fields["voting_token"] = token
     return fields
+
+
+def _voting_token(row, ctx, racerid):
+    """The racer's voting token from a Django snapshot's `votingtoken`
+    (D87, #206), or None, and the model's default makes a new one: for a
+    PHP file, which has no such column, and for a token that is not a GUID
+    or that another racer holds already, here or in another event."""
+    raw = row["votingtoken"]
+    if raw is None:
+        return None
+    token = parse_token(raw)
+    taken = ctx.voting_tokens()
+    if token is None or token in taken:
+        ctx.report.add(
+            Kind.CHANGED_VALUE,
+            "registrationinfo",
+            racerid,
+            "votingtoken is not a GUID or is another racer's; a new one is made",
+        )
+        return None
+    taken.add(token)
+    return token
 
 
 def _round(row, ctx):

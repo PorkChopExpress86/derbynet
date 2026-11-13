@@ -14,6 +14,9 @@ partition lists.
 
 Reads only: the page writes neither the session nor the database. The
 voter's ballot is `ballot.get`'s, which the page asks for once it shows.
+`has_token` says whether the session holds a voting token of a racer of
+the event (#206, D86); without one the page asks for a code and never asks
+for the ballot.
 """
 
 from dataclasses import dataclass
@@ -64,6 +67,9 @@ class VoteAward:
 @dataclass
 class Page:
     is_open: bool
+    has_token: bool
+    # `balloting.ballot_key()` of the session's code, "" with none.
+    ballot_key: str
     awards: list[VoteAward]
     racers: list[VoteRacer]
     orders: dict[str, list[int]]
@@ -75,6 +81,8 @@ class Page:
         """What the page's script reads."""
         return {
             "open": self.is_open,
+            "hasToken": self.has_token,
+            "ballotKey": self.ballot_key,
             "order": self.order,
             "orders": self.orders,
             "awards": {a.id: {"name": a.name, "racers": a.racers} for a in self.awards},
@@ -107,7 +115,7 @@ def _orders(racers: list[Racer]) -> dict[str, list[int]]:
     }
 
 
-def build(event, order: str = "car") -> Page:
+def build(event, order: str = "car", token=None) -> Page:
     settings = RaceSettings.objects.get(event=event)
     prefix = get_script_prefix()
     racers = list(
@@ -128,6 +136,7 @@ def build(event, order: str = "car") -> Page:
         found = photos.page_url(repo, r.car_photo, photos.WORK) if r.car_photo else ""
         return prefix + found if found else ""
 
+    key = balloting.page_ballot_key(event, token)
     eligibility = Eligibility(event.id)
     awards = sorted(
         Award.objects.filter(event=event)
@@ -137,6 +146,8 @@ def build(event, order: str = "car") -> Page:
     )
     return Page(
         is_open=balloting.is_open(event),
+        has_token=bool(key),
+        ballot_key=key,
         awards=[
             VoteAward(a.pk, a.name, [r.pk for r in eligibility.winners(a, racers)])
             for a in awards

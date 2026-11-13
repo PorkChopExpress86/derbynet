@@ -18,6 +18,11 @@ urlpatterns = [
         views.racer_delete,
         name="checkin-delete",
     ),
+    path(
+        "checkin/racer/<int:racer_id>/voting-code/",
+        views.voting_code,
+        name="checkin-voting-code",
+    ),
     path("checkin/racer/<int:racer_id>/pass/", views.pass_racer, name="checkin-pass"),
     path("checkin/racer/<int:racer_id>/weigh/", views.weigh, name="checkin-weigh"),
     path("checkin/weigh/", views.weigh_fields, name="checkin-weigh-fields"),
