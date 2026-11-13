@@ -213,11 +213,15 @@ check_user() {
     fi
 }
 
+# The first of its arguments, such as a glob's first match.  (`ls | head -1`
+# fails under pipefail when ls is still writing as head exits.)
+first() { echo "$1"; }
+
 # A JPEG of exactly $2 bytes: a real photo with random bytes after its end,
 # which every decoder ignores.
 padded_jpeg() {
     local out="$1" size="$2" photo
-    photo="$(ls "$TESTING"/data/headshots/*.jpg | head -1)"
+    photo="$(first "$TESTING"/data/headshots/*.jpg)"
     cp "$photo" "$out"
     head -c $((size - $(stat -c %s "$photo"))) /dev/urandom >> "$out"
 }
@@ -425,9 +429,11 @@ check_timeout() {
     docker exec "$PREFIX-t1" grep -h 'proxy_read_timeout' /etc/nginx/derbynet-proxy.conf
     docker exec "$PREFIX-t1" grep -q 'proxy_read_timeout 600s;' /etc/nginx/derbynet-proxy.conf \
         || fail "nginx's proxy_read_timeout is not 600s"
-    docker exec "$PREFIX-t1" ps -e -o args | grep -m1 '[g]unicorn'
-    docker exec "$PREFIX-t1" ps -e -o args | grep -m1 '[g]unicorn' | grep -q -- '--timeout 600' \
-        || fail "gunicorn's --timeout is not 600"
+    local args
+    args="$(docker exec "$PREFIX-t1" ps -e -o args)"
+    args="$(grep '[g]unicorn' <<<"$args")"
+    echo "${args%%$'\n'*}"
+    [[ "$args" == *"--timeout 600 "* ]] || fail "gunicorn's --timeout is not 600"
 }
 
 check_engine() {
@@ -526,10 +532,10 @@ check_backup() {
     login "$url" "$jar" RaceCoordinator
     racer="$(curl -s -b "$jar" "$url/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
     curl -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
-        -F photo=@"$(ls "$TESTING"/data/headshots/*.jpg | head -1)" "$url/action.php" | grep -q success \
+        -F photo=@"$(first "$TESTING"/data/headshots/*.jpg)" "$url/action.php" | grep -q success \
         || fail "no racer photo"
     curl -s -b "$jar" -F action=photo.upload -F repo=car -F racerid="$racer" \
-        -F photo=@"$(ls "$TESTING"/data/carphotos/Car-*.jpg | head -1)" "$url/action.php" | grep -q success \
+        -F photo=@"$(first "$TESTING"/data/carphotos/Car-*.jpg)" "$url/action.php" | grep -q success \
         || fail "no car photo"
     head -c 300000 /dev/urandom > "$work/replay.mkv"
     curl -s -b "$jar" -F action=video.upload -F video=@"$work/replay.mkv;filename=Heat-1.mkv" \
