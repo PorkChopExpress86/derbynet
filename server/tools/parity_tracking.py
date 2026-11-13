@@ -8,7 +8,15 @@ behind the gate's expected red.
 
 Each `<database>=<path>` is one gate job's `parity_gate.py --failing` file.
 A gate job that died before writing it counts as one failing entry, `(the
-leg did not report)`, so the issue still changes. The failing list is each
+leg did not report)`, so the issue still changes. `--jobs` is the run's
+`gh run view --json jobs`: a leg job (`leg (php)`, `leg (django, <database>)`)
+that did not succeed counts as one failing entry, `(the leg's job failed)`,
+naming its failed steps, on its database (`leg (php)` on every one). A leg
+uploads its steps before it replays the golden fixtures and races
+derby-timer.jar, so the gate passes when only those fail: from 2026-11-11 the
+nightly was red on a missing Chromium while this issue said no step failed
+(#206 retro). A `--jobs` file it cannot read counts as `(the leg jobs could
+not be read)`. The failing list is each
 failing step's label and the databases it fails on. The open issue labeled
 `LABEL` and titled `TITLE` carries the list it last showed, in a comment
 line at the top of its body. It is found by its label, not by a search,
@@ -26,9 +34,10 @@ that would write instead of making it, and reads the issue's body from
 
 import argparse
 import json
+import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 REPO = "PorkChopExpress86/derbynet"
@@ -37,6 +46,9 @@ LABEL = "parity-gate"
 LABEL_COLOR = "d93f0b"
 NO_REPORT = "(the leg did not report)"
 CUT_SHORT = "(the leg was cut short)"
+JOB_FAILED = "(the leg's job failed)"
+JOBS_UNREAD = "(the leg jobs could not be read)"
+LEG_JOB = re.compile(r"leg \((?:php|django, (\w+))\)")
 MARKER = "<!-- parity-gate-failing: "
 
 
@@ -46,6 +58,10 @@ class Leg:
     steps: list[dict]
     short: list[str]
     reported: bool = True
+    # JOB_FAILED or JOBS_UNREAD, and the leg job's failures as "<job>:
+    # <step>", or why its jobs file could not be read.
+    job: str | None = None
+    job_problems: tuple[str, ...] = ()
 
 
 def read_legs(arguments: list[str]) -> list[Leg]:
@@ -61,10 +77,40 @@ def read_legs(arguments: list[str]) -> list[Leg]:
     return legs
 
 
+def read_jobs(legs: list[Leg], path: Path) -> list[Leg]:
+    """`legs`, each with its leg job's failures from `path`, the run's
+    `gh run view --json jobs`."""
+    try:
+        jobs = json.loads(path.read_text(encoding="utf-8"))["jobs"]
+        found: dict[str, list[str]] = {leg.database: [] for leg in legs}
+        for job in jobs:
+            leg_job = LEG_JOB.fullmatch(job["name"])
+            if not leg_job or job["conclusion"] in ("success", "skipped"):
+                continue
+            steps = [
+                step["name"]
+                for step in job.get("steps") or []
+                if step.get("conclusion") == "failure"
+            ]
+            failures = [f"{job['name']}: {step}" for step in steps] or [
+                f"{job['name']}: {job['conclusion'] or job.get('status')}"
+            ]
+            for database in [leg_job[1]] if leg_job[1] else list(found):
+                found.setdefault(database, []).extend(failures)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        why = (f"{path.name}: {error!r}",)
+        return [replace(leg, job=JOBS_UNREAD, job_problems=why) for leg in legs]
+    return [
+        replace(leg, job=JOB_FAILED, job_problems=tuple(found[leg.database]))
+        if found.get(leg.database)
+        else leg
+        for leg in legs
+    ]
+
+
 def _extra(leg: Leg) -> list[str]:
-    if not leg.reported:
-        return [NO_REPORT]
-    return [CUT_SHORT] if leg.short else []
+    extra = [NO_REPORT] if not leg.reported else [CUT_SHORT] if leg.short else []
+    return extra + ([leg.job] if leg.job else [])
 
 
 def failing_list(legs: list[Leg]) -> dict[str, list[str]]:
@@ -116,7 +162,10 @@ def render(legs: list[Leg], run_url: str, sha: str) -> str:
         cells, waiting, problems = [], None, []
         for leg in legs:
             step = next((s for s in leg.steps if s["label"] == label), None)
-            if label in _extra(leg):
+            if label == leg.job:
+                cells.append("job failed" if label == JOB_FAILED else "not read")
+                problems += [p for p in leg.job_problems if p not in problems]
+            elif label in _extra(leg):
                 cells.append("did not report" if label == NO_REPORT else "cut short")
                 problems += [p for p in leg.short if p not in problems]
             elif step is None:
@@ -251,10 +300,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--issue-body", type=Path)
     parser.add_argument("--workdir", type=Path, default=Path("."))
+    parser.add_argument("--jobs", type=Path, help="the run's gh run view --json jobs")
     args = parser.parse_args(argv)
     body = args.issue_body.read_text(encoding="utf-8") if args.issue_body else None
     gh = Gh(args.dry_run, body)
-    did = track(gh, read_legs(args.legs), args.run_url, args.sha, args.workdir)
+    legs = read_legs(args.legs)
+    if args.jobs:
+        legs = read_jobs(legs, args.jobs)
+    did = track(gh, legs, args.run_url, args.sha, args.workdir)
     print(f"tracking issue {did}")
     return 0
 

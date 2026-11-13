@@ -219,3 +219,99 @@ def test_the_issue_is_found_by_its_label_not_by_a_search(tmp_path):
     [listing] = [call for call in gh.calls if call[1:3] == ["issue", "list"]]
     assert "--search" not in listing
     assert listing[listing.index("--label") + 1] == "parity-gate"
+
+
+# The jobs of nightly run 43254181268 (2026-11-12), as `gh run view --json
+# jobs` gives them, cut to the fields read: both Django legs failed after
+# uploading their steps, so both gates passed and the issue said no step
+# failed (#206 retro).
+GOLDEN = "Replay the golden fixtures against Django"
+NOV_12_JOBS = {
+    "jobs": [
+        {
+            "name": f"leg (django, {database})",
+            "conclusion": "failure",
+            "status": "completed",
+            "steps": [
+                {"name": "Run the suite, step by step", "conclusion": "success"},
+                {"name": GOLDEN, "conclusion": "failure"},
+            ],
+        }
+        for database in ("postgres", "sqlite")
+    ]
+    + [
+        {"name": name, "conclusion": "success", "status": "completed", "steps": []}
+        for name in (
+            "leg (php)",
+            "gate (django, sqlite)",
+            "gate (django, postgres)",
+            "track the failing steps",
+        )
+    ]
+}
+GREEN = {"short": [], "steps": []}
+
+
+def test_a_leg_job_that_failed_after_the_gate_passed_changes_the_list(tmp_path):
+    gh = pt.Gh(dry_run=True, issue_body=issue_body(tmp_path, GREEN))
+    jobs = saved(tmp_path, "jobs", NOV_12_JOBS)
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+    did = pt.track(gh, one, "https://example/run/9", "c" * 40, tmp_path)
+
+    assert jobs and did == "updated"
+    assert pt.failing_list(one) == {"(the leg's job failed)": ["postgres", "sqlite"]}
+    body = (tmp_path / "parity-tracking-body.md").read_text()
+    assert (
+        "| `(the leg's job failed)` | job failed | job failed | no WAITING entry |"
+        f" leg (django, sqlite): {GOLDEN}; leg (django, postgres): {GOLDEN} |"
+    ) in body
+
+
+def test_a_failed_php_leg_counts_on_every_database(tmp_path):
+    php = {"name": "leg (php)", "conclusion": "cancelled", "status": "completed"}
+    saved(tmp_path, "jobs", {"jobs": [php]})
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {"(the leg's job failed)": ["postgres", "sqlite"]}
+    assert one[0].job_problems == ("leg (php): cancelled",)
+
+
+def test_a_failed_gate_job_is_left_to_the_gate_file(tmp_path):
+    gate = {"name": "gate (django, sqlite)", "conclusion": "failure", "steps": []}
+    saved(tmp_path, "jobs", {"jobs": [gate]})
+
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {}
+
+
+def test_a_jobs_file_it_cannot_read_is_a_failing_entry(tmp_path):
+    one = pt.read_jobs(legs(tmp_path, GREEN), tmp_path / "jobs.json")
+
+    assert pt.failing_list(one) == {
+        "(the leg jobs could not be read)": ["postgres", "sqlite"]
+    }
+
+
+def test_main_reads_the_jobs_file(tmp_path, capsys):
+    saved(tmp_path, "jobs", NOV_12_JOBS)
+    body = tmp_path / "issue.md"
+    body.write_text(issue_body(tmp_path, GREEN))
+
+    pt.main(
+        [
+            "--dry-run",
+            "--issue-body",
+            str(body),
+            "--workdir",
+            str(tmp_path),
+            "--jobs",
+            str(tmp_path / "jobs.json"),
+            f"sqlite={saved(tmp_path, 'sqlite', GREEN)}",
+            f"postgres={saved(tmp_path, 'postgres', GREEN)}",
+        ]
+    )
+
+    assert "tracking issue updated" in capsys.readouterr().out

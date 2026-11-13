@@ -271,6 +271,8 @@ jobs:
     permissions:
       contents: read
       issues: write
+      # gh run view reads the leg jobs' conclusions.
+      actions: read
     defaults:
       run:
         working-directory: server
@@ -290,6 +292,17 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/failing
 
+      # A leg job that failed after uploading its steps (the golden replay,
+      # the derby-timer.jar race) leaves the gate green; parity_tracking.py
+      # lists it from this file (#206 retro).  A file gh could not write is
+      # listed as unread.
+      - name: Read the leg jobs' conclusions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh run view "$GITHUB_RUN_ID" --repo PorkChopExpress86/derbynet --json jobs
+          > "$RUNNER_TEMP/jobs.json" || rm -f "$RUNNER_TEMP/jobs.json"
+
       - name: Open or update the tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -301,5 +314,6 @@ jobs:
           --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --sha "$GITHUB_SHA"
           --workdir "$RUNNER_TEMP"
+          --jobs "$RUNNER_TEMP/jobs.json"
           sqlite="$RUNNER_TEMP/failing/failing-sqlite.json"
           postgres="$RUNNER_TEMP/failing/failing-postgres.json"

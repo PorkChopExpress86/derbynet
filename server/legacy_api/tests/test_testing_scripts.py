@@ -126,3 +126,97 @@ def test_every_script_parses(script):
     )
 
     assert result.returncode == 0, result.stderr
+
+
+# The helpers that write their path argument alone as the request line of
+# output.curl (`echo $1 >> $OUTPUT_CURL`); the others write `post`, `photo`,
+# `login` or `snapshot.put` before it, which `_REQUEST` always parses.
+BARE_REQUEST = re.compile(r"^\s*echo \$1 >> \$OUTPUT_CURL", re.MULTILINE)
+FUNCTION = re.compile(r"^function (\w+)\(\) \{\n(.*?)^\}", re.MULTILINE | re.DOTALL)
+
+
+def bare_request_helpers() -> set[str]:
+    text = COMMON.read_text(encoding="utf-8")
+    return {m[1] for m in FUNCTION.finditer(text) if BARE_REQUEST.search(m[2])}
+
+
+def static_word(line: str, start: int) -> tuple[str, bool]:
+    """The shell word at `start`, its quotes dropped and each expansion
+    (`$x`, `${x}`, `$(...)`) as `x`; and whether any of it was literal."""
+    out, literal, i, quote = [], False, start, None
+    while i < len(line):
+        c = line[i]
+        if c == "$" and line[i + 1 : i + 2] == "(":
+            depth, i = 1, i + 2
+            while i < len(line) and depth:
+                depth += {"(": 1, ")": -1}.get(line[i], 0)
+                i += 1
+            out.append("x")
+            continue
+        if c == "$":
+            found = re.match(r"\$(\{[^}]*\}|\w+)", line[i:])
+            if found:
+                out.append("x")
+                i += len(found[0])
+                continue
+        if quote:
+            if c == quote:
+                quote = None
+            else:
+                out.append(c)
+                literal = True
+        elif c in "\"'":
+            quote = c
+        elif c in " \t|;&)":
+            break
+        else:
+            out.append(c)
+            literal = True
+        i += 1
+    return "".join(out), literal
+
+
+def unparsed_requests(path: Path) -> list[str]:
+    """Each call of a bare-request helper whose path `_REQUEST` would not
+    read as a request."""
+    from tools.transcript_diff import _REQUEST
+
+    call = re.compile(rf"(?<![\w-])({'|'.join(sorted(bare_request_helpers()))})\s+")
+    found = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if line.lstrip().startswith("#"):
+            continue
+        for m in call.finditer(line):
+            word, literal = static_word(line, m.end())
+            if literal and not _REQUEST.fullmatch(word):
+                found.append(f"{path.name}:{n}: {m[1]} {word}")
+    return found
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda path: path.name)
+def test_every_request_line_a_script_records_is_one_the_gate_parses(script):
+    """`tools/transcript_diff.py` splits output.curl at the lines `_REQUEST`
+    matches. #206's `curl_text "checkin/racer/<id>/voting-code/"`, a page
+    only Django has, was no request to it, so the page's body joined the
+    award.edit before it and the parity gate failed on both databases (run
+    43345570671). Read a Django-only page with `lookup_get`, which records
+    nothing, or teach `_REQUEST` the path."""
+    assert unparsed_requests(script) == []
+
+
+def test_a_request_line_the_gate_cannot_parse_is_found(tmp_path):
+    script = tmp_path / "x.sh"
+    script.write_text(
+        # The line #206 fixed with lookup_get.
+        'curl_text "checkin/racer/$(racerid_of $1)/voting-code/" | \\\n'
+        '# curl_text "commented/out/"\n'
+        'curl_page "kiosk.php?page=a&p=$(jq -rn --arg v "$X" \'$v\')" | x\n'
+        'curl_page_missing "$PAGE"\n'
+        "curl_getj action.php?query=poll.coordinator\n"
+        'lookup_get "checkin/racer/$ID/voting-code/"\n'
+    )
+
+    assert {"curl_text", "curl_getj", "curl_page_missing"} <= bare_request_helpers()
+    assert unparsed_requests(script) == [
+        "x.sh:1: curl_text checkin/racer/x/voting-code/"
+    ]

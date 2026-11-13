@@ -6,6 +6,13 @@
 # names no test, the step that failed and its error line.  Waits for checks to
 # appear first, because GitHub creates the runs a few seconds after a push.
 #
+# It counts the checks plan/bin/pr-merge counts: a parity-check/<name> push
+# of the head runs the parity gate on the same SHA, and those checks show on
+# the PR, but pr-merge leaves them out, so pr-wait neither waits for them nor
+# fails on them.  It prints them last, under "parity-check push (not
+# counted):".  #295's red `leg (django, *)` jobs there made pr-wait exit 1 on
+# a PR pr-merge then merged (#206 retro).
+#
 # Usage: plan/bin/pr-wait <pr> [--timeout-min N]   (default 90)
 set -euo pipefail
 PR=${1:?usage: pr-wait <pr> [--timeout-min N]}
@@ -34,10 +41,18 @@ while :; do
     exit 2
   fi
   # bucket is pass, fail, pending, skipping, or cancel
-  checks=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,link \
-             --jq '.[] | "\(.bucket) \(.name) \(.link)"' 2>/dev/null || true)
+  all=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,link,workflow,event \
+          --jq '.[] | (if .workflow == "parity" and .event == "push"
+                       then "parity-push " else "" end)
+                    + "\(.bucket) \(.name) \(.link)"' 2>/dev/null || true)
+  checks=$(grep -v '^parity-push ' <<<"$all" || true)
+  parity=$(sed -n 's/^parity-push //p' <<<"$all")
   if [ -n "$checks" ] && ! grep -q '^pending ' <<<"$checks"; then
     echo "$checks"
+    if [ -n "$parity" ]; then
+      echo "parity-check push (not counted):"
+      sed 's/^/  /' <<<"$parity"
+    fi
     grep -qvE '^(pass|skipping) ' <<<"$checks" || exit 0
     # Which failing tests also failed on master lately: a known flake (#212 retro).
     echo "ci-failures:"
