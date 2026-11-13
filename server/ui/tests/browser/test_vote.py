@@ -241,8 +241,9 @@ def test_a_bad_vote_link_says_the_code_is_not_valid(page, event, page_errors):
     is allowed for the bad link's URL only (the twin below)."""
     page_errors.allow_missing(BAD_LINK)
 
-    page.goto("/vote/code/not-a-code")
+    response = page.goto("/vote/code/not-a-code")
 
+    assert response.status == 404
     expect(
         page.get_by_role("heading", name="This voting code is not valid")
     ).to_be_visible()
@@ -268,7 +269,7 @@ def test_a_404_beside_the_bad_link_still_fails(page, event, page_errors):
         page.get_by_role("heading", name="This voting code is not valid")
     ).to_be_visible()
 
-    # The console event can land after the heading shows: wait up to 2 s.
+    # The console event can land after the heading shows: wait a while.
     for _ in range(40):
         if page_errors.errors:
             break
