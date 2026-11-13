@@ -9,6 +9,13 @@
 
 name: derbynet
 
+# The database's name, user and password, for both containers.
+# POSTGRES_PASSWORD may hold any character; the server percent-encodes it.
+x-postgres: &postgres
+  POSTGRES_USER: derbynet
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-derbynet}
+  POSTGRES_DB: derbynet
+
 services:
   server:
     image: ${DERBYNET_IMAGE:-ghcr.io/porkchopexpress86/derbynet_server:latest}
@@ -20,11 +27,12 @@ services:
       - "${DERBYNET_HTTP_PORT:-80}:80"
       - "${DERBYNET_HTTPS_PORT:-443}:443"
     environment:
+      <<: *postgres
       TZ: ${TZ:-America/New_York}
-      # The database the entrypoint uses when the postgres service below is
-      # running, as it is under `--profile postgres`.  Otherwise the server
-      # keeps SQLite, one file on the data volume in WAL mode.
-      DERBYNET_POSTGRES_URL: postgres://derbynet:${POSTGRES_PASSWORD:-derbynet}@postgres:5432/derbynet
+      # The entrypoint uses Postgres on this host when the postgres service
+      # below runs, as it does under `--profile postgres`.  Otherwise the
+      # server keeps SQLite, one file on the data volume in WAL mode.
+      DERBYNET_POSTGRES_HOST: postgres
     volumes:
       - data:/var/lib/derbynet
     depends_on:
@@ -37,15 +45,12 @@ services:
     image: postgres:17@sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07
     profiles: [postgres]
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: derbynet
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-derbynet}
-      POSTGRES_DB: derbynet
+    environment: *postgres
     # No ports: only the server reaches it, on the compose network.
     volumes:
       - postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U derbynet -d derbynet"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 2s
       timeout: 5s
       retries: 30

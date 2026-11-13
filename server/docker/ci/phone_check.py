@@ -7,7 +7,8 @@ Chromium in phone mode, the browser tests' 390x844 touch size
 live camera (Chromium's fake camera) and checks the racer in. The live camera
 is offered only in a secure context, so the check also asserts the page is
 one; over plain HTTP the sheet has only the file input
-(`test_a_photo_over_plain_http_uploads_crops_and_shows`).
+(`test_a_photo_over_plain_http_uploads_crops_and_shows`). It taps each control
+as a finger would, and fails a page wider than the phone.
 
     uv run python docker/ci/phone_check.py https://192.168.1.20 shot.png
 
@@ -42,11 +43,12 @@ def check(base: str, screenshot: str) -> None:
         context = browser.new_context(**PHONE, base_url=base, ignore_https_errors=True)
         page = context.new_page()
         page.set_default_timeout(20_000)
+        page.set_default_navigation_timeout(60_000)
         try:
             page.goto("/login/?all")
             assert page.url.startswith("https://"), page.url
             assert page.evaluate("window.isSecureContext"), "not a secure context"
-            page.locator('button[data-role="RaceCrew"]').click()
+            page.locator('button[data-role="RaceCrew"]').tap()
             password = page.get_by_label("Password")
             password.fill(PASSWORD)
             password.press("Enter")
@@ -55,26 +57,25 @@ def check(base: str, screenshot: str) -> None:
             page.goto("/checkin/")
             expect(page.locator("#checkin-list")).to_be_visible()
             racer_photo = re.compile("^Racer photo of ")
-            page.get_by_role("button", name=racer_photo).first.click()
+            page.get_by_role("button", name=racer_photo).first.tap()
             sheet = page.locator('[data-sheet="checkin"]')
             photo = sheet.locator("[data-photo-sheet]")
             live = photo.locator("[data-live]")
             expect(live).to_be_visible()
-            live.get_by_role("button", name="Use the live camera").click()
+            live.get_by_role("button", name="Use the live camera").tap()
             snap = live.get_by_role("button", name="Capture", exact=True)
             expect(snap).to_be_enabled()
-            snap.click()
+            snap.tap()
             expect(photo.locator("[data-preview]")).to_be_visible()
-            # Pressed with Enter, not clicked: with this roster the sheet
-            # leaves Chromium's visual viewport 46 px below the layout
-            # viewport (visualViewport.offsetTop), and Playwright's click,
-            # aimed by layout coordinates, lands on the Autocrop label above
-            # the button. A finger taps what the screen shows.
-            photo.get_by_role("button", name="Capture and check in").press("Enter")
+            photo.get_by_role("button", name="Capture and check in").tap()
             expect(sheet.locator("[data-crop-sheet]")).to_be_visible()
             expect(sheet.locator("[data-sheet-notice]")).to_contain_text(
                 "Racer photo saved"
             )
+            # A page wider than the phone scrolls sideways and shifts the
+            # sheets (#58's first phone check, a long racer name).
+            width = page.evaluate("document.documentElement.scrollWidth")
+            assert width <= PHONE["viewport"]["width"], f"the page is {width} px wide"
             print(f"ok: live-camera photo saved over {page.url}")
         finally:
             page.screenshot(path=screenshot)

@@ -510,7 +510,7 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`:
 | `DERBYNET_VERSION` | the checkout's branch and commit, else `dev` | The build version the menu shows |
 | `DERBYNET_QUICKREF_PDF` | `../docs/dist/Quick Reference.pdf` | The quick reference the help link serves at `quickref.pdf`. The docs build writes the default |
 | `DERBYNET_STATIC_ROOT` | unset | Sets `STATIC_ROOT`, where `collectstatic` writes. The Docker image collects into `/opt/derbynet/static` and its nginx serves `/static/` from there |
-| `MAX_UPLOAD_SIZE` | unset | An nginx size (`16M`, `512k`, `1G`) that sets `DATA_UPLOAD_MAX_MEMORY_SIZE`; unset, Django's default stands. The Docker image sets it to `16M` and gives nginx's `client_max_body_size` the same value |
+| `MAX_UPLOAD_SIZE` | `100M` | An nginx size (`16M`, `512k`, `1G`) that sets `DATA_UPLOAD_MAX_MEMORY_SIZE`. The Docker image gives nginx's `client_max_body_size` the same value |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server generates a key into `<DERBYNET_CONFIG_DIR>/secret_key` with mode 0600 on first start, and reuses it after that |
 
 SQLite runs in WAL mode with `synchronous=NORMAL`, `IMMEDIATE` transactions, and a 20 second busy timeout (ADR-05). WAL writes `-wal` and `-shm` files next to the database, so keep `DERBYNET_DATA_DIR` on a writable local disk. A database on a network share can be corrupted. A Postgres `DATABASE_URL` is used as `dj-database-url` parses it, with no extra options.

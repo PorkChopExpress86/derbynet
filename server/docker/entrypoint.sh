@@ -16,7 +16,8 @@ die() { log "$*"; exit 1; }
 
 export DERBYNET_DATA_DIR="${DERBYNET_DATA_DIR:-/var/lib/derbynet}"
 export DERBYNET_CONFIG_DIR="${DERBYNET_CONFIG_DIR:-/var/lib/derbynet}"
-MAX_UPLOAD_SIZE="${MAX_UPLOAD_SIZE:-16M}"
+# The one place each default is set; server/docker/README.md lists them.
+MAX_UPLOAD_SIZE="${MAX_UPLOAD_SIZE:-100M}"
 DERBYNET_REQUEST_TIMEOUT="${DERBYNET_REQUEST_TIMEOUT:-30}"
 GUNICORN_WORKERS="${GUNICORN_WORKERS:-4}"
 export MAX_UPLOAD_SIZE
@@ -29,6 +30,20 @@ export MAX_UPLOAD_SIZE
     || die "DERBYNET_REQUEST_TIMEOUT must be a whole number of seconds, not '$DERBYNET_REQUEST_TIMEOUT'"
 [[ "$GUNICORN_WORKERS" =~ ^[1-9][0-9]*$ ]] \
     || die "GUNICORN_WORKERS must be a whole number, not '$GUNICORN_WORKERS'"
+for name in DERBYNET_DATA_DIR DERBYNET_CONFIG_DIR; do
+    [[ "${!name}" =~ ^/[A-Za-z0-9._/-]*$ ]] \
+        || die "$name must be an absolute path of letters, digits and . _ - /, not '${!name}'"
+done
+# Client addresses or networks whose X-Forwarded-Proto is believed: a proxy in
+# front of this container.  From anyone else it is replaced by the scheme of
+# the connection.
+trusted="${DERBYNET_TRUSTED_PROXIES:-}"
+trusted_geo=""
+for net in ${trusted//,/ }; do
+    [[ "$net" =~ ^[0-9A-Fa-f.:]+(/[0-9]{1,3})?$ ]] \
+        || die "DERBYNET_TRUSTED_PROXIES holds addresses or networks such as 172.17.0.1 or 10.0.0.0/8, not '$net'"
+    trusted_geo+="        $net 1;"$'\n'
+done
 prefix="${DERBYNET_URL_PREFIX:-}"
 prefix="${prefix#"${prefix%%[!/]*}"}"
 prefix="${prefix%"${prefix##*[!/]}"}"
@@ -73,9 +88,9 @@ elif [ -e "$TLS/cert.pem" ] || [ -e "$TLS/key.pem" ]; then
 fi
 if [ ! -e "$TLS/cert.pem" ]; then
     log "making a TLS key and self-signed certificate in $TLS"
-    # 825 days, the longest validity Apple's devices accept for a TLS server
-    # certificate (Apple support article HT210176, "Requirements for trusted
-    # certificates in iOS 13 and macOS 10.15").
+    # 825 days, because Apple's support article HT210176 ("Requirements for
+    # trusted certificates in iOS 13 and macOS 10.15") names it as the longest
+    # validity Apple's devices accept for a TLS server certificate.
     openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -sha256 \
         -days 825 -nodes -subj "/CN=DerbyNet" \
         -addext "subjectAltName=DNS:derbynet,DNS:localhost,IP:127.0.0.1" \
@@ -136,11 +151,15 @@ http {
 
     client_max_body_size $MAX_UPLOAD_SIZE;
 
-    # A proxy in front of this one says the client's scheme; otherwise it is
-    # this connection's.
-    map \$http_x_forwarded_proto \$derbynet_proto {
-        "" \$scheme;
-        default \$http_x_forwarded_proto;
+    # A trusted proxy in front of this one (DERBYNET_TRUSTED_PROXIES) says
+    # the client's scheme; for anyone else it is this connection's.
+    geo \$derbynet_trusted {
+        default 0;
+$trusted_geo    }
+    map "\$derbynet_trusted:\$http_x_forwarded_proto" \$derbynet_proto {
+        default \$scheme;
+        "1:http" http;
+        "1:https" https;
     }
     map \$http_host \$derbynet_host {
         "" \$host;
@@ -174,22 +193,36 @@ nginx -t -q -e stderr
 # compose's postgres profile runs the postgres service.  Otherwise SQLite on
 # the data volume.  A volume that has run on Postgres refuses to start on
 # SQLite, which would show an empty event instead of the race.
+# DERBYNET_POSTGRES_HOST and the POSTGRES_* names are compose.yaml's; the
+# password is percent-encoded into the URL, so any character works.
 engine_file="$DERBYNET_CONFIG_DIR/database-engine"
-if [ -z "${DATABASE_URL:-}" ] && [ -n "${DERBYNET_POSTGRES_URL:-}" ]; then
-    pg_host="${DERBYNET_POSTGRES_URL#*@}"
-    pg_host="${pg_host%%[:/]*}"
-    if getent hosts "$pg_host" >/dev/null; then
-        export DATABASE_URL="$DERBYNET_POSTGRES_URL"
-        log "using Postgres at $pg_host"
-    fi
-fi
-if [ -z "${DATABASE_URL:-}" ] && [ "$(cat "$engine_file" 2>/dev/null)" = postgres ]; then
-    die "this volume's race data is in Postgres, and no Postgres is running. Start it with 'docker compose --profile postgres up', or delete $engine_file to start again on SQLite."
+if [ -z "${DATABASE_URL:-}" ] && [ -n "${DERBYNET_POSTGRES_HOST:-}" ] \
+   && getent hosts "$DERBYNET_POSTGRES_HOST" >/dev/null; then
+    DATABASE_URL="$(python3 -I -c '
+import os
+from urllib.parse import quote
+e = os.environ
+print("postgres://%s:%s@%s:5432/%s" % (quote(e["POSTGRES_USER"], safe=""),
+      quote(e["POSTGRES_PASSWORD"], safe=""), e["DERBYNET_POSTGRES_HOST"],
+      quote(e["POSTGRES_DB"], safe="")))')"
+    export DATABASE_URL
+    log "using Postgres at $DERBYNET_POSTGRES_HOST"
 fi
 case "${DATABASE_URL:-}" in
-    postgres*) echo postgres > "$engine_file" ;;
-    "") echo sqlite > "$engine_file" ;;
+    postgres*) engine=postgres ;;
+    "") engine=sqlite ;;
+    *) engine=other ;;
 esac
+# A volume keeps the engine it first ran on.  Starting it on the other one
+# would show an empty event and leave the race in the first.
+recorded="$(cat "$engine_file" 2>/dev/null || true)"
+if [ -n "$recorded" ] && [ "$recorded" != "$engine" ]; then
+    case "$recorded" in
+        postgres) die "this volume's race data is in Postgres, and the server would start on $engine. Start it with 'docker compose --profile postgres up', or delete $engine_file to start again on $engine." ;;
+        *) die "this volume's race data is in $recorded, and the server would start on $engine. Unset DATABASE_URL and start without the postgres profile, or delete $engine_file to start again on $engine." ;;
+    esac
+fi
+echo "$engine" > "$engine_file"
 chown derbynet:derbynet "$engine_file" 2>/dev/null || true
 
 # --- Django -----------------------------------------------------------------
@@ -246,6 +279,8 @@ if [ "$stopping" = 0 ]; then
     [ "$status" = 0 ] && status=1
 fi
 kill -TERM "$gunicorn_pid" "$nginx_pid" 2>/dev/null || true
-wait || true
+# The two pids, not a bare wait, which after `wait -n` loops on "pid N is not
+# a child of this shell" until docker stop's grace runs out.
+wait "$gunicorn_pid" "$nginx_pid" 2>/dev/null || true
 [ "$stopping" = 1 ] && exit 0
 exit "$status"

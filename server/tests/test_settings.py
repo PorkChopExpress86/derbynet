@@ -151,8 +151,8 @@ def test_max_upload_size_reads_nginx_sizes(load_settings, value, size):
     assert loaded["DATA_UPLOAD_MAX_MEMORY_SIZE"] == size
 
 
-def test_max_upload_size_unset_keeps_djangos_default(load_settings):
-    assert "DATA_UPLOAD_MAX_MEMORY_SIZE" not in load_settings()
+def test_max_upload_size_defaults_to_100m(load_settings):
+    assert load_settings()["DATA_UPLOAD_MAX_MEMORY_SIZE"] == 100 * 1024**2
 
 
 @pytest.mark.parametrize("value", ["16MB", "M", "-1M", "0", "1.5M", "sixteen"])

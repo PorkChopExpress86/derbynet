@@ -12,6 +12,15 @@
 !lib/json-20210307.jar
 server/var/
 server/.venv/
+# Tests, tools, docs and caches the server never reads at run time.
+server/tests/
+server/**/tests/
+server/conftest.py
+server/tools/
+server/docs/
+server/.hypothesis/
+server/.pytest_cache/
+server/.ruff_cache/
 **/__pycache__/
 **/*.pyc
 server/ui/static/timer/js/timer/

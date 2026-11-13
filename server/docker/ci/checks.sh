@@ -13,13 +13,25 @@
 #   secret     secret_key: mode 0600, kept across containers, new per volume,
 #              and not written when DJANGO_SECRET_KEY is set
 #   user       ps -o user,comm: gunicorn runs as derbynet, not root
-#   upload     a 15 MiB photo.upload succeeds and a 17 MiB one answers 413,
-#              under the default MAX_UPLOAD_SIZE=16M
+#   upload     with MAX_UPLOAD_SIZE=16M a 15 MiB photo.upload succeeds and a
+#              17 MiB one answers 413; at the default (100M) the photo
+#              stand's 30 MB photo succeeds
 #   bind-mount a bind mount owned by another uid is given to derbynet, and
 #              one it can't be given to stops the container with a message
-#   client-ip  Django sees the client's address, not the unix socket's
+#   client-ip  Django sees the client's address, not the unix socket's, and
+#              not an X-Real-IP the client sent
+#   forwarded-proto
+#              a client's X-Forwarded-Proto counts only from
+#              DERBYNET_TRUSTED_PROXIES
+#   stop       docker stop ends the container at once, with status 0
+#   reload     GUNICORN_RELOAD=1 shows a template edit without a rebuild
 #   timeout    DERBYNET_REQUEST_TIMEOUT reaches gunicorn and nginx
-#   engine     a volume that ran on Postgres refuses to start on SQLite
+#   engine     a volume refuses to start on the other database engine, in
+#              both directions
+#   postgres-password
+#              compose's postgres profile with a password holding @ : / # %
+#   bad-env    values that would reach nginx's configuration malformed stop
+#              the container with a message
 #   upgrade    a volume made by OLD_IMAGE, holding racers and results, starts
 #              under IMAGE, migrates, and keeps the racer and result counts
 #   backup     server/docker/README.md's backup and restore, with compose:
@@ -32,7 +44,7 @@
 # check removes its own.  Each check prints what it saw, and the script exits
 # non-zero at the first that fails.
 
-set -e -E -o pipefail
+set -e -E -u -o pipefail
 
 IMAGE="${IMAGE:-derbynet_server:dev}"
 PREFIX="${DERBYNET_TEST_PREFIX:-derbynet-checks}"
@@ -48,6 +60,7 @@ cleanup() {
         --entrypoint sh "$IMAGE" -c 'rm -rf /t/bind /t/backup' >/dev/null 2>&1 || true
     docker ps -aq --filter "name=^$PREFIX-" | xargs -r docker rm -f >/dev/null
     docker volume ls -q --filter "name=^$PREFIX-" | xargs -r docker volume rm >/dev/null
+    docker network ls -q --filter "name=^$PREFIX-" | xargs -r docker network rm >/dev/null
 }
 trap cleanup EXIT
 trap 'exit 143' TERM INT
@@ -210,7 +223,8 @@ padded_jpeg() {
 }
 
 check_upload() {
-    start up1 "$PREFIX-upload" -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 127.0.0.1::80
+    start up1 "$PREFIX-upload" -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -e MAX_UPLOAD_SIZE=16M \
+        -p 127.0.0.1::80
     local url="http://$(docker port "$PREFIX-up1" 80/tcp)"
     local work="$RUNNER_TEMP_DIR/upload" jar="$RUNNER_TEMP_DIR/upload/cookies"
     suite_copy "$work"
@@ -231,6 +245,19 @@ check_upload() {
         -F repo=head -F photo=@"$work/17m.jpg" "$url/action.php")"
     echo "HTTP $code"
     [ "$code" = 413 ] || fail "the 17 MiB upload answered $code, not 413"
+    stop up1
+
+    say "at the default MAX_UPLOAD_SIZE, the photo stand's 30000000-byte photo"
+    start up2 "$PREFIX-upload" -p 127.0.0.1::80
+    url="http://$(docker port "$PREFIX-up2" 80/tcp)"
+    rm -f "$jar"
+    login "$url" "$jar" Photo
+    padded_jpeg "$work/30mb.jpg" 30000000
+    reply="$(curl -s -c "$jar" -b "$jar" -w '\nHTTP %{http_code}' -F action=photo.upload \
+        -F repo=head -F MAX_FILE_SIZE=30000000 -F photo=@"$work/30mb.jpg" "$url/action.php")"
+    echo "$reply" | tail -12
+    echo "$reply" | grep -q 'HTTP 200' || fail "the 30 MB upload did not answer 200"
+    echo "$reply" | grep -q '"code": "success"' || fail "the 30 MB upload did not succeed"
 }
 
 check_bind_mount() {
@@ -271,6 +298,119 @@ check_client_ip() {
     [[ "$target" =~ address=${gateway//./\\.}%2B([0-9]+)$ ]] \
         || fail "the kiosk's address is not the client's ($gateway)"
     (( BASH_REMATCH[1] > 200 )) || fail "the kiosk's port is the stand-in ${BASH_REMATCH[1]}"
+    say "the same with a forged X-Real-IP: 10.9.8.7"
+    target="$(curl -s -o /dev/null -H 'X-Real-IP: 10.9.8.7' -H 'X-Real-Port: 4242' \
+        -w '%{redirect_url}' "$url/kiosk.php")"
+    echo "$target"
+    [[ "$target" =~ address=${gateway//./\\.}%2B([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" != 4242 ] \
+        || fail "a client's X-Real-IP or X-Real-Port reached Django"
+}
+
+# action.php refuses a POST whose Origin is not this server's own
+# `<scheme>://<host>` with `notauthorized` (S34, legacy_api/views.py
+# _foreign_origin), so an https Origin over plain HTTP passes that refusal
+# only when Django takes the request for HTTPS.  (Past it, a server with no
+# event answers 302 to setup.php.)
+origin_post() { # origin_post <url> [curl options]: the refusal code, or "passed"
+    local url="$1" body
+    shift
+    body="$(curl -s "$@" -H "Origin: https://${url#http://}" -d 'action=role.login&name=' \
+        "$url/action.php")"
+    if echo "$body" | grep -q notauthorized; then echo notauthorized; else echo passed; fi
+}
+
+check_forwarded_proto() {
+    start fp1 "$PREFIX-proto" -p 127.0.0.1::80
+    local url="http://$(docker port "$PREFIX-fp1" 80/tcp)" code gateway
+    gateway="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$PREFIX-fp1")"
+    say "plain HTTP, Origin https://..., X-Forwarded-Proto: https, from an untrusted client"
+    code="$(origin_post "$url" -H 'X-Forwarded-Proto: https')"
+    echo "$code"
+    [ "$code" = notauthorized ] || fail "Django took a client's X-Forwarded-Proto"
+    stop fp1
+    say "the same from DERBYNET_TRUSTED_PROXIES=$gateway"
+    start fp2 "$PREFIX-proto" -p 127.0.0.1::80 -e DERBYNET_TRUSTED_PROXIES="$gateway"
+    url="http://$(docker port "$PREFIX-fp2" 80/tcp)"
+    code="$(origin_post "$url" -H 'X-Forwarded-Proto: https')"
+    echo "$code"
+    [ "$code" = passed ] || fail "a trusted proxy's X-Forwarded-Proto was not taken"
+    say "and from it with no header, the connection's scheme"
+    code="$(origin_post "$url")"
+    echo "$code"
+    [ "$code" = notauthorized ] || fail "Django took plain HTTP for HTTPS"
+}
+
+check_stop() {
+    start st1 "$PREFIX-stop"
+    local began took status lines
+    began="$(date +%s%N)"
+    docker stop "$PREFIX-st1" >/dev/null
+    took=$(( ($(date +%s%N) - began) / 1000000 ))
+    status="$(docker inspect -f '{{.State.ExitCode}}' "$PREFIX-st1")"
+    lines="$(docker logs "$PREFIX-st1" 2>&1 | wc -l)"
+    say "docker stop: $took ms, exit status $status, $lines log lines"
+    docker logs "$PREFIX-st1" 2>&1 | tail -3
+    [ "$status" = 0 ] || fail "the container exited with $status"
+    # docker stop's grace is 10 s; gunicorn's workers stop within a second.
+    (( took < 5000 )) || fail "docker stop took $took ms"
+    (( lines < 200 )) || fail "the log grew to $lines lines while stopping"
+}
+
+check_reload() {
+    local work="$RUNNER_TEMP_DIR/reload" template marker
+    rm -rf "$work" && mkdir -p "$work/server"
+    tar -C "$ROOT/server" --exclude=./.venv --exclude=./var -cf - . | tar -C "$work/server" -xf -
+    template="$work/server/accounts/templates/accounts/login.html"
+    start rl1 "$PREFIX-reload" -p 127.0.0.1::80 -e GUNICORN_RELOAD=1 \
+        -v "$work/server:/opt/derbynet/server:ro"
+    local url="http://$(docker port "$PREFIX-rl1" 80/tcp)"
+    marker="reload-check-$RANDOM"
+    # The page is read whole before it is searched: grep -q's early exit
+    # would fail curl with SIGPIPE under pipefail.
+    local page
+    page="$(curl -s "$url/login/?all")"
+    [[ "$page" != *"$marker"* ]] || fail "the marker is there before the edit"
+    sed -i "/{% block main %}/a <!-- $marker -->" "$template"
+    say "after a template edit, with no rebuild"
+    for _ in $(seq 30); do
+        page="$(curl -s "$url/login/?all")"
+        [[ "$page" == *"$marker"* ]] && break
+        sleep 1
+    done
+    [[ "$page" == *"$marker"* ]] || fail "the edit never showed"
+    echo "the login page shows <!-- $marker -->"
+}
+
+check_bad_env() {
+    local setting out status
+    for setting in 'MAX_UPLOAD_SIZE=16MB' 'DERBYNET_CONFIG_DIR=/var/lib/derbynet;evil' \
+                   'DERBYNET_DATA_DIR=relative' 'DERBYNET_TRUSTED_PROXIES=10.0.0.1; evil' \
+                   'DERBYNET_URL_PREFIX=/a b' 'DERBYNET_REQUEST_TIMEOUT=30s'; do
+        status=0
+        out="$(timeout 60 docker run --rm -e "$setting" "$IMAGE" 2>&1)" || status=$?
+        say "$setting: exit status $status: $(echo "$out" | tail -1)"
+        [ "$status" != 0 ] || fail "the container started with $setting"
+        [[ "$out" == *"derbynet: ${setting%%=*}"* ]] || fail "no message names ${setting%%=*}"
+    done
+}
+
+check_postgres_password() {
+    local project="$PREFIX-pgpass" password='p@ss:w/rd#%'
+    local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml"
+                   --profile postgres)
+    say "compose --profile postgres with POSTGRES_PASSWORD='$password'"
+    POSTGRES_PASSWORD="$password" DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 \
+        DERBYNET_HTTPS_PORT=127.0.0.1:0 "${compose[@]}" up -d --wait
+    local log engine
+    log="$("${compose[@]}" logs server 2>&1)"
+    echo "$log" | grep 'derbynet:'
+    [[ "$log" == *"using Postgres at postgres"* ]] || fail "the server did not use Postgres"
+    engine="$("${compose[@]}" exec -T server cat /var/lib/derbynet/database-engine)"
+    echo "database-engine: $engine"
+    [ "$engine" = postgres ] || fail "the volume is not marked Postgres"
+    "${compose[@]}" exec -T server sh -c '! ls /var/lib/derbynet/*.sqlite3 2>/dev/null' \
+        || fail "a SQLite database was made"
+    "${compose[@]}" down --volumes
 }
 
 check_timeout() {
@@ -279,8 +419,8 @@ check_timeout() {
     docker exec "$PREFIX-t1" grep -h 'proxy_read_timeout' /etc/nginx/derbynet-proxy.conf
     docker exec "$PREFIX-t1" grep -q 'proxy_read_timeout 600s;' /etc/nginx/derbynet-proxy.conf \
         || fail "nginx's proxy_read_timeout is not 600s"
-    docker exec "$PREFIX-t1" ps -e -o args | grep '[g]unicorn' | head -1
-    docker exec "$PREFIX-t1" ps -e -o args | grep '[g]unicorn' | grep -q -- '--timeout 600' \
+    docker exec "$PREFIX-t1" ps -e -o args | grep -m1 '[g]unicorn'
+    docker exec "$PREFIX-t1" ps -e -o args | grep -m1 '[g]unicorn' | grep -q -- '--timeout 600' \
         || fail "gunicorn's --timeout is not 600"
 }
 
@@ -294,6 +434,17 @@ check_engine() {
     [ "$status" != 0 ] || fail "the server started on SQLite"
     echo "$out" | grep -q "race data is in Postgres" || fail "no message says why"
     docker rm -f "$PREFIX-e1" >/dev/null
+
+    say "a SQLite volume refuses a Postgres DATABASE_URL"
+    start e2 "$PREFIX-engine2"
+    stop e2
+    status=0
+    out="$(timeout 120 docker run --name "$PREFIX-e3" -v "$PREFIX-engine2:/var/lib/derbynet" \
+        -e DATABASE_URL=postgres://derbynet:x@nowhere.invalid:5432/derbynet "$IMAGE" 2>&1)" || status=$?
+    echo "$out" | tail -2
+    [ "$status" != 0 ] || fail "the server started on Postgres"
+    echo "$out" | grep -q "race data is in sqlite" || fail "no message says why"
+    docker rm -f "$PREFIX-e3" >/dev/null
 }
 
 # A copy of testing/ in $1, whose scripts write beside themselves.
@@ -386,22 +537,28 @@ check_backup() {
     data="$("${compose[@]}" volumes -q | grep '_data$')"
     postgres="$("${compose[@]}" volumes -q | grep '_postgres$' || true)"
     "${compose[@]}" stop
-    docker run --rm -v "$data:/data:ro" -v "$work:/backup" --entrypoint tar "$IMAGE" \
-        -C /data -czf /backup/derbynet-data.tgz .
-    if [ "$profile" = postgres ]; then
-        docker run --rm -v "$postgres:/data:ro" -v "$work:/backup" --entrypoint tar "$IMAGE" \
-            -C /data -czf /backup/derbynet-postgres.tgz .
-    fi
+    (
+        cd "$work"
+        umask 077
+        docker run --rm -v "$data:/data:ro" --entrypoint tar "$IMAGE" -C /data -czf - . > derbynet-data.tgz
+        if [ "$profile" = postgres ]; then
+            docker run --rm -v "$postgres:/data:ro" --entrypoint tar "$IMAGE" \
+                -C /data -czf - . > derbynet-postgres.tgz
+        fi
+    )
     ls -l "$work"/*.tgz
+    for file in "$work"/*.tgz; do
+        [ "$(stat -c '%a %u' "$file")" = "600 $(id -u)" ] || fail "$file is not private to $(id -un)"
+    done
+    "${compose[@]}" start
 
     say "restore into fresh volumes and a fresh container"
     "${compose[@]}" down --volumes
     "${compose[@]}" create
-    docker run --rm -v "$data:/data" -v "$work:/backup" --entrypoint tar "$IMAGE" \
-        -C /data -xzf /backup/derbynet-data.tgz
+    docker run --rm -i -v "$data:/data" --entrypoint tar "$IMAGE" -C /data -xzf - < "$work/derbynet-data.tgz"
     if [ "$profile" = postgres ]; then
-        docker run --rm -v "$postgres:/data" -v "$work:/backup" --entrypoint tar "$IMAGE" \
-            -C /data -xzf /backup/derbynet-postgres.tgz
+        docker run --rm -i -v "$postgres:/data" --entrypoint tar "$IMAGE" \
+            -C /data -xzf - < "$work/derbynet-postgres.tgz"
     fi
     "${compose[@]}" up -d --wait
     url="http://$("${compose[@]}" port server 80)"
@@ -430,7 +587,8 @@ backup_state() { # backup_state <url> <jar> <racerid>
 
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
-[ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip timeout engine
+[ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
+    reload timeout engine postgres-password bad-env
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -441,6 +599,11 @@ for check in "$@"; do
         client-ip) check_client_ip ;;
         timeout) check_timeout ;;
         engine) check_engine ;;
+        forwarded-proto) check_forwarded_proto ;;
+        stop) check_stop ;;
+        reload) check_reload ;;
+        postgres-password) check_postgres_password ;;
+        bad-env) check_bad_env ;;
         upgrade) check_upgrade ;;
         backup) check_backup ;;
         *) fail "no check named $check" ;;

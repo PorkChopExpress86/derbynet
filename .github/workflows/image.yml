@@ -3,22 +3,27 @@ name: image
 # The Docker image of the Django server (#58), from server/docker/Dockerfile.
 #
 # - build: both platforms, linux/amd64 and linux/arm64 (arm64 under QEMU),
-#   into a registry that lives only in the job, so `docker buildx imagetools
-#   inspect` can show the manifest list.  Nothing leaves the runner.
+#   once, into an OCI archive that every later job uses: the test jobs load
+#   their platform's image from it, and publish pushes the archive itself, so
+#   the published bits are the tested ones.  The build job also pushes it to a
+#   registry that lives only in the job, so `docker buildx imagetools
+#   inspect` can show the manifest list, and dry-runs publish.sh there.
 # - suite: testing/exercise-one-database.sh against the amd64 image as a race
 #   runs it: one `docker run` on a fresh volume, compose with the postgres
 #   profile, under DERBYNET_URL_PREFIX, behind a host nginx, and the long
 #   schedule with DERBYNET_REQUEST_TIMEOUT=600.  The suite runs as
 #   server.yml's exercise job runs it (#37): the same script, the same
 #   DERBYNET_BACKEND and test endpoints.
-# - arm64: the same suite against the arm64 image, built and run natively on
+# - arm64: the same suite against the archive's arm64 image, run natively on
 #   GitHub's ubuntu-24.04-arm runner.
 # - checks: server/docker/ci/checks.sh (TLS, secret key, user, uploads, bind
 #   mounts, client address, timeout, engine guard, upgrade, backup) and the
 #   phone check, Chromium in phone mode over https://<LAN IP>/ (D88).
-# - publish: on a release tag only, both platforms to
+# - publish: on a release tag only, the archive to
 #   ghcr.io/porkchopexpress86/derbynet_server with the repository's
-#   GITHUB_TOKEN (D89).  Pull requests and branch pushes push nothing.
+#   GITHUB_TOKEN (D89), and `latest` for a release that is not a prerelease
+#   (server/docker/ci/publish.sh).  Pull requests and branch pushes push
+#   nothing.
 
 on:
   push:
@@ -84,22 +89,52 @@ jobs:
         with:
           driver-opts: network=host
 
-      - name: Build both platforms into the job's own registry
+      - name: Build both platforms into an OCI archive
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: server/docker/Dockerfile
           platforms: linux/amd64,linux/arm64
-          tags: localhost:5000/derbynet_server:ci
-          push: true
+          provenance: false
+          outputs: type=oci,dest=${{ runner.temp }}/image.tar
           cache-from: type=gha,scope=image
           cache-to: type=gha,scope=image,mode=max
 
-      - name: docker buildx imagetools inspect
+      - name: Push the archive to the job's own registry, and inspect it
         run: |
+          skopeo copy --all --preserve-digests --dest-tls-verify=false \
+            "oci-archive:$RUNNER_TEMP/image.tar" docker://localhost:5000/derbynet_server:ci
           docker buildx imagetools inspect localhost:5000/derbynet_server:ci | tee inspect.txt
           grep -q 'Platform: *linux/amd64' inspect.txt
           grep -q 'Platform: *linux/arm64' inspect.txt
+
+      # publish.sh as the publish job runs it, against the job's registry: a
+      # release gets its tag and latest, a prerelease only its tag, and both
+      # keep the archive's digest.
+      - name: Dry-run the publish step
+        run: |
+          archive="$RUNNER_TEMP/image.tar"
+          server/docker/ci/publish.sh "$archive" localhost:5000/dry-release v1.2.3 --dest-tls-verify=false
+          server/docker/ci/publish.sh "$archive" localhost:5000/dry-prerelease v1.2.4-rc1 --dest-tls-verify=false
+          tags() { curl -s "http://localhost:5000/v2/$1/tags/list" | jq -c '.tags | sort'; }
+          echo "dry-release: $(tags dry-release)"
+          echo "dry-prerelease: $(tags dry-prerelease)"
+          test "$(tags dry-release)" = '["latest","v1.2.3"]'
+          test "$(tags dry-prerelease)" = '["v1.2.4-rc1"]'
+          digest() { skopeo inspect --raw "$@" | sha256sum | cut -d' ' -f1; }
+          tested="$(digest "oci-archive:$archive")"
+          for ref in dry-release:v1.2.3 dry-release:latest dry-prerelease:v1.2.4-rc1; do
+            pushed="$(digest --tls-verify=false "docker://localhost:5000/$ref")"
+            echo "$ref sha256:$pushed (archive sha256:$tested)"
+            test "$pushed" = "$tested"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar
+          retention-days: 7
+          if-no-files-found: error
 
   suite:
     name: suite (amd64, ${{ matrix.variant }})
@@ -113,17 +148,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v4.4.1
-
-      - name: Build the amd64 image
-        uses: docker/build-push-action@v7.4.0
+      - uses: actions/download-artifact@v8
         with:
-          context: .
-          file: server/docker/Dockerfile
-          platforms: linux/amd64
-          tags: ${{ env.IMAGE }}
-          load: true
-          cache-from: type=gha,scope=image
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the amd64 image the build job made
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
 
       - name: Install the suite's tools
         run: |
@@ -152,17 +185,14 @@ jobs:
             compose-postgres) compose --profile postgres up -d --wait; url=http://localhost ;;
             # The Docker install doc's setup: the host's own web server
             # proxies a path to the container on 127.0.0.1:8000.
+            # server/docker/README.md's location block, read from the README.
             host-proxy)
-              run -p 127.0.0.1:8000:80 -e DERBYNET_URL_PREFIX=/my-derbynet
-              sudo tee /etc/nginx/sites-enabled/default >/dev/null <<'EOF'
-          server {
-              listen 80 default_server;
-              client_max_body_size 16M;
-              location /my-derbynet/ {
-                  proxy_pass http://127.0.0.1:8000/;
-              }
-          }
-          EOF
+              run -p 127.0.0.1:8000:80 -e DERBYNET_URL_PREFIX=/my-derbynet \
+                -e DERBYNET_TRUSTED_PROXIES=172.17.0.1
+              { echo 'server {'; echo '    listen 80 default_server;'
+                awk '/^```nginx$/ {on=1; next} /^```$/ {on=0} on' server/docker/README.md
+                echo '}'; } | sudo tee /etc/nginx/sites-enabled/default
+              grep -q 'location /my-derbynet/' /etc/nginx/sites-enabled/default
               sudo nginx -t
               sudo systemctl restart nginx
               url=http://localhost/my-derbynet ;;
@@ -253,23 +283,26 @@ jobs:
 
   arm64:
     name: suite (arm64)
+    needs: build
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v4.4.1
-
-      - name: Build the arm64 image natively
-        uses: docker/build-push-action@v7.4.0
+      - uses: actions/download-artifact@v8
         with:
-          context: .
-          file: server/docker/Dockerfile
-          platforms: linux/arm64
-          tags: ${{ env.IMAGE }}
-          load: true
-          cache-from: type=gha,scope=image-arm64
-          cache-to: type=gha,scope=image-arm64,mode=max
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the arm64 image the build job made
+        run: |
+          command -v skopeo >/dev/null || {
+            sudo sh .github/ubuntu-mirror.sh
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends skopeo
+          }
+          skopeo copy --override-os linux --override-arch arm64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
 
       - name: The host
         run: |
@@ -312,17 +345,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: docker/setup-buildx-action@v4.4.1
-
-      - name: Build the amd64 image
-        uses: docker/build-push-action@v7.4.0
+      - uses: actions/download-artifact@v8
         with:
-          context: .
-          file: server/docker/Dockerfile
-          platforms: linux/amd64
-          tags: ${{ env.IMAGE }}
-          load: true
-          cache-from: type=gha,scope=image
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the amd64 image the build job made
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
 
       - name: Install the checks' tools
         run: |
@@ -379,17 +410,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v4.4.1
-
-      - name: Build the amd64 image
-        uses: docker/build-push-action@v7.4.0
+      - uses: actions/download-artifact@v8
         with:
-          context: .
-          file: server/docker/Dockerfile
-          platforms: linux/amd64
-          tags: ${{ env.IMAGE }}
-          load: true
-          cache-from: type=gha,scope=image
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the amd64 image the build job made
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
 
       - uses: astral-sh/setup-uv@v10.3.2
         with:
@@ -449,30 +478,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up QEMU
-        run: |
-          docker run --privileged --rm \
-            tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 \
-            --install arm64
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
 
-      - uses: docker/setup-buildx-action@v4.4.1
-
-      - name: Log in to ghcr.io
+      - name: Push the tested archive to ghcr.io
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-
-      - name: Build and push both platforms
-        uses: docker/build-push-action@v7.4.0
-        with:
-          context: .
-          file: server/docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/porkchopexpress86/derbynet_server:${{ github.ref_name }}
-            ghcr.io/porkchopexpress86/derbynet_server:latest
-          push: true
-          cache-from: type=gha,scope=image
+        run: |
+          echo "$TOKEN" | skopeo login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          server/docker/ci/publish.sh "$RUNNER_TEMP/image.tar" \
+            ghcr.io/porkchopexpress86/derbynet_server "$GITHUB_REF_NAME"
 
       - name: docker buildx imagetools inspect
-        run: docker buildx imagetools inspect "ghcr.io/porkchopexpress86/derbynet_server:${{ github.ref_name }}"
+        run: docker buildx imagetools inspect "ghcr.io/porkchopexpress86/derbynet_server:${GITHUB_REF_NAME}"

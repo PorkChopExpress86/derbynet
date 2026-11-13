@@ -93,10 +93,9 @@ ENV PATH=/opt/derbynet/venv/bin:$PATH \
     DERBYNET_CONFIG_DIR=/var/lib/derbynet \
     DERBYNET_DATA_DIR=/var/lib/derbynet \
     DERBYNET_STATIC_ROOT=/opt/derbynet/static \
-    TZ=America/New_York \
-    MAX_UPLOAD_SIZE=16M \
-    DERBYNET_REQUEST_TIMEOUT=30 \
-    GUNICORN_WORKERS=4
+    TZ=America/New_York
+# MAX_UPLOAD_SIZE, DERBYNET_REQUEST_TIMEOUT and GUNICORN_WORKERS default in
+# entrypoint.sh, their one source.
 
 WORKDIR /opt/derbynet/server
 VOLUME /var/lib/derbynet

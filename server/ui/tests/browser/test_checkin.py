@@ -804,6 +804,29 @@ def test_phone_landscape_layout(browser, live_server, event, page_errors):
     context.close()
 
 
+def test_a_long_name_keeps_the_phone_list_one_screen_wide(login, event):
+    """A card is as wide as the list, whatever the name: the list's one
+    column was `auto` wide, so the longest unbroken line (the name and the
+    car line are `truncate`, one line each) widened every card and the page
+    scrolled sideways on a phone. testing/import-roster.sh's "Darrell &
+    Darrell Delaughter" of White's Wolves did it at 390x844 (#58's phone
+    check)."""
+    racer = add_racers(event, "White's Wolves", 1, 217)[0]
+    Racer.objects.filter(pk=racer.pk).update(
+        first_name="Darrell & Darrell", last_name="Delaughter"
+    )
+    page = open_checkin(login("RaceCrew"))
+    phone_only(page)
+    expect(card(page, racer)).to_contain_text("Darrell & Darrell Delaughter")
+    no_sideways_scroll(page)
+    width = page.evaluate(
+        "() => [document.querySelector('#checkin-list').clientWidth,"
+        " document.querySelector('[data-racer]').getBoundingClientRect().width]"
+    )
+    # one read: the list is drawn and nothing redraws it before the read
+    assert width[1] <= width[0], width
+
+
 # ----- screenshots and accessibility -----
 
 

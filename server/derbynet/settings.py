@@ -234,12 +234,10 @@ VIDEO_UPLOAD_MAX_BYTES = _env_millions("DERBYNET_VIDEO_UPLOAD_MAX_MB", 100)
 PHOTO_MAX_PIXELS = _env_millions("DERBYNET_PHOTO_MAX_MEGAPIXELS", 50, "megapixels")
 
 
-def _nginx_size(name):
+def _nginx_size(name, default):
     """An nginx size (`16M`, `512k`, `1g`, or bytes) as bytes, as nginx reads
     `client_max_body_size`, so the image's nginx and Django share one value."""
-    value = os.environ.get(name, "").strip()
-    if not value:
-        return None
+    value = os.environ.get(name, "").strip() or default
     units = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3}
     number, unit = value[:-1], value[-1].lower()
     if unit.isdigit():
@@ -251,11 +249,11 @@ def _nginx_size(name):
     return int(number) * units[unit]
 
 
-# The Docker image's MAX_UPLOAD_SIZE (#58, default 16M) is nginx's
-# client_max_body_size and Django's cap on the form fields of one request.
-# Unset, Django's own default stands.
-if (_max_upload := _nginx_size("MAX_UPLOAD_SIZE")) is not None:
-    DATA_UPLOAD_MAX_MEMORY_SIZE = _max_upload
+# MAX_UPLOAD_SIZE is the Docker image's nginx client_max_body_size (#58) and
+# Django's cap on the form fields of one request. Its default, 100M, holds
+# the largest upload, a replay clip (DERBYNET_VIDEO_UPLOAD_MAX_MB); the image's
+# entrypoint passes the same value to nginx.
+DATA_UPLOAD_MAX_MEMORY_SIZE = _nginx_size("MAX_UPLOAD_SIZE", "100M")
 
 # PHP's DERBYNET_FACEDETECT autocrop hook: an executable that takes an image
 # path and prints `x y width height`. Unset, OpenCV finds the face.
