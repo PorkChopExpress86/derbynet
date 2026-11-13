@@ -32,7 +32,7 @@ Never drive `derbynet-local` on port 8080: that is the owner's own instance.
 
 ## Real phone
 
-When the owner checks a page on their own phone or tablet, serve a Django run on the tailnet with `bin/phone` after `launch` and `seed`:
+Ticket evidence comes from Chromium's phone mode at 390x844, and no ticket waits on a real device. The owner's iPhone and WebKit check runs once, in #299 (D88). When the owner checks a page on their own phone or tablet, serve a Django run on the tailnet with `bin/phone` after `launch` and `seed`:
 
 ```bash
 VERIFY_RUN=v1 VERIFY_PORT=8090 VERIFY_SERVER=django VERIFY_SUDO=agent-sudo .claude/skills/verify/bin/phone   # prints "phone https://<host>.ts.net/"
