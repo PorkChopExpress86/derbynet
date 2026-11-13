@@ -18,8 +18,9 @@ adds `0-rotated` for the original of a turned photo.
 - `photo.rotate` stores the rotation (`PhotoRotation`) and leaves the upload.
 - PNG renders use Pillow's default compression, where PHP writes level 0.
 
-A render is made on first request under a per-file lock, and only for the
-labels in `ALLOWED_BOXES`. Any other size gets the allowed render nearest to
+A render is made on first request under a per-file lock, and opened for the
+response before the lock is let go (#302), and only for the labels in
+`ALLOWED_BOXES`. Any other size gets the allowed render nearest to
 it, so a client cannot create folders. Sizes truncate as PHP's do: 921x299
 becomes 200x64 at `200x200`.
 
@@ -39,6 +40,7 @@ import zlib
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
+from io import BufferedReader
 from pathlib import Path
 from urllib.parse import unquote_plus
 
@@ -357,7 +359,9 @@ def _photo_lock(repo: Repository, name: str):
     and the rotation, then writes, under the lock, and `photo.crop`,
     `photo.rotate` and `photo.delete` hold it until their transaction has
     committed and the stale renders are gone. No render made from the old
-    state can outlive the change.
+    state can outlive the change. `photo.php` opens a render it made, or one
+    it found gone, under the lock too, so a change waiting on it can't unlink
+    it before the read (`open_render()`).
 
     The locks are a fixed set of files in the data folder, picked by the
     photo's folder and name, so no lock file is left in a photo folder. A
@@ -454,23 +458,72 @@ def find_or_make(repo: Repository, label: Label, name: str) -> Path | None:
     made if it is missing, or None when there is no such photo."""
     if repo.directory is None or not is_valid_name(name):
         return None
+    ready = _ready(repo, label, name)
+    if ready is not None:
+        return ready
+    try:
+        with _photo_lock(repo, name):
+            return _made(repo, label, name)
+    except PhotoLockError:
+        return None
+
+
+def open_render(repo: Repository, label: Label, name: str) -> BufferedReader | None:
+    """`find_or_make()`'s file, open for reading, or None when there is no
+    such photo. A file already made is opened without the photo's lock. One
+    that isn't, or that a change unlinked before the open, is found or made
+    again and opened before the lock is let go, so a rotation or delete
+    waiting on the lock unlinks it only once it is open, and the file then
+    reads as it was (#302). The caller streams it after the lock is let go,
+    so viewers of one photo don't wait on each other. An open that fails
+    under the lock raises the OSError."""
+    if repo.directory is None or not is_valid_name(name):
+        return None
+    ready = _ready(repo, label, name)
+    if ready is not None:
+        try:
+            return ready.open("rb")
+        except OSError:
+            pass
+    try:
+        with _photo_lock(repo, name):
+            made = _made(repo, label, name)
+            return made.open("rb") if made is not None else None
+    except PhotoLockError:
+        return None
+
+
+def _ready(repo: Repository, label: Label, name: str) -> Path | None:
+    """The file that serves `name` at `label` when it needs no making, found
+    without the photo's lock, so a change may unlink it before it is read: the
+    crop, the upload itself, a turned photo's render, or a render made before
+    for a fixed size."""
     cropped = repo.file(name, CROPPED_FOLDER)
     if label.name == CROPPED and cropped.is_file():
         return cropped
     if label.name in (ORIGINAL, CROPPED):
-        return _original(repo, name)
-    # A render already made for a fixed size is served without the lock.
+        original = repo.file(name)
+        if not original.is_file():
+            return None
+        if _is_svg(original) or not rotation_of(repo, name):
+            return original
+        rotated = repo.file(name, ROTATED_FOLDER)
+        return rotated if rotated.is_file() else None
     fixed = WORK_FOLDER if label.name == WORK else None
     if label.requested is not None:
         box = _ALLOWED_FOLDERS.get("x".join(f"{n:g}" for n in label.requested))
         fixed = box.folder if box else None
     if fixed and repo.file(name, fixed).is_file():
         return repo.file(name, fixed)
-    try:
-        with _photo_lock(repo, name):
-            return _render(repo, label, name)
-    except PhotoLockError:
-        return None
+    return None
+
+
+def _made(repo: Repository, label: Label, name: str) -> Path | None:
+    """The file that serves `name` at `label` when `_ready()` found none,
+    made if it is missing. The caller holds the photo's lock."""
+    if label.name in (ORIGINAL, CROPPED):
+        return _original(repo, name)
+    return _render(repo, label, name)
 
 
 def _render(repo: Repository, label: Label, name: str) -> Path | None:
@@ -505,39 +558,37 @@ def _render(repo: Repository, label: Label, name: str) -> Path | None:
 
 
 def _original(repo: Repository, name: str) -> Path | None:
-    """The upload itself, or for a turned photo, its turned render."""
+    """The upload itself, or for a turned photo, its turned render. The
+    caller holds the photo's lock."""
     original = repo.file(name)
+    rotation = rotation_of(repo, name)
     if not original.is_file():
         return None
-    if _is_svg(original) or not rotation_of(repo, name):
+    if _is_svg(original) or not rotation:
         return original
-    rotated = repo.file(name, ROTATED_FOLDER)
-    if rotated.is_file():
-        return rotated
-    try:
-        with _photo_lock(repo, name):
-            rotation = rotation_of(repo, name)
-            if not original.is_file():
-                return None
-            if not rotation:
-                return original
-            return _make(rotated, lambda: _open_upright(original, rotation))
-    except PhotoLockError:
-        return None
+    return _make(
+        repo.file(name, ROTATED_FOLDER), lambda: _open_upright(original, rotation)
+    )
 
 
-def racer_photo(repo: Repository, path: str, label: Label | None) -> Path | None:
+def open_racer_photo(
+    repo: Repository, path: str, label: Label | None
+) -> BufferedReader | None:
     """The file `photo.php/<repo>/racer/<id>[/<render>]` serves for a racer
-    whose column holds `path`. With no render, the file the column names."""
+    whose column holds `path`, open as `open_render()` opens it, or None. With
+    no render, the file the column names. A crop unlinked before its open is
+    None, as a missing crop is; an open that fails otherwise raises."""
     if repo.directory is None or not path:
         return None
     name = path.rsplit("/", 1)[-1]
     if label is not None:
-        return find_or_make(repo, label, name)
+        return open_render(repo, label, name)
     if path.startswith(CROPPED_FOLDER + "/"):
-        cropped = repo.file(name, CROPPED_FOLDER)
-        return cropped if cropped.is_file() else None
-    return _original(repo, name)
+        try:
+            return repo.file(name, CROPPED_FOLDER).open("rb")
+        except FileNotFoundError:
+            return None
+    return open_render(repo, Label(ORIGINAL), name)
 
 
 def _dependents(repo: Repository, name: str, keep: str | None) -> list[Path]:
