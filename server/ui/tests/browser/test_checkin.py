@@ -805,11 +805,10 @@ def test_phone_landscape_layout(browser, live_server, event, page_errors):
 
 
 def test_a_long_name_keeps_the_phone_list_one_screen_wide(login, event):
-    """A card is as wide as the list, whatever the name: the list's one
-    column was `auto` wide, so the longest unbroken line (the name and the
-    car line are `truncate`, one line each) widened every card and the page
-    scrolled sideways on a phone. testing/import-roster.sh's "Darrell &
-    Darrell Delaughter" of White's Wolves did it at 390x844 (#58's phone
+    """A card is no wider than the list, whatever the name, so the page never
+    scrolls sideways on a phone. The list's column took the width of its
+    widest card's unbroken text, and testing/import-roster.sh's "Darrell &
+    Darrell Delaughter" widened every card past the phone (#58's phone
     check)."""
     racer = add_racers(event, "White's Wolves", 1, 217)[0]
     Racer.objects.filter(pk=racer.pk).update(

@@ -340,20 +340,24 @@ check_forwarded_proto() {
     [ "$code" = notauthorized ] || fail "Django took plain HTTP for HTTPS"
 }
 
+# The bare `wait` this guards against spun on about half the stops (2 of 4
+# on one machine), so the check stops the container STOPS times.
 check_stop() {
-    start st1 "$PREFIX-stop"
-    local began took status lines
-    began="$(date +%s%N)"
-    docker stop "$PREFIX-st1" >/dev/null
-    took=$(( ($(date +%s%N) - began) / 1000000 ))
-    status="$(docker inspect -f '{{.State.ExitCode}}' "$PREFIX-st1")"
-    lines="$(docker logs "$PREFIX-st1" 2>&1 | wc -l)"
-    say "docker stop: $took ms, exit status $status, $lines log lines"
-    docker logs "$PREFIX-st1" 2>&1 | tail -3
-    [ "$status" = 0 ] || fail "the container exited with $status"
-    # docker stop's grace is 10 s; gunicorn's workers stop within a second.
-    (( took < 5000 )) || fail "docker stop took $took ms"
-    (( lines < 200 )) || fail "the log grew to $lines lines while stopping"
+    local began took status lines round
+    for round in $(seq "${STOPS:-8}"); do
+        start st1 "$PREFIX-stop"
+        began="$(date +%s%N)"
+        docker stop "$PREFIX-st1" >/dev/null
+        took=$(( ($(date +%s%N) - began) / 1000000 ))
+        status="$(docker inspect -f '{{.State.ExitCode}}' "$PREFIX-st1")"
+        lines="$(docker logs "$PREFIX-st1" 2>&1 | wc -l)"
+        say "docker stop $round: $took ms, exit status $status, $lines log lines"
+        [ "$status" = 0 ] || fail "the container exited with $status"
+        # docker stop's grace is 10 s; the check allows half of it.
+        (( took < 5000 )) || fail "docker stop took $took ms"
+        (( lines < 200 )) || fail "the log grew to $lines lines while stopping"
+        stop st1
+    done
 }
 
 check_reload() {
@@ -361,7 +365,9 @@ check_reload() {
     rm -rf "$work" && mkdir -p "$work/server"
     tar -C "$ROOT/server" --exclude=./.venv --exclude=./var -cf - . | tar -C "$work/server" -xf -
     template="$work/server/accounts/templates/accounts/login.html"
-    start rl1 "$PREFIX-reload" -p 127.0.0.1::80 -e GUNICORN_RELOAD=1 \
+    # One worker, which has the page cached before the edit: Django caches
+    # templates even with DEBUG on, so only a restart shows the edit.
+    start rl1 "$PREFIX-reload" -p 127.0.0.1::80 -e GUNICORN_RELOAD=1 -e GUNICORN_WORKERS=1 \
         -v "$work/server:/opt/derbynet/server:ro"
     local url="http://$(docker port "$PREFIX-rl1" 80/tcp)"
     marker="reload-check-$RANDOM"
