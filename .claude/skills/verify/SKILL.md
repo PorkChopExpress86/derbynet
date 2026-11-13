@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Drive DerbyNet's web UI, PHP or the Django port, in a real browser to prove a change works, as a race crew would. Use after changing a page, an action.php handler, or a kiosk, and before reporting UI work as done.
+description: Drive DerbyNet's web UI, PHP or the Django port, in a real browser to prove a change works, as a race crew would. Use after changing a page, an action.php handler, or a kiosk, before reporting UI work as done, and to serve the Django port to a real phone or tablet over Tailscale.
 ---
 
 # Verify DerbyNet
@@ -29,6 +29,16 @@ The Django server keeps the code and templates it started with. After each edit 
 Baseline after `seed`: event `Verify`, 4 lanes, racers `Ava`..`Hal Verify` in dens `Lions` (cars 101-104) and `Tigers` (201-204), all checked in. Role passwords: RaceCoordinator `doyourbest`, RaceCrew `murphy`, Photo `flashbulb`.
 
 Never drive `derbynet-local` on port 8080: that is the owner's own instance.
+
+## Real phone
+
+When the owner checks a page on their own phone or tablet, serve a Django run on the tailnet with `bin/phone` after `launch` and `seed`:
+
+```bash
+VERIFY_RUN=v1 VERIFY_PORT=8090 VERIFY_SERVER=django VERIFY_SUDO=agent-sudo .claude/skills/verify/bin/phone   # prints "phone https://<host>.ts.net/"
+```
+
+It restarts the server trusting the tailnet origin, so logins and forms posted from the phone pass Django's CSRF check, starts `tailscale serve` on port 443 (root, through `VERIFY_SUDO`), and fails unless the login page and `static/ui/app.css` answer 200 through that URL. Send the owner the URL it prints. `cleanup` turns the serve off. It refuses to replace a `tailscale serve` config it did not start.
 
 ## Doctor
 
