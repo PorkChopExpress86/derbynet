@@ -7,6 +7,8 @@ The timer side of each test posts `timer-message` to `/action.php` as
 import hashlib
 import os
 import re
+import shutil
+import tempfile
 from io import StringIO
 from pathlib import Path
 
@@ -567,16 +569,21 @@ def test_profiles_js_fills_the_template(tmp_path, monkeypatch):
 
 @pytest.fixture
 def umask_077():
-    """A umask that keeps every new file to its owner, under which
-    `NamedTemporaryFile` and `copyfile` write 0600 files."""
+    """A umask that keeps every new file to its owner."""
     old = os.umask(0o077)
     yield
     os.umask(old)
 
 
 def test_the_build_writes_files_any_user_can_read(tmp_path, monkeypatch, umask_077):
-    """#312: the image's server runs as `derbynet`, and a 0600 profiles.js in
-    a bind-mounted checkout answered 500."""
+    """#312: the image's server runs as `derbynet`, which could not read a
+    0600 profiles.js in a bind-mounted checkout. `NamedTemporaryFile` and
+    `copyfile` write 0600 under this umask, and the build's files are 0644."""
+    with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as bare:
+        pass
+    shutil.copyfile(timer_build.SOURCE_HTML, tmp_path / "copied")
+    assert Path(bare.name).stat().st_mode & 0o777 == 0o600
+    assert (tmp_path / "copied").stat().st_mode & 0o777 == 0o600
     monkeypatch.setattr(timer_build, "ASSETS", tmp_path)
     monkeypatch.setattr(timer_build, "PROFILES", tmp_path / "js" / "profiles.js")
     written = [*timer_build.copy_sources(), timer_build.profiles_js("[]")]
