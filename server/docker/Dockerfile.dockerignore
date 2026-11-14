@@ -1,8 +1,10 @@
 # The build context is the repository root (Dockerfile header).  Only what
-# the stages copy goes in: server/, and the browser timer's sources for
-# build_timer.
+# the stages copy goes in: server/, the guides for build_docs (#61), and the
+# browser timer's sources for build_timer.
 *
 !server/
+!docs/*.md
+!docs/img/
 !templates/timer.html
 !templates/timer-profiles.js
 !timer/src/

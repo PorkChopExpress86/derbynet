@@ -58,3 +58,6 @@ server/var/
 
 # Python bytecode
 __pycache__/
+
+# The first pass of docs/tools/fodt-to-md.sh (#61)
+docs/first-pass/

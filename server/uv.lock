@@ -131,6 +131,7 @@ default-groups = ["browser", "dev"]
 dependencies = [
     { name = "dj-database-url" },
     { name = "django" },
+    { name = "markdown" },
     { name = "opencv-python-headless" },
     { name = "openpyxl" },
     { name = "pillow" },
@@ -160,6 +161,7 @@ serve = [
 requires-dist = [
     { name = "dj-database-url", specifier = ">=3.0" },
     { name = "django", specifier = ">=5.2,<5.3" },
+    { name = "markdown", specifier = ">=3.8,<4" },
     { name = "opencv-python-headless", specifier = ">=4.12,<5" },
     { name = "openpyxl", specifier = ">=3.1,<4" },
     { name = "pillow", specifier = ">=13.0.0" },
@@ -385,6 +387,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
+]
+
+[[package]]
+name = "markdown"
+version = "3.11.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/eb/dc0fd6eff604bfb870b7fb68b90985a32caaf3c76f67736bbf7f438acd59/markdown-3.11.3.tar.gz", hash = "sha256:81eb91631dc97ad1efbc76019ef0f80fe90ca49ddf81546752d79989c3bfff3e", size = 498810, upload-time = "2026-11-05T20:30:52.926Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/6f/1fa8970e960e5c832874399e6efa564870ade8206d57fef5d5e296b834f5/markdown-3.11.3-py3-none-any.whl", hash = "sha256:e1a31a112232504d753e5c01bb8c2de90d3f0ba986b063e10770cf7695b09e73", size = 116758, upload-time = "2026-11-05T20:30:51.775Z" },
 ]
 
 [[package]]

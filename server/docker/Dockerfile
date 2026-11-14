@@ -33,8 +33,9 @@ COPY server/pyproject.toml server/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-default-groups --group serve --no-build
 
-# The static files, once, on the build machine's own platform: they are the
-# same on every platform, so they are never built under QEMU.  The Tailwind
+# The static files and the rendered guides, once, on the build machine's own
+# platform: they are the same on every platform, so they are never built under
+# QEMU.  The Tailwind
 # standalone CLI builds app.css (#40), build_timer writes the browser timer and
 # its profiles.js (#50), with a JDK for the timer's Java sources, and
 # collectstatic gathers everything into /opt/derbynet/static.  Throwaway
@@ -58,14 +59,20 @@ COPY templates/timer.html templates/timer-profiles.js /src/templates/
 COPY timer/src /src/timer/src
 COPY timer/derbynet-timer/src /src/timer/derbynet-timer/src
 COPY lib/jssc.jar lib/Java-WebSocket-1.5.2.jar lib/json-20210307.jar /src/lib/
+COPY docs/*.md /src/docs/
+COPY docs/img /src/docs/img
 COPY server/ ./
 ENV DJANGO_SECRET_KEY=static-stage-only \
     DERBYNET_DATA_DIR=/tmp/static-stage/data \
     DERBYNET_CONFIG_DIR=/tmp/static-stage/config \
-    DERBYNET_STATIC_ROOT=/opt/derbynet/static
+    DERBYNET_STATIC_ROOT=/opt/derbynet/static \
+    DERBYNET_DOCS_ROOT=/opt/derbynet/docs
+# build_docs renders the guides in docs/ for /docs/ (#61), so a request only
+# reads files and no page needs the network.
 RUN python3 -I ui/css_build.py fetch \
  && python3 -I ui/css_build.py build \
  && /opt/derbynet/venv/bin/python manage.py build_timer \
+ && /opt/derbynet/venv/bin/python manage.py build_docs \
  && /opt/derbynet/venv/bin/python manage.py collectstatic --noinput --verbosity 0
 
 FROM ${UBUNTU}
@@ -80,6 +87,7 @@ RUN apt-get update \
  && usermod -aG derbynet www-data
 COPY --from=venv /opt/derbynet/venv /opt/derbynet/venv
 COPY --from=static /opt/derbynet/static /opt/derbynet/static
+COPY --from=static /opt/derbynet/docs /opt/derbynet/docs
 # nginx serves every static file from /opt/derbynet/static, so the server's
 # own static folders, which a dev bind mount replaces, are never read.
 COPY server/ /opt/derbynet/server/
@@ -93,6 +101,7 @@ ENV PATH=/opt/derbynet/venv/bin:$PATH \
     DERBYNET_CONFIG_DIR=/var/lib/derbynet \
     DERBYNET_DATA_DIR=/var/lib/derbynet \
     DERBYNET_STATIC_ROOT=/opt/derbynet/static \
+    DERBYNET_DOCS_ROOT=/opt/derbynet/docs \
     TZ=America/New_York
 # MAX_UPLOAD_SIZE, DERBYNET_REQUEST_TIMEOUT and GUNICORN_WORKERS default in
 # entrypoint.sh, their one source.

@@ -65,7 +65,7 @@ The image sets these. `server/README.md`'s Settings table lists the rest, such a
 
 ## Timers on a Mac or Windows laptop
 
-Docker Desktop on a Mac cannot pass a USB serial device into a container (D3). On a Mac or Windows laptop, connect the timer through the browser timer instead: open `http://<host>/timer.php` in Chrome on the laptop the timer is plugged into, which talks to the timer over Web Serial. The image serves that page. On a Linux host, `derby-timer.jar` runs on the host and connects to `http://<host>/`.
+Docker Desktop on a Mac cannot pass a USB serial device into a container (D3). On a Mac or Windows laptop, connect the timer through the browser timer instead: open `https://<host>/timer.php` in Chrome or Edge on the laptop the timer is plugged into, which talks to the timer over Web Serial. The image serves that page. Web Serial needs a secure page, so use the HTTPS address and accept the certificate; plain `http://` works only as `http://localhost/timer.php` on the computer running the container. Over plain HTTP to another address, Chrome hides Web Serial and the page sends the browser to `/timer/no-serial/`. On a Linux host, `derby-timer.jar` runs on the host and connects to `http://<host>/`. `docs/install-docker.md` says the same for race crews.
 
 ## Behind another web server
 

@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods
 
@@ -24,16 +24,6 @@ def placeholder(request):
 
 
 @require_GET
-def quickref(request):
-    """The quick reference the help link opens. The docs build writes it
-    (`docs/build.xml`, target `quickref`)."""
-    try:
-        pdf = open(settings.QUICKREF_PDF, "rb")  # FileResponse closes it.
-    except FileNotFoundError:
-        raise Http404("The quick reference has not been built.") from None
-    return FileResponse(pdf, content_type="application/pdf")
-
-
 def _components_enabled():
     if not (settings.DEBUG or settings.ENABLE_TEST_ENDPOINTS):
         raise Http404

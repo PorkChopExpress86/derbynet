@@ -1,0 +1,44 @@
+/* The guides under /docs/ (#61). The Markdown renders to plain elements with
+   no Tailwind classes, and Tailwind's reset strips heading sizes, margins and
+   list markers, so this sheet gives them back. The colors are app.css's theme
+   variables, so a guide follows the device's dark mode (D20). */
+.doc { max-width: 46rem; line-height: 1.6; overflow-wrap: break-word; }
+.doc h1 { font-size: 1.75rem; font-weight: 700; line-height: 1.25; margin: 0.25rem 0 1rem; }
+.doc h2 { font-size: 1.35rem; font-weight: 650; line-height: 1.3; margin: 2rem 0 0.75rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--color-line); }
+.doc h3 { font-size: 1.1rem; font-weight: 650; margin: 1.5rem 0 0.5rem; }
+.doc h4 { font-weight: 650; margin: 1.25rem 0 0.5rem; }
+.doc p, .doc ul, .doc ol, .doc pre, .doc table, .doc blockquote { margin: 0 0 1rem; }
+.doc ul { list-style: disc; padding-left: 1.5rem; }
+.doc ol { list-style: decimal; padding-left: 1.5rem; }
+.doc li { margin: 0.25rem 0; }
+.doc li > ul, .doc li > ol { margin: 0.25rem 0 0; }
+.doc a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.doc strong { font-weight: 650; }
+.doc em { font-style: italic; }
+.doc code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; background: var(--color-surface-2); border: 1px solid var(--color-line); border-radius: 0.25rem; padding: 0.05rem 0.3rem; }
+/* A long command or a wide table scrolls in its own box, so a phone's page
+   never scrolls sideways. */
+.doc pre { overflow-x: auto; background: var(--color-surface-2); border: 1px solid var(--color-line); border-radius: 0.5rem; padding: 0.75rem; line-height: 1.45; }
+.doc pre code { background: none; border: 0; padding: 0; font-size: 0.85rem; }
+.doc table { display: block; overflow-x: auto; border-collapse: collapse; max-width: 100%; }
+.doc th, .doc td { border: 1px solid var(--color-line); padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
+.doc th { background: var(--color-surface-2); font-weight: 650; }
+.doc blockquote { border-left: 4px solid var(--color-line); padding-left: 1rem; color: var(--color-ink-muted); }
+.doc img { max-width: 100%; height: auto; border: 1px solid var(--color-line); border-radius: 0.5rem; }
+.doc hr { border: 0; border-top: 1px solid var(--color-line); margin: 2rem 0; }
+.doc-footer { margin-top: 2rem; }
+.doc-footer a { color: var(--color-accent); text-decoration: underline; }
+
+/* Paper: the guide alone, black on white, with no menus, banner or toasts. */
+@media print {
+  body { background: #fff; color: #000; }
+  #page > nav, #page > div > header, [data-bottom-nav], [data-default-password-banner],
+  #sheets, #toasts, a[href="#main"], .doc-footer { display: none !important; }
+  main#main { max-width: none; padding: 0 !important; }
+  .doc { max-width: none; }
+  .doc a { color: #000; }
+  .doc pre, .doc code, .doc th { background: #fff; }
+  .doc pre, .doc table, .doc img { break-inside: avoid; }
+  .doc h2, .doc h3 { break-after: avoid; }
+  .doc table { display: table; }
+}

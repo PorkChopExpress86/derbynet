@@ -35,3 +35,9 @@ The same `server/compose.yaml` also runs the PHP server and Django's
 `runserver` side by side (`server/README.md`, "Run both servers").
 `server/docker/README.md` describes the image itself: its settings, TLS,
 Postgres, and backups.
+
+The guides for race crews and developers are Markdown files in `docs/`, starting
+with `docs/install-docker.md` and `docs/developer-guide.md`. The server shows
+them under `/docs/`, rendered when the image is built; with `runserver`, run
+`uv run python manage.py build_docs` in `server/` first, and again after
+changing a guide.

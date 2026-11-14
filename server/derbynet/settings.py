@@ -200,11 +200,9 @@ STATIC_URL = "static/"
 # Django serves static files only with DEBUG on. Unset, collectstatic refuses.
 STATIC_ROOT = os.environ.get("DERBYNET_STATIC_ROOT") or None
 
-# The quick reference the help link opens. The docs build writes it.
-QUICKREF_PDF = Path(
-    os.environ.get("DERBYNET_QUICKREF_PDF")
-    or BASE_DIR.parent / "docs" / "dist" / "Quick Reference.pdf"
-)
+# The guides under /docs/, as `manage.py build_docs` renders them from docs/
+# (#61). The Docker image renders them at build time into /opt/derbynet/docs.
+DOCS_ROOT = Path(os.environ.get("DERBYNET_DOCS_ROOT") or BASE_DIR / "var" / "docs")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

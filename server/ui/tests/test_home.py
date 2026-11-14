@@ -71,7 +71,7 @@ def test_the_vote_entry_shows_to_a_visitor(client, event):
 def test_the_drawer_shows_the_help_link_and_the_version(login):
     page = login("RaceCrew").get("/").content.decode()
 
-    assert 'href="/quickref.pdf"' in page
+    assert 'href="/docs/quick-reference/"' in page
     assert "data-version>DerbyNet " in page
 
 

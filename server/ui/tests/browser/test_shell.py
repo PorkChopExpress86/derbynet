@@ -58,7 +58,7 @@ def test_the_more_drawer_holds_the_rest_and_the_help_link(login):
     expect(drawer.get_by_role("link", name="Retrospective")).to_be_visible()
     expect(drawer.get_by_role("link", name="Race Check-In")).to_have_count(0)
     expect(drawer.get_by_role("link", name="Quick reference")).to_have_attribute(
-        "href", "/quickref.pdf"
+        "href", "/docs/quick-reference/"
     )
     expect(drawer.locator("[data-version]")).to_contain_text("DerbyNet ")
     assert_accessible(page)
