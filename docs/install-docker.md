@@ -203,7 +203,9 @@ On Windows, run these in WSL as written. PowerShell needs two changes, and only 
 
 ```powershell
 docker run --rm -v derbynet:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-data.tgz
-``` With Compose, the volume is `derbynet_data`, and under the `postgres` profile the Postgres volume `derbynet_postgres` needs the same copy. `server/docker/README.md` has the Compose commands.
+```
+
+With Compose, the volume is `derbynet_data`, and under the `postgres` profile the Postgres volume `derbynet_postgres` needs the same copy. `server/docker/README.md` has the Compose commands.
 
 A snapshot from Set-Up is not a full backup. It leaves out videos and some race state (D65).
 

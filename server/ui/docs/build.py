@@ -106,6 +106,17 @@ def render(text: str) -> tuple[str, str]:
     if not first.startswith("# "):
         raise BuildError(f"a guide starts with its `# ` title, not {first!r}")
     html = markdown.markdown(text, extensions=[*EXTENSIONS, _LinksExtension()])
+    # A fence the renderer did not close shows its backticks on the page. A
+    # closing fence with text after it on the same line closes nothing, so
+    # the rest of the guide became code: install-docker.md's PowerShell
+    # restore swallowed the Upgrade section until the #61 retro.
+    if "```" in html:
+        at = html.index("```")
+        raise BuildError(
+            "a code fence is not closed, so the page shows its backticks: "
+            f"...{html[max(0, at - 80) : at + 80]!r}... A closing fence is "
+            "a line of three backticks alone."
+        )
     html = SCROLLERS.sub(r'<\1 tabindex="0">', html)
     return first[2:].strip(), html
 

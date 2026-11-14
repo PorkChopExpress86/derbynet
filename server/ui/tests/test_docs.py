@@ -167,6 +167,26 @@ def test_the_old_quickref_pdf_moves_to_the_quick_reference(client, event, prefix
     assert response["Location"] == "/docs/quick-reference/?x=1"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # install-docker.md at 565e0c84: text after a closing fence left the
+        # block open until the next fence, so Upgrade became code.
+        "# T\n\n```sh\nrun\n``` Then more.\n\n## Upgrade\n\n```sh\npull\n```\n",
+        "# T\n\n```sh\nrun\n",
+    ],
+)
+def test_a_fence_left_open_is_refused(text):
+    with pytest.raises(build.BuildError, match="code fence is not closed"):
+        build.render(text)
+
+
+def test_a_closed_fence_renders_its_code_and_the_section_after_it():
+    _, html = build.render("# T\n\n```sh\nrun\n```\n\nThen more.\n\n## Upgrade\n")
+    assert '<code class="language-sh">run\n</code>' in html
+    assert '<h2 id="upgrade">Upgrade</h2>' in html
+
+
 def test_a_code_block_and_a_table_take_the_focus_to_scroll():
     _, html = build.render("# T\n\n```\ncode\n```\n\n| a |\n|---|\n| b |\n")
     assert '<pre tabindex="0">' in html
