@@ -599,6 +599,7 @@ def test_the_build_writes_files_any_user_can_read(tmp_path, monkeypatch, umask_0
     assets = tmp_path / "static" / "timer"
     templates = tmp_path / "templates"
     (assets / "js").mkdir(parents=True)  # as the checkout has it, 0700 here
+    assert (assets / "js").stat().st_mode & 0o777 == 0o700
     monkeypatch.setattr(timer_build, "ASSETS", assets)
     monkeypatch.setattr(
         timer_build, "PROFILES", assets / "js" / "timer" / "profiles.js"
