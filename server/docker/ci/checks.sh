@@ -42,8 +42,9 @@
 #              guide's image answer from the guides the build rendered (#61),
 #              /quickref.pdf answers 301 to it (D94), and under
 #              DERBYNET_URL_PREFIX the page's links carry the prefix
-#   timer      /timer.php as Timer, at / and /derbynet/, and every script and
-#              stylesheet it links answer 200 with their content type (#312)
+#   timer      /timer.php as RaceCoordinator, at / and /derbynet/: every
+#              script, image and stylesheet it links, and the worker and
+#              images its scripts load, answer 200 with their type (#312)
 #   backup     server/docker/README.md's backup and restore, with compose:
 #              an event with a racer photo, a car photo and a video, backed
 #              up, restored into fresh volumes, and all there.  PROFILE=postgres
@@ -678,43 +679,71 @@ check_docs() {
         || fail "the guide's links are not relative"
 }
 
-# The browser timer (#312): /timer.php, as the Timer role, and every script
-# and stylesheet it links, at the root and under the Debian layout's
-# /derbynet/.  The links are read from the page, so a file the page gains is
-# checked too.  Each file's status is printed before the check fails, so the
-# log lists them all.
+# The page's own files: each <script src>, <img src> and stylesheet href,
+# whichever order the attributes come in and whichever quotes they use.  The
+# page is read as one line, since a tag may span lines.
+page_files() { # page_files <html file>
+    local page tags
+    page="$(tr '\n\t' '  ' < "$1")"
+    tags="$(grep -oiE '<(script|img|link)[[:space:]][^>]*>' <<<"$page" || true)"
+    tags="$(grep -viE '^<link' <<<"$tags" || true)
+$(grep -iE "^<link.*[[:space:]]rel=[\"']?stylesheet" <<<"$tags" || true)"
+    sed -nE "s/.*[[:space:]](src|href)=[\"']([^\"']+)[\"'].*/\2/p" <<<"$tags"
+}
+
+# The files a script loads by a quoted relative path, in either quote style
+# and escaped too: main.js's clock worker, and the images gui.js and main.js
+# draw.
+script_files() { # script_files <script file>
+    grep -oE '\\?["'"'"'](js|img)/[A-Za-z0-9_./-]+\.(js|png)\\?["'"'"']' "$1" \
+        | tr -d "\"'\\\\" || true
+}
+
+# The browser timer (#312): /timer.php, as RaceCoordinator, the race-day
+# laptop's login (D53), at the root and under the Debian layout's /derbynet/.
+# Every file the page links, and every file its scripts load by name, answers
+# 200 with its content type.  gui.js builds the serial status image's name
+# (`'img/status/' + png + '.png'`), so those four are named here.  Each file's
+# status is printed before the check fails, so the log lists them all.
 check_timer() {
     start timer "$PREFIX-timer" -p 127.0.0.1::80
     local url="http://$(docker port "$PREFIX-timer" 80/tcp)" jar="$RUNNER_TEMP_DIR/timer-cookies"
+    local html="$RUNNER_TEMP_DIR/timer.html" script="$RUNNER_TEMP_DIR/timer-script"
     new_event "$url"
-    login "$url" "$jar" Timer
-    local base page got links link want bad=0 seen
+    login "$url" "$jar" RaceCoordinator
+    local base got files path want bad=0 seen
     for base in / /derbynet/; do
-        say "${base}timer.php as Timer"
-        got="$(curl -s -o "$RUNNER_TEMP_DIR/timer.html" -b "$jar" \
-            -w '%{http_code} %{content_type}' "$url${base}timer.php")"
+        say "${base}timer.php as RaceCoordinator"
+        got="$(curl -s -o "$html" -b "$jar" -w '%{http_code} %{content_type}' "$url${base}timer.php")"
         echo "$got"
         case "$got" in "200 text/html"*) ;; *) fail "${base}timer.php answered $got" ;; esac
-        page="$(cat "$RUNNER_TEMP_DIR/timer.html")"
-        # Each <script src> and stylesheet href, in the page's order.
-        links="$(grep -oE '<script [^>]*src="[^"]+"|<link [^>]*rel="stylesheet"[^>]*href="[^"]+"' \
-            <<<"$page" | sed -E 's/.*(src|href)="([^"]+)"$/\2/' || true)"
-        for want in js/timer/main.js js/timer/profiles.js css/timer.css js/jquery.js; do
-            grep -qxF "$want" <<<"$links" || fail "${base}timer.php links no $want"
+        files="$(page_files "$html")"
+        while read -r path; do
+            case "$path" in *.js) ;; *) continue ;; esac
+            curl -s -o "$script" -b "$jar" "$url$base$path"
+            files+=$'\n'"$(script_files "$script")"
+        done <<<"$files"
+        files+=$'\n'"$(printf 'img/status/%s.png\n' ok not_connected trouble unknown)"
+        files="$(awk 'NF && !seen[$0]++' <<<"$files")"
+        for want in js/timer/main.js js/timer/profiles.js css/timer.css js/jquery.js \
+                    js/timer/clock-worker.js img/gear_icon.png img/derbynet.png \
+                    img/small-check.png img/timer/trouble-tiny.png; do
+            grep -qxF "$want" <<<"$files" || fail "found no $want for ${base}timer.php"
         done
         seen=0
-        while read -r link; do
-            case "$link" in /*|*://*) fail "${base}timer.php links $link, not a relative path" ;; esac
-            got="$(curl -s -o /dev/null -b "$jar" -w '%{http_code} %{content_type}' "$url$base$link")"
-            echo "$got $base$link"
+        while read -r path; do
+            case "$path" in /*|*://*) fail "${base}timer.php loads $path, not a relative path" ;; esac
+            got="$(curl -s -o /dev/null -b "$jar" -w '%{http_code} %{content_type}' "$url$base$path")"
+            echo "$got $base$path"
             seen=$((seen + 1))
-            case "$link:$got" in
+            case "$path:$got" in
                 *.js:"200 text/javascript"*|*.js:"200 application/javascript"*) ;;
                 *.css:"200 text/css"*) ;;
+                *.png:"200 image/png"*) ;;
                 *) bad=$((bad + 1)) ;;
             esac
-        done <<<"$links"
-        echo "$seen files linked"
+        done <<<"$files"
+        echo "$seen files"
     done
     [ "$bad" = 0 ] || fail "$bad of the timer page's files did not answer 200 with their type"
 }

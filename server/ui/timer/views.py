@@ -375,6 +375,20 @@ def no_serial(request):
     )
 
 
+def _asset(folder: str, path: str):
+    """The first file at `path` under one of `timer_build.asset_roots`, or
+    None. A path that leaves its root, or holds a NUL, finds nothing."""
+    for root in timer_build.asset_roots(folder):
+        top = root.resolve()
+        try:
+            found = (top / path).resolve()
+        except ValueError:  # an embedded NUL
+            return None
+        if top in found.parents and found.is_file():
+            return found
+    return None
+
+
 @require_GET
 def browser_asset(request, folder: str, path: str):
     """A file the browser timer loads by a relative path: `js/`, `css/` or
@@ -382,12 +396,8 @@ def browser_asset(request, folder: str, path: str):
     where the Docker image has the generated files (`timer_build.asset_roots`,
     #312). Only files that are there are served, and no path leaves the
     folder it is found in."""
-    for root in timer_build.asset_roots(folder):
-        root = root.resolve()
-        found = (root / path).resolve()
-        if root in found.parents and found.is_file():
-            break
-    else:
+    found = _asset(folder, path)
+    if found is None:
         raise Http404
     content_type, _ = mimetypes.guess_type(found.name)
     response = FileResponse(found.open("rb"), content_type=content_type)

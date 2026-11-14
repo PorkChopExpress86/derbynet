@@ -456,7 +456,13 @@ def test_the_legacy_files_are_served_at_their_paths(client, path):
 
 @pytest.mark.parametrize(
     "path",
-    ["js/../../timer_build.py", "js/%2e%2e/%2e%2e/views.py", "img/nope.png", "js/"],
+    [
+        "js/../../timer_build.py",
+        "js/%2e%2e/%2e%2e/views.py",
+        "img/nope.png",
+        "js/",
+        "js/jquery.js%00.txt",
+    ],
 )
 def test_nothing_else_is_served(client, path):
     assert client.get(f"/{path}").status_code == 404
@@ -577,20 +583,64 @@ def umask_077():
 
 def test_the_build_writes_files_any_user_can_read(tmp_path, monkeypatch, umask_077):
     """#312: the image's server runs as `derbynet`, which could not read a
-    0600 profiles.js in a bind-mounted checkout. `NamedTemporaryFile` and
-    `copyfile` write 0600 under this umask, and the build's files are 0644."""
+    0600 profiles.js in a bind-mounted checkout. Under this umask
+    `NamedTemporaryFile`, `copyfile` and `write_text` write 0600 files and
+    `mkdir` makes 0700 folders; the build's files are 0644 and its folders,
+    the ones it makes and the ones it writes into, 0755."""
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as bare:
         pass
     shutil.copyfile(timer_build.SOURCE_HTML, tmp_path / "copied")
+    (tmp_path / "written").write_text("")
+    (tmp_path / "made").mkdir()
     assert Path(bare.name).stat().st_mode & 0o777 == 0o600
     assert (tmp_path / "copied").stat().st_mode & 0o777 == 0o600
-    monkeypatch.setattr(timer_build, "ASSETS", tmp_path)
-    monkeypatch.setattr(timer_build, "PROFILES", tmp_path / "js" / "profiles.js")
-    written = [*timer_build.copy_sources(), timer_build.profiles_js("[]")]
+    assert (tmp_path / "written").stat().st_mode & 0o777 == 0o600
+    assert (tmp_path / "made").stat().st_mode & 0o777 == 0o700
+    assets = tmp_path / "static" / "timer"
+    templates = tmp_path / "templates"
+    (assets / "js").mkdir(parents=True)  # as the checkout has it, 0700 here
+    monkeypatch.setattr(timer_build, "ASSETS", assets)
+    monkeypatch.setattr(
+        timer_build, "PROFILES", assets / "js" / "timer" / "profiles.js"
+    )
+    monkeypatch.setattr(timer_build, "TEMPLATES", templates)
+    monkeypatch.setattr(
+        timer_build, "TEMPLATE", templates / "ui" / "timer" / "browser.html"
+    )
+    timer_build.write_template()
+    timer_build.copy_sources()
+    timer_build.profiles_js("[]")
     modes = {
-        p.relative_to(tmp_path).as_posix(): p.stat().st_mode & 0o777 for p in written
+        p.relative_to(tmp_path).as_posix(): p.stat().st_mode & 0o777
+        for root in (assets, templates)
+        for p in (root, *root.rglob("*"))
     }
-    assert set(modes.values()) == {0o644}, modes
+    assert "templates/ui/timer/browser.html" in modes
+    assert "static/timer/js/timer/profiles.js" in modes
+    assert "static/timer/css/timer.css" in modes
+    files = {name: mode for name, mode in modes.items() if "." in name.split("/")[-1]}
+    folders = {name: mode for name, mode in modes.items() if name not in files}
+    assert set(files.values()) == {0o644}, files
+    assert set(folders.values()) == {0o755}, folders
+    assert set(folders) == {
+        "static/timer",
+        "static/timer/js",
+        "static/timer/js/timer",
+        "static/timer/css",
+        "templates",
+        "templates/ui",
+        "templates/ui/timer",
+    }
+
+
+def test_profiles_js_alone_makes_its_folders_readable(tmp_path, monkeypatch, umask_077):
+    """`profiles_js` makes its own folders readable, without relying on
+    `copy_sources` running first."""
+    monkeypatch.setattr(timer_build, "ASSETS", tmp_path)
+    monkeypatch.setattr(timer_build, "PROFILES", tmp_path / "js" / "timer" / "p.js")
+    timer_build.profiles_js("[]")
+    folders = (tmp_path, tmp_path / "js", tmp_path / "js" / "timer")
+    assert [f.stat().st_mode & 0o777 for f in folders] == [0o755] * 3
 
 
 def test_copy_sources_copies_every_script_and_the_css(tmp_path, monkeypatch):
