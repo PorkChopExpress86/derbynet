@@ -699,12 +699,19 @@ script_files() { # script_files <script file>
         | tr -d "\"'\\\\" || true
 }
 
+# The files the timer's scripts load, named here so that a missing script
+# cannot hide them: main.js's clock worker, the images main.js and gui.js
+# draw, and the four serial status images, whose names gui.js builds
+# (`'img/status/' + png + '.png'`).
+TIMER_SCRIPT_FILES="js/timer/clock-worker.js img/small-check.png img/small-cross.png
+img/timer/trouble-tiny.png img/status/ok.png img/status/not_connected.png
+img/status/trouble.png img/status/unknown.png"
+
 # The browser timer (#312): /timer.php, as RaceCoordinator, the race-day
 # laptop's login (D53), at the root and under the Debian layout's /derbynet/.
-# Every file the page links, and every file its scripts load by name, answers
-# 200 with its content type.  gui.js builds the serial status image's name
-# (`'img/status/' + png + '.png'`), so those four are named here.  Each file's
-# status is printed before the check fails, so the log lists them all.
+# Every file the page links, TIMER_SCRIPT_FILES, and every file a script it
+# links names by a quoted path answer 200 with their content type.  Each
+# file's status is printed before the check fails, so the log lists them all.
 check_timer() {
     start timer "$PREFIX-timer" -p 127.0.0.1::80
     local url="http://$(docker port "$PREFIX-timer" 80/tcp)" jar="$RUNNER_TEMP_DIR/timer-cookies"
@@ -723,13 +730,8 @@ check_timer() {
             curl -s -o "$script" -b "$jar" "$url$base$path"
             files+=$'\n'"$(script_files "$script")"
         done <<<"$files"
-        files+=$'\n'"$(printf 'img/status/%s.png\n' ok not_connected trouble unknown)"
+        files+=$'\n'"$(tr ' ' '\n' <<<"$TIMER_SCRIPT_FILES")"
         files="$(awk 'NF && !seen[$0]++' <<<"$files")"
-        for want in js/timer/main.js js/timer/profiles.js css/timer.css js/jquery.js \
-                    js/timer/clock-worker.js img/gear_icon.png img/derbynet.png \
-                    img/small-check.png img/timer/trouble-tiny.png; do
-            grep -qxF "$want" <<<"$files" || fail "found no $want for ${base}timer.php"
-        done
         seen=0
         while read -r path; do
             case "$path" in /*|*://*) fail "${base}timer.php loads $path, not a relative path" ;; esac
@@ -744,6 +746,10 @@ check_timer() {
             esac
         done <<<"$files"
         echo "$seen files"
+        for want in js/timer/main.js js/timer/profiles.js css/timer.css js/jquery.js \
+                    img/gear_icon.png img/derbynet.png; do
+            grep -qxF "$want" <<<"$files" || fail "${base}timer.php links no $want"
+        done
     done
     [ "$bad" = 0 ] || fail "$bad of the timer page's files did not answer 200 with their type"
 }
