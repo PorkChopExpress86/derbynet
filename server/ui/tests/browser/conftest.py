@@ -53,6 +53,7 @@ from django.db import connection  # noqa: E402
 from accounts.models import Role  # noqa: E402
 from awards.models import AwardType  # noqa: E402
 from core.tests.factories import EventFactory  # noqa: E402
+from ui.tests.browser.helpers import dismiss_toasts, htmx_settled  # noqa: E402, F401
 from ui.tests.roles import PASSWORDS  # noqa: E402
 
 SIZES = {
@@ -291,14 +292,6 @@ def _toasts_cover_nothing_clicked():
         for name in CLEAR_OF_TOASTS:
             patch.setattr(Locator, name, _clear_of_toasts(getattr(Locator, name)))
         yield
-
-
-def dismiss_toasts(page):
-    """Close the toasts, as a race coordinator would, before tapping a
-    control they cover."""
-    toasts = page.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 @pytest.fixture(autouse=True)
@@ -655,17 +648,6 @@ def htmx_post(page, path: str):
         yield
     assert reply.value.ok, reply.value.status
     htmx_settled(page)
-
-
-def htmx_settled(page):
-    """Wait until htmx has no request in flight and has settled every swap.
-    The page settles at once (`defaultSettleDelay` 0), so a swapped-in
-    control is bound as soon as it shows, and every swap is checked for that
-    (UNBOUND_AFTER_SWAP); wait for this before reading what a request
-    changed."""
-    page.wait_for_function(
-        "!document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')"
-    )
 
 
 def shoot(page, name: str, full_page: bool = True) -> Path:

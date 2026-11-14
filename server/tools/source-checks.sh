@@ -77,6 +77,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   ui/tests/test_browser_fixture_order.py \
   ui/tests/test_photo_urls.py \
   ui/tests/test_phone_grids.py \
+  ui/tests/test_race_day_screens.py \
   ui/tests/test_relative_urls.py \
   ui/tests/test_vendored.py \
   ui/tests/test_settings_bounds.py \

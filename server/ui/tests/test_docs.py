@@ -139,11 +139,14 @@ def test_unbuilt_a_guide_is_404_and_the_index_says_how_to_build(
 
 
 def test_an_image_is_served_and_only_a_built_image(client, event, built):
-    name = json.loads((built / "index.json").read_text())["images"][0]
-    response = client.get(f"/docs/img/{name}")
-    assert response.status_code == 200
-    assert response["Content-Type"] == "image/jpeg"
-    assert b"".join(response.streaming_content) == (DOCS / "img" / name).read_bytes()
+    images = json.loads((built / "index.json").read_text())["images"]
+    for suffix, content_type in ((".jpg", "image/jpeg"), (".png", "image/png")):
+        name = next(n for n in images if n.endswith(suffix))
+        response = client.get(f"/docs/img/{name}")
+        assert response.status_code == 200
+        assert response["Content-Type"] == content_type
+        served = b"".join(response.streaming_content)
+        assert served == (DOCS / "img" / name).read_bytes()
     assert client.get("/docs/img/no-such.png").status_code == 404
     assert client.get("/docs/img/../index.json").status_code == 404
     assert client.get("/docs/img/%2e%2e/index.json").status_code == 404

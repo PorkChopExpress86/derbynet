@@ -13,6 +13,7 @@ from core.models import Event, RaceSettings
 from roster.models import Partition, Racer
 from transfer import backups
 from ui.tests.browser.conftest import assert_accessible, htmx_post, shoot
+from ui.tests.browser.helpers import open_section
 from ui.tests.race import add_racers, race_setup, scheduled
 
 
@@ -26,14 +27,6 @@ def _data_dir(settings, tmp_path):
 def phone_only(page):
     if page.size != "phone":
         pytest.skip("this acceptance check is at 390x844")
-
-
-def open_section(page, key):
-    section = page.locator(f'details[data-section="{key}"]')
-    if section.get_attribute("open") is None:
-        section.locator("summary").click()
-    expect(section).to_have_attribute("open", "")
-    return section
 
 
 def saved(page):
