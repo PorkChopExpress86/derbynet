@@ -101,7 +101,8 @@ def test_source_checks_refuses_a_timeout():
 
 
 @pytest.mark.parametrize(
-    ("plan_status", "pytest_status", "status"), [(1, 0, 1), (0, 3, 3), (1, 4, 4)]
+    ("plan_status", "pytest_status", "status"),
+    [(0, 0, 0), (1, 0, 1), (0, 3, 3), (1, 4, 4)],
 )
 def test_both_halves_run_whatever_the_first_says(
     tmp_path, plan_status, pytest_status, status

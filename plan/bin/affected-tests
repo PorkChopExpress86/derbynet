@@ -20,10 +20,12 @@ targets, then:
   (#273's "Heat 100" failed only there);
 - the repeats under load each changed browser test file takes: 25 for one
   that involves timing, 5 per font for a deterministic one;
-- the commands, from server/, with `tools/docstring_claims.py` on each changed
-  test file and `tools/operand_mutants.py` when a changed source file can hold
-  a condition: run both before the first hand-off run, since a claim or a
-  mutant they find means an edit, and the run starts again (#312 retro).
+- before the commands, `tools/docstring_claims.py` on each changed test file
+  and `tools/operand_mutants.py` when a changed hand-written source file can
+  hold a condition (not a migration or vendored code): run both before the
+  first hand-off run, since a claim or a mutant they find means an edit, and
+  the run starts again (#312 retro);
+- the commands, from server/.
 
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
 reaches every suite on both databases (#282's browser conftest hook ran in
@@ -114,8 +116,10 @@ DB_CODE = re.compile(
     r'\.aggregate\(|\.values(_list)?\(|\.order_by\(|\bF\(|\bQ\(|Subquery|'
     r'OuterRef|bulk_create|bulk_update|update_or_create|get_or_create')
 RAW_SQL = re.compile(r'cursor\(|\.raw\(|RawSQL|connection\.vendor')
-# What tools/operand_mutants.py reads conditions and min()/max() calls from.
+# What tools/operand_mutants.py reads conditions and min()/max() calls from,
+# and the folders of code nobody here writes by hand.
 MUTANT_SOURCES = ('.py', '.js', '.css')
+NOT_HAND_WRITTEN = {'migrations', 'vendor'}
 BROWSER_MARK = re.compile(r'^pytestmark\s*=.*mark\.browser', re.MULTILINE)
 BROWSER_DECORATOR = re.compile(r'^@pytest\.mark\.browser\b', re.MULTILINE)
 TEMPLATE_TAG = re.compile(
@@ -942,7 +946,7 @@ def fallback(plan, tree, path):
 def map_file(plan, tree, path):
     rel = s(path)
     if rel and not in_tests(rel) and Path(rel).suffix in MUTANT_SOURCES \
-            and tree.exists(rel):
+            and not NOT_HAND_WRITTEN & set(Path(rel).parts) and tree.exists(rel):
         plan.changed_source.append(rel)
     for _name, matches, cover in RULES:
         if matches(path):
@@ -1087,6 +1091,18 @@ def report(plan, tree):
         say('Repeats under load: no browser test file changed.')
     say('')
 
+    # #312 restarted its hand-off run for a docstring's numbers no assert
+    # read, and never listed its operand mutants.
+    if plan.changed_tests or plan.changed_source:
+        say('Before the first hand-off run, from server/: settle what these list, '
+            'since an edit restarts the runs below (#312 retro):')
+        if plan.changed_tests:
+            say(f'  uv run python tools/docstring_claims.py {" ".join(plan.changed_tests)}')
+        if plan.changed_source:
+            base = f' --base {plan.base}' if plan.from_git else ''
+            say(f'  uv run python tools/operand_mutants.py{base}')
+        say('')
+
     say('Run from server/ (start a run longer than a minute in the background):')
     if plain:
         say(f'  uv run pytest -n auto {" ".join(plain)}')
@@ -1105,13 +1121,6 @@ def report(plan, tree):
             f'{" ".join(measured)}')
     for line in plan.commands:
         say(f'  {line}')
-    # Before the first hand-off run: #312 restarted its run for a docstring's
-    # numbers no assert read, and never listed its operand mutants.
-    if plan.changed_tests:
-        say(f'  uv run python tools/docstring_claims.py {" ".join(plan.changed_tests)}')
-    if plan.changed_source:
-        base = f' --base {plan.base}' if plan.from_git else ''
-        say(f'  uv run python tools/operand_mutants.py{base}')
     say('  tools/source-checks.sh')
     say('  uv run ruff check && uv run ruff format --check')
     return '\n'.join(out) + '\n'

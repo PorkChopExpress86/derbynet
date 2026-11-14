@@ -133,6 +133,14 @@ def commands(out):
     return out.split('Run from server/', 1)[1]
 
 
+def before_hand_off(out):
+    """The lines printed to run before the first hand-off run, ahead of the
+    commands."""
+    if 'Before the first hand-off run' not in out:
+        return ''
+    return out.split('Before the first hand-off run', 1)[1].split('Run from server/', 1)[0]
+
+
 def docker_command(out):
     """The printed line that builds the image and runs checks.sh."""
     found = [line.strip() for line in commands(out).splitlines() if 'docker build' in line]
@@ -481,6 +489,15 @@ class UiPage(unittest.TestCase):
         out = run('server/ui/static/ui/kiosk.css')
         self.assertIn('ui/tests/browser/test_table_columns.py', commands(out))
 
+    def test_a_name_is_matched_as_a_whole_word(self):
+        """A test that names kiosk.json does not name kiosk.js."""
+        tree = {**TREE, 'server/ui/static/ui/kiosk.js': '',
+                'server/ui/tests/test_data_names.py': 'DATA = "kiosk.json"\n',
+                'server/ui/tests/test_script_names.py': 'SCRIPT = "kiosk.js"\n'}
+        out = run('server/ui/static/ui/kiosk.js', tree=tree)
+        self.assertIn('ui/tests/test_script_names.py', out)
+        self.assertNotIn('test_data_names.py', out)
+
     def test_a_name_php_also_has_is_not_matched_bare(self):
         tree = {**TREE, 'server/ui/static/ui/ondeck.css': '',
                 'server/ui/templates/kiosk/pages/ondeck.html':
@@ -627,15 +644,18 @@ class BeforeTheHandOff(unittest.TestCase):
     def test_a_changed_test_file_lists_its_docstring_claims(self):
         out = run('server/ui/tests/test_dashboard.py', 'server/ui/tests/test_kiosk_pages.py')
         self.assertIn('  uv run python tools/docstring_claims.py ui/tests/test_dashboard.py '
-                      'ui/tests/test_kiosk_pages.py\n', commands(out))
+                      'ui/tests/test_kiosk_pages.py\n', before_hand_off(out))
+        self.assertNotIn('docstring_claims', commands(out))
         self.assertNotIn('operand_mutants', out)
 
     def test_a_changed_source_file_lists_its_operand_mutants(self):
-        for path in ('server/awards/editing.py', 'server/ui/static/ui/kiosk.css'):
+        for path in ('server/awards/editing.py', 'server/ui/static/ui/kiosk.css',
+                     'server/ui/static/ui/kiosk-ondeck.js'):
             with self.subTest(path=path):
-                tree = {**TREE, path: TREE.get(path, 'a { width: min(1em, 2vw); }\n')}
-                out = run(path, tree=tree)
-                self.assertIn('  uv run python tools/operand_mutants.py\n', commands(out))
+                out = run(path)
+                self.assertIn('  uv run python tools/operand_mutants.py\n',
+                              before_hand_off(out))
+                self.assertNotIn('operand_mutants', commands(out))
                 self.assertNotIn('docstring_claims', out)
 
     def test_a_test_helper_a_deleted_file_or_a_doc_lists_neither(self):
@@ -643,6 +663,14 @@ class BeforeTheHandOff(unittest.TestCase):
                   'server/docs/x.md', 'server/tools/source-checks.sh')
         self.assertNotIn('operand_mutants', out)
         self.assertNotIn('docstring_claims', out)
+        self.assertNotIn('Before the first hand-off run', out)
+
+    def test_a_migration_or_vendored_code_lists_no_mutants(self):
+        tree = {**TREE, 'server/racing/migrations/0002_x.py': 'X = 1\n',
+                'server/ui/static/ui/vendor/lib-1.0.js': 'if (a && b) {}\n'}
+        out = run('server/racing/migrations/0002_x.py',
+                  'server/ui/static/ui/vendor/lib-1.0.js', tree=tree)
+        self.assertNotIn('operand_mutants', out)
 
 
 class GitDiff(unittest.TestCase):
@@ -681,7 +709,7 @@ class GitDiff(unittest.TestCase):
             self.assertIn('server/awards/editing.py\n', out)
             self.assertIn('Postgres: not needed', out)
             self.assertIn('  uv run python tools/operand_mutants.py --base HEAD~1\n',
-                          commands(out))
+                          before_hand_off(out))
             editing.write_text('Award.objects.all()\n\n\nNAME = Award.objects.get()\n')
             out = affected()
             self.assertIn('Postgres: needed', out)
