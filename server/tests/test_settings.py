@@ -67,7 +67,17 @@ def test_allowed_hosts_default_to_any_lan_address(load_settings):
     assert load_settings()["ALLOWED_HOSTS"] == ["*"]
     assert load_settings(DERBYNET_ALLOWED_HOSTS="race.local, 10.0.0.5")[
         "ALLOWED_HOSTS"
-    ] == ["race.local", "10.0.0.5"]
+    ] == ["race.local", "10.0.0.5", "localhost", "127.0.0.1", "[::1]"]
+
+
+def test_named_hosts_keep_the_server_itself(load_settings):
+    """The image's HEALTHCHECK asks for http://127.0.0.1/, and a browser on
+    the server machine for localhost, so naming a host keeps them (#61: a
+    named host turned the container unhealthy). Each is listed once."""
+    hosts = load_settings(DERBYNET_ALLOWED_HOSTS="derby.example.org,localhost")[
+        "ALLOWED_HOSTS"
+    ]
+    assert hosts == ["derby.example.org", "localhost", "127.0.0.1", "[::1]"]
 
 
 def test_debug_rejects_values_other_than_0_or_1(load_settings):

@@ -32,6 +32,10 @@
 #              compose's postgres profile with a password holding @ : / # %
 #   bad-env    values that would reach nginx's configuration malformed stop
 #              the container with a message
+#   allowed-hosts
+#              with DERBYNET_ALLOWED_HOSTS naming a host, the image's own
+#              HEALTHCHECK passes and Docker reports the container healthy;
+#              the named host answers and another is refused (#61)
 #   upgrade    a volume made by OLD_IMAGE, holding racers and results, starts
 #              under IMAGE, migrates, and keeps the racer and result counts
 #   docs       on a network with no internet, /docs/quick-reference/ and a
@@ -608,6 +612,33 @@ fetch() {
         "http://127.0.0.1$2"
 }
 
+check_allowed_hosts() {
+    local name="$PREFIX-hosts" probe code status
+    say "DERBYNET_ALLOWED_HOSTS=derby.example.org: the image's HEALTHCHECK"
+    start hosts "$PREFIX-hosts" -e DERBYNET_ALLOWED_HOSTS=derby.example.org
+    probe="$(docker inspect -f '{{index .Config.Healthcheck.Test 1}}' "$name")"
+    echo "$probe"
+    status=0
+    docker exec "$name" sh -c "$probe" || status=$?
+    echo "exit status $status"
+    [ "$status" = 0 ] || fail "the HEALTHCHECK fails with DERBYNET_ALLOWED_HOSTS set"
+    for _ in $(seq 120); do
+        [ "$(docker inspect -f '{{.State.Health.Status}}' "$name")" = healthy ] && break
+        sleep 1
+    done
+    echo "docker: $(docker inspect -f '{{.State.Health.Status}}' "$name")"
+    [ "$(docker inspect -f '{{.State.Health.Status}}' "$name")" = healthy ] \
+        || fail "the container is not healthy with DERBYNET_ALLOWED_HOSTS set"
+    say "the named host answers, and another host is refused"
+    code="$(docker exec "$name" curl -s -o /dev/null -w '%{http_code}' -H 'Host: derby.example.org' http://127.0.0.1/index.php)"
+    echo "derby.example.org: $code"
+    case "$code" in 2??|3??) ;; *) fail "the named host answered $code" ;; esac
+    code="$(docker exec "$name" curl -s -o /dev/null -w '%{http_code}' -H 'Host: other.example.org' http://127.0.0.1/index.php)"
+    echo "other.example.org: $code"
+    [ "$code" = 400 ] || fail "another host answered $code"
+    stop hosts
+}
+
 check_docs() {
     docker network create --internal "$PREFIX-offline" >/dev/null
     start docs "$PREFIX-docs" --network "$PREFIX-offline"
@@ -647,7 +678,7 @@ check_docs() {
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
 [ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
-    reload timeout engine postgres-password bad-env docs
+    reload timeout engine postgres-password bad-env allowed-hosts docs
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -663,6 +694,7 @@ for check in "$@"; do
         reload) check_reload ;;
         postgres-password) check_postgres_password ;;
         bad-env) check_bad_env ;;
+        allowed-hosts) check_allowed_hosts ;;
         upgrade) check_upgrade ;;
         backup) check_backup ;;
         docs) check_docs ;;

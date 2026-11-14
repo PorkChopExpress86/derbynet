@@ -5,13 +5,14 @@
 #   check-paths.sh                 the ADRs in this folder
 #   check-paths.sh --docs [DIR]    the guides in DIR (default docs/), #61
 #
-# With --docs it also checks each #fragment of a link to a guide against that
-# guide's headings, and fails on a remote image (a guide must work with no
-# internet), a long dash (#61's house style), and an instruction from a PHP
-# install that no longer exists: editing config-roles.inc, a php.ini file or
-# an ODBC data source, or installing a Debian package, the Mac package or the
-# Windows build (#61, D3, D4).  In a guide, a backticked span with a space,
-# `://`, `=`, `<`, `>` or `*` is a command, a URL or a placeholder, not a path.
+# With --docs it also checks each #fragment of a link to a guide against the
+# ids the docs build gives that guide's headings, and fails on a remote image
+# (a guide must work with no internet), a long dash (#61's house style), and
+# an instruction from a PHP install that no longer exists: editing
+# config-roles.inc, a php.ini file or an ODBC data source, or installing a
+# Debian package, the Mac package or the Windows build (#61, D3, D4).  In a
+# guide, a backticked span with a space, `://`, `=`, `<`, `>` or `*` is a
+# command, a URL or a placeholder, not a path.
 set -euo pipefail
 
 adr_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -137,11 +138,34 @@ while IFS= read -r span; do
   fi
 done < <(grep -oh '`[^`]*`' "${files[@]}" | tr -d '`' | sort -u)
 
-# The anchors GitHub and the docs build give a guide's headings: lowercase,
-# punctuation dropped, spaces as hyphens.
+# A guide's anchors are the ids the docs build gives its headings, which the
+# build reports itself (`server/ui/docs/build.py --anchors`), so the check
+# never keeps a copy of its rule.  CHECK_PATHS_PYTHON names a Python with the
+# markdown package; by default the server's uv environment runs it.
+guide_ids=""
+if (( docs )); then
+  check_dir_real="$(cd "$check_dir" && pwd -P)"
+  build_py="$adr_dir/../../ui/docs/build.py"
+  if [[ -n "${CHECK_PATHS_PYTHON:-}" ]]; then
+    guide_ids="$("$CHECK_PATHS_PYTHON" -I "$build_py" --anchors "${files[@]}")"
+  else
+    guide_ids="$(uv run --project "$adr_dir/../.." --frozen --no-dev --quiet \
+                   python -I "$build_py" --anchors "${files[@]}")"
+  fi
+fi
+
+# anchors FILE: the ids a #fragment of a link to FILE may name.  A guide's
+# come from the build.  Another Markdown file opens on GitHub, which makes
+# its own: lowercase, punctuation dropped, spaces as hyphens.
 anchors() {
-  grep -E '^#{1,6} ' "$1" | sed -E 's/^#+ +//' | tr '[:upper:]' '[:lower:]' \
-    | sed -E 's/[^a-z0-9 _-]//g; s/ /-/g'
+  local real
+  real="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
+  if [[ "$(dirname "$real")" == "$check_dir_real" ]]; then
+    awk -F '\t' -v f="$real" '$1 == f { print $2 }' <<<"$guide_ids"
+  else
+    grep -E '^#{1,6} ' "$1" | sed -E 's/^#+ +//' | tr '[:upper:]' '[:lower:]' \
+      | sed -E 's/[^a-z0-9 _-]//g; s/ /-/g'
+  fi
 }
 
 # Relative Markdown link and image targets, and <img src> in raw HTML,

@@ -110,6 +110,25 @@ def render(text: str) -> tuple[str, str]:
     return first[2:].strip(), html
 
 
+def anchors(text: str) -> list[str]:
+    """The ids the build gives a guide's headings, in order: what a `#part`
+    link to the guide must name. `server/docs/adr/check-paths.sh --docs`
+    reads them from here, so the check and the pages share one rule (the
+    `toc` extension's: `## Roles - passwords` is `roles-passwords`, and a
+    second `## Same` is `same_1`)."""
+    md = markdown.Markdown(extensions=EXTENSIONS)
+    md.convert(text)
+    ids: list[str] = []
+
+    def walk(tokens):
+        for token in tokens:
+            ids.append(token["id"])
+            walk(token["children"])
+
+    walk(md.toc_tokens)
+    return ids
+
+
 def build(out: Path, source: Path = SOURCE) -> list[Path]:
     """Render every guide in `GUIDES` from `source` into `out`, and copy its
     images. Returns the files written."""
@@ -137,3 +156,16 @@ def build(out: Path, source: Path = SOURCE) -> list[Path]:
     )
     written.append(out / INDEX)
     return written
+
+
+if __name__ == "__main__":
+    # `build.py --anchors FILE...` prints `<resolved FILE>\t<id>` for each
+    # heading, for check-paths.sh. It needs only the markdown package.
+    import sys
+
+    if sys.argv[1:2] != ["--anchors"]:
+        sys.exit("usage: build.py --anchors FILE...")
+    for name in sys.argv[2:]:
+        path = Path(name).resolve()
+        for anchor in anchors(path.read_text(encoding="utf-8")):
+            print(f"{path}\t{anchor}")

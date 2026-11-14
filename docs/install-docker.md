@@ -49,6 +49,8 @@ The repository holds the same setup as a Compose file, `server/docker/compose.ya
 docker compose up -d
 ```
 
+Like `docker run`, Compose pulls the published image, so until the project tags a release it fails the same way. Then build the image from the repository instead: from the folder that holds `compose.yaml` in a copy of the repository, run `docker compose up -d --build`.
+
 Compose names the volume `derbynet_data`. The file reads `TZ` from your shell, or from a file named `.env` beside it, so a line `TZ=America/Chicago` in `.env` sets the time zone. The Postgres profile below also needs Compose.
 
 ## Open DerbyNet
@@ -71,7 +73,7 @@ The browser timer, the replay page, and the live camera at check-in need the HTT
 
 The server takes its time zone only from the `TZ` variable, or from `DERBYNET_TIME_ZONE` when that is set (D56). Set-Up and the settings page show the zone in use, and say how to change it. Without either variable, the image uses `America/New_York`.
 
-Pass the zone with `-e TZ=...` as above. Do not mount the host's `/etc/localtime` into the container: that file does not exist on Windows, and the server would fall back to UTC.
+Pass the zone with `-e TZ=...` as above. Do not mount the host's `/etc/localtime` into the container: that file does not exist on Windows, and the server never reads it, so the zone would stay `America/New_York`.
 
 To change the zone later, remove the container and start it again with the new `-e TZ=...`. Your data stays in the volume:
 
@@ -137,7 +139,7 @@ The container reads these variables. Pass each with `-e NAME=value` on `docker r
 | `DERBYNET_REQUEST_TIMEOUT` | `30` | Seconds a request may take. Raise it for a very long schedule, such as `600`. |
 | `GUNICORN_WORKERS` | `4` | How many requests the server handles at once. |
 | `DERBYNET_URL_PREFIX` | empty | Serves the server under a path, such as `/derbynet`, as well as at `/`. See the reverse proxy section. |
-| `DERBYNET_ALLOWED_HOSTS` | `*` | The host names the server answers to, separated by commas. A server on the internet should name its own. |
+| `DERBYNET_ALLOWED_HOSTS` | `*` | The host names the server answers to, separated by commas. A server on the internet should name its own. `localhost` and `127.0.0.1` always answer, for the container's health check. |
 | `DERBYNET_CSRF_TRUSTED_ORIGINS` | empty | Extra origins, such as `https://derby.example.org`, for the pages behind another HTTPS proxy. |
 | `DERBYNET_TRUSTED_PROXIES` | empty | Addresses or networks of a proxy in front of the container, separated by commas. |
 | `DERBYNET_LOCK_SETTINGS` | unset | `1` locks the photo and video folder settings, and hides the event controls, for a shared server. |
@@ -194,7 +196,14 @@ docker run --rm -i -v derbynet:/data --entrypoint tar ghcr.io/porkchopexpress86/
 
 Then start the container as in [Start DerbyNet](#start-derbynet).
 
-On Windows, run these in WSL, or in PowerShell 7.4 or later, which keeps a command's output byte for byte. With Compose, the volume is `derbynet_data`, and under the `postgres` profile the Postgres volume `derbynet_postgres` needs the same copy. `server/docker/README.md` has the Compose commands.
+On Windows, run these in WSL as written. PowerShell needs two changes, and only version 7.4 or later keeps a command's output byte for byte, which the backup needs:
+
+- Leave out `umask 077`, which PowerShell does not have. Save the backup in your own user folder, not a shared one.
+- PowerShell has no `<`. Restore from the folder that holds `derbynet-data.tgz`, which the container reads directly:
+
+```powershell
+docker run --rm -v derbynet:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-data.tgz
+``` With Compose, the volume is `derbynet_data`, and under the `postgres` profile the Postgres volume `derbynet_postgres` needs the same copy. `server/docker/README.md` has the Compose commands.
 
 A snapshot from Set-Up is not a full backup. It leaves out videos and some race state (D65).
 

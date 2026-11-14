@@ -100,7 +100,7 @@ What the server does:
 - When racing is off, it answers the failure `notracing` and records no result.
 - When no round is current, it answers the failure `nocurrentround`.
 - When `roundid` and `heat` name another heat, it answers the failure `wrong-heat`, and records nothing.
-- When every time is zero, it stops racing for a person to look, and answers success. The replay station replays the heat.
+- When every time is zero, or the timer sent times but no scheduled lane has one above zero or a place (a false start, `is_false_start` in `server/racing/engine/results.py`), it stops racing for a person to look, records nothing, and answers success. The replay station replays the heat.
 - Otherwise it records the heat, and moves to the next heat. A lane that has a car but no time, a zero time, or a time that is not a number gets 9.999 seconds, and the heat counts as run (D42).
 - When the event is read-only, it answers the failure `event-read-only`, and records nothing (D81).
 

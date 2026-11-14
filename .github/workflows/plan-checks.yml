@@ -48,13 +48,6 @@ jobs:
         if: github.event_name != 'issues'
         run: bash server/docs/adr/check-paths.sh
 
-      # The guides served under /docs/ (#61): relative links, images, anchors,
-      # backticked paths, no remote image, no long dash, and no instruction
-      # from a PHP install.
-      - name: Check the guides in docs/
-        if: github.event_name != 'issues'
-        run: bash server/docs/adr/check-paths.sh --docs docs
-
       # The plan tools parse server/ code, which is Python 3.14 (`except A, B:`);
       # the runner's python3 is older, so the tools run on 3.14 as the server
       # jobs do. affected-tests also counts a module it cannot parse as
@@ -63,6 +56,14 @@ jobs:
         if: github.event_name != 'issues'
         with:
           python-version: '3.14'
+
+      # The guides served under /docs/ (#61): relative links, images, anchors,
+      # backticked paths, no remote image, no long dash, and no instruction
+      # from a PHP install. It runs after uv is set up: a guide's anchors are
+      # the ids the docs build gives its headings (server/ui/docs/build.py).
+      - name: Check the guides in docs/
+        if: github.event_name != 'issues'
+        run: bash server/docs/adr/check-paths.sh --docs docs
 
       - name: Test the plan tools
         if: github.event_name != 'issues'

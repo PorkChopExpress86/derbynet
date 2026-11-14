@@ -3,12 +3,16 @@
 Each rule gets a guide that breaks only it and must fail, beside a clean guide
 that must pass: a broken relative link, a missing image, a backticked path
 that names no file, an anchor no heading makes, a remote image, a long dash,
-and each instruction from a PHP install (`FORBIDDEN`). The last test runs the
-check on the repository's own `docs/`.
+and each instruction from a PHP install (`FORBIDDEN`). An anchor is checked
+against the ids the docs build itself gives the headings (`ui.docs.build`),
+which differ from GitHub's for a dash between words and a repeated heading.
+The last test runs the check on the repository's own `docs/`.
 """
 
+import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -31,7 +35,8 @@ Text.
 
 
 def run(*args, root=None):
-    env = {"PATH": "/usr/bin:/bin"}
+    # The Python running the tests has the markdown package the build uses.
+    env = {"PATH": "/usr/bin:/bin", "CHECK_PATHS_PYTHON": sys.executable}
     if root is not None:
         env["CHECK_PATHS_ROOT"] = str(root)
     return subprocess.run(
@@ -132,6 +137,57 @@ def test_each_php_install_instruction_fails(fixture, words):
     result = fixture(CLEAN.replace("Text.", words))
     assert result.returncode == 1
     assert "PHP INSTALL" in result.stdout
+
+
+HEADINGS = (
+    CLEAN
+    + """
+## Roles - passwords
+
+## Same
+
+## Same
+"""
+)
+
+
+@pytest.mark.parametrize(
+    ("link", "passes"),
+    [
+        # The build's toc rule makes one dash of a run of dashes and spaces.
+        ("#roles-passwords", True),
+        # GitHub's rule, one dash per space, is not a page's id.
+        ("#roles---passwords", False),
+        ("#same", True),
+        # The build numbers a repeated heading with `_1`; GitHub uses `-1`.
+        ("#same_1", True),
+        ("#same-1", False),
+    ],
+)
+def test_an_anchor_is_one_the_docs_build_makes(fixture, link, passes):
+    from ui.docs.build import anchors
+
+    assert (link[1:] in anchors(HEADINGS)) is passes
+    result = fixture(HEADINGS.replace("(#a-part)", f"({link})"))
+    assert result.returncode == (0 if passes else 1), result.stdout
+    if not passes:
+        assert f"MISSING  anchor guide.md{link}" in result.stdout
+
+
+def test_an_anchor_in_another_guide_is_one_the_build_makes(fixture, tmp_path):
+    (tmp_path / "docs" / "other.md").write_text("# Other\n\n## Its - part\n")
+    result = fixture()
+    assert "MISSING  anchor other.md#its-part" not in result.stdout
+    assert result.returncode == 0, result.stdout
+    result = fixture(CLEAN.replace("other.md#its-part", "other.md#its---part"))
+    assert "MISSING  anchor other.md#its---part" in result.stdout
+
+
+def test_the_build_gives_the_headings_the_ids_it_reports():
+    from ui.docs.build import anchors, render
+
+    _, html = render(HEADINGS)
+    assert anchors(HEADINGS) == re.findall(r'<h[1-6] id="([^"]+)"', html)
 
 
 def test_a_command_in_backticks_is_not_a_path_in_a_guide(fixture):
