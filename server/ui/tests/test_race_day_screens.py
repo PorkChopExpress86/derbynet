@@ -4,11 +4,16 @@ images the race-day guides embed.
 A later ticket that changes a screen shoots it again with the script (D91),
 so every picture in running-a-race, timer-operation, photo-upload and
 balloting must be one the script takes, or that picture never gets taken
-again. And a shot no guide embeds is a file the docs carry for nothing. The
-script checks both at the end of its run (`unmatched()`); this checks them
-from the source, with no server.
+again. And a shot no guide embeds is a file the docs carry for nothing.
+
+The guard is the end of each run: `report()` fails the run when the shots it
+took and the images the guides embed differ, so a walk that skips a shot (an
+`if` that never holds) fails there, and the tests below test `report()`.
+The source checks here catch a guide image with no `s.shot()` call at all,
+with no server.
 """
 
+import ast
 import re
 from pathlib import Path
 
@@ -69,3 +74,30 @@ def test_a_lower_car_is_faster_in_every_lane():
     for lane in (1, 2, 3, 4):
         times = [float(tool.car_time(car, lane)) for car in cars]
         assert times == sorted(times) and len(set(times)) == len(cars)
+
+
+def test_report_fails_a_run_with_an_error_or_a_shot_missing(tmp_path, capsys):
+    used = sorted(tool.embedded())
+    for name in used:
+        (tmp_path / name).parent.mkdir(exist_ok=True)
+        (tmp_path / name).write_bytes(b"")
+    assert tool.report([], used, tmp_path) == 0
+    assert capsys.readouterr().err == ""
+    assert tool.report([], used[1:], tmp_path) == 1
+    assert f"was not shot: {used[0]}" in capsys.readouterr().err
+    assert tool.report(["phone 404: /x"], used, tmp_path) == 1
+    assert capsys.readouterr().err == "phone 404: /x\n"
+
+
+def test_the_script_never_reads_the_real_headshots():
+    """The owner chose drawn placeholders over testing/data/headshots, so a
+    reshoot shows no real child's face (#61). The module docstring may name
+    the folder; no other string of the script may."""
+    tree = ast.parse(SCRIPT)
+    strings = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
+    assert strings[0] == ast.get_docstring(tree, clean=False)
+    assert not [text for text in strings[1:] if "headshots" in text]

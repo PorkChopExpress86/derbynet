@@ -39,7 +39,7 @@ The cars voted for carry a check mark and "Your vote", and the award shows how m
 
 ![Two cars chosen for Best Design](img/balloting/vote-chosen.png)
 
-Before balloting opens, the page says to keep it open, and opens the ballot by itself when voting starts. After it closes, the page says "Voting is closed". "Vote" in the menu, with no code, says to scan a racer's voting code.
+While balloting is not open, before or after the vote, the page says "Voting is closed", and to keep it open: it opens the ballot by itself when voting starts. "Vote" in the menu, with no code, says to scan a racer's voting code.
 
 ## Count the votes
 

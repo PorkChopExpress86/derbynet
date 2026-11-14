@@ -14,7 +14,7 @@ Open the server's address in a browser. A new server opens Set-Up, at "Create or
 
 ![Set-Up on a new server, with no event yet](img/running-a-race/setup-new-event.png)
 
-Starting the first event logs this browser in as RaceCoordinator. Each event keeps its own racers, results and photos. Set-Up, then "Events: copy, switch, archive, export", starts a later event, and can copy this one's settings, classes and awards (D14).
+Starting the first event logs this browser in as RaceCoordinator. Each event keeps its own racers, results and photos. Set-Up, then "Events: copy, switch, archive, export", starts a later event, and can copy this one's settings, classes and awards (D14). It also switches between events, and archives or exports one (see [After the race](#after-the-race)).
 
 ### Log in, and change the passwords
 
@@ -27,6 +27,10 @@ Until each default password is changed, a yellow banner says so on every page. "
 ![Roles and passwords](img/running-a-race/roles.png)
 
 ### Set the lanes
+
+Set-Up's "Before race day" list opens the pages the next steps use.
+
+![Set-Up, the Before race day list](img/running-a-race/setup-links.png)
 
 Open Settings from Set-Up. Under "Track", type the number of lanes in "Lanes on the track". It saves as you leave the field. "Lanes in use" leaves a damaged lane out of new schedules.
 
@@ -66,6 +70,8 @@ The speed trophies need no setup. For a design award, open Judging, then "Edit a
 
 ![The Awards Editor](img/running-a-race/awards-editor.png)
 
+![The Awards Editor on a computer](img/running-a-race/awards-editor-desktop.png)
+
 Here the pack adds "Best Design", which the families vote on (see [Online balloting](balloting.md)).
 
 ### Plan the rounds
@@ -80,11 +86,13 @@ Each round after the first has "Wait for operator" turned on. The playlist then 
 
 ![The Rounds Playlist on a computer](img/running-a-race/playlist-desktop.png)
 
+"Runs per lane", in a round's sheet, sets how many times each racer runs in each lane. Under "Scheduling", below the playlist, "Scheduling method and lanes" sets how heats are made, and which lanes they use.
+
 ## Set up on race day
 
 ### The network
 
-Every phone, tablet, kiosk and the timer computer must reach the server. Bring your own Wi-Fi router, rather than rely on the building's network. The camera, the browser timer and replay need the server's HTTPS address (see [Secure contexts](secure-contexts.md)).
+Every phone, tablet, kiosk and the timer computer must reach the server. Bring your own Wi-Fi router, rather than rely on the building's network. The live camera at check-in, the browser timer and replay need the server's HTTPS address (see [Secure contexts](secure-contexts.md)).
 
 ### The timer
 
@@ -104,11 +112,13 @@ Tap a kiosk's "Name" and pick a name, such as Main. The scenes reach only named 
 
 ### Replay
 
-The replay kiosk records the finish line with a camera, and plays each heat back after it finishes. On the computer beside the track, log in as RaceCoordinator, and press "Replay Kiosk" on the login page. Choose the camera, then press "Proceed". Click the kiosk to come back to the setup; right-click it to replay now.
+The replay kiosk records the finish line with a camera, and plays each heat back after it finishes. On the computer beside the track, log in as RaceCoordinator, and press "Replay Kiosk" on the login page. Choose the camera, then press "Proceed". Click the kiosk to come back to the setup. Right-click it to replay now.
 
 ![The replay setup on a computer](img/running-a-race/replay-setup-desktop.png)
 
-"Be a Camera" on the login page makes a phone the replay camera instead. The replay's speed and clip length are under Settings, then "Replay". "Trigger Replay" on the dashboard plays the last heat again.
+"Be a Camera" on the login page makes a phone the replay camera instead. "Replay settings" on the dashboard sets the replay's length, how many times it shows, and its playback speed. Settings, then "Replay", has the same settings. "Trigger Replay" on the dashboard plays the last heat again.
+
+![Replay settings on the dashboard](img/running-a-race/dashboard-replay-settings.png)
 
 ## Check-in
 
@@ -142,9 +152,17 @@ Other tools on the page:
 - "Phone QR" shows a code for a second phone to scan. That phone then checks racers in for 60 minutes, with no login.
 - "Voting code" on each card is the racer's ballot (see [Online balloting](balloting.md)).
 
+![Bulk changes](img/running-a-race/checkin-bulk.png)
+
+![The QR code for a second phone](img/running-a-race/checkin-phone-qr.png)
+
 Only passed racers are scheduled. When every car is in, the count at the top of the list reads "17 of 17 passed".
 
 ![Every racer passed](img/running-a-race/checkin-all-passed.png)
+
+## Photos
+
+The car photos are taken at check-in. Racer photos taken before the race, or by a photographer, go up in a batch on Racer Photos: press "Upload photos", then tap each photo and then its racer (D95). [Photo upload](photo-upload.md) shows each way, with pictures.
 
 ## Racing
 
@@ -176,14 +194,22 @@ The same card holds after the Scouts final, and after Outlaws round 1. The playl
 
 ![The last heat of the day](img/running-a-race/dashboard-done.png)
 
+### Racing without the playlist
+
+The playlist is optional. Under "Rounds", each round's card has "Schedule". Its sheet sets "Times each racer runs in each lane". "Schedule Only" then makes the round's heats, and "Schedule + Race" makes them and starts racing at once. A scheduled round that has not raced has "Unschedule". After a round, "Add New Rounds" makes a final or another round by hand.
+
+![Scheduling a round from the dashboard](img/running-a-race/dashboard-schedule-sheet.png)
+
 ### When something goes wrong
 
 - A car jumped the track: run the heat again. Once the heat has times, the button reads "Re-Run This Heat". When the next heat is already staged, it reads "Re-Run Previous". Either one discards the heat's results and races it again, and then reads "Reinstate Heat", which puts the results back.
-- The timer missed a heat: "Manual results", type the times or the places, and press "Save results".
+- The timer missed a heat: "Manual results", type each lane's time (its place, when the race is scored by points), and press "Save results".
 - A lane breaks: "Close a lane" reschedules the heats still to race on the open lanes.
 - A racer arrives late: their card at check-in has "Add to round…". Or on the dashboard, "Not in the schedule", then "Preview and add".
 - A round must race again: "Repeat Round" on its card. It deletes the round's results.
 - "Previous" and "Next heat" move between heats. The switch on the heat card turns racing off and on.
+
+![Manual results for a heat](img/running-a-race/dashboard-manual-results.png)
 
 ## Results
 
@@ -205,6 +231,8 @@ Judging lists the awards and the racers. Tap an award to see the racers who can 
 
 ![Judging](img/running-a-race/judging.png)
 
+![Judging on a computer](img/running-a-race/judging-desktop.png)
+
 ![Choosing the winner of Most Creative](img/running-a-race/judging-award-sheet.png)
 
 "Manage ballot" opens the vote on the design awards. [Online balloting](balloting.md) walks through it.
@@ -217,6 +245,8 @@ Give one kiosk the "Award presentations" page on the Kiosk Dashboard. Then open 
 
 ![The winner, revealed](img/running-a-race/present-revealed.png)
 
+![Present Awards on a computer](img/running-a-race/present-desktop.png)
+
 ![The award on the kiosk](img/running-a-race/kiosk-award-tv.png)
 
 ## After the race
@@ -225,4 +255,14 @@ Export Results downloads the roster, every result, each standings view and the a
 
 ![Export Results](img/running-a-race/export.png)
 
-Set-Up, then "Snapshots", then "Snapshot, complete", saves the whole event in one file. Retrospective lists the day's events in order, and checks the track for lane bias.
+Set-Up, then "Snapshots", then "Snapshot, complete", saves the whole event in one file. To bring one back, choose it under "Snapshot to import" and press "Import snapshot…". That replaces all of the event's data with the snapshot's.
+
+![Set-Up, the Snapshots section](img/running-a-race/setup-snapshots.png)
+
+Events, from Set-Up, lists every event. "Make active" switches to one, "Archive" puts one away, and "Export zip" saves one to move to another server.
+
+![Events](img/running-a-race/events.png)
+
+Retrospective lists the day's events in order, and checks the track for lane bias.
+
+![Retrospective](img/running-a-race/retrospective.png)

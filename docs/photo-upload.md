@@ -42,7 +42,7 @@ You can start from the racer instead: tap the empty photo square on a racer's ca
 
 ![Every photo assigned](img/photo-upload/racer-photos-assigned.png)
 
-On each racer's card, "Unassign" puts the photo back with the unassigned ones, and "Take photo" opens the camera sheet. Tap a racer's photo, or "Crop, turn or delete" beside an unassigned one, to open the crop sheet. It has "Delete photo…" for a photo you do not want. "Racers" and "Cars" at the top switch between the two kinds.
+On each racer's card, "Unassign" puts the photo back with the unassigned ones, and "Take photo" opens the camera sheet. Tap a racer's photo to open the crop sheet. For an unassigned photo, tap it, then "Crop, turn or delete" in the sheet that opens. It has "Delete photo…" for a photo you do not want. "Racers" and "Cars" at the top switch between the two kinds.
 
 ![Racer Photos on a computer](img/photo-upload/racer-photos-desktop.png)
 

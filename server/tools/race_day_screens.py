@@ -1,4 +1,4 @@
-"""Screenshots of the race day for the guides in `docs/` (#61, D91).
+r"""Screenshots of the race day for the guides in `docs/` (#61, D91).
 
 The script plays the owner's race day (D11) against a server with no event
 yet, through its pages as a race coordinator would, and shoots each screen
@@ -6,20 +6,24 @@ the guides show into `docs/img/<guide>/`: running-a-race, timer-operation,
 photo-upload and balloting. Two classes, Scouts and Outlaws, each race a
 first round and a final for their top 4, with an intermission between rounds
 (D12). The timer is the legacy timer protocol, played with fixed times
-(`car_time`), so a reshoot draws the same results. A later ticket that
-changes one of these screens runs it again (D91).
+(`car_time`), so a reshoot draws the same results and standings. Its bytes
+still differ: the pages show clock times, ages ("2 s ago") and dated file
+names. A later ticket that changes one of these screens runs it again (D91).
+The racer photos are drawn by `placeholders()`, never taken from
+`testing/data/headshots`, so the guides show no real child's face.
 
 Every screen is shot at 390x844, the phone, as the race coordinator's view.
-A page also gets a 1280x800 shot, named `-desktop`, when its layout changes
-at the `lg` breakpoint (1024 px: the sidebar, two columns, a grid), or when it
-is for a computer only: the browser timer, the replay kiosk, the fake
-timer, a kiosk TV (1280x720). Shots are of the window, not the whole page,
-saved as 128-colour PNGs: #61's 58 shots came to 1.4 MB.
+A page also gets a 1280x800 shot, named `-desktop`, when its content lays out
+differently at the `lg` breakpoint (1024 px: two columns or a wider grid,
+not only the sidebar), or when it is for a computer only: the browser timer,
+the replay kiosk, and a kiosk TV (1280x720). Shots are of the window, not
+the whole page, saved as 128-colour PNGs.
 
 The script fails when a page logs an error or a failed response, when a
 page scrolls sideways, and when the shots and the images the four guides
-embed differ: a shot no guide uses, an image a guide uses that was not
-shot, or an old file in a guide's folder.
+embed differ (`report()`): a shot no guide uses, an image a guide uses that
+was not shot, or an old file in a guide's folder. It refuses a server that
+already has an event.
 
 Shoot from the Docker image, so the pages show its paths (`/var/lib/derbynet`)
 and version. Serve it on port 80 as `derbynet.local`, a name the script maps
@@ -31,10 +35,10 @@ From the repository root:
     docker buildx build -f server/docker/Dockerfile -t derbynet-docs --load .
     (cd server && uv run python manage.py build_timer)
     chmod -R a+rX server/ui/static/timer
-    docker run -d --name derbynet-docs -p 127.0.0.1:80:80 \\
-        -v derbynet-docs:/var/lib/derbynet -e TZ=America/Chicago \\
-        -e DERBYNET_ALLOWED_HOSTS=derbynet.local \\
-        -v "$PWD/server/ui/static/timer:/opt/derbynet/server/ui/static/timer:ro" \\
+    docker run -d --name derbynet-docs -p 127.0.0.1:80:80 \
+        -v derbynet-docs:/var/lib/derbynet -e TZ=America/Chicago \
+        -e DERBYNET_ALLOWED_HOSTS=derbynet.local \
+        -v "$PWD/server/ui/static/timer:/opt/derbynet/server/ui/static/timer:ro" \
         derbynet-docs
     (cd server && uv run python tools/race_day_screens.py http://derbynet.local)
     docker rm -f derbynet-docs && docker volume rm derbynet-docs
@@ -44,8 +48,7 @@ Any other server with no event works too, such as `runserver` at
 paths. `--text DIR` writes each screen's text and controls beside it, to
 check the labels the guides quote. The script uses the full Chromium
 (`channel="chromium"`), whose new headless mode treats `derbynet.local` as a
-secure page for the camera and Web Serial: `uv run playwright install
-chromium` once.
+secure page for the camera and Web Serial.
 """
 
 import argparse
@@ -53,6 +56,7 @@ import io
 import re
 import sys
 import tempfile
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -60,6 +64,12 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "server"))
 
 from accounts.defaults import DEFAULT_ROLES  # noqa: E402
+from ui.tests.browser.helpers import (  # noqa: E402
+    dismiss_toasts,
+    open_section,
+    ready,
+)
+from ui.tests.browser.helpers import htmx_settled as settled  # noqa: E402
 
 PASSWORDS = {name: password for name, password, _, _ in DEFAULT_ROLES if name}
 PHONE = {
@@ -128,7 +138,11 @@ class Shooter:
         dismiss_toasts(tab)
         if at is not None:
             at.evaluate(SCROLL_TO)
-        tab.wait_for_timeout(400)
+        # Two frames, so the scroll and the last swap are painted.
+        tab.evaluate(
+            "() => new Promise(r => requestAnimationFrame("
+            "() => requestAnimationFrame(r)))"
+        )
         width = tab.evaluate("document.documentElement.scrollWidth")
         if width > tab.viewport_size["width"]:
             self.errors.append(f"{guide}/{name} is {width} px wide")
@@ -148,12 +162,6 @@ class Shooter:
                 + "\n".join(tab.evaluate(CONTROLS))
             )
         print("shot", path.relative_to(self.out))
-
-
-def settled(tab):
-    tab.wait_for_function(
-        "!document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling')"
-    )
 
 
 def log_in(tab, role="RaceCoordinator", password=None):
@@ -204,6 +212,32 @@ def roster_csv(folder: Path) -> Path:
 
 
 TIMES_BASE = 2.8
+
+
+# Racer photos are drawn here, not taken from testing/data/headshots, so the
+# guides show no real child's face (the owner, #61).
+COLOURS = ("#2563eb", "#16a34a", "#d97706", "#db2777", "#7c3aed", "#0891b2")
+
+
+def placeholders(folder: Path, names) -> list[Path]:
+    """One 600x800 JPEG per racer: a head and shoulders in a light shade on
+    a coloured ground, with the racer's initials."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    paths = []
+    for i, (first, last) in enumerate(names):
+        image = Image.new("RGB", (600, 800), COLOURS[i % len(COLOURS)])
+        draw = ImageDraw.Draw(image)
+        draw.ellipse((180, 170, 420, 410), fill="#e5e7eb")
+        draw.ellipse((70, 450, 530, 1000), fill="#e5e7eb")
+        font = ImageFont.load_default(size=96)
+        draw.text(
+            (300, 650), first[0] + last[0], fill="#374151", font=font, anchor="mm"
+        )
+        path = folder / f"racer-{i + 1:02}.jpg"
+        image.save(path, quality=85)
+        paths.append(path)
+    return paths
 
 
 def car_time(car: int, lane: int) -> str:
@@ -269,6 +303,8 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
 
     # ----- Set-up: the first event, before anyone logs in.
     phone.goto("/")
+    if phone.locator('[data-step="event"][data-step-status="unknown"]').count() != 1:
+        raise SystemExit(f"{base} already has an event: start a server with none")
     s.shot(phone, "running-a-race", "setup-new-event")
     phone.get_by_label("New event's name").fill("Pack 42 2026")
     phone.get_by_role("button", name="Start a new event").click()
@@ -286,9 +322,10 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
         card.get_by_label(f"New password for {role}").fill(NEW_PASSWORDS[role])
         card.get_by_role("button", name="Change password").click()
         settled(phone)
+    phone.goto("/setup/")
+    s.shot(phone, "running-a-race", "setup-links", at=phone.locator("[data-links]"))
     phone.goto("/settings/")
-    open_section(phone, "track")
-    track = phone.locator('details[data-section="track"]')
+    track = open_section(phone, "track")
     track.get_by_label("Lanes on the track").fill("4")
     track.get_by_label("Lanes on the track").press("Enter")
     expect(track.locator('select[name="color"]')).to_have_count(4)
@@ -335,6 +372,8 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     form.get_by_role("button", name="Add award").click()
     settled(phone)
     s.shot(phone, "running-a-race", "awards-editor")
+    desktop.goto("/awards/edit/")
+    s.shot(desktop, "running-a-race", "awards-editor-desktop")
 
     # ----- The rounds playlist (D11, D12).
     phone.goto("/playlist/")
@@ -448,6 +487,15 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     search(phone, "")
     phone.reload()
     s.shot(phone, "running-a-race", "checkin-all-passed")
+    tap(phone, phone.get_by_role("button", name="Bulk", exact=True))
+    ready(phone, phone.locator('[data-sheet="checkin"] [data-bulk]'))
+    s.shot(phone, "running-a-race", "checkin-bulk")
+    close_sheet(phone)
+    tap(phone, phone.get_by_role("button", name="Phone QR", exact=True))
+    qr = ready(phone, phone.locator('[data-sheet="checkin"] [data-qr]'))
+    expect(qr.locator("svg")).to_be_visible()
+    s.shot(phone, "running-a-race", "checkin-phone-qr")
+    close_sheet(phone)
 
     # A racer's voting code (D86).
     search(phone, "Ben Brooks")
@@ -464,8 +512,8 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     close_sheet(phone)
 
     # ----- Racer photos: upload a batch, then tap a photo and its racer.
-    heads = sorted((REPO / "testing" / "data" / "headshots").glob("Cub-*.jpg"))
     names = [*SCOUTS, *OUTLAWS, LATE]
+    heads = placeholders(work, names)
     phone.goto("/photos/racers/")
     s.shot(phone, "photo-upload", "racer-photos")
     phone.locator("[data-upload-input]").set_input_files(
@@ -476,7 +524,7 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     )
     phone.reload()
     for i, (_, last) in enumerate(names):
-        photo = phone.get_by_role("button", name=re.compile(r"^Assign Cub-")).first
+        photo = phone.get_by_role("button", name=re.compile(r"^Assign racer-")).first
         tap(phone, photo)
         choices = phone.locator("[data-racer-choices]")
         ready(phone, choices)
@@ -515,11 +563,13 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     browser_timer = desktop.context.new_page()
     s.watch(browser_timer, "browser timer")
     browser_timer.goto("/timer.php")
-    browser_timer.wait_for_timeout(1500)
+    expect(browser_timer.get_by_role("button", name="Start Scanning")).to_be_visible()
     s.shot(browser_timer, "timer-operation", "browser-timer-desktop")
     browser_timer.close()
     phone.goto("/timer/test/")
     s.shot(phone, "timer-operation", "timer-test")
+    phone.goto("/timer/fake/")
+    s.shot(phone, "timer-operation", "fake-timer")
     desktop.goto("/timer/fake/")
     s.shot(desktop, "timer-operation", "fake-timer-desktop")
     desktop.goto("/dashboard/")
@@ -540,6 +590,15 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     timer.message("HEARTBEAT")
     phone.goto("/dashboard/")
     s.shot(phone, "running-a-race", "dashboard-ready")
+    # A round's Schedule, as a race with no playlist starts it.
+    tap(phone, phone.get_by_role("button", name="Schedule", exact=True).first)
+    ready(phone, phone.locator("[data-sheet]:visible"))
+    s.shot(phone, "running-a-race", "dashboard-schedule-sheet")
+    close_sheet(phone)
+    tap(phone, phone.locator('[data-action="replay-settings"]'))
+    ready(phone, phone.locator("[data-replay-settings]"))
+    s.shot(phone, "running-a-race", "dashboard-replay-settings")
+    close_sheet(phone)
     tap(phone, phone.get_by_role("button", name="Start Playlist"))
     settled(phone)
     expect(phone.locator("[data-heat-text]")).to_contain_text("Heat 1")
@@ -554,14 +613,25 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
             reply = timer.heat(current)
             heats += 1
             if number == 0 and heats == 1:
-                expect(phone.locator('[data-lane="1"] [data-result]')).not_to_be_empty()
+                expect(phone.locator('[data-lane="1"] [data-result]')).to_have_text(
+                    re.compile(r"\d\.\d{3}")
+                )
                 s.shot(phone, "running-a-race", "dashboard-heat-result")
+                tap(phone, phone.locator('[data-action="manual-results"]'))
+                ready(phone, phone.locator("[data-results-form]"))
+                s.shot(phone, "running-a-race", "dashboard-manual-results")
+                close_sheet(phone)
             if "heat-ready" not in reply:
                 break
         if next_round is None:
             break
         intermission = phone.locator("[data-intermission]")
         expect(intermission).to_contain_text(f"Up next: {next_round}", timeout=10000)
+        # The heat card holds the heat it last showed for 10 s after the
+        # current heat moves on (`ui.dashboard.state._hold`, PHP's
+        # generate_current_heat_racers()). The heats here come faster than
+        # its 2 s poll, so wait for the hold to end.
+        expect(phone.locator("[data-hold-note]")).to_have_count(0, timeout=20000)
         if number == 0:
             s.shot(phone, "running-a-race", "dashboard-intermission", at=intermission)
         tap(phone, intermission.get_by_role("button", name="Start next round"))
@@ -630,6 +700,8 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     settled(phone)
     phone.goto("/judging/")
     s.shot(phone, "running-a-race", "judging")
+    desktop.goto("/judging/")
+    s.shot(desktop, "running-a-race", "judging-desktop")
     creative = phone.locator("[data-award-card]").filter(has_text="Most Creative")
     tap(phone, creative.locator("[data-open-award]"))
     eligible = ready(phone, phone.locator('[data-sheet="judging"] [data-eligible]'))
@@ -652,41 +724,40 @@ def walk(s: Shooter, phone, desktop, work: Path, playwright, base, api_base):
     tap(phone, phone.get_by_role("button", name="Reveal"))
     settled(phone)
     s.shot(phone, "running-a-race", "present-revealed")
-    kiosk.wait_for_timeout(4000)
+    desktop.goto("/awards/present/")
+    s.shot(desktop, "running-a-race", "present-desktop")
+    expect(kiosk.get_by_text("Cara Cole")).to_be_visible(timeout=10000)
     s.shot(kiosk, "running-a-race", "kiosk-award-tv")
 
     # ----- Export.
     phone.goto("/export/")
     s.shot(phone, "running-a-race", "export")
+    phone.goto("/setup/")
+    snapshots = phone.locator('[data-section="snapshots"]')
+    s.shot(phone, "running-a-race", "setup-snapshots", at=snapshots)
+    phone.goto("/setup/events/")
+    s.shot(phone, "running-a-race", "events")
+    phone.goto("/history/")
+    s.shot(phone, "running-a-race", "retrospective")
+
+
+# True once check-in's list shows only the racers `text` finds, or every
+# racer for an empty `text`: the count reads "N shown" only while filtered.
+FILTERED = """text => {
+  const cards = [...document.querySelectorAll('#checkin-list [data-racer]')];
+  const count = document.querySelector('#checkin-list [data-count]');
+  if (!count) return false;
+  if (!text) return !count.textContent.includes('shown');
+  return count.textContent.includes('shown') && cards.length > 0
+    && cards.every(c => c.innerText.toLowerCase().includes(text.toLowerCase()));
+}"""
 
 
 def search(tab, text):
-    field = tab.get_by_label("Find a racer by name or car number").first
-    field.fill(text)
+    """Type `text` into check-in's search field, and wait for the list."""
+    tab.get_by_label("Find a racer by name or car number").first.fill(text)
+    tab.wait_for_function(FILTERED, arg=text)
     settled(tab)
-    tab.wait_for_timeout(600)
-    settled(tab)
-
-
-BOUND = """root => [root, ...root.querySelectorAll('[hx-get], [hx-post]')]
-  .filter((e) => e.matches('[hx-get], [hx-post]'))
-  .every((e) => (e['htmx-internal-data'] || {}).initHash)"""
-
-
-def ready(tab, body):
-    """`body`, a sheet just loaded, once htmx has bound its controls."""
-    from playwright.sync_api import expect
-
-    expect(body).to_be_visible()
-    settled(tab)
-    tab.wait_for_function(BOUND, arg=body.element_handle())
-    return body
-
-
-def dismiss_toasts(tab):
-    toasts = tab.locator("#toasts").get_by_role("button", name="Dismiss")
-    while toasts.count():
-        toasts.first.click()
 
 
 def tap(tab, control):
@@ -708,13 +779,6 @@ NEW_PASSWORDS = {
     "RaceCrew": "pit-crew",
     "RaceCoordinator": "grand-prix",
 }
-
-
-def open_section(tab, key):
-    section = tab.locator(f'details[data-section="{key}"]')
-    if section.get_attribute("open") is None:
-        section.locator("summary").click()
-    return section
 
 
 def main(argv=None) -> int:
@@ -741,6 +805,7 @@ def main(argv=None) -> int:
         flags.append(f"--unsafely-treat-insecure-origin-as-secure={args.base}")
         netloc = parts.netloc.replace(parts.hostname, "127.0.0.1")
         api_base = parts._replace(netloc=netloc).geturl()
+    wait_for_server(api_base)
     with sync_playwright() as p, tempfile.TemporaryDirectory() as work:
         # The full Chromium's new headless mode: the headless shell ignores
         # --unsafely-treat-insecure-origin-as-secure.
@@ -758,9 +823,31 @@ def main(argv=None) -> int:
             walk(s, *tabs, Path(work), p, args.base, api_base)
         finally:
             browser.close()
-    s.errors += unmatched(s.shots, args.out)
-    sys.stderr.write("".join(f"{e}\n" for e in s.errors))
-    return 1 if s.errors else 0
+    return report(s.errors, s.shots, args.out)
+
+
+def wait_for_server(base: str, seconds: int = 90) -> None:
+    """Waits until the server answers its Set-Up page, as a container just
+    started takes a few seconds to."""
+    from urllib.error import URLError
+    from urllib.request import urlopen
+
+    for _ in range(seconds):
+        try:
+            with urlopen(f"{base.rstrip('/')}/setup/", timeout=5):
+                return
+        except URLError, OSError:
+            time.sleep(1)
+    raise SystemExit(f"{base} did not answer in {seconds} s")
+
+
+def report(errors: list[str], shots: list[str], out: Path) -> int:
+    """Writes the run's errors, and what `unmatched()` finds, to stderr, and
+    returns the exit status: 1 when there is any. This end-of-run check is
+    what fails a run whose walk skipped a shot a guide embeds."""
+    found = errors + unmatched(shots, out)
+    sys.stderr.write("".join(f"{e}\n" for e in found))
+    return 1 if found else 0
 
 
 GUIDES = ("running-a-race", "timer-operation", "photo-upload", "balloting")

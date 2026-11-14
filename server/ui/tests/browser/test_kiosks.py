@@ -23,6 +23,7 @@ from ui.tests.browser.conftest import (
     htmx_settled,
     shoot,
 )
+from ui.tests.browser.helpers import bound, ready
 
 ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
 ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
@@ -106,31 +107,6 @@ def card(page, address):
 
 def sheet(page, name):
     return page.locator(f'[data-sheet="{name}"]')
-
-
-# True once htmx has processed every element under `root` (and `root`) that
-# makes a request: htmx 2 sets `initHash` on an element's internal data when
-# it binds the element's `hx-*` attributes.
-BOUND = """root => [root, ...root.querySelectorAll('[hx-get], [hx-post]')]
-  .filter((e) => e.matches('[hx-get], [hx-post]'))
-  .every((e) => (e['htmx-internal-data'] || {}).initHash)"""
-
-
-def bound(page, locator):
-    """Wait until htmx has bound the requests of what `locator` shows. Alpine
-    shows swapped-in content at once, but htmx binds its `hx-*` attributes
-    only when the swap settles, 20 ms later or more under load, and a
-    control used before then sends nothing (#46 CI: the award sheet's "For"
-    select never fetched the partition list). No settling class marks every
-    such swap, so `htmx_settled()` alone does not cover it."""
-    page.wait_for_function(BOUND, arg=locator.element_handle())
-
-
-def ready(page, body):
-    """`body`, a sheet body just loaded, once its controls are bound."""
-    expect(body).to_be_visible()
-    bound(page, body)
-    return body
 
 
 def tap(page, control):

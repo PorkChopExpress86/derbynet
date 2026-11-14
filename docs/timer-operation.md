@@ -13,7 +13,7 @@ On a phone, open the timer page with "Timer status" on the race dashboard, or op
 
 ![The timer page on a phone](img/timer-operation/timer.png)
 
-Only one timer client reports at a time. A second one that starts is told another one is running, and its messages are ignored.
+Run one timer client at a time. The server takes the client that said hello last as the timer, unless another one sent a message less than a second before. Each heartbeat from any other client is answered that another timer is running. The browser timer then stops, and says "Another timer interface is running and competing with this window."
 
 "Timer settings" shows the settings the timer client reported, such as how long it waits to reset the timer after a heat. A change goes to the timer client with its next message.
 
@@ -52,7 +52,7 @@ A timer that answers is found by the scan. Two kinds never answer: the FastTrack
 
 A browser may slow a page that is out of sight. Keep the browser timer's window open and in view during the race.
 
-The browser timer page in the v0.1.0-rc1 image cannot load its scripts, so it never shows the scan (#312). Until a release fixes it, connect the timer with `derby-timer.jar`. The page works when the server runs from a checkout.
+The browser timer page in the v0.1.0-rc1 image cannot load its scripts, so it never shows the scan (#312). Until a release fixes it, connect the timer with `derby-timer.jar`.
 
 ## Test the timer
 
@@ -64,9 +64,11 @@ Before race day, test the timer on the track. Open "Timer test" on the timer pag
 
 ## The fake timer
 
-The fake timer stands in for a timer, to practice with no track. Open `/timer/fake/` on any computer, logged in as RaceCrew or RaceCoordinator. It works only while its page is open, and only while racing or simulated racing is on.
+The fake timer stands in for a timer, to practice with no track. Open `/timer/fake/` on any phone or computer, logged in as RaceCoordinator. It works only while its page is open, and only while racing or simulated racing is on.
 
-![The fake timer](img/timer-operation/fake-timer-desktop.png)
+![The fake timer on a phone](img/timer-operation/fake-timer.png)
+
+![The fake timer on a computer](img/timer-operation/fake-timer-desktop.png)
 
 "Start" starts the heat, and "Stop" under each lane finishes that car. "Auto mode" races each heat by itself a few seconds after it is staged, with random times.
 
