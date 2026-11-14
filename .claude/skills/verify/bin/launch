@@ -7,11 +7,11 @@
 set -euo pipefail
 BIN="$(cd "$(dirname "$0")" && pwd)"
 source "$BIN/env.sh"
-if [ "$KIND" = php ] && docker ps -a --format '{{.Names}}' | grep -qx "$SERVER"; then
+if [ "$KIND" = php ] && grep -qx "$SERVER" <<<"$(docker ps -a --format '{{.Names}}')"; then
   echo "$SERVER already exists; run bin/cleanup first, or pick another VERIFY_RUN" >&2
   exit 1
 fi
-if ss -ltn | grep -q ":$PORT\b"; then
+if grep -q ":$PORT\b" <<<"$(ss -ltn)"; then
   echo "port $PORT is taken; set VERIFY_PORT" >&2
   exit 1
 fi

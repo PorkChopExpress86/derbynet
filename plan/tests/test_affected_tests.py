@@ -469,6 +469,28 @@ class ServerTools(unittest.TestCase):
         self.assertIn('tests/test_pytest_under_load.py', commands(out))
 
 
+class Docker(unittest.TestCase):
+    """No pytest builds the image, so a docker file prints the build and
+    checks.sh: #58 pushed image.yml's steps unrun (#58 retro)."""
+
+    def test_a_docker_file_builds_the_image_and_runs_its_checks(self):
+        out = run('server/docker/entrypoint.sh')
+        self.assertIn('[docker]', section(out, 'server/docker/entrypoint.sh'))
+        self.assertNotIn('[fallback]', out)
+        self.assertIn('docker build -f docker/Dockerfile -t derbynet_server:dev .. && '
+                      'IMAGE=derbynet_server:dev DERBYNET_TEST_PREFIX=<yours> '
+                      'docker/ci/checks.sh', commands(out))
+
+    def test_the_image_workflow_builds_the_image_too(self):
+        out = run('.github/workflows/image.yml')
+        self.assertIn('[docker]', section(out, '.github/workflows/image.yml'))
+        self.assertIn('[everything]', section(out, '.github/workflows/image.yml'))
+        self.assertIn('docker/ci/checks.sh', commands(out))
+
+    def test_another_workflow_builds_no_image(self):
+        self.assertNotIn('docker build', run('.github/workflows/server.yml'))
+
+
 class PatchedPaths(unittest.TestCase):
     def test_a_mock_patch_path_counts_as_an_import(self):
         out = run('server/core/database_scripts.py')

@@ -51,6 +51,8 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_no_xdist_fixtures.py \
   tests/test_playwright_in_process.py \
   tests/test_transactional_tests.py \
+  tests/test_docker_checks.py \
+  tests/test_pipefail_pipes.py \
   transfer/tests/test_id_readers.py \
   ui/tests/test_no_copied_helpers.py \
   ui/tests/test_rules_in_services.py \
@@ -68,6 +70,7 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_golden_marker.py \
   ui/tests/test_browser_fixture_order.py \
   ui/tests/test_photo_urls.py \
+  ui/tests/test_phone_grids.py \
   ui/tests/test_relative_urls.py \
   ui/tests/test_vendored.py \
   ui/tests/test_settings_bounds.py \

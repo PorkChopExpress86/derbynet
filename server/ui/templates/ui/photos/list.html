@@ -23,7 +23,7 @@
   </section>
   <section aria-label="Racers" class="lg:order-1">
     {% if listing.cards %}
-    <ul role="list" class="grid gap-2 sm:grid-cols-2" data-cards>
+    <ul role="list" class="grid grid-cols-1 gap-2 sm:grid-cols-2" data-cards>
       {% for card in listing.cards %}{% include "ui/photos/card.html" %}{% endfor %}
     </ul>
     {% elif listing.total %}

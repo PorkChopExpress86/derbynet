@@ -208,7 +208,7 @@ check_user() {
     ps="$(docker exec "$PREFIX-u1" ps -e -o user,comm)"
     echo "$ps"
     echo "$ps" | grep -q '^derbynet  *gunicorn' || fail "no gunicorn runs as derbynet"
-    if echo "$ps" | grep -v '^derbynet' | grep -q gunicorn; then
+    if grep -q gunicorn <<<"$(grep -v '^derbynet' <<<"$ps")"; then
         fail "a gunicorn process runs as another user"
     fi
 }
@@ -283,7 +283,7 @@ check_bind_mount() {
     echo "exit status $status"
     [ "$status" != 0 ] || fail "the container started on a folder derbynet can't write"
     echo "$out" | grep -q 'not writable by the derbynet user' || fail "no message names the folder"
-    if docker run --rm -v "$dir:/d" --entrypoint stat "$IMAGE" -c %a /d | grep -q 7$; then
+    if grep -q 7$ <<<"$(docker run --rm -v "$dir:/d" --entrypoint stat "$IMAGE" -c %a /d)"; then
         fail "the folder was opened to everyone"
     fi
     docker rm -f "$PREFIX-b2" >/dev/null
@@ -466,15 +466,16 @@ suite_copy() {
 
 # An event on a server with none, as exercise-one-database.sh makes one.
 new_event() {
-    curl -sf -d 'action=setup.nodata&ez-new=checks' "$1/action.php" | grep -q success \
+    grep -q success <<<"$(curl -sf -d 'action=setup.nodata&ez-new=checks' "$1/action.php")" \
         || fail "setup.nodata did not make an event at $1"
 }
 
 login() { # login <url> <jar> <role>
     local password
     password="$(sed -n -e "s/^$3://p" "$TESTING/default.passwords")"
-    curl -sf -c "$2" -b "$2" -d "action=role.login&name=$3&password=$password" \
-        "$1/action.php" | grep -q success || fail "$3 could not log in"
+    grep -q success <<<"$(curl -sf -c "$2" -b "$2" \
+        -d "action=role.login&name=$3&password=$password" "$1/action.php")" \
+        || fail "$3 could not log in"
 }
 
 # Racers, and results from one race of every round, in a new event.
@@ -506,7 +507,7 @@ check_upgrade() {
     say "the same volume under $IMAGE"
     start new1 "$PREFIX-upgrade"
     docker logs "$PREFIX-new1" 2>&1 | grep -E 'Applying|No migrations to apply' || true
-    if docker exec -u derbynet "$PREFIX-new1" python manage.py showmigrations --plan | grep -q '^\[ \]'; then
+    if grep -q '^\[ \]' <<<"$(docker exec -u derbynet "$PREFIX-new1" python manage.py showmigrations --plan)"; then
         fail "migrations are left unapplied"
     fi
     after="$(counts "$PREFIX-new1")"
@@ -531,15 +532,15 @@ check_backup() {
     local jar="$work/cookies" racer
     login "$url" "$jar" RaceCoordinator
     racer="$(curl -s -b "$jar" "$url/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
-    curl -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
-        -F photo=@"$(first "$TESTING"/data/headshots/*.jpg)" "$url/action.php" | grep -q success \
+    grep -q success <<<"$(curl -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
+        -F photo=@"$(first "$TESTING"/data/headshots/*.jpg)" "$url/action.php")" \
         || fail "no racer photo"
-    curl -s -b "$jar" -F action=photo.upload -F repo=car -F racerid="$racer" \
-        -F photo=@"$(first "$TESTING"/data/carphotos/Car-*.jpg)" "$url/action.php" | grep -q success \
+    grep -q success <<<"$(curl -s -b "$jar" -F action=photo.upload -F repo=car -F racerid="$racer" \
+        -F photo=@"$(first "$TESTING"/data/carphotos/Car-*.jpg)" "$url/action.php")" \
         || fail "no car photo"
     head -c 300000 /dev/urandom > "$work/replay.mkv"
-    curl -s -b "$jar" -F action=video.upload -F video=@"$work/replay.mkv;filename=Heat-1.mkv" \
-        "$url/action.php" | grep -q success || fail "no video"
+    grep -q success <<<"$(curl -s -b "$jar" -F action=video.upload \
+        -F video=@"$work/replay.mkv;filename=Heat-1.mkv" "$url/action.php")" || fail "no video"
     local before after
     before="$(backup_state "$url" "$jar" "$racer")"
     echo "$before"

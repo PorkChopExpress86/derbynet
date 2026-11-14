@@ -17,6 +17,8 @@ PR_WAIT = Path(__file__).resolve().parent.parent / 'bin' / 'pr-wait'
 FAKE_GH = '''#!{python}
 import subprocess, sys
 args = sys.argv[1:]
+if args[2:3] != [{pr!r}]:
+    sys.exit('pr-wait named ' + ' '.join(args[2:3]))
 if args[:2] == ['pr', 'view'] and 'headRefOid' in args:
     print('abc123')
 elif args[:2] == ['pr', 'checks']:
@@ -38,13 +40,13 @@ class PrWait(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp)
 
-    def wait(self, checks):
+    def wait(self, checks, pr='7'):
         (self.tmp / 'checks.json').write_text(json.dumps(checks))
         gh = self.tmp / 'gh'
-        gh.write_text(FAKE_GH.format(python=sys.executable,
+        gh.write_text(FAKE_GH.format(python=sys.executable, pr=pr,
                                      checks=str(self.tmp / 'checks.json')))
         gh.chmod(0o755)
-        return subprocess.run(['bash', str(PR_WAIT), '7', '--timeout-min', '0'],
+        return subprocess.run(['bash', str(PR_WAIT), pr, '--timeout-min', '0'],
                               env={**os.environ, 'GH': str(gh)},
                               capture_output=True, text=True, timeout=60)
 
@@ -75,6 +77,14 @@ class PrWait(unittest.TestCase):
         done = self.wait([check('fail', 'lint'), check('pass', 'ui (sqlite)')])
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertNotIn('parity-check push', done.stdout)
+
+    def test_a_branch_names_its_pr(self):
+        """#58's implementer waited on image.yml alone, and missed a red
+        server.yml (#58 retro)."""
+        done = self.wait([check('pass', 'build', 'image'), check('fail', 'pytest (sqlite)')],
+                         pr='issue-58-docker-image')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('fail pytest (sqlite)', done.stdout)
 
     def test_a_pending_pull_request_check_is_waited_for(self):
         done = self.wait([check('pending', 'lint'),

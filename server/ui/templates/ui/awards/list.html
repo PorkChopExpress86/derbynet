@@ -4,7 +4,7 @@
   {% if editor.awards %}
   <p class="mt-1 text-sm text-ink-muted">Awards are presented in this order. Tap a name to edit it. Drag a handle, or use a row's menu, to reorder.</p>
   <div x-data="uiSortable('{% url 'awards-editor-order' %}', 'order')" data-sortable-src="{% static 'ui/vendor/sortable-1.15.6.min.js' %}" class="mt-3">
-    <ul role="list" aria-label="Awards" x-ref="list" class="grid gap-2 lg:grid-cols-2" data-award-list>
+    <ul role="list" aria-label="Awards" x-ref="list" class="grid grid-cols-1 gap-2 lg:grid-cols-2" data-award-list>
       {% for a in editor.awards %}
       <li data-id="{{ a.id }}" data-label="{{ a.name }}" data-award="{{ a.id }}" x-data="{ menu: false }" @keydown.escape.stop="menu = false" class="relative flex min-h-16 items-center gap-1 rounded-xl border border-line bg-bg pr-1">
         {% if editor.awards|length > 1 %}<button type="button" data-handle aria-label="Drag to reorder {{ a.name }}" class="grid size-11 shrink-0 cursor-grab touch-none place-items-center text-ink-muted">{% include "ui/components/icon.html" with name="drag" cls="size-5" %}</button>{% else %}<span class="w-3"></span>{% endif %}

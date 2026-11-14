@@ -23,7 +23,7 @@ trap 'echo "pytest-postgres.sh: line $LINENO: \`$BASH_COMMAND\` failed" >&2' ERR
 
 docker run -d --name "$NAME" -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=derbynet \
        -p 127.0.0.1::5432 postgres:17 >/dev/null
-PORT="$(docker port "$NAME" 5432/tcp | head -1 | sed 's/.*://')"
+PORT="$(docker port "$NAME" 5432/tcp | sed -n '1s/.*://p')"
 # Under CPU load Postgres can take over 30 s. The image's first start runs a
 # server for initdb on the socket only, then restarts it, so wait on TCP:
 # the socket answered during that first server (#54 retro).

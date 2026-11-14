@@ -2,7 +2,7 @@
 """Lists each test that failed on a PR's current checks, and whether it also
 failed on a recent master run: a known flake, not the PR's doing.
 
-Usage: plan/bin/ci-failures <pr> [--master-runs N]   (default 15)
+Usage: plan/bin/ci-failures <pr or branch> [--master-runs N]   (default 15)
 
 Reads the failed checks' logs (`gh run view --log-failed`) for pytest's
 `FAILED path::test` and `ERROR path::test` lines, then the logs of the last
@@ -10,6 +10,19 @@ N failed runs on master. Prints one line per failing test:
 
     known  <test id>  master <sha> run <id>
     new    <test id>
+
+and under a `new` test whose file the PR does not change, the command that
+repeats it under load on origin/master, since such a test is more likely a
+race master already has than the PR's doing:
+
+    new    media/tests/test_photo_races.py::test_a_rotation_during_a_render_...
+      not in this PR's diff: before a rerun, repeat it on origin/master, from server/:
+      tools/pytest-under-load.sh --loops 12 -n auto --count 180 media/tests/...
+
+#58's PR failed that photo race test in 3 of 4 server runs. It was `new`
+(no failed master run named it), and the lead's rerun failed again. Under
+12 load loops it failed 2 of 180 on master, a race #302 then fixed (#58
+retro).
 
 and, for the failed jobs of a run whose log names no test (a lint or a setup
 step), a `no test id` line, then one line per job with the first step that
@@ -166,9 +179,17 @@ def no_test_id(run_id: str, log: str, names: str) -> tuple[list[str], bool]:
     return out, outage
 
 
+def repro(test: str) -> str:
+    """The load run that repeats `test` on origin/master. A parametrized id
+    loses its brackets, since pytest-repeat renames each parameter."""
+    target = test.split("[", 1)[0]
+    browser = "-m browser " if "/browser/" in target else ""
+    return f"tools/pytest-under-load.sh --loops 12 {browser}-n auto --count 180 {target}"
+
+
 def main(argv: list[str]) -> int:
-    if not argv or not argv[0].isdigit():
-        print("usage: ci-failures <pr> [--master-runs N]", file=sys.stderr)
+    if not argv or argv[0].startswith("-"):
+        print("usage: ci-failures <pr or branch> [--master-runs N]", file=sys.stderr)
         return 2
     pr = argv[0]
     master_runs = int(argv[2]) if argv[1:2] == ["--master-runs"] else 15
@@ -206,11 +227,21 @@ def main(argv: list[str]) -> int:
         for run in runs:
             for test in failed_tests(str(run["databaseId"]), repo) & (tests - known.keys()):
                 known[test] = f"master {run['headSha'][:8]} run {run['databaseId']}"
+    changed: set[str] = set()
+    if tests - known.keys():
+        changed = set(
+            gh("pr", "view", pr, "--repo", repo, "--json", "files",
+               "--jq", ".files[].path").split()
+        )
     for test in sorted(tests):
         if test in known:
             print(f"known  {test}  {known[test]}")
         else:
             print(f"new    {test}")
+            if f"server/{test.split('::', 1)[0]}" not in changed:
+                print("  not in this PR's diff: before a rerun, repeat it on "
+                      "origin/master, from server/:")
+                print(f"  {repro(test)}")
             status = 1
     if outages and all(outages):
         print(OUTAGE)

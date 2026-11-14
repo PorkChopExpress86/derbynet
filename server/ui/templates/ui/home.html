@@ -7,7 +7,7 @@
   {% if shell.set_up and section == "After" %}</div><div>{% elif forloop.first %}<div>{% endif %}
   <section aria-labelledby="home-{{ section|lower }}" class="mb-6" data-section="{{ section }}">
     <h2 id="home-{{ section|lower }}" class="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-muted">{{ section }}</h2>
-    <ul role="list" class="grid gap-2 sm:grid-cols-2 {% if not shell.set_up %}lg:grid-cols-3{% endif %}">
+    <ul role="list" class="grid grid-cols-1 gap-2 sm:grid-cols-2 {% if not shell.set_up %}lg:grid-cols-3{% endif %}">
       {% for e in entries %}<li>
         <a href="{% url e.key %}" class="flex min-h-14 items-center gap-3 rounded-xl border border-line bg-surface px-4 text-base font-semibold hover:border-accent">{% include "ui/components/icon.html" with name=e.icon cls="size-6 shrink-0 text-ink-muted" %}<span>{{ e.label }}</span></a>
       </li>{% endfor %}

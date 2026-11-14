@@ -89,9 +89,12 @@ while read -r _ local_sha _ remote_sha; do
   else
     base="$remote_sha"
   fi
+  # The whole list first: under pipefail, grep -q's early exit can fail the
+  # pipe (server/tests/test_pipefail_pipes.py).  image.yml runs checks.sh,
+  # which server/tests/test_docker_checks.py reads (#58 retro).
   if [ -z "$base" ] \
-       || git diff --name-only "$base" "$local_sha" \
-            | grep -qE '^(server/|testing/|website/inc/generators/)'; then
+       || grep -qE '^(server/|testing/|website/inc/generators/|\.github/workflows/image\.yml$)' \
+            <<<"$(git diff --name-only "$base" "$local_sha")"; then
     changed=1
   fi
 done
