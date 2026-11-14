@@ -9,6 +9,10 @@ the change, and with a toast. A control on the page sends its reply to the
 toast region. A form in the page's one sheet gets the sheet's next body, or
 a body that closes the sheet. A refusal is a 422 error toast, or, for a
 form, the form again with the refusal in it. No GET writes anything.
+
+A new partition makes its own subgroup (`find_or_create_partition()`), so
+the page has no separate control to add a subgroup, where
+`racing-groups.php:226` has one (D95).
 """
 
 from django.http import Http404, HttpResponse
@@ -544,7 +548,7 @@ NEW_GROUP = "new"
 @guard
 def subgroup_move(request, subgroup_id):
     """ "Move to...": the other groups and "New group" (`rank.move`), so a
-    subgroup changes group with a tap, never a drag."""
+    subgroup changes group with a tap, never a drag (D95)."""
     subgroup = _subgroup(request, subgroup_id)
     event = _event(request)
     if request.method == "GET":

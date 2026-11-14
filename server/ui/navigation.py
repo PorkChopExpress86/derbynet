@@ -305,6 +305,21 @@ ENTRIES: tuple[NavEntry, ...] = (
         icon="about",
         view="ui.about.views.page",
     ),
+    # The guides (#61). Anyone may read them, before the first event too
+    # (D92, refining D5). Each guide, `docs/<slug>/`, and its images take this
+    # entry's guard (`ui/urls.py`); the help link opens the quick reference
+    # (D94).
+    NavEntry(
+        "docs",
+        "Help",
+        "docs/",
+        ANON,
+        OTHER,
+        61,
+        icon="help",
+        menu=False,
+        view="ui.docs.views.index",
+    ),
     # Reached from other pages (#39 Context).
     NavEntry(
         "settings",

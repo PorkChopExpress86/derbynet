@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "Django>=5.2,<5.3",
     "dj-database-url>=3.0",
+    "markdown>=3.8,<4",
     "opencv-python-headless>=4.12,<5",
     "openpyxl>=3.1,<4",
     "pillow>=13.0.0",

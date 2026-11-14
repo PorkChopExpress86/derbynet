@@ -1,4 +1,4 @@
 <div class="flex items-center justify-between gap-2 text-sm text-ink-muted">
-  <a href="{% url 'quickref' %}" target="derbynet_help" rel="noreferrer noopener" class="flex min-h-11 items-center gap-2 rounded-lg px-3 font-medium text-accent hover:bg-surface-2">{% include "ui/components/icon.html" with name="help" cls="size-5" %}Quick reference</a>
+  <a href="{% url 'docs-page' 'quick-reference' %}" target="derbynet_help" rel="noreferrer noopener" class="flex min-h-11 items-center gap-2 rounded-lg px-3 font-medium text-accent hover:bg-surface-2">{% include "ui/components/icon.html" with name="help" cls="size-5" %}Quick reference</a>
   <span class="px-3" data-version>DerbyNet {{ shell.version }}</span>
 </div>

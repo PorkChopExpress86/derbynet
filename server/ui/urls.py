@@ -1,6 +1,7 @@
 from django.urls import include, path
 
 from ui import navigation, redirects, views
+from ui.docs import views as docs_views
 
 urlpatterns = [
     *navigation.urlpatterns(),
@@ -26,7 +27,8 @@ urlpatterns = [
     path("", include("ui.setup.urls")),
     path("", include("ui.events.urls")),
     *redirects.urlpatterns(),
-    path("quickref.pdf", views.quickref, name="quickref"),
+    path("docs/<slug:slug>/", docs_views.page, name="docs-page"),
+    path("docs/img/<path:name>", docs_views.image, name="docs-image"),
     path("components/", views.components, name="components"),
     path(
         "components/demo/<str:outcome>/", views.components_demo, name="components-demo"

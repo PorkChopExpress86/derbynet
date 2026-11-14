@@ -39,6 +39,10 @@ on:
       - lib/jssc.jar
       - lib/Java-WebSocket-1.5.2.jar
       - lib/json-20210307.jar
+      # The guides: server/ui/tests/test_docs.py reads them, and the image
+      # renders them (#61).
+      - docs/*.md
+      - docs/img/**
       - .github/workflows/image.yml
   pull_request:
     paths:
@@ -51,6 +55,10 @@ on:
       - lib/jssc.jar
       - lib/Java-WebSocket-1.5.2.jar
       - lib/json-20210307.jar
+      # The guides: server/ui/tests/test_docs.py reads them, and the image
+      # renders them (#61).
+      - docs/*.md
+      - docs/img/**
       - .github/workflows/image.yml
   workflow_dispatch:
 
@@ -362,7 +370,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
 
       # Every check checks.sh runs with no arguments.
-      - name: TLS, secret key, user, uploads, bind mounts, client address, proxies, stop, reload, timeout, engine guard, Postgres password, bad settings
+      - name: TLS, secret key, user, uploads, bind mounts, client address, proxies, stop, reload, timeout, engine guard, Postgres password, bad settings, allowed hosts, guides
         run: server/docker/ci/checks.sh
 
       - name: Backup and restore, SQLite

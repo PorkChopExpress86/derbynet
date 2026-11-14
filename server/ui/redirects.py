@@ -9,7 +9,9 @@ A `php` value with a query string, such as `photo-thumbs.php?repo=head`, is
 not a URL path, so it gets no entry in the table. `QUERY_PAGES` maps such a
 PHP path to a view that reads the query and redirects: `photo-thumbs.php`
 goes to the racer or car photos by its `repo` (#47).
-`EXTRA_PAGES` holds PHP pages that are not registry pages. Machine paths,
+`EXTRA_PAGES` holds PHP pages that are not registry pages, and `EXTRA_URLS`
+those whose replacement takes an argument: the help link's `quickref.pdf`
+goes to the quick reference guide (D94, #61). Machine paths,
 such as `action.php` and `kiosk.php`, keep their own behavior and are never
 here.
 """
@@ -29,6 +31,10 @@ EXTRA_PAGES: dict[str, str] = {
     "mcheckin.php": "checkin",
     "import-snapshot.php": "setup",
 }
+# PHP path to the URL name and arguments of its replacement.
+EXTRA_URLS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "quickref.pdf": ("docs-page", ("quick-reference",)),
+}
 # PHP page to the dotted path of the view that redirects it by its query.
 QUERY_PAGES: dict[str, str] = {"photo-thumbs.php": "ui.photos.views.legacy_page"}
 
@@ -43,9 +49,9 @@ def legacy_pages() -> dict[str, str]:
     return {**built, **EXTRA_PAGES}
 
 
-def _redirect_to(name: str):
+def _redirect_to(name: str, args: tuple[str, ...] = ()):
     def legacy_page(request):
-        target = reverse(name)
+        target = reverse(name, args=args)
         if query := request.META.get("QUERY_STRING", ""):
             target = f"{target}?{query}"
         return HttpResponsePermanentRedirect(target)
@@ -60,6 +66,9 @@ def urlpatterns():
     patterns = []
     for php, name in legacy_pages().items():
         view = _redirect_to(name)
+        patterns += [path(php, view), path(f"{prefix}/{php}", view)]
+    for php, (name, args) in EXTRA_URLS.items():
+        view = _redirect_to(name, args)
         patterns += [path(php, view), path(f"{prefix}/{php}", view)]
     for php, dotted in QUERY_PAGES.items():
         view = import_string(dotted)

@@ -1,5 +1,5 @@
 """Judging (#45): `judging.php` and `judging.js`, over the award services of
-#33. Judges assign an award by tapping, with no drag: a racer, then one of
+#33. Judges assign an award by tapping, with no drag (D95): a racer, then one of
 the awards on the racer's sheet, or an award, then one of the racers on the
 award's sheet.
 
