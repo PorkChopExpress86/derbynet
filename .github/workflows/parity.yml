@@ -10,9 +10,9 @@ name: parity
 # races a round with derby-timer.jar (#32), as server.yml does.
 #
 # The Django server runs as in server.yml, with runserver and the test
-# endpoints on; there is no Django image yet (#58).  Both legs run the suite
-# from the test harness image of testing/docker/run-suite.sh, so they use the
-# same curl, jq and xmllint.
+# endpoints on; image.yml runs the suite against the Docker image (#58).
+# Both legs run the suite from the test harness image of
+# testing/docker/run-suite.sh, so they use the same curl, jq and xmllint.
 #
 # The gate can't pass until the tickets in WAITING (server/tools/parity_gate.py)
 # land, so it runs nightly, on demand, and on a push to a branch named

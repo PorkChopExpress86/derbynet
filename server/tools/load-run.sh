@@ -12,7 +12,8 @@
 # given.  It makes a fresh SQLite database under server/var/, refuses to run
 # unless SQLite is in WAL mode, serves it with the locked gunicorn of the
 # `serve` dependency group and DERBYNET_LOAD_WORKERS sync workers (default 4,
-# a stand-in until M6 settles the production config), runs
+# the same as the Docker image's GUNICORN_WORKERS default; this run's report
+# is what will set both), runs
 # tools/load_test.py --setup at p95 300 ms and p99 1 s, and stops gunicorn.
 # It exits with the load script's status: 0 when every check passed.
 

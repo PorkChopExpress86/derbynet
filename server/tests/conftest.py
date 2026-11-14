@@ -16,7 +16,13 @@ def load_settings(monkeypatch, tmp_path):
     def load(**env):
         env.setdefault("DERBYNET_DATA_DIR", str(tmp_path / "data"))
         env.setdefault("DERBYNET_CONFIG_DIR", str(tmp_path / "config"))
-        for name in ("DJANGO_SECRET_KEY", "DATABASE_URL", "DERBYNET_URL_PREFIX"):
+        for name in (
+            "DJANGO_SECRET_KEY",
+            "DATABASE_URL",
+            "DERBYNET_URL_PREFIX",
+            "DERBYNET_STATIC_ROOT",
+            "MAX_UPLOAD_SIZE",
+        ):
             monkeypatch.delenv(name, raising=False)
         for name, value in env.items():
             monkeypatch.setenv(name, value)

@@ -27,8 +27,9 @@ dev = [
     "pytest-xdist>=3.8",
     "ruff>=0.14",
 ]
-# The WSGI server tools/load-run.sh serves Django with (ADR-08), until M6
-# settles the production image. `uv run --group serve` installs it.
+# The WSGI server of the Docker image (#58, server/docker/Dockerfile), which
+# tools/load-run.sh also serves Django with (ADR-08). `uv run --group serve`
+# installs it.
 serve = [
     "gunicorn>=26.2,<27",
 ]

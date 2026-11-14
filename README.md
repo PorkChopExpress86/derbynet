@@ -4,37 +4,34 @@
 
 # Developing locally
 
-To quickly get started on local development, the existing Docker image can be
-used to provide the web server and PHP engine, even if you don't have these
-installed natively on your machine.
+The server is the Django port in `server/`; `server/README.md` covers its
+tests and tools. Docker is the only install (D3), and you can develop against
+the same image a race runs, with your checkout's `server/` mounted into it.
+You need Docker (Docker Desktop on a Mac or Windows) and nothing else.
 
-1. Install [Apache Ant](https://ant.apache.org/). 
-   1. You can [install WSL](https://learn.microsoft.com/en-us/windows/wsl/install) and run:
+1. From the root of the cloned repository, build the image and start it with
+   the `image` profile of `server/compose.yaml`:
 
-      ```bash
-      sudo apt-get update
-      sudo apt-get install ant
-      ```
-
-2. Execute `ant generated` from the root of the cloned repository.  (This build
-target includes a step to generate PDF files from their ODF source files.  This
-step will be silently skipped if the LibreOffice/OpenOffice `soffice`
-application is not available.)
-
-3. If desired, do one or both of the following.  (If you do neither, you won't
-be able to connect to a hardware timer.)
-
-   1. Execute `ant timer-in-browser` to build the in-browser timer interface.
-   2. Execute `ant timer-jar` to build the derby-timer.jar timer interface.
-
-4. Instantiate the docker container, but use your local sources rather than
-those deployed in the container.  _**PATH_TO_YOUR_DATA**_ is a local directory
-where you'd like databases, photos, and other data files to be stored.
-_**PATH_TO_YOUR_REPOSITORY**_ is the path to your local cloned repository.
-
-   ```powershell
-   docker run --detach -p 80:80 -p 443:443 \
-     --volume [** PATH TO YOUR DATA **]\lib\:/var/lib/derbynet \
-     --mount type=bind,src=[** PATH TO YOUR REPOSITORY **]\website\,target=/var/www/html,readonly \
-     jeffpiazza/derbynet_server   
+   ```sh
+   docker compose -f server/compose.yaml --profile image up --build image
    ```
+
+   It serves `http://localhost:8081/` and `https://localhost:8443/`
+   (`DERBYNET_IMAGE_HTTP_PORT` and `DERBYNET_IMAGE_HTTPS_PORT` change them).
+   The first visit sets up an event.
+
+2. Edit the code. `server/` is mounted read-only over the image's copy, so
+   gunicorn restarts its workers after a Python or template edit
+   (`GUNICORN_RELOAD=1`), and the next page load shows it. Static files
+   (CSS and JavaScript) are collected when the image is built, so rerun the
+   command above with `--build` after changing them, and after a change to
+   `server/uv.lock`.
+
+3. Your data stays in the `image-data` volume between runs, as a race's does
+   in its data volume. `docker compose -f server/compose.yaml --profile image
+   down -v` deletes it.
+
+The same `server/compose.yaml` also runs the PHP server and Django's
+`runserver` side by side (`server/README.md`, "Run both servers").
+`server/docker/README.md` describes the image itself: its settings, TLS,
+Postgres, and backups.

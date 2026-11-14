@@ -1,0 +1,496 @@
+name: image
+
+# The Docker image of the Django server (#58), from server/docker/Dockerfile.
+#
+# - build: both platforms, linux/amd64 and linux/arm64 (arm64 under QEMU),
+#   once, into an OCI archive that every later job uses: the test jobs load
+#   their platform's image from it, and publish pushes the archive itself, so
+#   the published bits are the tested ones.  The build job also pushes it to a
+#   registry that lives only in the job, so `docker buildx imagetools
+#   inspect` can show the manifest list, and dry-runs publish.sh there.
+# - suite: testing/exercise-one-database.sh against the amd64 image as a race
+#   runs it: one `docker run` on a fresh volume, compose with the postgres
+#   profile, under DERBYNET_URL_PREFIX, behind a host nginx, and the long
+#   schedule with DERBYNET_REQUEST_TIMEOUT=600.  The suite runs as
+#   server.yml's exercise job runs it (#37): the same script, the same
+#   DERBYNET_BACKEND and test endpoints.
+# - arm64: the same suite against the archive's arm64 image, run natively on
+#   GitHub's ubuntu-24.04-arm runner.
+# - checks: every check of server/docker/ci/checks.sh (its header lists
+#   them), backup, upgrade, and the phone check, Chromium in phone mode over
+#   https://<LAN IP>/ (D88).
+# - publish: on a release tag only, the archive to
+#   ghcr.io/porkchopexpress86/derbynet_server with the repository's
+#   GITHUB_TOKEN (D89), and `latest` for a release that is not a prerelease
+#   (server/docker/ci/publish.sh).  Pull requests and branch pushes push
+#   nothing.
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+    paths:
+      - server/**
+      - testing/**
+      - templates/timer.html
+      - templates/timer-profiles.js
+      - timer/src/**
+      - timer/derbynet-timer/src/**
+      - lib/jssc.jar
+      - lib/Java-WebSocket-1.5.2.jar
+      - lib/json-20210307.jar
+      - .github/workflows/image.yml
+  pull_request:
+    paths:
+      - server/**
+      - testing/**
+      - templates/timer.html
+      - templates/timer-profiles.js
+      - timer/src/**
+      - timer/derbynet-timer/src/**
+      - lib/jssc.jar
+      - lib/Java-WebSocket-1.5.2.jar
+      - lib/json-20210307.jar
+      - .github/workflows/image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: derbynet_server:ci
+
+jobs:
+  build:
+    name: build (linux/amd64, linux/arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      registry:
+        image: registry:3@sha256:82f6ff4a7f982960c8aa51617fea3aabc485df6e55cce80d22deb1de36f1bc3c
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v7
+
+      # QEMU for the arm64 stages; the static stage runs on the runner's own
+      # platform (--platform=$BUILDPLATFORM).
+      - name: Set up QEMU
+        run: |
+          docker run --privileged --rm \
+            tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 \
+            --install arm64
+
+      - uses: docker/setup-buildx-action@v4.4.1
+        with:
+          driver-opts: network=host
+
+      - name: Build both platforms into an OCI archive
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: server/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          provenance: false
+          outputs: type=oci,dest=${{ runner.temp }}/image.tar
+          cache-from: type=gha,scope=image
+          cache-to: type=gha,scope=image,mode=max
+
+      - name: Push the archive to the job's own registry, and inspect it
+        run: |
+          skopeo copy --all --preserve-digests --dest-tls-verify=false \
+            "oci-archive:$RUNNER_TEMP/image.tar" docker://localhost:5000/derbynet_server:ci
+          docker buildx imagetools inspect localhost:5000/derbynet_server:ci | tee inspect.txt
+          grep -q 'Platform: *linux/amd64' inspect.txt
+          grep -q 'Platform: *linux/arm64' inspect.txt
+
+      # publish.sh as the publish job runs it, against the job's registry: a
+      # release gets its tag and latest, a prerelease only its tag, and both
+      # keep the archive's digest.
+      - name: Dry-run the publish step
+        run: |
+          archive="$RUNNER_TEMP/image.tar"
+          server/docker/ci/publish.sh "$archive" localhost:5000/dry-release v1.2.3 --dest-tls-verify=false
+          server/docker/ci/publish.sh "$archive" localhost:5000/dry-prerelease v1.2.4-rc1 --dest-tls-verify=false
+          tags() { curl -s "http://localhost:5000/v2/$1/tags/list" | jq -c '.tags | sort'; }
+          echo "dry-release: $(tags dry-release)"
+          echo "dry-prerelease: $(tags dry-prerelease)"
+          test "$(tags dry-release)" = '["latest","v1.2.3"]'
+          test "$(tags dry-prerelease)" = '["v1.2.4-rc1"]'
+          digest() { skopeo inspect --raw "$@" | sha256sum | cut -d' ' -f1; }
+          tested="$(digest "oci-archive:$archive")"
+          for ref in dry-release:v1.2.3 dry-release:latest dry-prerelease:v1.2.4-rc1; do
+            pushed="$(digest --tls-verify=false "docker://localhost:5000/$ref")"
+            echo "$ref sha256:$pushed (archive sha256:$tested)"
+            test "$pushed" = "$tested"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar
+          retention-days: 7
+          if-no-files-found: error
+
+  suite:
+    name: suite (amd64, ${{ matrix.variant }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [docker-run, compose-postgres, compose-sqlite, url-prefix, host-proxy, timeout]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the amd64 image the build job made
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
+
+      - name: Install the suite's tools
+        run: |
+          sudo sh .github/ubuntu-mirror.sh
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
+          if [ "${{ matrix.variant }}" = host-proxy ]; then
+            sudo apt-get install -y --no-install-recommends nginx
+          fi
+
+      # Each variant starts the server on a fresh volume and says where the
+      # suite reaches it.
+      - name: Start the server
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          run() { docker run -d --name derbynet -v derbynet-data:/var/lib/derbynet \
+                    -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 "$@" "$IMAGE"; }
+          compose() { DERBYNET_IMAGE="$IMAGE" docker compose -p derbynet \
+                        -f server/docker/compose.yaml -f server/docker/ci/compose.ci.yaml "$@"; }
+          case "$VARIANT" in
+            docker-run) run -p 80:80 -p 443:443; url=http://localhost ;;
+            timeout) run -p 80:80 -e DERBYNET_REQUEST_TIMEOUT=600; url=http://localhost ;;
+            url-prefix) run -p 80:80 -e DERBYNET_URL_PREFIX=/derbynet; url=http://localhost/derbynet ;;
+            compose-sqlite) compose up -d --wait; url=http://localhost ;;
+            compose-postgres) compose --profile postgres up -d --wait; url=http://localhost ;;
+            # The Docker install doc's setup: the host's own web server
+            # proxies a path to the container on 127.0.0.1:8000.
+            # server/docker/README.md's location block, read from the README.
+            host-proxy)
+              run -p 127.0.0.1:8000:80 -e DERBYNET_URL_PREFIX=/my-derbynet \
+                -e DERBYNET_TRUSTED_PROXIES=172.17.0.1
+              { echo 'server {'; echo '    listen 80 default_server;'
+                awk '/^```nginx$/ {on=1; next} /^```$/ {on=0} on' server/docker/README.md
+                echo '}'; } | sudo tee /etc/nginx/sites-enabled/default
+              grep -q 'location /my-derbynet/' /etc/nginx/sites-enabled/default
+              sudo nginx -t
+              sudo systemctl restart nginx
+              url=http://localhost/my-derbynet ;;
+          esac
+          echo "URL=$url" >> "$GITHUB_ENV"
+          for _ in $(seq 120); do
+            curl -fsS -o /dev/null "$url/index.php" && break
+            sleep 1
+          done
+          curl -fsS -o /dev/null -w '%{http_code} %{url_effective}\n' "$url/index.php"
+
+      # SQLite removes the -wal and -shm files when its last connection
+      # closes, and Django closes its connection after each request, so the
+      # compose-sqlite run lists the data volume while the suite runs, and
+      # keeps the first listing that shows them.
+      - name: Run testing/exercise-one-database.sh against the image
+        if: matrix.variant != 'timeout'
+        env:
+          DERBYNET_BACKEND: django
+        run: |
+          if [ "${{ matrix.variant }}" = compose-sqlite ]; then
+            ( while sleep 0.2; do
+                docker exec derbynet-server-1 ls -la /var/lib/derbynet > "$RUNNER_TEMP/ls.txt" 2>/dev/null || continue
+                if grep -q 'sqlite3-wal$' "$RUNNER_TEMP/ls.txt" && grep -q 'sqlite3-shm$' "$RUNNER_TEMP/ls.txt"; then
+                  mv "$RUNNER_TEMP/ls.txt" "$RUNNER_TEMP/ls-during-suite.txt"
+                  break
+                fi
+              done ) &
+          fi
+          bash testing/exercise-one-database.sh "$URL" ez
+
+      # As server.yml's shell job runs it, with no edit inside the container.
+      - name: Run test-extended-scheduling.sh with DERBYNET_REQUEST_TIMEOUT=600
+        if: matrix.variant == 'timeout'
+        run: |
+          curl -sf -d 'action=setup.nodata&ez-new=timeout' "$URL/action.php" | grep -q success
+          bash testing/reset-database.sh "$URL"
+          bash testing/test-car-numbers.sh "$URL"
+          bash testing/test-extended-scheduling.sh "$URL"
+
+      - name: docker compose ps, and the data volume
+        if: always() && startsWith(matrix.variant, 'compose')
+        run: |
+          compose() { DERBYNET_IMAGE="$IMAGE" docker compose -p derbynet \
+                        -f server/docker/compose.yaml -f server/docker/ci/compose.ci.yaml "$@"; }
+          compose ps -a
+          compose exec -T server ls -la /var/lib/derbynet
+          services="$(compose ps --services --status running)"
+          if [ "${{ matrix.variant }}" = compose-sqlite ]; then
+            ! echo "$services" | grep -qx postgres
+            echo "The data volume while the suite ran:"
+            cat "$RUNNER_TEMP/ls-during-suite.txt"
+            test "$(grep -c '\.sqlite3$' "$RUNNER_TEMP/ls-during-suite.txt")" = 1
+            test "$(grep -c '\.sqlite3' "$RUNNER_TEMP/ls-during-suite.txt")" = 3
+            compose exec -T -u derbynet server python -c \
+              'import sqlite3; print("journal_mode", sqlite3.connect("/var/lib/derbynet/derbynet.sqlite3").execute("PRAGMA journal_mode").fetchone()[0])' \
+              | tee "$RUNNER_TEMP/mode.txt"
+            grep -qx 'journal_mode wal' "$RUNNER_TEMP/mode.txt"
+          else
+            echo "$services" | grep -qx postgres
+            compose exec -T server sh -c '! ls /var/lib/derbynet/*.sqlite3*'
+          fi
+
+      # #64 S36: the suite logs in as RaceCoordinator with doyourbest.
+      - name: Check the log holds no role password
+        if: always()
+        run: |
+          if [ -n "$(docker ps -aq --filter name=^derbynet$)" ]; then
+            docker logs derbynet > "$RUNNER_TEMP/server.log" 2>&1
+          else
+            docker compose -p derbynet -f server/docker/compose.yaml logs --no-color > "$RUNNER_TEMP/server.log" 2>&1
+          fi
+          # The suite's posts, under a URL prefix too.
+          grep -c 'POST /[a-z/-]*action.php' "$RUNNER_TEMP/server.log"
+          if grep -n 'doyourbest' "$RUNNER_TEMP/server.log"; then
+            echo "The log holds RaceCoordinator's password." >&2
+            exit 1
+          fi
+
+      - name: Check the suite left the checkout clean
+        run: |
+          status="$(git status --porcelain)"
+          [ -z "$status" ] || { echo "$status"; exit 1; }
+
+      - name: Show the server log
+        if: failure()
+        run: cat "$RUNNER_TEMP/server.log" || docker logs derbynet
+
+  arm64:
+    name: suite (arm64)
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the arm64 image the build job made
+        run: |
+          command -v skopeo >/dev/null || {
+            sudo sh .github/ubuntu-mirror.sh
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends skopeo
+          }
+          skopeo copy --override-os linux --override-arch arm64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
+
+      - name: The host
+        run: |
+          hostname
+          uname -m
+          docker image inspect -f '{{.Os}}/{{.Architecture}}' "$IMAGE"
+
+      - name: Install the suite's tools
+        run: |
+          sudo sh .github/ubuntu-mirror.sh
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
+
+      - name: Start the server on a fresh volume
+        run: |
+          docker run -d --name derbynet -v derbynet-data:/var/lib/derbynet \
+            -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 80:80 -p 443:443 "$IMAGE"
+          for _ in $(seq 120); do
+            curl -fsS -o /dev/null http://localhost/index.php && break
+            sleep 1
+          done
+          docker exec derbynet uname -m
+
+      - name: Run testing/exercise-one-database.sh against the arm64 image
+        env:
+          DERBYNET_BACKEND: django
+        run: bash testing/exercise-one-database.sh http://localhost ez
+
+      - name: Show the server log
+        if: failure()
+        run: docker logs derbynet
+
+  checks:
+    name: checks (amd64)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the amd64 image the build job made
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
+
+      - name: Install the checks' tools
+        run: |
+          sudo sh .github/ubuntu-mirror.sh
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
+
+      # Every check checks.sh runs with no arguments.
+      - name: TLS, secret key, user, uploads, bind mounts, client address, proxies, stop, reload, timeout, engine guard, Postgres password, bad settings
+        run: server/docker/ci/checks.sh
+
+      - name: Backup and restore, SQLite
+        run: server/docker/ci/checks.sh backup
+
+      - name: Backup and restore, Postgres
+        env:
+          PROFILE: postgres
+        run: server/docker/ci/checks.sh backup
+
+      # The previous image: the last release tag's, or for a pull request or
+      # a branch push the base commit's.  When that commit has no
+      # server/docker/ yet, its server/ is built with this commit's
+      # server/docker/, settings.py and proxied_wsgi.py, which the image
+      # needs (the step says so); its models and migrations stay its own.
+      - name: Build the previous image
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            BASE="$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || echo "$BASE")"
+          fi
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE="$(git rev-parse HEAD^)"
+          fi
+          echo "previous: $BASE $(git log -1 --format=%s "$BASE")"
+          git worktree add --detach "$RUNNER_TEMP/previous" "$BASE"
+          if [ ! -e "$RUNNER_TEMP/previous/server/docker/Dockerfile" ]; then
+            echo "::notice::$BASE has no server/docker/; building its server/ with this commit's server/docker/, settings.py and proxied_wsgi.py"
+            cp -r server/docker "$RUNNER_TEMP/previous/server/docker"
+            cp server/derbynet/settings.py server/derbynet/proxied_wsgi.py "$RUNNER_TEMP/previous/server/derbynet/"
+          fi
+          docker buildx build --load -t derbynet_server:previous \
+            -f "$RUNNER_TEMP/previous/server/docker/Dockerfile" "$RUNNER_TEMP/previous"
+
+      - name: Upgrade from the previous image
+        env:
+          OLD_IMAGE: derbynet_server:previous
+        run: server/docker/ci/checks.sh upgrade
+
+  phone:
+    name: phone check (Chromium 390x844 over HTTPS)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the amd64 image the build job made
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install Chromium
+        working-directory: server
+        run: |
+          uv sync --locked
+          sudo sh "$GITHUB_WORKSPACE/.github/ubuntu-mirror.sh"
+          uv run playwright install --with-deps chromium
+
+      # The runner's own address on its network, as a phone on the LAN
+      # reaches the server.
+      - name: Start the server, with an event and racers
+        run: |
+          docker run -d --name derbynet -v derbynet-data:/var/lib/derbynet \
+            -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 80:80 -p 443:443 "$IMAGE"
+          lan="$(hostname -I | awk '{print $1}')"
+          echo "LAN=$lan" >> "$GITHUB_ENV"
+          for _ in $(seq 120); do
+            curl -fsS -o /dev/null "http://$lan/index.php" && break
+            sleep 1
+          done
+          curl -sf -d 'action=setup.nodata&ez-new=phone' "http://$lan/action.php" | grep -q success
+          bash testing/reset-database.sh "http://$lan"
+          bash testing/import-roster.sh "http://$lan"
+
+      - name: Take a check-in photo with the live camera over https://<LAN IP>/
+        working-directory: server
+        run: uv run python docker/ci/phone_check.py "https://$LAN" "$RUNNER_TEMP/phone-checkin.png"
+
+      - name: The racer has the photo and is checked in
+        run: |
+          jar="$RUNNER_TEMP/cookies"
+          curl -sf -c "$jar" -b "$jar" -d 'action=role.login&name=RaceCoordinator&password=doyourbest' \
+            "http://$LAN/action.php" > /dev/null
+          curl -sf -b "$jar" "http://$LAN/action.php?query=racer.list" \
+            | jq -e '[.racers[] | select((.headshot | test("camera")) and .passed == true)] | length == 1'
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: phone-checkin
+          path: ${{ runner.temp }}/phone-checkin.png
+          if-no-files-found: warn
+
+  publish:
+    name: publish to ghcr.io
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, suite, arm64, checks, phone]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Push the tested archive to ghcr.io
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$TOKEN" | skopeo login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          server/docker/ci/publish.sh "$RUNNER_TEMP/image.tar" \
+            ghcr.io/porkchopexpress86/derbynet_server "$GITHUB_REF_NAME"
+
+      - name: docker buildx imagetools inspect
+        run: docker buildx imagetools inspect "ghcr.io/porkchopexpress86/derbynet_server:${GITHUB_REF_NAME}"
