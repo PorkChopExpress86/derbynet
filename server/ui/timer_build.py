@@ -12,11 +12,14 @@ build them for PHP.
   `javac`, with no Ant and no jar, or runs both in a JDK container when the
   host has no JDK.
 
-The copied scripts and `profiles.js` are not committed (`.gitignore`). The ui
-CI job runs `manage.py build_timer` before the browser tests, and
+The copied scripts and `profiles.js` are not committed (`.gitignore`). Each
+file the build writes is 0644 (`PUBLIC_FILE`), and each folder it writes into
+0755 (`PUBLIC_FOLDER`). The ui CI job runs
+`manage.py build_timer` before the browser tests, and
 `ui/tests/browser/test_timer.py` builds them when they are missing. The Docker
 image's static stage (server/docker/Dockerfile, #58) runs it too, so nothing
-runs Java at request time.
+runs Java at request time; the image has them only in the collected copy
+under `STATIC_ROOT`, which `asset_roots()` reads after `ASSETS` (#312).
 The legacy files the page also loads, jQuery, `mobile.js`, `modal.js`,
 `ajax-setup.js`, `global.css`, `mobile.css` and the images, are committed
 copies under `ui/static/timer/`, so the page keeps working once `website/`
@@ -30,6 +33,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from django.conf import settings
+
 UI_DIR = Path(__file__).resolve().parent
 REPO = UI_DIR.parent.parent
 SOURCE_HTML = REPO / "templates" / "timer.html"
@@ -42,8 +47,17 @@ JAVA_LIBS = [
 ]
 
 ASSETS = UI_DIR / "static" / "timer"
-TEMPLATE = UI_DIR / "templates" / "ui" / "timer" / "browser.html"
+# Where collectstatic puts ASSETS under STATIC_ROOT: `timer/`.
+STATIC_SUBDIR = ASSETS.relative_to(UI_DIR / "static")
+TEMPLATES = UI_DIR / "templates"
+TEMPLATE = TEMPLATES / "ui" / "timer" / "browser.html"
 PROFILES = ASSETS / "js" / "timer" / "profiles.js"
+# The mode of each file the build writes, whatever the umask, as
+# collectstatic gives its copies (FILE_UPLOAD_PERMISSIONS), and of each folder
+# it writes into. A server running as another user, such as the image's with
+# this folder bind-mounted, answered 500 for a 0600 profiles.js (#312).
+PUBLIC_FILE = 0o644
+PUBLIC_FOLDER = 0o755
 
 # A JDK image for a host with no `javac`, pinned by digest. Override with
 # DERBYNET_JDK_IMAGE.
@@ -118,9 +132,22 @@ def django_template(source: str) -> str:
     return HEADER + html.lstrip("\n")
 
 
+def _public_folder(folder: Path, top: Path) -> Path:
+    """`folder`, made if missing, with it and each folder above it up to
+    `top`, when it is under `top`, readable by any user."""
+    folder.mkdir(parents=True, exist_ok=True)
+    each = folder
+    while True:
+        each.chmod(PUBLIC_FOLDER)
+        if top not in each.parents:
+            return folder
+        each = each.parent
+
+
 def write_template() -> Path:
-    TEMPLATE.parent.mkdir(parents=True, exist_ok=True)
+    _public_folder(TEMPLATE.parent, TEMPLATES)
     TEMPLATE.write_text(django_template(SOURCE_HTML.read_text()))
+    TEMPLATE.chmod(PUBLIC_FILE)
     return TEMPLATE
 
 
@@ -134,10 +161,10 @@ def copy_sources() -> list[Path]:
     """`timer-in-browser`: the scripts into `js/timer/`, the CSS into `css/`."""
     written = []
     for folder, pattern, into in (("js", "*.js", "js/timer"), ("css", "*.css", "css")):
-        target = ASSETS / into
-        target.mkdir(parents=True, exist_ok=True)
+        target = _public_folder(ASSETS / into, ASSETS)
         for path in sorted((TIMER_SRC / folder).glob(pattern)):
             shutil.copyfile(path, target / path.name)
+            (target / path.name).chmod(PUBLIC_FILE)
             written.append(target / path.name)
     return written
 
@@ -200,14 +227,29 @@ def profiles_js(profiles_json: str | None = None) -> Path:
     profiles = profiles_json if profiles_json is not None else all_profiles()
     if not profiles.strip().startswith("["):
         raise BuildError(f"AllProfiles printed no JSON array: {profiles[:200]!r}")
-    PROFILES.parent.mkdir(parents=True, exist_ok=True)
+    _public_folder(PROFILES.parent, ASSETS)
     text = PROFILES_TEMPLATE.read_text().replace("@PROFILES@", profiles.strip())
     with tempfile.NamedTemporaryFile(
         "w", dir=PROFILES.parent, delete=False, suffix=".tmp"
     ) as out:
         out.write(text)
+    # mkstemp makes the file 0600.
+    Path(out.name).chmod(PUBLIC_FILE)
     Path(out.name).replace(PROFILES)
     return PROFILES
+
+
+def asset_roots(folder: str) -> list[Path]:
+    """Where the page's `js/`, `css/` or `img/` files are read from, in
+    order: `ASSETS`, then its copy that `collectstatic` made under
+    `STATIC_ROOT`, when that is set. The Docker image's server folder holds
+    only the committed files, and its collected copy holds the build too
+    (#312); under `runserver`, a fresh `build_timer` wins over an old
+    collected copy."""
+    roots = [ASSETS / folder]
+    if settings.STATIC_ROOT:
+        roots.append(Path(settings.STATIC_ROOT) / STATIC_SUBDIR / folder)
+    return roots
 
 
 def built() -> bool:

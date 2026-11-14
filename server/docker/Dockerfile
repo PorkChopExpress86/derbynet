@@ -88,8 +88,11 @@ RUN apt-get update \
 COPY --from=venv /opt/derbynet/venv /opt/derbynet/venv
 COPY --from=static /opt/derbynet/static /opt/derbynet/static
 COPY --from=static /opt/derbynet/docs /opt/derbynet/docs
-# nginx serves every static file from /opt/derbynet/static, so the server's
-# own static folders, which a dev bind mount replaces, are never read.
+# nginx serves /static/ from /opt/derbynet/static.  The server's own static
+# folders, which a dev bind mount replaces, hold only the committed files: the
+# browser timer's js/, css/ and img/, which Django serves at the paths
+# timer.php loads them from, are read from the collected copy when the server
+# folder lacks them (ui/timer_build.py asset_roots, #312).
 COPY server/ /opt/derbynet/server/
 COPY server/docker/entrypoint.sh /opt/derbynet/entrypoint.sh
 # Fails the build when a platform's wheel or a library it needs is missing.

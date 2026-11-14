@@ -12,6 +12,7 @@ gave 4 passed in #58's retro review (tests/workflow_steps.py).
 """
 
 import re
+import subprocess
 from pathlib import Path
 
 from tests.workflow_steps import steps
@@ -147,3 +148,78 @@ def test_a_step_that_never_runs_runs_nothing():
         "        env:\n          PROFILE: postgres\n",
     )
     assert "backup" in run_by(with_env, default)
+
+
+# ----- checks.sh timer's file lists (#312) -----------------------------------
+
+
+def shell_function(name: str) -> str:
+    match = re.search(rf"^{name}\(\) \{{.*?^\}}$", CHECKS.read_text(), re.M | re.S)
+    assert match, f"checks.sh defines no {name}()"
+    return match.group()
+
+
+def run_function(name: str, tmp_path: Path, text: str) -> list[str]:
+    """`name <file>` under checks.sh's own shell options, on a file holding
+    `text`."""
+    path = tmp_path / "input"
+    path.write_text(text)
+    done = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'set -e -E -u -o pipefail\n{shell_function(name)}\n{name} "$1"',
+            "bash",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return done.stdout.split()
+
+
+def test_page_files_takes_any_attribute_order_and_quote_style(tmp_path):
+    page = (
+        "<link href='css/a.css' type=\"text/css\" rel='stylesheet'/>\n"
+        '<link rel="icon" href="img/icon.png"/>\n'
+        '<LINK rel=stylesheet href="css/b.css">\n'
+        "<script src='js/one.js' type=\"text/javascript\"></script>\n"
+        '<script type="text/javascript" src="js/two.js"></script>\n'
+        '<img id="x"\n     src="img/three.png"\n     onclick="go()"/>\n'
+    )
+    assert sorted(run_function("page_files", tmp_path, page)) == [
+        "css/a.css",
+        "css/b.css",
+        "img/three.png",
+        "js/one.js",
+        "js/two.js",
+    ]
+
+
+def test_page_files_reads_the_timer_page(tmp_path):
+    """The committed template, where the gear icon's <img> spans lines."""
+    from ui import timer_build
+
+    found = run_function("page_files", tmp_path, timer_build.TEMPLATE.read_text())
+    assert "img/gear_icon.png" in found
+    assert {"js/timer/main.js", "js/timer/profiles.js", "css/timer.css"} <= set(found)
+
+
+def test_script_files_takes_either_quote_escaped_or_not(tmp_path):
+    script = (
+        "g = new Worker('js/timer/w.js');\n"
+        '$("<img src=\\"img/c.png\\"/>");\n'
+        "$(\"<img src='img/d.png'/>\");\n"
+        "x.prop('src', 'img/status/' + png + '.png');\n"
+        "var y = 'css/not-loaded.css';\n"
+    )
+    assert run_function("script_files", tmp_path, script) == [
+        "js/timer/w.js",
+        "img/c.png",
+        "img/d.png",
+    ]
+
+
+def test_script_files_with_no_match_prints_nothing(tmp_path):
+    assert run_function("script_files", tmp_path, "var x = 1;\n") == []
