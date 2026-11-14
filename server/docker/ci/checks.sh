@@ -42,6 +42,8 @@
 #              guide's image answer from the guides the build rendered (#61),
 #              /quickref.pdf answers 301 to it (D94), and under
 #              DERBYNET_URL_PREFIX the page's links carry the prefix
+#   timer      /timer.php as Timer, at / and /derbynet/, and every script and
+#              stylesheet it links answer 200 with their content type (#312)
 #   backup     server/docker/README.md's backup and restore, with compose:
 #              an event with a racer photo, a car photo and a video, backed
 #              up, restored into fresh volumes, and all there.  PROFILE=postgres
@@ -676,10 +678,51 @@ check_docs() {
         || fail "the guide's links are not relative"
 }
 
+# The browser timer (#312): /timer.php, as the Timer role, and every script
+# and stylesheet it links, at the root and under the Debian layout's
+# /derbynet/.  The links are read from the page, so a file the page gains is
+# checked too.  Each file's status is printed before the check fails, so the
+# log lists them all.
+check_timer() {
+    start timer "$PREFIX-timer" -p 127.0.0.1::80
+    local url="http://$(docker port "$PREFIX-timer" 80/tcp)" jar="$RUNNER_TEMP_DIR/timer-cookies"
+    new_event "$url"
+    login "$url" "$jar" Timer
+    local base page got links link want bad=0 seen
+    for base in / /derbynet/; do
+        say "${base}timer.php as Timer"
+        got="$(curl -s -o "$RUNNER_TEMP_DIR/timer.html" -b "$jar" \
+            -w '%{http_code} %{content_type}' "$url${base}timer.php")"
+        echo "$got"
+        case "$got" in "200 text/html"*) ;; *) fail "${base}timer.php answered $got" ;; esac
+        page="$(cat "$RUNNER_TEMP_DIR/timer.html")"
+        # Each <script src> and stylesheet href, in the page's order.
+        links="$(grep -oE '<script [^>]*src="[^"]+"|<link [^>]*rel="stylesheet"[^>]*href="[^"]+"' \
+            <<<"$page" | sed -E 's/.*(src|href)="([^"]+)"$/\2/' || true)"
+        for want in js/timer/main.js js/timer/profiles.js css/timer.css js/jquery.js; do
+            grep -qxF "$want" <<<"$links" || fail "${base}timer.php links no $want"
+        done
+        seen=0
+        while read -r link; do
+            case "$link" in /*|*://*) fail "${base}timer.php links $link, not a relative path" ;; esac
+            got="$(curl -s -o /dev/null -b "$jar" -w '%{http_code} %{content_type}' "$url$base$link")"
+            echo "$got $base$link"
+            seen=$((seen + 1))
+            case "$link:$got" in
+                *.js:"200 text/javascript"*|*.js:"200 application/javascript"*) ;;
+                *.css:"200 text/css"*) ;;
+                *) bad=$((bad + 1)) ;;
+            esac
+        done <<<"$links"
+        echo "$seen files linked"
+    done
+    [ "$bad" = 0 ] || fail "$bad of the timer page's files did not answer 200 with their type"
+}
+
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
 [ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
-    reload timeout engine postgres-password bad-env allowed-hosts docs
+    reload timeout engine postgres-password bad-env allowed-hosts docs timer
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -699,6 +742,7 @@ for check in "$@"; do
         upgrade) check_upgrade ;;
         backup) check_backup ;;
         docs) check_docs ;;
+        timer) check_timer ;;
         *) fail "no check named $check" ;;
     esac
     cleanup
