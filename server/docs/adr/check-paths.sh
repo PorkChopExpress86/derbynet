@@ -180,7 +180,7 @@ while IFS= read -r target; do
     echo "MISSING  link $target"
     failures=$((failures + 1))
   elif (( docs )) && [[ -n "$fragment" && "$file" == *.md ]] \
-       && ! anchors "$check_dir/$file" | grep -qxF -- "$fragment"; then
+       && ! grep -qxF -- "$fragment" <<<"$(anchors "$check_dir/$file")"; then
     echo "MISSING  anchor $target"
     failures=$((failures + 1))
   else
@@ -195,7 +195,7 @@ if (( docs )); then
   for f in "${files[@]}"; do
     while IFS= read -r fragment; do
       checked=$((checked + 1))
-      if anchors "$f" | grep -qxF -- "$fragment"; then
+      if grep -qxF -- "$fragment" <<<"$(anchors "$f")"; then
         echo "ok       anchor $(basename "$f")#$fragment"
       else
         echo "MISSING  anchor $(basename "$f")#$fragment"
