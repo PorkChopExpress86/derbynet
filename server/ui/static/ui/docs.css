@@ -32,7 +32,7 @@
 /* Paper: the guide alone, black on white, with no menus, banner or toasts. */
 @media print {
   body { background: #fff; color: #000; }
-  #page > nav, #page > div > header, [data-bottom-nav], [data-default-password-banner],
+  #page > nav, #page > div > header, [data-default-password-banner],
   #sheets, #toasts, a[href="#main"], .doc-footer { display: none !important; }
   main#main { max-width: none; padding: 0 !important; }
   .doc { max-width: none; }

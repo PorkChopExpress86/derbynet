@@ -20,9 +20,8 @@ from ui.tests.browser.conftest import (
 )
 
 # Registry pages drawn without the shell, so with no help link: the kiosk
-# pages shown on their own, and the replay station and its camera, which fill
-# the screen.
-NO_SHELL = {"slideshow", "ondeck", "replay", "camera"}
+# pages shown on their own.
+NO_SHELL = {"slideshow", "ondeck"}
 
 
 @pytest.fixture
@@ -36,7 +35,8 @@ def help_link(page):
         return page.get_by_role("navigation", name="Main menu").get_by_role(
             "link", name="Quick reference"
         )
-    page.get_by_role("button", name="More").click()
+    # exact: a page's steppers are "More: <name>" buttons too.
+    page.get_by_role("button", name="More", exact=True).click()
     drawer = page.get_by_role("dialog", name="More")
     expect(drawer).to_be_visible()
     return drawer.get_by_role("link", name="Quick reference")
@@ -88,6 +88,7 @@ def test_a_printed_guide_leaves_out_the_menus(login, built):
     expect(page.locator("article.doc h1")).to_be_visible()
     expect(page.get_by_role("navigation", name="Main menu")).to_be_hidden()
     expect(page.locator("#page > div > header")).to_be_hidden()
+    # `#page > nav` is the sidebar and the phone's bottom bar.
     expect(page.locator("[data-bottom-nav]")).to_be_hidden()
     expect(page.get_by_role("link", name="All guides")).to_be_hidden()
     page.emulate_media(media="screen")

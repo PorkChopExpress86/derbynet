@@ -12,13 +12,15 @@
 # not a file to commit.
 #
 # Needs soffice (LibreOffice Writer) and pandoc on the PATH.  The host has
-# neither; a throwaway Debian container has both:
+# neither, so #61 built a throwaway Debian image with both and ran the script
+# in it as the checkout's owner, so the files it writes are yours:
 #
-#   docker run --rm --name derbynet-fodt-to-md -v "$PWD:/repo" -w /repo \
-#     debian:trixie-slim bash -c 'apt-get update -qq &&
-#       apt-get install -y -qq --no-install-recommends \
-#         libreoffice-writer-nogui pandoc >/dev/null &&
-#       docs/tools/fodt-to-md.sh'
+#   printf '%s\n' 'FROM debian:trixie-slim' \
+#     'RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends libreoffice-writer-nogui pandoc >/dev/null && rm -rf /var/lib/apt/lists/*' \
+#     | docker build -t derbynet-fodt -
+#   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+#     -v "$PWD:/repo" -w /repo derbynet-fodt docs/tools/fodt-to-md.sh
+#   docker image rm derbynet-fodt
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
