@@ -190,6 +190,31 @@ class Docs(unittest.TestCase):
         self.assertIn('(no pytest target', out)
 
 
+class Guide(unittest.TestCase):
+    """A guide in docs/ renders through the docs build; #61's fix round
+    left a fence open that only CI's build could find (#61 retro)."""
+
+    def test_a_guide_maps_to_the_docs_build_and_its_check(self):
+        for path in ('docs/install-docker.md', 'docs/img/live-streaming/a.jpg'):
+            with self.subTest(path=path):
+                out = run(path, root=REPO)
+                self.assertIn('[guide] a guide served under /docs/', section(out, path))
+                self.assertNotIn('[docs]', out)
+                self.assertNotIn('[fallback]', out)
+                cmds = commands(out)
+                self.assertIn('ui/tests/test_docs.py', cmds)
+                self.assertIn('tests/test_check_paths.py', cmds)
+                self.assertIn('-m browser ui/tests/browser/test_docs.py', cmds)
+                self.assertIn('  bash docs/adr/check-paths.sh --docs ../docs\n', cmds)
+
+    def test_markdown_elsewhere_in_docs_is_still_docs_only(self):
+        for path in ('docs/obsolete/old.md', 'docs/Quick Reference.fodt'):
+            with self.subTest(path=path):
+                out = run(path)
+                self.assertIn('[docs] docs only', out)
+                self.assertNotIn('[guide]', out)
+
+
 class Website(unittest.TestCase):
     def test_a_diff_with_no_target_leaves_it_to_the_checks(self):
         out = run('plan/README.md')

@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Lists each open line of an issue that asks for evidence in the PR, and
+with `--check BODY.md` names each one the PR body gives no evidence for.
+
+Usage: plan/bin/pr-evidence <issue> [--check BODY.md]
+
+A line asks for evidence in the PR when it says so: "Evidence is ... in the
+PR", "The PR lists", "Record the size in the PR", "Attach" (but not
+"attached to this issue"), "Link the run", "PR description". Its key is its
+first sentence, or its first two when another line starts the same way. The
+body gives each key a list item, `- <key>: <evidence>` (the key's closing
+stop may go), or a list item under
+`## Still open` when this PR leaves it for later. Evidence that is empty or
+starts "Not done" or "TODO" counts as none. A ticked box is left out, since
+an earlier PR gave its evidence.
+
+#61's body draft left out the reviewer's checklist its timer-guide box asked
+for, though the checklist was drafted, until the lead found it (#61 retro).
+Exits 1 on a key the body gives no evidence for, or when the issue cannot be
+read.
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+ASKS = re.compile(
+    r"\b(?:in|to) the PR\b|\bthe PR (?:lists|names|says|records|shows|explains)\b"
+    r"|\bPR (?:description|body)\b|\battach|\blink the run\b",
+    re.IGNORECASE,
+)
+ELSEWHERE = re.compile(r"\b(?:to|on|in) this issue\b", re.IGNORECASE)
+ITEM = re.compile(r"^\s*[-*] (?:\[( |x|X)\] )?(.*)$")
+SENTENCES = re.compile(r".*?[.!?](?=\s|$)")
+NO_EVIDENCE = re.compile(r"^(?:not done|todo)\b", re.IGNORECASE)
+
+
+def fold(text: str) -> str:
+    """Text with runs of white space folded and case dropped."""
+    return " ".join(text.split()).casefold()
+
+
+def items(body: str) -> list[tuple[str | None, str]]:
+    """Each list item as (its box mark or None, its text), with the indented
+    lines that continue it joined on."""
+    found: list[tuple[str | None, str]] = []
+    open_item = False
+    for line in body.splitlines():
+        item = ITEM.match(line)
+        if item:
+            found.append((item[1], item[2].strip()))
+            open_item = True
+        elif open_item and line[:1].isspace() and line.strip():
+            mark, text = found[-1]
+            found[-1] = (mark, f"{text} {line.strip()}")
+        else:
+            open_item = False
+    return found
+
+
+def keys(body: str) -> list[str]:
+    """The key of each open list item that asks for evidence in the PR, in
+    the issue's order, each once."""
+    asking = []
+    for mark, text in items(body):
+        if mark in ("x", "X") or not ASKS.search(text) or ELSEWHERE.search(text):
+            continue
+        asking.append([s.strip() for s in SENTENCES.findall(text)] or [text])
+    found = []
+    for sentences in asking:
+        key = sentences[0]
+        alike = {tuple(other) for other in asking if other[0] == key}
+        if len(alike) > 1 and len(sentences) > 1:
+            key = f"{key} {sentences[1]}"
+        if key not in found:
+            found.append(key)
+    return found
+
+
+def body_items(body: str) -> tuple[list[str], list[str]]:
+    """The folded list items of a PR body: those outside `## Still open`,
+    and those under it."""
+    outside: list[str] = []
+    still_open: list[str] = []
+    section = None
+    chunk: list[str] = []
+    for line in [*body.splitlines(), "## "]:
+        if line.startswith("## "):
+            target = still_open if section == "Still open" else outside
+            target.extend(fold(text) for _mark, text in items("\n".join(chunk)))
+            section, chunk = line[3:].strip(), []
+        else:
+            chunk.append(line)
+    return outside, still_open
+
+
+def has_evidence(key: str, outside: list[str], still_open: list[str]) -> bool:
+    """Whether an item reads `<key>: <evidence>` with evidence that is not
+    "Not done" or "TODO", or an item under `## Still open` starts with the
+    key. The key's closing stop may be left out before the colon."""
+    k = fold(key)
+    for stem in {k, k.rstrip(".!?")}:
+        for item in outside:
+            if item.startswith(stem + ":"):
+                rest = item[len(stem) + 1 :].strip()
+                if rest and not NO_EVIDENCE.match(rest):
+                    return True
+    return any(item.startswith(k.rstrip(".!?")) for item in still_open)
+
+
+def issue_body(number: str) -> str:
+    gh = os.environ.get("GH", "gh")
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+    done = subprocess.run(
+        [gh, "issue", "view", number, "--repo", repo, "--json", "body", "--jq", ".body"],
+        capture_output=True,
+        text=True,
+    )
+    if done.returncode:
+        sys.exit(f"pr-evidence: gh could not read #{number}:\n{done.stderr.strip()}")
+    return done.stdout.replace("\r", "")
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) not in (1, 3) or (len(argv) == 3 and argv[1] != "--check"):
+        sys.exit(__doc__)
+    asked = keys(issue_body(argv[0]))
+    if len(argv) == 1:
+        for key in asked:
+            print(f"- {key.rstrip('.!?')}: ")
+        print(f"{len(asked)} open lines of #{argv[0]} ask for evidence in the PR")
+        return 0
+    with open(argv[2], encoding="utf-8") as f:
+        outside, still_open = body_items(f.read())
+    missing = [key for key in asked if not has_evidence(key, outside, still_open)]
+    for key in missing:
+        print(f"no evidence in the body: {key}")
+    print(
+        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{argv[0]} that ask "
+        "for evidence in the PR have it in the body"
+    )
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

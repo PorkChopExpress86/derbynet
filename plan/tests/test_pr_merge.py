@@ -4,6 +4,7 @@ origin, so it runs with no network.
 Run: python3 -I -m unittest discover -s plan/tests
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -182,6 +183,135 @@ class PrMerge(unittest.TestCase):
         self.master('plan/Quick Reference.md')
         done = self.merge(head)
         self.assertIn('#288: master moved\nplan/\n', done.stderr)
+
+    def source_checks(self, *tests):
+        """Commits on the branch a server/tools/source-checks.sh that runs
+        `tests` (paths under server/), as the real one lists them, and
+        pushes it to master as the merge base."""
+        lines = ''.join(f'  {t} \\\n' for t in tests)
+        path = self.work / 'server' / 'tools' / 'source-checks.sh'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f'exec uv run pytest -q \\\n{lines}  "$@"\n')
+        self.git('add', '.')
+        self.git('commit', '-q', '-m', 'source checks')
+        self.git('push', '-q', 'origin', 'HEAD:master')
+
+    def test_a_source_check_master_added_refuses_a_pr_in_no_area(self):
+        """#304 added test_pipefail_pipes.py to the source checks while #309
+        added pipes to check-paths.sh, which no area holds. #309 also changed
+        .github/, as #304 did; this PR changes nothing else (#61 retro)."""
+        self.source_checks('tests/test_php_claims.py')
+        head = self.pr('server/docs/adr/check-paths.sh')
+        self.git('switch', '-q', '-c', 'moved', 'origin/master')
+        self.commit('#304: pipefail rule', 'server/tests/test_pipefail_pipes.py')
+        path = self.work / 'server' / 'tools' / 'source-checks.sh'
+        path.write_text(path.read_text().replace(
+            '  tests/test_php_claims.py', '  tests/test_php_claims.py \\\n  tests/test_pipefail_pipes.py'))
+        self.git('commit', '-q', '-am', '#304: list it')
+        self.git('push', '-q', 'origin', 'HEAD:master')
+        self.git('switch', '-q', 'branch')
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(self.merged(), '')
+        self.assertIn('#304: pipefail rule\n', done.stderr)
+        self.assertIn('a source check one side changed reads code the other changed', done.stderr)
+        self.assertNotIn('in an area the PR also changes', done.stderr)
+        self.assertIn('source checks, and the code they read\n'
+                      '  master check:  server/tests/test_pipefail_pipes.py\n'
+                      '  master check:  server/tools/source-checks.sh\n'
+                      '  this PR code:  server/docs/adr/check-paths.sh\n'
+                      'For the source checks, run server/tools/source-checks.sh on the PR merged '
+                      'with origin/master; it takes seconds.\n', done.stderr)
+
+    def test_the_real_source_check_list_is_read(self):
+        """The list as server/tools/source-checks.sh writes it, not as the
+        stand-in above does: each test it runs counts, its first, its last,
+        and one named with `::` among them."""
+        real = (Path(__file__).resolve().parents[2] / 'server' / 'tools'
+                / 'source-checks.sh').read_text()
+        listed = re.findall(r'^\s+([\w./-]+\.py)', real, re.M)
+        self.assertIn('tests/test_pipefail_pipes.py', listed)
+        for test in sorted({listed[0], listed[-1], 'tests/test_pipefail_pipes.py',
+                            next(t for t in listed if 'test_htmx' in t)}):
+            with self.subTest(test=test):
+                self.setUp()
+                path = self.work / 'server' / 'tools' / 'source-checks.sh'
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(real)
+                self.git('add', '.')
+                self.git('commit', '-q', '-m', 'source checks')
+                self.git('push', '-q', 'origin', 'HEAD:master')
+                head = self.pr('server/docs/adr/check-paths.sh')
+                self.master(f'server/{test}')
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'  master check:  server/{test}\n', done.stderr)
+                self.assertEqual(self.merged(), '')
+
+    def test_a_source_check_the_pr_changes_refuses_when_master_changed_code(self):
+        self.source_checks('ui/tests/test_htmx.py::test_no_reply', 'tests/test_php_claims.py')
+        head = self.pr('server/ui/tests/test_htmx.py')
+        self.master('docs/install-docker.md', 'testing/common.sh')
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('  this PR check: server/ui/tests/test_htmx.py\n'
+                      '  master code:   testing/common.sh\n', done.stderr)
+        self.assertEqual(self.merged(), '')
+
+    def test_each_kind_of_code_counts(self):
+        for code in ('server/ui/views.py', 'testing/test-basics.sh', '.github/workflows/x.yml',
+                     '.githooks/pre-push', 'plan/bin/pr-wait'):
+            with self.subTest(code=code):
+                self.setUp()
+                head = self.pr('plan/tests/test_lint_issues.py')
+                self.master(code)
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'  this PR check: plan/tests/test_lint_issues.py\n'
+                              f'  master code:   {code}\n', done.stderr)
+
+    def test_a_source_check_against_no_code_merges(self):
+        """A template, CSS or guide change against a source check merges:
+        some source checks read them (test_htmx.py, test_php_claims.py), and
+        the rule leaves those to CI on master as a trade-off, since master
+        changes a source check often (#61 retro review)."""
+        for check, other in (('plan/tests/test_lint_issues.py', 'server/ui/kiosk.css'),
+                             ('plan/tests/test_lint_issues.py', 'docs/install-docker.md'),
+                             ('plan/tests/test_lint_issues.py', 'server/ui/templates/ui/a.html')):
+            with self.subTest(other=other):
+                self.setUp()
+                head = self.pr(check)
+                self.master(other)
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn('pr merge 7', self.merged())
+                self.setUp()
+                head = self.pr(other)
+                self.master(check)
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_source_check_on_one_side_with_master_not_moved_merges(self):
+        self.source_checks('tests/test_php_claims.py')
+        head = self.pr('server/tests/test_php_claims.py')
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('pr merge 7', self.merged())
+
+    def test_a_test_no_source_check_lists_is_no_source_check(self):
+        self.source_checks('tests/test_php_claims.py')
+        head = self.pr('server/ui/tests/test_docs.py')
+        self.master('docs/install-docker.md')
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('pr merge 7', self.merged())
+
+    def test_base_checked_merges_past_a_source_check(self):
+        head = self.pr('plan/tests/test_lint_issues.py')
+        self.master('server/ui/views.py')
+        done = self.merge(head, '--base-checked')
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('pr merge 7', self.merged())
 
     def test_a_failed_fetch_refuses_with_the_head_local(self):
         head = self.pr('plan/AGENT-BRIEF.md')

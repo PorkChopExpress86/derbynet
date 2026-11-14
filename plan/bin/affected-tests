@@ -434,9 +434,28 @@ def cover_everything(plan, tree, path):
     plan.add(path, 'everything', why)
 
 
+def match_guide(path):
+    p = Path(path)
+    return (p.parent == Path('docs') and p.suffix == '.md') or path.startswith('docs/img/')
+
+
+def cover_guide(plan, tree, path):
+    """A guide is rendered by the docs build and read by its check, which
+    run only in CI otherwise: #61's fix round left a fence open in
+    install-docker.md that swallowed its Upgrade section (#61 retro). The
+    browser test draws each guide (its fit, its images, axe)."""
+    plan.command('bash docs/adr/check-paths.sh --docs ../docs')
+    plan.add(path, 'guide', 'a guide served under /docs/ (#61): the docs build '
+             'renders it (ui/docs/build.py refuses a fence line it does not take as a fence), '
+             'the browser test draws it, and docs/adr/check-paths.sh --docs checks its '
+             'links, anchors and paths',
+             ['ui/tests/test_docs.py', 'tests/test_check_paths.py',
+              'ui/tests/browser/test_docs.py'])
+
+
 def match_docs(path):
     p = Path(path)
-    if s(path) is not None and in_tests(s(path)):
+    if (s(path) is not None and in_tests(s(path))) or match_guide(path):
         return False
     return p.suffix in ('.md', '.rst', '.txt') or p.name in ('LICENSE', 'COPYING') \
         or path.startswith('docs/')
@@ -863,6 +882,7 @@ def cover_docker(plan, tree, path):
 
 RULES = (
     ('everything', match_everything, cover_everything),
+    ('guide', match_guide, cover_guide),
     ('docs', match_docs, cover_docs),
     ('website', match_website, cover_website),
     ('plan-tools', match_plan_tools, cover_plan_tools),
