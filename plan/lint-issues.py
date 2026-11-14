@@ -9,8 +9,8 @@ Reads every issue labeled django-migration, then checks each body for:
   "caused by") while Current PHP behavior or Scope marks an observation or
   a cause unverified ("not yet verified", "observed once", "not reproduced",
   "suspect")
-- cited repository paths that exist on origin/master (LINT_BASE), not only in
-  this checkout
+- cited repository paths that exist in this checkout, and for a --file
+  draft on origin/master too (LINT_BASE)
 - #N references that name an existing issue
 - forward-only ## Dependencies, with no cycles across the plan
 - open kind:ticket and kind:spec issues that a merged PR closes, unless a
@@ -143,13 +143,15 @@ def base_paths(ref):
     return paths - {''}
 
 
-# A cited path is looked up on origin/master, the tree a reader of the live
-# issue and plan-checks on master see, not in this checkout: #307's draft,
-# linted in #61's worktree, passed on docs/dev-timer-protocol.md, which only
-# that branch had, and the issue-event lint on master would have failed it
-# (#61 retro). LINT_BASE names another tree, for plan/tests.
+# Every cited path must exist in this checkout, so a PR that deletes or
+# renames one fails its own plan-checks. A --file draft's paths must also be
+# on origin/master, the tree a reader of the new body and the issue-event
+# lint on master see: #307's draft, linted in #61's worktree, passed on
+# docs/dev-timer-protocol.md, which only that branch had (#61 retro). Live
+# bodies are left to the checkout, since a PR that adds a path a live issue
+# already cites passes then. LINT_BASE names another tree, for plan/tests.
 BASE = os.environ.get('LINT_BASE', 'origin/master')
-on_base = base_paths(BASE)
+on_base = base_paths(BASE) if drafts else None
 
 
 def check_path(n, tok):
@@ -164,16 +166,14 @@ def check_path(n, tok):
         return
     if ' ' in p:
         cands.append(p.split(' ')[0])
-
-    def here(c):
-        return os.path.exists(os.path.join(ROOT, c.rstrip('/')))
-
-    if any(c.rstrip('/') in on_base if on_base is not None else here(c) for c in cands):
+    here = [c for c in cands if os.path.exists(os.path.join(ROOT, c.rstrip('/')))]
+    if here and not (n in drafts and on_base is not None
+                     and not any(c.rstrip('/') in on_base for c in here)):
         return
     if p in ALLOWED_MISSING:
         notes.append(p)
         return
-    if on_base is not None and any(here(c) for c in cands):
+    if here:
         findings.append(f'#{n}: path `{p}` is in this checkout but not on {BASE}; '
                         f'cite it once it merges, or the lint on master fails')
         return
@@ -338,8 +338,9 @@ def has_section(issue, name):
 
 
 notes_out = []
-if on_base is None:
-    notes_out.append(f'{BASE} is not fetched, so cited paths were checked in this checkout')
+if drafts and on_base is None:
+    notes_out.append(f'{BASE} is not fetched, so the drafts\' cited paths were checked in '
+                     'this checkout only')
 closers = merged_closers()
 for n, issue in sorted(issues.items()):
     k, labels = kind(issue), {l['name'] for l in issue['labels']}

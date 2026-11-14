@@ -214,10 +214,12 @@ class PrMerge(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(self.merged(), '')
         self.assertIn('#304: pipefail rule\n', done.stderr)
-        self.assertIn('source checks (they read every file the other side changed)\n'
-                      '  master:  server/tests/test_pipefail_pipes.py\n'
-                      '  master:  server/tools/source-checks.sh\n'
-                      '  this PR: 1 changed files\n'
+        self.assertIn('a source check one side changed reads code the other changed', done.stderr)
+        self.assertNotIn('in an area the PR also changes', done.stderr)
+        self.assertIn('source checks, and the code they read\n'
+                      '  master check:  server/tests/test_pipefail_pipes.py\n'
+                      '  master check:  server/tools/source-checks.sh\n'
+                      '  this PR code:  server/docs/adr/check-paths.sh\n'
                       'For the source checks, run server/tools/source-checks.sh on the PR merged '
                       'with origin/master; it takes seconds.\n', done.stderr)
 
@@ -239,29 +241,55 @@ class PrMerge(unittest.TestCase):
                 self.git('add', '.')
                 self.git('commit', '-q', '-m', 'source checks')
                 self.git('push', '-q', 'origin', 'HEAD:master')
-                head = self.pr('docs/install-docker.md')
+                head = self.pr('server/docs/adr/check-paths.sh')
                 self.master(f'server/{test}')
                 done = self.merge(head)
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-                self.assertIn(f'  master:  server/{test}\n', done.stderr)
+                self.assertIn(f'  master check:  server/{test}\n', done.stderr)
                 self.assertEqual(self.merged(), '')
 
-    def test_a_source_check_the_pr_changes_refuses_when_master_moved_anywhere(self):
+    def test_a_source_check_the_pr_changes_refuses_when_master_changed_code(self):
         self.source_checks('ui/tests/test_htmx.py::test_no_reply', 'tests/test_php_claims.py')
         head = self.pr('server/ui/tests/test_htmx.py')
-        self.master('docs/install-docker.md')
+        self.master('docs/install-docker.md', 'testing/common.sh')
         done = self.merge(head)
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn('  master:  1 changed files\n'
-                      '  this PR: server/ui/tests/test_htmx.py\n', done.stderr)
+        self.assertIn('  this PR check: server/ui/tests/test_htmx.py\n'
+                      '  master code:   testing/common.sh\n', done.stderr)
         self.assertEqual(self.merged(), '')
 
-    def test_a_plan_test_the_pr_changes_refuses_when_master_moved_anywhere(self):
-        head = self.pr('plan/tests/test_lint_issues.py')
-        self.master('server/ui/kiosk.css')
-        done = self.merge(head)
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn('  this PR: plan/tests/test_lint_issues.py\n', done.stderr)
+    def test_each_kind_of_code_counts(self):
+        for code in ('server/ui/views.py', 'testing/test-basics.sh', '.github/workflows/x.yml',
+                     '.githooks/pre-push', 'plan/bin/pr-wait'):
+            with self.subTest(code=code):
+                self.setUp()
+                head = self.pr('plan/tests/test_lint_issues.py')
+                self.master(code)
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'  this PR check: plan/tests/test_lint_issues.py\n'
+                              f'  master code:   {code}\n', done.stderr)
+
+    def test_a_source_check_against_no_code_merges(self):
+        """A template, CSS or guide change against a source check merges:
+        some source checks read them (test_htmx.py, test_php_claims.py), and
+        the rule leaves those to CI on master as a trade-off, since master
+        changes a source check often (#61 retro review)."""
+        for check, other in (('plan/tests/test_lint_issues.py', 'server/ui/kiosk.css'),
+                             ('plan/tests/test_lint_issues.py', 'docs/install-docker.md'),
+                             ('plan/tests/test_lint_issues.py', 'server/ui/templates/ui/a.html')):
+            with self.subTest(other=other):
+                self.setUp()
+                head = self.pr(check)
+                self.master(other)
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn('pr merge 7', self.merged())
+                self.setUp()
+                head = self.pr(other)
+                self.master(check)
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_a_source_check_on_one_side_with_master_not_moved_merges(self):
         self.source_checks('tests/test_php_claims.py')
@@ -280,7 +308,7 @@ class PrMerge(unittest.TestCase):
 
     def test_base_checked_merges_past_a_source_check(self):
         head = self.pr('plan/tests/test_lint_issues.py')
-        self.master('server/ui/kiosk.css')
+        self.master('server/ui/views.py')
         done = self.merge(head, '--base-checked')
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn('pr merge 7', self.merged())

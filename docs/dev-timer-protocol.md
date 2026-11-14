@@ -16,27 +16,27 @@ The server keeps the login in a session cookie, `sessionid`. Send the cookie the
 
 1. `GET action.php?query=role.list` answers JSON. Each role in `roles` has its `name`, and a `timer-message` value that is not 0 when the role may send timer messages. A new install answers:
 
-   ```json
-   {
-       "roles": [
-           {"name": "", "timer-message": 0},
-           {"name": "Timer", "timer-message": 4096},
-           {"name": "Photo", "timer-message": 0},
-           {"name": "RaceCrew", "timer-message": 0},
-           {"name": "RaceCoordinator", "timer-message": 4096}
-       ]
-   }
-   ```
+```json
+{
+    "roles": [
+        {"name": "", "timer-message": 0},
+        {"name": "Timer", "timer-message": 4096},
+        {"name": "Photo", "timer-message": 0},
+        {"name": "RaceCrew", "timer-message": 0},
+        {"name": "RaceCoordinator", "timer-message": 4096}
+    ]
+}
+```
 
 2. `POST action.php` with `action=role.login&name=Timer&password=` logs in. A new install's Timer role has an empty password. The answer is JSON, and sets the session cookie:
 
-   ```json
-   {
-       "action": {"action": "role.login", "name": "Timer", "password": "..."},
-       "outcome": {"summary": "success", "code": "success", "description": ""},
-       "timecheck": "2026-11-13T23:07:50-0500"
-   }
-   ```
+```json
+{
+    "action": {"action": "role.login", "name": "Timer", "password": "..."},
+    "outcome": {"summary": "success", "code": "success", "description": ""},
+    "timecheck": "2026-11-13T23:07:50-0500"
+}
+```
 
    The answer also carries `role`, the role's name, when the login gave a password. A login that fails answers `"summary": "failure"` with the code `role` (no such role) or `login` (wrong password).
 

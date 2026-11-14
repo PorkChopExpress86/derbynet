@@ -20,12 +20,14 @@ file on GitHub, since the image ships only `docs/`.
 import json
 import re
 import shutil
+from html import unescape
 from pathlib import Path
 from urllib.parse import urlsplit
 from xml.etree.ElementTree import Element
 
 import markdown
 from markdown.extensions import Extension
+from markdown.extensions.fenced_code import FencedBlockPreprocessor
 from markdown.treeprocessors import Treeprocessor
 
 REPO = Path(__file__).resolve().parents[3]
@@ -99,6 +101,43 @@ class _LinksExtension(Extension):
         md.treeprocessors.register(_Links(md), "derbynet_links", 0)
 
 
+# A line written as a fence: backticks with none after them on the line
+# (an inline code span has some), or tildes, after any indent.
+FENCE_LINE = re.compile(r"^\s*(?:`{3,}(?!.*`)|~{3,})")
+PRE = re.compile(r"<pre[^>]*><code[^>]*>(.*?)</code></pre>", re.DOTALL)
+
+
+def fence_slips(text: str, html: str):
+    """Yields (line number, line) for each line written as a fence that the
+    renderer does not take as one. The blocks are the ones the `fenced_code`
+    extension finds, with its own pattern, so the check keeps no copy of its
+    rule. A line inside a block that starts with the block's fence, as a
+    closing fence must, was meant to close it. A fence line outside every
+    block is a slip unless `html`, the rendered page, shows it in a code
+    block, as an indented code block does. Text after a closing fence left
+    install-docker.md's PowerShell restore open over the Upgrade section,
+    and fences indented under list items in dev-timer-protocol.md and
+    photo-stand.md became inline code (#61 retro)."""
+    # The renderer's own clean-up before the extension runs.
+    text = text.replace("\r\n", "\n").replace("\r", "\n").expandtabs(4)
+    shown = [unescape(code) for code in PRE.findall(html)]
+    taken = []
+    for block in FencedBlockPreprocessor.FENCED_BLOCK_RE.finditer(text):
+        taken.append((block.start(), block.end()))
+        start = block.start("code")
+        for line in block.group("code").splitlines(keepends=True):
+            if line.startswith(block.group("fence")):
+                yield text.count("\n", 0, start) + 1, line
+            start += len(line)
+    at = 0
+    for number, line in enumerate(text.splitlines(keepends=True), 1):
+        inside = any(begin <= at < end for begin, end in taken)
+        if not inside and FENCE_LINE.match(line):
+            if not any(line.strip() in code for code in shown):
+                yield number, line
+        at += len(line)
+
+
 def render(text: str) -> tuple[str, str]:
     """(title, HTML) of one guide's Markdown. The title is its first `# `
     heading, which every guide starts with."""
@@ -106,16 +145,12 @@ def render(text: str) -> tuple[str, str]:
     if not first.startswith("# "):
         raise BuildError(f"a guide starts with its `# ` title, not {first!r}")
     html = markdown.markdown(text, extensions=[*EXTENSIONS, _LinksExtension()])
-    # A fence the renderer did not close shows its backticks on the page. A
-    # closing fence with text after it on the same line closes nothing, so
-    # the rest of the guide became code: install-docker.md's PowerShell
-    # restore swallowed the Upgrade section until the #61 retro.
-    if "```" in html:
-        at = html.index("```")
+    slip = min(fence_slips(text, html), default=None)
+    if slip is not None:
         raise BuildError(
-            "a code fence is not closed, so the page shows its backticks: "
-            f"...{html[max(0, at - 80) : at + 80]!r}... A closing fence is "
-            "a line of three backticks alone."
+            f"line {slip[0]}: {slip[1].strip()!r} is not a fence to the renderer: "
+            "a fence starts at the start of a line, outside a list item, and "
+            "closes on a line that holds the same fence alone"
         )
     html = SCROLLERS.sub(r'<\1 tabindex="0">', html)
     return first[2:].strip(), html

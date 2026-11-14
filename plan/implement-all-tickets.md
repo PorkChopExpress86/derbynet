@@ -38,8 +38,8 @@ While a subagent runs, read its notifications: when they show the same backgroun
 
 ## 3. PR
 
-1. Have the implementer merge origin/master into the branch before its fix-round hand-off run (Code review's step 4), so that one run covers the merge too, and push. Have it write the PR body with /mattpocock-skills:pr to a scratchpad file, with the low findings under "Left for later" and `Closes #N` (or the reason the ticket stays open under `## Still open`), and return the path. The body quotes each line `plan/bin/pr-evidence N` lists beside its evidence, or under `## Still open`.
-2. Run `plan/bin/pr-evidence N --check <path>`, and send each line it names back to the implementer: #61's body draft left out the reviewer's checklist its timer box asked for (#61 retro). Then run `gh pr edit <pr> --repo PorkChopExpress86/derbynet --body-file <path>` on the draft PR.
+1. Have the implementer merge origin/master into the branch before its fix-round hand-off run (Code review's step 4), so that one run covers the merge too, and push. Have it write the PR body with /mattpocock-skills:pr to a scratchpad file, with the low findings under "Left for later" and `Closes #N` (or the reason the ticket stays open under `## Still open`), and return the path. The body fills in each `- <key>: ` line `plan/bin/pr-evidence N` prints with its evidence, or lists the key under `## Still open`.
+2. Run `plan/bin/pr-evidence N --check <path>`, and send each line it names back to the implementer, since a key with no evidence after it, or with "Not done", is no evidence: #61's body draft left out the reviewer's checklist its timer box asked for (#61 retro). Then run `gh pr edit <pr> --repo PorkChopExpress86/derbynet --body-file <path>` on the draft PR.
 
 ## 4. Merge
 

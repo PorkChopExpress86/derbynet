@@ -442,12 +442,15 @@ def match_guide(path):
 def cover_guide(plan, tree, path):
     """A guide is rendered by the docs build and read by its check, which
     run only in CI otherwise: #61's fix round left a fence open in
-    install-docker.md that swallowed its Upgrade section (#61 retro)."""
+    install-docker.md that swallowed its Upgrade section (#61 retro). The
+    browser test draws each guide (its fit, its images, axe)."""
     plan.command('bash docs/adr/check-paths.sh --docs ../docs')
     plan.add(path, 'guide', 'a guide served under /docs/ (#61): the docs build '
-             'renders it (ui/docs/build.py refuses a page that shows a fence\'s backticks), and '
-             'docs/adr/check-paths.sh --docs checks its links, anchors and paths',
-             ['ui/tests/test_docs.py', 'tests/test_check_paths.py'])
+             'renders it (ui/docs/build.py refuses a fence line it does not take as a fence), '
+             'the browser test draws it, and docs/adr/check-paths.sh --docs checks its '
+             'links, anchors and paths',
+             ['ui/tests/test_docs.py', 'tests/test_check_paths.py',
+              'ui/tests/browser/test_docs.py'])
 
 
 def match_docs(path):

@@ -4,6 +4,7 @@ Run: python3 -I -m unittest discover -s plan/tests
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -143,8 +144,86 @@ class CitedPaths(Lint):
     def test_a_base_not_fetched_checks_this_checkout_and_says_so(self):
         done = self.cite('plan/README.md', 'refs/remotes/nowhere/master')
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn('note: refs/remotes/nowhere/master is not fetched, so cited paths were '
-                      'checked in this checkout', done.stdout)
+        self.assertIn("note: refs/remotes/nowhere/master is not fetched, so the drafts' cited "
+                      'paths were checked in this checkout only', done.stdout)
+
+
+class CitedPathsInABranch(unittest.TestCase):
+    """The lint copied into a scratch repository whose master cites
+    `.github/workflows/electron.yml`, as #37 does, run from a checkout that
+    deletes it or adds another path (#61 retro review)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.repo = self.tmp / 'repo'
+        (self.repo / 'plan').mkdir(parents=True)
+        shutil.copy(LINT, self.repo / 'plan' / 'lint-issues.py')
+        (self.repo / '.github' / 'workflows').mkdir(parents=True)
+        (self.repo / '.github' / 'workflows' / 'electron.yml').write_text('on: push\n')
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        self.git_env = {**env, 'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@t',
+                        'GIT_COMMITTER_NAME': 't', 'GIT_COMMITTER_EMAIL': 't@t',
+                        'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1'}
+        self.git('init', '-q', '-b', 'master')
+        self.git('add', '.')
+        self.git('commit', '-q', '-m', 'base')
+        self.base = self.git('rev-parse', 'HEAD')
+
+    def git(self, *argv):
+        return subprocess.run(['git', *argv], cwd=self.repo, env=self.git_env, check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    def lint(self, live, draft=None):
+        """The lint with issue 37's live body `live`, and `draft` as a new
+        issue's, against the base commit."""
+        issues = [*ISSUES, {'number': 37, 'state': 'OPEN', 'body': live,
+                            'labels': [{'name': 'kind:ticket'}]}]
+        gh = self.tmp / 'gh'
+        gh.write_text(f'#!{sys.executable}\n' + FAKE_GH.format(issues=issues))
+        gh.chmod(0o755)
+        argv = []
+        if draft is not None:
+            (self.tmp / 'draft.md').write_text(draft)
+            argv = ['--file', f'0={self.tmp / "draft.md"}']
+        return subprocess.run(
+            [sys.executable, '-I', str(self.repo / 'plan' / 'lint-issues.py'), *argv],
+            capture_output=True, text=True,
+            env={**os.environ, 'GH': str(gh), 'LINT_BASE': self.base})
+
+    def test_a_live_issue_citing_a_path_the_branch_deletes_is_a_finding(self):
+        """The review's `git rm .github/workflows/electron.yml` gave 0
+        findings where master's lint gave one for each issue citing it."""
+        self.git('rm', '-q', '.github/workflows/electron.yml')
+        done = self.lint(TICKET + '\n\nSee `.github/workflows/electron.yml`.')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('#37: missing path `.github/workflows/electron.yml`', done.stdout)
+
+    def test_a_draft_citing_a_path_the_branch_deletes_is_a_finding(self):
+        self.git('rm', '-q', '.github/workflows/electron.yml')
+        done = self.lint(TICKET, TICKET + '\n\nSee `.github/workflows/electron.yml`.')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('#0: missing path `.github/workflows/electron.yml`', done.stdout)
+
+    def test_a_draft_citing_a_path_only_the_branch_adds_is_a_finding(self):
+        (self.repo / 'plan' / 'new.md').write_text('')
+        done = self.lint(TICKET, TICKET + '\n\nSee `plan/new.md`.')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f'#0: path `plan/new.md` is in this checkout but not on {self.base}',
+                      done.stdout)
+
+    def test_a_live_issue_citing_a_path_the_branch_adds_passes(self):
+        """The PR that adds a path a live issue already cites passes its own
+        plan-checks."""
+        (self.repo / 'plan' / 'new.md').write_text('')
+        done = self.lint(TICKET + '\n\nSee `plan/new.md`.')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('0 findings', done.stdout)
+
+    def test_paths_in_the_checkout_and_on_the_base_pass(self):
+        done = self.lint(TICKET + '\n\nSee `.github/workflows/electron.yml`.',
+                         TICKET + '\n\nSee `.github/workflows/electron.yml`.')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
 
 class UnverifiedCause(Lint):

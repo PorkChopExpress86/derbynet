@@ -204,6 +204,7 @@ class Guide(unittest.TestCase):
                 cmds = commands(out)
                 self.assertIn('ui/tests/test_docs.py', cmds)
                 self.assertIn('tests/test_check_paths.py', cmds)
+                self.assertIn('-m browser ui/tests/browser/test_docs.py', cmds)
                 self.assertIn('  bash docs/adr/check-paths.sh --docs ../docs\n', cmds)
 
     def test_markdown_elsewhere_in_docs_is_still_docs_only(self):

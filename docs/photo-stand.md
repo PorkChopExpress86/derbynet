@@ -37,13 +37,13 @@ These steps install the photo stand's scripts from a copy of the DerbyNet reposi
 
 1. Copy the scripts into place:
 
-   ```sh
-   git clone https://github.com/PorkChopExpress86/derbynet.git
-   cd derbynet/extras
-   sudo mkdir -p /usr/share/derbynet
-   sudo cp -r autostart conf scripts sounds tools /usr/share/derbynet/
-   sudo cp derbynet.conf /etc/derbynet.conf
-   ```
+```sh
+git clone https://github.com/PorkChopExpress86/derbynet.git
+cd derbynet/extras
+sudo mkdir -p /usr/share/derbynet
+sudo cp -r autostart conf scripts sounds tools /usr/share/derbynet/
+sudo cp derbynet.conf /etc/derbynet.conf
+```
 
 2. Install the program for your camera:
    - A webcam: `sudo apt install -y fswebcam`
@@ -54,10 +54,10 @@ These steps install the photo stand's scripts from a copy of the DerbyNet reposi
 
 4. Start the photo stand when the Pi starts:
 
-   ```sh
-   mkdir -p ~/.config/autostart
-   cp /usr/share/derbynet/autostart/photostand.desktop ~/.config/autostart/
-   ```
+```sh
+mkdir -p ~/.config/autostart
+cp /usr/share/derbynet/autostart/photostand.desktop ~/.config/autostart/
+```
 
 ## Point it at the server
 

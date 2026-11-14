@@ -31,8 +31,14 @@ ISSUE = textwrap.dedent('''\
     - [x] The help link opens the quick reference. Evidence is a link to the run in the PR.
     - [ ] The workflow is green on this pull request. Link the run.
     - [ ] The fixture list is in the PR description.
+    - [ ] A measurement report, attached to this issue with its scripts.
+    - [ ] Manual check on a Pi 4. The timer races three heats. Attach the jar log.
+    - [ ] Manual check on a Pi 4. The photo stand takes a photo. Attach the log.
+    - [ ] The workflow is green on this pull request. Link the run.
     ''')
 
+# Each open line that asks, once: #56's "attached to this issue" is not the
+# PR's, and #59's two lines that start alike take their second sentence.
 KEYS = [
     'Embedded images make up most of the `.fodt` size.',
     '`install-docker.md` was followed end to end on three machines.',
@@ -40,7 +46,13 @@ KEYS = [
     '`/docs/quick-reference` loads offline.',
     'The workflow is green on this pull request.',
     'The fixture list is in the PR description.',
+    'Manual check on a Pi 4. The timer races three heats.',
+    'Manual check on a Pi 4. The photo stand takes a photo.',
 ]
+
+
+def evidence(keys):
+    return ''.join(f'- {k.rstrip(".")}: shown below.\n' for k in keys)
 
 
 class PrEvidence(unittest.TestCase):
@@ -64,29 +76,45 @@ class PrEvidence(unittest.TestCase):
         (self.tmp / 'body.md').write_text(body)
         return self.run_tool('--check', str(self.tmp / 'body.md'))
 
-    def test_it_lists_the_first_sentence_of_each_open_line_that_asks(self):
+    def test_it_lists_each_open_line_that_asks_as_a_line_to_fill_in(self):
         done = self.run_tool()
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(done.stdout.splitlines(),
-                         [*KEYS, '6 open lines of #61 ask for evidence in the PR'])
+                         [*(f'- {k.rstrip(".")}: ' for k in KEYS),
+                          '8 open lines of #61 ask for evidence in the PR'])
 
     def test_a_body_without_the_checklist_is_refused(self):
         """#61's draft left out the timer guide's checklist (#61 retro)."""
-        body = '\n\n'.join(k for k in KEYS if 'dev-timer' not in k)
-        done = self.check(body)
+        done = self.check(evidence(k for k in KEYS if 'dev-timer' not in k))
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertEqual(done.stdout.splitlines(), [
-            'not in the body: `dev-timer-protocol.md` lists every message.',
-            '5 of 6 open lines of #61 that ask for evidence in the PR are quoted in the body'])
+            'no evidence in the body: `dev-timer-protocol.md` lists every message.',
+            '7 of 8 open lines of #61 that ask for evidence in the PR have it in the body'])
 
-    def test_a_body_quoting_each_line_passes_wrapped_or_quoted(self):
-        body = ('<details><summary>Embedded images make up most of the\n'
-                '`.fodt` size.</summary>\n\n12 MB\n</details>\n\n'
-                '> `install-docker.md` was followed end to end on\n> three machines.\n\n'
-                '## Still open\n\n' + '\n'.join(f'- {k.upper()}' for k in KEYS[2:]))
+    def test_each_line_given_evidence_or_left_open_passes(self):
+        body = ('## Evidence\n\n' + evidence(KEYS[:2])
+                + '- `DEV-TIMER-PROTOCOL.md`   lists every message.: the checklist below\n'
+                + '  <details>12 rows</details>\n\n'
+                + '## Still open\n\n' + ''.join(f'- {k} Waits on #59.\n' for k in KEYS[3:]))
         done = self.check(body)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn('6 of 6', done.stdout)
+        self.assertIn('8 of 8', done.stdout)
+
+    def test_a_quote_with_no_evidence_is_refused(self):
+        """The review's body, "Not done: manual hardware smoke test on the
+        release candidate.", passed as a quote anywhere in the body."""
+        for item in ('Not done: {k}', '{k}', '{k}:', '{k}: Not done.', '{k}: TODO',
+                     'See {k}: below'):
+            with self.subTest(item=item):
+                body = evidence(KEYS[1:]) + '- ' + item.format(k=KEYS[0].rstrip('.')) + '\n'
+                done = self.check(body)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('no evidence in the body: Embedded images', done.stdout)
+
+    def test_a_key_under_another_section_than_still_open_is_no_evidence(self):
+        body = evidence(KEYS[1:]) + '\n## Left for later\n\n- ' + KEYS[0] + '\n'
+        done = self.check(body)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
 
     def test_an_issue_gh_cannot_read_exits_with_its_message(self):
         gh = self.tmp / 'gh'

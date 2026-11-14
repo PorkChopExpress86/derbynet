@@ -168,22 +168,67 @@ def test_the_old_quickref_pdf_moves_to_the_quick_reference(client, event, prefix
 
 
 @pytest.mark.parametrize(
-    "text",
+    ("text", "line"),
     [
         # install-docker.md at 565e0c84: text after a closing fence left the
         # block open until the next fence, so Upgrade became code.
-        "# T\n\n```sh\nrun\n``` Then more.\n\n## Upgrade\n\n```sh\npull\n```\n",
-        "# T\n\n```sh\nrun\n",
+        ("# T\n\n```sh\nrun\n``` Then more.\n\n## Upgrade\n\n```sh\npull\n```\n", 5),
+        # A fence with no closing line is text, backticks and all.
+        ("# T\n\n```sh\nrun\n", 3),
+        # Text after the only closing fence: the renderer makes inline code.
+        ("# T\n\n```sh\nrun\n``` Then more.\n", 3),
+        # dev-timer-protocol.md and photo-stand.md at 565e0c84: a fence
+        # indented under a list item is no fence to the renderer, so the
+        # JSON became one inline code span and the list restarted.
+        ("# T\n\n1. Ask:\n\n   ```json\n   {}\n   ```\n\n2. Then.\n", 5),
+        ("# T\n\n~~~\nrun\n~~~ Then more.\n\n~~~\npull\n~~~\n", 5),
     ],
 )
-def test_a_fence_left_open_is_refused(text):
-    with pytest.raises(build.BuildError, match="code fence is not closed"):
+def test_a_fence_the_renderer_does_not_take_is_refused(text, line):
+    with pytest.raises(build.BuildError, match=rf"line {line}: .*not a fence"):
         build.render(text)
 
 
-def test_a_closed_fence_renders_its_code_and_the_section_after_it():
-    _, html = build.render("# T\n\n```sh\nrun\n```\n\nThen more.\n\n## Upgrade\n")
-    assert '<code class="language-sh">run\n</code>' in html
+@pytest.mark.parametrize(
+    ("text", "code"),
+    [
+        (
+            "# T\n\n```sh\nrun\n```\n\nThen more.\n",
+            '<code class="language-sh">run\n</code>',
+        ),
+        # Backticks in an inline code span.
+        ("# T\n\nType ```` ``` ```` to open a fence.\n", "<code>```</code>"),
+        ("# T\n\n```` ``` ```` opens a fence.\n", "<code>```</code> opens"),
+        # A four-backtick fence that shows a three-backtick one.
+        ("# T\n\n````md\n```sh\nrun\n```\n````\n", "```sh\nrun\n```\n</code>"),
+        # A tilde fence that holds backticks.
+        ("# T\n\n~~~md\n```sh\nrun\n```\n~~~\n", "```sh\nrun\n```\n</code>"),
+        # A closing fence with spaces after it.
+        ("# T\n\n```\nrun\n```   \n\nThen.\n", "<code>run\n</code>"),
+        # An indented code block that shows a fence.
+        (
+            "# T\n\nText.\n\n    ```sh\n    run\n    ```\n",
+            "<code>```sh\nrun\n```\n</code>",
+        ),
+        # An indented fence line inside a fenced block.
+        (
+            "# T\n\n```md\n  ```sh\n  run\n  ```\n```\n",
+            "  ```sh\n  run\n  ```\n</code>",
+        ),
+        # Windows line endings.
+        (
+            "# T\r\n\r\n```sh\r\nrun\r\n```\r\n",
+            '<code class="language-sh">run\n</code>',
+        ),
+    ],
+)
+def test_a_fence_the_renderer_takes_renders(text, code):
+    _, html = build.render(text)
+    assert code in html
+
+
+def test_the_section_after_a_closed_fence_is_a_section():
+    _, html = build.render("# T\n\n```sh\nrun\n```\n\n## Upgrade\n")
     assert '<h2 id="upgrade">Upgrade</h2>' in html
 
 
