@@ -17,7 +17,7 @@
 #
 # A branch names its PR, as `gh pr checks` takes it, so an implementer waits
 # on every workflow of its head: #58's own waiter watched image.yml alone and
-# reported CI green while server.yml's pytest (sqlite) was red (#58 retro).
+# reported CI green while server.yml's run 43497485339 was red (#58 retro).
 set -euo pipefail
 PR=${1:?usage: pr-wait <pr or branch> [--timeout-min N]}
 TIMEOUT_MIN=${3:-90}

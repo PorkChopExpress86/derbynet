@@ -357,13 +357,13 @@ def test_a_long_award_name_keeps_the_phone_list_one_screen_wide(login, event):
     phone_only(page)
     card = page.locator(f'[data-award-list] [data-award="{award.pk}"]')
     expect(card).to_contain_text("Darrell & Darrell Delaughter Memorial Award")
-    no_sideways_scroll(page)
-    width = page.evaluate(
-        "() => [document.querySelector('[data-award-list]').clientWidth,"
-        " document.querySelector('[data-award]').getBoundingClientRect().width]"
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('[data-award-list] [data-award]')]"
+        ".every(c => c.getBoundingClientRect().width"
+        " <= document.querySelector('[data-award-list]').clientWidth)",
+        timeout=5000,
     )
-    # one read: the list is drawn and nothing redraws it before the read
-    assert width[1] <= width[0], width
+    no_sideways_scroll(page)
 
 
 # ----- parity: awards-editor.php -----

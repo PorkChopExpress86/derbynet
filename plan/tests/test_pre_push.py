@@ -80,6 +80,21 @@ class PrePush(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
+class ImageWorkflow(unittest.TestCase):
+    """image.yml runs checks.sh, which server/tests/test_docker_checks.py
+    reads, and server.yml does not run on an image.yml-only push, so the hook
+    runs its server checks for it (#58 retro)."""
+
+    def test_an_image_yml_push_runs_the_server_checks(self):
+        result = push('.github/workflows/image.yml', PASSING)
+        self.assertIn('pre-push: server/docs/adr/check-paths.sh', result.stderr)
+
+    def test_another_workflow_push_runs_only_plan_tests(self):
+        result = push('.github/workflows/server.yml', PASSING)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('check-paths.sh', result.stderr)
+
+
 PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
 
 

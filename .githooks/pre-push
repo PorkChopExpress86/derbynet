@@ -1,8 +1,9 @@
 #! /bin/bash
 #
 # Runs the quick checks of the `lint` job in .github/workflows/server.yml
-# before a push that changes server/, testing/ or website/inc/generators/, so a
-# red lint shows up in seconds instead of after CI.  It also checks that the
+# before a push that changes server/, testing/, website/inc/generators/ or
+# .github/workflows/image.yml, so a red lint shows up in seconds instead of
+# after CI.  It also checks that the
 # HTTP golden fixtures were captured from the testing/ scripts being pushed
 # (server/tools/golden_inputs.py), which the golden-fixtures workflow finds
 # only after a 25-minute capture, and the paths the ADRs cite, which

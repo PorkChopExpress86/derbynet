@@ -109,7 +109,7 @@ class CiFailures(unittest.TestCase):
 
     def test_a_new_test_in_a_file_the_pr_does_not_change_gets_a_repro_command(self):
         """#58's photo race test was new, in a file #58 never changed, and
-        failed 2 of 180 under load on master (#58 retro)."""
+        failed under load on master too (#58 retro)."""
         race = 'media/tests/test_photo_races.py::test_a_rotation_during_a_render_leaves_no_stale_render'
         result = run([check('fail', 2, 'pytest (sqlite)')],
                      {'2': line(race) + line(EVENTS), '1': line(VOTE)}, MASTER)

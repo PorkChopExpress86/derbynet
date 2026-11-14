@@ -3,9 +3,10 @@
 
 The reader exits at its first line or match, the writer's next write gets
 SIGPIPE, and pipefail makes the whole pipe fail. A `set -e` script then stops,
-as #58's `ls ... | head -1` in checks.sh did on CI, and in an `if` the match
-is lost (test_an_early_reader_loses_the_match). #58 hit it twice, the first
-time with `docker logs | grep -q`, and fixed only that form (#58 retro).
+as #58's `ls ... | head -1` in checks.sh did in image run 43490392705, and in
+an `if` the match is lost (test_an_early_reader_loses_the_match). #58's
+round 1 took `grep -q` off the pipes it judged mattered (M8) and left the
+rest (#58 retro).
 
 The forms that read the writer's whole output first:
 

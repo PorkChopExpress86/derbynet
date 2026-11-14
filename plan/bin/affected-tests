@@ -848,7 +848,7 @@ def cover_docker(plan, tree, path):
     wrong tree, a log check that missed a URL prefix); its round 1 checks
     ran only by hand (#58 retro)."""
     plan.command('docker build -f docker/Dockerfile -t derbynet_server:dev .. && '
-                 'IMAGE=derbynet_server:dev DERBYNET_TEST_PREFIX=<yours> docker/ci/checks.sh')
+                 'IMAGE=derbynet_server:dev DERBYNET_TEST_PREFIX=derbynet-checks-dev docker/ci/checks.sh')
     plan.add(path, 'docker', 'the Docker image (#58): build it and run checks.sh '
              '(its header lists the checks; backup and upgrade run by name), then '
              'each image.yml step the diff changes, by hand against that image. '

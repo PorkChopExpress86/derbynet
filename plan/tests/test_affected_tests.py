@@ -478,7 +478,7 @@ class Docker(unittest.TestCase):
         self.assertIn('[docker]', section(out, 'server/docker/entrypoint.sh'))
         self.assertNotIn('[fallback]', out)
         self.assertIn('docker build -f docker/Dockerfile -t derbynet_server:dev .. && '
-                      'IMAGE=derbynet_server:dev DERBYNET_TEST_PREFIX=<yours> '
+                      'IMAGE=derbynet_server:dev DERBYNET_TEST_PREFIX=derbynet-checks-dev '
                       'docker/ci/checks.sh', commands(out))
 
     def test_the_image_workflow_builds_the_image_too(self):

@@ -12,17 +12,17 @@ N failed runs on master. Prints one line per failing test:
     new    <test id>
 
 and under a `new` test whose file the PR does not change, the command that
-repeats it under load on origin/master, since such a test is more likely a
-race master already has than the PR's doing:
+repeats it under load on origin/master, so a rerun waits until it is known
+whether master fails it too:
 
     new    media/tests/test_photo_races.py::test_a_rotation_during_a_render_...
       not in this PR's diff: before a rerun, repeat it on origin/master, from server/:
       tools/pytest-under-load.sh --loops 12 -n auto --count 180 media/tests/...
 
-#58's PR failed that photo race test in 3 of 4 server runs. It was `new`
-(no failed master run named it), and the lead's rerun failed again. Under
-12 load loops it failed 2 of 180 on master, a race #302 then fixed (#58
-retro).
+#58's PR failed that photo race test in server runs 43490392723 and
+43497485339. It was `new`, since no failed master run named it, and the
+lead's rerun failed again; under load on master it failed too, a race #302
+then fixed (#58 retro).
 
 and, for the failed jobs of a run whose log names no test (a lint or a setup
 step), a `no test id` line, then one line per job with the first step that

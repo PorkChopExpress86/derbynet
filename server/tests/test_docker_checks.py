@@ -4,7 +4,7 @@
 #58's first review round added the checks stop, reload, forwarded-proto,
 engine, postgres-password, bad-env, upgrade and backup. They ran only locally
 until 7391a51a, since the workflow's checks job named each check by hand and
-listed none of them; the gap was found while writing the PR body (#58 retro).
+listed none of them (#58 retro).
 The checks job runs `checks.sh` with no arguments, which runs its default
 list, and names each check left out of that list in a step of its own.
 """
