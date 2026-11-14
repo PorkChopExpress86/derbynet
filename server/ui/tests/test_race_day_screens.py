@@ -17,9 +17,12 @@ import ast
 import re
 from pathlib import Path
 
+import pytest
+
 from tools import race_day_screens as tool
 
 SCRIPT = Path(tool.__file__).read_text()
+SERVER = Path(tool.__file__).resolve().parents[1]
 # Every call of `s.shot(tab, "<guide>", "<name>")`.
 SHOT = re.compile(r's\.shot\(\s*\w+,\s*"([\w-]+)",\s*"([\w-]+)"')
 
@@ -89,15 +92,23 @@ def test_report_fails_a_run_with_an_error_or_a_shot_missing(tmp_path, capsys):
     assert capsys.readouterr().err == "phone 404: /x\n"
 
 
-def test_the_script_never_reads_the_real_headshots():
-    """The owner chose drawn placeholders over testing/data/headshots, so a
-    reshoot shows no real child's face (#61). The module docstring may name
-    the folder; no other string of the script may."""
-    tree = ast.parse(SCRIPT)
+@pytest.mark.parametrize(
+    "script", sorted(p.name for p in (SERVER / "tools").glob("*.py")), ids=str
+)
+def test_no_tool_reads_the_real_headshots(script):
+    """testing/data/headshots are real children's photos. The owner chose
+    drawn placeholders for the race-day guides, so a reshoot shows no real
+    child's face (#61), and so does any other screenshot a tool in `tools/`
+    takes. #61's first push shot them before anyone asked. A module
+    docstring may name the folder; no other string of the script may."""
+    tree = ast.parse((SERVER / "tools" / script).read_text())
     strings = [
         node.value
         for node in ast.walk(tree)
         if isinstance(node, ast.Constant) and isinstance(node.value, str)
     ]
-    assert strings[0] == ast.get_docstring(tree, clean=False)
-    assert not [text for text in strings[1:] if "headshots" in text]
+    docstring = ast.get_docstring(tree, clean=False)
+    if docstring is not None:
+        assert strings[0] == docstring
+        strings = strings[1:]
+    assert not [text for text in strings if "headshots" in text]
