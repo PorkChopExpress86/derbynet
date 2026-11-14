@@ -189,7 +189,9 @@ class CitedPathsInABranch(unittest.TestCase):
         return subprocess.run(
             [sys.executable, '-I', str(self.repo / 'plan' / 'lint-issues.py'), *argv],
             capture_output=True, text=True,
-            env={**os.environ, 'GH': str(gh), 'LINT_BASE': self.base})
+            # Without the GIT_DIR a pre-push hook sets, git reads the scratch
+            # repository the lint sits in.
+            env={**self.git_env, 'GH': str(gh), 'LINT_BASE': self.base})
 
     def test_a_live_issue_citing_a_path_the_branch_deletes_is_a_finding(self):
         """The review's `git rm .github/workflows/electron.yml` gave 0
