@@ -21,7 +21,7 @@ from django.utils.html import escapejs
 from accounts.permissions import Perm
 from core.models import RaceSettings, RaceState
 from legacy_api.tests.conftest import log_in, post
-from racing.models import TimerStatus
+from racing.models import HeatLane, TimerStatus
 from racing.services import timer
 from ui import timer_build
 from ui.tests.race import race_setup, scheduled
@@ -81,11 +81,39 @@ def test_the_status_and_test_pages_need_control_race(login, url):
     assert login("RaceCoordinator").get(url).status_code == 200
 
 
-def test_the_fake_timer_needs_check_in(login):
-    assert login("anonymous").get("/timer/fake/").status_code == 302
-    page = login("RaceCrew").get("/timer/fake/")
-    assert page.status_code == 200
-    assert b"data-fake-timer" in page.content
+def test_the_fake_timer_needs_timer_message(login):
+    """D96: the page needs TIMER_MESSAGE, as every message it sends does;
+    `fake-timer.php:9` asks for CHECK_IN_RACERS, which RaceCrew holds. A
+    role without it is sent to log in, and an htmx request gets 403."""
+    for name in ("anonymous", "RaceCrew", "Photo"):
+        response = login(name).get("/timer/fake/")
+        assert response.status_code == 302, name
+        assert response["Location"] == "/login/?next=%2Ftimer%2Ffake%2F", name
+    assert hx(login("RaceCrew"), "/timer/fake/").status_code == 403
+    for name in ("Timer", "RaceCoordinator"):
+        page = login(name).get("/timer/fake/")
+        assert page.status_code == 200, name
+        assert b"data-fake-timer" in page.content, name
+
+
+def test_the_timer_role_sends_a_lane_result_from_the_fake_timer_session(login, event):
+    """The messages the page's script posts, from a session logged in as
+    Timer through the login page, are accepted: the heat's times are saved."""
+    wolves = scheduled(race_setup(event, groups=(("Wolves", 4),), lanes=4)["Wolves"])
+    timer_role = login("Timer")
+    assert timer_role.get("/timer/fake/").status_code == 200
+    connect(timer_role)
+    assert "<success/>" in message(timer_role, "STARTED")
+    assert "<success/>" in message(
+        timer_role, "FINISHED&lane1=3.1&lane2=3.2&lane3=3.3&lane4=3.4"
+    )
+    finished = HeatLane.objects.filter(round=wolves, heat=1).order_by("lane")
+    assert list(finished.values_list("finish_time", flat=True)) == [
+        3.1,
+        3.2,
+        3.3,
+        3.4,
+    ]
 
 
 @pytest.mark.parametrize(
@@ -177,6 +205,34 @@ def test_the_fake_timer_link_shows_while_no_timer_is_connected(coordinator):
     html = coordinator.get("/timer/").content.decode()
     assert "NOT CONNECTED" in html
     assert 'href="/timer/fake/"' in html
+
+
+def test_the_fake_timer_link_shows_only_to_a_role_that_can_open_it(login, event):
+    """D96: no default role holds CONTROL_RACE, which the status page needs,
+    without TIMER_MESSAGE, so a role made of CONTROL_RACE alone stands in.
+    RaceCrew cannot open the status page at all."""
+    starter = Client()
+    log_in(starter, Perm.CONTROL_RACE, role="Starter")
+    html = starter.get("/timer/").content.decode()
+    assert "NOT CONNECTED" in html
+    assert 'data-action="fake-timer"' not in html
+    poll = hx(starter, "/timer/status/").content.decode()
+    assert "NOT CONNECTED" in poll and 'data-action="fake-timer"' not in poll
+    assert starter.get("/timer/fake/").status_code == 302
+    both = Client()
+    log_in(both, Perm.CONTROL_RACE | Perm.TIMER_MESSAGE, role="Starter")
+    assert 'data-action="fake-timer"' in hx(both, "/timer/status/").content.decode()
+    assert login("RaceCrew").get("/timer/").status_code == 302
+
+
+def test_the_no_serial_page_links_the_timer_role_to_the_fake_timer(login):
+    """The page a browser without Web Serial gets needs TIMER_MESSAGE, as the
+    fake timer does (D96), so its link opens for every role that sees it."""
+    timer_role = login("Timer")
+    html = timer_role.get("/timer/no-serial/").content.decode()
+    assert 'href="/timer/fake/"' in html
+    assert timer_role.get("/timer/fake/").status_code == 200
+    assert login("RaceCrew").get("/timer/no-serial/").status_code == 302
 
 
 def test_a_malfunction_and_the_refused_results_show(coordinator, jar, event):

@@ -127,7 +127,7 @@ BUILT_BEFORE_THE_CHECK = {
     "judging.php", "racer-results.php", "awards-presentation.php",
     "standings.php", "export.php", "history.php", "racing-groups.php",
     "playlist.php", "scenes.php", "import-roster.php", "import-awards.php",
-    "import-results.php", "awards-editor.php", "fake-timer.php",
+    "import-results.php", "awards-editor.php",
 }  # fmt: skip
 
 
@@ -170,6 +170,7 @@ PAGE_GATES = {
     "ondeck": Access.ANONYMOUS,
     "racer-results": Access.ANONYMOUS,
     "timer-test": Perm.CONTROL_RACE,
+    "fake-timer": Perm.TIMER_MESSAGE,  # D96
     "replay": Perm.CONTROL_RACE,
 }
 
