@@ -9,6 +9,7 @@ Where to find each task in DerbyNet. Each line reads "page, then the button or c
 - Settings, racing groups, the rounds playlist, the imports, roles and passwords, and events open from Set-Up, under "Before race day".
 - "Quick reference" at the bottom of the menu, or of "More" on a phone, opens this page. Every guide is part of the server, so they work with no internet.
 - "Den" below stands for your partition label, which you may have renamed.
+- Every page works by taps. Nothing is dragged and dropped, except to reorder a list by its handle (D95).
 
 ## Events and data
 
@@ -66,7 +67,7 @@ Where to find each task in DerbyNet. Each line reads "page, then the button or c
 - Rename a group or subgroup: Racing groups, then tap its name.
 - Reorder groups or subgroups: Racing groups, then drag the handle, or the row menu, then "Move up" or "Move down".
 - Speed trophies for one group: Racing groups, then tap the group, then "Speed trophies".
-- Use subgroups: Racing groups, then "Labels", then "Use subgroups". Subgroups show under the one-group and custom rules (D50).
+- Use subgroups: Racing groups, then "Labels", then "Use subgroups". Subgroups show under the one-group and custom rules (D50). Each new den makes its own subgroup, so there is no separate button to add one (D95).
 - Delete a group: move or delete its racers first, then Racing groups, tap the group, and "Delete".
 
 ## Rounds and the playlist

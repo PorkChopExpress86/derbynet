@@ -23,7 +23,6 @@ def placeholder(request):
     return render(request, "ui/placeholder.html")
 
 
-@require_GET
 def _components_enabled():
     if not (settings.DEBUG or settings.ENABLE_TEST_ENDPOINTS):
         raise Http404

@@ -2,7 +2,7 @@
 
 Most pinewood derby timers talk to a computer over a serial or USB connection. A timer client reads the timer, and reports each heat to the DerbyNet server over HTTP. DerbyNet has two timer clients: the browser timer, a page of the server (`/timer.php`), and `derby-timer.jar`, the Java program. A timer that speaks HTTP itself could talk to the server directly with this protocol, and need neither.
 
-This guide is the contract between a timer client and the server. The Django server keeps it as the PHP server had it (ADR-02, ADR-11). Every message here is part of the contract (D17). The server code is `server/legacy_api/handlers/timer.py` and `server/racing/services/timer.py`, and the PHP original is `website/ajax/action.timer-message.inc`.
+This guide is the contract between a timer client and the server. The Django server keeps it as the PHP server had it (ADR-02, ADR-11). Every message here is part of the contract (D17). A few details still differ from the PHP server in ways a client does not see in the replies: a lane count above 32767, timer text longer than the server keeps, and when a silent timer's timeout is recorded. #307 settles them. The server code is `server/legacy_api/handlers/timer.py` and `server/racing/services/timer.py`, and the PHP original is `website/ajax/action.timer-message.inc`.
 
 ## Requests
 
@@ -14,16 +14,28 @@ The server keeps the login in a session cookie, `sessionid`. Send the cookie the
 
 `derby-timer.jar` first asks the server which roles may send timer messages, then logs in as one of them. Both requests are open to anyone (D23).
 
-1. `GET action.php?query=role.list` answers JSON. Each role in `roles` has its `name`, and a `timer-message` value that is not 0 when the role may send timer messages.
+1. `GET action.php?query=role.list` answers JSON. Each role in `roles` has its `name`, and a `timer-message` value that is not 0 when the role may send timer messages. A new install answers:
 
    ```json
-   {"roles": [{"name": "Timer", "timer-message": 4096}, {"name": "RaceCrew", "timer-message": 0}], "outcome": {"summary": "success"}}
+   {
+       "roles": [
+           {"name": "", "timer-message": 0},
+           {"name": "Timer", "timer-message": 4096},
+           {"name": "Photo", "timer-message": 0},
+           {"name": "RaceCrew", "timer-message": 0},
+           {"name": "RaceCoordinator", "timer-message": 4096}
+       ]
+   }
    ```
 
 2. `POST action.php` with `action=role.login&name=Timer&password=` logs in. A new install's Timer role has an empty password. The answer is JSON, and sets the session cookie:
 
    ```json
-   {"timecheck": "2026-11-13T19:25:45-0600", "outcome": {"summary": "success"}}
+   {
+       "action": {"action": "role.login", "name": "Timer", "password": "..."},
+       "outcome": {"summary": "success", "code": "success", "description": ""},
+       "timecheck": "2026-11-13T23:07:50-0500"
+   }
    ```
 
    The answer also carries `role`, the role's name, when the login gave a password. A login that fails answers `"summary": "failure"` with the code `role` (no such role) or `login` (wrong password).
@@ -131,16 +143,18 @@ The server answers the failure `notunderstood`.
 
 ## Answers from the server
 
-The server answers every timer message with XML:
+The server answers every timer message with XML. This answer to a HEARTBEAT, while racing is on, sends the first heat of a round:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <action-response action="timer-message" message="HEARTBEAT">
   <success/>
-  <heat-ready lane-mask="14" class="Lions" round="1" roundid="7" heat="4" lanes="4"/>
+  <heat-ready lane-mask="15" class="Wolves" round="1" roundid="1" heat="1" lanes="4"/>
 <remote-log send='false'/>
 </action-response>
 ```
+
+It is recorded from the PHP server in `server/tests/golden/http/timer/race-staging-and-results.http`, and `server/legacy_api/tests/test_timer_parity.py` checks that the Django server answers the same, byte for byte.
 
 An answer holds the elements below. They come in this order: the message's own answer first, then `<abort />`, `<heat-ready>`, the assignments, `<remote-start/>`, `<remote-log>`, and the last `<abort/>`. A client reads every element of every answer, since one answer can carry several.
 

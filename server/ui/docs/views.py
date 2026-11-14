@@ -31,11 +31,19 @@ def _read(name: str) -> dict:
 @require_GET
 @requires_page("docs")
 def index(request):
-    return render(request, "ui/docs/index.html", {"guides": _read(INDEX)["guides"]})
+    """The list of guides. Unbuilt, as in a checkout before `build_docs`, it
+    says how to build them, so the page itself still answers."""
+    try:
+        guides = _read(INDEX)["guides"]
+    except Http404:
+        guides = None
+    return render(
+        request, "ui/docs/index.html", {"guides": guides, "not_built": NOT_BUILT}
+    )
 
 
 @require_GET
-@requires_page("docs-page")
+@requires_page("docs")
 def page(request, slug):
     if slug not in GUIDES:
         raise Http404("No such guide.")

@@ -111,6 +111,7 @@ The guides are Markdown files in `docs/`, with their images in `docs/img/<guide>
 
 - `manage.py build_docs` renders them to HTML into `DERBYNET_DOCS_ROOT`, by default `server/var/docs`. The image renders them when it is built. Run it again after you change a guide.
 - `server/ui/docs/build.py` lists the guides in `GUIDES`. A new guide goes into that list.
+- A link between guides, and an image in `docs/img/`, works with no network. A link to another file of the repository, such as `server/README.md`, opens that file on GitHub, so it needs a network connection.
 - `server/docs/adr/check-paths.sh --docs docs` checks every relative link, every image, and every path in backticks, and the house style. CI runs it.
 - `docs/tools/fodt-to-md.sh` made the first draft of each guide from the LibreOffice files the PHP version shipped.
 

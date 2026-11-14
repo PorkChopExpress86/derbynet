@@ -50,4 +50,11 @@ docker cp /path/to/pack42 derbynet:/tmp/pack42
 docker exec -u derbynet derbynet python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"
 ```
 
+Under the `postgres` profile, run it through Compose, and give it the database's address, since a command run with `exec` does not get the address the container found when it started. #308 will make the address reach such a command, and this step will go. Use your `POSTGRES_PASSWORD` in place of the second `derbynet`:
+
+```sh
+docker compose cp /path/to/pack42 server:/tmp/pack42
+docker compose exec -u derbynet -e DATABASE_URL=postgres://derbynet:derbynet@postgres:5432/derbynet server python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"
+```
+
 Stop the older server before you copy its database. The importer reads every schema version of older DerbyNet databases, from 1 to 10, and prints a summary of the rows it read, dropped and changed. `--report report.json` writes the full report. `server/README.md` lists the importer's options.

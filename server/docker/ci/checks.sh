@@ -34,6 +34,10 @@
 #              the container with a message
 #   upgrade    a volume made by OLD_IMAGE, holding racers and results, starts
 #              under IMAGE, migrates, and keeps the racer and result counts
+#   docs       on a network with no internet, /docs/quick-reference/ and a
+#              guide's image answer from the guides the build rendered (#61),
+#              /quickref.pdf answers 301 to it (D94), and under
+#              DERBYNET_URL_PREFIX the page's links carry the prefix
 #   backup     server/docker/README.md's backup and restore, with compose:
 #              an event with a racer photo, a car photo and a video, backed
 #              up, restored into fresh volumes, and all there.  PROFILE=postgres
@@ -597,10 +601,53 @@ backup_state() { # backup_state <url> <jar> <racerid>
     echo "video $("${compose[@]}" exec -T server sh -c 'find /var/lib/derbynet -name Heat-1.mkv -exec sha256sum {} +' | cut -c1-16)"
 }
 
+# fetch <container> <path>: the status, the content type and the body, from
+# inside the container.
+fetch() {
+    docker exec "$PREFIX-$1" curl -sS -o /tmp/fetched -w '%{http_code} %{content_type} %{redirect_url}\n' \
+        "http://127.0.0.1$2"
+}
+
+check_docs() {
+    docker network create --internal "$PREFIX-offline" >/dev/null
+    start docs "$PREFIX-docs" --network "$PREFIX-offline"
+    say "the container reaches no other host"
+    if docker exec "$PREFIX-docs" curl -sS -m 5 -o /dev/null https://example.org 2>&1; then
+        fail "the container reached https://example.org"
+    fi
+    say "the quick reference, offline"
+    local got
+    got="$(fetch docs /docs/quick-reference/)"
+    echo "$got"
+    case "$got" in "200 text/html"*) ;; *) fail "/docs/quick-reference/ answered $got" ;; esac
+    docker exec "$PREFIX-docs" grep -q '<h1 id="quick-reference">Quick reference</h1>' /tmp/fetched \
+        || fail "/docs/quick-reference/ has no Quick reference heading"
+    docker exec "$PREFIX-docs" grep -q 'href="/docs/quick-reference/"' /tmp/fetched \
+        || fail "the help link does not open /docs/quick-reference/"
+    say "a guide's image"
+    got="$(fetch docs /docs/img/live-streaming/track-view-scene.jpg)"
+    echo "$got"
+    case "$got" in "200 image/jpeg"*) ;; *) fail "the image answered $got" ;; esac
+    say "the old help link"
+    got="$(fetch docs /quickref.pdf)"
+    echo "$got"
+    case "$got" in "301 "*"/docs/quick-reference/") ;; *) fail "/quickref.pdf answered $got" ;; esac
+    stop docs
+    say "under DERBYNET_URL_PREFIX=/derbynet"
+    start docs-prefix "$PREFIX-docs" --network "$PREFIX-offline" -e DERBYNET_URL_PREFIX=/derbynet
+    got="$(fetch docs-prefix /derbynet/docs/quick-reference/)"
+    echo "$got"
+    case "$got" in "200 text/html"*) ;; *) fail "/derbynet/docs/quick-reference/ answered $got" ;; esac
+    docker exec "$PREFIX-docs-prefix" grep -q 'href="/derbynet/docs/quick-reference/"' /tmp/fetched \
+        || fail "the help link has no /derbynet prefix"
+    docker exec "$PREFIX-docs-prefix" grep -q 'href="../roles-and-passwords/"' /tmp/fetched \
+        || fail "the guide's links are not relative"
+}
+
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
 [ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
-    reload timeout engine postgres-password bad-env
+    reload timeout engine postgres-password bad-env docs
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -618,6 +665,7 @@ for check in "$@"; do
         bad-env) check_bad_env ;;
         upgrade) check_upgrade ;;
         backup) check_backup ;;
+        docs) check_docs ;;
         *) fail "no check named $check" ;;
     esac
     cleanup

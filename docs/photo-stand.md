@@ -33,7 +33,7 @@ A few barcodes control the photo stand itself:
 
 ## Set up a new photo stand
 
-These steps install the photo stand's scripts from a copy of the DerbyNet repository on the Pi.
+These steps install the photo stand's scripts from a copy of the DerbyNet repository on the Pi. They copy the scripts to the places the older install package put them. Nobody has tried these steps on a Pi yet, so check each one, and tell the project what you find. The Pi images of #59 will replace them.
 
 1. Copy the scripts into place:
 

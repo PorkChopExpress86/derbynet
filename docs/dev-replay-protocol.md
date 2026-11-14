@@ -19,10 +19,14 @@ action=replay.message&status=0&finished-replay=0
 - `status` is the client's state: `0` ready, `1` recording, `2` playing, or a negative number for an error. The race dashboard shows it.
 - `finished-replay` is accepted and not used.
 
-The answer is JSON. `replay` lists the commands queued since the last poll, oldest first:
+The answer is JSON. `replay` lists the commands queued since the last poll, oldest first. After the race coordinator presses "Trigger Replay":
 
 ```json
-{"replay": ["HELLO", "START Lions_Round1_Heat04"], "outcome": {"summary": "success"}}
+{
+    "action": {"action": "replay.message", "status": 0, "finished-replay": 0},
+    "outcome": {"summary": "success", "code": "success", "description": ""},
+    "replay": ["TEST 4000 2 50"]
+}
 ```
 
 The replay page polls four times a second. A client that has not polled for more than 10 seconds counts as gone: the server queues no commands for it, so a client that comes back never gets a burst of stale ones. Its first poll after that starts with `HELLO`. Each command goes to one poll only.
@@ -36,8 +40,8 @@ Each command is a line of text: a word, then its values, separated by spaces.
 | `HELLO` | First, in the first poll after the client was gone. | Nothing. |
 | `START NAME` | A heat becomes the current heat while racing is on: racing turns on, the heat advances, or a heat is run again. | Names the next clip `NAME`, such as `Lions_Round1_Heat04`. The timer test names its heats `Timer Test_Round1_HeatNN`. |
 | `CANCEL` | Racing turns off, or the current heat changes. | Drops any replay it has waiting. |
-| `RACE_STARTS SKIPBACK SHOWINGS RATE` | The timer reports that the gate opened (its STARTED message). | Waits `SKIPBACK` milliseconds, then replays, and ignores the `REPLAY` that follows for this heat. |
-| `REPLAY SKIPBACK SHOWINGS RATE` | The timer reports the heat's results (FINISHED), or someone asks for a replay. | Replays, unless `RACE_STARTS` already did. |
+| `RACE_STARTS SKIPBACK SHOWINGS RATE` | The timer reports that the gate opened (its STARTED message). | Waits `SKIPBACK` milliseconds, then replays. A `REPLAY` that comes first replays at once instead, and a `REPLAY` that comes after is ignored. |
+| `REPLAY SKIPBACK SHOWINGS RATE` | The timer reports the heat's results (FINISHED), or someone asks for a replay. | Replays, unless the wait after `RACE_STARTS` already replayed this heat. |
 | `TEST SKIPBACK SHOWINGS RATE` | The race coordinator presses "Trigger Replay" to test the station. | Replays. |
 
 The values:

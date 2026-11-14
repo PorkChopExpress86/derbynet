@@ -27,6 +27,7 @@ urlpatterns = [
     path("", include("ui.setup.urls")),
     path("", include("ui.events.urls")),
     *redirects.urlpatterns(),
+    path("docs/<slug:slug>/", docs_views.page, name="docs-page"),
     path("docs/img/<path:name>", docs_views.image, name="docs-image"),
     path("components/", views.components, name="components"),
     path(

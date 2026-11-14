@@ -1,7 +1,7 @@
 """Photo management (#47): `photo-thumbs.php` for a phone, as the registry
 pages `racer-photos` and `car-photos`, over the photo service of #35.
 
-A volunteer taps instead of dragging: a racer, then a photo from a sheet of
+A volunteer taps instead of dragging (D95): a racer, then a photo from a sheet of
 unassigned photos, or a photo, then a racer from a searchable sheet. The crop
 and capture sheets are #42's (`ui/photo_sheets/`). Every POST calls one
 `media.photos` service and answers with a toast, or the sheet's next body,

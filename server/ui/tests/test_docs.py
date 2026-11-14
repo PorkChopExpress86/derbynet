@@ -128,10 +128,14 @@ def test_an_unknown_guide_is_404(client, event, built):
     assert client.get("/docs/no-such-guide/").status_code == 404
 
 
-def test_an_unbuilt_guide_is_404(client, event, settings):
+def test_unbuilt_a_guide_is_404_and_the_index_says_how_to_build(
+    client, event, settings
+):
     settings.DOCS_ROOT = Path("/nonexistent/docs")
-    response = client.get("/docs/quick-reference/")
-    assert response.status_code == 404
+    assert client.get("/docs/quick-reference/").status_code == 404
+    response = client.get("/docs/")
+    assert response.status_code == 200
+    assert "Run `manage.py build_docs`." in response.content.decode()
 
 
 def test_an_image_is_served_and_only_a_built_image(client, event, built):
@@ -167,3 +171,17 @@ def test_a_code_block_and_a_table_take_the_focus_to_scroll():
     _, html = build.render("# T\n\n```\ncode\n```\n\n| a |\n|---|\n| b |\n")
     assert '<pre tabindex="0">' in html
     assert '<table tabindex="0">' in html
+
+
+def test_a_file_the_build_did_not_list_is_not_served(client, event, built):
+    """The image route serves only names in the build's index, never a path
+    joined from the URL."""
+    (built / "img" / "planted.png").write_bytes(b"not listed")
+    assert (built / "img" / "planted.png").is_file()
+    assert client.get("/docs/img/planted.png").status_code == 404
+
+
+def test_a_slug_that_names_no_guide_never_reads_a_build_file(client, event, built):
+    """`index.json` sits beside the guides' files; `/docs/index/` is no guide."""
+    assert (built / "index.json").is_file()
+    assert client.get("/docs/index/").status_code == 404

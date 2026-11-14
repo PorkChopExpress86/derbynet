@@ -40,7 +40,7 @@ def _payload(ctx: LegacyContext) -> tuple[str, object] | None:
     "message.send",
     permission=Perm.CONTROL_RACE,
     divergences=REPLAY_LOGIN
-    + ("D16: a message over 64 KiB encoded fails with too-large.",),
+    + ("D59: a message over 64 KiB encoded fails with too-large.",),
 )
 def message_send(ctx: LegacyContext) -> None:
     found = _payload(ctx)

@@ -46,10 +46,7 @@ def test_the_help_link_opens_the_quick_reference_on_every_manager_page(login, bu
     page = login("RaceCoordinator")
     shelled, unshelled = [], []
     for entry in ENTRIES:
-        path = (
-            "/docs/quick-reference/" if entry.key == "docs-page" else f"/{entry.path}"
-        )
-        page.goto(path)
+        page.goto(f"/{entry.path}")
         if not page.locator("#page").count():
             unshelled.append(entry.key)
             continue
