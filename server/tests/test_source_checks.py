@@ -11,6 +11,7 @@ with the reason it is not. A guard that reads its files another way, such as
 `test_settings_bounds.py`, is added to source-checks by hand.
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -97,3 +98,35 @@ def test_source_checks_refuses_a_timeout():
     assert result.returncode == 2, result.stderr
     assert "it runs under timeout" in result.stderr
     assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    ("plan_status", "pytest_status", "status"),
+    [(0, 0, 0), (1, 0, 1), (0, 3, 3), (1, 4, 4)],
+)
+def test_both_halves_run_whatever_the_first_says(
+    tmp_path, plan_status, pytest_status, status
+):
+    """A failing plan test leaves the pytest half to run, and the script exits
+    with the last failure: #312 stopped at the plan test and took a second
+    scratch merge to learn the pytest half passed (#312 retro)."""
+    script = tmp_path / "server" / "tools" / "source-checks.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy(SCRIPT, script)
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    for name, code in (("python3", plan_status), ("uv", pytest_status)):
+        stub = stubs / name
+        stub.write_text(f'#! /bin/sh\necho {name} >> "$RAN"\nexit {code}\n')
+        stub.chmod(0o755)
+    ran = tmp_path / "ran"
+    result = subprocess.run(
+        [str(script)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        stdin=subprocess.DEVNULL,
+        env={**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "RAN": str(ran)},
+    )
+    assert ran.read_text() == "python3\nuv\n", result.stderr
+    assert result.returncode == status, result.stderr

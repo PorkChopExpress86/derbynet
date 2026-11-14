@@ -42,6 +42,9 @@
 #              guide's image answer from the guides the build rendered (#61),
 #              /quickref.pdf answers 301 to it (D94), and under
 #              DERBYNET_URL_PREFIX the page's links carry the prefix
+#   timer      /timer.php as RaceCoordinator, at / and /derbynet/: every
+#              script, image and stylesheet it links, and the worker and
+#              images its scripts load, answer 200 with their type (#312)
 #   backup     server/docker/README.md's backup and restore, with compose:
 #              an event with a racer photo, a car photo and a video, backed
 #              up, restored into fresh volumes, and all there.  PROFILE=postgres
@@ -676,10 +679,85 @@ check_docs() {
         || fail "the guide's links are not relative"
 }
 
+# The page's own files: each <script src>, <img src> and stylesheet href,
+# whichever order the attributes come in and whichever quotes they use.  The
+# page is read as one line, since a tag may span lines.
+page_files() { # page_files <html file>
+    local page tags
+    page="$(tr '\n\t' '  ' < "$1")"
+    tags="$(grep -oiE '<(script|img|link)[[:space:]][^>]*>' <<<"$page" || true)"
+    tags="$(grep -viE '^<link' <<<"$tags" || true)
+$(grep -iE "^<link.*[[:space:]]rel=[\"']?stylesheet" <<<"$tags" || true)"
+    sed -nE "s/.*[[:space:]](src|href)=[\"']([^\"']+)[\"'].*/\2/p" <<<"$tags"
+}
+
+# The files a script loads by a quoted relative path, in either quote style
+# and escaped too: main.js's clock worker, and the images gui.js and main.js
+# draw.
+script_files() { # script_files <script file>
+    grep -oE '\\?["'"'"'](js|img)/[A-Za-z0-9_./-]+\.(js|png)\\?["'"'"']' "$1" \
+        | tr -d "\"'\\\\" || true
+}
+
+# The files the timer's scripts load, named here so that a missing script
+# cannot hide them: main.js's clock worker, the images main.js and gui.js
+# draw, and the four serial status images, whose names gui.js builds
+# (`'img/status/' + png + '.png'`).
+TIMER_SCRIPT_FILES="js/timer/clock-worker.js img/small-check.png img/small-cross.png
+img/timer/trouble-tiny.png img/status/ok.png img/status/not_connected.png
+img/status/trouble.png img/status/unknown.png"
+
+# The browser timer (#312): /timer.php, as RaceCoordinator, the race-day
+# laptop's login (D53), at the root and under the Debian layout's /derbynet/.
+# Every file the page links, TIMER_SCRIPT_FILES, and every file a script it
+# links names by a quoted path answer 200 with their content type.  Each
+# file's status is printed before the check fails, so the log lists them all.
+check_timer() {
+    start timer "$PREFIX-timer" -p 127.0.0.1::80
+    local url="http://$(docker port "$PREFIX-timer" 80/tcp)" jar="$RUNNER_TEMP_DIR/timer-cookies"
+    local html="$RUNNER_TEMP_DIR/timer.html" script="$RUNNER_TEMP_DIR/timer-script"
+    new_event "$url"
+    login "$url" "$jar" RaceCoordinator
+    local base got files path want bad=0 seen
+    for base in / /derbynet/; do
+        say "${base}timer.php as RaceCoordinator"
+        got="$(curl -s -o "$html" -b "$jar" -w '%{http_code} %{content_type}' "$url${base}timer.php")"
+        echo "$got"
+        case "$got" in "200 text/html"*) ;; *) fail "${base}timer.php answered $got" ;; esac
+        files="$(page_files "$html")"
+        while read -r path; do
+            case "$path" in *.js) ;; *) continue ;; esac
+            curl -s -o "$script" -b "$jar" "$url$base$path"
+            files+=$'\n'"$(script_files "$script")"
+        done <<<"$files"
+        files+=$'\n'"$(tr ' ' '\n' <<<"$TIMER_SCRIPT_FILES")"
+        files="$(awk 'NF && !seen[$0]++' <<<"$files")"
+        seen=0
+        while read -r path; do
+            case "$path" in /*|*://*) fail "${base}timer.php loads $path, not a relative path" ;; esac
+            got="$(curl -s -o /dev/null -b "$jar" -w '%{http_code} %{content_type}' "$url$base$path")"
+            echo "$got $base$path"
+            seen=$((seen + 1))
+            case "$path:$got" in
+                *.js:"200 text/javascript"*|*.js:"200 application/javascript"*) ;;
+                *.css:"200 text/css"*) ;;
+                *.png:"200 image/png"*) ;;
+                *) bad=$((bad + 1)) ;;
+            esac
+        done <<<"$files"
+        echo "$seen files"
+        for want in js/timer/main.js js/timer/profiles.js css/timer.css js/jquery.js \
+                    img/gear_icon.png img/derbynet.png; do
+            grep -qxF "$want" <<<"$files" || fail "${base}timer.php links no $want"
+        done
+    done
+    [ "$bad" = 0 ] || fail "$bad of the timer page's files did not answer 200 with their type"
+}
+
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
 [ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
-    reload timeout engine postgres-password bad-env allowed-hosts docs
+    reload timeout engine postgres-password bad-env allowed-hosts docs timer
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -699,6 +777,7 @@ for check in "$@"; do
         upgrade) check_upgrade ;;
         backup) check_backup ;;
         docs) check_docs ;;
+        timer) check_timer ;;
         *) fail "no check named $check" ;;
     esac
     cleanup
