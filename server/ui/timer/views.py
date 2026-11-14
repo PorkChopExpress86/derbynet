@@ -378,11 +378,16 @@ def no_serial(request):
 @require_GET
 def browser_asset(request, folder: str, path: str):
     """A file the browser timer loads by a relative path: `js/`, `css/` or
-    `img/` under `ui/static/timer/`. Only files that are there are served,
-    and no path leaves the folder."""
-    root = (timer_build.ASSETS / folder).resolve()
-    found = (root / path).resolve()
-    if root not in found.parents or not found.is_file():
+    `img/` under `ui/static/timer/`, or under its collected copy, which is
+    where the Docker image has the generated files (`timer_build.asset_roots`,
+    #312). Only files that are there are served, and no path leaves the
+    folder it is found in."""
+    for root in timer_build.asset_roots(folder):
+        root = root.resolve()
+        found = (root / path).resolve()
+        if root in found.parents and found.is_file():
+            break
+    else:
         raise Http404
     content_type, _ = mimetypes.guess_type(found.name)
     response = FileResponse(found.open("rb"), content_type=content_type)

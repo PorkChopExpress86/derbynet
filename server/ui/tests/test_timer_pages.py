@@ -5,6 +5,7 @@ The timer side of each test posts `timer-message` to `/action.php` as
 `derby-timer.jar` does, from a session with only TIMER_MESSAGE."""
 
 import hashlib
+import os
 import re
 from io import StringIO
 from pathlib import Path
@@ -459,6 +460,66 @@ def test_nothing_else_is_served(client, path):
     assert client.get(f"/{path}").status_code == 404
 
 
+@pytest.fixture
+def two_roots(tmp_path, monkeypatch, settings):
+    """`ASSETS` and a `STATIC_ROOT` holding its collected copy, as the
+    Docker image has them: the generated files only in the copy (#312)."""
+    source = tmp_path / "source"
+    collected = tmp_path / "static" / "timer"
+    for root in (source, collected):
+        (root / "js" / "timer").mkdir(parents=True)
+    monkeypatch.setattr(timer_build, "ASSETS", source)
+    settings.STATIC_ROOT = str(tmp_path / "static")
+    return source, collected
+
+
+def body(response) -> bytes:
+    return b"".join(response.streaming_content)
+
+
+def test_a_file_only_in_the_collected_copy_is_served(client, two_roots):
+    _, collected = two_roots
+    (collected / "js" / "timer" / "main.js").write_text("collected();")
+    response = client.get("/js/timer/main.js")
+    assert response.status_code == 200
+    assert response["Content-Type"] in ("text/javascript", "application/javascript")
+    assert body(response) == b"collected();"
+    assert client.get("/derbynet/js/timer/main.js").status_code == 200
+
+
+def test_the_source_wins_over_the_collected_copy(client, two_roots):
+    """`runserver` after `build_timer` serves the new build, even with an old
+    collected copy under `STATIC_ROOT`."""
+    source, collected = two_roots
+    (source / "js" / "timer" / "main.js").write_text("fresh();")
+    (collected / "js" / "timer" / "main.js").write_text("stale();")
+    assert body(client.get("/js/timer/main.js")) == b"fresh();"
+
+
+def test_a_file_in_neither_folder_answers_404(client, two_roots):
+    assert client.get("/js/timer/main.js").status_code == 404
+
+
+def test_without_static_root_only_the_source_is_read(client, two_roots, settings):
+    _, collected = two_roots
+    (collected / "js" / "timer" / "main.js").write_text("collected();")
+    settings.STATIC_ROOT = None
+    assert client.get("/js/timer/main.js").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "path", ["js/%2e%2e/%2e%2e/secret.txt", "js/%2e%2e/css/timer.css"]
+)
+def test_no_path_leaves_the_collected_folder(client, two_roots, path):
+    """Not to `STATIC_ROOT`'s other files, and not from `js/` to `css/`."""
+    _, collected = two_roots
+    (collected.parent / "secret.txt").write_text("secret")
+    (collected / "css").mkdir()
+    (collected / "css" / "timer.css").write_text("p {}")
+    assert client.get("/css/timer.css").status_code == 200
+    assert client.get(f"/{path}").status_code == 404
+
+
 def test_the_legacy_files_are_copies_of_website():
     """The copies the browser timer loads match website/ until #4 deletes it."""
     if not WEBSITE.exists():
@@ -502,6 +563,27 @@ def test_profiles_js_fills_the_template(tmp_path, monkeypatch):
     assert 'var _all_the_timer_profiles =  [\n  {"name": "Fake"}\n];' in text
     with pytest.raises(timer_build.BuildError):
         timer_build.profiles_js("Exception in thread main")
+
+
+@pytest.fixture
+def umask_077():
+    """A umask that keeps every new file to its owner, under which
+    `NamedTemporaryFile` and `copyfile` write 0600 files."""
+    old = os.umask(0o077)
+    yield
+    os.umask(old)
+
+
+def test_the_build_writes_files_any_user_can_read(tmp_path, monkeypatch, umask_077):
+    """#312: the image's server runs as `derbynet`, and a 0600 profiles.js in
+    a bind-mounted checkout answered 500."""
+    monkeypatch.setattr(timer_build, "ASSETS", tmp_path)
+    monkeypatch.setattr(timer_build, "PROFILES", tmp_path / "js" / "profiles.js")
+    written = [*timer_build.copy_sources(), timer_build.profiles_js("[]")]
+    modes = {
+        p.relative_to(tmp_path).as_posix(): p.stat().st_mode & 0o777 for p in written
+    }
+    assert set(modes.values()) == {0o644}, modes
 
 
 def test_copy_sources_copies_every_script_and_the_css(tmp_path, monkeypatch):
