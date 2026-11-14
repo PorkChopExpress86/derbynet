@@ -10,6 +10,7 @@
 # entries for the suites server.yml runs, fixtures only xdist provides (#220
 # retro), a test that starts Playwright in the pytest process (#239 retro),
 # prose that calls a clamped font by its viewport term (#283 retro),
+# the first entry of a folder listing taken as it comes (#312 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -40,8 +41,12 @@ done
 
 cd "$(dirname "$0")/.."
 # plan/bin reads the parity gate and the workflows; #222 broke a plan test.
-python3 -I -m unittest discover -s ../plan/tests </dev/null
-exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
+# Both halves run whatever the first one says, and the script exits with the
+# last failure's status: #312 stopped at a failing plan test and needed a
+# second scratch merge to learn the pytest half passed (#312 retro).
+status=0
+python3 -I -m unittest discover -s ../plan/tests </dev/null || status=$?
+env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_php_claims.py \
   tests/test_php_cite_lines.py \
   tests/test_clamp_claims.py \
@@ -53,6 +58,7 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_transactional_tests.py \
   tests/test_docker_checks.py \
   tests/test_pipefail_pipes.py \
+  tests/test_listing_order.py \
   transfer/tests/test_id_readers.py \
   ui/tests/test_no_copied_helpers.py \
   ui/tests/test_rules_in_services.py \
@@ -79,4 +85,5 @@ exec env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   media/tests/test_repository_paths.py \
   racing/engine/tests/test_no_django.py \
   legacy_api/tests/test_testing_scripts.py \
-  "$@"
+  "$@" || status=$?
+exit "$status"

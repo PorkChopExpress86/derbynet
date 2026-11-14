@@ -20,7 +20,10 @@ targets, then:
   (#273's "Heat 100" failed only there);
 - the repeats under load each changed browser test file takes: 25 for one
   that involves timing, 5 per font for a deterministic one;
-- the commands, from server/.
+- the commands, from server/, with `tools/docstring_claims.py` on each changed
+  test file and `tools/operand_mutants.py` when a changed source file can hold
+  a condition: run both before the first hand-off run, since a claim or a
+  mutant they find means an edit, and the run starts again (#312 retro).
 
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
 reaches every suite on both databases (#282's browser conftest hook ran in
@@ -111,6 +114,8 @@ DB_CODE = re.compile(
     r'\.aggregate\(|\.values(_list)?\(|\.order_by\(|\bF\(|\bQ\(|Subquery|'
     r'OuterRef|bulk_create|bulk_update|update_or_create|get_or_create')
 RAW_SQL = re.compile(r'cursor\(|\.raw\(|RawSQL|connection\.vendor')
+# What tools/operand_mutants.py reads conditions and min()/max() calls from.
+MUTANT_SOURCES = ('.py', '.js', '.css')
 BROWSER_MARK = re.compile(r'^pytestmark\s*=.*mark\.browser', re.MULTILINE)
 BROWSER_DECORATOR = re.compile(r'^@pytest\.mark\.browser\b', re.MULTILINE)
 TEMPLATE_TAG = re.compile(
@@ -127,6 +132,8 @@ class Plan:
     postgres: list = field(default_factory=list)
     commands: list = field(default_factory=list)
     changed_browser_tests: list = field(default_factory=list)
+    changed_tests: list = field(default_factory=list)
+    changed_source: list = field(default_factory=list)
     untracked: list = field(default_factory=list)
 
     def add(self, path, rule, note, targets=()):
@@ -150,15 +157,18 @@ class Tree:
         self._graph = None
         self._website = None
         self._users = {}
+        self._texts = {}
 
     def exists(self, rel):
         return (self.server / rel).exists()
 
     def text(self, rel):
-        try:
-            return (self.server / rel).read_text(errors='replace')
-        except OSError:
-            return ''
+        if rel not in self._texts:
+            try:
+                self._texts[rel] = (self.server / rel).read_text(errors='replace')
+            except OSError:
+                self._texts[rel] = ''
+        return self._texts[rel]
 
     def test_dirs_under(self, rel_dir):
         """The `tests` folders under `rel_dir`, but not one inside another."""
@@ -262,9 +272,13 @@ class Tree:
     def mentions(self, words):
         """The test files whose text names one of `words`, as a whole word:
         kiosk.js is not named by kiosk.json."""
-        found = [re.compile(rf'(?<![\w-]){re.escape(w)}(?![\w-])') for w in words if w]
+        # The plain `in` first: a pattern that opens on a lookbehind scans
+        # slowly, and every template in RealTree's test pays it (#312 retro).
+        found = [(w, re.compile(rf'(?<![\w-]){re.escape(w)}(?![\w-])'))
+                 for w in words if w]
         return sorted(rel for rel in self.test_files()
-                      if any(f.search(self.text(rel)) for f in found))
+                      if any(w in self.text(rel) and f.search(self.text(rel))
+                             for w, f in found))
 
     def source_checks(self):
         """The test files tools/source-checks.sh runs."""
@@ -534,6 +548,7 @@ def cover_test_file(plan, tree, path):
     if not tree.exists(rel):
         plan.add(path, 'test-file', 'deleted: nothing of its own to run')
         return
+    plan.changed_tests.append(rel)
     if is_browser_test(tree, rel):
         plan.changed_browser_tests.append(rel)
     plan.add(path, 'test-file', 'the test file itself', [rel])
@@ -925,6 +940,10 @@ def fallback(plan, tree, path):
 
 
 def map_file(plan, tree, path):
+    rel = s(path)
+    if rel and not in_tests(rel) and Path(rel).suffix in MUTANT_SOURCES \
+            and tree.exists(rel):
+        plan.changed_source.append(rel)
     for _name, matches, cover in RULES:
         if matches(path):
             cover(plan, tree, path)
@@ -1086,6 +1105,13 @@ def report(plan, tree):
             f'{" ".join(measured)}')
     for line in plan.commands:
         say(f'  {line}')
+    # Before the first hand-off run: #312 restarted its run for a docstring's
+    # numbers no assert read, and never listed its operand mutants.
+    if plan.changed_tests:
+        say(f'  uv run python tools/docstring_claims.py {" ".join(plan.changed_tests)}')
+    if plan.changed_source:
+        base = f' --base {plan.base}' if plan.from_git else ''
+        say(f'  uv run python tools/operand_mutants.py{base}')
     say('  tools/source-checks.sh')
     say('  uv run ruff check && uv run ruff format --check')
     return '\n'.join(out) + '\n'

@@ -402,7 +402,7 @@ def test_take_photo_from_a_racer_card(login, event, folders):
     ).click()
     capture = sheet(page).locator('[data-photo-sheet="head"]')
     expect(capture).to_be_visible()
-    capture.locator("[data-pick]").set_input_files(str(next(HEADSHOTS.glob("*.jpg"))))
+    capture.locator("[data-pick]").set_input_files(str(min(HEADSHOTS.glob("*.jpg"))))
     expect(capture.locator("[data-preview]")).to_be_visible()
     capture.get_by_label("Autocrop to the face").uncheck()
     capture.get_by_role("button", name="Save photo").click()

@@ -620,6 +620,31 @@ class Fallback(unittest.TestCase):
                       commands(out))
 
 
+class BeforeTheHandOff(unittest.TestCase):
+    """#312 restarted its hand-off run for a docstring number no assert read,
+    which docstring_claims.py lists, and never ran operand_mutants.py."""
+
+    def test_a_changed_test_file_lists_its_docstring_claims(self):
+        out = run('server/ui/tests/test_dashboard.py', 'server/ui/tests/test_kiosk_pages.py')
+        self.assertIn('  uv run python tools/docstring_claims.py ui/tests/test_dashboard.py '
+                      'ui/tests/test_kiosk_pages.py\n', commands(out))
+        self.assertNotIn('operand_mutants', out)
+
+    def test_a_changed_source_file_lists_its_operand_mutants(self):
+        for path in ('server/awards/editing.py', 'server/ui/static/ui/kiosk.css'):
+            with self.subTest(path=path):
+                tree = {**TREE, path: TREE.get(path, 'a { width: min(1em, 2vw); }\n')}
+                out = run(path, tree=tree)
+                self.assertIn('  uv run python tools/operand_mutants.py\n', commands(out))
+                self.assertNotIn('docstring_claims', out)
+
+    def test_a_test_helper_a_deleted_file_or_a_doc_lists_neither(self):
+        out = run('server/core/tests/factories.py', 'server/awards/gone.py',
+                  'server/docs/x.md', 'server/tools/source-checks.sh')
+        self.assertNotIn('operand_mutants', out)
+        self.assertNotIn('docstring_claims', out)
+
+
 class GitDiff(unittest.TestCase):
     def test_it_reads_database_code_from_the_diff_only(self):
         """In a module that imports no models module and makes no ORM write,
@@ -655,6 +680,8 @@ class GitDiff(unittest.TestCase):
             out = affected()
             self.assertIn('server/awards/editing.py\n', out)
             self.assertIn('Postgres: not needed', out)
+            self.assertIn('  uv run python tools/operand_mutants.py --base HEAD~1\n',
+                          commands(out))
             editing.write_text('Award.objects.all()\n\n\nNAME = Award.objects.get()\n')
             out = affected()
             self.assertIn('Postgres: needed', out)
@@ -699,15 +726,19 @@ class GitDiff(unittest.TestCase):
 
 class RealTree(unittest.TestCase):
     """Every page file of the real tree reaches a test by a rule, not the
-    fallback: a new page folder or script name that no test file is named
+    fallback: a new page, template or script name that no test file is named
     after shows up here."""
 
-    def test_every_static_file_template_folder_and_ui_package_maps(self):
+    def test_every_static_file_template_and_ui_package_maps(self):
+        """Every template, not one per folder: #288's sample took the first
+        file a folder listed, which is base.html on ext4 and placeholder.html
+        on tmpfs, so a fresh worktree under /tmp failed where the hook passed
+        (#312 retro)."""
         server = REPO / 'server'
         files = [str(p.relative_to(REPO)) for p in (server / 'ui/static/ui').glob('*.*')
                  if p.suffix in ('.css', '.js')]
-        files += sorted({str(next(p.parent.glob('*.html')).relative_to(REPO))
-                         for p in (server / 'ui/templates').rglob('*.html')})
+        files += sorted(str(p.relative_to(REPO))
+                        for p in (server / 'ui/templates').rglob('*.html'))
         files += [str(p.relative_to(REPO)) for p in (server / 'ui').glob('*/views.py')]
         out = run(*files, root=REPO)
         for path in files:
