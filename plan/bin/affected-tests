@@ -847,8 +847,13 @@ def cover_docker(plan, tree, path):
     two of its steps failed CI on a guess (a stand-in image built from the
     wrong tree, a log check that missed a URL prefix); its round 1 checks
     ran only by hand (#58 retro)."""
-    plan.command('docker build -f docker/Dockerfile -t derbynet_server:dev .. && '
-                 'IMAGE=derbynet_server:dev DERBYNET_TEST_PREFIX=derbynet-checks-dev docker/ci/checks.sh')
+    # A prefix and tag of its own: checks.sh removes every container, volume
+    # and network under its prefix, so two runs that share one remove each
+    # other's (CLAUDE.md; #58 retro review).  The status is checks.sh's.
+    plan.command('P=derbynet-checks-$$ && '
+                 'docker build -f docker/Dockerfile -t "derbynet_server:$P" .. && '
+                 'IMAGE="derbynet_server:$P" DERBYNET_TEST_PREFIX="$P" docker/ci/checks.sh; '
+                 's=$?; docker rmi "derbynet_server:$P" >/dev/null; (exit $s)')
     plan.add(path, 'docker', 'the Docker image (#58): build it and run checks.sh '
              '(its header lists the checks; backup and upgrade run by name), then '
              'each image.yml step the diff changes, by hand against that image. '

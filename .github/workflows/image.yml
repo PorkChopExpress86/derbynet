@@ -228,7 +228,7 @@ jobs:
       - name: Run test-extended-scheduling.sh with DERBYNET_REQUEST_TIMEOUT=600
         if: matrix.variant == 'timeout'
         run: |
-          curl -sf -d 'action=setup.nodata&ez-new=timeout' "$URL/action.php" | grep -q success
+          grep -q success <<<"$(curl -sf -d 'action=setup.nodata&ez-new=timeout' "$URL/action.php")"
           bash testing/reset-database.sh "$URL"
           bash testing/test-car-numbers.sh "$URL"
           bash testing/test-extended-scheduling.sh "$URL"
@@ -444,7 +444,7 @@ jobs:
             curl -fsS -o /dev/null "http://$lan/index.php" && break
             sleep 1
           done
-          curl -sf -d 'action=setup.nodata&ez-new=phone' "http://$lan/action.php" | grep -q success
+          grep -q success <<<"$(curl -sf -d 'action=setup.nodata&ez-new=phone' "http://$lan/action.php")"
           bash testing/reset-database.sh "http://$lan"
           bash testing/import-roster.sh "http://$lan"
 

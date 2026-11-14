@@ -133,6 +133,19 @@ def commands(out):
     return out.split('Run from server/', 1)[1]
 
 
+def docker_command(out):
+    """The printed line that builds the image and runs checks.sh."""
+    found = [line.strip() for line in commands(out).splitlines() if 'docker build' in line]
+    if len(found) != 1:
+        raise AssertionError(out)
+    return found[0]
+
+
+def stub(path, body):
+    path.write_text(f'#!/bin/bash\n{body}\n')
+    path.chmod(0o755)
+
+
 class Everything(unittest.TestCase):
     def test_pyproject_leaves_the_full_suites_to_ci(self):
         """D85: an "everything" diff runs its targeted tests locally, and CI's
@@ -477,9 +490,34 @@ class Docker(unittest.TestCase):
         out = run('server/docker/entrypoint.sh')
         self.assertIn('[docker]', section(out, 'server/docker/entrypoint.sh'))
         self.assertNotIn('[fallback]', out)
-        self.assertIn('docker build -f docker/Dockerfile -t derbynet_server:dev .. && '
-                      'IMAGE=derbynet_server:dev DERBYNET_TEST_PREFIX=derbynet-checks-dev '
-                      'docker/ci/checks.sh', commands(out))
+        self.assertIn('docker/ci/checks.sh', docker_command(out))
+
+    def test_each_paste_of_the_docker_command_has_its_own_prefix(self):
+        """checks.sh removes everything under DERBYNET_TEST_PREFIX, so two
+        runs of one printed prefix removed each other's containers (#58 retro
+        review; CLAUDE.md gives each concurrent run its own prefix)."""
+        line = docker_command(run('server/docker/entrypoint.sh'))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'bin').mkdir()
+            (root / 'server' / 'docker' / 'ci').mkdir(parents=True)
+            log = root / 'log'
+            stub(root / 'bin' / 'docker', f'echo "docker $*" >> {log}')
+            stub(root / 'server' / 'docker' / 'ci' / 'checks.sh',
+                 f'echo "checks $IMAGE $DERBYNET_TEST_PREFIX" >> {log}; exit 3')
+            env = dict(os.environ, PATH=f'{root / "bin"}:{os.environ["PATH"]}')
+            env.pop('DERBYNET_TEST_PREFIX', None)
+            codes = [subprocess.run(['bash', '-c', line], cwd=root / 'server',
+                                    env=env).returncode for _ in range(2)]
+            calls = log.read_text().splitlines()
+        self.assertEqual(codes, [3, 3], "the status is checks.sh's")
+        checks = [c.split() for c in calls if c.startswith('checks ')]
+        self.assertEqual(len(checks), 2, calls)
+        (_, image1, prefix1), (_, image2, prefix2) = checks
+        self.assertNotEqual(prefix1, prefix2)
+        self.assertEqual(image1, f'derbynet_server:{prefix1}')
+        self.assertIn(f'docker rmi derbynet_server:{prefix1}', calls)
+        self.assertIn(f'docker rmi derbynet_server:{prefix2}', calls)
 
     def test_the_image_workflow_builds_the_image_too(self):
         out = run('.github/workflows/image.yml')

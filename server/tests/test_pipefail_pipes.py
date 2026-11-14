@@ -15,11 +15,19 @@ The forms that read the writer's whole output first:
 
 An `echo` or `printf` of a variable is a builtin, so it may pipe into
 `grep -q`.
+
+A workflow's `run:` step counts too when it runs under pipefail: its shell is
+`bash`, which GitHub runs as `bash --noprofile --norc -eo pipefail {0}`, or it
+sets pipefail itself. A step with no shell given runs as `bash -e {0}`, as
+image.yml's logs print, so its pipes pass on the reader's status
+(tests/workflow_steps.py).
 """
 
 import re
 import subprocess
 from pathlib import Path
+
+from tests.workflow_steps import WORKFLOWS, Step, steps
 
 ROOT = Path(__file__).resolve().parents[2]
 PIPEFAIL = re.compile(r"^\s*set\s+(?:-\w+\s+)*-\w*o\s+pipefail\b", re.M)
@@ -101,8 +109,31 @@ def early_pipes(text: str) -> list[tuple[int, str]]:
     return found
 
 
+def workflow_pipes(name: str, text: str) -> list[str]:
+    out = []
+    for step in steps(text):
+        if not (step.pipefail or PIPEFAIL.search(step.script)):
+            continue
+        # A block's first line is the one after `run: |`.
+        first = step.line + (
+            0 if "\n" not in step.script and _inline(step, text) else 1
+        )
+        for n, line in early_pipes(step.script):
+            out.append(f"{name}:{first + n - 1}: {line}")
+    return out
+
+
+def _inline(step: Step, text: str) -> bool:
+    value = text.splitlines()[step.line - 1].split("run:", 1)[1].strip()
+    return not value.startswith(("|", ">"))
+
+
 def offenders(exempt=EXEMPT) -> list[str]:
     out = []
+    for path in sorted(WORKFLOWS.glob("*.y*ml")):
+        name = str(path.relative_to(ROOT))
+        if name not in exempt:
+            out += workflow_pipes(name, path.read_text(encoding="utf-8"))
     for path in shell_files():
         if str(path.relative_to(ROOT)) in exempt:
             continue
@@ -152,6 +183,43 @@ a || grep -q x file
 docker logs x | grep -c POST
 """
     assert early_pipes(text) == []
+
+
+WORKFLOW = """jobs:
+  a:
+{defaults}    steps:
+      - name: one
+{shell}        run: |
+          echo start
+          curl -sf -d 'action=setup.nodata' "$URL/action.php" | grep -q success
+      - run: ls | head -1
+"""
+
+
+def test_a_workflow_step_under_pipefail_is_checked():
+    """image.yml had two `curl ... | grep -q success` steps, the pipe
+    checks.sh's new_event no longer uses (#58 retro review)."""
+    bash_step = WORKFLOW.format(defaults="", shell="        shell: bash\n")
+    curl = "curl -sf -d 'action=setup.nodata' \"$URL/action.php\" | grep -q success"
+    assert workflow_pipes("w.yml", bash_step) == [f"w.yml:8: {curl}"]
+    job_default = WORKFLOW.format(
+        defaults="    defaults:\n      run:\n        shell: bash\n", shell=""
+    )
+    assert [line.split(":")[1] for line in workflow_pipes("w.yml", job_default)] == [
+        "10",
+        "11",
+    ]
+    sets_it = WORKFLOW.format(defaults="", shell="").replace(
+        "echo start", "set -o pipefail"
+    )
+    assert [line.split(":")[1] for line in workflow_pipes("w.yml", sets_it)] == ["7"]
+
+
+def test_a_workflow_step_without_pipefail_is_left():
+    """No shell given runs as `bash -e {0}`: the pipe's status is grep's."""
+    assert workflow_pipes("w.yml", WORKFLOW.format(defaults="", shell="")) == []
+    sh = WORKFLOW.format(defaults="", shell="        shell: sh\n")
+    assert workflow_pipes("w.yml", sh) == []
 
 
 def test_the_pipefail_forms_count():
