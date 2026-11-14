@@ -36,11 +36,14 @@ IMAGES = "img"
 # The repository's files, for a link to one outside docs/.
 GITHUB = "https://github.com/PorkChopExpress86/derbynet/blob/master/"
 
-# Every guide, in the order the index lists them. PR 2 of #61 adds
-# running-a-race, timer-operation, photo-upload and balloting (D91, D93).
+# Every guide, in the order the index lists them.
 GUIDES: tuple[str, ...] = (
     "quick-reference",
+    "running-a-race",
     "install-docker",
+    "timer-operation",
+    "photo-upload",
+    "balloting",
     "secure-contexts",
     "roles-and-passwords",
     "database",

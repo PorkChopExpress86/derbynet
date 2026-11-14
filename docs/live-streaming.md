@@ -59,7 +59,7 @@ DerbyNet no longer uses the websocket server of earlier versions, `extras/websoc
 
 ### Voting for awards
 
-An audience at home can vote for the awards your judges leave to them, such as "Coolest Car". Each racer's voting code lets the family vote from a phone.
+An audience at home can vote for the awards your judges leave to them, such as "Coolest Car". Each racer's voting code lets the family vote from a phone (see [Online balloting](balloting.md)).
 
 ## Scene ideas
 

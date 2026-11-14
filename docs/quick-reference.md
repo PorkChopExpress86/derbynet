@@ -1,6 +1,6 @@
 # Quick reference
 
-Where to find each task in DerbyNet. Each line reads "page, then the button or control to use". Quoted words are the labels on the screen.
+Where to find each task in DerbyNet. Each line reads "page, then the button or control to use". Quoted words are the labels on the screen. [Running a race](running-a-race.md) walks through a whole race day, with pictures.
 
 ## Find your way around
 
@@ -38,6 +38,8 @@ Where to find each task in DerbyNet. Each line reads "page, then the button or c
 - Change a password: Set-Up, then "Roles and passwords". See [Roles and passwords](roles-and-passwords.md).
 
 ## Track and timer
+
+See [Timer operation](timer-operation.md) for the browser timer, the timer test and `derby-timer.jar`.
 
 - The timer's status: on a phone, Dashboard, then "Timer status". The timer page is at `/timer/`.
 - Connect the timer through the browser: on the computer the timer is plugged into, the timer page, then "Connect a timer in this browser". It needs Chrome or Edge, and an HTTPS address (see [Secure contexts](secure-contexts.md)).
@@ -98,7 +100,7 @@ Where to find each task in DerbyNet. Each line reads "page, then the button or c
 - Change or delete an award: Awards editor, then tap the award.
 - Give an award: Judging, then tap the award, then tap the racer.
 - Take an award back: Judging, then the "X" beside the winner's name on the award.
-- Let the audience vote: Judging, then "Manage ballot", then "Balloting is open". Each racer's card at check-in has a "Voting code".
+- Let the audience vote: Judging, then "Manage ballot", then "Balloting is open". Each racer's card at check-in has a "Voting code". See [Online balloting](balloting.md).
 - Present awards: Kiosk Dashboard, set a kiosk's "Page" to "Award presentations". Then Present Awards, tap the award, and press "Reveal".
 
 ## Kiosks
@@ -109,6 +111,8 @@ Where to find each task in DerbyNet. Each line reads "page, then the button or c
 - Edit the scenes: Kiosk Dashboard, then "Scene editor".
 
 ## Photos
+
+See [Photo upload](photo-upload.md) for every way to get photos to the server.
 
 - Take a photo at check-in: Race Check-In, then tap the racer's photo or car tile, then "Take racer photo" or "Take car photo".
 - Upload many photos: Racer Photos or Car Photos, then "Upload photos".
