@@ -28,17 +28,12 @@ already has an event.
 Shoot from the Docker image, so the pages show its paths (`/var/lib/derbynet`)
 and version. Serve it on port 80 as `derbynet.local`, a name the script maps
 to 127.0.0.1 in its browser, so the links the pages print read like a race
-day's. The image's browser timer cannot load its scripts until #312 is
-fixed: mount the ones `manage.py build_timer` writes, made readable.
-From the repository root:
+day's. From the repository root:
 
     docker buildx build -f server/docker/Dockerfile -t derbynet-docs --load .
-    (cd server && uv run python manage.py build_timer)
-    chmod -R a+rX server/ui/static/timer
     docker run -d --name derbynet-docs -p 127.0.0.1:80:80 \
         -v derbynet-docs:/var/lib/derbynet -e TZ=America/Chicago \
         -e DERBYNET_ALLOWED_HOSTS=derbynet.local \
-        -v "$PWD/server/ui/static/timer:/opt/derbynet/server/ui/static/timer:ro" \
         derbynet-docs
     (cd server && uv run python tools/race_day_screens.py http://derbynet.local)
     docker rm -f derbynet-docs && docker volume rm derbynet-docs

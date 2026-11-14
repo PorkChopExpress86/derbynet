@@ -52,7 +52,7 @@ A timer that answers is found by the scan. Two kinds never answer: the FastTrack
 
 A browser may slow a page that is out of sight. Keep the browser timer's window open and in view during the race.
 
-The browser timer page in the v0.1.0-rc1 image cannot load its scripts, so it never shows the scan (#312). Until a release fixes it, connect the timer with `derby-timer.jar`.
+The browser timer page in the v0.1.0-rc1 image cannot load its scripts, so it never shows the scan (#312, fixed for the next release by #314). With that image, connect the timer with `derby-timer.jar`.
 
 ## Test the timer
 
