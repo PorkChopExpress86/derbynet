@@ -9,7 +9,7 @@ source "$(dirname "$0")/env.sh"
 pid=$(cat "$PIDFILE" 2>/dev/null) || { echo "no $PIDFILE; run bin/launch" >&2; exit 1; }
 kill "$pid" 2>/dev/null || true
 for _ in $(seq 20); do
-  ss -ltn | grep -q ":$PORT\b" || break
+  grep -q ":$PORT\b" <<<"$(ss -ltn)" || break
   sleep 0.5
 done
 start_django

@@ -66,7 +66,7 @@ write_provenance() {
     echo "php: $(php -r "echo PHP_MAJOR_VERSION . chr(46) . PHP_MINOR_VERSION;")"
     echo "tz: $TZ"
     echo "php cli extensions: $(modules php)"
-    echo "php-fpm extensions: $(modules "$(ls /usr/sbin/php-fpm* | head -n 1)")"
+    echo "php-fpm extensions: $(modules "$(ls /usr/sbin/php-fpm* | sed -n 1p)")"
   ' > "$GOLDEN/provenance.txt"
 }
 
@@ -115,7 +115,7 @@ check_fixtures() {
     echo "The capture differs from the committed fixtures:" >&2
     echo "$changed" | head -n 40 >&2
     git -C "$ROOT" --no-pager diff --stat -- server/tests/golden | tail -n 40 >&2
-    git -C "$ROOT" --no-pager diff -U1 -- server/tests/golden | head -n 120 >&2
+    git -C "$ROOT" --no-pager diff -U1 -- server/tests/golden | sed -n 1,120p >&2
     exit 1
   fi
   echo "The capture matches the committed fixtures." >&2

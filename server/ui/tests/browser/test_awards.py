@@ -23,6 +23,7 @@ from ui.tests.browser.conftest import (
     dismiss_toasts,
     htmx_post,
     htmx_settled,
+    no_sideways_scroll,
     shoot,
 )
 
@@ -342,6 +343,27 @@ def test_the_no_kiosk_warning_shows_and_hides(login, event):
     page.reload()
     expect(page.locator("[data-section=console]")).to_be_visible()
     expect(warning).to_have_count(0)
+
+
+def test_a_long_award_name_keeps_the_phone_list_one_screen_wide(login, event):
+    """A card is no wider than the list, whatever the award's name, so the
+    editor never scrolls sideways on a phone. With no phone columns the list's
+    one column took the width of the widest name, which `truncate` keeps on
+    one line, as the check-in list's did (#58 review finding H3, #58 retro;
+    ui/tests/test_phone_grids.py)."""
+    award = new_award(event, "Darrell & Darrell Delaughter Memorial Award")
+    new_award(event, "Short")
+    page = open_editor(login("RaceCoordinator"))
+    phone_only(page)
+    card = page.locator(f'[data-award-list] [data-award="{award.pk}"]')
+    expect(card).to_contain_text("Darrell & Darrell Delaughter Memorial Award")
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('[data-award-list] [data-award]')]"
+        ".every(c => c.getBoundingClientRect().width"
+        " <= document.querySelector('[data-award-list]').clientWidth)",
+        timeout=5000,
+    )
+    no_sideways_scroll(page)
 
 
 # ----- parity: awards-editor.php -----

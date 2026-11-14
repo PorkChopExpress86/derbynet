@@ -838,6 +838,29 @@ def cover_server_tools(plan, tree, path):
              sorted(set(targets)))
 
 
+def match_docker(path):
+    return path.startswith(f'{SERVER}/docker/') or path == '.github/workflows/image.yml'
+
+
+def cover_docker(plan, tree, path):
+    """No pytest runs the image. #58 pushed its first image.yml unrun, and
+    two of its steps failed CI on a guess (a stand-in image built from the
+    wrong tree, a log check that missed a URL prefix); its round 1 checks
+    ran only by hand (#58 retro)."""
+    # A prefix and tag of its own: checks.sh removes every container, volume
+    # and network under its prefix, so two runs that share one remove each
+    # other's (CLAUDE.md; #58 retro review).  The status is checks.sh's.
+    plan.command('P=derbynet-checks-$$ && '
+                 'docker build -f docker/Dockerfile -t "derbynet_server:$P" .. && '
+                 'IMAGE="derbynet_server:$P" DERBYNET_TEST_PREFIX="$P" docker/ci/checks.sh; '
+                 's=$?; docker rmi "derbynet_server:$P" >/dev/null; (exit $s)')
+    plan.add(path, 'docker', 'the Docker image (#58): build it and run checks.sh '
+             '(its header lists the checks; backup and upgrade run by name), then '
+             'each image.yml step the diff changes, by hand against that image. '
+             'The tests that name the file:',
+             tree.mentions([Path(path).name, 'checks.sh' if path.endswith('.yml') else '']))
+
+
 RULES = (
     ('everything', match_everything, cover_everything),
     ('docs', match_docs, cover_docs),
@@ -859,6 +882,7 @@ RULES = (
     ('shared-ui', match_shared_ui, cover_shared_ui),
     ('ui-page', match_ui_page, cover_ui_page),
     ('server-tools', match_server_tools, cover_server_tools),
+    ('docker', match_docker, cover_docker),
 )
 
 
@@ -885,7 +909,7 @@ def map_file(plan, tree, path):
         if matches(path):
             cover(plan, tree, path)
     entries = plan.covers.get(path, [])
-    if not any(targets or rule in ('everything', 'docs', 'website', 'plan-tools')
+    if not any(targets or rule in ('everything', 'docs', 'website', 'plan-tools', 'docker')
                or note.startswith('a server tool no test')
                or note.startswith('deleted')
                for rule, note, targets in entries):

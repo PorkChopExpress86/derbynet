@@ -7,7 +7,7 @@ if [ "$KIND" = django ]; then
   pid=$(cat "$PIDFILE" 2>/dev/null) || { echo "FAIL no $PIDFILE"; exit 1; }
   kill -0 "$pid" 2>/dev/null || { echo "FAIL runserver $pid is not running; see $EVIDENCE/server.log"; exit 1; }
   echo "runserver pid $pid, data $DJANGO_STATE"
-  ss -ltnpH "sport = :$PORT" 2>/dev/null | grep -q "pid=$pid," \
+  grep -q "pid=$pid," <<<"$(ss -ltnpH "sport = :$PORT" 2>/dev/null)" \
     || { echo "FAIL port $PORT is not this runserver's"; ok=0; }
   css=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/static/ui/app.css")
   echo "static/ui/app.css: $css"

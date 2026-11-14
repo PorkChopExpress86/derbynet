@@ -62,7 +62,7 @@ clean() {
 }
 # A kept server is named even when the script fails, so it can be removed.
 kept() {
-  echo "PHP is at http://$(docker port "$SERVER" 80/tcp 2>/dev/null | head -n 1)/" >&2
+  echo "PHP is at http://$(docker port "$SERVER" 80/tcp 2>/dev/null | sed -n 1p)/" >&2
   echo "Remove it with: docker rm -f $SERVER && docker volume rm $VOLUME" >&2
 }
 if [ -n "$KEEP" ]; then trap kept EXIT; else trap clean EXIT; fi

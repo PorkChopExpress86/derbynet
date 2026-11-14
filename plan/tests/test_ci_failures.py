@@ -19,9 +19,11 @@ def line(test, reason=''):
     return f'ui (postgres)\tRun the browser tests\t2026-11-06T18:34:35Z [gw3] [ 87%] FAILED {test}{reason}\n'
 
 
-def run(checks, logs, master):
+def run(checks, logs, master, files=('server/ui/tests/browser/test_events.py',),
+        pr='219'):
     """`checks`: the PR's checks; `logs`: run id -> its failed log;
-    `master`: the failed master runs, newest first."""
+    `master`: the failed master runs, newest first; `files`: the paths the
+    PR changes."""
     with tempfile.TemporaryDirectory() as tmp:
         gh = Path(tmp) / 'gh'
         gh.write_text(f'''#!{sys.executable}
@@ -34,11 +36,13 @@ elif args[:2] == ['run', 'list']:
     print(json.dumps({master!r}))
 elif args[:2] == ['run', 'view']:
     print({logs!r}[args[2]], end='')
+elif args[:2] == ['pr', 'view'] and args[2] == {pr!r} and 'files' in args:
+    print(' '.join({list(files)!r}))
 else:
     sys.exit('unexpected gh ' + ' '.join(args))
 ''')
         gh.chmod(0o755)
-        return subprocess.run([sys.executable, '-I', str(CI_FAILURES), '219'],
+        return subprocess.run([sys.executable, '-I', str(CI_FAILURES), pr],
                               env={**os.environ, 'GH': str(gh)},
                               capture_output=True, text=True)
 
@@ -102,6 +106,36 @@ class CiFailures(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(f'new    {EVENTS}\n', result.stdout)
         self.assertIn(f'known  {VOTE}  master 0141fa3b run 1\n', result.stdout)
+
+    def test_a_new_test_in_a_file_the_pr_does_not_change_gets_a_repro_command(self):
+        """#58's photo race test was new, in a file #58 never changed, and
+        failed under load on master too (#58 retro)."""
+        race = 'media/tests/test_photo_races.py::test_a_rotation_during_a_render_leaves_no_stale_render'
+        result = run([check('fail', 2, 'pytest (sqlite)')],
+                     {'2': line(race) + line(EVENTS), '1': line(VOTE)}, MASTER)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(
+            result.stdout,
+            f'new    {race}\n'
+            "  not in this PR's diff: before a rerun, repeat it on origin/master, from server/:\n"
+            f'  tools/pytest-under-load.sh --loops 12 -n auto --count 180 {race}\n'
+            f'new    {EVENTS}\n')
+
+    def test_a_browser_test_repro_drops_its_parameter_and_selects_browser(self):
+        result = run([check('fail', 2)], {'2': line(EVENTS), '1': line(VOTE)}, MASTER,
+                     files=['server/ui/views.py'])
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('  tools/pytest-under-load.sh --loops 12 -m browser -n auto --count 180 '
+                      'ui/tests/browser/test_events.py::test_reopen_and_archive_from_the_page\n',
+                      result.stdout)
+
+    def test_a_branch_names_the_pr(self):
+        """pr-wait and ci-failures take a branch, as `gh pr checks` does, so an
+        implementer waits on every workflow of its head (#58 retro)."""
+        result = run([check('fail', 2)], {'2': line(EVENTS), '1': line(VOTE)}, MASTER,
+                     pr='issue-58-docker-image')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout, f'new    {EVENTS}\n')
 
     def test_a_failed_check_with_no_test_id_names_its_step_and_error(self):
         lint = ('lint\tRun ruff\t2026-11-11T16:41:34.3875028Z E501 Line too long (110 > 88)\n'
