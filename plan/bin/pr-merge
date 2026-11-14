@@ -16,9 +16,11 @@
 # plan/tests) reads files across the tree, so one that either side changed
 # refuses whatever the other side changed, in any area: #304 added
 # test_pipefail_pipes.py while #309 added `anchors ... | grep -q` pipes to
-# server/docs/adr/check-paths.sh, and only the lead's trial merge of the two
-# heads found it (#61 retro). Its run is server/tools/source-checks.sh on the
-# merge, which takes seconds.
+# server/docs/adr/check-paths.sh. The lead's trial merge of the two heads
+# found it; both PRs also changed .github/, so the area rule would have
+# refused the pair, but a PR like #309 with no shared area would have merged
+# (#61 retro). Its run is server/tools/source-checks.sh on the merge, which
+# takes seconds.
 #
 # Usage: plan/bin/pr-merge <pr> [--base-checked] [--squash|--rebase|--merge] [--delete-branch]
 # With no merge method it squashes and deletes the branch, as the plan's PRs do.

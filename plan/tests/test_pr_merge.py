@@ -4,6 +4,7 @@ origin, so it runs with no network.
 Run: python3 -I -m unittest discover -s plan/tests
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -197,7 +198,8 @@ class PrMerge(unittest.TestCase):
 
     def test_a_source_check_master_added_refuses_a_pr_in_no_area(self):
         """#304 added test_pipefail_pipes.py to the source checks while #309
-        added pipes to check-paths.sh, which no area holds (#61 retro)."""
+        added pipes to check-paths.sh, which no area holds. #309 also changed
+        .github/, as #304 did; this PR changes nothing else (#61 retro)."""
         self.source_checks('tests/test_php_claims.py')
         head = self.pr('server/docs/adr/check-paths.sh')
         self.git('switch', '-q', '-c', 'moved', 'origin/master')
@@ -218,6 +220,31 @@ class PrMerge(unittest.TestCase):
                       '  this PR: 1 changed files\n'
                       'For the source checks, run server/tools/source-checks.sh on the PR merged '
                       'with origin/master; it takes seconds.\n', done.stderr)
+
+    def test_the_real_source_check_list_is_read(self):
+        """The list as server/tools/source-checks.sh writes it, not as the
+        stand-in above does: each test it runs counts, its first, its last,
+        and one named with `::` among them."""
+        real = (Path(__file__).resolve().parents[2] / 'server' / 'tools'
+                / 'source-checks.sh').read_text()
+        listed = re.findall(r'^\s+([\w./-]+\.py)', real, re.M)
+        self.assertIn('tests/test_pipefail_pipes.py', listed)
+        for test in sorted({listed[0], listed[-1], 'tests/test_pipefail_pipes.py',
+                            next(t for t in listed if 'test_htmx' in t)}):
+            with self.subTest(test=test):
+                self.setUp()
+                path = self.work / 'server' / 'tools' / 'source-checks.sh'
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(real)
+                self.git('add', '.')
+                self.git('commit', '-q', '-m', 'source checks')
+                self.git('push', '-q', 'origin', 'HEAD:master')
+                head = self.pr('docs/install-docker.md')
+                self.master(f'server/{test}')
+                done = self.merge(head)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'  master:  server/{test}\n', done.stderr)
+                self.assertEqual(self.merged(), '')
 
     def test_a_source_check_the_pr_changes_refuses_when_master_moved_anywhere(self):
         self.source_checks('ui/tests/test_htmx.py::test_no_reply', 'tests/test_php_claims.py')

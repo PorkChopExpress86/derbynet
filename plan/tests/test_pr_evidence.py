@@ -71,7 +71,7 @@ class PrEvidence(unittest.TestCase):
                          [*KEYS, '6 open lines of #61 ask for evidence in the PR'])
 
     def test_a_body_without_the_checklist_is_refused(self):
-        """#61's draft quoted every box but the timer guide's."""
+        """#61's draft left out the timer guide's checklist (#61 retro)."""
         body = '\n\n'.join(k for k in KEYS if 'dev-timer' not in k)
         done = self.check(body)
         self.assertEqual(done.returncode, 1, done.stderr)
