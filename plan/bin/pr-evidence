@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Lists each open line of an issue that asks for evidence in the PR, and
+with `--check BODY.md` names each one the PR body leaves out.
+
+Usage: plan/bin/pr-evidence <issue> [--check BODY.md]
+
+A line asks for evidence in the PR when it says so: "Evidence is ... in the
+PR", "The PR lists", "Record the size in the PR", "Attach", "Link the run",
+"PR description". Its key is its first sentence, and the body carries each
+key as written, beside the evidence or under `## Still open` when this PR
+leaves the line for later, so the reviewer finds the evidence by its line.
+A ticked box is left out, since an earlier PR gave its evidence.
+
+#61's body draft left out the reviewer's checklist its timer-guide box asked
+for, though the checklist was drafted, until the lead found it (#61 retro).
+Exits 1 on a key the body leaves out, or when the issue cannot be read.
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+ASKS = re.compile(
+    r"\b(?:in|to) the PR\b|\bthe PR (?:lists|names|says|records|shows|explains)\b"
+    r"|\bPR (?:description|body)\b|\battach|\blink the run\b",
+    re.IGNORECASE,
+)
+ITEM = re.compile(r"^\s*- (?:\[( |x|X)\] )?(.*)$")
+SENTENCE = re.compile(r"^(.*?[.!?])(?:\s|$)")
+
+
+def flat(text: str) -> str:
+    """Text with Markdown quote marks and runs of white space folded, for a
+    match that a wrapped line or a quote leaves alone."""
+    text = re.sub(r"^\s*>\s?", "", text, flags=re.MULTILINE)
+    return " ".join(text.split()).casefold()
+
+
+def items(body: str) -> list[tuple[str | None, str]]:
+    """Each list item as (its box mark or None, its text), with the indented
+    lines that continue it joined on."""
+    found: list[tuple[str | None, str]] = []
+    open_item = False
+    for line in body.splitlines():
+        item = ITEM.match(line)
+        if item:
+            found.append((item[1], item[2].strip()))
+            open_item = True
+        elif open_item and line[:1].isspace() and line.strip():
+            mark, text = found[-1]
+            found[-1] = (mark, f"{text} {line.strip()}")
+        else:
+            open_item = False
+    return found
+
+
+def keys(body: str) -> list[str]:
+    """The first sentence of each list item that asks for evidence in the
+    PR, in the issue's order, unticked boxes and plain items only."""
+    found = []
+    for mark, text in items(body):
+        if mark in ("x", "X") or not ASKS.search(text):
+            continue
+        sentence = SENTENCE.match(text)
+        found.append(sentence[1] if sentence else text)
+    return found
+
+
+def issue_body(number: str) -> str:
+    gh = os.environ.get("GH", "gh")
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+    done = subprocess.run(
+        [gh, "issue", "view", number, "--repo", repo, "--json", "body", "--jq", ".body"],
+        capture_output=True,
+        text=True,
+    )
+    if done.returncode:
+        sys.exit(f"pr-evidence: gh could not read #{number}:\n{done.stderr.strip()}")
+    return done.stdout.replace("\r", "")
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) not in (1, 3) or (len(argv) == 3 and argv[1] != "--check"):
+        sys.exit(__doc__)
+    asked = keys(issue_body(argv[0]))
+    if len(argv) == 1:
+        for key in asked:
+            print(key)
+        print(f"{len(asked)} open lines of #{argv[0]} ask for evidence in the PR")
+        return 0
+    with open(argv[2], encoding="utf-8") as f:
+        body = flat(f.read())
+    missing = [key for key in asked if flat(key) not in body]
+    for key in missing:
+        print(f"not in the body: {key}")
+    print(
+        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{argv[0]} that ask "
+        "for evidence in the PR are quoted in the body"
+    )
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

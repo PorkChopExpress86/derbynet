@@ -98,6 +98,55 @@ class LintIssues(Lint):
         self.assertIn("!= ['Summary',", done.stdout)
 
 
+# git's empty tree: a base that holds no file.
+EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
+
+class CitedPaths(Lint):
+    """A cited path is looked up on origin/master, not in the checkout the
+    lint runs from (#61 retro: #307's draft passed in #61's worktree on a
+    guide only that branch had)."""
+
+    def cite(self, path, base):
+        self.env['LINT_BASE'] = base
+        return self.lint(TICKET + f'\n\nSee `{path}`.')
+
+    def test_a_path_only_this_checkout_has_is_a_finding(self):
+        done = self.cite('plan/README.md', EMPTY_TREE)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f'#0: path `plan/README.md` is in this checkout but not on {EMPTY_TREE}; '
+                      'cite it once it merges, or the lint on master fails', done.stdout)
+
+    def test_a_path_on_the_base_passes(self):
+        done = self.cite('plan/README.md', 'HEAD')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('0 findings', done.stdout)
+
+    def test_a_folder_on_the_base_passes(self):
+        done = self.cite('plan/bin/', 'HEAD')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_path_with_a_command_after_it_is_looked_up_by_its_first_word(self):
+        done = self.cite('plan/bin/issue 61', 'HEAD')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_path_on_neither_is_missing(self):
+        done = self.cite('plan/no-such-file.md', 'HEAD')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('#0: missing path `plan/no-such-file.md`', done.stdout)
+
+    def test_an_allowed_missing_path_is_a_note_on_any_base(self):
+        done = self.cite('docs/dist/', EMPTY_TREE)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('0 findings, 1 allowed missing paths', done.stdout)
+
+    def test_a_base_not_fetched_checks_this_checkout_and_says_so(self):
+        done = self.cite('plan/README.md', 'refs/remotes/nowhere/master')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('note: refs/remotes/nowhere/master is not fetched, so cited paths were '
+                      'checked in this checkout', done.stdout)
+
+
 class UnverifiedCause(Lint):
     """A Goal that asserts a cause while Current PHP behavior or Scope marks
     an observation or a cause unverified (#282 retro)."""

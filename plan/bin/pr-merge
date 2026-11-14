@@ -12,6 +12,14 @@
 # plan/bin/affected-tests maps the combined diff to. After that run on the
 # PR merged with origin/master, --base-checked merges anyway.
 #
+# A source check (a test server/tools/source-checks.sh runs, that script, or
+# plan/tests) reads files across the tree, so one that either side changed
+# refuses whatever the other side changed, in any area: #304 added
+# test_pipefail_pipes.py while #309 added `anchors ... | grep -q` pipes to
+# server/docs/adr/check-paths.sh, and only the lead's trial merge of the two
+# heads found it (#61 retro). Its run is server/tools/source-checks.sh on the
+# merge, which takes seconds.
+#
 # Usage: plan/bin/pr-merge <pr> [--base-checked] [--squash|--rebase|--merge] [--delete-branch]
 # With no merge method it squashes and deletes the branch, as the plan's PRs do.
 set -euo pipefail
@@ -72,16 +80,45 @@ if [ "$base_checked" = 0 ]; then
   # and an area both sides changed could go unseen (#206 retro).
   shared=$(LC_ALL=C comm -12 <(cut -f1 <<<"$pr_paths" | LC_ALL=C sort -u) \
              <(cut -f1 <<<"$master_paths" | LC_ALL=C sort -u) | grep . || true)
-  if [ -n "$shared" ]; then
+  pr_all=$(git diff --name-only "$base" "$head")
+  master_all=$(git diff --name-only "$base" origin/master)
+  # The source checks, as either side's source-checks.sh lists them.
+  checks=$({ git show "$head:server/tools/source-checks.sh" 2>/dev/null || true
+             git show "origin/master:server/tools/source-checks.sh" 2>/dev/null || true; } |
+           sed -nE 's,^[[:space:]]+([A-Za-z0-9_./-]+\.py).*,server/\1,p'
+           echo server/tools/source-checks.sh)
+  is_check() { # is_check <paths>: those that are source checks
+    { grep -Fx -f <(echo "$checks") <<<"$1"; grep '^plan/tests/' <<<"$1"; } | sort -u || true
+  }
+  pr_checks=$(is_check "$pr_all")
+  master_checks=$(is_check "$master_all")
+  checks_shared=0
+  if { [ -n "$pr_checks" ] && [ -n "$master_all" ]; } ||
+     { [ -n "$master_checks" ] && [ -n "$pr_all" ]; }; then
+    checks_shared=1
+  fi
+  if [ -n "$shared" ] || [ "$checks_shared" = 1 ]; then
     {
       echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, in an area the PR also changes, so CI ran without these commits:"
-      mapfile -t moved < <(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
-      git log --format='  %h %s' "$base..origin/master" -- "${moved[@]}"
+      if [ "$checks_shared" = 1 ]; then
+        git log --format='  %h %s' "$base..origin/master"
+      else
+        mapfile -t moved < <(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
+        git log --format='  %h %s' "$base..origin/master" -- "${moved[@]}"
+      fi
       for area in $shared; do
         echo "$area"
         awk -F'\t' -v a="$area" '$1 == a { print "  master:  " $2 }' <<<"$master_paths"
         awk -F'\t' -v a="$area" '$1 == a { print "  this PR: " $2 }' <<<"$pr_paths"
       done
+      if [ "$checks_shared" = 1 ]; then
+        echo "source checks (they read every file the other side changed)"
+        if [ -n "$master_checks" ]; then sed 's/^/  master:  /' <<<"$master_checks"
+        else echo "  master:  $(grep -c . <<<"$master_all") changed files"; fi
+        if [ -n "$pr_checks" ]; then sed 's/^/  this PR: /' <<<"$pr_checks"
+        else echo "  this PR: $(grep -c . <<<"$pr_all") changed files"; fi
+        echo "For the source checks, run server/tools/source-checks.sh on the PR merged with origin/master; it takes seconds."
+      fi
       echo "Run what plan/bin/affected-tests prints for the combined diff on the PR merged with origin/master, then rerun with --base-checked; or update the branch (gh pr update-branch $PR) and wait for CI again. For the combined diff it prints:"
       { git diff --name-only "$base" "$head"; git diff --name-only "$base" origin/master; } | sort -u |
         "${AFFECTED:-$(dirname "$0")/affected-tests}" --stdin || echo "(affected-tests failed)"
