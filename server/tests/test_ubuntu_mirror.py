@@ -6,7 +6,7 @@ mirrors.edge.kernel.org hung for 39 min until CI cancelled the job (run
 On 2026-11-14 the same download hung for 49 min after a probe that passed
 (run 43640908879).  apt's own timeout counts only silence, and a server
 that sends a byte every few seconds holds apt-get for as long as it likes
-(the trickle tests below, with apt 2.8 and 3.2).  So the script bounds each
+(the trickling-mirror test below).  So the script bounds each
 apt-get with a shim, which takes the mirror out and runs apt-get again,
 and writes an apt.conf drop-in so a silent mirror costs seconds."""
 
@@ -15,7 +15,9 @@ import os
 import pwd
 import re
 import shutil
+import signal
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -306,6 +308,69 @@ def test_a_failing_apt_get_with_no_mirror_listed_keeps_its_status(tmp_path, serv
     assert (tmp_path / "apt-mirrors.txt").read_text() == RUNNER
 
 
+HOLD_LOCK = """
+import fcntl, os, sys, time
+lock = open(sys.argv[1], "w")
+fcntl.lockf(lock, fcntl.LOCK_EX)
+open(sys.argv[2], "w").write(str(os.getpid()))
+time.sleep(30)
+"""
+
+
+def test_no_second_apt_get_runs_while_the_dpkg_lock_is_held(tmp_path, server):
+    """#318's review: apt-get ran out of time while dpkg configured a package.
+    dpkg runs in a session of its own, so the kill leaves it holding its lock,
+    and a second apt-get fails on that lock.  Here the real
+    apt-get starts a holder of a POSIX lock in a new session, as apt starts
+    dpkg, then hangs past the shim's 2 s.  The holder's output goes to
+    /dev/null, or the test would wait on its pipes."""
+    mirror = f"{server}/fast/ubuntu/"
+    lock = tmp_path / "lock"
+    lock.touch()
+    held = tmp_path / "holder"
+    listed, _, _ = run(tmp_path, mirror, APT_GET_SECONDS="2", DPKG_LOCK=str(lock))
+    calls = fake_apt_get(
+        tmp_path,
+        f"setsid {sys.executable} -c '{HOLD_LOCK}' {lock} {held}"
+        " </dev/null >/dev/null 2>&1 &\n"
+        f"until [ -s {held} ]; do sleep 0.1; done\n"
+        "sleep 30",
+    )
+    try:
+        done, took = shim(tmp_path, "install", "-y", "slowpkg")
+        pid = held.read_text()
+        name = Path(f"/proc/{pid}/comm").read_text().strip()
+    finally:
+        os.kill(int(held.read_text()), signal.SIGKILL)
+
+    assert done.returncode == 124
+    assert took < 10
+    assert calls.read_text() == "install -y slowpkg\n"
+    assert (
+        f"and process {pid} ({name}) still holds {lock}; a second apt-get would"
+        " fail on that lock, so none runs"
+    ) in done.stderr
+    assert (tmp_path / "apt-mirrors.txt").read_text() == listed
+
+
+def test_a_lock_nobody_holds_lets_apt_get_run_again(tmp_path, server):
+    """The same hang with the lock file there and free: the mirror leaves
+    and apt-get runs a second time."""
+    mirror = f"{server}/fast/ubuntu/"
+    lock = tmp_path / "lock"
+    lock.touch()
+    run(tmp_path, mirror, APT_GET_SECONDS="2", DPKG_LOCK=str(lock))
+    calls = fake_apt_get(
+        tmp_path, f"grep -q /fast/ {tmp_path}/apt-mirrors.txt && sleep 30\nexit 0"
+    )
+
+    done, _ = shim(tmp_path, "update")
+
+    assert done.returncode == 0, done.stderr
+    assert calls.read_text() == "update\nupdate\n"
+    assert "still holds" not in done.stderr
+
+
 def test_a_runner_with_no_mirror_list_still_gets_the_bounds(tmp_path, server):
     listed, printed, _ = run(tmp_path, f"{server}/fast/ubuntu/", listed=None)
     calls = fake_apt_get(tmp_path, "exit 100")
@@ -369,7 +434,8 @@ needs_apt = pytest.mark.skipif(APT_GET is None, reason="no apt-get on this host"
 def test_apt_falls_back_from_a_silent_mirror_within_the_drop_in_timeout(
     tmp_path, server
 ):
-    """With apt's defaults, 30 s and 3 retries, each file held two minutes."""
+    """apt gives the silent mirror up after the drop-in's 1 s, file by file,
+    and the update ends well inside the shim's bound."""
     done, took, listed = real_update(tmp_path, server, "silent", APT_GET_SECONDS="60")
 
     assert done.returncode == 0, done.stderr

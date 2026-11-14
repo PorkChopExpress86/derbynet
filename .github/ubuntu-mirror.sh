@@ -28,11 +28,18 @@
 #   same apt-get once more.  playwright's --with-deps runs apt-get itself,
 #   and goes through the shim too.
 #
+# `timeout` ends apt-get and its downloads, but not a dpkg that apt-get has
+# started: dpkg runs in a session of its own and keeps /var/lib/dpkg/lock
+# (`DPKG_LOCK`) with its package half configured.  A second apt-get would
+# only fail on that lock, so while any process holds it the shim names the
+# process and exits with apt-get's status, the mirror left listed.  The
+# shim reads the holder from /proc/locks, which every Linux has.
+#
 # Run it with sudo before any apt-get, playwright's --with-deps included;
 # server/tests/test_ubuntu_mirror.py fails a workflow step that runs apt
 # without it.  The tests set APT_MIRRORS_LIST, UBUNTU_MIRROR,
 # UBUNTU_CODENAME, the probe's two bounds, APT_CONF, APT_GET_SHIM, APT_GET
-# (the real apt-get) and the three apt bounds.
+# (the real apt-get), DPKG_LOCK and the three apt bounds.
 set -eu
 list=${APT_MIRRORS_LIST:-/etc/apt/apt-mirrors.txt}
 mirror=${UBUNTU_MIRROR:-https://mirrors.edge.kernel.org/ubuntu/}
@@ -49,13 +56,25 @@ shim=${APT_GET_SHIM:-/usr/local/sbin/apt-get}
 {
   echo '#!/bin/sh'
   echo '# Written by .github/ubuntu-mirror.sh, which says why.'
-  printf "real='%s' list='%s' mirror='%s' bound='%s'\n" \
-    "${APT_GET:-/usr/bin/apt-get}" "$list" "$mirror" "${APT_GET_SECONDS:-300}"
+  printf "real='%s' list='%s' mirror='%s' bound='%s' lock='%s'\n" \
+    "${APT_GET:-/usr/bin/apt-get}" "$list" "$mirror" "${APT_GET_SECONDS:-300}" \
+    "${DPKG_LOCK:-/var/lib/dpkg/lock}"
   cat <<'EOF'
 echo "apt-get $*: at most $bound s, by .github/ubuntu-mirror.sh" >&2
 rc=0
 timeout -k 10 "$bound" "$real" "$@" || rc=$?
 [ "$rc" -eq 0 ] && exit 0
+# A /proc/locks line names the holder's pid, then major:minor:inode.
+inode=$(stat -c %i "$lock" 2>/dev/null || true)
+holder=$(awk -v inode=":$inode" '
+  { for (i = 2; i <= NF; i++) if (substr($i, length($i) - length(inode) + 1) == inode) { print $(i - 1); exit } }
+' /proc/locks 2>/dev/null || true)
+if [ -n "$inode" ] && [ -n "$holder" ]; then
+  echo "ubuntu-mirror.sh: apt-get $* failed (exit $rc, 124 is out of time)," \
+    "and process $holder ($(cat "/proc/$holder/comm" 2>/dev/null || echo gone)) still holds $lock;" \
+    "a second apt-get would fail on that lock, so none runs" >&2
+  exit "$rc"
+fi
 grep -qsF "$mirror" "$list" || exit "$rc"
 echo "ubuntu-mirror.sh: apt-get $* failed (exit $rc, 124 is out of time);" \
   "$mirror leaves $list and apt-get runs again" >&2

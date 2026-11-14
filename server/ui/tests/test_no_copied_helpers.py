@@ -1,20 +1,21 @@
-"""No two top-level functions in `ui/` have the same code (#45 retro).
+"""No two top-level functions in `ui/` have the same code (#45 retro), and no
+function or string constant in `tools/` copies one in `server/` (#61 retro).
 
 #45's review found `_int` copied into three views (one of them named
 `_type`) and `car` in two modules, and moved them to `ui/responses.py`;
-`_nocase` and `_round_name` stayed copied until this test. A copy drifts: the
-playlist's `_int` refused a number past 32 bits and the groups page's did
-not. This test compares each function's arguments, annotations, decorators
-and body, with its name and docstring left out, so it finds a copy under any
-name. Two helpers that differ by a line are past its reach; the review still
-looks for them.
+`_nocase` and `_round_name` stayed copied until this test. A copy drifts:
+the playlist's `_int` checked a range and the groups page's did not. These
+tests compare each function's kind (`def` or `async def`), arguments,
+annotations, decorators and body, with its name and docstring left out, so
+they find a copy under any name. Two helpers that differ by a line are past
+their reach; the review still looks for them.
 
 Put a shared helper in `ui/responses.py`, or in the service that owns its
 rule.
 
 A script in `tools/` imports what it shares with the server or the tests,
 too: no function there may copy one anywhere in `server/`, tests included,
-and no string constant of a line or more may either (#61's
+and no top-level string constant with a newline in it may either (#61's
 `race_day_screens.py` copied `htmx_settled`, `dismiss_toasts` and `BOUND`
 from the browser tests, with `page` renamed `tab`; review found them).
 Arguments are compared by position, so a renamed argument is still a copy.
@@ -74,7 +75,7 @@ def _shape(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     ):
         body = body[1:]
     return ast.dump(
-        ast.FunctionDef(
+        type(node)(
             name="_",
             args=node.args,
             body=body,
@@ -241,3 +242,8 @@ def test_it_tells_arguments_apart_by_position():
     renamed = "def f(a, b):\n    return a - b\n\n\ndef g(x, y):\n    return x - y\n"
     assert copies({"m.py": swapped}) == []
     assert copies({"m.py": renamed}) == [["m.py:1 f", "m.py:5 g"]]
+
+
+def test_it_tells_a_def_from_an_async_def():
+    both = "def f(page):\n    return page\n\n\nasync def g(page):\n    return page\n"
+    assert copies({"m.py": both}) == []
