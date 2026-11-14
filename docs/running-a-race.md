@@ -180,7 +180,7 @@ The same card holds after the Scouts final, and after Outlaws round 1. The playl
 
 - A car jumped the track: run the heat again. Once the heat has times, the button reads "Re-Run This Heat". When the next heat is already staged, it reads "Re-Run Previous". Either one discards the heat's results and races it again, and then reads "Reinstate Heat", which puts the results back.
 - The timer missed a heat: "Manual results", type the times or the places, and press "Save results".
-- A lane breaks: "Close a lane" takes it out of the heats still to race.
+- A lane breaks: "Close a lane" reschedules the heats still to race on the open lanes.
 - A racer arrives late: their card at check-in has "Add to round…". Or on the dashboard, "Not in the schedule", then "Preview and add".
 - A round must race again: "Repeat Round" on its card. It deletes the round's results.
 - "Previous" and "Next heat" move between heats. The switch on the heat card turns racing off and on.
