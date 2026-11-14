@@ -35,7 +35,7 @@ What each part does:
 
 Docker downloads the image the first time, which takes a minute or two. On Linux, put `sudo` in front of each `docker` command unless your user is in the `docker` group.
 
-The image is published when the project tags a release (D89). If the command says the image is not found, build it from a copy of the repository instead. From the repository's top folder, run `docker buildx build -f server/docker/Dockerfile -t derbynet_server .` and use `derbynet_server` in place of the image name.
+The image is published when the project tags a release (D89). The commands here use the image's `latest` tag, which only a full release sets. Until the first one, only test releases are published, so add the newest test release's tag from the project's [Releases page](https://github.com/PorkChopExpress86/derbynet/releases) to the end of the image name in each command, after a colon, for example `:v0.1.0-rc2`. Use `v0.1.0-rc2` or later, since `v0.1.0-rc1` cannot run the browser timer. If the command says the image is not found, build it from a copy of the repository instead. From the repository's top folder, run `docker buildx build -f server/docker/Dockerfile -t derbynet_server .` and use `derbynet_server` in place of the image name.
 
 ### If port 80 or 443 is taken
 
@@ -49,7 +49,7 @@ The repository holds the same setup as a Compose file, `server/docker/compose.ya
 docker compose up -d
 ```
 
-Like `docker run`, Compose pulls the published image, so until the project tags a release it fails the same way. Then build the image from the repository instead: from the folder that holds `compose.yaml` in a copy of the repository, run `docker compose up -d --build`.
+Like `docker run`, Compose pulls the published image's `latest` tag. Until the first full release, put a line naming a test release in a file named `.env` beside `compose.yaml`, for example `DERBYNET_IMAGE=ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc2`. If no image is published yet, it fails the same way. Then build the image from the repository instead: from the folder that holds `compose.yaml` in a copy of the repository, run `docker compose up -d --build`.
 
 Compose names the volume `derbynet_data`. The file reads `TZ` from your shell, or from a file named `.env` beside it, so a line `TZ=America/Chicago` in `.env` sets the time zone. The Postgres profile below also needs Compose.
 
