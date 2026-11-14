@@ -1,6 +1,7 @@
 name: plan-checks
 
-# Checks the Django migration's planning records: the paths the ADRs cite, and
+# Checks the Django migration's planning records: the paths the ADRs cite, the
+# guides in docs/ (#61), and
 # every django-migration issue body (plan/lint-issues.py).
 #
 # The issue lint reads live GitHub state, not the checkout, so a pull request
@@ -55,6 +56,14 @@ jobs:
         if: github.event_name != 'issues'
         with:
           python-version: '3.14'
+
+      # The guides served under /docs/ (#61): relative links, images, anchors,
+      # backticked paths, no remote image, no long dash, and no instruction
+      # from a PHP install. It runs after uv is set up: a guide's anchors are
+      # the ids the docs build gives its headings (server/ui/docs/build.py).
+      - name: Check the guides in docs/
+        if: github.event_name != 'issues'
+        run: bash server/docs/adr/check-paths.sh --docs docs
 
       - name: Test the plan tools
         if: github.event_name != 'issues'

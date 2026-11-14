@@ -55,17 +55,18 @@ The image sets these. `server/README.md`'s Settings table lists the rest, such a
 | `DERBYNET_REQUEST_TIMEOUT` | `30` | Seconds a request may take: gunicorn's `--timeout` and nginx's `proxy_read_timeout`. Raise it for very long schedules, such as `600` |
 | `GUNICORN_WORKERS` | `4` | gunicorn's sync workers. The default is `tools/load-run.sh`'s until #37's race-day load run sets it |
 | `DERBYNET_URL_PREFIX` | empty | Serves the server under a path, such as `/derbynet`, as well as at `/`. Django builds its links with the prefix (`FORCE_SCRIPT_NAME`) |
-| `DERBYNET_ALLOWED_HOSTS` | `*` | Comma-separated host names the server answers to. Phones reach a LAN server by an address the image can't know, so it answers any; a server on the internet should name its host, because a client could otherwise set the host that absolute links, such as check-in QR codes, are built with |
+| `DERBYNET_ALLOWED_HOSTS` | `*` | Comma-separated host names the server answers to. Phones reach a LAN server by an address the image can't know, so it answers any; a server on the internet should name its host, because a client could otherwise set the host that absolute links, such as check-in QR codes, are built with. A list always keeps `localhost`, `127.0.0.1` and `[::1]`, which the HEALTHCHECK asks for (#61) |
 | `DERBYNET_CSRF_TRUSTED_ORIGINS` | empty | Extra origins for the manager pages behind another HTTPS proxy |
 | `DERBYNET_TRUSTED_PROXIES` | empty | Comma-separated addresses or networks of a proxy in front of the container (below). Only from these is a request's `X-Forwarded-Proto` believed; from anyone else, the scheme is the connection's |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server makes one on first start in `/var/lib/derbynet/secret_key`, mode 0600 |
 | `DATABASE_URL` | unset | Another database. Unset, SQLite on the volume, or the compose `postgres` service when it runs |
 | `DERBYNET_DATA_DIR`, `DERBYNET_CONFIG_DIR` | `/var/lib/derbynet` | Where the data and the install's files are. Keep both on the volume |
+| `DERBYNET_DOCS_ROOT` | `/opt/derbynet/docs` | The guides under `/docs/`, rendered from `docs/` when the image is built (#61). Leave it |
 | `GUNICORN_RELOAD` | `0` | `1` restarts gunicorn's workers when a Python file or a template changes, for development (README.md) |
 
 ## Timers on a Mac or Windows laptop
 
-Docker Desktop on a Mac cannot pass a USB serial device into a container (D3). On a Mac or Windows laptop, connect the timer through the browser timer instead: open `http://<host>/timer.php` in Chrome on the laptop the timer is plugged into, which talks to the timer over Web Serial. The image serves that page. On a Linux host, `derby-timer.jar` runs on the host and connects to `http://<host>/`.
+Docker Desktop on a Mac cannot pass a USB serial device into a container (D3). On a Mac or Windows laptop, connect the timer through the browser timer instead: open `https://<host>/timer.php` in Chrome or Edge on the laptop the timer is plugged into, which talks to the timer over Web Serial. The image serves that page. Web Serial needs a secure page, so use the HTTPS address and accept the certificate; plain `http://` works only as `http://localhost/timer.php` on the computer running the container. Over plain HTTP to another address, Chrome hides Web Serial and the page sends the browser to `/timer/no-serial/`. On a Linux host, `derby-timer.jar` runs on the host and connects to `http://<host>/`. `docs/install-docker.md` says the same for race crews.
 
 ## Behind another web server
 
@@ -118,7 +119,7 @@ docker run --rm -v derbynet_postgres:/data:ro --entrypoint tar \
   ghcr.io/porkchopexpress86/derbynet_server -C /data -czf - . > derbynet-postgres.tgz
 ```
 
-On Windows, run these in WSL or PowerShell 7.4 or later, which keep a command's output byte for byte.
+On Windows, run these in WSL as written. PowerShell 7.4 or later, which keeps a command's output byte for byte, runs them with three changes: each command on one line, since PowerShell continues a line with a backtick, not `\`; no `umask 077`, which PowerShell lacks, so save the files in your own user folder, not a shared one; and the restore below reads its file from a mounted folder, since PowerShell has no `<`.
 
 The backup holds the whole race: the database, photos, car photos, videos, the secret key and the TLS key. A snapshot from the settings page leaves out videos and some race state (D65).
 
@@ -139,6 +140,13 @@ Under the `postgres` profile, pass `--profile postgres` to each `docker compose`
 ```sh
 docker run --rm -i -v derbynet_postgres:/data --entrypoint tar \
   ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf - < derbynet-postgres.tgz
+```
+
+In PowerShell, each restore reads the backup from the folder that holds it:
+
+```powershell
+docker run --rm -v derbynet_data:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-data.tgz
+docker run --rm -v derbynet_postgres:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-postgres.tgz
 ```
 
 `.github/workflows/image.yml` runs these steps, with SQLite and with Postgres, on an event holding a racer photo, a car photo and a video (`server/docker/ci/checks.sh backup`).

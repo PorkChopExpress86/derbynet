@@ -1,0 +1,10 @@
+{% extends "ui/base.html" %}{% load static %}
+{% block head %}<link rel="stylesheet" href="{% static 'ui/docs.css' %}">{% endblock %}
+{% block main %}
+{# The guides in docs/ (#61), in ui.docs.build.GUIDES order. #}
+<article class="doc" data-doc-index>
+  <h1>DerbyNet guides</h1>
+  <p>These guides are served by this DerbyNet server, so they work with no internet. Print any of them from the browser.</p>
+  {% if guides is None %}<p data-docs-not-built>{{ not_built }}</p>{% else %}<ul>{% for guide in guides %}<li><a href="{% url 'docs-page' guide.slug %}">{{ guide.title }}</a></li>{% endfor %}</ul>{% endif %}
+</article>
+{% endblock %}

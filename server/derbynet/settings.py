@@ -107,6 +107,17 @@ LOCK_SETTINGS = _env_flag("DERBYNET_LOCK_SETTINGS")
 ENABLE_TEST_ENDPOINTS = _env_flag("DERBYNET_ENABLE_TEST_ENDPOINTS")
 
 ALLOWED_HOSTS = _env_list("DERBYNET_ALLOWED_HOSTS", "*")
+# A named list keeps the server itself: the image's HEALTHCHECK asks for
+# http://127.0.0.1/ and a browser on the server machine for localhost, and
+# without them a hosted install's container turned unhealthy (#61). A host
+# name a client sends builds absolute links, and these name only the
+# client's own machine.
+if "*" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS += [
+        host
+        for host in ("localhost", "127.0.0.1", "[::1]")
+        if host not in ALLOWED_HOSTS
+    ]
 CSRF_TRUSTED_ORIGINS = _env_list("DERBYNET_CSRF_TRUSTED_ORIGINS")
 
 FORCE_SCRIPT_NAME = _url_prefix(os.environ.get("DERBYNET_URL_PREFIX", ""))
@@ -200,11 +211,9 @@ STATIC_URL = "static/"
 # Django serves static files only with DEBUG on. Unset, collectstatic refuses.
 STATIC_ROOT = os.environ.get("DERBYNET_STATIC_ROOT") or None
 
-# The quick reference the help link opens. The docs build writes it.
-QUICKREF_PDF = Path(
-    os.environ.get("DERBYNET_QUICKREF_PDF")
-    or BASE_DIR.parent / "docs" / "dist" / "Quick Reference.pdf"
-)
+# The guides under /docs/, as `manage.py build_docs` renders them from docs/
+# (#61). The Docker image renders them at build time into /opt/derbynet/docs.
+DOCS_ROOT = Path(os.environ.get("DERBYNET_DOCS_ROOT") or BASE_DIR / "var" / "docs")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
