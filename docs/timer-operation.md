@@ -13,7 +13,7 @@ On a phone, open the timer page with "Timer status" on the race dashboard, or op
 
 ![The timer page on a phone](img/timer-operation/timer.png)
 
-Run one timer client at a time. The server takes the client that said hello last as the timer, unless another one sent a message less than a second before. Each heartbeat from any other client is answered that another timer is running. The browser timer then stops, and says "Another timer interface is running and competing with this window."
+Run one timer client at a time. The server keeps one client as the timer: the last one to say hello, unless the current one sent a message in the second or two before. It answers each heartbeat from another client that another timer is running, and the browser timer then stops, and says "Another timer interface is running and competing with this window." The server tells clients apart by their browser or program name (the User-Agent), so two copies of one browser, or of `derby-timer.jar`, look like one timer to it.
 
 "Timer settings" shows the settings the timer client reported, such as how long it waits to reset the timer after a heat. A change goes to the timer client with its next message.
 
