@@ -2,12 +2,17 @@
 starts anything: #47 and #48 each lost a 25-repeat run to
 `timeout 3000 ... | grep` (#48 retro). It also refuses an output folder
 that already holds files: #220 reused one, and a wait for its `junit.xml`
-fired on an earlier session's results (#220 retro)."""
+fired on an earlier session's results (#220 retro). A run holds a lock
+for the machine, a second waits for it, and a SIGKILL frees it (#316
+retro)."""
 
+import fcntl
 import os
 import re
 import shutil
+import signal
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -15,13 +20,14 @@ import pytest
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
 
 
-def run(command: str, out: str = "/nonexistent") -> subprocess.CompletedProcess:
+def run(
+    command: str, out: str = "/nonexistent", lock: str | None = None
+) -> subprocess.CompletedProcess:
+    env = {"PATH": "/usr/bin:/bin", "DERBYNET_LOAD_RUN_DIR": out}
+    if lock:
+        env["DERBYNET_LOAD_LOCK"] = lock
     return subprocess.run(
-        ["bash", "-c", command],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={"PATH": "/usr/bin:/bin", "DERBYNET_LOAD_RUN_DIR": out},
+        ["bash", "-c", command], capture_output=True, text=True, timeout=60, env=env
     )
 
 
@@ -71,9 +77,350 @@ def test_the_summary_names_an_error_as_well_as_a_failure(tmp_path):
         text=True,
         timeout=120,
         cwd=tmp_path,
-        env={**os.environ, "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run")},
+        env={
+            **os.environ,
+            "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+        },
     )
     summary = (tmp_path / "out").read_text()
     assert result.returncode == 1, summary
     assert re.search(r"^ERROR \S*test_breaks.py::test_errors_at_setup", summary, re.M)
     assert re.search(r"^FAILED \S*test_breaks.py::test_fails", summary, re.M)
+
+
+# A stub test that holds its run open until the test writes `go` beside it,
+# for at most 60 s, so the first run is still running when the second
+# starts, on any load.
+HOLD = """\
+import os
+import time
+from pathlib import Path
+
+HERE = Path(__file__).parent
+
+
+def test_holds():
+    held = os.environ.get("DERBYNET_LOAD_LOCK_HELD")
+    (HERE / "started").write_text(f"{os.getpid()} {held}")
+    for _ in range(600):
+        if (HERE / "go").exists():
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("no go within 60 s")
+"""
+
+
+def start(tmp_path, name, lock, extra_env=None, go=False, loops=1):
+    """The script on a stub of its own in `tmp_path/name`, in a session of
+    its own so the test can kill all it started, with its output in
+    `tmp_path/name.out` (a file, as run_in_background gives it). With `go`
+    its stub passes at once."""
+    folder = tmp_path / name
+    folder.mkdir()
+    (folder / f"test_{name}.py").write_text(HOLD)
+    if go:
+        (folder / "go").write_text("")
+    out = open(tmp_path / f"{name}.out", "w")
+    env = {
+        **os.environ,
+        "DERBYNET_LOAD_RUN_DIR": str(tmp_path / f"{name}-run"),
+        "DERBYNET_LOAD_LOCK": str(lock),
+        **(extra_env or {}),
+    }
+    env.pop("DERBYNET_LOAD_LOCK_HELD", None)
+    run = subprocess.Popen(
+        [str(SCRIPT), "--loops", str(loops), "-p", "no:cacheprovider", str(folder)],
+        stdout=out,
+        stderr=subprocess.STDOUT,
+        cwd=tmp_path,
+        env=env,
+        start_new_session=True,
+    )
+    out.close()
+    return run
+
+
+def wait_until(condition, what, seconds=60):
+    deadline = time.monotonic() + seconds
+    while not condition():
+        if time.monotonic() > deadline:
+            raise AssertionError(f"no {what} within {seconds} s")
+        time.sleep(0.1)
+
+
+def child_pids(pid):
+    """(pid, command name) of each live process whose parent is `pid`."""
+    found = []
+    for stat in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            name, rest = stat.read_text().rsplit(")", 1)
+        except OSError:
+            continue
+        fields = rest.split()
+        if int(fields[1]) == pid and fields[0] != "Z":
+            found.append((int(stat.parent.name), name.split("(", 1)[1]))
+    return found
+
+
+def children(pid):
+    """The command names of the processes whose parent is `pid`."""
+    return [name for _, name in child_pids(pid)]
+
+
+def alive(pid):
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+    except OSError:
+        return False
+    return state != "Z"
+
+
+def free(lock):
+    """Whether the next load run would take `lock` at once."""
+    fd = os.open(lock, os.O_RDONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except BlockingIOError:
+        return False
+    finally:
+        os.close(fd)
+
+
+def holder_block(out):
+    """The lines a waiting run printed under `held by:`."""
+    text = out.read_text()
+    if "held by:" not in text:
+        return None
+    block = text.split("held by:\n", 1)[1]
+    return [line for line in block.splitlines() if line.startswith("  ")]
+
+
+def finish(tmp_path, *runs):
+    for folder in tmp_path.iterdir():
+        if folder.is_dir() and list(folder.glob("test_*.py")):
+            (folder / "go").write_text("")
+    for run in runs:
+        try:
+            run.wait(timeout=90)
+        except subprocess.TimeoutExpired:
+            pass
+        try:
+            os.killpg(run.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def test_a_second_load_run_waits_for_the_first_and_names_it(tmp_path):
+    """#316's hand-off ran beside #317's load run and failed, then waited
+    for a slot the lead handed out by message (#316 retro)."""
+    lock = tmp_path / "load.lock"
+    first = start(tmp_path, "first", lock)
+    second = None
+    try:
+        wait_until((tmp_path / "first" / "started").exists, "first run")
+        second = start(tmp_path, "second", lock)
+        out = tmp_path / "second.out"
+        wait_until(
+            lambda: (
+                "Waiting for the load lock" in out.read_text()
+                or (tmp_path / "second" / "started").exists()
+            ),
+            "wait or start of the second run",
+        )
+        assert not (tmp_path / "second" / "started").exists(), out.read_text()
+        # It waits in flock, not in a sleep that would let it through later.
+        wait_until(lambda: "flock" in children(second.pid), "flock under it", 10)
+        held = out.read_text()
+        assert f"  pid {first.pid}, since " in held
+        assert f"  cwd {tmp_path}\n" in held
+        assert re.search(r"^  head [0-9a-f]{40}$", held, re.M), held
+        assert f"  args --loops 1 -p no:cacheprovider {tmp_path / 'first'}" in held
+        (tmp_path / "first" / "go").write_text("")
+        assert first.wait(timeout=90) == 0
+        # Its pytest is told, so its header names no other run (conftest.py).
+        started = (tmp_path / "first" / "started").read_text()
+        assert started == f"{started.split()[0]} {lock}"
+        wait_until((tmp_path / "second" / "started").exists, "second run")
+        (tmp_path / "second" / "go").write_text("")
+        assert second.wait(timeout=90) == 0
+        assert re.search(r"^Got the load lock after \d+ s$", out.read_text(), re.M)
+    finally:
+        finish(tmp_path, first, *([second] if second else []))
+
+
+def test_a_sigkill_frees_the_lock_though_its_loops_and_pytest_live_on(tmp_path):
+    """A SIGKILL skips the script's trap, so its busy loop and its pytest
+    live on; neither keeps the lock, and the next run starts at once
+    (plan/AGENT-BRIEF.md: a SIGKILL followed by the next run)."""
+    lock = tmp_path / "load.lock"
+    first = start(tmp_path, "first", lock)
+    second = None
+    try:
+        wait_until((tmp_path / "first" / "started").exists, "first run")
+        stub = int((tmp_path / "first" / "started").read_text().split()[0])
+        os.kill(first.pid, signal.SIGKILL)
+        first.wait(timeout=10)
+        second = start(tmp_path, "second", lock)
+        wait_until((tmp_path / "second" / "started").exists, "second run")
+        os.kill(stub, 0)  # the first run's pytest still runs
+        assert "Waiting" not in (tmp_path / "second.out").read_text()
+    finally:
+        finish(tmp_path, first, *([second] if second else []))
+
+
+def test_two_runs_waiting_on_one_new_folder_do_not_both_take_it(tmp_path):
+    """Both passed the used-folder check before the wait, so both wrote into
+    the same folder; it is checked again once the lock is taken (#354
+    review)."""
+    lock = tmp_path / "load.lock"
+    shared = {"DERBYNET_LOAD_RUN_DIR": str(tmp_path / "shared-run")}
+    first = start(tmp_path, "first", lock)
+    runs = [first]
+    try:
+        wait_until((tmp_path / "first" / "started").exists, "first run")
+        for name in ("second", "third"):
+            runs.append(start(tmp_path, name, lock, shared, go=True))
+        for name in ("second", "third"):
+            out = tmp_path / f"{name}.out"
+            wait_until(lambda o=out: "Waiting" in o.read_text(), f"{name} waiting")
+        (tmp_path / "first" / "go").write_text("")
+        codes = sorted(r.wait(timeout=90) for r in runs[1:])
+        assert first.wait(timeout=90) == 0
+        assert codes == [0, 2]
+        refused = [
+            out.read_text()
+            for out in (tmp_path / "second.out", tmp_path / "third.out")
+            if "already holds files" in out.read_text()
+        ]
+        assert len(refused) == 1
+    finally:
+        finish(tmp_path, *runs)
+
+
+def test_a_waiter_never_reads_half_the_holder_s_lines(tmp_path):
+    """The holder wrote its lines singly after a truncate, so a waiter
+    that came while its git was slow printed only the pid and the folder
+    (#354 review). Here the holder's git waits for the test."""
+    lock = tmp_path / "load.lock"
+    bin_dir = tmp_path / "slowbin"
+    bin_dir.mkdir()
+    git = shutil.which("git")
+    (bin_dir / "git").write_text(
+        "#!/bin/bash\n"
+        f"touch '{tmp_path}/git-called'\n"
+        "for _ in $(seq 600); do\n"
+        f"  [ -e '{tmp_path}/git-go' ] && break\n"
+        "  sleep 0.1\n"
+        "done\n"
+        f"exec '{git}' \"$@\"\n"
+    )
+    (bin_dir / "git").chmod(0o755)
+    slow = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    first = start(tmp_path, "first", lock, slow)
+    runs = [first]
+    try:
+        wait_until((tmp_path / "git-called").exists, "the holder's git")
+        second = start(tmp_path, "second", lock, go=True)
+        runs.append(second)
+        out = tmp_path / "second.out"
+        wait_until(
+            lambda: "Waiting" in out.read_text() or second.poll() is not None,
+            "the second run waiting or done",
+        )
+        (tmp_path / "git-go").write_text("")
+        (tmp_path / "first" / "go").write_text("")
+        assert second.wait(timeout=90) == 0
+        assert first.wait(timeout=90) == 0
+        held = holder_block(out)
+        if held is not None:
+            keys = [line.split()[0] for line in held]
+            assert keys in (["(no"], ["pid", "cwd", "head", "args"]), held
+    finally:
+        finish(tmp_path, *runs)
+
+
+def test_a_waiter_on_an_empty_lock_file_says_so(tmp_path):
+    """Between the holder's truncation and its write the file is empty."""
+    lock = tmp_path / "load.lock"
+    lock.write_text("")
+    fd = os.open(lock, os.O_RDONLY)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    run = None
+    try:
+        run = start(tmp_path, "second", lock, go=True)
+        out = tmp_path / "second.out"
+        wait_until(lambda: "flock" in children(run.pid), "the run waiting")
+        assert holder_block(out) == ["  (no details yet)"], out.read_text()
+    finally:
+        os.close(fd)
+        if run:
+            assert run.wait(timeout=90) == 0
+            finish(tmp_path, run)
+
+
+def test_no_flock_is_refused_with_how_to_install_it(tmp_path):
+    """macOS has no `flock(1)`: the run printed the shell's `command not
+    found` and a Waiting line with no holder (#354 review)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for tool in ("ps", "tr", "dirname"):
+        (bin_dir / tool).symlink_to(shutil.which(tool))
+    out = tmp_path / "out"
+    with out.open("w") as stdout:
+        result = subprocess.run(
+            [str(SCRIPT), "--loops", "0", str(tmp_path)],
+            stdout=stdout,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=60,
+            env={
+                "PATH": str(bin_dir),
+                "HOME": str(tmp_path),
+                "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+            },
+        )
+    assert result.returncode == 2
+    assert "brew install flock" in result.stderr
+    assert "not found" not in result.stderr + out.read_text()
+
+
+def test_an_unwritable_lock_is_refused_by_name(tmp_path):
+    folder = tmp_path / "read-only"
+    folder.mkdir()
+    folder.chmod(0o555)
+    lock = folder / "derbynet" / "load-run.lock"
+    try:
+        result = run(
+            f"'{SCRIPT}' --loops 0 tests/test_pytest_under_load.py >/dev/null",
+            out=str(tmp_path / "run"),
+            lock=str(lock),
+        )
+    finally:
+        folder.chmod(0o755)
+    assert result.returncode == 2
+    assert f"cannot open the load lock {lock}" in result.stderr
+    assert "Permission denied" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "signals", [("TERM", "TERM"), ("TERM", "INT")], ids=["TERM-TERM", "TERM-INT"]
+)
+def test_a_second_signal_during_the_cleanup_still_frees_all(tmp_path, signals):
+    """plan/AGENT-BRIEF.md: a tool that cleans up in a trap is tested with a
+    second signal during the cleanup (#354 review)."""
+    lock = tmp_path / "load.lock"
+    first = start(tmp_path, "first", lock, loops=4)
+    try:
+        wait_until((tmp_path / "first" / "started").exists, "first run")
+        loops = [pid for pid, name in child_pids(first.pid) if name == "bash"]
+        assert len(loops) == 4
+        for name in signals:
+            os.kill(first.pid, getattr(signal, f"SIG{name}"))
+        first.wait(timeout=30)
+        wait_until(lambda: not any(alive(pid) for pid in loops), "loops gone", 10)
+        assert free(lock)
+    finally:
+        finish(tmp_path, first)
