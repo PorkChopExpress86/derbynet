@@ -11,6 +11,7 @@ step that runs counts: a `# run:` commented out, or a step with `if: false`,
 gave 4 passed in #58's retro review (tests/workflow_steps.py).
 """
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -442,3 +443,52 @@ def test_an_exec_as_derbynet_and_prose_pass():
         (11, "derbynet"),
         (12, "derbynet"),
     ]
+
+
+# ----- checks.sh uid-exec's .env lines from the guide (D106) ------------------
+
+
+def guide_env_lines(tmp_path: Path, text: str) -> str:
+    path = tmp_path / "guide.md"
+    path.write_text(text)
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"set -e -E -u -o pipefail\n{shell_function('guide_env_lines')}\n"
+            'guide_env_lines "$1"',
+            "bash",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def test_guide_env_lines_run_write_the_host_users_ids(tmp_path):
+    """The guide's Compose step, run as uid-exec runs it, writes the ids `id`
+    prints into .env."""
+    lines = guide_env_lines(tmp_path, (ROOT / "docs" / "install-docker.md").read_text())
+    assert lines == (
+        'echo "DERBYNET_UID=$(id -u)" >> .env\necho "DERBYNET_GID=$(id -g)" >> .env\n'
+    )
+    work = tmp_path / "work"
+    work.mkdir()
+    subprocess.run(["bash", "-euo", "pipefail", "-c", lines], cwd=work, check=True)
+    assert (work / ".env").read_text() == (
+        f"DERBYNET_UID={os.getuid()}\nDERBYNET_GID={os.getgid()}\n"
+    )
+
+
+def test_guide_env_lines_skip_other_blocks(tmp_path):
+    """A `docker run` naming DERBYNET_UID, and another line into .env, are not
+    the step."""
+    text = (
+        "# T\n\n```sh\ndocker run -e DERBYNET_UID=$(id -u) image\n```\n\n"
+        "```sh\necho DERBYNET_IMAGE=x >> .env\n```\n\n"
+        "```powershell\necho DERBYNET_UID=1 >> .env\n```\n"
+    )
+    assert guide_env_lines(tmp_path, text) == ""
+    step = "```sh\necho DERBYNET_UID=1 >> .env\n```\n"
+    assert guide_env_lines(tmp_path, text + step) == "echo DERBYNET_UID=1 >> .env\n"
