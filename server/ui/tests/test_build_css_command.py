@@ -10,7 +10,7 @@ from ui import css_build
 
 # A stand-in CLI: writes a fixed stylesheet to the path after --output.
 FAKE_CLI = b"""#!/bin/sh
-while [ "$1" != "--output" ]; do shift; done
+while [ $# -gt 0 ] && [ "$1" != "--output" ]; do shift; done
 printf '.built{}' > "$2"
 """
 

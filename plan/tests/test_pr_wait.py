@@ -12,6 +12,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 PR_WAIT = Path(__file__).resolve().parent.parent / 'bin' / 'pr-wait'
 
 FAKE_GH = '''#!{python}

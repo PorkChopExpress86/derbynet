@@ -1,6 +1,7 @@
-""".githooks/pre-push runs plan/tests, in a scratch repository whose only
-test fails, so it runs no server check, and refuses a push typed after a
-pytest run in one command.
+""".githooks/pre-push runs plan/tests once on every push, in a scratch
+repository with one plan test, stand-ins for uv and check-paths.sh and the
+real source-checks.sh, and refuses a push typed after a pytest run in one
+command.
 
 Run: python3 -I -m unittest discover -s plan/tests
 """
@@ -11,12 +12,21 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 HOOK = Path(__file__).resolve().parents[2] / '.githooks' / 'pre-push'
-FAILING = '''import unittest
+SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'source-checks.sh'
+# The server checks' stand-ins: each notes its arguments and passes.
+UV = '#!/bin/sh\necho "uv $*" >>"$STUB_LOG"\n'
+CHECK_PATHS = 'echo "check-paths.sh" >>"$STUB_LOG"\necho "0 failures"\n'
+FAILING = '''import os
+import unittest
 
 
 class Plan(unittest.TestCase):
     def test_it_fails(self):
+        with open(os.environ['STUB_LOG'], 'a') as log:
+            log.write('plan/tests\\n')
         self.fail('the plan test failed')
 '''
 
@@ -40,6 +50,15 @@ def push(changed: str, plan_test: str, shell: str = '') -> subprocess.CompletedP
         git('init', '-q', '-b', 'master')
         (repo / '.githooks').mkdir()
         shutil.copy(HOOK, repo / '.githooks' / 'pre-push')
+        (repo / 'server' / 'tools').mkdir(parents=True)
+        shutil.copy(SOURCE_CHECKS, repo / 'server' / 'tools' / 'source-checks.sh')
+        (repo / 'server' / 'docs' / 'adr').mkdir(parents=True)
+        (repo / 'server' / 'docs' / 'adr' / 'check-paths.sh').write_text(CHECK_PATHS)
+        stubs = Path(tmp, 'stubs')
+        stubs.mkdir()
+        (stubs / 'uv').write_text(UV)
+        (stubs / 'uv').chmod(0o755)
+        env.update(PATH=f'{stubs}:{os.environ["PATH"]}', STUB_LOG=str(Path(tmp, 'ran')))
         (repo / 'plan' / 'tests').mkdir(parents=True)
         (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
         git('add', '.')
@@ -55,20 +74,36 @@ def push(changed: str, plan_test: str, shell: str = '') -> subprocess.CompletedP
         if shell:
             # Not the script's last command, so bash forks the hook as its child.
             hook = ['bash', '-c', f'{shell}\nbash .githooks/pre-push origin url; exit $?']
-        return subprocess.run(
+        result = subprocess.run(
             hook, cwd=repo, env=env,
             input=f'refs/heads/b {head} refs/heads/b {base}\n',
             capture_output=True, text=True)
+        ran = Path(tmp, 'ran')
+        result.ran = ran.read_text() if ran.exists() else ''
+        return result
 
 
 class PrePush(unittest.TestCase):
     def test_a_failing_plan_test_stops_a_push_of_the_parity_gate(self):
         """#222 changed server/tools/parity_gate.py, and only plan-checks.yml
         found the plan test it broke (#218 retro)."""
-        # A failing plan test stops the hook before it reaches server/.
         result = push('server/tools/parity_gate.py', FAILING)
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('the plan test failed', result.stderr)
+
+    def test_a_push_of_server_runs_plan_tests_once(self):
+        """source-checks.sh runs plan/tests, and #311's push ran them a
+        second time after the hook's own run (#311 retro)."""
+        result = push('server/tools/parity_gate.py', PASSING)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.ran.count('plan/tests'), 1, result.ran)
+        self.assertIn('uv run --locked ruff check', result.ran)
+        self.assertIn('pytest -q -p no:cacheprovider', result.ran)
+
+    def test_a_push_outside_server_runs_plan_tests_once(self):
+        result = push('plan/README.md', PASSING)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.ran, 'plan/tests\n')
 
     def test_a_failing_plan_test_stops_a_push_outside_server(self):
         result = push('plan/README.md', FAILING)
@@ -87,6 +122,7 @@ class ImageWorkflow(unittest.TestCase):
 
     def test_an_image_yml_push_runs_the_server_checks(self):
         result = push('.github/workflows/image.yml', PASSING)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('pre-push: server/docs/adr/check-paths.sh', result.stderr)
 
     def test_another_workflow_push_runs_only_plan_tests(self):
