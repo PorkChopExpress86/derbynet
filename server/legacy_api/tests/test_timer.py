@@ -13,6 +13,7 @@ from accounts.permissions import Perm
 from core.models import ActionLog, RaceSettings, RaceState
 from legacy_api.tests.conftest import log_in, post
 from racing.models import AuditEvent, HeatLane, TimerSetting, TimerStatus
+from racing.services import polls
 from racing.services import timer as timer_service
 
 pytestmark = pytest.mark.django_db
@@ -169,19 +170,49 @@ def test_a_rerun_applies_the_contact_timeout_first(
     assert [c.detail["from"] for c in changes] == [TimerStatus.State.STAGING] * overdue
 
 
-def test_the_timeout_row_is_dated_when_the_minute_ran_out(event, jar):
-    """#307: the `timer.*overdue` row the next message writes is dated to
-    the end of the minute, where the Retrospective lists it; PHP writes it
-    at the first read after the minute (`timer-state.inc:72-79`)."""
-    connect(jar)
-    move_contact_back(event, 600)
-    silent_since = TimerStatus.objects.get(event=event).last_contact
-    message(jar, "HEARTBEAT")
-    row = ActionLog.objects.get(request__action="timer.*overdue")
-    assert row.received == silent_since + timedelta(seconds=60)
-
-
 SECOND = datetime(2026, 11, 14, 12, 0, 0, tzinfo=UTC)
+
+
+def test_the_timeout_row_is_dated_when_the_minute_ran_out(event, jar):
+    """#307, D100: the `timer.*overdue` row the next message writes, and its
+    audited change, are dated to the first moment the timeout rule holds: a
+    contact 0.9 s past SECOND times out at 61 s past SECOND, the whole
+    second 61 s after its own, and not 1 microsecond before. The
+    Retrospective lists the row there; PHP writes it at the first read after
+    the minute (`timer-state.inc:72-79`)."""
+    connect(jar)
+    contact = SECOND + timedelta(seconds=0.9)
+    TimerStatus.objects.filter(event=event).update(last_contact=contact)
+    at = SECOND + timedelta(seconds=61)
+    row = TimerStatus.objects.get(event=event)
+    assert timer_service.TimerState.read(row, at).timed_out
+    assert not timer_service.TimerState.read(
+        row, at - timedelta(microseconds=1)
+    ).timed_out
+    message(jar, "HEARTBEAT")
+    assert ActionLog.objects.get(request__action="timer.*overdue").received == at
+    change = AuditEvent.objects.get(
+        action=Action.TIMER_STATE_CHANGED, detail__to=TimerStatus.State.NOT_CONNECTED
+    )
+    assert change.recorded_at == at
+
+
+def test_a_connected_timers_age_counts_whole_seconds(event):
+    """#307: the status text's age is PHP's `time() - $this->last_contact`
+    (`timer-state.inc:97-102`), in whole seconds: a contact 0.9 s past
+    SECOND, read 60.2 s past it, is 60 sec. old, though only 59.3 s have
+    passed."""
+    contact = SECOND + timedelta(seconds=0.9)
+    now = SECOND + timedelta(seconds=60.2)
+    assert (now - contact).total_seconds() == pytest.approx(59.3)
+    row = TimerStatus(
+        event=event, state=TimerStatus.State.CONNECTED, last_contact=contact
+    )
+    found = timer_service.TimerState.read(row, now)
+    assert polls._timer_status(found, now) == (
+        "CONNECTED (60 sec.)",
+        "img/status/ok.png",
+    )
 
 
 @pytest.mark.parametrize(
@@ -547,7 +578,7 @@ def test_a_timeout_is_audited_as_its_own_change(event, coordinator, jar):
     timeout, after = list(changes)[-2:]
     assert (timeout.detail, timeout.recorded_at) == (
         {"from": State.STAGING, "to": State.NOT_CONNECTED},
-        silent_since + timedelta(seconds=60),
+        timer_service.timed_out_at(silent_since),
     )
     assert after.detail == {"from": State.NOT_CONNECTED, "to": State.STAGING}
 
@@ -651,17 +682,33 @@ def test_a_long_flag_name_keeps_its_description(event, coordinator, jar):
     [
         ("1", 1),
         ("0", 6),
+        ("0.99", 6),
+        ("1.0", 1),
+        ("1.5", 1),
         ("32767", 32767),
+        ("32767.5", 32767),
         ("32768", 6),
         ("4.5", 4),
         ("1e3", 1000),
     ],
-    ids=["smallest", "one-under", "largest", "one-over", "fraction", "exponent"],
+    ids=[
+        "smallest",
+        "one-under",
+        "fraction-under-1",
+        "one-as-fraction",
+        "fraction-over-1",
+        "largest",
+        "fraction-over-largest",
+        "one-over",
+        "fraction",
+        "exponent",
+    ],
 )
 def test_a_lane_count_is_a_number_from_1_to_32767(event, coordinator, jar, lanes, kept):
-    """D99 (#307): IDENTIFIED takes a lane count from 1 to 32767 that PHP
-    reads as a number, cut toward zero, and ignores 0 and 32768 with the same
-    reply. PHP ignores 0 too, and stores the others as sent
+    """D99 (#307): IDENTIFIED cuts a lane count PHP reads as a number toward
+    zero, then takes it from 1 to 32767: 0.99 becomes 0 and is ignored, as 0
+    and 32768 are, with the same reply; 1.5 is taken as 1 and 32767.5 as
+    32767. PHP ignores 0 too, and stores the others as sent
     (`action.timer-message.inc:99-104`)."""
     ok(coordinator, "action=settings.write&n-lanes=6")
     assert "<success/>" in message(jar, f"IDENTIFIED&lane_count={lanes}")

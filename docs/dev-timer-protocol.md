@@ -71,7 +71,7 @@ When another client has sent a message in the last second with a different `User
 
 The client sends IDENTIFIED once it has found the timer. Every parameter is optional:
 
-- `lane_count`: the number of lanes the timer reports. It sets the race's lane count only while no heat is scheduled. Once a schedule exists, the race keeps its count, and the timer status page and the race dashboard show the timer's count beside it (D74). A count that is not a number from 1 to 32767 is ignored, and a fraction is cut to its whole number (D99). The PHP server stored any value above 0 as sent, such as `abc` or `4.5`.
+- `lane_count`: the number of lanes the timer reports. It sets the race's lane count only while no heat is scheduled. Once a schedule exists, the race keeps its count, and the timer status page and the race dashboard show the timer's count beside it (D74). The server cuts a fraction to its whole number, then ignores a count outside 1 to 32767, or text that is not a number (D99): `1.5` sets 1 lane, and `0.5` is ignored. The PHP server stored any value above 0 as sent, such as `abc` or `4.5`.
 - `timer`: the timer's type. `derby-timer.jar` sends the name of its Java class.
 - `human`: a name for the timer that people read, such as its maker and model.
 - `ident`: the timer's own identity, such as a serial number.
@@ -143,7 +143,7 @@ The server answers the failure `notunderstood`.
 
 ## The contact timeout
 
-A timer that has sent no message for more than 60 seconds is not connected, and every page and poll shows it so. The server counts whole seconds, as the PHP server does. It records the timeout, shown as "Timer contact lost." in the race's history, when the timer next sends a message, or when the race coordinator reruns a heat, and dates it to when the 60 seconds ran out. A timer that never sends again, with no rerun, leaves no such record. The PHP server recorded the timeout when a page or poll first read the timer's state after the 60 seconds (D100).
+A timer that has sent no message for more than 60 seconds is not connected, and every page and poll shows it so. The server counts whole seconds, as the PHP server does. It records the timeout, shown as "Timer contact lost." in the race's history, when the timer next sends a message, or when the race coordinator reruns a heat, and dates it to the moment it first counts the timer as not connected: 61 seconds after the whole second of the last message. A timer that never sends again, with no rerun, leaves no such record. The PHP server recorded the timeout when a page or poll first read the timer's state after the 60 seconds (D100).
 
 ## Answers from the server
 

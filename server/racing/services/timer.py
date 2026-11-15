@@ -25,7 +25,7 @@ from core.models import ActionLog, Event, RaceSettings, RaceState
 from core.services import EventReadOnly, lock_race_state, require_writable
 from legacy_api.xml import php_escape
 from racing.engine import heat_state as hs
-from racing.engine.phpcompat import php_equals, php_numeric, php_truthy
+from racing.engine.phpcompat import php_equals, php_int, php_numeric, php_truthy
 from racing.models import HeatLane, Round, TimerSetting, TimerStatus
 from racing.services import audit, replay
 from racing.services.heats import transition
@@ -89,9 +89,9 @@ class TimerState:
             malfunction_requires_reset=row.malfunction_requires_reset,
             malfunction_message=row.malfunction_message,
         )
-        stale = found.last_contact is None or _seconds(
+        stale = found.last_contact is None or php_time(
             found.last_contact
-        ) + CONTACT_SECONDS < _seconds(now)
+        ) + CONTACT_SECONDS < php_time(now)
         if not found.assume_connected and stale:
             found.timed_out = found.state != State.NOT_CONNECTED
             found.state = State.NOT_CONNECTED
@@ -144,19 +144,31 @@ _STATE_FIELDS = [
 ]
 
 
-def _seconds(moment: datetime) -> int:
+def php_time(moment: datetime) -> int:
     """PHP's `time()` for `moment`: whole seconds."""
     return int(moment.timestamp())
+
+
+def timed_out_at(last_contact: datetime) -> datetime:
+    """The first moment `TimerState.read` finds a contact at `last_contact`
+    timed out: the whole second 61 s after its own, since PHP's
+    `last_contact + 60 < time()` compares whole seconds (`timer-state.inc:72`)."""
+    return (
+        last_contact
+        - timedelta(microseconds=last_contact.microsecond)
+        + timedelta(seconds=CONTACT_SECONDS + 1)
+    )
 
 
 def time_out(event: Event, row: TimerStatus, timer: TimerState, now) -> audit.Record:
     """Store the contact timeout that `TimerState.read` found, log
     `timer.*overdue`, and return its audit record. Both are dated to when
-    the minute ran out (D100). The caller holds the timer's row lock."""
+    the minute ran out (D100), the moment `TimerState.read` first finds
+    it (`timed_out_at`). The caller holds the timer's row lock."""
     was = row.state
     timer.store(row, now, renew=False)
     row.save(update_fields=_STATE_FIELDS)
-    at = None if timer.last_contact is None else timer.last_contact + CONTACT_TIMEOUT
+    at = None if timer.last_contact is None else timed_out_at(timer.last_contact)
     ActionLog.objects.create(
         event=event, request={"action": "timer.*overdue"}, received=at or now
     )
@@ -361,16 +373,17 @@ def _hello(msg: _Message) -> None:
 
 
 def _identified(msg: _Message) -> None:
-    lanes = php_numeric(msg.get("lane_count")) if msg.has("lane_count") else None
-    # D99: a PHP number from 1 to MAX_LANES, cut toward zero.
-    if lanes is not None and 0 < lanes <= MAX_LANES:
+    number = php_numeric(msg.get("lane_count")) if msg.has("lane_count") else None
+    # D99: a PHP number, cut toward zero, then taken from 1 to MAX_LANES.
+    lanes = None if number is None else php_int(number)
+    if lanes is not None and 1 <= lanes <= MAX_LANES:
         # D74, C26: the timer's count is kept to show beside the race's, and
         # sets the race's only while no heat is scheduled, so a schedule
         # never meets a lane count it was not made for. PHP always writes
         # it. `handle_message` holds the race-state lock.
-        msg.row.reported_lane_count = int(lanes)
+        msg.row.reported_lane_count = lanes
         if not heats_scheduled(msg.event.id):
-            msg.settings.lane_count = int(lanes)
+            msg.settings.lane_count = lanes
             msg.settings.save(update_fields=["lane_count"])
     for key, column in (
         ("timer", "timer_type"),
