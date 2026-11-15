@@ -14,6 +14,8 @@ import time
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 PR_MERGE = Path(__file__).resolve().parent.parent / 'bin' / 'pr-merge'
 SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'source-checks.sh'
 
@@ -83,6 +85,24 @@ elif args[:2] == ['pr', 'merge']:
 '''
 
 
+def setUpModule():
+    """These tests run the real source-checks.sh, which refuses a `timeout`
+    above it, so under one they fail on that refusal: #311's timing run
+    under `timeout 300` failed 9 subtests, and its retro's mutant run failed
+    on it too (#311 retro). Fail once, before any test, saying so."""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            comm = Path(f'/proc/{pid}/comm').read_text().strip()
+            pid = int(Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return
+        if comm == 'timeout':
+            raise RuntimeError(
+                'test_pr_merge.py runs under timeout, which source-checks.sh refuses: '
+                'run it with no timeout')
+
+
 class PrMerge(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -90,7 +110,9 @@ class PrMerge(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
         self.env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
                         GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
-                        GIT_CONFIG_NOSYSTEM='1', CLOSE_WAIT='0')
+                        GIT_CONFIG_NOSYSTEM='1', CLOSE_WAIT='0',
+                        # A deaf run's 10 s waits took 21 s of plan/tests' 74 s (#311 retro).
+                        KILL_WAIT='3')
         stubs = self.tmp / 'stubs'
         stubs.mkdir()
         for name in ('python3', 'uv'):
@@ -452,6 +474,27 @@ class PrMerge(unittest.TestCase):
         self.assert_no_worktree()
         self.assertEqual(self.passed(), f'{head} {master}\n')
         self.assertEqual(list(self.cache.glob('*.log')), [])
+
+    def test_the_run_prints_its_own_time_and_load(self):
+        """#330's and #335's merges printed "it took 16 min at a load
+        average of 34", #333's time, as if it were the run they started
+        (#311 retro)."""
+        took = r' (in|after) \d+ s, with a load average of \d+\.\d+ at the end'
+        head = self.check_pair()
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("output in ", done.stderr)
+        self.assertIn("; #333's run took 16 min at a load average of 34\n", done.stderr)
+        self.assertNotIn('; it took', done.stderr)
+        self.assertRegex(done.stderr, r'the source checks passed on #7 merged with origin/master '
+                         r'[0-9a-f]{8}' + took + '\n')
+        # A new head, so the passed pair doesn't skip the run.
+        head = self.pr('server/tools/other.sh')
+        self.env['STUB_UV'] = 'fail'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertRegex(done.stderr, r'source-checks.sh failed \(exit 1\) on the PR merged with '
+                         r'origin/master [0-9a-f]{8},' + took + r'\. Its summary lines')
 
     def test_a_failing_check_refuses_and_prints_its_summary_lines(self):
         """Each half's failures, in the formats unittest and pytest -q print

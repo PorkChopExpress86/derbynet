@@ -13,6 +13,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 REPO = Path(__file__).resolve().parents[2]
 AFFECTED = REPO / 'plan' / 'bin' / 'affected-tests'
 

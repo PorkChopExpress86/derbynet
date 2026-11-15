@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 CI_SUITES = Path(__file__).resolve().parent.parent / 'bin' / 'ci-suites'
 
 
