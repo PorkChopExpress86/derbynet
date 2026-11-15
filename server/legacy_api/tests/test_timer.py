@@ -282,6 +282,17 @@ def test_a_competing_timers_messages_still_change_the_timer(event, jar):
     assert status() == (UA, State.SEARCHING, "Other")
 
 
+def test_no_client_competes_before_one_says_hello(event, jar):
+    """#307: with no client recorded, as before any HELLO, nothing competes:
+    PHP checks `$ua &&` first (`action.timer-message.inc:86`, `:192`)."""
+    assert "<competing>" not in message(jar, "HEARTBEAT")
+    assert TimerStatus.objects.get(event=event).agent == ""
+    other = Client(headers={"User-Agent": "Other/1.0"})
+    log_in(other, Perm.TIMER_MESSAGE, role="Timer")
+    assert "<competing>" not in message(other, "HELLO")
+    assert TimerStatus.objects.get(event=event).agent == "Other/1.0"
+
+
 def test_a_second_timer_after_the_window_takes_over(event, jar):
     message(jar, "HELLO")
     move_contact_back(event, 2)
