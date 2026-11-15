@@ -22,6 +22,7 @@ from django.utils import timezone
 from accounts.permissions import Perm, allows
 from core.models import Event, RaceSettings, RaceState
 from kiosks.models import ReplayStatus
+from racing.engine.phpcompat import php_time
 from racing.models import HeatLane, Round, TimerStatus
 from racing.services import finals, lanes, master, playlist, polls, timer
 from roster.models import Racer
@@ -196,9 +197,14 @@ def _master_heats(event: Event) -> list[tuple[int, str, int]]:
 
 
 def _age(moment, now) -> int | None:
+    """The seconds since the timer's or the replay client's last contact,
+    counted in whole seconds as the ages of PHP's coordinator page are:
+    `time() - $this->last_contact` (`timer-state.inc:97-102`) and
+    `time() - $replay['last_contact']` (`json-replay.inc:11`), D100 (#341).
+    Never below 0."""
     if moment is None:
         return None
-    return max(0, int((now - moment).total_seconds()))
+    return max(0, php_time(now) - php_time(moment))
 
 
 @dataclass

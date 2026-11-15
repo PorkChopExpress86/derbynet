@@ -238,7 +238,7 @@ def test_a_limit_from_the_view_passes(source):
 # `replay.inc:35`). The port stores a `last_contact` datetime with its
 # fraction, so a `last_contact` added to, subtracted from or ordered against
 # a datetime counts time PHP never sees. The rule lives in
-# `racing.services.timer.php_time`. #307 moved the timer's timeout to whole
+# `racing.engine.phpcompat.php_time`. #307 moved the timer's timeout to whole
 # seconds in `TimerState.read`, left `polls._timer_status`'s age counting the
 # fraction, and dated the overdue row before the moment the rule first holds;
 # review found both, and the scan finds both in #307's lines before its fix
@@ -251,15 +251,9 @@ CONTACT_SKIP = {".venv", "tests", "migrations", "tools", "node_modules"}
 WHOLE_SECONDS = {
     "racing/services/timer.py::timed_out_at": "floors last_contact to its second",
 }
-# Known differences from PHP, each waiting on its ticket.
-OPEN_DIFFERENCES = {
-    "racing/services/polls.py::replay_state": (
-        "#341: PHP counts whole seconds (replay.inc:35, json-replay.inc:11)"
-    ),
-    "racing/services/replay.py::connected": (
-        "#341: send_replay_message reads get_replay() (replay.inc:59, :35)"
-    ),
-}
+# Known differences from PHP, each waiting on its ticket. #341 settled
+# replay's two (polls.replay_state, replay.connected).
+OPEN_DIFFERENCES: dict[str, str] = {}
 
 
 def _names_contact(node: ast.expr) -> bool:
@@ -321,7 +315,7 @@ def test_a_contact_counts_php_whole_seconds():
         if key not in WHOLE_SECONDS and key not in OPEN_DIFFERENCES
         for hit in hits
     ]
-    assert wrong == [], "count whole seconds with racing.services.timer.php_time"
+    assert wrong == [], "count whole seconds with racing.engine.phpcompat.php_time"
 
 
 def test_each_whole_seconds_entry_still_has_its_arithmetic():
