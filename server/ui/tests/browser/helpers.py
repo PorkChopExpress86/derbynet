@@ -64,12 +64,19 @@ def open_section(page, key):
 
 
 def pause_clock_at(page, at):
-    """Pause Playwright's clock at `at` (a datetime), before the page loads.
+    """Pause Playwright's clock at `at` (a datetime), on a page that has not
+    navigated (about:blank), so the page loads on the paused clock. It
+    refuses any other page (`test_pause_clock_at_refuses_a_page_that_has_loaded`
+    in `test_kiosk_scale_mph.py`): a timer a loaded page queued between the
+    install and the pause fired once in the pause's jump forward (the #359
+    review's probe).
+
     The clock runs from its install, so `pause_at(at)` after an install at
     `at` itself failed "Cannot fast-forward to the past" once the two calls
     were more than a moment apart, as under load (#317, #348). Installed a
-    minute early, the pause always moves forward
-    (`test_the_clock_pauses_after_a_slow_install` in
+    minute early, the pause moves forward unless the two calls are a minute
+    or more apart (`test_the_clock_pauses_after_a_slow_install` in
     `test_kiosk_results_by_racer.py` and `test_kiosk_scale_mph.py`)."""
+    assert page.url == "about:blank", f"pause_clock_at on a loaded page: {page.url}"
     page.clock.install(time=at - timedelta(minutes=1))
     page.clock.pause_at(at)

@@ -13,6 +13,7 @@ control, so it plays in real time (2.8 s) and the test waits on its
 
 from datetime import datetime
 
+import pytest
 from playwright.sync_api import expect
 
 from ui.tests.browser.conftest import shoot
@@ -72,6 +73,16 @@ def test_the_clock_pauses_after_a_slow_install(page, event, day):  # noqa: F811
     page.clock.install = slow_install
     open_paused(page, event)
     assert page.evaluate("Date.now()") == PAUSED_AT.timestamp() * 1000
+
+
+def test_pause_clock_at_refuses_a_page_that_has_loaded(page, event, day):  # noqa: F811
+    """`pause_clock_at` after the kiosk has loaded fails before it installs
+    the clock: the page's `Date.now()` still reads the real time, not
+    PAUSED_AT."""
+    open_kiosk(page, event, "kiosks/scale-MPH.kiosk")
+    with pytest.raises(AssertionError, match="pause_clock_at on a loaded page"):
+        pause_clock_at(page, PAUSED_AT)
+    assert page.evaluate("Date.now()") > datetime.now().timestamp() * 1000 - 60_000
 
 
 def test_the_car_waits_off_screen_between_drives(page, event, day):  # noqa: F811
