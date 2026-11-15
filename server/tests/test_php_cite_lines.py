@@ -17,7 +17,9 @@ A cite may name a file of the port too (`kiosk.css:353`,
 `server/accounts/defaults.py:15`), and may be written in prose
 (`` `kiosk.css` line 353 ``). #250 wrote "kiosk.css line 351" because this
 called `kiosk.css:351` "no such PHP file", and nothing read the prose form; a
-CSS edit above it had moved the rule to line 353 (#250 retro). A `.py` cite
+CSS edit above it had moved the rule to line 353 (#250 retro). The browser
+timer's sources under timer/ are read as cite targets too
+(`timer/derbynet-timer/src/js/host_poller.js:216`, #307 retro). A `.py` cite
 needs a folder (`accounts/defaults.py:15`), since tests print made-up ones
 (`test_late.py:3`).
 """
@@ -31,8 +33,16 @@ ROOT = SERVER.parent
 # The PHP tree, the templates build.xml makes some of its files from, and the
 # suites in testing/, whose puppeteer scripts a replacement test cites
 # (`testing/puppeteer/ondeck-columns-test.js:12`; #240 retro).
-# The port's own files are cited too (#250 retro).
-PHP_TREES = (ROOT / "website", ROOT / "templates", ROOT / "testing", SERVER)
+# The port's own files are cited too (#250 retro), and the browser timer the
+# port serves unchanged (ADR 0011), whose cite #307 had to rewrite as a
+# function name because this called it "no such file" (#307 retro).
+PHP_TREES = (
+    ROOT / "website",
+    ROOT / "templates",
+    ROOT / "testing",
+    ROOT / "timer",
+    SERVER,
+)
 SUFFIXES = (".php", ".inc", ".js", ".kiosk", ".css", ".html")
 SKIP = {".venv", "node_modules", "var", "__pycache__", "vendor"}
 # The testing/ scripts and READMEs cite PHP too (#240's test-visit-each-page.sh).
@@ -113,6 +123,9 @@ def test_a_cite_to_a_blank_line_a_brace_or_no_file_is_found():
     assert check("kiosks.inc:27-31") is None
     # A replacement test cites the puppeteer script it replaces (#240 retro).
     assert check("testing/puppeteer/ondeck-columns-test.js:1") is None
+    # The browser timer the port serves unchanged (#307 retro).
+    assert check("timer/derbynet-timer/src/js/host_poller.js:216-222") is None
+    assert check("timer/derbynet-timer/src/js/no_such_poller.js:1") == "no such file"
     assert check("testing/puppeteer/no-such-test.js:1") == "no such file"
     # The port's own files, and the prose form (#250 retro).
     assert check("`server/accounts/defaults.py:15`") is None
