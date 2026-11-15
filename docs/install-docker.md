@@ -125,7 +125,7 @@ SQLite, one file on the data volume, is the default and suits a race (D1). To ke
 docker compose --profile postgres up -d
 ```
 
-Pass `--profile postgres` to every later `docker compose` command for this install too. Choose the profile when you first start an install. A `docker compose exec server python manage.py ...` command uses the same database as the server. See [the database guide](database.md) for the details.
+Pass `--profile postgres` to every later `docker compose` command for this install too. Choose the profile when you first start an install. A `docker compose exec -u derbynet server python manage.py ...` command uses the same database as the server. See [the database guide](database.md) for the details.
 
 ## Settings
 

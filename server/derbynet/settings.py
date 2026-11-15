@@ -191,15 +191,19 @@ def _compose_postgres_url(config_dir):
     entrypoint exporting a URL, gives gunicorn, migrate and a command started
     with `docker compose exec` the same database (#308). No name is looked
     up, so with Postgres down a command fails to connect instead of making a
-    SQLite file. The password is percent-encoded, so any character works.
+    SQLite file, and manage.py says what to start. The password is
+    percent-encoded, so any character works.
     """
     host = os.environ.get("DERBYNET_POSTGRES_HOST")
     if not host:
         return None
+    path = config_dir / "database-engine"
     try:
-        engine = (config_dir / "database-engine").read_text().strip()
+        engine = path.read_text().strip()
     except FileNotFoundError:
         return None
+    except (OSError, UnicodeDecodeError) as error:
+        raise ImproperlyConfigured(f"{path} could not be read: {error}") from error
     if engine != "postgres":
         return None
     names = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
@@ -213,10 +217,17 @@ def _compose_postgres_url(config_dir):
     return f"postgres://{user}:{password}@{host}:5432/{database}"
 
 
+_compose_url = (
+    None if os.environ.get("DATABASE_URL") else _compose_postgres_url(CONFIG_DIR)
+)
+# The compose postgres service's host when it is the database, so manage.py
+# can say what to start when it does not answer (#308).
+COMPOSE_POSTGRES_HOST = os.environ["DERBYNET_POSTGRES_HOST"] if _compose_url else None
+
 DATABASES = {
     "default": dj_database_url.parse(
         os.environ.get("DATABASE_URL")
-        or _compose_postgres_url(CONFIG_DIR)
+        or _compose_url
         or f"sqlite:///{DATA_DIR / 'derbynet.sqlite3'}"
     ),
 }

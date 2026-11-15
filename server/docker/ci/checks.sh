@@ -31,10 +31,11 @@
 #   postgres-password
 #              compose's postgres profile with a password holding @ : / # %
 #   exec-database
-#              docker compose exec ... python manage.py uses the server's
-#              database: under the postgres profile database.md's import lands
-#              in Postgres and no SQLite file appears, also with Postgres
-#              stopped; with no profile, it reads the server's SQLite (#308)
+#              docker compose exec -u derbynet ... python manage.py uses the
+#              server's database: under the postgres profile database.md's
+#              import lands in Postgres and no SQLite file appears; with
+#              Postgres stopped it fails with one message naming the host;
+#              with no profile, it reads the server's SQLite (#308)
 #   bad-env    values that would reach nginx's configuration malformed stop
 #              the container with a message
 #   allowed-hosts
@@ -451,7 +452,8 @@ c = sqlite3.connect(sys.argv[1]); c.executescript(open(sys.argv[2]).read()); c.c
     chmod -R a+rX "$1"
 }
 
-# The database a `docker compose exec ... python manage.py` reaches (#308).
+# The database a `docker compose exec -u derbynet ... python manage.py`
+# reaches (#308).
 exec_database() { # exec_database <compose...>: "<vendor> <name> <host>"
     "$@" exec -T -u derbynet server python manage.py shell --no-imports -c '
 from django.db import connection
@@ -461,8 +463,9 @@ print(connection.vendor, s["NAME"], s["HOST"] or "-")'
 
 # docker compose exec under the postgres profile reaches the server's
 # Postgres: database.md's import lands in Postgres, migrations show applied,
-# and no SQLite file appears on the volume, also once Postgres has stopped
-# (#308).  Without the profile, it reaches the server's SQLite.
+# and no SQLite file appears on the volume, also once Postgres has stopped,
+# when the command prints one message saying what to start (#308).  Without
+# the profile, it reaches the server's SQLite.
 check_exec_database() {
     local project="$PREFIX-execdb" password='p@ss:w/rd#%' work="$RUNNER_TEMP_DIR/execdb"
     local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml"
@@ -516,14 +519,17 @@ print(connection.vendor, connection.settings_dict["NAME"])')"
     echo "$got"
     [ "$got" = "sqlite /var/lib/derbynet/derbynet.sqlite3" ] || fail "no database-engine did not keep SQLite"
 
-    say "with the postgres container stopped, an exec'd manage.py fails"
+    say "with the postgres container stopped, an exec'd manage.py fails with one message"
     "${compose[@]}" stop postgres
     status=0
     out="$("${compose[@]}" exec -T -u derbynet server python manage.py import_derbynet \
         /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2026" 2>&1)" || status=$?
-    echo "$out" | tail -2
-    echo "exit status $status"
+    echo "$out" | tail -4
+    echo "exit status $status, $(wc -l <<<"$out") lines"
     [ "$status" != 0 ] || fail "the import succeeded with Postgres stopped"
+    [[ "$out" == "derbynet: could not connect to the Postgres at postgres: "*"Start it with 'docker compose --profile postgres up -d', or check DERBYNET_POSTGRES_HOST." ]] \
+        || fail "no short message names the host and what to start"
+    [[ "$out" != *Traceback* ]] || fail "the command printed a traceback"
     [[ "$out" != *"$password"* ]] || fail "the error shows the password"
     "${compose[@]}" exec -T server sh -c '! ls /var/lib/derbynet/*.sqlite3 2>/dev/null' \
         || fail "a SQLite database was made on the volume"

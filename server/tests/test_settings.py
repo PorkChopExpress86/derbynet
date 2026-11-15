@@ -1,3 +1,4 @@
+import os
 import runpy
 import stat
 from pathlib import Path
@@ -133,6 +134,37 @@ def test_an_explicit_database_url_wins_over_the_postgres_service(
     db = load_settings(DATABASE_URL=url, **COMPOSE)["DATABASES"]["default"]
 
     assert db == dj_database_url.parse(url)
+
+
+def test_compose_postgres_host_names_the_service_only_when_it_is_the_database(
+    load_settings, tmp_path
+):
+    """manage.py's message when Postgres does not answer reads it."""
+    assert load_settings(**COMPOSE)["COMPOSE_POSTGRES_HOST"] is None
+    engine_file(tmp_path, "postgres")
+    assert load_settings(**COMPOSE)["COMPOSE_POSTGRES_HOST"] == "postgres"
+    url = "postgres://other:secret@db.example:5433/elsewhere"
+    assert load_settings(DATABASE_URL=url, **COMPOSE)["COMPOSE_POSTGRES_HOST"] is None
+
+
+@pytest.mark.parametrize("kind", ["directory", "not utf-8", "unreadable"])
+def test_an_unreadable_database_engine_is_named(load_settings, tmp_path, kind):
+    path = tmp_path / "config" / "database-engine"
+    path.parent.mkdir()
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "not utf-8":
+        path.write_bytes(b"\xffpostgres\n")
+    else:
+        if os.geteuid() == 0:
+            pytest.skip("root reads a file of mode 000")
+        path.write_text("postgres\n")
+        path.chmod(0)
+
+    with pytest.raises(ImproperlyConfigured) as raised:
+        load_settings(**COMPOSE)
+
+    assert str(raised.value).startswith(f"{path} could not be read: ")
 
 
 @pytest.mark.parametrize("name", ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"])
