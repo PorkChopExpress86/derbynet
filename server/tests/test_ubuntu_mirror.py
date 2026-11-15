@@ -334,7 +334,8 @@ def test_no_second_apt_get_runs_while_the_dpkg_lock_is_held(tmp_path, server):
         f"setsid {sys.executable} -c '{HOLD_LOCK}' {lock} {held}"
         " </dev/null >/dev/null 2>&1 &\n"
         # dash, /bin/sh here, has no $SECONDS; 300 steps of 0.1 s bound the wait.
-        f'i=0; until [ -s {held} ] || [ "$i" -ge 300 ]; do i=$((i + 1)); sleep 0.1; done\n'
+        f'i=0; until [ -s {held} ] || [ "$i" -ge 300 ]; do\n'
+        "i=$((i + 1)); sleep 0.1; done\n"
         "sleep 30",
     )
     try:
