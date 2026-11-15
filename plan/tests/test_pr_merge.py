@@ -21,8 +21,8 @@ SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'sour
 # check runs (as server/tests/test_source_checks.py stubs them): each logs
 # where it ran, the merge's parents and files, then prints what the real tool
 # prints and exits as $STUB_<NAME> says (pass, fail, broken, hang, deaf:
-# hang and ignore SIGTERM, or move: push $STUB_PUSH_FROM's HEAD to master
-# once). A hang stops after $STUB_LIMIT seconds (120), so a test run that is
+# hang and ignore SIGTERM, move: push $STUB_PUSH_FROM's HEAD to master
+# once, or cut: move $STUB_ORIGIN away). A hang stops after $STUB_LIMIT seconds (120), so a test run that is
 # killed leaves no stub looping (#333 review).
 STUB = '''#!/bin/bash
 name=$(basename "$0")
@@ -51,6 +51,9 @@ case $name:${{!var:-}} in
     trap '' TERM
     echo $$ >"$RAN.pid"
     while [ "$SECONDS" -lt "${{STUB_LIMIT:-120}}" ]; do date >>busy; sleep 0.1; done ;;
+  uv:cut)
+    # origin goes away while the checks run.
+    [ -e "$STUB_ORIGIN" ] && mv "$STUB_ORIGIN" "$STUB_ORIGIN.gone" ;;
   uv:move)
     # Another PR merges while the checks run.
     [ -e "$RAN.moved" ] || {{ git -C "$STUB_PUSH_FROM" push -q origin HEAD:master && touch "$RAN.moved"; }} ;;
@@ -71,6 +74,10 @@ elif args[:2] == ['issue', 'view'] and 'state,body' in args:
 elif args[:2] == ['pr', 'view'] and 'state,mergeCommit' in args:
     print('MERGED abc')
 elif args[:2] == ['pr', 'merge']:
+    if os.environ.get('FAKE_MERGE_HANG'):
+        open(os.environ['FAKE_MERGE_HANG'], 'w').close()
+        import time
+        time.sleep(30)
     with open({log!r}, 'a') as f:
         f.write(' '.join(args) + '\\n')
 '''
@@ -877,6 +884,43 @@ class PrMerge(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn('it closes #12, whose body has a "## Still open" section', done.stderr)
         self.assertNotIn('dry run:', done.stderr)
+
+    def test_a_master_it_cannot_fetch_again_refuses(self):
+        head = self.check_pair()
+        self.env.update(STUB_UV='cut', STUB_ORIGIN=str(self.tmp / 'origin.git'))
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('the source checks passed on #7', done.stderr)
+        self.assertIn('not merging #7; could not fetch origin/master again to see whether it '
+                      'moved during the run; rerun pr-merge\n', done.stderr)
+        self.assertEqual(self.merged(), '')
+
+    def test_the_traps_are_back_after_the_run(self):
+        """The cleanup ignores INT, HUP and TERM while it runs, then sets
+        their traps again: a TERM while gh merges still stops pr-merge, and
+        gh, which would inherit an ignored TERM, with it."""
+        head = self.check_pair()
+        merging = self.tmp / 'merging'
+        gh = self.tmp / 'gh'
+        gh.write_text(FAKE_GH.format(python=sys.executable, head=head, log=str(self.log)))
+        gh.chmod(0o755)
+        proc = subprocess.Popen(['bash', str(PR_MERGE), '7'], cwd=self.work,
+                                env={**self.env, 'GH': str(gh), 'FAKE_MERGE_HANG': str(merging)},
+                                start_new_session=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True)
+        self.addCleanup(lambda: proc.poll() is None and os.killpg(proc.pid, signal.SIGKILL))
+        deadline = time.monotonic() + 120
+        while not merging.exists():
+            self.assertIsNone(proc.poll(), proc.stderr.read() if proc.poll() is not None else '')
+            self.assertLess(time.monotonic(), deadline, 'gh pr merge never ran')
+            time.sleep(0.1)
+        start = time.monotonic()
+        os.killpg(proc.pid, signal.SIGTERM)
+        out, err = proc.communicate(timeout=60)
+        self.assertEqual(proc.returncode, 143, err)
+        self.assertEqual(self.merged(), '')
+        # The fake gh sleeps 30 s; a TERM it ignored would end pr-merge after that.
+        self.assertLess(time.monotonic() - start, 20)
 
 
 if __name__ == '__main__':
