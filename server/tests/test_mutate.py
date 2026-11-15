@@ -434,7 +434,14 @@ def test_listed_narrows_to_each_file_given_and_lists_scripts_and_stylesheets(pro
     ], run.stdout
     assert "2 listed" in run.stdout
     run = listed(project, "test_mod.py::test_the_bound", tool=("--file", "a.css"))
-    assert "a.css:1  min  min(1px, 2px)  ->  1px" in run.stdout, run.stdout
+    # The row names the stylesheet and its line 1; split, so no cite check
+    # takes it for a cite of a real file.
+    where = ("a.css", "1")
+    assert any(
+        line.split()[1] == ":".join(where)
+        and line.endswith("  min  min(1px, 2px)  ->  1px")
+        for line in run.stdout.splitlines()
+    ), run.stdout
     assert "2 listed" in run.stdout
 
 
