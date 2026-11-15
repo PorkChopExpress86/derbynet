@@ -229,16 +229,16 @@ class TimerSetting(EventScoped):
         PENDING_DEVICE = "pending-device"
 
     kind = models.CharField(max_length=20, choices=Kind.choices)
-    name = models.CharField(max_length=100)
-    value_type = models.CharField(max_length=10, blank=True, default="")
-    value = models.CharField(max_length=100, blank=True, default="")
+    # The timer's text is kept whole, as PHP keeps it: SQLite enforces no
+    # VARCHAR width (#307).
+    name = models.TextField()
+    value_type = models.TextField(blank=True, default="")
+    value = models.TextField(blank=True, default="")
     # Null for a flag the timer reported with no description, as PHP's
     # `timer.settings` reports it.
-    description = models.CharField(  # noqa: DJ001
-        max_length=500, null=True, blank=True, default=""
-    )
+    description = models.TextField(null=True, blank=True, default="")  # noqa: DJ001
     # Null means no change is pending. An empty string is a requested value.
-    pending = models.CharField(max_length=100, null=True, blank=True)  # noqa: DJ001
+    pending = models.TextField(null=True, blank=True)  # noqa: DJ001
 
 
 class TimerStatus(PerEvent):
@@ -263,7 +263,7 @@ class TimerStatus(PerEvent):
     # malfunction_expiration=0 is the reset case (`timer-state.inc`).
     malfunction_expires_at = models.DateTimeField(null=True, blank=True)
     malfunction_requires_reset = models.BooleanField(default=False)
-    malfunction_message = models.CharField(max_length=500, blank=True, default="")
+    malfunction_message = models.TextField(blank=True, default="")
 
     # Legacy `timer_current`, the heat sent in the last `heat-ready`. A staged
     # heat with no round is a heat of the timer test.
@@ -272,14 +272,16 @@ class TimerStatus(PerEvent):
     )
     staged_heat = models.PositiveSmallIntegerField(null=True, blank=True)
 
-    agent = models.CharField(max_length=200, blank=True, default="")
-    interface = models.CharField(max_length=200, blank=True, default="")
-    timer_type = models.CharField(max_length=200, blank=True, default="")
-    human = models.CharField(max_length=200, blank=True, default="")
-    ident = models.CharField(max_length=200, blank=True, default="")
-    options = models.CharField(max_length=500, blank=True, default="")
-    vid = models.CharField(max_length=20, blank=True, default="")
-    pid = models.CharField(max_length=20, blank=True, default="")
+    # The timer's text is kept whole, as PHP keeps it in RaceInfo, whose
+    # VARCHAR(200) SQLite does not enforce (#307).
+    agent = models.TextField(blank=True, default="")
+    interface = models.TextField(blank=True, default="")
+    timer_type = models.TextField(blank=True, default="")
+    human = models.TextField(blank=True, default="")
+    ident = models.TextField(blank=True, default="")
+    options = models.TextField(blank=True, default="")
+    vid = models.TextField(blank=True, default="")
+    pid = models.TextField(blank=True, default="")
     reported_lane_count = models.PositiveSmallIntegerField(null=True, blank=True)
     log_path = models.CharField(max_length=500, blank=True, default="")
 
