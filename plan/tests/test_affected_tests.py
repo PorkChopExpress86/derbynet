@@ -9,6 +9,7 @@ import contextlib
 import importlib.machinery
 import importlib.util
 import io
+import itertools
 import os
 import subprocess
 import sys
@@ -674,7 +675,10 @@ class BeforeTheHandOff(unittest.TestCase):
                 out = run(path)
                 self.assertIn('  uv run python tools/operand_mutants.py\n',
                               before_hand_off(out))
+                self.assertIn('  uv run python tools/mutate.py --listed -- <the node ids',
+                              before_hand_off(out))
                 self.assertNotIn('operand_mutants', commands(out))
+                self.assertNotIn('mutate.py', commands(out))
                 self.assertNotIn('docstring_claims', out)
 
     def test_a_test_helper_a_deleted_file_or_a_doc_lists_neither(self):
@@ -745,6 +749,8 @@ class GitDiff(unittest.TestCase):
             self.assertIn('server/awards/editing.py\n', out)
             self.assertIn('Postgres: not needed', out)
             self.assertIn('  uv run python tools/operand_mutants.py --base HEAD~1\n',
+                          before_hand_off(out))
+            self.assertIn('  uv run python tools/mutate.py --listed --base HEAD~1 -- ',
                           before_hand_off(out))
             editing.write_text('Award.objects.all()\n\n\nNAME = Award.objects.get()\n')
             out = affected()
@@ -1989,6 +1995,120 @@ def test_counts(page, n):
 
     def test_a_file_new_on_the_branch(self):
         self.assert_whole('new on the branch', D101_BASE, base=None)
+
+
+# The readers a reach shape chains (#336 retro): a module helper, a module
+# test, a test method of TestK, and a TestK method that is no test.
+REACH_KINDS = ('helper', 'test', 'method', 'again')
+IN_CLASS = {'method', 'again'}
+
+
+def reach_shape(leaf, chain, subclass, value):
+    """A test file in which `chain`'s readers each call the one before,
+    the first calling `leaf`, which returns `value`: a module-level reader
+    calls a TestK method as `TestK().name()`, a TestK method as
+    `self.name()`. With `subclass`, TestSub(TestK) inherits TestK's tests.
+    Returns the text and the leaf's name."""
+    kinds = [leaf, *chain]
+    names = [{'helper': f'h{i}', 'test': f'test_t{i}', 'method': f'test_m{i}',
+              'again': f'again{i}'}[k] for i, k in enumerate(kinds)]
+    module, klass = [], ['    def test_z(self):\n        return 0\n']
+    for i, (kind, name) in enumerate(zip(kinds, names)):
+        if i == 0:
+            body = str(value)
+        elif kinds[i - 1] not in IN_CLASS:
+            body = f'{names[i - 1]}()'
+        elif kind in IN_CLASS:
+            body = f'self.{names[i - 1]}()'
+        else:
+            body = f'TestK().{names[i - 1]}()'
+        if kind in IN_CLASS:
+            klass.append(f'    def {name}(self):\n        return {body}\n')
+        else:
+            module.append(f'def {name}():\n    return {body}\n')
+    text = 'def test_z0():\n    return 0\n\n\n' + '\n\n'.join(module)
+    text += '\n\nclass TestK:\n' + '\n'.join(klass)
+    if subclass:
+        text += '\n\nclass TestSub(TestK):\n    pass\n'
+    return text, names[0]
+
+
+def tests_that_call(text, leaf):
+    """The node ids of the tests pytest would collect from `text` whose run
+    calls `leaf`, found by running each one under a profiler: the expected
+    set comes from Python, not from the tool's reading of the AST."""
+    ns = {}
+    exec(compile(text, '<reach>', 'exec'), ns)
+    tests = [(n, f) for n, f in ns.items() if n.startswith('test') and callable(f)]
+    for cname, cls in ns.items():
+        if cname.startswith('Test') and isinstance(cls, type):
+            tests += [(f'{cname}::{m}', getattr(cls(), m)) for m in dir(cls)
+                      if m.startswith('test')]
+    out = set()
+    for key, run in tests:
+        called = []
+
+        def profile(frame, event, arg):
+            if event == 'call' and frame.f_code.co_filename == '<reach>' \
+                    and frame.f_code.co_name == leaf:
+                called.append(key)
+
+        sys.setprofile(profile)
+        try:
+            run()
+        finally:
+            sys.setprofile(None)
+        if called:
+            out.add(key)
+    return out
+
+
+def reach_shapes():
+    """Each leaf a diff changes (a helper, a test, a test method), read
+    through 0, 1 or 2 readers of each kind and then a test or a test
+    method, with and without a subclass."""
+    for leaf in ('helper', 'test', 'method'):
+        for hops in (0, 1, 2):
+            for middle in itertools.product(REACH_KINDS, repeat=hops):
+                for end in ('test', 'method'):
+                    for subclass in (False, True):
+                        yield leaf, (*middle, end), subclass
+
+
+class ReachShapes(unittest.TestCase):
+    """D101's reach against every chain of readers up to three long (#336
+    retro). Review found a test that calls a test (L1) and a method that
+    calls one through `self` (L2), and the advisor's probe then found a
+    test method reached through a helper missing from its class's reach,
+    a subclass, and a class helper method: each was probed one shape at a
+    time. Here each shape's expected tests are the ones that call the
+    changed leaf when run: a test left out fails open, and a test picked
+    that never calls it repeats for nothing."""
+
+    maxDiff = None
+
+    def test_the_tests_that_call_the_changed_leaf_repeat_and_no_other(self):
+        misses, resolved = [], set()
+        shapes = list(reach_shapes())
+        for leaf, chain, subclass in shapes:
+            base, _ = reach_shape(leaf, chain, subclass, 1)
+            head, name = reach_shape(leaf, chain, subclass, 2)
+            try:
+                picked = {key for key, _ in TOOL.changed_tests(base, head, lambda m: None)}
+            except TOOL.WholeFile:
+                continue  # the whole file repeats, which holds every test
+            resolved.add((leaf, chain, subclass))
+            expected = tests_that_call(head, name)
+            if picked != expected:
+                misses.append(f'{leaf} <- {" <- ".join(chain)}'
+                              f'{" + TestSub" if subclass else ""}: missing '
+                              f'{sorted(expected - picked)}, extra {sorted(picked - expected)}')
+        self.assertEqual(misses, [])
+        # A tool that repeated every file whole would pass the loop above:
+        # each shape with no subclass and no class helper method resolves.
+        plain = {s for s in shapes if not s[2] and 'again' not in s[1]}
+        self.assertEqual(sorted(plain - resolved), [])
+        self.assertEqual((len(shapes), len(plain)), (252, 78))
 
 
 def lines(head, base=D101_BASE, postgres=False):

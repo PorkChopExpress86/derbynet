@@ -121,3 +121,61 @@ def test_javascript_in_a_python_if_keeps_its_mutants():
         ("operand", "x.b", "true"),
         ("operand", "x.b", "false"),
     ]
+
+
+def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path):
+    """#336's round-1 survivors sat in a `return a and b` split over lines
+    (`is_docstring`), a multi-line `if not (...)` (`marks_only`) and an
+    `or` inside `any(...)` (`reads_doc`), which the line reader skips, so
+    they were listed by hand, and some never (#336 retro). By AST each is
+    listed with the span `tools/mutate.py --listed` replaces."""
+    text = (
+        "def is_doc(node):\n"
+        "    return isinstance(node, Expr) and isinstance(node.value, Constant) \\\n"
+        "        and isinstance(node.value.value, str)\n"
+        "\n"
+        "\n"
+        "def old(a, b):\n"
+        "    return a and b\n"
+        "\n"
+        "\n"
+        "def wait(q):\n"
+        "    while q and not (q[0] or\n"
+        "                     q[1]):\n"
+        "        q.pop()\n"
+        "    return 1 if q else 0\n"
+    )
+    (tmp_path / "t.py").write_text(text)
+    lines = text.splitlines()
+    diff = "+++ b/t.py\n@@ -0,0 +1,3 @@\n" + "".join(f"+{x}\n" for x in lines[:3])
+    diff += "@@ -9,0 +10,5 @@\n" + "".join(f"+{x}\n" for x in lines[9:])
+    found = om.mutants(diff, tmp_path)
+    for m in found:
+        assert text[m.span[0] : m.span[1]] == m.old, m
+    assert [(m.line, m.kind, m.old, m.new) for m in found][::2] == [
+        (2, "operand", "isinstance(node, Expr)", "True"),
+        (2, "operand", "isinstance(node.value, Constant)", "True"),
+        (3, "operand", "isinstance(node.value.value, str)", "True"),
+        (11, "condition", "q and not (q[0] or\n                     q[1])", "True"),
+        (11, "operand", "q", "True"),
+        (11, "operand", "not (q[0] or\n                     q[1])", "True"),
+        (11, "operand", "q[0]", "True"),
+        (12, "operand", "q[1]", "True"),
+        (14, "condition", "q", "True"),
+    ]
+    assert {m.new for m in found[1::2]} == {"False"}
+    assert str(found[6]) == "t.py:11  condition  q and not (q[0] or q[1])  ->  True"
+    # Line 7's `a and b` is on no added line.
+
+
+def test_a_python_file_that_does_not_parse_is_read_by_line(tmp_path):
+    (tmp_path / "t.py").write_text("if a and b:\n")
+    diff = "+++ b/t.py\n@@ -0,0 +1 @@\n+if a and b:\n"
+    assert [m.old for m in om.mutants(diff, tmp_path)] == [
+        "a and b",
+        "a and b",
+        "a",
+        "a",
+        "b",
+        "b",
+    ]

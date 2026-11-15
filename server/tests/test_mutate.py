@@ -286,3 +286,110 @@ def test_the_counts_come_from_the_last_summary_line():
     summary."""
     output = "1 failed, 2 passed in 0.5s\n1 passed, 3 deselected in 0.1s\nwarning\n"
     assert counts(output) == {"passed": 1, "deselected": 3}
+
+
+# --listed (#336 retro): every mutant tools/operand_mutants.py lists.
+PICK = """
+
+def pick(a, b):
+    if a > 0 and b > 0:
+        return 1
+    return 0
+"""
+PICK_TESTS = """
+
+def test_pick():
+    from mod import pick
+    assert pick(1, 1) == 1
+    assert pick(0, 1) == 0
+"""
+
+
+def listed(project, *pytest_args, tool=(), wait=False):
+    command = [sys.executable, str(TOOL), "--listed", "--base", "HEAD~1", *tool]
+    command += ["--", "-p", "no:cacheprovider", *pytest_args]
+    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    if wait:
+        return subprocess.Popen(
+            command, cwd=project, env=env, text=True, stdout=subprocess.PIPE
+        )
+    return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
+
+
+def commit(project, module, tests=""):
+    (project / "mod.py").write_text(module)
+    (project / "test_mod.py").write_text(TESTS + tests)
+    subprocess.run([*GIT, "commit", "-qam", "change"], cwd=project, check=True)
+
+
+def test_listed_runs_each_mutant_and_names_each_survivor(project):
+    """`pick(1, 1)` and `pick(0, 1)` leave `b > 0` made true alive: no case
+    has b at 0 or below."""
+    commit(project, MODULE + PICK, PICK_TESTS)
+    run = listed(project, "test_mod.py::test_pick")
+    assert run.stdout.splitlines()[:6] == [
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  True",
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  False",
+        "KILLED    mod.py:10  operand  a > 0  ->  True",
+        "KILLED    mod.py:10  operand  a > 0  ->  False",
+        "SURVIVED  mod.py:10  operand  b > 0  ->  True",
+        "KILLED    mod.py:10  operand  b > 0  ->  False",
+    ], run.stdout
+    assert "6 listed: 5 KILLED, 1 SURVIVED, 0 REFUSED, 0 ERROR" in run.stdout
+    assert (
+        run.stdout.splitlines()[-1] == "  SURVIVED  mod.py:10  operand  b > 0  ->  True"
+    )
+    assert run.returncode == 1
+    assert (project / "mod.py").read_text() == MODULE + PICK
+
+
+def test_listed_exits_0_when_every_mutant_is_killed(project):
+    commit(project, MODULE + PICK, PICK_TESTS + "    assert pick(1, 0) == 0\n")
+    run = listed(project, "test_mod.py::test_pick")
+    assert "6 listed: 6 KILLED" in run.stdout
+    assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_listed_refuses_a_text_twice_on_its_line(project):
+    """A line mutant's text is placed by its line, and a line that holds it
+    twice is left to a run by hand."""
+    commit(project, MODULE + "\n\ndef low(a, b):\n    return min(a, b) + min(a, b)\n")
+    run = listed(project, "test_mod.py::test_the_bound")
+    assert run.stdout.splitlines()[0].startswith("REFUSED   mod.py:10  min"), run.stdout
+    assert "not once on its line" in run.stdout.splitlines()[0]
+    assert run.returncode == 2
+
+
+def test_listed_refuses_a_diff_with_no_mutant(project):
+    commit(project, MODULE + "\n\ndef three():\n    return 3\n")
+    run = listed(project, "test_mod.py::test_the_bound")
+    assert run.returncode == 2
+    assert "no mutant listed" in run.stderr
+
+
+def test_listed_takes_no_old_or_new(project):
+    run = listed(project, "test_mod.py", tool=("--old", "a"))
+    assert run.returncode == 2
+    assert "--listed takes no --old" in run.stderr
+
+
+@pytest.mark.parametrize(
+    "signum", [signal.SIGTERM, signal.SIGINT], ids=lambda s: s.name
+)
+def test_a_stopped_listed_run_restores_the_file_and_names_what_it_left(project, signum):
+    commit(project, MODULE + PICK, PICK_TESTS)
+    tool = listed(project, "test_mod.py::test_waits", wait=True)
+    deadline = time.monotonic() + 30
+    while not (project / "started").exists() or not (project / "started").read_text():
+        assert time.monotonic() < deadline, "the test never started"
+        assert tool.poll() is None
+        time.sleep(0.05)
+    assert "if True:" in (project / "mod.py").read_text(), "mutated while it runs"
+    tool.send_signal(signum)
+    out, _ = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signum
+    assert (project / "mod.py").read_text() == MODULE + PICK
+    assert "STOPPED  6 of 6 not run:" in out
+    assert out.count("  NOT RUN  mod.py:10") == 6
+    run = listed(project, "test_mod.py::test_pick")
+    assert run.returncode == 1, "no lock is left behind: " + run.stderr

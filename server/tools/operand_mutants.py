@@ -27,18 +27,30 @@ that line of the new file. For each added line it lists:
   it splits at the top level into `&&`/`||` (or `and`/`or`) operands, each
   operand made true and made false.
 
-It reads one line at a time, so a call or a condition that spans lines,
-a ternary, and a condition in a `while`, a `return` or an arrow function
-outside `.filter()` are left out: list those by hand.
+A Python file on disk is read by its AST instead, for its conditions:
+each `if`, `elif`, `while`, ternary and comprehension condition, and each
+operand of every `and` and `or` (a `return a and b` too), wherever it
+spans lines, when it touches an added line. Its `old` is then the text of
+its span, which can hold a newline; the line printed is the span's first.
+The rest is read one line at a time, so a JavaScript call or condition that
+spans lines, a ternary, and a condition in a `while`, a `return` or an
+arrow function outside `.filter()` are left out, and so is every branch
+that is no condition in either language (a tuple element such as
+`(ast.Global, ast.Nonlocal)`, a set taken away, a loop's bound): list those
+by hand.
+
+`tools/mutate.py --listed` runs every mutant this lists, in one call
+(#336 retro).
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 CALL = re.compile(r"(?<![\w-])(min|max|clamp)\(")
@@ -55,9 +67,13 @@ class Mutant:
     kind: str
     old: str
     new: str
+    # Where `old` sits in the file, as (start, end) offsets into its text;
+    # None when the file was not read, or `old` is on its line more than once.
+    span: tuple[int, int] | None = field(default=None, compare=False)
 
     def __str__(self) -> str:
-        return f"{self.path}:{self.line}  {self.kind}  {self.old}  ->  {self.new}"
+        old = " ".join(self.old.split()) if "\n" in self.old else self.old
+        return f"{self.path}:{self.line}  {self.kind}  {old}  ->  {self.new}"
 
 
 def closing(text: str, start: int) -> int | None:
@@ -181,13 +197,18 @@ def is_python(root: Path | None, path: str) -> bool:
     return first.startswith(b"#!") and b"python" in first
 
 
-def line_mutants(path: str, text: str, python: bool) -> list[tuple[str, str, str]]:
+def line_mutants(
+    path: str, text: str, python: bool, by_ast: bool = False
+) -> list[tuple[str, str, str]]:
+    """The mutants one line holds; with `by_ast`, its Python conditions are
+    left to python_conditions()."""
     found = call_mutants(text)
     py_if = None
     if python and (m := PY_IF.match(text)):
-        found += condition_mutants(m.group(1).strip(), js=False)
+        if not by_ast:
+            found += condition_mutants(m.group(1).strip(), js=False)
         py_if = len(text) - len(text.lstrip())
-    if python:
+    if python and not by_ast:
         found += comprehension_mutants(text)
         # JavaScript inside a Python string, as the browser tests keep it; a
         # Python `if (a, b) in seen:` is no JavaScript `if (...)`.
@@ -208,6 +229,57 @@ def line_mutants(path: str, text: str, python: bool) -> list[tuple[str, str, str
             found.append(("filter", whole, f"{param} => false"))
             found += condition_mutants(body, js=True)[2:]
     return found
+
+
+def offsets(text: str) -> list[int]:
+    """The offset of each line's start in `text`, for 1-based line numbers."""
+    starts = [0, 0]
+    for i, c in enumerate(text):
+        if c == "\n":
+            starts.append(i + 1)
+    return starts
+
+
+def python_conditions(
+    text: str, added: set[int]
+) -> list[tuple[int, str, str, str, tuple[int, int]]]:
+    """(line, kind, old, new, span) for each condition and `and`/`or` operand
+    of a Python module that touches a line in `added`; [] when it does not
+    parse, which mutants() takes as no AST."""
+    tree = ast.parse(text)
+    lines = text.split("\n")
+    starts = offsets(text)
+
+    def at(line: int, col: int) -> int:
+        # ast's columns count UTF-8 bytes.
+        return starts[line] + len(lines[line - 1].encode()[:col].decode())
+
+    def entry(node: ast.expr, kind: str, new: str):
+        span = (
+            at(node.lineno, node.col_offset),
+            at(node.end_lineno, node.end_col_offset),
+        )
+        return (node.lineno, kind, text[span[0] : span[1]], new, span)
+
+    def touches(node: ast.expr) -> bool:
+        return any(n in added for n in range(node.lineno, node.end_lineno + 1))
+
+    tests, ops = [], []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.If, ast.While, ast.IfExp)):
+            tests.append(node.test)
+        elif isinstance(node, ast.comprehension):
+            tests += node.ifs
+        elif isinstance(node, ast.BoolOp):
+            ops += node.values
+    out = []
+    for node in tests:
+        if touches(node):
+            out += [entry(node, "condition", "True"), entry(node, "condition", "False")]
+    for node in ops:
+        if touches(node):
+            out += [entry(node, "operand", "True"), entry(node, "operand", "False")]
+    return sorted(out, key=lambda e: (e[4][0], e[1] != "condition", -e[4][1]))
 
 
 def added_lines(diff: str):
@@ -244,20 +316,58 @@ def css_code(root: Path | None, path: str) -> list[str] | None:
     return blanked.splitlines()
 
 
+def source(root: Path | None, path: str) -> str | None:
+    if root is None:
+        return None
+    try:
+        return (root / path).read_text()
+    except OSError, UnicodeDecodeError:
+        return None
+
+
 def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
-    out = []
-    files: dict[str, list[str] | None] = {}
-    python: dict[str, bool] = {}
+    """Each mutant the diff's added lines hold, by file and then by line;
+    with `root`, the tree the diff's new side is checked out in, a Python
+    file's conditions come from its AST, and each mutant has its span."""
+    added: dict[str, list[tuple[int, str]]] = {}
     for path, line, text in added_lines(diff):
-        if path not in files:
-            files[path] = css_code(root, path)
-            python[path] = is_python(root, path)
-        code = files[path]
-        if code is not None and line <= len(code):
-            text = code[line - 1]
-        for kind, old, new in line_mutants(path, text, python[path]):
-            if old != new:
-                out.append(Mutant(path, line, kind, old, new))
+        added.setdefault(path, []).append((line, text))
+    out = []
+    for path, rows in added.items():
+        code, python, text = (
+            css_code(root, path),
+            is_python(root, path),
+            source(root, path),
+        )
+        conditions = []
+        if python and text is not None:
+            try:
+                conditions = python_conditions(text, {line for line, _ in rows})
+                by_ast = True
+            except SyntaxError:
+                by_ast = False
+        else:
+            by_ast = False
+        starts = offsets(text) if text is not None else None
+        lines = text.split("\n") if text is not None else None
+        found = []
+        for line, row in rows:
+            if code is not None and line <= len(code):
+                row = code[line - 1]
+            for kind, old, new in line_mutants(path, row, python, by_ast):
+                span = None
+                if (
+                    lines is not None
+                    and line <= len(lines)
+                    and lines[line - 1].count(old) == 1
+                ):
+                    start = starts[line] + lines[line - 1].index(old)
+                    span = (start, start + len(old))
+                found.append((line, 0, Mutant(path, line, kind, old, new, span)))
+        for line, kind, old, new, span in conditions:
+            found.append((line, 1, Mutant(path, line, kind, old, new, span)))
+        found.sort(key=lambda f: (f[0], f[1]))
+        out += [m for _, _, m in found if m.old != m.new]
     return out
 
 

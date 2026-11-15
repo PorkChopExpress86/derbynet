@@ -57,9 +57,10 @@ targets, then:
 - before the commands, `tools/docstring_claims.py` on each changed test file
   and `tools/operand_mutants.py` when a changed hand-written source file can
   hold a condition (not a migration or vendored code), plan/'s Python tools
-  and tests among them: run both before the first hand-off run, since a
-  claim or a mutant they find means an edit, and the run starts again (#312
-  retro);
+  and tests among them, with `tools/mutate.py --listed`, which runs every
+  mutant it lists (#336 retro): run them before the first hand-off run,
+  since a claim or a mutant they find means an edit, and the run starts
+  again (#312 retro);
 - the commands, from server/.
 
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
@@ -1995,6 +1996,10 @@ def report(plan, tree):
         if plan.changed_source:
             base = f' --base {plan.base}' if plan.from_git else ''
             say(f'  uv run python tools/operand_mutants.py{base}')
+            # #336 picked its mutants by hand, mostly one way, and 21 of 98
+            # survived on branches no test reached (#336 retro).
+            say(f'  uv run python tools/mutate.py --listed{base} -- '
+                '<the node ids of the tests that cover them>')
         say('')
 
     say('Run from server/ (start a run longer than a minute in the background):')
