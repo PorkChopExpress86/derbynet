@@ -43,7 +43,7 @@ was refused or errored, or none is listed. It mutates `.py`, `.js` and
 `.css` files and Python scripts, and names each other file whose mutants
 it skips: a `min()` a Markdown file quotes, and a test file's own
 conditions, since `affected-tests` prints this line with no `--file` and
-#336 retro's diff held 61 in its test files. A mutant whose text occurs
+#336 retro's last diff held 115 in its three test files. A mutant whose text occurs
 more than once on its line is refused, to be run by hand. A stop restores each
 file and names the mutants not run. The cases the listing reads past are
 still mutated by hand, one per call.
