@@ -9,7 +9,7 @@ from datetime import datetime
 def php_time(moment: datetime) -> int:
     """PHP's `time()` for `moment`: whole seconds. PHP stores a contact as
     `time()` and compares and subtracts whole seconds, so the port's
-    contact rules read both sides through this (D100, #341)."""
+    contact rules read both sides through this (#307, #341)."""
     return int(moment.timestamp())
 
 

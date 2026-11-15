@@ -28,7 +28,7 @@ def lapsed(last_contact: datetime | None, now: datetime) -> bool:
     """`get_replay()`'s timeout: no contact, or none for longer than
     `REPLAY_TIMEOUT`. Counted in whole seconds, as PHP's
     `$last_contact + REPLAY_TIMEOUT_LIMIT < time()` counts them
-    (`replay.inc:35`, D100), so a contact 0.8 s past a whole second lapses
+    (`replay.inc:35`, #307), so a contact 0.8 s past a whole second lapses
     11 s after that whole second, 10.2 s after the contact (#341)."""
     return last_contact is None or php_time(last_contact) + REPLAY_TIMEOUT < php_time(
         now

@@ -200,8 +200,8 @@ def _age(moment, now) -> int | None:
     """The seconds since the timer's or the replay client's last contact,
     counted in whole seconds as the ages of PHP's coordinator page are:
     `time() - $this->last_contact` (`timer-state.inc:97-102`) and
-    `time() - $replay['last_contact']` (`json-replay.inc:11`), D100 (#341).
-    Never below 0."""
+    `time() - $replay['last_contact']` (`json-replay.inc:11`), the rule
+    #307's review set (#341). Never below 0."""
     if moment is None:
         return None
     return max(0, php_time(now) - php_time(moment))
