@@ -106,8 +106,9 @@ class TimerState:
             found.state = State.NOT_CONNECTED
         # PHP's `malfunction_expiration <= time()` (`timer-state.inc:82`),
         # in whole seconds (#307, #356): PHP stores `time() + 60`
-        # (`timer-state.inc:126`), so a malfunction 0.5 s past a whole second
-        # ends 60 s after that second, 59.5 s after it began.
+        # (`timer-state.inc:126`), so a malfunction 0.6 s past a whole second
+        # ends 60 s past that second, 59.4 s after it began
+        # (`test_a_malfunction_expires_in_whole_seconds`).
         expires = found.malfunction_expires_at
         if expires is not None and php_time(expires) <= php_time(now):
             found.malfunction_expires_at = None
@@ -745,8 +746,9 @@ def details(event: Event) -> dict:
 def has_remote_start(row: TimerStatus, now: datetime) -> bool:
     """`has_remote_start()`'s `remote-start + 60 >= time()`
     (`remote-start.inc:14`), in whole seconds (#307, #356): PHP stores the
-    offer as `time()` (`remote-start.inc:7`), so an offer 0.5 s past a whole
-    second holds until 61 s past that second, 60.5 s after it."""
+    offer as `time()` (`remote-start.inc:7`), so an offer 0.6 s past a whole
+    second holds until 61 s past that second, 60.4 s after it
+    (`test_remote_start_counts_whole_seconds`)."""
     seen = row.remote_start_seen_at
     return seen is not None and php_time(seen) + REMOTE_START_SECONDS >= php_time(now)
 
