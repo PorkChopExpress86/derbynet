@@ -13,7 +13,10 @@
 # push, as plan-checks.yml does: #222 changed the parity gate a plan test read,
 # and only CI found it (#218 retro).  They run once: source-checks.sh runs
 # them on a push it checks, and the hook runs them itself on any other push
-# (#311 retro).  It refuses a push typed in the same
+# (#311 retro).  It runs check-paths.sh --docs, as plan-checks.yml does, on a
+# push that changes a guide in docs/, the check or the docs build, whatever
+# else the push changes: #345's backticked `manage.py` passed the hook and
+# failed the hand-off (#345 retro).  It refuses a push typed in the same
 # command after a pytest run or a read of its output (#282 retro).  Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
@@ -77,6 +80,7 @@ EOF
 # Git sends one "<local ref> <local sha> <remote ref> <remote sha>" line per
 # ref it pushes.  A new branch has no remote sha; compare it with master.
 changed=
+guides=
 while read -r _ local_sha _ remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue  # a deleted ref
   if [ "$remote_sha" = "$ZERO" ]; then
@@ -88,12 +92,25 @@ while read -r _ local_sha _ remote_sha; do
   # The whole list first: under pipefail, grep -q's early exit can fail the
   # pipe (server/tests/test_pipefail_pipes.py).  image.yml runs checks.sh,
   # which server/tests/test_docker_checks.py reads (#58 retro).
+  names="$(git diff --name-only "$base" "$local_sha")"
   if [ -z "$base" ] \
        || grep -qE '^(server/|testing/|website/inc/generators/|\.github/workflows/image\.yml$)' \
-            <<<"$(git diff --name-only "$base" "$local_sha")"; then
+            <<<"$names"; then
     changed=1
   fi
+  if [ -z "$base" ] \
+       || grep -qE '^(docs/|server/docs/adr/check-paths\.sh$|server/ui/docs/build\.py$)' \
+            <<<"$names"; then
+    guides=1
+  fi
 done
+# The guides' check, as plan-checks.yml runs it, printing only its failures
+# and its count.
+if [ -n "$guides" ]; then
+  echo "pre-push: server/docs/adr/check-paths.sh --docs docs" >&2
+  (cd "$ROOT" && bash server/docs/adr/check-paths.sh --docs docs) \
+    | grep -v -e '^ok ' -e '^allowed '
+fi
 # plan/bin reads server/ and .github/, so plan/tests run on every push.
 # source-checks.sh, below, runs them on a push it checks; #311's push ran
 # them twice, and the second run alone took 603 s (#311 retro).

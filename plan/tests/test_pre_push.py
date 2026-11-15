@@ -18,7 +18,12 @@ HOOK = Path(__file__).resolve().parents[2] / '.githooks' / 'pre-push'
 SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'source-checks.sh'
 # The server checks' stand-ins: each notes its arguments and passes.
 UV = '#!/bin/sh\necho "uv $*" >>"$STUB_LOG"\n'
-CHECK_PATHS = 'echo "check-paths.sh" >>"$STUB_LOG"\necho "0 failures"\n'
+# It notes its arguments, and fails the guides' check when the guide holds
+# BROKEN, as #345's `manage.py` did.
+CHECK_PATHS = '''echo "check-paths.sh $*" >>"$STUB_LOG"
+if [ "$1" = --docs ] && grep -qs BROKEN docs/*.md; then echo "MISSING  manage.py"; exit 1; fi
+echo "0 failures"
+'''
 FAILING = '''import os
 import unittest
 
@@ -31,9 +36,10 @@ class Plan(unittest.TestCase):
 '''
 
 
-def push(changed: str, plan_test: str, shell: str = '') -> subprocess.CompletedProcess:
-    """Runs the hook for a push of one commit that changes only `changed`,
-    from a `bash -c` script that runs `shell` first when it is given."""
+def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n') -> subprocess.CompletedProcess:
+    """Runs the hook for a push of one commit that changes only `changed`, a
+    path or a tuple of paths, each written `text`, from a `bash -c` script
+    that runs `shell` first when it is given."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -64,9 +70,10 @@ def push(changed: str, plan_test: str, shell: str = '') -> subprocess.CompletedP
         git('add', '.')
         git('commit', '-q', '-m', 'base')
         base = git('rev-parse', 'HEAD')
-        path = repo / changed
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text('changed\n')
+        for name in (changed,) if isinstance(changed, str) else changed:
+            path = repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
         git('add', '.')
         git('commit', '-q', '-m', 'change')
         head = git('rev-parse', 'HEAD')
@@ -132,6 +139,51 @@ class ImageWorkflow(unittest.TestCase):
 
 
 PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
+
+
+class Guides(unittest.TestCase):
+    """#345's guide sentence named `manage.py` in backticks, which
+    check-paths.sh --docs reads as a missing top-level path. The hook ran
+    check-paths.sh on the ADRs alone, so the push passed and the hand-off
+    failed, and a new head cost a second push and a restart (#345 retro).
+    plan-checks.yml runs the guides' check, so the hook runs it when a push
+    changes a guide or the check, with or without a change to server/."""
+
+    def test_a_guide_push_runs_the_guides_check(self):
+        result = push('docs/install-docker.md', PASSING)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('check-paths.sh --docs docs\n', result.ran)
+        self.assertEqual(result.ran.count('plan/tests'), 1, result.ran)
+
+    def test_a_broken_guide_stops_a_push_outside_server(self):
+        result = push('docs/install-docker.md', PASSING, text='BROKEN\n')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('MISSING  manage.py', result.stdout)
+
+    def test_a_broken_guide_stops_a_push_of_server_too(self):
+        """#345's own push, f7c0f3cf, changed server/manage.py beside the
+        guides."""
+        result = push(('server/manage.py', 'docs/database.md'), PASSING, text='BROKEN\n')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('MISSING  manage.py', result.stdout)
+        self.assertIn('check-paths.sh --docs docs\n', result.ran)
+
+    def test_a_change_to_the_check_or_the_docs_build_runs_it(self):
+        # The push writes its text into the changed file, so the stand-in
+        # check is pushed with a line added.
+        for changed, text in (('server/docs/adr/check-paths.sh', CHECK_PATHS + '# changed\n'),
+                              ('server/ui/docs/build.py', 'changed\n')):
+            with self.subTest(changed=changed):
+                result = push(changed, PASSING, text=text)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('check-paths.sh --docs docs\n', result.ran)
+
+    def test_a_push_with_no_guide_skips_the_guides_check(self):
+        for changed in ('plan/README.md', 'server/tools/parity_gate.py', 'server/docs/adr/README.md'):
+            with self.subTest(changed=changed):
+                result = push(changed, PASSING, text='BROKEN\n')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn('--docs', result.ran)
 
 
 class ChainedPush(unittest.TestCase):
