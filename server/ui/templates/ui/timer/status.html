@@ -14,7 +14,8 @@
   {% if status.interface %}<dt class="text-ink-muted">Interface</dt><dd class="break-words" data-detail="interface">{{ status.interface }}</dd>{% endif %}
   {% if status.agent %}<dt class="text-ink-muted">Client</dt><dd class="break-all text-xs" data-detail="agent">{{ status.agent }}</dd>{% endif %}
 </dl>
-{% if status.agent %}<p class="mt-1 text-xs text-ink-muted">A second timer client that starts now is told another one is running, and its messages are ignored.</p>{% endif %}
+{# The server acts on a competing client's messages, as PHP does (legacy_api/tests/test_timer.py, test_a_competing_timers_messages_still_change_the_timer); the browser timer stops on <competing> (`decodeResponse` in timer/derbynet-timer/src/js/host_poller.js) and derby-timer.jar has no handling for it (#307). #}
+{% if status.agent %}<p class="mt-1 text-xs text-ink-muted">Run one timer client at a time. The server acts on every client's messages; a second browser or program is told another one is running, and the browser timer then stops, but derby-timer.jar keeps sending.</p>{% endif %}
 
 {% if status.test_running %}<p role="status" class="mt-3 rounded-xl border border-warn bg-warn-soft px-3 py-2 text-sm text-warn-ink" data-test-running>Simulated racing is on. <a href="{% url 'timer-test' %}" class="font-semibold underline underline-offset-2">Timer test</a></p>{% endif %}
 {% if status.refused_results %}<p role="status" class="mt-3 rounded-xl border border-warn bg-warn-soft px-3 py-2 text-sm text-warn-ink" data-refused-results>{{ status.refused_results }} unexpected result{{ status.refused_results|pluralize:" from the timer has,s from the timer have" }} been received. <a href="{% url 'dashboard' %}" class="font-semibold underline underline-offset-2">Race dashboard</a></p>{% endif %}
