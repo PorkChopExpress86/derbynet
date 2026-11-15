@@ -19,27 +19,47 @@ targets, then:
   `DERBYNET_BROWSER_FONT="DejaVu Sans"`, which draws `system-ui` as CI does
   (#273's "Heat 100" failed only there);
 - the repeats under load each changed browser test file takes (D85): 25 for
-  one that involves timing, 5 per font for a deterministic one, and none for
-  an import-only move (D97, amending D85): a diff that only changes imports
-  and deletes top-level defs, classes or constants into a module M that
-  has them unchanged, by AST. Each deleted name is imported by name
-  (`from M import name`), or is a dependency the moved code took along
-  into M: a name the moved code reads, which nothing the file keeps reads,
-  and which is not decorated (nor, for a constant, built by a call), since
-  pytest finds a fixture by its presence. Each name the moved code reads is
-  bound alike in M, and one the file binds by a statement moved too. An
-  import goes only with the moved code that alone read it.
-  A changed body or docstring, a new test or comment, a copy that differs,
-  an import that binds any other name anew or a name otherwise, an
-  assignment expression (:=) outside a function, `from __future__` imports
-  that differ, or what can't be parsed or resolved (a relative or star
-  import, a module outside the tree) keeps the count, and so does a flake
-  ticket, whatever the tool prints;
+  one that involves timing, 5 per font for a deterministic one, read from
+  the whole file, of the tests its diff adds or changes, by node id (D101,
+  amending D85 beside D97). Compared by AST at BASE and HEAD, a top-level
+  test or a test class's test method repeats when it is new or changed, or
+  when it reads, directly or through another helper or test of the file, a
+  helper (an undecorated def that is no test and nothing pytest reads by
+  its name) or a test the diff adds, changes or deletes; a test method also
+  when it reads such a method of its class through `self`, `cls` or the
+  class's name. A new test class repeats whole. The whole file repeats
+  when anything else changes: a fixture, a hook (an xunit setup or
+  teardown pytest calls by name too, `XUNIT`), pytestmark, an import or other
+  module-level code that is no part of a D97 move, a test class outside its
+  test methods; when a changed helper is read by nothing in the file, or by
+  such code, or a changed test method is read by its class outside its test
+  methods; when a name is bound twice, by `global` or by an assignment
+  expression (:=) outside a function; when a docstring changes and the file
+  reads `__doc__`; when the diff changes no test or helper by AST; and for
+  a file new on the branch, one that can't be parsed, or `--stdin`. The
+  module's docstring, a test class's, and comments are no change. None
+  repeat for an import-only move (D97, amending D85): a diff that only
+  changes imports and deletes top-level defs, classes or constants into a
+  module M that has them unchanged, by AST. Each deleted name is imported
+  by name (`from M import name`), or is a dependency the moved code took
+  along into M: a name the moved code reads, which nothing the file keeps
+  reads, and which is not decorated (nor, for a constant, built by a call),
+  since pytest finds a fixture by its presence. Each name the moved code
+  reads is bound alike in M, and one the file binds by a statement moved
+  too. An import goes only with the moved code that alone read it. A
+  changed body or docstring, a new test or comment, a copy that differs, an
+  import that binds any other name anew or a name otherwise, an assignment
+  expression (:=) outside a function, `from __future__` imports that
+  differ, or what can't be parsed or resolved (a relative or star import, a
+  module outside the tree) is no import-only move. A flake ticket keeps 25
+  repeats of the whole file, on the database it failed on, whatever the
+  tool prints (D101);
 - before the commands, `tools/docstring_claims.py` on each changed test file
   and `tools/operand_mutants.py` when a changed hand-written source file can
-  hold a condition (not a migration or vendored code): run both before the
-  first hand-off run, since a claim or a mutant they find means an edit, and
-  the run starts again (#312 retro);
+  hold a condition (not a migration or vendored code), plan/'s Python tools
+  and tests among them: run both before the first hand-off run, since a
+  claim or a mutant they find means an edit, and the run starts again (#312
+  retro);
 - the commands, from server/.
 
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
@@ -53,8 +73,8 @@ no test names or imports).
 `--stdin` reads the file list instead of git, for a back-test
 (`git diff --name-only SHA^ SHA | plan/bin/affected-tests --stdin`); it then
 looks for database code in each whole file rather than in its diff, and
-has no BASE to find an import-only move against, so every changed browser
-test file keeps its count.
+has no BASE to find an import-only move or a changed test against, so
+every changed browser test file keeps its count, of the whole file.
 `--root DIR` reads the tree at DIR instead of the repository's top level.
 """
 
@@ -529,11 +549,39 @@ def match_plan_tools(path):
         or path.startswith('.githooks/')
 
 
+def python_script(tree, path):
+    """A `.py` file, or a script with no extension whose shebang names
+    Python, as tools/operand_mutants.py reads them."""
+    if path.endswith('.py'):
+        return (tree.root / path).is_file()
+    if Path(path).suffix:
+        return False
+    try:
+        with open(tree.root / path, 'rb') as f:
+            first = f.readline()
+    except OSError:
+        return False
+    return first.startswith(b'#!') and b'python' in first
+
+
 def cover_plan_tools(plan, tree, path):
+    # #320's diff was a plan/bin tool and its test, and neither line of the
+    # "before the first hand-off run" step was printed (#320 retro).
+    if python_script(tree, path):
+        rel = f'../{path}'
+        if Path(path).name.startswith('test_'):
+            plan.changed_tests.append(rel)
+        else:
+            plan.changed_source.append(rel)
     # tools/source-checks.sh, printed for every diff, runs plan/tests: a line
     # of their own ran them twice (#338).
     plan.add(path, 'plan-tools', 'plan/tests, which test the plan tools and the '
              'pre-push hook: tools/source-checks.sh runs them')
+    # A server test that runs a plan tool where plan/tests can't, such as
+    # pytest itself for affected-tests' XUNIT (#336 review, M1).
+    named = tree.mentions([path])
+    if named:
+        plan.add(path, 'plan-tools', 'the server tests that name it', named)
 
 
 def match_timer_build(path):
@@ -1220,6 +1268,13 @@ def import_only(base_text, head_text, module_text):
         head = ast.parse(head_text)
     except SyntaxError as e:
         raise NotImportOnly(f'cannot be parsed ({e.msg}, line {e.lineno})') from None
+    return moves(base, head, module_text, (base_text, head_text))
+
+
+def moves(base, head, module_text, texts=None):
+    """import_only() on parsed modules; `texts`, the two files' texts, adds
+    the check that no comment is new. D101 calls it on the files with their
+    changed tests and helpers put back as BASE had them."""
     base_binds = bindings(base, 'BASE')
     head_binds = bindings(head, 'the file')
 
@@ -1239,12 +1294,13 @@ def import_only(base_text, head_text, module_text):
         raise NotImportOnly('it moves no top-level definition')
 
     # A comment is no code, but it is a change to the file.
-    import_lines = {ln for n in head.body if is_import(n)
-                    for ln in range(n.lineno, n.end_lineno + 1)}
-    old = iter(comments(base_text))
-    for comment in comments(head_text, import_lines):
-        if not any(comment == c for c in old):
-            raise NotImportOnly(f'a comment is new or changed: {comment}')
+    if texts is not None:
+        import_lines = {ln for n in head.body if is_import(n)
+                        for ln in range(n.lineno, n.end_lineno + 1)}
+        old = iter(comments(texts[0]))
+        for comment in comments(texts[1], import_lines):
+            if not any(comment == c for c in old):
+                raise NotImportOnly(f'a comment is new or changed: {comment}')
 
     for tree, where in ((base, 'BASE'), (head, 'the file')):
         no_walrus(tree, where)
@@ -1420,6 +1476,355 @@ def module_text(tree, name):
     return None
 
 
+# --- D101: the tests a diff adds or changes ---------------------------------
+#
+# A changed browser test file repeats under load only the tests its diff adds
+# or changes, by node id, and the tests that reach a helper it adds or
+# changes (D101, amending D85 beside D97; #319's 25 repeats of all of
+# test_timer.py took 58 min for one new test and a helper drawn out of
+# another). As with D97, a wrong verdict skips repeats that would show a
+# flake, so every check fails closed: whatever else the diff changes, or the
+# tool can't resolve, repeats the whole file.
+
+class WholeFile(Exception):
+    """Why a file repeats whole."""
+
+
+FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
+# The xunit-style setups and teardowns pytest 9.2 calls by name, at module
+# and class level (`_pytest/python.py`, `_get_first_non_fixture_func`):
+# server/tests/test_xunit_names.py sweeps them from a pytest run (#336
+# review, M1).
+XUNIT = ('setUpModule', 'setup_module', 'tearDownModule', 'teardown_module',
+         'setup_function', 'teardown_function', 'setup_class', 'teardown_class',
+         'setup_method', 'teardown_method')
+# What pytest or Python reads from a module or a class by its presence: a
+# hook, an xunit setup or teardown (#336), pytestmark, a dunder.
+PYTEST_READS = re.compile(r'__\w+__|pytestmark|pytest_\w+|' + '|'.join(XUNIT))
+
+
+def marks_only(node):
+    """Each decorator of `node` is `pytest.mark.X` or a call of one, such as
+    `pytest.mark.parametrize(...)`: a test's own marks. A fixture or any
+    other decorator makes it no test this verdict can resolve."""
+    for d in node.decorator_list:
+        if isinstance(d, ast.Call):
+            d = d.func
+        if not (isinstance(d, ast.Attribute) and isinstance(d.value, ast.Attribute)
+                and d.value.attr == 'mark' and isinstance(d.value.value, ast.Name)
+                and d.value.value.id == 'pytest'):
+            return False
+    return True
+
+
+def is_docstring(node):
+    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) \
+        and isinstance(node.value.value, str)
+
+
+def is_test(node):
+    """A def pytest collects as a test (python_functions' default, `test`),
+    with only marks for decorators."""
+    return isinstance(node, FUNCTIONS) and node.name.startswith('test') \
+        and marks_only(node)
+
+
+def is_helper(node):
+    """A module-level def that is no fixture or other decorated def, and
+    nothing pytest reads by its name. Side reads a test first."""
+    return isinstance(node, FUNCTIONS) and not node.decorator_list \
+        and not PYTEST_READS.fullmatch(node.name)
+
+
+def is_test_class(node):
+    """A class pytest collects (python_classes' default, `Test`, and no
+    `__init__`)."""
+    return isinstance(node, ast.ClassDef) and node.name.startswith('Test') \
+        and not any(isinstance(n, FUNCTIONS) and n.name == '__init__'
+                    for n in node.body)
+
+
+def what(node):
+    """How the output names a statement of a file's frame."""
+    if isinstance(node, FUNCTIONS):
+        if PYTEST_READS.fullmatch(node.name):
+            return f'the hook {node.name}'
+        if any('fixture' in mentions(d) or any(isinstance(n, ast.Attribute)
+                                                and n.attr == 'fixture'
+                                                for n in ast.walk(d))
+               for d in node.decorator_list):
+            return f'the fixture {node.name}'
+        return f'the decorated def {node.name}'
+    if isinstance(node, ast.ClassDef):
+        return f'the class {node.name}'
+    if is_import(node):
+        return f'the import on line {node.lineno}'
+    name = defined_name(node)
+    if name:
+        return f'the module-level {name}'
+    return f'the module-level code on line {node.lineno}'
+
+
+class Side:
+    """One side of the diff, BASE or HEAD, cut into what D101 resolves (the
+    tests, the helpers, the test classes and their test methods) and the
+    frame, which must be the same at both."""
+
+    def __init__(self, module, where):
+        self.module = module
+        body = list(module.body)
+        self.doc = None
+        if body and is_docstring(body[0]):
+            self.doc = body.pop(0).value.value
+        self.tests, self.helpers, self.classes, self.frame = {}, {}, {}, []
+        for node in body:
+            if is_test(node):
+                self.tests[node.name] = node
+            elif is_helper(node):
+                self.helpers[node.name] = node
+            elif is_test_class(node):
+                self.classes[node.name] = TestClass(node, where)
+            else:
+                self.frame.append(node)
+        try:
+            binds = bindings(module, where)
+        except NotImportOnly as e:
+            raise WholeFile(str(e)) from None
+        for name in [*self.tests, *self.helpers, *self.classes]:
+            if binds.get(name) is AMBIGUOUS:
+                raise WholeFile(f'{where} binds {name} more than once, or not by a '
+                                'plain def')
+
+    def names(self):
+        return {**self.tests, **self.helpers,
+                **{name: c.node for name, c in self.classes.items()}}
+
+
+class TestClass:
+    """A test class: its test methods, and the class less them and its
+    docstring, which must be the same at BASE and HEAD."""
+
+    def __init__(self, node, where):
+        self.node = node
+        body = list(node.body)
+        self.doc = body.pop(0).value.value if body and is_docstring(body[0]) else None
+        self.tests = {}
+        rest = []
+        for n in body:
+            if is_test(n):
+                if n.name in self.tests:
+                    raise WholeFile(f'{where} defines {node.name}.{n.name} twice')
+                self.tests[n.name] = n
+            else:
+                rest.append(n)
+        self.frame = ast.ClassDef(name=node.name, bases=node.bases,
+                                  keywords=node.keywords, body=rest,
+                                  decorator_list=node.decorator_list,
+                                  type_params=node.type_params)
+        self.rest = rest
+
+
+def attributes(node, owners):
+    """The attributes `node` reads off a name in `owners`, such as
+    `self.test_b` (#336 review, L2: mentions() reads no attribute)."""
+    return {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)
+            and isinstance(n.value, ast.Name) and n.value.id in owners}
+
+
+def reads_doc(module):
+    """The module reads a `__doc__`, its own or a class's."""
+    return any((isinstance(n, ast.Name) and n.id == '__doc__')
+               or (isinstance(n, ast.Attribute) and n.attr == '__doc__')
+               or (isinstance(n, ast.Constant) and n.value == '__doc__')
+               for n in ast.walk(module))
+
+
+def frame_change(base, head):
+    """How the module-level frame differs, or None."""
+    old = [ast.dump(n) for n in base.frame]
+    new = [ast.dump(n) for n in head.frame]
+    if old == new:
+        return None
+    for node, dump in zip(head.frame, new):
+        if dump not in old:
+            return f'{what(node)} is new or changed'
+    for node, dump in zip(base.frame, old):
+        if dump not in new:
+            return f'it deletes {what(node)}'
+    return 'it reorders the module-level code'
+
+
+def put_back(base, head):
+    """The two modules for D97's check of the frame: each test, helper and
+    test class HEAD has put back as BASE had it, one HEAD adds left out, a
+    test or test class HEAD deletes left out of BASE, and neither docstring.
+    A deleted helper stays in BASE, for D97 to find moved or not."""
+    old = base.names()
+    units = {id(n) for n in head.names().values()}
+    head_body = []
+    for n in head.module.body:
+        if id(n) not in units:
+            head_body.append(n)
+        elif n.name in old:
+            head_body.append(old[n.name])
+    gone = {id(n) for name, n in old.items()
+            if name not in head.names() and name not in base.helpers}
+    base_body = [n for n in base.module.body if id(n) not in gone]
+    for body, side in ((base_body, base), (head_body, head)):
+        if side.doc is not None:
+            del body[0]
+    return (ast.Module(body=base_body, type_ignores=[]),
+            ast.Module(body=head_body, type_ignores=[]))
+
+
+def changed_tests(base_text, head_text, module_text):
+    """D101's verdict on a browser test file: [(node id less the path, why)],
+    in HEAD's order, for each test the diff from `base_text` to `head_text`
+    adds or changes, by AST, and each that reads, directly or through a
+    helper of the file, a helper the diff adds, changes or deletes. A frame
+    that differs is resolved only as a D97 move (`module_text` as for
+    import_only()). Raises WholeFile with the reason otherwise."""
+    if base_text is None:
+        raise WholeFile('new on the branch, so each of its tests is new')
+    try:
+        trees = ast.parse(base_text), ast.parse(head_text)
+    except SyntaxError as e:
+        raise WholeFile(f'cannot be parsed ({e.msg}, line {e.lineno})') from None
+    for tree, where in zip(trees, ('BASE', 'the file')):
+        try:
+            no_walrus(tree, where)
+        except NotImportOnly as e:
+            raise WholeFile(str(e)) from None
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Global):
+                raise WholeFile(f'{where} line {n.lineno}: `global` lets a def rebind '
+                                'a module name')
+    base, head = Side(trees[0], 'BASE'), Side(trees[1], 'the file')
+
+    docs = [(base.doc, head.doc)] + [(c.doc, head.classes[name].doc)
+                                     for name, c in base.classes.items()
+                                     if name in head.classes]
+    if any(a != b for a, b in docs) and reads_doc(trees[1]):
+        raise WholeFile('a docstring changes, and the file reads `__doc__`')
+
+    moved = set()
+    why = frame_change(base, head)
+    if why:
+        try:
+            moved = {name for names in moves(*put_back(base, head), module_text).values()
+                     for name in names}
+        except NotImportOnly as e:
+            raise WholeFile(f'{why}, and it is no import-only move (D97: {e})') from None
+
+    # What the diff adds, changes or deletes: a test or a helper by its name,
+    # a new or deleted test class by its own.
+    seeds, ids = set(), {}
+    for name, node in head.tests.items():
+        old = base.tests.get(name)
+        if old is None or ast.dump(old) != ast.dump(node):
+            seeds.add(name)
+            ids[name] = 'new' if old is None else 'changed'
+    for name, node in head.helpers.items():
+        old = base.helpers.get(name)
+        if old is None or ast.dump(old) != ast.dump(node):
+            seeds.add(name)
+            readers = [n for other, n in head.names().items() if other != name]
+            if not any(name in mentions(n) for n in readers + head.frame):
+                raise WholeFile(f'it adds or changes the helper {name}, which nothing '
+                                'in the file reads')
+    seeds |= {name for name in [*base.tests, *base.helpers]
+              if name not in head.names() and name not in moved}
+    for name, c in head.classes.items():
+        old = base.classes.get(name)
+        if old is None:
+            seeds.add(name)
+            ids[name] = 'new'
+            continue
+        if ast.dump(old.frame) != ast.dump(c.frame):
+            changed = next((what(n) for n in c.rest
+                            if ast.dump(n) not in map(ast.dump, old.rest)),
+                           'its bases, its decorators or what it deletes')
+            raise WholeFile(f'the class {name} changes outside its test methods: '
+                            f'{changed}')
+        for method, node in c.tests.items():
+            was = old.tests.get(method)
+            if was is None or ast.dump(was) != ast.dump(node):
+                ids[f'{name}::{method}'] = 'new' if was is None else 'changed'
+        # A changed or deleted method makes its class reached below.
+    seeds |= {name for name in base.classes if name not in head.classes}
+
+    # The helpers and tests that read a seed, directly or through another
+    # (#336 review, L1: a test that calls a test); within a test class, the
+    # test methods that read one, or read a reached method of their class
+    # through `self`, `cls` or the class's name (L2). A class with a
+    # reached method is reached itself, for a subclass or a test that
+    # reads it, and the module's reach runs again.
+    reached = set(seeds)
+    readers = {**head.helpers, **head.tests}
+    in_class = {}
+    for _ in range(len(head.classes) + 1):
+        for _ in range(len(readers) + 1):
+            more = {name for name, node in readers.items()
+                    if name not in reached and mentions(node) & reached}
+            if not more:
+                break
+            reached |= more
+        for name, c in head.classes.items():
+            old = base.classes.get(name)
+            if old is None:
+                continue
+            owners = {'self', 'cls', name}
+            hit = {m for m in [*c.tests, *old.tests] if f'{name}::{m}' in ids
+                   or m not in c.tests or mentions(c.tests[m]) & (reached - {name})}
+            for _ in range(len(c.tests) + 1):
+                more = {m for m, node in c.tests.items()
+                        if m not in hit and attributes(node, owners) & hit}
+                if not more:
+                    break
+                hit |= more
+            in_class[name] = (owners, hit)
+        grown = {name for name, (_, hit) in in_class.items() if hit} - reached
+        if not grown:
+            break
+        reached |= grown
+    for node in head.frame + [c.frame for c in head.classes.values()]:
+        hit = sorted(mentions(node) & reached)
+        if hit:
+            raise WholeFile(f'{what(node)} reads {hit[0]}, which the diff adds, '
+                            'changes or deletes, or which reads one')
+    for name, (owners, hit) in in_class.items():
+        used = sorted(attributes(head.classes[name].frame, owners) & hit)
+        if used:
+            raise WholeFile(f'the class {name} reads {used[0]} outside its test methods, '
+                            'which the diff adds, changes or deletes, or which reads one')
+
+    out = []
+
+    def pick(key, node, skip, method=None):
+        hit = sorted(mentions(node) & (reached - {skip}))
+        if method is not None:
+            owners, changed = in_class[skip]
+            hit += sorted(f'{a} of {skip}' for a in attributes(node, owners)
+                          & (changed - {method}))
+        if key in ids or hit:
+            out.append((key, ids.get(key) or f'reads {", ".join(hit)}'))
+
+    for node in head.module.body:
+        name = getattr(node, 'name', None)
+        if node is head.tests.get(name):
+            pick(name, node, name)
+        elif name in head.classes and node is head.classes[name].node:
+            if ids.get(name) == 'new':
+                out.append((name, 'new'))
+                continue
+            for method, test in head.classes[name].tests.items():
+                pick(f'{name}::{method}', test, name, method)
+    if not out:
+        raise WholeFile('by AST it adds or changes no test, and no helper a test '
+                        'reads: a comment, a docstring or a deletion')
+    return out
+
+
 # --- output ----------------------------------------------------------------
 
 def collapse(targets):
@@ -1440,11 +1845,68 @@ def browser_files(tree, targets):
 
 
 def first_hit(tree, rel, pattern):
-    for number, line in enumerate(tree.text(rel).splitlines(), 1):
+    return text_hit(tree.text(rel), pattern)
+
+
+NO_BASE = object()  # --stdin: no BASE to compare with
+
+
+def text_hit(text, pattern):
+    for number, line in enumerate(text.splitlines(), 1):
         hit = pattern.search(line)
         if hit:
             return f'line {number}: {hit.group(0)}'
     return None
+
+
+def load_repeats(rel, base, head, module_text, postgres=False):
+    """The "Repeats under load" lines for the changed browser test file
+    `server/rel` from `base`, its text at BASE (None when it is new on the
+    branch, NO_BASE under --stdin), to `head`: none for an import-only move
+    (D97), else the count the whole file's text sets, for the tests D101
+    picks, or the whole file and why."""
+    out = []
+    say = out.append
+    if base is not NO_BASE:
+        try:
+            moved = import_only(base, head, module_text)
+        except NotImportOnly as why:
+            moved = None
+            not_moved = str(why)
+        if moved:
+            say(f'  {rel}: import-only (D97): none')
+            for module, names in sorted(moved.items()):
+                say(f'      moves {", ".join(names)} unchanged to {module}, '
+                    'which it imports from; a flake ticket still repeats it 25 times')
+            return out
+    timing = text_hit(head, TIMING)
+    count = 25 if timing else 5
+    kind = (f'involves timing ({timing})' if timing
+            else 'deterministic: check that it waits on no poll, timer or animation')
+    say(f'  {rel}: {count} repeats, {kind}')
+    if base is not NO_BASE:
+        say(f'      not an import-only move (D97): {not_moved}')
+    try:
+        if base is NO_BASE:
+            raise WholeFile('--stdin has no BASE to compare with')
+        picked = changed_tests(base, head, module_text)
+    except WholeFile as why:
+        say(f'      the whole file (D101): {why}')
+        targets = rel
+    else:
+        say('      the tests it adds or changes, and those that read a helper it adds '
+            'or changes (D101):')
+        for key, reason in picked:
+            say(f'        {key}: {reason}')
+        say(f'      a flake ticket repeats the whole file {rel} 25 times instead, on '
+            'the database it failed on (D101)')
+        targets = ' '.join(f'{rel}::{key}' for key, _ in picked)
+    pg = '--postgres ' if postgres else ''
+    run = f'tools/pytest-under-load.sh {pg}-m browser -n 4 --count {count} {targets}'
+    say(f'      {run}')
+    if text_hit(head, MEASURES):
+        say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
+    return out
 
 
 def report(plan, tree):
@@ -1507,40 +1969,18 @@ def report(plan, tree):
         say('Measures text: none of the browser tests it runs.')
     say('')
     if plan.changed_browser_tests:
-        say('Repeats under load, on the changed test files only (owner, 2026-11-11; '
-            'D97: none for an import-only move; a flake ticket keeps 25 on the '
-            'database it failed on):')
+        say('Repeats under load (D85), on the changed test files only: the tests '
+            'each adds or changes, by node id, and those that read a helper it adds '
+            'or changes (D101); none for an import-only move (D97). A flake ticket '
+            'keeps 25 of the whole file, on the database it failed on, whatever this '
+            'prints (owner, 2026-11-11):')
         if not plan.from_git:
             say('  (--stdin has no BASE to compare with, so no file counts as an '
-                'import-only move, D97: each keeps its count)')
+                'import-only move, D97: each keeps its count, of the whole file, D101)')
         for r in plan.changed_browser_tests:
-            if plan.from_git:
-                try:
-                    moved = import_only(base_text(plan, r), tree.text(r),
-                                        lambda name: module_text(tree, name))
-                except NotImportOnly as why:
-                    moved = None
-                    not_moved = str(why)
-                if moved:
-                    say(f'  {r}: import-only (D97): none')
-                    for module, names in sorted(moved.items()):
-                        say(f'      moves {", ".join(names)} unchanged to {module}, '
-                            'which it imports from; a flake ticket still repeats it 25 times')
-                    continue
-            timing = first_hit(tree, r, TIMING)
-            measures = first_hit(tree, r, MEASURES)
-            count = 25 if timing else 5
-            kind = (f'involves timing ({timing})' if timing
-                    else 'deterministic: check that it waits on no poll, timer or '
-                    'animation')
-            say(f'  {r}: {count} repeats, {kind}')
-            if plan.from_git:
-                say(f'      not an import-only move (D97): {not_moved}')
-            pg ='--postgres ' if plan.postgres else ''
-            run = f'tools/pytest-under-load.sh {pg}-m browser -n 4 --count {count} {r}'
-            say(f'      {run}')
-            if measures:
-                say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
+            base = base_text(plan, r) if plan.from_git else NO_BASE
+            out += load_repeats(r, base, tree.text(r), lambda name: module_text(tree, name),
+                                plan.postgres)
     else:
         say('Repeats under load: no browser test file changed.')
     say('')
