@@ -21,6 +21,6 @@
 
 <div class="mt-3 flex flex-wrap gap-2 empty:hidden">
   {% if status.remote_start %}<button type="button" hx-post="{% url 'timer-remote-start' %}" hx-target="#toasts" hx-swap="beforeend" hx-sync="#timer-status:replace" data-action="start-race" class="min-h-12 grow rounded-xl bg-accent px-4 font-semibold text-accent-ink sm:grow-0">Start Race</button>{% endif %}
-  {# Offered only while no timer is connected, as timer-test.js offers it. #}
-  {% if not status.connected %}<a href="{{ fake_timer_url }}" target="_blank" data-action="fake-timer" class="inline-flex min-h-12 items-center rounded-xl border border-line px-4 font-semibold">Fake Timer</a>{% endif %}
+  {# Offered only while no timer is connected, as timer-test.js offers it (timer-test.js:270-271), and only to a session that can open the fake timer (D96); timer-test.php shows it to every visitor (timer-test.php:105-106). #}
+  {% if not status.connected and fake_timer_url %}<a href="{{ fake_timer_url }}" target="_blank" data-action="fake-timer" class="inline-flex min-h-12 items-center rounded-xl border border-line px-4 font-semibold">Fake Timer</a>{% endif %}
 </div>

@@ -449,7 +449,11 @@ ENTRIES: tuple[NavEntry, ...] = (
         "fake-timer",
         "Fake Timer",
         "timer/fake/",
-        Perm.CHECK_IN_RACERS,
+        # D96: TIMER_MESSAGE, as every timer-message the page sends needs
+        # (legacy_api/handlers/timer.py) and /timer.php takes. PHP's page asks
+        # for CHECK_IN_RACERS (`fake-timer.php:9`), so RaceCrew opened it and
+        # had every message refused.
+        Perm.TIMER_MESSAGE,
         DURING,
         50,
         php="fake-timer.php",

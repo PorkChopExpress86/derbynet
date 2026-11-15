@@ -26,7 +26,9 @@ Every timer control needs CONTROL_RACE, as #15 hardened `timer.assign-*`,
 `timer.test`, `timer.log` and `timer.settings` (S21); the status and test
 pages take it as their page gate. The browser timer needs TIMER_MESSAGE, the
 Timer role's one permission (D5), and shows its Timer settings button only
-to a session with CONTROL_RACE (D53).
+to a session with CONTROL_RACE (D53). The fake timer needs TIMER_MESSAGE too,
+as every message it sends does, and the status page links to it only for a
+session that holds it (D96).
 """
 
 import hashlib
@@ -45,8 +47,8 @@ from core import settings_form
 from core.models import RaceSettings
 from racing.models import TimerStatus
 from racing.services import timer
-from ui import timer_build
-from ui.navigation import requires_page
+from ui import navigation, timer_build
+from ui.navigation import can_open, requires_page
 from ui.responses import active_event as _event
 from ui.responses import (
     closing_sheet,
@@ -78,9 +80,14 @@ def _with_contact(response: HttpResponse, found: state.Status) -> HttpResponse:
 
 def status_html(request) -> tuple[str, str, state.Status]:
     found = state.status(_event(request), timezone.now())
+    # D96: the link shows only to a session that can open the fake timer.
+    can_fake = can_open(request, navigation.entry("fake-timer"))
     html = render_to_string(
         "ui/timer/status.html",
-        {"status": found, "fake_timer_url": reverse("fake-timer")},
+        {
+            "status": found,
+            "fake_timer_url": reverse("fake-timer") if can_fake else "",
+        },
         request,
     )
     return (*_signed(html, "timer-sig"), found)

@@ -1,8 +1,8 @@
 """The timer pages in a browser (#50): the browser timer at `/timer.php`
 with every file it loads, its Timer settings button by role (D53), the
 page a browser without Web Serial gets, the fake timer racing a heat in auto
-mode, the parity boxes of `timer-test.php` and `fake-timer.php`, and the
-screenshots.
+mode and as the Timer role (D96), the parity boxes of `timer-test.php` and
+`fake-timer.php`, and the screenshots.
 
 The timer side posts `timer-message` from the page's own session, as the
 fake timer and the browser timer do."""
@@ -232,6 +232,22 @@ def test_the_fake_timer_races_a_heat_in_auto_mode(login, event):
     expect(card).to_contain_text("1 run")
 
 
+def race_heat_1_by_hand(page, round_):
+    """Start, once the page enables it, then Stop on each of the 4 lanes; the
+    round's heat 1 then holds all 4 times, within 5 s."""
+    start = page.get_by_role("button", name="Start", exact=True)
+    expect(start).to_be_enabled(timeout=5000)
+    start.click()
+    for lane in range(1, 5):
+        page.get_by_role("button", name=f"Stop lane {lane}").click()
+    heat_1 = HeatLane.objects.filter(round=round_, heat=1)
+    for _ in range(50):
+        if heat_1.exclude(finish_time=None).count() == 4:
+            break
+        page.wait_for_timeout(100)
+    assert heat_1.exclude(finish_time=None).count() == 4
+
+
 def test_fake_timer_parity_lanes_start_and_stop(login, event):
     """Parity: lane count, Start and a Stop per lane."""
     page = login("RaceCoordinator")
@@ -239,7 +255,6 @@ def test_fake_timer_parity_lanes_start_and_stop(login, event):
     wolves = race_setup(event, groups=(("Wolves", 4),), lanes=4)["Wolves"]
     scheduled(wolves, race=False)
     page.goto("/timer/fake/")
-    start = page.get_by_role("button", name="Start", exact=True)
     expect(page.locator("[data-summary]")).to_have_text("Not racing.")
     page.get_by_role("button", name="More: Lanes on the track").click()
     expect(page.locator("[data-lanes] li")).to_have_count(5)
@@ -247,16 +262,19 @@ def test_fake_timer_parity_lanes_start_and_stop(login, event):
     expect(page.locator("[data-lanes] li")).to_have_count(4)
     # The page asks again each second; racing on stages heat 1.
     assert heats.select_heat(event, round_id=wolves.pk, heat=1, now_racing=True) is None
-    expect(start).to_be_enabled(timeout=5000)
-    start.click()
-    for lane in range(1, 5):
-        page.get_by_role("button", name=f"Stop lane {lane}").click()
-    heat_1 = HeatLane.objects.filter(round=wolves, heat=1)
-    for _ in range(50):
-        if heat_1.exclude(finish_time=None).count() == 4:
-            break
-        page.wait_for_timeout(100)
-    assert heat_1.exclude(finish_time=None).count() == 4
+    race_heat_1_by_hand(page, wolves)
+
+
+def test_the_timer_role_races_a_heat_from_the_fake_timer(login, event):
+    """Acceptance (D96): logged in as Timer through the login page, the fake
+    timer opens, and the lane results it sends are accepted. Timer holds
+    TIMER_MESSAGE alone, so the race is set up on the server."""
+    page = login("Timer")
+    phone_only(page)
+    wolves = scheduled(race_setup(event, groups=(("Wolves", 4),), lanes=4)["Wolves"])
+    page.goto("/timer/fake/")
+    expect(page.locator("[data-summary]")).to_contain_text("Ready for heat 1 of")
+    race_heat_1_by_hand(page, wolves)
 
 
 # ----- timer status ----------------------------------------------------------------
