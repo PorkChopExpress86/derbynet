@@ -1486,7 +1486,7 @@ class RealTree(unittest.TestCase):
     def test_each_file_the_role_pages_check_reads_prints_it(self):
         """The fixtures, the seeded roles, the gates, the URL confs that
         resolve() reads, and each view its OTHER_PAGES names, read from the
-        real test: #323's CI failed 10 jobs on that fixture (#320 retro)."""
+        real test: #323's CI failed on that fixture (#320 retro)."""
         fixture = 'tests/test_role_pages_fixture.py'
         views = [f'server/{v}' for v in TOOL.role_page_views(TOOL.Tree(REPO))]
         self.assertIn('server/ui/timer/views.py', views)
