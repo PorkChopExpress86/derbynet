@@ -667,6 +667,20 @@ class BeforeTheHandOff(unittest.TestCase):
         self.assertNotIn('docstring_claims', out)
         self.assertNotIn('Before the first hand-off run', out)
 
+    def test_a_plan_tool_and_its_test_list_both(self):
+        """#320's diff was `plan/bin/affected-tests` and its test, and the
+        tool printed neither line, so its implementer listed claims and
+        mutants by hand (#320 retro). Paths are from server/."""
+        tree = {**TREE, 'plan/bin/tool': '#!/usr/bin/env python3\nif a:\n    pass\n',
+                'plan/tests/test_tool.py': '"""2 runs."""\n',
+                'plan/bin/hook': '#! /bin/bash\n'}
+        out = run('plan/bin/tool', 'plan/tests/test_tool.py', tree=tree)
+        self.assertIn('  uv run python tools/docstring_claims.py ../plan/tests/test_tool.py\n',
+                      before_hand_off(out))
+        self.assertIn('  uv run python tools/operand_mutants.py\n', before_hand_off(out))
+        out = run('plan/bin/hook', 'plan/README.md', tree=tree)
+        self.assertNotIn('Before the first hand-off run', out)
+
     def test_a_migration_or_vendored_code_lists_no_mutants(self):
         tree = {**TREE, 'server/racing/migrations/0002_x.py': 'X = 1\n',
                 'server/ui/static/ui/vendor/lib-1.0.js': 'if (a && b) {}\n'}

@@ -75,3 +75,25 @@ def test_each_old_text_is_on_its_line_and_removed_lines_are_skipped():
     assert {m.line for m in found} == {2}
     for m in found:
         assert m.old in "if (x > Math.max(a, b)) {}"
+
+
+def test_a_python_script_with_no_extension_is_read_as_python(tmp_path):
+    """#320's `plan/bin/affected-tests` has no `.py`: the tool read it as
+    JavaScript, listed `if (module, name) in seen:` as a condition of
+    `module, name`, and missed each Python `if`, so every condition was
+    listed by hand (#320 retro). Its shebang names Python."""
+    script = tmp_path / "plan" / "bin" / "tool"
+    script.parent.mkdir(parents=True)
+    script.write_text("#!/usr/bin/env python3\nif (module, name) in seen:\n")
+    (tmp_path / "plan" / "bin" / "hook").write_text("#! /bin/bash\nif (x) {}\n")
+    diff = (
+        "+++ b/plan/bin/tool\n@@ -1,0 +2 @@\n+if (module, name) in seen:\n"
+        "+++ b/plan/bin/hook\n@@ -1,0 +2 @@\n+if (x) {}\n"
+    )
+    found = [(m.path, m.old, m.new) for m in om.mutants(diff, tmp_path)]
+    assert found == [
+        ("plan/bin/tool", "(module, name) in seen", "True"),
+        ("plan/bin/tool", "(module, name) in seen", "False"),
+        ("plan/bin/hook", "x", "true"),
+        ("plan/bin/hook", "x", "false"),
+    ]

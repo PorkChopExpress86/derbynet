@@ -37,7 +37,8 @@ targets, then:
   ticket, whatever the tool prints;
 - before the commands, `tools/docstring_claims.py` on each changed test file
   and `tools/operand_mutants.py` when a changed hand-written source file can
-  hold a condition (not a migration or vendored code): run both before the
+  hold a condition (not a migration or vendored code), plan/'s Python tools
+  and tests among them: run both before the
   first hand-off run, since a claim or a mutant they find means an edit, and
   the run starts again (#312 retro);
 - the commands, from server/.
@@ -529,7 +530,30 @@ def match_plan_tools(path):
         or path.startswith('.githooks/')
 
 
+def python_script(tree, path):
+    """A `.py` file under plan/, or a plan/bin script whose shebang names
+    Python, as tools/operand_mutants.py reads them."""
+    if path.endswith('.py'):
+        return (tree.root / path).is_file()
+    if Path(path).suffix:
+        return False
+    try:
+        with open(tree.root / path, 'rb') as f:
+            first = f.readline()
+    except OSError:
+        return False
+    return first.startswith(b'#!') and b'python' in first
+
+
 def cover_plan_tools(plan, tree, path):
+    # #320's diff was a plan/bin tool and its test, and neither line of the
+    # "before the first hand-off run" step was printed (#320 retro).
+    if path.startswith('plan/') and python_script(tree, path):
+        rel = f'../{path}'
+        if Path(path).name.startswith('test_'):
+            plan.changed_tests.append(rel)
+        else:
+            plan.changed_source.append(rel)
     plan.command('python3 -I -m unittest discover -s ../plan/tests')
     plan.add(path, 'plan-tools', 'plan/tests, which test the plan tools and the '
              'pre-push hook (tools/source-checks.sh runs them too)')

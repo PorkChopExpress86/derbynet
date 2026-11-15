@@ -22,7 +22,8 @@ that line of the new file. For each added line it lists:
   lists `min(9vh, 11vw)`'s;
 - a condition, JavaScript's `if (...)` and `.filter(x => ...)` and
   Python's `if ...:`, `elif ...:` and a one-line comprehension's `if`, made
-  true and made false, and, when
+  true and made false (Python: a `.py` file, or a script with no extension
+  whose shebang names Python, such as `plan/bin/affected-tests`), and, when
   it splits at the top level into `&&`/`||` (or `and`/`or`) operands, each
   operand made true and made false.
 
@@ -165,15 +166,32 @@ def comprehension_mutants(text: str) -> list[tuple[str, str, str]]:
     return out
 
 
-def line_mutants(path: str, text: str) -> list[tuple[str, str, str]]:
-    found = call_mutants(text)
+def is_python(root: Path | None, path: str) -> bool:
+    """A `.py` file, or a script whose shebang names Python, such as
+    `plan/bin/affected-tests` (#320 retro)."""
     if path.endswith(".py"):
+        return True
+    if root is None or Path(path).suffix:
+        return False
+    try:
+        with open(root / path, "rb") as f:
+            first = f.readline()
+    except OSError:
+        return False
+    return first.startswith(b"#!") and b"python" in first
+
+
+def line_mutants(path: str, text: str, python: bool) -> list[tuple[str, str, str]]:
+    found = call_mutants(text)
+    m = None
+    if python:
         m = PY_IF.match(text)
         if m:
             found += condition_mutants(m.group(1).strip(), js=False)
         found += comprehension_mutants(text)
-        # JavaScript inside a Python string, as the browser tests keep it.
-    if not path.endswith(".css"):
+        # JavaScript inside a Python string, as the browser tests keep it; a
+        # Python `if (a, b) in seen:` is no JavaScript `if (...)`.
+    if not path.endswith(".css") and not m:
         for m in JS_IF.finditer(text):
             end = closing(text, m.end())
             if end is not None:
@@ -227,13 +245,15 @@ def css_code(root: Path | None, path: str) -> list[str] | None:
 def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
     out = []
     files: dict[str, list[str] | None] = {}
+    python: dict[str, bool] = {}
     for path, line, text in added_lines(diff):
         if path not in files:
             files[path] = css_code(root, path)
+            python[path] = is_python(root, path)
         code = files[path]
         if code is not None and line <= len(code):
             text = code[line - 1]
-        for kind, old, new in line_mutants(path, text):
+        for kind, old, new in line_mutants(path, text, python[path]):
             if old != new:
                 out.append(Mutant(path, line, kind, old, new))
     return out
