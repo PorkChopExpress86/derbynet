@@ -57,3 +57,9 @@ def test_the_commit_is_the_rootdir_s_from_any_folder(request, tmp_path, monkeypa
 def test_a_tree_outside_git_is_named_so(request, tmp_path):
     lines = _hook(request.config)(SimpleNamespace(rootpath=tmp_path))
     assert "head: unknown (not a git checkout)" in lines
+
+
+def test_no_git_on_the_path_is_named_so(request, monkeypatch):
+    monkeypatch.setenv("PATH", "")
+    lines = _hook(request.config)(request.config)
+    assert "head: unknown (no git)" in lines

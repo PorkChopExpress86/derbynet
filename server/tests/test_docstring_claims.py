@@ -125,3 +125,17 @@ def test_a_row_naming_another_test_by_nickname_lists_nothing(tmp_path):
         "<details>\n- `test_lanes`: 9, and\n  2 in the lane count\n</details>\n"
     )
     assert dc.main(["--check", str(body), str(path)]) == 0
+
+
+def test_a_class_claim_counts_on_a_row_naming_its_method(tmp_path):
+    """#333's rows name the test method, under its class's claims."""
+    path = tmp_path / "test_sample.py"
+    path.write_text(
+        'class Merge:\n    def test_pr(self):\n        """PR 7."""\n\n\n'
+        "def test_other():\n    pass\n"
+    )
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n| `test_pr` | PR 7 |\n</details>\n")
+    assert dc.main(["--check", str(body), str(path)]) == 0
+    body.write_text("<details>\n| `test_other` | PR 7 |\n</details>\n")
+    assert dc.main(["--check", str(body), str(path)]) == 1
