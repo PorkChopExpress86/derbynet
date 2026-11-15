@@ -96,6 +96,9 @@ class Inputs:
     posted: Sequence[Posted] = ()
     finalists_for: FinalistsFor | None = None
     now: datetime = field(default_factory=timezone.now)
+    # The audit records the effects make, for the caller to write after the
+    # transaction (D26).
+    records: list[audit.Record] = field(default_factory=list)
 
 
 def transition(
@@ -248,10 +251,23 @@ class _Effects:
             apply_scene(self.state, self.settings.racing_scene_id)
 
     def _TimerToConnected(self, effect: hs.TimerToConnected) -> None:
-        TimerStatus.objects.filter(
-            event_id=self.state.event_id,
-            state__in=(TimerStatus.State.STAGING, TimerStatus.State.RUNNING),
-        ).update(state=TimerStatus.State.CONNECTED)
+        """A staging or running timer back to connected, so its next message
+        gets a new heat-ready. The contact timeout comes first, as PHP's
+        `new TimerState()` applies it (`action.heat.rerun.inc:59-63`): a
+        timer silent for over a minute is not connected, logged as
+        `timer.*overdue` (D100)."""
+        from racing.services import timer
+
+        row = TimerStatus.objects.select_for_update().get(event_id=self.state.event_id)
+        found = timer.TimerState.read(row, self.inputs.now)
+        if found.timed_out:
+            event = Event(pk=self.state.event_id)
+            self.inputs.records.append(
+                timer.time_out(event, row, found, self.inputs.now)
+            )
+        elif row.state in (TimerStatus.State.STAGING, TimerStatus.State.RUNNING):
+            row.state = TimerStatus.State.CONNECTED
+            row.save(update_fields=["state"])
 
     def _ClearTimerCurrent(self, effect: hs.ClearTimerCurrent) -> None:
         TimerStatus.objects.filter(event_id=self.state.event_id).update(
@@ -451,11 +467,12 @@ def rerun(
             if locked is not None:
                 return locked
         ended = state.ended_round_id
-        decision = transition(state, hs.Rerun(target))
+        inputs = Inputs()
+        decision = transition(state, hs.Rerun(target), inputs)
         if decision.failure is None:
             rebuild_waiting_final(event, [target[0]], ended, finalists_for)
     if decision.failure is None:
-        audit.write(event.id, [audit.discarded(target)])
+        audit.write(event.id, [*inputs.records, audit.discarded(target)])
     return decision.failure
 
 

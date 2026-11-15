@@ -29,7 +29,7 @@ from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round, TimerStat
 from racing.services import rounds as rounds_service
 from racing.services.heats import LastHeat, engine_state, load_chart
 from racing.services.playlist import apply_due_scene
-from racing.services.timer import TimerState, has_remote_start
+from racing.services.timer import TimerState, has_remote_start, php_time
 from roster.models import Group, GroupConstituentSubgroup, Racer
 from roster.services import car_numbers, structure
 from roster.services.groups import labels
@@ -269,7 +269,9 @@ def _timer_status(timer: TimerState, now: datetime) -> tuple[str, str]:
         seconds = (
             0
             if timer.assume_connected
-            else int((now - timer.last_contact).total_seconds())
+            # Whole seconds, as PHP's `time() - $this->last_contact`
+            # (`timer-state.inc:97-102`).
+            else php_time(now) - php_time(timer.last_contact)
         )
         return f"CONNECTED ({seconds} sec.)", "img/status/ok.png"
     if state == State.STAGING:
