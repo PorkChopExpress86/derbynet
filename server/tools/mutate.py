@@ -163,8 +163,8 @@ def _pytest(pytest_args: list[str], timeout: float):
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as late:
-        output = late.stdout or ""
-        return None, output if isinstance(output, str) else output.decode()
+        # Bytes whatever `text` says (the subprocess docs, TimeoutExpired).
+        return None, (late.stdout or b"").decode()
     return run, run.stdout
 
 

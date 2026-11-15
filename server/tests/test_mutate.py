@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.mutate import counts
+from tools.mutate import counts, main
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "mutate.py"
 MODULE = "def bound(a, b):\n    return a < b\n\n\ndef twice():\n    return 1 + 1\n"
@@ -86,6 +86,7 @@ def test_a_killed_mutant_exits_0_and_the_file_is_restored(project):
     run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
     assert run.returncode == 0, run.stdout + run.stderr
     assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
+    assert run.stdout.count("test session starts") == 1, "pytest's output once"
     assert (project / "mod.py").read_text() == MODULE
 
 
@@ -278,6 +279,7 @@ def test_a_run_past_its_bound_is_stopped(project):
     assert run.returncode == 2
     assert run.stdout.splitlines()[-1].startswith("ERROR")
     assert "timed out" in run.stdout.splitlines()[-1]
+    assert "test_mod.py" in run.stdout, "what pytest printed before the bound"
     assert (project / "mod.py").read_text() == MODULE
 
 
@@ -397,3 +399,74 @@ def test_a_stopped_listed_run_restores_the_file_and_names_what_it_left(project, 
     assert out.count("  NOT RUN  mod.py:10") == 6
     run = listed(project, "test_mod.py::test_pick")
     assert run.returncode == 1, "no lock is left behind: " + run.stderr
+
+
+@pytest.mark.parametrize(
+    ("argv", "why"),
+    [
+        (["--listed", "--old", "a"], "--listed takes no --old"),
+        (["--listed", "--new", "a"], "--listed takes no --old, --new"),
+        (["--listed", "--expect", "pass"], "or --expect"),
+        (["--old", "a", "--new", "b"], "give one --file"),
+        (["--file", "m.py", "--new", "b"], "give one --file"),
+        (["--file", "m.py", "--old", "a"], "give one --file"),
+        (["--file", "m.py", "--file", "n.py", "--old", "a", "--new", "b"], "give one"),
+    ],
+)
+def test_a_mode_given_the_other_modes_arguments_is_a_usage_error(argv, why, capsys):
+    with pytest.raises(SystemExit) as stopped:
+        main([*argv, "--", "test_mod.py"])
+    assert stopped.value.code == 2
+    assert why in capsys.readouterr().err
+
+
+def test_listed_narrows_to_each_file_given_and_lists_scripts_and_stylesheets(project):
+    """A stylesheet's call and a Python script with no extension are
+    mutated; a file left out of --file is not."""
+    (project / "tool").write_text("#!/usr/bin/env python3\nif a:\n    pass\n")
+    (project / "a.css").write_text(".a { width: min(1px, 2px); }\n")
+    subprocess.run([*GIT, "add", "tool", "a.css"], cwd=project, check=True)
+    commit(project, MODULE + PICK, PICK_TESTS)
+    run = listed(project, "test_mod.py::test_the_bound", tool=("--file", "tool"))
+    assert [line.split()[1] for line in run.stdout.splitlines()[:2]] == [
+        "tool:2",
+        "tool:2",
+    ], run.stdout
+    assert "2 listed" in run.stdout
+    run = listed(project, "test_mod.py::test_the_bound", tool=("--file", "a.css"))
+    assert "a.css:1  min  min(1px, 2px)  ->  1px" in run.stdout, run.stdout
+    assert "2 listed" in run.stdout
+
+
+def test_listed_names_an_error_with_pytests_last_lines_and_exits_2(project):
+    commit(project, MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n")
+    run = listed(project, "test_mod.py::test_no_such")
+    assert run.stdout.splitlines()[0].startswith("ERROR     mod.py:10  min"), run.stdout
+    assert "\n    ERROR: not found: " in run.stdout
+    assert "2 listed: 0 KILLED, 0 SURVIVED, 0 REFUSED, 2 ERROR" in run.stdout
+    assert run.returncode == 2
+
+
+@pytest.mark.parametrize(
+    ("tool", "why"),
+    [(("--base", "no-such-rev"), "git diff"), ((), "not in a git work tree")],
+)
+def test_listed_refuses_a_base_git_cannot_read_or_no_git_tree(project, tool, why):
+    if not tool:
+        subprocess.run(["rm", "-rf", str(project / ".git")], check=True)
+    command = [sys.executable, str(TOOL), "--listed", *tool, "--", "test_mod.py"]
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["GIT_CEILING_DIRECTORIES"] = str(project.parent)
+    run = subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
+    assert run.returncode == 2
+    assert why in run.stderr
+
+
+def test_a_listed_mutant_past_its_bound_is_an_error(project):
+    commit(project, MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n")
+    run = listed(project, "test_mod.py::test_waits", tool=("--timeout", "3"))
+    assert run.stdout.splitlines()[0].startswith("ERROR     mod.py:10  min"), run.stdout
+    assert "(timed out after 3 s)" in run.stdout.splitlines()[0]
+    assert "0 KILLED, 0 SURVIVED, 0 REFUSED, 2 ERROR" in run.stdout
+    assert run.returncode == 2
+    assert (project / "mod.py").read_text().endswith("return min(a, b)\n")
