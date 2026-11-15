@@ -273,7 +273,8 @@ def test_a_sigkill_frees_the_lock_though_its_loops_and_pytest_live_on(tmp_path):
 
 def test_two_runs_waiting_on_one_new_folder_do_not_both_take_it(tmp_path):
     """Both passed the used-folder check before the wait, so both wrote into
-    one folder; it is checked again once the lock is taken (#354 review)."""
+    the same folder; it is checked again once the lock is taken (#354
+    review)."""
     lock = tmp_path / "load.lock"
     shared = {"DERBYNET_LOAD_RUN_DIR": str(tmp_path / "shared-run")}
     first = start(tmp_path, "first", lock)
@@ -300,7 +301,7 @@ def test_two_runs_waiting_on_one_new_folder_do_not_both_take_it(tmp_path):
 
 
 def test_a_waiter_never_reads_half_the_holder_s_lines(tmp_path):
-    """The holder wrote its lines one by one after a truncate, so a waiter
+    """The holder wrote its lines singly after a truncate, so a waiter
     that came while its git was slow printed only the pid and the folder
     (#354 review). Here the holder's git waits for the test."""
     lock = tmp_path / "load.lock"
@@ -342,7 +343,7 @@ def test_a_waiter_never_reads_half_the_holder_s_lines(tmp_path):
 
 
 def test_a_waiter_on_an_empty_lock_file_says_so(tmp_path):
-    """Between the holder's truncation and its one write the file is empty."""
+    """Between the holder's truncation and its write the file is empty."""
     lock = tmp_path / "load.lock"
     lock.write_text("")
     fd = os.open(lock, os.O_RDONLY)
@@ -361,8 +362,8 @@ def test_a_waiter_on_an_empty_lock_file_says_so(tmp_path):
 
 
 def test_no_flock_is_refused_with_how_to_install_it(tmp_path):
-    """macOS has no flock(1): the run printed `flock: command not found`
-    twice and a Waiting line, and exited 127 (#354 review)."""
+    """macOS has no `flock(1)`: the run printed the shell's `command not
+    found` and a Waiting line with no holder (#354 review)."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     for tool in ("ps", "tr", "dirname"):
