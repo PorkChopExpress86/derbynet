@@ -616,6 +616,11 @@ class PrMerge(unittest.TestCase):
             self.assertLess(time.monotonic(), deadline, 'the stub never started')
             time.sleep(0.1)
         stub = int(pid_file.read_text())
+        # The run has a session of its own, so a test that fails leaves it
+        # running unless this stops it.
+        group_of_stub = os.getpgid(stub)
+        self.addCleanup(lambda: subprocess.run(['kill', '-KILL', '--', f'-{group_of_stub}'],
+                                               capture_output=True))
         if group:
             os.killpg(proc.pid, sig)
         else:
@@ -625,7 +630,6 @@ class PrMerge(unittest.TestCase):
         finally:
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGKILL)
-                os.kill(stub, signal.SIGKILL)
                 proc.communicate()
         return proc.returncode, err, stub
 
@@ -661,6 +665,30 @@ class PrMerge(unittest.TestCase):
         self.assert_gone(stub)
         self.assert_no_worktree()
         self.assertEqual(self.merged(), '')
+
+    def test_a_hang_up_stops_the_checks_and_removes_the_worktree(self):
+        status, err, stub = self.hang(signal.SIGHUP, group=False)
+        self.assertEqual(status, 129, err)
+        self.assert_gone(stub)
+        self.assert_no_worktree()
+        self.assertEqual(self.merged(), '')
+
+    @unittest.skipUnless(shutil.which('timeout'), 'no timeout')
+    def test_under_timeout_the_run_is_refused(self):
+        """source-checks.sh refuses to run under `timeout`, and pr-merge
+        under it inherits that (its help says so)."""
+        head = self.check_pair()
+        gh = self.tmp / 'gh'
+        gh.write_text(FAKE_GH.format(python=sys.executable, head=head, log=str(self.log)))
+        gh.chmod(0o755)
+        done = subprocess.run(['timeout', '300', 'bash', str(PR_MERGE), '7'], cwd=self.work,
+                              env={**self.env, 'GH': str(gh)}, capture_output=True, text=True)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('server/tools/source-checks.sh failed (exit 2)', done.stderr)
+        self.assertIn('source-checks.sh: it runs under timeout', done.stderr)
+        self.assertEqual(self.ran(), '')
+        self.assertEqual(self.merged(), '')
+        self.assert_no_worktree()
 
     def test_base_checked_with_a_failed_fetch_refuses(self):
         """The source-check rule reads both sides, so --base-checked can't
