@@ -10,14 +10,11 @@ moves only when a test runs the clock. A test that resumes the clock for
 axe stops the kiosk first (`stop_the_kiosk`)."""
 
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
 from playwright.sync_api import Error, expect
 
 from ui.tests.browser.conftest import (
-    SETTLE_BARRIER,
-    _barrier,
     assert_accessible,
     shoot,
     stop_timers,
@@ -32,8 +29,8 @@ PAUSED_AT = datetime(2026, 11, 9, 12, 0, 0)
 # minute early, the pause always moves forward
 # (`test_the_clock_pauses_after_a_slow_install`).
 INSTALLED_AT = PAUSED_AT - timedelta(minutes=1)
-KIOSK_JS = Path(__file__).resolve().parents[2] / "static" / "ui" / "kiosk.js"
-# Past kiosk.js's `GIVE_UP_MS`, after which the page aborts a request.
+# Past kiosk.js's `GIVE_UP_MS`, after which the page aborts a request
+# (`test_the_page_gives_a_poll_up_between_14_and_16_s`).
 PAST_GIVE_UP_MS = 16_000
 WCAG_AA = 4.5
 
@@ -118,17 +115,21 @@ def open_paused(page, event):
 
 
 def stop_the_kiosk(page):
-    """On the paused clock, wait for the kiosk's requests to be answered,
-    then stop its polls and its glide, so the page sends nothing once the
-    clock resumes for axe. A results/rounds/ poll sent on the resumed clock
-    with no reply within 15 s of page time was given up by the page
-    (kiosk.js `GIVE_UP_MS`), and its `net::ERR_ABORTED` failed the test at
-    teardown (#317; `test_the_resumed_clock_sends_no_kiosk_request`).
-    Nothing sends between the drain and the stop, since no timer fires on
-    the paused clock, and a reply that landed after the stop would queue
-    its poll again (`test_a_poll_out_at_the_stop_is_answered_first`)."""
-    _barrier(page)
-    assert page.in_flight.drain(page) == []
+    """On the paused clock, pause the kiosk as replay does, then stop its
+    timers, so the page sends nothing once the clock resumes for axe. A
+    results/rounds/ poll sent on the resumed clock with no reply within
+    15 s of page time was given up by the page (kiosk.js `GIVE_UP_MS`), and
+    its `net::ERR_ABORTED` failed the test at teardown (#317,
+    `test_the_resumed_clock_sends_no_kiosk_request`).
+
+    The page's own `replay-started` pause comes first: a paused kiosk's
+    content polls queue their next turn without fetching (kiosk.js `run()`),
+    so a poll still out at the stop, whose reply queues it again, sends
+    nothing either (`test_a_poll_out_at_the_stop_sends_nothing_after`). The
+    stop clears the 5 s kiosk poll, which the pause does not hold, the
+    glide, and the give-up timer of a request still out."""
+    page.evaluate("() => window.postMessage('replay-started', '*')")
+    page.wait_for_function("window.Kiosk.paused === true", timeout=15_000)
     stop_timers(page)
 
 
@@ -218,9 +219,42 @@ def hold_after_resume(page) -> list:
     return held
 
 
-def test_kiosk_js_gives_a_request_up_after_15_s():
-    assert "var GIVE_UP_MS = 15000;" in KIOSK_JS.read_text()
-    assert PAST_GIVE_UP_MS > 15000
+def test_the_page_gives_a_poll_up_between_14_and_16_s(page, event, day, page_errors):  # noqa: F811
+    """On the paused clock, a results/rounds/ poll with no reply: no error
+    once the clock has run 14 s, `net::ERR_ABORTED` from the page by 16 s
+    (`PAST_GIVE_UP_MS`, past kiosk.js's `GIVE_UP_MS`), and the poll's next
+    turn goes out after it."""
+    seen = []
+
+    def hold_the_first(route):
+        seen.append(route.request.url)
+        if len(seen) > 1:
+            route.continue_()
+
+    page.route("**/results/rounds/**", hold_the_first)
+    open_paused(page, event)
+    for _ in range(100):
+        if seen:
+            break
+        page.wait_for_timeout(50)
+    assert len(seen) == 1
+    page.clock.run_for(14_000)
+    page.wait_for_timeout(500)
+    # One read: what had failed by 14 s, before the allowance below.
+    at_14_s = list(page_errors.errors)
+    page_errors.allow(r"request failed: \S*/results/rounds/\S* net::ERR_ABORTED$")
+    with page.expect_event(
+        "requestfailed", lambda r: "/results/rounds/" in r.url, timeout=10_000
+    ) as failed:
+        page.clock.run_for(PAST_GIVE_UP_MS - 14_000)
+    page.clock.run_for(1_100)
+    for _ in range(100):
+        if len(seen) > 1:
+            break
+        page.wait_for_timeout(50)
+    assert at_14_s == []
+    assert failed.value.failure == "net::ERR_ABORTED"
+    assert len(seen) == 2
 
 
 def test_the_resumed_clock_sends_no_kiosk_request(page, event, day, page_errors):  # noqa: F811
@@ -239,36 +273,53 @@ def test_the_resumed_clock_sends_no_kiosk_request(page, event, day, page_errors)
     assert held == []
 
 
-def test_a_poll_out_at_the_stop_is_answered_first(page, event, day):  # noqa: F811
-    """A results/rounds/ poll still out when the kiosk stops: its reply,
-    held until the settle barrier of `stop_the_kiosk` goes out, comes
-    before the stop, so it queues no poll for the resumed clock. With the
-    stop before the drain, the reply queued its poll again past the stop,
-    and that poll went out once the clock ran."""
+# Delivers the page's `replay-started` message `window.pauseLagMs` of real
+# time late (a Worker's timer, which Playwright's clock does not fake), as a
+# busy renderer would.
+LATE_PAUSE = """(() => {
+  const post = window.postMessage.bind(window);
+  window.pauseLagMs = 0;
+  window.postMessage = function (message, ...rest) {
+    if (message !== 'replay-started' || !window.pauseLagMs) {
+      return post(message, ...rest);
+    }
+    const worker = new Worker(URL.createObjectURL(new Blob(
+      ['setTimeout(() => postMessage(0), ' + window.pauseLagMs + ')'])));
+    worker.onmessage = () => { worker.terminate(); post(message, ...rest); };
+  };
+})();"""
+
+
+@pytest.mark.parametrize("pause_lag_ms", [0, 4000])
+def test_a_poll_out_at_the_stop_sends_nothing_after(page, event, day, pause_lag_ms):  # noqa: F811
+    """A results/rounds/ poll still out when the kiosk stops, answered only
+    once the clock has resumed, so its reply queues the poll again past the
+    stop: the paused kiosk sends nothing. With the pause message delivered
+    4 s late, `stop_the_kiosk` waits for it; without that wait, the poll
+    went out before the pause, which `stop_timers` and the 1 s poll outlast
+    at 2 s late. Without the pause the queued poll went out (the #342
+    review's probe, there with the reply handled 500 ms late)."""
     first = []
-    out = []
 
     def hold_the_first_poll(route):
         if first:
             route.continue_()
         else:
-            first.append(route.request.url)
-            out.append(route)
+            first.append(route)
 
-    def let_it_go(request):
-        if request.url.endswith(SETTLE_BARRIER) and out:
-            out.pop().continue_()
-
+    page.add_init_script(LATE_PAUSE)
     page.route("**/results/rounds/**", hold_the_first_poll)
-    page.on("request", let_it_go)
     open_paused(page, event)
     for _ in range(100):
         if first:
             break
         page.wait_for_timeout(50)
     assert len(first) == 1
+    page.evaluate(f"window.pauseLagMs = {pause_lag_ms}")
     held = hold_after_resume(page)
     resume_for_axe(page)
+    first[0].continue_()
+    page.wait_for_timeout(1500)
     page.clock.run_for(PAST_GIVE_UP_MS)
     assert held == []
 
