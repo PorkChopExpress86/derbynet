@@ -7,6 +7,7 @@ server/README.md.
 import os
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import dj_database_url
@@ -179,9 +180,55 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "derbynet.wsgi.application"
 
+
+def _compose_postgres_url(config_dir):
+    """The compose `postgres` service's URL, when this volume runs on it.
+
+    compose.yaml sets DERBYNET_POSTGRES_HOST with or without its `postgres`
+    profile, so the host alone says nothing. The image's entrypoint decides at
+    start, and writes the engine it chose to `database-engine` in the config
+    folder before any manage.py runs. Reading that file here, rather than the
+    entrypoint exporting a URL, gives gunicorn, migrate and a command started
+    with `docker compose exec` the same database (#308). No name is looked
+    up, so with Postgres down a command fails to connect instead of making a
+    SQLite file, and manage.py says what to start. The password is
+    percent-encoded, so any character works.
+    """
+    host = os.environ.get("DERBYNET_POSTGRES_HOST")
+    if not host:
+        return None
+    path = config_dir / "database-engine"
+    try:
+        engine = path.read_text().strip()
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError) as error:
+        raise ImproperlyConfigured(f"{path} could not be read: {error}") from error
+    if engine != "postgres":
+        return None
+    names = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
+    missing = [name for name in names if not os.environ.get(name)]
+    if missing:
+        raise ImproperlyConfigured(
+            f"{', '.join(missing)} must be set: this volume runs on the "
+            f"Postgres at DERBYNET_POSTGRES_HOST={host!r}"
+        )
+    user, password, database = (quote(os.environ[name], safe="") for name in names)
+    return f"postgres://{user}:{password}@{host}:5432/{database}"
+
+
+_compose_url = (
+    None if os.environ.get("DATABASE_URL") else _compose_postgres_url(CONFIG_DIR)
+)
+# The compose postgres service's host when it is the database, so manage.py
+# can say what to start when it does not answer (#308).
+COMPOSE_POSTGRES_HOST = os.environ["DERBYNET_POSTGRES_HOST"] if _compose_url else None
+
 DATABASES = {
     "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'derbynet.sqlite3'}"
+        os.environ.get("DATABASE_URL")
+        or _compose_url
+        or f"sqlite:///{DATA_DIR / 'derbynet.sqlite3'}"
     ),
 }
 if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":

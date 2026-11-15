@@ -1,3 +1,4 @@
+import os
 import runpy
 import stat
 from pathlib import Path
@@ -51,6 +52,133 @@ def test_postgres_url_passes_through_unchanged(load_settings):
 
     assert db == dj_database_url.parse(url)
     assert db["ENGINE"] == "django.db.backends.postgresql"
+
+
+# ----- the compose postgres service (#308) -----------------------------------
+# compose.yaml's server environment, with a password holding every character
+# a URL reserves that checks.sh postgres-password tries.
+COMPOSE = {
+    "DERBYNET_POSTGRES_HOST": "postgres",
+    "POSTGRES_USER": "derbynet",
+    "POSTGRES_PASSWORD": "p@ss:w/rd#%",
+    "POSTGRES_DB": "derbynet",
+}
+
+
+def engine_file(tmp_path, engine):
+    """database-engine as the entrypoint writes it: `echo "$engine" > ...`."""
+    config = tmp_path / "config"
+    config.mkdir(exist_ok=True)
+    (config / "database-engine").write_text(f"{engine}\n")
+
+
+def test_a_postgres_volume_under_compose_uses_the_postgres_service(
+    load_settings, tmp_path, monkeypatch
+):
+    """What gunicorn, migrate and an exec'd manage.py get on a volume the
+    entrypoint marked Postgres: no name is looked up, so with Postgres down a
+    command fails to connect rather than falling back to SQLite."""
+    engine_file(tmp_path, "postgres")
+
+    def no_lookup(*args, **kwargs):
+        raise AssertionError("settings looked a name up")
+
+    monkeypatch.setattr("socket.getaddrinfo", no_lookup)
+    monkeypatch.setattr("socket.gethostbyname", no_lookup)
+    db = load_settings(**COMPOSE)["DATABASES"]["default"]
+
+    assert db["ENGINE"] == "django.db.backends.postgresql"
+    assert (db["HOST"], db["PORT"]) == ("postgres", 5432)
+    assert (db["USER"], db["PASSWORD"], db["NAME"]) == (
+        "derbynet",
+        "p@ss:w/rd#%",
+        "derbynet",
+    )
+    assert "OPTIONS" not in db or db["OPTIONS"] == {}
+
+
+@pytest.mark.parametrize("engine", ["sqlite", "other", None])
+def test_compose_without_a_postgres_volume_keeps_sqlite(
+    load_settings, tmp_path, engine
+):
+    """compose.yaml sets DERBYNET_POSTGRES_HOST with or without its profile,
+    so the host alone picks nothing. None is a volume with no database-engine
+    yet: a fresh one before its first start."""
+    if engine:
+        engine_file(tmp_path, engine)
+
+    db = load_settings(**COMPOSE)["DATABASES"]["default"]
+
+    assert db["ENGINE"] == "django.db.backends.sqlite3"
+    assert db["NAME"] == str(tmp_path / "data" / "derbynet.sqlite3")
+
+
+def test_a_postgres_volume_without_the_compose_host_keeps_sqlite(
+    load_settings, tmp_path
+):
+    engine_file(tmp_path, "postgres")
+    env = {k: v for k, v in COMPOSE.items() if k != "DERBYNET_POSTGRES_HOST"}
+
+    db = load_settings(**env)["DATABASES"]["default"]
+
+    assert db["ENGINE"] == "django.db.backends.sqlite3"
+    assert db["NAME"] == str(tmp_path / "data" / "derbynet.sqlite3")
+
+
+def test_an_explicit_database_url_wins_over_the_postgres_service(
+    load_settings, tmp_path
+):
+    engine_file(tmp_path, "postgres")
+    url = "postgres://other:secret@db.example:5433/elsewhere"
+
+    db = load_settings(DATABASE_URL=url, **COMPOSE)["DATABASES"]["default"]
+
+    assert db == dj_database_url.parse(url)
+
+
+def test_compose_postgres_host_names_the_service_only_when_it_is_the_database(
+    load_settings, tmp_path
+):
+    """manage.py's message when Postgres does not answer reads it."""
+    assert load_settings(**COMPOSE)["COMPOSE_POSTGRES_HOST"] is None
+    engine_file(tmp_path, "postgres")
+    assert load_settings(**COMPOSE)["COMPOSE_POSTGRES_HOST"] == "postgres"
+    url = "postgres://other:secret@db.example:5433/elsewhere"
+    assert load_settings(DATABASE_URL=url, **COMPOSE)["COMPOSE_POSTGRES_HOST"] is None
+
+
+@pytest.mark.parametrize("kind", ["directory", "not utf-8", "unreadable"])
+def test_an_unreadable_database_engine_is_named(load_settings, tmp_path, kind):
+    path = tmp_path / "config" / "database-engine"
+    path.parent.mkdir()
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "not utf-8":
+        path.write_bytes(b"\xffpostgres\n")
+    else:
+        if os.geteuid() == 0:
+            pytest.skip("root reads a file of mode 000")
+        path.write_text("postgres\n")
+        path.chmod(0)
+
+    with pytest.raises(ImproperlyConfigured) as raised:
+        load_settings(**COMPOSE)
+
+    assert str(raised.value).startswith(f"{path} could not be read: ")
+
+
+@pytest.mark.parametrize("name", ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"])
+def test_a_missing_postgres_variable_is_named_without_the_password(
+    load_settings, tmp_path, name
+):
+    engine_file(tmp_path, "postgres")
+    env = {k: v for k, v in COMPOSE.items() if k != name}
+
+    with pytest.raises(ImproperlyConfigured) as raised:
+        load_settings(**env)
+
+    assert str(raised.value).startswith(f"{name} must be set")
+    assert COMPOSE["POSTGRES_PASSWORD"] not in str(raised.value)
 
 
 @pytest.mark.parametrize(

@@ -188,31 +188,27 @@ EOF
 nginx -t -q -e stderr
 
 # --- the database -----------------------------------------------------------
-# DATABASE_URL, when set, is the database.  Otherwise compose.yaml's
-# DERBYNET_POSTGRES_URL is, when its host answers by name, which it does once
-# compose's postgres profile runs the postgres service.  Otherwise SQLite on
-# the data volume.  A volume that has run on Postgres refuses to start on
-# SQLite, which would show an empty event instead of the race.
-# DERBYNET_POSTGRES_HOST and the POSTGRES_* names are compose.yaml's; the
-# password is percent-encoded into the URL, so any character works.
+# DATABASE_URL, when set, is the database.  Otherwise compose.yaml's postgres
+# service is, when DERBYNET_POSTGRES_HOST answers by name, which it does once
+# compose's postgres profile runs that service.  Otherwise SQLite on the data
+# volume.  A volume that has run on Postgres refuses to start on SQLite, which
+# would show an empty event instead of the race.
+# The engine chosen here goes into database-engine before any manage.py runs,
+# and settings.py builds the postgres service's URL from that file and the
+# POSTGRES_* variables, so gunicorn, migrate and a command started with
+# `docker compose exec` all use this database (#308).  No URL is exported or
+# logged, since it holds the password.
 engine_file="$DERBYNET_CONFIG_DIR/database-engine"
-if [ -z "${DATABASE_URL:-}" ] && [ -n "${DERBYNET_POSTGRES_HOST:-}" ] \
-   && getent hosts "$DERBYNET_POSTGRES_HOST" >/dev/null; then
-    DATABASE_URL="$(python3 -I -c '
-import os
-from urllib.parse import quote
-e = os.environ
-print("postgres://%s:%s@%s:5432/%s" % (quote(e["POSTGRES_USER"], safe=""),
-      quote(e["POSTGRES_PASSWORD"], safe=""), e["DERBYNET_POSTGRES_HOST"],
-      quote(e["POSTGRES_DB"], safe="")))')"
-    export DATABASE_URL
-    log "using Postgres at $DERBYNET_POSTGRES_HOST"
-fi
 case "${DATABASE_URL:-}" in
     postgres*) engine=postgres ;;
     "") engine=sqlite ;;
     *) engine=other ;;
 esac
+if [ -z "${DATABASE_URL:-}" ] && [ -n "${DERBYNET_POSTGRES_HOST:-}" ] \
+   && getent hosts "$DERBYNET_POSTGRES_HOST" >/dev/null; then
+    engine=postgres
+    log "using Postgres at $DERBYNET_POSTGRES_HOST"
+fi
 # A volume keeps the engine it first ran on.  Starting it on the other one
 # would show an empty event and leave the race in the first.
 recorded="$(cat "$engine_file" 2>/dev/null || true)"

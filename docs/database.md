@@ -16,8 +16,8 @@ Postgres is fully supported, through the `postgres` profile of the Compose file 
 docker compose --profile postgres up -d
 ```
 
-- Choose the profile when you first start an install. A data volume remembers the engine it first ran on, in a file named `database-engine` on the volume. The server then refuses to start on the other engine, rather than open an empty event and leave the race in the first database. To start again on the other engine, delete that file.
-- Set `POSTGRES_PASSWORD` before the first start to choose the database password. The Postgres container publishes no port, so only the server reaches it.
+- Choose the profile when you first start an install. A data volume remembers the engine it first ran on, in a file named `database-engine` on the volume. The server then refuses to start on the other engine, rather than open an empty event and leave the race in the first database. To start again on the other engine, stop the server and delete that file.
+- Set `POSTGRES_PASSWORD` before the first start to choose the database password. The Postgres container publishes no port, so only the server reaches it. `DERBYNET_DEBUG=1` shows the password on Django's error page, so never set it at a race.
 - Pass `--profile postgres` to every later `docker compose` command for this install, and back up both volumes, `derbynet_data` and `derbynet_postgres`.
 
 ### A Postgres server of your own
@@ -50,11 +50,13 @@ docker cp /path/to/pack42 derbynet:/tmp/pack42
 docker exec -u derbynet derbynet python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"
 ```
 
-Under the `postgres` profile, run it through Compose, and give it the database's address, since a command run with `exec` does not get the address the container found when it started. #308 will make the address reach such a command, and this step will go. Use your `POSTGRES_PASSWORD` in place of the second `derbynet`:
+With Compose, run the same command through Compose. A command run this way uses the server's database, SQLite or the `postgres` profile's Postgres alike (#308):
 
 ```sh
 docker compose cp /path/to/pack42 server:/tmp/pack42
-docker compose exec -u derbynet -e DATABASE_URL=postgres://derbynet:derbynet@postgres:5432/derbynet server python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"
+docker compose exec -u derbynet server python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"
 ```
+
+Under the `postgres` profile, an older version of the image ran such a command on SQLite instead: the import failed with `no such table: core_event` and left a `derbynet.sqlite3` on the data volume. That file holds no race: at most the empty tables of a `migrate` run the same way. You can delete it with `docker compose exec server rm /var/lib/derbynet/derbynet.sqlite3`.
 
 Stop the older server before you copy its database. The importer reads every schema version of older DerbyNet databases, from 1 to 10, and prints a summary of the rows it read, dropped and changed. `--report report.json` writes the full report. `server/README.md` lists the importer's options.
