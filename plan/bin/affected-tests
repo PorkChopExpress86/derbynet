@@ -530,9 +530,10 @@ def match_plan_tools(path):
 
 
 def cover_plan_tools(plan, tree, path):
-    plan.command('python3 -I -m unittest discover -s ../plan/tests')
+    # tools/source-checks.sh, printed for every diff, runs plan/tests: a line
+    # of their own ran them twice (#338).
     plan.add(path, 'plan-tools', 'plan/tests, which test the plan tools and the '
-             'pre-push hook (tools/source-checks.sh runs them too)')
+             'pre-push hook: tools/source-checks.sh runs them')
 
 
 def match_timer_build(path):

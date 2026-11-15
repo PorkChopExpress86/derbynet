@@ -250,10 +250,13 @@ class Website(unittest.TestCase):
 
 
 class PlanTools(unittest.TestCase):
-    def test_a_plan_tool_runs_plan_tests(self):
+    def test_a_plan_tool_runs_plan_tests_through_the_source_checks(self):
+        """tools/source-checks.sh runs plan/tests, so a line of their own ran
+        them twice at each hand-off (#338)."""
         out = run('plan/bin/pr-merge')
         self.assertIn('[plan-tools]', out)
-        self.assertIn('python3 -I -m unittest discover -s ../plan/tests', commands(out))
+        self.assertNotIn('unittest discover', commands(out))
+        self.assertIn('  tools/source-checks.sh\n', commands(out))
 
     def test_the_pre_push_hook_runs_plan_tests(self):
         self.assertIn('[plan-tools]', run('.githooks/pre-push'))
