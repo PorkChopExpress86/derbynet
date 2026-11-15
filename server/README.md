@@ -455,6 +455,7 @@ How the page and the timer pages differ from PHP:
 - `timer-test.php` is split in two, as #50's scope lists them: the timer status page (`/timer/`: state, details, settings sheet, remote logging, log tail, Start Race, refused results) and the timer test (`/timer/test/`), where `timer-test.php` redirects (D72). Both need `CONTROL_RACE` (S21).
 - A lane toggle on the timer test posts the lane and its end state, not the whole mask, and stages a new test heat at every change (`racing.services.timer.set_test_lane`). PHP's `tt-mask`, which the legacy endpoint keeps, lands on the heat already staged after a second change, so the timer never hears of it (`racing/tests/test_timer_test_lanes.py`; D72, C52).
 - The log tail stops while the page is hidden (D72); PHP polls on.
+- The fake timer needs `TIMER_MESSAGE`, as every `timer-message` it sends does and as `/timer.php` does, so RaceCrew cannot open it, and the timer status page links to it only for a session that holds it (D96; PHP's page needs `CHECK_IN_RACERS`, `fake-timer.php:9`). It is in `ROUTE_DIVERGENCES`.
 - The fake timer's script is `ui/static/ui/fake-timer.js`, a port of `website/js/fake-timer.js` with the same messages and timings: the PHP file posts to the relative `action.php`, which from `/timer/fake/` misses the server, and drives the PHP page's jQuery table.
 
 The pages are in `ui/timer/`.

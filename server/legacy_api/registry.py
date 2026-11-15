@@ -651,6 +651,12 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " and its JavaScript version, and adds the setup health checks and the"
         " database.check results for SET_UP.",
     ),
+    "fake-timer.php": (
+        "D20: a 301 to /timer/fake/, the query string kept.",
+        "D96: needs TIMER_MESSAGE, as the timer-message it sends does;"
+        " fake-timer.php asks for CHECK_IN_RACERS, so a role without"
+        " TIMER_MESSAGE opened it and had every message refused.",
+    ),
     "fakeroster.php": (
         "D20: a 301 to /setup/fake-roster/, the query string kept.",
         "C56: needs SET_UP, as racer.fake does; fakeroster.php asks for"

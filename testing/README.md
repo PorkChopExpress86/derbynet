@@ -170,7 +170,11 @@ allowed page answers 200 and a denied one redirects to the login page.  With
   `website/inc/preferences.inc:534`), `ballot_password` among it (`:93`).
   `RaceCrew`'s permissions, 8687 (`server/accounts/defaults.py:15`), lack
   `CONTROL_RACE`, 512 (`server/accounts/permissions.py:29`).  `RaceCrew` is
-  also denied `fakeroster.php`, which needs `SET_UP` (C56).  The script fails
+  also denied `fakeroster.php`, which needs `SET_UP` (C56), and
+  `fake-timer.php`, which needs `TIMER_MESSAGE`, 4096
+  (`server/accounts/permissions.py:32`), as the messages it sends do (D96).
+  Anonymous visitors are denied `fake-timer.php` by the PHP fixture already,
+  and `RaceCoordinator` holds every bit.  The script fails
   when the override moves a page the PHP fixture doesn't have in the other
   list, and prints how many pages it checked for each role.
   `vote.php` needs no override: Django's ballot page is anonymous (#54, the

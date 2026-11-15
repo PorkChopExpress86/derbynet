@@ -64,7 +64,7 @@ Before race day, test the timer on the track. Open "Timer test" on the timer pag
 
 ## The fake timer
 
-The fake timer stands in for a timer, to practice with no track. Open `/timer/fake/` on any phone or computer, logged in as RaceCoordinator. It works only while its page is open, and only while racing or simulated racing is on.
+The fake timer stands in for a timer, to practice with no track. Open `/timer/fake/` on any phone or computer, logged in as RaceCoordinator or as Timer (under "Show all roles" on the login page). RaceCrew cannot open it, since it sends what a timer sends (D96). It works only while its page is open, and only while racing or simulated racing is on.
 
 ![The fake timer on a phone](img/timer-operation/fake-timer.png)
 
