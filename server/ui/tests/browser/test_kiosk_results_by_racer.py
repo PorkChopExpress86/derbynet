@@ -9,7 +9,7 @@ page loads, so the list's glide (kiosk-results.js, a pixel every 40 ms)
 moves only when a test runs the clock. A test that resumes the clock for
 axe stops the kiosk first (`stop_the_kiosk`)."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -26,6 +26,12 @@ from ui.tests.browser.test_kiosk_pages import day, open_kiosk  # noqa: F401
 from ui.tests.race import run_heat
 
 PAUSED_AT = datetime(2026, 11, 9, 12, 0, 0)
+# The clock runs from its install, so `pause_at(PAUSED_AT)` after an install
+# at PAUSED_AT itself failed "Cannot fast-forward to the past" once the two
+# calls were more than a moment apart, as under load (#317). Installed a
+# minute early, the pause always moves forward
+# (`test_the_clock_pauses_after_a_slow_install`).
+INSTALLED_AT = PAUSED_AT - timedelta(minutes=1)
 KIOSK_JS = Path(__file__).resolve().parents[2] / "static" / "ui" / "kiosk.js"
 # Past kiosk.js's `GIVE_UP_MS`, after which the page aborts a request.
 PAST_GIVE_UP_MS = 16_000
@@ -105,7 +111,7 @@ def open_paused(page, event):
     on a clock paused before the page loads."""
     run_heat(event)
     run_heat(event)
-    page.clock.install(time=PAUSED_AT)
+    page.clock.install(time=INSTALLED_AT)
     page.clock.pause_at(PAUSED_AT)
     open_kiosk(page, event, "kiosks/results-by-racer.kiosk")
     expect(page.locator("[data-result] [data-shown]").first).not_to_be_empty()
@@ -130,6 +136,20 @@ def resume_for_axe(page):
     """Resume the paused clock with the kiosk stopped (`stop_the_kiosk`)."""
     stop_the_kiosk(page)
     page.clock.resume()
+
+
+def test_the_clock_pauses_after_a_slow_install(page, event, day):  # noqa: F811
+    """`open_paused` with 200 ms between the clock's install and its pause,
+    a slow machine's gap. The page's clock reads PAUSED_AT."""
+    install = page.clock.install
+
+    def slow_install(**kwargs):
+        install(**kwargs)
+        page.wait_for_timeout(200)
+
+    page.clock.install = slow_install
+    open_paused(page, event)
+    assert page.evaluate("Date.now()") == PAUSED_AT.timestamp() * 1000
 
 
 def assert_readable_on_gradient(page):
