@@ -230,20 +230,21 @@ def test_script_files_with_no_match_prints_nothing(tmp_path):
 # `docker exec` and `docker compose exec` skip the entrypoint, so they run as
 # root unless told otherwise.  #308's first round wrote
 # `docker compose exec server python manage.py ...` in install-docker.md and a
-# compose.yaml comment; run that way, an import leaves the event's photo folder
-# `drwx------ root root`, photo.php answers 404, and the next import as
-# derbynet fails.  Review found both lines.
+# compose.yaml comment.  Review found both: run that way, an import leaves the
+# event's photo folder root's (#327's commit message).
 
 # Where a command a reader or a script runs is written.  Python tests hold
 # stand-ins, this file's own among them.
 EXEC_SUFFIXES = (".md", ".sh", ".yml", ".yaml", ".html", ".txt", ".py")
 # `docker exec`, `docker compose exec`, a `compose` shell function, or a
-# compose command held in "$@" or "${array[@]}", then manage.py later in the
-# same command: before a pipe, an `&&`, a closing backtick or the end of the
-# line, once backslash continuations are joined.
+# compose command held in "$@" or "${compose[@]}", with any options before
+# `exec` (`--profile postgres`, `-f FILE`), then manage.py later in the same
+# command: before a pipe, an `&&`, a closing backtick or the end of the line,
+# once backslash continuations are joined.
 EXEC = re.compile(
-    r"""(?:\bdocker|\bcompose|"\$@"|"\$\{\w+\[@\]\}")[ \t]+exec[ \t]+"""
-    r"((?:(?!&&)[^|`\n])*?)\bmanage\.py\b"
+    r"""(?:\bdocker|\bcompose|"\$@"|"\$\{\w+\[@\]\}")"""
+    r"(?:[ \t]+(?:compose|-\S+(?:[ \t]+(?!exec\b|-)\S+)?))*"
+    r"[ \t]+exec[ \t]+((?:(?!&&)[^|`\n])*?)\bmanage\.py\b"
 )
 # exec options that take a value, for docker exec and docker compose exec.
 EXEC_VALUED = {
@@ -313,14 +314,8 @@ def test_every_execd_manage_py_runs_as_derbynet():
             found[name] = found.get(name, 0) + 1
             if user != "derbynet":
                 root.append(f"{name}:{line} runs as {user or 'root'}")
-    # The places #308 wrote such a command: the scan still reads them.
-    for name in (
-        "docs/database.md",
-        "docs/install-docker.md",
-        "server/docker/README.md",
-        "server/docker/compose.yaml",
-        "server/docker/ci/checks.sh",
-    ):
+    # The scan still reaches a guide and a script that hold such commands.
+    for name in ("docs/database.md", "server/docker/ci/checks.sh"):
         assert found.get(name), f"no exec'd manage.py found in {name}"
     assert root == [], (
         "pass `-u derbynet` before the container or service name: an exec runs "
@@ -338,6 +333,9 @@ def test_an_exec_without_derbynet_is_found():
         '"${compose[@]}" exec -T -e A=b server \\\n'
         "    python manage.py migrate\n"
         "docker compose exec server sh -c 'cd /opt; python manage.py check'\n"
+        "docker compose --profile postgres exec server python manage.py migrate\n"
+        "docker compose -p x -f compose.yaml exec -T server python manage.py check\n"
+        "compose exec -T server python manage.py check\n"
     )
     assert exec_commands(text) == [
         (1, None),
@@ -346,6 +344,9 @@ def test_an_exec_without_derbynet_is_found():
         (4, None),
         (5, None),
         (7, None),
+        (8, None),
+        (9, None),
+        (10, None),
     ]
 
 
@@ -360,10 +361,16 @@ def test_an_exec_as_derbynet_and_prose_pass():
         "an exec'd manage.py's database: postgres\n"
         "docker compose exec server ls | grep manage.py\n"
         "docker compose exec server true && python manage.py check\n"
+        "docker compose --profile postgres exec -u derbynet server python manage.py x\n"
+        "docker exec --user derbynet derbynet python manage.py shell\n"
+        "compose exec -T -u derbynet server python manage.py check\n"
     )
     assert exec_commands(text) == [
         (1, "derbynet"),
         (2, "derbynet"),
         (3, "derbynet"),
         (4, "derbynet"),
+        (10, "derbynet"),
+        (11, "derbynet"),
+        (12, "derbynet"),
     ]
