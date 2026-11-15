@@ -20,8 +20,10 @@ SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'sour
 # Stand-ins for the two halves of server/tools/source-checks.sh, so no real
 # check runs (as server/tests/test_source_checks.py stubs them): each logs
 # where it ran, the merge's parents and files, then prints what the real tool
-# prints and exits as $STUB_<NAME> says (pass, fail, broken, hang, or
-# deaf: hang and ignore SIGTERM).
+# prints and exits as $STUB_<NAME> says (pass, fail, broken, hang, deaf:
+# hang and ignore SIGTERM, or move: push $STUB_PUSH_FROM's HEAD to master
+# once). A hang stops after $STUB_LIMIT seconds (120), so a test run that is
+# killed leaves no stub looping (#333 review).
 STUB = '''#!/bin/bash
 name=$(basename "$0")
 if [ "$name" = python3 ] && [ "$*" != "-I -m unittest discover -s ../plan/tests" ]; then
@@ -44,21 +46,28 @@ case $name:${{!var:-}} in
     exit 2 ;;
   uv:hang)
     echo $$ >"$RAN.pid"
-    while :; do date >>busy; sleep 0.1; done ;;
+    while [ "$SECONDS" -lt "${{STUB_LIMIT:-120}}" ]; do date >>busy; sleep 0.1; done ;;
   uv:deaf)
     trap '' TERM
     echo $$ >"$RAN.pid"
-    while :; do date >>busy; sleep 0.1; done ;;
+    while [ "$SECONDS" -lt "${{STUB_LIMIT:-120}}" ]; do date >>busy; sleep 0.1; done ;;
+  uv:move)
+    # Another PR merges while the checks run.
+    [ -e "$RAN.moved" ] || {{ git -C "$STUB_PUSH_FROM" push -q origin HEAD:master && touch "$RAN.moved"; }} ;;
 esac
 '''
 
 # Every check passed (the --jq filter prints nothing) and the PR closes
 # nothing, so only the base check can refuse. `pr merge` is logged.
 FAKE_GH = '''#!{python}
-import sys
+import os, sys
 args = sys.argv[1:]
 if args[:2] == ['pr', 'view'] and 'headRefOid' in args:
     print({head!r})
+elif args[:2] == ['pr', 'view'] and 'closingIssuesReferences' in args:
+    print(os.environ.get('FAKE_CLOSES', ''))
+elif args[:2] == ['issue', 'view'] and 'state,body' in args:
+    print('## Still open\\n\\n- the screenshots')
 elif args[:2] == ['pr', 'view'] and 'state,mergeCommit' in args:
     print('MERGED abc')
 elif args[:2] == ['pr', 'merge']:
@@ -445,7 +454,7 @@ class PrMerge(unittest.TestCase):
         done = self.merge(head)
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(self.merged(), '')
-        log = self.cache / 'derbynet-pr-merge-7.log'
+        (log,) = self.cache.glob('derbynet-pr-merge-7-*.log')
         self.assertIn('not merging #7; server/tools/source-checks.sh failed (exit 1) on the PR '
                       'merged with origin/master', done.stderr)
         self.assertIn(f'whole output in {log}:\n'
@@ -544,6 +553,7 @@ class PrMerge(unittest.TestCase):
             with self.subTest(argv=argv):
                 done = self.merge(head, *argv)
                 self.assertIn('not running them again', done.stderr)
+                self.assertNotIn('16 min', done.stderr)
                 self.assertEqual(self.ran().count('\nuv '), 1, self.ran())
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn('pr merge 7', self.merged())
@@ -594,12 +604,32 @@ class PrMerge(unittest.TestCase):
         self.assertIn('pr-merge-source-checks', done.stdout)
         self.assertIn('16 min', done.stdout)
 
-    def hang(self, sig, group, stub='hang'):
+    def hang(self, sig, group, stub='hang', twice=False):
         """Starts a merge whose checks hang, writing into the worktree, and
         sends `sig` once they run: to the process group as Ctrl-C does, or
-        to pr-merge alone."""
+        to pr-merge alone; with `twice`, again a second later."""
         head = self.check_pair()
         self.env['STUB_UV'] = stub
+        proc, stub = self.start(head)
+        if group:
+            os.killpg(proc.pid, sig)
+        else:
+            proc.send_signal(sig)
+        if twice:
+            time.sleep(1)
+            if proc.poll() is None:
+                os.killpg(proc.pid, sig) if group else proc.send_signal(sig)
+        try:
+            out, err = proc.communicate(timeout=60)
+        finally:
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.communicate()
+        return proc.returncode, err, stub
+
+    def start(self, head):
+        """Starts pr-merge 7 and returns it and the hung stub's pid once the
+        stub runs."""
         gh = self.tmp / 'gh'
         gh.write_text(FAKE_GH.format(python=sys.executable, head=head, log=str(self.log)))
         gh.chmod(0o755)
@@ -621,17 +651,15 @@ class PrMerge(unittest.TestCase):
         group_of_stub = os.getpgid(stub)
         self.addCleanup(lambda: subprocess.run(['kill', '-KILL', '--', f'-{group_of_stub}'],
                                                capture_output=True))
-        if group:
-            os.killpg(proc.pid, sig)
-        else:
-            proc.send_signal(sig)
+        self.addCleanup(lambda: proc.poll() is None and os.killpg(proc.pid, signal.SIGKILL))
+        return proc, stub
+
+    def alive(self, pid):
         try:
-            out, err = proc.communicate(timeout=60)
-        finally:
-            if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGKILL)
-                proc.communicate()
-        return proc.returncode, err, stub
+            state = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[0]
+        except FileNotFoundError:
+            return False
+        return state != 'Z'
 
     def assert_gone(self, pid):
         deadline = time.monotonic() + 30
@@ -700,6 +728,155 @@ class PrMerge(unittest.TestCase):
         self.assertIn('could not fetch origin/master and its head', done.stderr)
         self.assertNotIn('--base-checked', done.stderr)
         self.assertEqual(self.merged(), '')
+
+    def ran_count(self, name='uv'):
+        return sum(line.startswith(f'{name} ') for line in self.ran().splitlines())
+
+    def test_master_moved_during_the_run_refuses(self):
+        """Another PR merged while the checks ran, so they never saw the
+        master the merge goes onto (#333 review): it refuses, and the rerun
+        checks the new pair."""
+        head = self.check_pair()
+        old = self.git('rev-parse', 'origin/master')
+        other = self.tmp / 'other'
+        self.git('clone', '-q', str(self.tmp / 'origin.git'), str(other), cwd=self.tmp)
+        (other / 'server' / 'tests' / 'test_pipefail_pipes.py').write_text('#304\n')
+        self.git('add', '.', cwd=other)
+        self.git('commit', '-q', '-m', '#304: a source check, merged mid-run', cwd=other)
+        new = self.git('rev-parse', 'HEAD', cwd=other)
+        self.env.update(STUB_UV='move', STUB_PUSH_FROM=str(other))
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('the source checks passed on #7', done.stderr)
+        self.assertIn(f'not merging #7; origin/master moved during the run '
+                      f'({old[:8]}..{new[:8]}); rerun pr-merge\n', done.stderr)
+        self.assertEqual(self.merged(), '')
+        self.assert_no_worktree()
+        del self.env['STUB_UV']
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn('not running them again', done.stderr)
+        self.assertEqual(self.ran_count(), 2)
+        self.assertIn(f'{head} {new}\n', self.passed())
+        self.assertIn('pr merge 7', self.merged())
+
+    def test_a_dry_run_also_refuses_a_master_that_moved(self):
+        head = self.check_pair()
+        other = self.tmp / 'other'
+        self.git('clone', '-q', str(self.tmp / 'origin.git'), str(other), cwd=self.tmp)
+        (other / 'docs').mkdir()
+        (other / 'docs' / 'x.md').write_text('x\n')
+        self.git('add', '.', cwd=other)
+        self.git('commit', '-q', '-m', 'moved', cwd=other)
+        self.env.update(STUB_UV='move', STUB_PUSH_FROM=str(other))
+        done = self.merge(head, '--dry-run')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('origin/master moved during the run', done.stderr)
+        self.assertNotIn('dry run:', done.stderr)
+
+    def test_a_second_ctrl_c_during_cleanup_still_removes_the_worktree(self):
+        """The first Ctrl-C starts the cleanup, which waits up to about 10 s
+        for a run that ignores TERM; a second one used to end pr-merge there
+        and leave both (#333 review)."""
+        status, err, stub = self.hang(signal.SIGINT, group=True, stub='deaf', twice=True)
+        self.assertEqual(status, 130, err)
+        self.assert_gone(stub)
+        self.assert_no_worktree()
+
+    def test_a_killed_pr_merge_s_run_is_cleaned_up_by_the_next(self):
+        """SIGKILL runs no trap: the run and its worktree stay until the next
+        pr-merge finds its owner gone (#333 review)."""
+        head = self.check_pair()
+        self.env['STUB_UV'] = 'hang'
+        proc, stub = self.start(head)
+        os.kill(proc.pid, signal.SIGKILL)
+        proc.communicate(timeout=60)
+        self.assertTrue(self.alive(stub))
+        self.assertEqual(self.git('worktree', 'list', '--porcelain').count('worktree '), 2)
+        del self.env['STUB_UV']
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertRegex(done.stderr, r'removed .*/derbynet-pr-merge\.\w+, left by pr-merge '
+                                      r'\d+, which is gone\n')
+        self.assert_gone(stub)
+        self.assert_no_worktree()
+
+    def test_a_live_pr_merge_s_worktree_is_left_alone(self):
+        """A worktree whose owner still runs is another pr-merge's run."""
+        self.cache.mkdir()
+        left = self.cache / 'derbynet-pr-merge.live01'
+        self.git('worktree', 'add', '-q', '--detach', str(left), 'HEAD')
+        owner = subprocess.Popen(['sleep', '120'])
+        self.addCleanup(lambda: (owner.kill(), owner.wait()))
+        gitdir = Path(self.git('-C', str(left), 'rev-parse', '--absolute-git-dir'))
+        (gitdir / 'pr-merge-owner').write_text(f'owner {owner.pid}\n')
+        head = self.pr('plan/AGENT-BRIEF.md')
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn('removed', done.stderr)
+        self.assertTrue(left.is_dir())
+        owner.kill()
+        owner.wait()
+        done = self.merge(head)
+        self.assertIn(f'removed {left}, left by pr-merge {owner.pid}, which is gone', done.stderr)
+        self.assertFalse(left.exists())
+        self.assertEqual(self.git('worktree', 'list', '--porcelain').count('worktree '), 1)
+
+    def test_a_hung_stub_stops_by_itself(self):
+        """So a test run that is killed leaves no stub writing every 0.1 s
+        (#333 review)."""
+        stub = self.tmp / 'stubs' / 'uv'
+        done = subprocess.run([str(stub)], cwd=self.work, capture_output=True, text=True,
+                              env={**self.env, 'STUB_UV': 'hang', 'STUB_LIMIT': '1'},
+                              timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_each_run_keeps_its_own_log(self):
+        """A passing run deleted a failed one's log, which both named
+        derbynet-pr-merge-7.log (#333 review)."""
+        head = self.check_pair()
+        self.env['STUB_UV'] = 'fail'
+        logs = []
+        for _ in range(2):
+            done = self.merge(head)
+            logs.append(Path(re.search(r'whole output in (\S+):\n', done.stderr).group(1)))
+        self.assertNotEqual(logs[0], logs[1])
+        del self.env['STUB_UV']
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        for log in logs:
+            self.assertTrue(log.is_file(), log)
+            self.assertTrue(log.name.startswith('derbynet-pr-merge-7-'), log)
+
+    def test_an_env_without_default_signal_refuses_naming_env(self):
+        """Before coreutils 8.31 env has no --default-signal, and the run's
+        exit 125 read as a failed source check (#333 review)."""
+        old = self.tmp / 'oldenv'
+        old.mkdir()
+        (old / 'env').write_text('#!/bin/bash\n'
+                                 'for a; do case $a in --default-signal*) '
+                                 'echo "env: unrecognized option \'$a\'" >&2; exit 125;; esac; done\n'
+                                 'exec /usr/bin/env "$@"\n')
+        (old / 'env').chmod(0o755)
+        self.env['PATH'] = f'{old}:{self.env["PATH"]}'
+        head = self.check_pair()
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('not merging #7; env takes no --default-signal', done.stderr)
+        self.assertNotIn('source-checks.sh failed', done.stderr)
+        self.assertEqual(self.ran(), '')
+        self.assertEqual(self.merged(), '')
+        self.assert_no_worktree()
+
+    def test_dry_run_stops_at_an_issue_still_open(self):
+        """--dry-run runs every gate, the `## Still open` one too (#333
+        review: a dry run that stopped above it passed every test)."""
+        head = self.pr('plan/AGENT-BRIEF.md')
+        self.env['FAKE_CLOSES'] = '12'
+        done = self.merge(head, '--dry-run')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('it closes #12, whose body has a "## Still open" section', done.stderr)
+        self.assertNotIn('dry run:', done.stderr)
 
 
 if __name__ == '__main__':
