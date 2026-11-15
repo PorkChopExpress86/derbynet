@@ -45,12 +45,12 @@ def test_check_refuses_a_body_that_leaves_a_claim_out(tmp_path, capsys):
     path = tmp_path / "test_sample.py"
     path.write_text(SAMPLE)
     rows = [
-        "390x844",
-        '"Lions, Round 1, Heat 14"',
-        "15vw",
-        "2 lines",
-        '"Heat 100"',
-        "58.3 px",
+        "| test_sample.py:1 `module` | 390x844 |",
+        '| test_sample.py:3 `module` | "Lions, Round 1, Heat 14" |',
+        "| test_sample.py:6 `module` | 15vw |",
+        "| test_sample.py:11 `test_labels` | 2 lines |",
+        '| test_sample.py:11 `test_labels` | "Heat 100" |',
+        "| test_sample.py:12 `test_labels` | 58.3 px |",
     ]
     body = tmp_path / "body.md"
     body.write_text("<details>\n" + "\n".join(rows) + "\n</details>\n")
@@ -58,10 +58,37 @@ def test_check_refuses_a_body_that_leaves_a_claim_out(tmp_path, capsys):
 
     body.write_text(
         "58.3 px outside the block\n<details>\n"
-        + "\n".join(r for r in rows if r != "58.3 px")
+        + "\n".join(r for r in rows if "58.3 px" not in r)
         + "\n</details>\n"
     )
     assert dc.main(["--check", str(body), str(path)]) == 1
     assert capsys.readouterr().out.strip() == (
-        f"{path}:12: test_labels: 58.3 px is in no <details> block"
+        f"{path}:12: test_labels: 58.3 px is in no <details> block line that"
+        " names test_labels"
     )
+
+
+def test_a_claim_counts_only_on_a_line_that_names_its_test(tmp_path, capsys):
+    """#324's body listed "2" for no test, and `--check` passed
+    `test_lane_two_off_leaves_it_out_of_heat_ready`'s 2 because a 2 stood
+    elsewhere in a block; a 12 or another test's row counts no more (#324
+    retro). A module claim's line names the module or the file."""
+    path = tmp_path / "test_sample.py"
+    path.write_text(
+        '"""1920x1080 here."""\n\n\ndef test_lanes():\n    """2 lanes."""\n\n\n'
+        'def test_heats():\n    """2 heats."""\n'
+    )
+    body = tmp_path / "body.md"
+    body.write_text(
+        "<details>\n| `test_lanes` | 12 lanes |\n| `test_heats` | 2 heats |\n"
+        "| test_sample.py `module` | 1920x1080 |\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert capsys.readouterr().out.strip() == (
+        f"{path}:5: test_lanes: 2 is in no <details> block line that names test_lanes"
+    )
+    body.write_text(
+        "<details>\n| `test_lanes` | 2 lanes |\n| `test_heats` | 2 heats |\n"
+        "test_sample.py: 1920x1080\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 0

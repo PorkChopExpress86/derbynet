@@ -119,6 +119,16 @@ def test_a_text_that_does_not_occur_once_is_refused(project, old, times):
     assert (project / "mod.py").read_text() == MODULE
 
 
+def test_a_new_text_that_equals_the_old_is_refused(project):
+    """A mutant whose edit changes nothing passes as a survivor: #324's m7
+    sed was never shown to apply, and its pass stood as an equivalent
+    mutant (#324 retro)."""
+    run = mutate(project, "a < b", "a < b", "test_mod.py::test_the_bound")
+    assert run.returncode == 2
+    assert "--new is --old" in run.stderr
+    assert "passed" not in run.stdout, "no test runs"
+
+
 def test_a_k_that_deselects_a_test_is_refused(project):
     run = mutate(project, "a < b", "a <= b", "test_mod.py", "-k", "the_bound")
     assert run.returncode == 2

@@ -15,9 +15,11 @@ A `?` is not a finding by itself: a share such as 15vw is asserted as
 `0.15 * width`, which the tool tries, and a count may be a `len()`. Fill the
 assert column by hand, or cut the claim.
 
-`--check BODY.md` prints each claim that appears in none of the body's
-`<details>` blocks and exits 1, or exits 0 when every claim is listed. It
-matches the claim's text (`2.85vw`, `"Heat 100"`, `two lines`) as written.
+`--check BODY.md` prints each claim that no line of the body's `<details>`
+blocks lists and exits 1, or exits 0 when every claim is listed. A line
+lists a claim when it holds the claim's text as written (`2.85vw`,
+`"Heat 100"`, `two lines`), as a whole token, and names its scope: the
+test or class, or `module` or the file's name, as a row of the table does.
 
 A claim is a number with its unit (`58.3 px`, `2.85vw`, `1920x1080`, `22`),
 a number word that counts something (`two lines`, `four tall windows`), or a
@@ -200,15 +202,23 @@ def claims(path: Path) -> list[tuple[Claim, list[int]]]:
     return out
 
 
-def listed_in(claim: str, listed: str) -> bool:
+def listed_in(claim: Claim, file: Path, listed: str) -> bool:
     """The claim as written, or a number word as its digits ("four
-    landscape" as "4 landscape")."""
-    if claim in listed:
-        return True
-    word, _, rest = claim.partition(" ")
+    landscape" as "4 landscape"), as a whole token on one line that names
+    its scope: the test or class, or for the module the word `module` or
+    the file's name, as the table above prints them. #324's 2 passed for a
+    2 elsewhere in the block (#324 retro)."""
+    forms = [claim.text]
+    word, _, rest = claim.text.partition(" ")
     if word.lower() in WORDS[:12] and rest:
-        return f"{WORDS.index(word.lower()) + 1} {rest}" in listed
-    return False
+        forms.append(f"{WORDS.index(word.lower()) + 1} {rest}")
+    names = [claim.scope] if claim.scope != "module" else ["module", file.name]
+    pattern = re.compile("|".join(rf"(?<![\w.]){re.escape(f)}(?![\w])" for f in forms))
+    return any(
+        pattern.search(line)
+        and any(re.search(rf"(?<![\w.]){re.escape(n)}(?![\w])", line) for n in names)
+        for line in listed.splitlines()
+    )
 
 
 def details(body: str) -> str:
@@ -223,9 +233,12 @@ def main(argv: list[str] | None = None) -> int:
     found = [(f, c, hits) for f in args.files for c, hits in claims(f)]
     if args.check:
         listed = details(args.check.read_text())
-        missing = [(f, c) for f, c, _ in found if not listed_in(c.text, listed)]
+        missing = [(f, c) for f, c, _ in found if not listed_in(c, f, listed)]
         for f, c in missing:
-            print(f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block")
+            print(
+                f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block"
+                f" line that names {c.scope if c.scope != 'module' else f.name}"
+            )
         return 1 if missing else 0
     print("| where | claim | code lines with its literal |")
     print("|---|---|---|")
