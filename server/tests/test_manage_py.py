@@ -205,9 +205,11 @@ def test_every_other_command_is_refused_as_root(monkeypatch, tmp_path):
 
 def test_the_marker_is_the_dockerfiles():
     """The Dockerfile writes the marker manage.py reads, outside the server
-    folder a bind mount replaces, and copies it into the image."""
+    folder a bind mount replaces, before the build's manage.py commands run,
+    so they run under the refusal, and copies it into the image."""
     text = DOCKERFILE.read_text()
     marker = str(load_manage().IMAGE_MARKER)
     assert not marker.startswith("/opt/derbynet/server/")
-    assert f"> {marker}\n" in text
+    written = text.index(f"> {marker}\n")
+    assert written < DOCKERFILE_COMMAND.search(text).start()
     assert f"COPY --from=static {marker} {marker}\n" in text
