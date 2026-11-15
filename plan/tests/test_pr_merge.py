@@ -782,9 +782,9 @@ class PrMerge(unittest.TestCase):
         self.assertNotIn('dry run:', done.stderr)
 
     def test_a_second_ctrl_c_during_cleanup_still_removes_the_worktree(self):
-        """The first Ctrl-C starts the cleanup, which waits up to about 10 s
-        for a run that ignores TERM; a second one used to end pr-merge there
-        and leave both (#333 review)."""
+        """The first Ctrl-C starts the cleanup, which waits out a run that
+        ignores TERM; a second Ctrl-C used to end pr-merge there and leave
+        both (#333 review)."""
         status, err, stub = self.hang(signal.SIGINT, group=True, stub='deaf', twice=True)
         self.assertEqual(status, 130, err)
         self.assert_gone(stub)
@@ -856,8 +856,8 @@ class PrMerge(unittest.TestCase):
             self.assertTrue(log.name.startswith('derbynet-pr-merge-7-'), log)
 
     def test_an_env_without_default_signal_refuses_naming_env(self):
-        """Before coreutils 8.31 env has no --default-signal, and the run's
-        exit 125 read as a failed source check (#333 review)."""
+        """With an env that has no --default-signal, the run's exit 125 read
+        as a failed source check (#333 review)."""
         old = self.tmp / 'oldenv'
         old.mkdir()
         (old / 'env').write_text('#!/bin/bash\n'

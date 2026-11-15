@@ -19,7 +19,7 @@
 # `timeout`, which source-checks.sh refuses. The run has SIGINT back at its
 # default, which bash ignores in a background job: #311's own run hung in its
 # Ctrl-C tests, whose pr-merge could not trap it. That needs env's
-# --default-signal (GNU coreutils 8.31 or later, or uutils). It refuses the PR
+# --default-signal, which GNU coreutils 9.7's env and uutils 0.10's take. It refuses the PR
 # when the merge conflicts or a check fails, and prints the failures' summary
 # lines; the whole output stays in
 # ${XDG_CACHE_HOME:-~/.cache}/derbynet-pr-merge-<pr>-<suffix>.log. A worktree
@@ -195,7 +195,7 @@ source_checks_on_the_merge() {
     return 1
   fi
   if ! env --default-signal=INT true 2>/dev/null; then
-    echo "not merging #$PR; env takes no --default-signal (GNU coreutils has it from 8.31, and uutils has it), which the run needs to put back the SIGINT a background job ignores. Update coreutils and rerun." >&2
+    echo "not merging #$PR; env takes no --default-signal (GNU coreutils 9.7's env and uutils 0.10's take it), which the run needs to put back the SIGINT a background job ignores. Update coreutils and rerun." >&2
     return 1
   fi
   tree=$(head -n 1 <<<"$out")
