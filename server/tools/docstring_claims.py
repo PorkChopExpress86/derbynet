@@ -264,10 +264,8 @@ def main(argv: list[str] | None = None) -> int:
         listed = rows(details(args.check.read_text()), names)
         missing = [(f, c) for f, c, _ in found if not listed_in(c, f, listed)]
         for f, c in missing:
-            print(
-                f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block"
-                f" line that names {c.scope if c.scope != 'module' else f.name}"
-            )
+            where = "" if c.scope == "module" else f" line that names {c.scope}"
+            print(f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block{where}")
         return 1 if missing else 0
     print("| where | claim | code lines with its literal |")
     print("|---|---|---|")
