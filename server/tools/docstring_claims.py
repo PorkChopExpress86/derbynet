@@ -15,9 +15,15 @@ A `?` is not a finding by itself: a share such as 15vw is asserted as
 `0.15 * width`, which the tool tries, and a count may be a `len()`. Fill the
 assert column by hand, or cut the claim.
 
-`--check BODY.md` prints each claim that appears in none of the body's
-`<details>` blocks and exits 1, or exits 0 when every claim is listed. It
-matches the claim's text (`2.85vw`, `"Heat 100"`, `two lines`) as written.
+`--check BODY.md` prints each claim that no line of the body's `<details>`
+blocks lists and exits 1, or exits 0 when every claim is listed. A line
+lists a claim when it holds the claim's text as written (`2.85vw`,
+`"Heat 100"`, `two lines`), as a whole token, and names its scope: the
+test or class, or `module` or the file's name, as a row of the table does.
+A `same` row or a wrapped line that names no scope lists for the scope of
+the line above it; any other row that names none lists for none. A module
+claim counts on any line, since its row may name the constant a comment
+sits above, or the test that reads it.
 
 A claim is a number with its unit (`58.3 px`, `2.85vw`, `1920x1080`, `22`),
 a number word that counts something (`two lines`, `four tall windows`), or a
@@ -200,19 +206,77 @@ def claims(path: Path) -> list[tuple[Claim, list[int]]]:
     return out
 
 
-def listed_in(claim: str, listed: str) -> bool:
+def methods(file: Path) -> dict[str, list[str]]:
+    """Each top-level class's methods, by name."""
+    return {
+        node.name: [
+            n.name
+            for n in node.body
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        for node in ast.parse(file.read_text()).body
+        if isinstance(node, ast.ClassDef)
+    }
+
+
+def scope_names(claim: Claim, file: Path) -> list[str]:
+    """What a line names a claim's scope by: the test, or a class or one of
+    its methods (#333's rows name the method), or for the module the word
+    `module` or the file's name, as the table above does."""
+    if claim.scope == "module":
+        return ["module", file.name]
+    return [claim.scope, *methods(file).get(claim.scope, [])]
+
+
+# A table row, a list item or a heading starts an entry of its own; a row
+# whose first cell is `same` (or a ditto mark) continues the one above.
+NEW_ITEM = re.compile(r"\s*(?:\||[-*+]\s|\d+[.)]\s|#)")
+SAME = re.compile(r"\s*\|\s*(?:same\b|〃|\")", re.IGNORECASE)
+
+
+def word(text: str) -> re.Pattern:
+    return re.compile(rf"(?<![\w.]){re.escape(text)}(?![\w])")
+
+
+def rows(blocks: list[str], names: set[str]) -> list[tuple[set[str], str]]:
+    """Each line of the `<details>` blocks with the scopes it lists claims
+    for: those it names, or, naming none, those of the line above it when
+    it is a `same` row or a wrapped line. Any other row or list item that
+    names no scope lists none: a test named by nickname is #324's failure
+    (#340 review)."""
+    found = {n: word(n) for n in names}
+    out = []
+    for block in blocks:
+        current: set[str] = set()
+        for line in block.splitlines():
+            if named := {n for n, pattern in found.items() if pattern.search(line)}:
+                current = named
+            elif NEW_ITEM.match(line) and not SAME.match(line):
+                current = set()
+            out.append((current, line))
+    return out
+
+
+def listed_in(claim: Claim, file: Path, listed: list[tuple[set[str], str]]) -> bool:
     """The claim as written, or a number word as its digits ("four
-    landscape" as "4 landscape")."""
-    if claim in listed:
-        return True
-    word, _, rest = claim.partition(" ")
-    if word.lower() in WORDS[:12] and rest:
-        return f"{WORDS.index(word.lower()) + 1} {rest}" in listed
-    return False
+    landscape" as "4 landscape"), as a whole token on a line that lists its
+    scope's claims (`rows()`). #324's 2 passed for a 2 in another test's
+    row (#324 retro). A module claim counts on any line."""
+    forms = [claim.text]
+    first, _, rest = claim.text.partition(" ")
+    if first.lower() in WORDS[:12] and rest:
+        forms.append(f"{WORDS.index(first.lower()) + 1} {rest}")
+    pattern = re.compile("|".join(word(f).pattern for f in forms))
+    if claim.scope == "module":
+        # A module claim's row may name the constant a comment sits above,
+        # and a test that reads it (#333's `STUB` comment row).
+        return any(pattern.search(line) for _, line in listed)
+    names = set(scope_names(claim, file))
+    return any(scopes & names and pattern.search(line) for scopes, line in listed)
 
 
-def details(body: str) -> str:
-    return "\n".join(re.findall(r"<details>(.*?)</details>", body, re.S))
+def details(body: str) -> list[str]:
+    return re.findall(r"<details>(.*?)</details>", body, re.S)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -222,10 +286,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     found = [(f, c, hits) for f in args.files for c, hits in claims(f)]
     if args.check:
-        listed = details(args.check.read_text())
-        missing = [(f, c) for f, c, _ in found if not listed_in(c.text, listed)]
+        names = {n for f, c, _ in found for n in scope_names(c, f)}
+        listed = rows(details(args.check.read_text()), names)
+        missing = [(f, c) for f, c, _ in found if not listed_in(c, f, listed)]
         for f, c in missing:
-            print(f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block")
+            where = (
+                ""
+                if c.scope == "module"
+                else f" line that names {c.scope}"
+                " (by its function name, not a nickname)"
+            )
+            print(f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block{where}")
         return 1 if missing else 0
     print("| where | claim | code lines with its literal |")
     print("|---|---|---|")

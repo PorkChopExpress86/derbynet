@@ -252,10 +252,13 @@ class Website(unittest.TestCase):
 
 
 class PlanTools(unittest.TestCase):
-    def test_a_plan_tool_runs_plan_tests(self):
+    def test_a_plan_tool_runs_plan_tests_through_the_source_checks(self):
+        """tools/source-checks.sh runs plan/tests, so a line of their own ran
+        them twice at each hand-off (#338)."""
         out = run('plan/bin/pr-merge')
         self.assertIn('[plan-tools]', out)
-        self.assertIn('python3 -I -m unittest discover -s ../plan/tests', commands(out))
+        self.assertNotIn('unittest discover', commands(out))
+        self.assertIn('  tools/source-checks.sh\n', commands(out))
 
     def test_the_pre_push_hook_runs_plan_tests(self):
         self.assertIn('[plan-tools]', run('.githooks/pre-push'))
@@ -1421,6 +1424,27 @@ class RealTree(unittest.TestCase):
                     'test_query_growth.py', 'test_photo_urls.py')}
                 self.assertTrue(set(named) - page_wide,
                                 'no test target beyond the page-wide checks')
+
+    def test_each_file_the_role_pages_check_reads_prints_it(self):
+        """The fixtures, the seeded roles, the gates, the URL confs that
+        resolve() reads, and each view its OTHER_PAGES names, read from the
+        real test: #323's CI failed on that fixture (#320 retro)."""
+        fixture = 'tests/test_role_pages_fixture.py'
+        views = [f'server/{v}' for v in TOOL.role_page_views(TOOL.Tree(REPO))]
+        self.assertIn('server/ui/timer/views.py', views)
+        self.assertEqual(sorted(set(views)), sorted(views))
+        self.assertEqual([v for v in views if not (REPO / v).is_file()], [])
+        files = ['testing/fixtures/role-pages.json', 'testing/fixtures/role-pages-django.json',
+                 'server/accounts/defaults.py', 'server/accounts/permissions.py',
+                 'server/ui/redirects.py', 'server/ui/navigation.py',
+                 'server/derbynet/urls.py', 'server/ui/urls.py', *views]
+        out = run(*files, 'server/awards/editing.py', root=REPO)
+        for path in files:
+            with self.subTest(path=path):
+                self.assertIn(fixture, section(out, path))
+        self.assertIn('[role-gates] a URL conf', section(out, 'server/ui/urls.py'))
+        self.assertIn('OTHER_PAGES', section(out, 'server/ui/timer/views.py'))
+        self.assertNotIn('[role-gates]', section(out, 'server/awards/editing.py'))
 
     def test_every_command_and_server_tool_maps(self):
         server = REPO / 'server'

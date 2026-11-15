@@ -7,7 +7,7 @@ mutants read as survivors until the traceback was read. Its `-k` misspelt a
 test name, and pytest deselected the test without a word. This refuses:
 
 - an old text that does not occur exactly once in the file; give more
-  context;
+  context. A new text equal to it, which would change nothing (#324 retro);
 - a run that deselects a test, runs none, or errors with no failure, so name
   the tests by node id (`path::test`, with `[param]` for one case of a
   parametrized test) and give `-m browser` for a browser test, which
@@ -142,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(signum, _stop)
 
     try:
+        if args.new == args.old:
+            raise Refused("--new is --old: the mutant would change nothing")
         if any(XDIST.match(arg) for arg in args.pytest_args):
             raise Refused(
                 "xdist leaves the deselected count out of its summary;"
