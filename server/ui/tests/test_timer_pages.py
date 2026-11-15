@@ -96,6 +96,54 @@ def test_the_fake_timer_needs_timer_message(login):
         assert b"data-fake-timer" in page.content, name
 
 
+FAKE_INTRO = re.compile(r"<section data-fake-intro[^>]*>(.*?)</section>", re.S)
+
+
+def fake_intro(client) -> tuple[str, str]:
+    """The fake timer page and its intro section."""
+    page = client.get("/timer/fake/")
+    assert page.status_code == 200
+    html = page.content.decode()
+    found = FAKE_INTRO.search(html)
+    assert found, html
+    return html, found.group(1)
+
+
+def words(html: str) -> str:
+    return " ".join(re.sub(r"<[^>]+>", "", html).split())
+
+
+def test_the_fake_timer_links_its_pages_only_for_a_role_that_can_open_them(login):
+    """D98: the race dashboard and the timer test need CONTROL_RACE, which
+    Timer lacks (D5), so a Timer session reads the same words with no link;
+    `fake-timer.php:99-100` links its pages for every role. A made-up role
+    holding TIMER_MESSAGE and CONTROL_RACE gets both links, as
+    RaceCoordinator does."""
+    timer_role = login("Timer")
+    page, plain = fake_intro(timer_role)
+    assert 'href="/dashboard/"' not in page
+    assert 'href="/timer/test/"' not in page
+    assert "<a " not in plain
+    assert (
+        "only while racing or simulated racing is on, from the race dashboard"
+        " or the timer test." in words(plain)
+    )
+    assert timer_role.get("/dashboard/").status_code == 302
+    assert timer_role.get("/timer/test/").status_code == 302
+    starter = Client()
+    log_in(starter, Perm.CONTROL_RACE | Perm.TIMER_MESSAGE, role="Starter")
+    for name, client in (
+        ("RaceCoordinator", login("RaceCoordinator")),
+        ("Starter", starter),
+    ):
+        _, linked = fake_intro(client)
+        assert '<a href="/dashboard/" data-action="dashboard"' in linked, name
+        assert '<a href="/timer/test/" data-action="timer-test"' in linked, name
+        assert words(linked) == words(plain), name
+        assert client.get("/dashboard/").status_code == 200, name
+        assert client.get("/timer/test/").status_code == 200, name
+
+
 def test_the_timer_role_sends_a_lane_result_from_the_fake_timer_session(login, event):
     """The messages the page's script posts, from a session logged in as
     Timer through the login page, are accepted: the heat's times are saved."""
