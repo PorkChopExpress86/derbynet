@@ -497,6 +497,7 @@ How they differ from PHP, each in the registry's `ROUTE_DIVERGENCES`:
 | `DERBYNET_DATA_DIR` | `server/var/data` | Root for event folders and media |
 | `DERBYNET_CONFIG_DIR` | `server/var/config` | Holds `secret_key` and other install-level files |
 | `DATABASE_URL` | `sqlite:///<DERBYNET_DATA_DIR>/derbynet.sqlite3` | Parsed with `dj-database-url` |
+| `DERBYNET_POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | unset | `docker/compose.yaml`'s Postgres service. With `DATABASE_URL` unset and `database-engine` in `DERBYNET_CONFIG_DIR` saying `postgres`, as the image's entrypoint writes it, the database is `postgres://USER:PASSWORD@HOST:5432/DB`, each part percent-encoded, so an exec'd `manage.py` uses the server's database (#308) |
 | `DERBYNET_URL_PREFIX` | empty | Sets `FORCE_SCRIPT_NAME`, for example `/derbynet` |
 | `DERBYNET_TIME_ZONE` | `TZ` when it is an IANA name, else `UTC` | Sets `TIME_ZONE`, with `USE_TZ = True`. An invalid value raises `ImproperlyConfigured` |
 | `DERBYNET_DEBUG` | `0` | Sets `DEBUG`. Only `0` and `1` are accepted |
