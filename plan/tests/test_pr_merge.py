@@ -27,7 +27,8 @@ name=$(basename "$0")
 if [ "$name" = python3 ] && [ "$*" != "-I -m unittest discover -s ../plan/tests" ]; then
   exec {python} "$@"
 fi
-{{ echo "$name $PWD $(git log -1 --format=%P)"; git -C "$(git rev-parse --show-toplevel)" ls-files | sed 's/^/  /'; }} >>"$RAN"
+{{ echo "$name $PWD $(git log -1 --format=%P)"
+   awk '/^SigIgn:/ {{ print "  SigIgn " $2 }}' /proc/$$/status; git -C "$(git rev-parse --show-toplevel)" ls-files | sed 's/^/  /'; }} >>"$RAN"
 var=STUB_${{name^^}}
 case $name:${{!var:-}} in
   python3:fail)
@@ -118,7 +119,7 @@ class PrMerge(unittest.TestCase):
 
     def master(self, *paths):
         """Commits `paths` on origin/master after the PR's merge base."""
-        self.git('switch', '-q', '-c', 'moved', 'origin/master')
+        self.git('switch', '-q', '-C', 'moved', 'origin/master')
         self.commit('#288: master moved', *paths)
         self.git('push', '-q', 'origin', 'HEAD:master')
         self.git('switch', '-q', 'branch')
@@ -423,6 +424,13 @@ class PrMerge(unittest.TestCase):
             self.assertTrue(cwd.startswith(str(self.cache / 'derbynet-pr-merge.')), cwd)
             self.assertTrue(cwd.endswith('/server'), cwd)
         self.assertIn('  server/docs/adr/check-paths.sh\n', ran)
+        # SIGINT is not ignored in the run, as in a run from a terminal:
+        # bash ignores it in a background job, and its children inherit that.
+        # A tool whose trap must see a Ctrl-C (this file's Ctrl-C tests,
+        # run inside pr-merge's run on #311's own merge) hung there.
+        for mask in re.findall(r'^  SigIgn ([0-9a-f]+)$', ran, re.M):
+            self.assertFalse(int(mask, 16) & (1 << (signal.SIGINT - 1)), ran)
+        self.assertEqual(len(re.findall(r'^  SigIgn ', ran, re.M)), 2, ran)
         self.assertIn('  server/tests/test_php_claims.py\n', ran)
         self.assertIn('the source checks passed on #7', done.stderr)
         self.assert_no_worktree()
@@ -584,7 +592,7 @@ class PrMerge(unittest.TestCase):
         self.assertIn('--base-checked  skips the area rule', done.stdout)
         self.assertIn('the source-check run still runs', done.stdout)
         self.assertIn('pr-merge-source-checks', done.stdout)
-        self.assertIn('5 min 10 s', done.stdout)
+        self.assertIn('14 min', done.stdout)
 
     def hang(self, sig, group, stub='hang'):
         """Starts a merge whose checks hang, writing into the worktree, and
@@ -595,9 +603,12 @@ class PrMerge(unittest.TestCase):
         gh = self.tmp / 'gh'
         gh.write_text(FAKE_GH.format(python=sys.executable, head=head, log=str(self.log)))
         gh.chmod(0o755)
+        # As at a terminal, SIGINT is not ignored: bash can't trap a signal
+        # ignored when it starts, and a background job's is.
         proc = subprocess.Popen(['bash', str(PR_MERGE), '7'], cwd=self.work,
                                 env={**self.env, 'GH': str(gh)}, start_new_session=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL))
         pid_file = Path(f'{self.ran_log}.pid')
         deadline = time.monotonic() + 120
         while not pid_file.exists() or not pid_file.read_text().strip():
@@ -614,6 +625,8 @@ class PrMerge(unittest.TestCase):
         finally:
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGKILL)
+                os.kill(stub, signal.SIGKILL)
+                proc.communicate()
         return proc.returncode, err, stub
 
     def assert_gone(self, pid):

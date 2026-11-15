@@ -13,10 +13,12 @@
 # merges the PR's head with origin/master in a temporary worktree under
 # ${XDG_CACHE_HOME:-~/.cache}, runs server/tools/source-checks.sh there, and
 # removes the worktree whatever happens, Ctrl-C included (#311). The run took
-# 5 min 10 s on the lead's machine at a load average of 25, about 4 min of it
-# in plan/tests; uv run --locked builds the worktree's server/.venv from uv's
+# 14 min on the lead's machine at a load average of 31, about 7 of them in
+# plan/tests; uv run --locked builds the worktree's server/.venv from uv's
 # cache in about a second. It needs uv on PATH, and it can't run under
-# `timeout`, which source-checks.sh refuses. It refuses the PR when the merge
+# `timeout`, which source-checks.sh refuses. The run has SIGINT back at its
+# default, which bash ignores in a background job: #311's own run hung in its
+# Ctrl-C tests, whose pr-merge could not trap it. It refuses the PR when the merge
 # conflicts or a check fails, and prints the failures' summary lines; the
 # whole output stays in ${XDG_CACHE_HOME:-~/.cache}/derbynet-pr-merge-<pr>.log.
 # A passing run is recorded by its pair of PR head and origin/master SHAs in
@@ -163,11 +165,11 @@ source_checks_on_the_merge() {
     return 1
   fi
   log=$cache_dir/derbynet-pr-merge-$PR.log
-  echo "running server/tools/source-checks.sh on #$PR merged with origin/master (${merge:0:8}) in $wt; it takes about 5 min under load, output in $log" >&2
-  (cd "$wt" && exec setsid bash server/tools/source-checks.sh) </dev/null >"$log" 2>&1 &
+  echo "running server/tools/source-checks.sh on #$PR merged with origin/master (${merge:0:8}) in $wt; it took 14 min at a load average of 31, output in $log" >&2
+  (cd "$wt" && exec setsid env --default-signal=INT bash server/tools/source-checks.sh) \
+    </dev/null >"$log" 2>&1 &
   checks_pid=$!
   wait "$checks_pid" && status=0 || status=$?
-  checks_pid=
   remove_worktree
   if [ "$status" != 0 ]; then
     echo "not merging #$PR; server/tools/source-checks.sh failed (exit $status) on the PR merged with origin/master ${master:0:8}. Its summary lines, and the whole output in $log:" >&2
