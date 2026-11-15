@@ -41,9 +41,10 @@ or `REFUSED` or `ERROR` with pytest's last lines), then the count of each,
 and exits 0 when every one is KILLED, 1 when one survived, and 2 when one
 was refused or errored, or none is listed. It mutates `.py`, `.js` and
 `.css` files and Python scripts, and names each other file whose mutants
-it skips, such as a `min()` a Markdown file quotes. A
-mutant whose text occurs more
-than once on its line is refused, to be run by hand. A stop restores each
+it skips: a `min()` a Markdown file quotes, and a test file's own
+conditions, since `affected-tests` prints this line with no `--file` and
+#336 retro's diff held 61 in its test files. A mutant whose text occurs
+more than once on its line is refused, to be run by hand. A stop restores each
 file and names the mutants not run. The cases the listing reads past are
 still mutated by hand, one per call.
 
@@ -224,12 +225,17 @@ def listed(args) -> int:
     listing = _listing()
     found, skipped = [], {}
     for m in listing.mutants(diff.stdout, root):
-        if m.path.endswith(SOURCES) or listing.is_python(root, m.path):
+        if Path(m.path).name.startswith("test_"):
+            why = "in a test file"
+        elif m.path.endswith(SOURCES) or listing.is_python(root, m.path):
             found.append(m)
+            continue
         else:
-            skipped[m.path] = skipped.get(m.path, 0) + 1
-    for path, n in skipped.items():
-        print(f"SKIPPED   {path}: {n} listed, in no source file", flush=True)
+            why = "in no source file"
+        n, _ = skipped.get(m.path, (0, why))
+        skipped[m.path] = (n + 1, why)
+    for path, (n, why) in skipped.items():
+        print(f"SKIPPED   {path}: {n} listed, {why}", flush=True)
     if not found:
         print("mutate.py: refused: no mutant listed for the diff", file=sys.stderr)
         return REFUSED

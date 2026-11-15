@@ -363,14 +363,19 @@ def test_listed_refuses_a_text_twice_on_its_line(project):
 
 
 def test_listed_refuses_a_diff_with_no_mutant(project):
-    """A Markdown file's `min(a, b)` is prose, not a mutant."""
+    """A Markdown file's `min(a, b)` is prose, not a mutant, and a test
+    file's own condition is no code under test."""
     (project / "notes.md").write_text("Take min(a, b).\n")
     subprocess.run([*GIT, "add", "notes.md"], cwd=project, check=True)
-    commit(project, MODULE + "\n\ndef three():\n    return 3\n")
+    test_if = "\n\ndef test_if():\n    if bound(1, 2):\n        pass\n"
+    commit(project, MODULE + "\n\ndef three():\n    return 3\n", test_if)
     run = listed(project, "test_mod.py::test_the_bound")
     assert run.returncode == 2
     assert "no mutant listed" in run.stderr
-    assert run.stdout == "SKIPPED   notes.md: 2 listed, in no source file\n"
+    assert run.stdout == (
+        "SKIPPED   notes.md: 2 listed, in no source file\n"
+        "SKIPPED   test_mod.py: 2 listed, in a test file\n"
+    )
 
 
 def test_listed_takes_no_old_or_new(project):
@@ -477,3 +482,13 @@ def test_a_listed_mutant_past_its_bound_is_an_error(project):
     assert "0 KILLED, 0 SURVIVED, 0 REFUSED, 2 ERROR" in run.stdout
     assert run.returncode == 2
     assert (project / "mod.py").read_text().endswith("return min(a, b)\n")
+
+
+def test_a_run_past_its_bound_that_printed_nothing_is_an_error(project):
+    """With -q pytest prints nothing before test_waits ends."""
+    run = mutate(
+        project, "1 + 1", "2", "-q", "test_mod.py::test_waits", tool=("--timeout", "3")
+    )
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1].startswith("ERROR")
+    assert (project / "mod.py").read_text() == MODULE
