@@ -76,8 +76,8 @@ def _held(path, holder="pid 42, since now\ncwd /there\n"):
 
 
 def test_a_load_run_holding_its_lock_is_named(request, tmp_path, monkeypatch):
-    """#316's hand-off ran beside #317's load run at a load average of 35
-    and failed a test that passes alone (#316 retro)."""
+    """#316's hand-off ran beside #317's load run and failed a test that
+    passes alone (#316 retro)."""
     lock = tmp_path / "load.lock"
     monkeypatch.setenv("DERBYNET_LOAD_LOCK", str(lock))
     monkeypatch.delenv("DERBYNET_LOAD_LOCK_HELD", raising=False)
@@ -86,6 +86,7 @@ def test_a_load_run_holding_its_lock_is_named(request, tmp_path, monkeypatch):
         "(pid 42, since now; cwd /there); results beside it are not clean"
     )
     assert named not in _hook(request.config)(request.config)  # no file yet
+    assert not lock.exists()  # and the probe made none
     fd = _held(lock)
     try:
         assert named in _hook(request.config)(request.config)
@@ -100,6 +101,23 @@ def test_a_load_run_holding_its_lock_is_named(request, tmp_path, monkeypatch):
         os.close(fd)
     assert named not in _hook(request.config)(request.config)  # released
     assert lock.read_text() == "pid 42, since now\ncwd /there\n"  # only read
+    fd = _held(lock, holder="")  # taken, its lines not yet written
+    try:
+        assert (
+            f"load run: tools/pytest-under-load.sh holds {lock} (no details yet); "
+            "results beside it are not clean"
+        ) in _hook(request.config)(request.config)
+    finally:
+        os.close(fd)
+
+
+def test_no_home_and_no_lock_named_reads_nothing(request, monkeypatch):
+    """As in a container that sets no HOME: no lock to read, and no error."""
+    monkeypatch.delenv("DERBYNET_LOAD_LOCK", raising=False)
+    monkeypatch.delenv("DERBYNET_LOAD_LOCK_HELD", raising=False)
+    monkeypatch.delenv("HOME")
+    lines = _hook(request.config)(request.config)
+    assert not [line for line in lines if line.startswith("load run:")]
 
 
 def test_the_load_run_s_own_pytest_names_nothing(request, tmp_path, monkeypatch):

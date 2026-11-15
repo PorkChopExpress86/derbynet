@@ -2,8 +2,9 @@
 starts anything: #47 and #48 each lost a 25-repeat run to
 `timeout 3000 ... | grep` (#48 retro). It also refuses an output folder
 that already holds files: #220 reused one, and a wait for its `junit.xml`
-fired on an earlier session's results (#220 retro). One run at a time per
-machine holds its lock, and a SIGKILL frees it (#316 retro)."""
+fired on an earlier session's results (#220 retro). A run holds a lock
+for the machine, a second waits for it, and a SIGKILL frees it (#316
+retro)."""
 
 import os
 import re
@@ -173,8 +174,8 @@ def finish(tmp_path, *runs):
 
 
 def test_a_second_load_run_waits_for_the_first_and_names_it(tmp_path):
-    """#316's hand-off ran beside #317's load run at a load average of 35,
-    and then waited 74 min for a slot the lead handed out by message."""
+    """#316's hand-off ran beside #317's load run and failed, then waited
+    for a slot the lead handed out by message (#316 retro)."""
     lock = tmp_path / "load.lock"
     first = start(tmp_path, "first", lock)
     second = None

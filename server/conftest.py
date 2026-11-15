@@ -62,21 +62,18 @@ def _load_run_lines():
             fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
         except BlockingIOError:
             lines = os.read(fd, 4096).decode(errors="replace").splitlines()
-            holder = "; ".join(line for line in lines if line) or "no details yet"
+            holder = "; ".join(lines) or "no details yet"
             return [
                 f"load run: tools/pytest-under-load.sh holds {path} ({holder}); "
                 "results beside it are not clean"
             ]
-        fcntl.flock(fd, fcntl.LOCK_UN)
         return []
     finally:
-        os.close(fd)
+        os.close(fd)  # which drops the probe's own shared lock
 
 
 def pytest_terminal_summary(terminalreporter, config):
     """The holder again at the end, since a load run may start mid-run."""
-    if hasattr(config, "workerinput"):
-        return
     for line in _load_run_lines():
         terminalreporter.write_line(line, yellow=True, bold=True)
 
