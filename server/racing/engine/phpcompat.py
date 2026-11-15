@@ -3,7 +3,7 @@ byte for byte (#20, "Numeric and comparison rules")."""
 
 import math
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 def php_time(moment: datetime) -> int:
@@ -11,6 +11,14 @@ def php_time(moment: datetime) -> int:
     `time()` and compares and subtracts whole seconds, so the port's
     contact rules read both sides through this (#307, #341)."""
     return int(moment.timestamp())
+
+
+def from_php_time(seconds: int) -> datetime:
+    """The first moment of PHP's `time()` value `seconds`, the moment where
+    `php_time` turns to it. A queryset compares a stored datetime with this
+    bound, so it gives PHP's whole-second answer at every moment of a
+    second (#356)."""
+    return datetime.fromtimestamp(seconds, tz=UTC)
 
 
 def php_round(x: float) -> int:

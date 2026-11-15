@@ -12,6 +12,7 @@ from django.utils import timezone
 from accounts.permissions import Perm
 from kiosks.models import Kiosk
 from legacy_api.tests.conftest import log_in, post
+from legacy_api.tests.whole_seconds import Clock, near_misses
 
 pytestmark = pytest.mark.django_db
 
@@ -148,6 +149,38 @@ def test_a_kiosk_silent_for_an_hour_is_dropped(coordinator, event):
 
     assert dashboard(coordinator)["kiosks"] == []
     assert set(Kiosk.objects.values_list("address", flat=True)) == {"quiet", "never"}
+
+
+# ----- the list and the drop, in whole seconds (#356) -----
+
+
+@pytest.mark.parametrize(("contact", "read", "listed"), near_misses(60, ["K1"], []))
+def test_the_list_counts_whole_seconds(coordinator, monkeypatch, contact, read, listed):
+    """#356: `all_kiosks()` lists a kiosk while `time() - last_contact < 60`
+    (`kiosks.inc:202`), in whole seconds, so a kiosk polled at a whole
+    second or a fraction past it leaves the list at the first moment of the
+    60th second after its own, and not 1 microsecond before."""
+    clock = Clock(monkeypatch)
+    clock.now = contact
+    poll(coordinator, "K1")
+    clock.now = read
+
+    assert [k["address"] for k in dashboard(coordinator)["kiosks"]] == listed
+
+
+@pytest.mark.parametrize(("contact", "read", "kept"), near_misses(3601, {"K1"}, set()))
+def test_the_drop_counts_whole_seconds(coordinator, monkeypatch, contact, read, kept):
+    """#356: `drop_old_kiosks()` deletes a kiosk once
+    `time() - last_contact > 3600` (`kiosks.inc:279`), in whole seconds, so
+    from the first moment of the 3601st second after its own, and not 1
+    microsecond before."""
+    clock = Clock(monkeypatch)
+    clock.now = contact
+    poll(coordinator, "K1")
+    clock.now = read
+    dashboard(coordinator)
+
+    assert set(Kiosk.objects.values_list("address", flat=True)) == kept
 
 
 def test_the_dashboard_offers_the_built_in_pages(coordinator):
