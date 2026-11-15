@@ -18,8 +18,16 @@ targets, then:
 - which browser tests measure text, and so also run with
   `DERBYNET_BROWSER_FONT="DejaVu Sans"`, which draws `system-ui` as CI does
   (#273's "Heat 100" failed only there);
-- the repeats under load each changed browser test file takes: 25 for one
-  that involves timing, 5 per font for a deterministic one;
+- the repeats under load each changed browser test file takes (D85): 25 for
+  one that involves timing, 5 per font for a deterministic one, and none for
+  an import-only move (D97, amending D85): a diff that only changes imports
+  and deletes top-level defs, classes or constants that a module the file
+  now imports from has unchanged, by AST, each name they read bound alike
+  there. A changed body or docstring, a new test or comment, a copy that
+  differs, an import that binds any other name anew or a name otherwise,
+  or what can't be parsed or resolved (a relative or star import, a module
+  outside the tree) keeps the count, and so does a flake ticket, whatever
+  the tool prints;
 - before the commands, `tools/docstring_claims.py` on each changed test file
   and `tools/operand_mutants.py` when a changed hand-written source file can
   hold a condition (not a migration or vendored code): run both before the
@@ -37,14 +45,18 @@ no test names or imports).
 
 `--stdin` reads the file list instead of git, for a back-test
 (`git diff --name-only SHA^ SHA | plan/bin/affected-tests --stdin`); it then
-looks for database code in each whole file rather than in its diff.
+looks for database code in each whole file rather than in its diff, and
+has no BASE to find an import-only move against, so every changed browser
+test file keeps its count.
 `--root DIR` reads the tree at DIR instead of the repository's top level.
 """
 
 import ast
+import io
 import re
 import subprocess
 import sys
+import tokenize
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -139,6 +151,7 @@ class Plan:
     changed_tests: list = field(default_factory=list)
     changed_source: list = field(default_factory=list)
     untracked: list = field(default_factory=list)
+    merge_base: str = None
 
     def add(self, path, rule, note, targets=()):
         self.covers.setdefault(path, []).append((rule, note, list(targets)))
@@ -985,6 +998,312 @@ def diff_text(plan, path):
                      if ln[:1] in '+-' and not ln.startswith(('+++', '---')))
 
 
+def base_text(plan, rel):
+    """`server/rel` as it was where the branch left BASE (the diff is
+    BASE...HEAD), or None when it is new on the branch."""
+    if plan.merge_base is None:
+        plan.merge_base = git(plan.root, 'merge-base', plan.base, 'HEAD').strip()
+    try:
+        return git(plan.root, 'show', f'{plan.merge_base}:{SERVER}/{rel}')
+    except subprocess.CalledProcessError:
+        return None
+
+
+# --- D97: an import-only move ----------------------------------------------
+#
+# A browser test file whose diff only moves top-level code, unchanged, into a
+# module it imports takes no repeats under load (D97, amending D85; #313's
+# helper move cost 156 min of them). A wrong verdict skips the repeats that
+# would show a flake, so every check fails closed: what can't be parsed or
+# resolved keeps the repeats (#320's Risks).
+
+class NotImportOnly(Exception):
+    """Why a file keeps its repeats."""
+
+
+AMBIGUOUS = object()  # a name bound twice, or by a loop, a try, `global`...
+# Names pytest or Python read from the module itself: moved, they change
+# what runs, so a file that deletes one keeps its repeats.
+SPECIAL = re.compile(r'__\w+__|pytestmark|pytest_\w+|test\w*|Test\w*')
+DUNDER = re.compile(r'__\w+__')
+
+
+def is_import(node):
+    return isinstance(node, (ast.Import, ast.ImportFrom))
+
+
+def defined_name(node):
+    """The one name a top-level def, class or simple assignment binds, or None."""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return node.name
+    if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+            and isinstance(node.targets[0], ast.Name):
+        return node.targets[0].id
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) \
+            and node.value is not None:
+        return node.target.id
+    return None
+
+
+def stored_names(node):
+    """Every name a statement may bind, wherever in it."""
+    out = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Name) and not isinstance(n.ctx, ast.Load):
+            out.add(n.id)
+        elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            out.add(n.name)
+        elif isinstance(n, (ast.Import, ast.ImportFrom)):
+            out.update((a.asname or a.name).split('.')[0] for a in n.names)
+        elif isinstance(n, ast.ExceptHandler) and n.name:
+            out.add(n.name)
+        elif isinstance(n, (ast.MatchAs, ast.MatchStar)) and n.name:
+            out.add(n.name)
+        elif isinstance(n, ast.MatchMapping) and n.rest:
+            out.add(n.rest)
+    return out
+
+
+def bindings(module, where):
+    """name -> what binds it at module level: ('from', module, name), or
+    ('import', {modules}) for `import a.b` (which binds `a`), or the
+    statement of a def, class or simple assignment; AMBIGUOUS for a name bound
+    twice or otherwise. A relative or star import fails: it can't be
+    resolved."""
+    out = {}
+
+    def bind(name, what):
+        old = out.get(name)
+        if old is None:
+            out[name] = what
+        elif isinstance(old, tuple) and isinstance(what, tuple) \
+                and old[0] == what[0] == 'import':
+            out[name] = ('import', old[1] | what[1])
+        else:
+            out[name] = AMBIGUOUS
+
+    for node in module.body:
+        if isinstance(node, ast.ImportFrom):
+            if node.level:
+                raise NotImportOnly(f'{where} line {node.lineno}: a relative import')
+            for a in node.names:
+                if a.name == '*':
+                    raise NotImportOnly(f'{where} line {node.lineno}: a star import')
+                bind(a.asname or a.name, ('from', node.module, a.name))
+        elif isinstance(node, ast.Import):
+            for a in node.names:
+                if a.asname:
+                    bind(a.asname, ('from', a.name, None))
+                else:
+                    bind(a.name.split('.')[0], ('import', frozenset([a.name])))
+        elif defined_name(node):
+            bind(defined_name(node), node)
+        else:
+            for name in stored_names(node):
+                out[name] = AMBIGUOUS
+    for node in ast.walk(module):
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            for name in node.names:
+                out[name] = AMBIGUOUS
+    return out
+
+
+def lookup(binds, name, where):
+    found = binds.get(name)
+    if found is AMBIGUOUS:
+        raise NotImportOnly(f'{where} binds {name} more than once, or not by a '
+                            'plain def, assignment or import')
+    return found
+
+
+def mentions(module):
+    """The names a module reads: each Name, parameter, and string constant
+    that is a bare name (a fixture's name in `usefixtures` or
+    `getfixturevalue`)."""
+    out = set()
+    for n in ast.walk(module):
+        if isinstance(n, ast.Name):
+            out.add(n.id)
+        elif isinstance(n, ast.arg):
+            out.add(n.arg)
+        elif isinstance(n, ast.Constant) and isinstance(n.value, str) \
+                and n.value.isidentifier():
+            out.add(n.value)
+    return out
+
+
+def comments(text, skip_lines=()):
+    """The comments of `text`, in order, outside the lines in `skip_lines`."""
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))
+    except (tokenize.TokenError, SyntaxError) as e:
+        raise NotImportOnly(f'cannot be tokenized ({e})') from None
+    return [t.string.strip() for t in tokens
+            if t.type == tokenize.COMMENT and t.start[0] not in skip_lines]
+
+
+def import_only(base_text, head_text, module_text):
+    """D97's verdict on a browser test file: {module: [moved names]} when the
+    diff from `base_text` to `head_text` only changes imports and deletes
+    top-level definitions that a module it imports from (`module_text(name)`
+    gives its text, or None outside the tree) has unchanged. Raises
+    NotImportOnly with the reason otherwise."""
+    if base_text is None:
+        raise NotImportOnly('new on the branch')
+    try:
+        base = ast.parse(base_text)
+        head = ast.parse(head_text)
+    except SyntaxError as e:
+        raise NotImportOnly(f'cannot be parsed ({e.msg}, line {e.lineno})') from None
+    base_binds = bindings(base, 'BASE')
+    head_binds = bindings(head, 'the file')
+
+    # Everything but the imports is BASE's, in order, less what was deleted.
+    kept = [n for n in base.body if not is_import(n)]
+    deleted, i = [], 0
+    for node in (n for n in head.body if not is_import(n)):
+        dump = ast.dump(node)
+        while i < len(kept) and ast.dump(kept[i]) != dump:
+            deleted.append(kept[i])
+            i += 1
+        if i == len(kept):
+            raise NotImportOnly(f'line {node.lineno} is new or changed')
+        i += 1
+    deleted += kept[i:]
+    if not deleted:
+        raise NotImportOnly('it moves no top-level definition')
+
+    # A comment is no code, but it is a change to the file.
+    import_lines = {ln for n in head.body if is_import(n)
+                    for ln in range(n.lineno, n.end_lineno + 1)}
+    old = iter(comments(base_text))
+    for comment in comments(head_text, import_lines):
+        if not any(comment == c for c in old):
+            raise NotImportOnly(f'a comment is new or changed: {comment}')
+
+    modules = {}
+
+    def parsed(name):
+        if name not in modules:
+            text = module_text(name)
+            if text is None:
+                modules[name] = None
+            else:
+                try:
+                    tree = ast.parse(text)
+                except SyntaxError as e:
+                    raise NotImportOnly(f'{name} cannot be parsed ({e.msg}, '
+                                        f'line {e.lineno})') from None
+                modules[name] = (tree, bindings(tree, name))
+        return modules[name]
+
+    def same(name, node, module, seen):
+        """`module` has `name` as BASE's `node`, and each name it reads is
+        bound alike in both modules."""
+        if (module, name) in seen:
+            return
+        seen.add((module, name))
+        copy = lookup(parsed(module)[1], name, module)
+        if not isinstance(copy, ast.stmt) or ast.dump(copy) != ast.dump(node):
+            raise NotImportOnly(f'{module} has {name} otherwise than the file had it')
+        for read in sorted({n.id for n in ast.walk(node) if isinstance(n, ast.Name)}):
+            if read == name:
+                continue
+            ours = lookup(base_binds, read, 'BASE')
+            theirs = lookup(parsed(module)[1], read, module)
+            if ours is None and theirs is None and not DUNDER.fullmatch(read):
+                continue  # a local or a builtin in both
+            if isinstance(ours, tuple) and ours == theirs:
+                continue
+            if isinstance(ours, ast.stmt) and isinstance(theirs, ast.stmt):
+                same(read, ours, module, seen)
+                continue
+            raise NotImportOnly(f'{name} reads {read}, which {module} binds '
+                                'otherwise than the file did')
+
+    used = mentions(head)
+    sources = sorted({b[1] for b in head_binds.values()
+                      if isinstance(b, tuple) and b[0] == 'from' and b[2]})
+    # The names first, then the imported ones, then the rest, so that the
+    # reason given is the most telling one.
+    names = {}
+    for node in deleted:
+        name = defined_name(node)
+        if name is None:
+            raise NotImportOnly(f'it deletes line {node.lineno}, which is not a def, '
+                                'a class or a constant')
+        if SPECIAL.fullmatch(name):
+            raise NotImportOnly(f'it deletes {name}, which pytest or Python reads '
+                                'from the file itself')
+        names[name] = node
+    moved = {}  # name -> the module that has it now
+    for name, node in names.items():
+        bound = lookup(head_binds, name, 'the file')
+        if bound is None:
+            continue
+        if isinstance(bound, ast.stmt):
+            raise NotImportOnly(f'the file still defines {name}')
+        if not (bound[0] == 'from' and bound[2] == name):
+            raise NotImportOnly(f'{name} is imported, but not as `from M import {name}`')
+        if parsed(bound[1]) is None:
+            raise NotImportOnly(f'{name} comes from {bound[1]}, which is not in '
+                                'the tree')
+        same(name, node, bound[1], set())
+        moved[name] = bound[1]
+    for name in names:
+        if name not in moved and name in used:
+            raise NotImportOnly(f'{name} is deleted and still used, but not imported')
+    for name, node in names.items():
+        if name in moved:
+            continue
+        why = f'it deletes {name}, and no module it imports from has it as it was'
+        for module in sources:
+            if parsed(module) is None or name not in parsed(module)[1]:
+                continue
+            try:
+                same(name, node, module, set())
+            except NotImportOnly as e:
+                why = str(e)
+                continue
+            moved[name] = module
+            break
+        else:
+            raise NotImportOnly(why)
+
+    # The imports: one that binds a name anew binds a moved definition, and
+    # one that goes binds a name nothing reads any more.
+    head_imported, base_imported = imported(head), imported(base)
+    for name in sorted(head_imported - set(moved)):
+        bound = lookup(head_binds, name, 'the file')
+        if name not in base_binds:
+            raise NotImportOnly(f'it imports {name}, which is no moved definition')
+        if lookup(base_binds, name, 'BASE') != bound:
+            raise NotImportOnly(f'it imports {name} otherwise than BASE did')
+    for name in sorted(base_imported - head_imported):
+        if name in used:
+            raise NotImportOnly(f'{name} is no longer imported but still used')
+    by_module = {}
+    for name in names:  # in BASE's order
+        by_module.setdefault(moved[name], []).append(name)
+    return by_module
+
+
+def imported(module):
+    """The names a module's top-level imports bind."""
+    return {(a.asname or a.name).split('.')[0]
+            for n in module.body if is_import(n) for a in n.names}
+
+
+def module_text(tree, name):
+    """The working tree's text of module `name`, or None when no file of
+    server/ holds it."""
+    rel = name.replace('.', '/')
+    for path in (f'{rel}.py', f'{rel}/__init__.py'):
+        if tree.exists(path):
+            return tree.text(path)
+    return None
+
+
 # --- output ----------------------------------------------------------------
 
 def collapse(targets):
@@ -1073,8 +1392,25 @@ def report(plan, tree):
     say('')
     if plan.changed_browser_tests:
         say('Repeats under load, on the changed test files only (owner, 2026-11-11; '
-            'a flake ticket keeps 25 on the database it failed on):')
+            'D97: none for an import-only move; a flake ticket keeps 25 on the '
+            'database it failed on):')
+        if not plan.from_git:
+            say('  (--stdin has no BASE to compare with, so no file counts as an '
+                'import-only move, D97: each keeps its count)')
         for r in plan.changed_browser_tests:
+            if plan.from_git:
+                try:
+                    moved = import_only(base_text(plan, r), tree.text(r),
+                                        lambda name: module_text(tree, name))
+                except NotImportOnly as why:
+                    moved = None
+                    not_moved = str(why)
+                if moved:
+                    say(f'  {r}: import-only (D97): none')
+                    for module, names in sorted(moved.items()):
+                        say(f'      moves {", ".join(names)} unchanged to {module}, '
+                            'which it imports; a flake ticket still repeats it 25 times')
+                    continue
             timing = first_hit(tree, r, TIMING)
             measures = first_hit(tree, r, MEASURES)
             count = 25 if timing else 5
@@ -1082,7 +1418,9 @@ def report(plan, tree):
                     else 'deterministic: check that it waits on no poll, timer or '
                     'animation')
             say(f'  {r}: {count} repeats, {kind}')
-            pg = '--postgres ' if plan.postgres else ''
+            if plan.from_git:
+                say(f'      not an import-only move (D97): {not_moved}')
+            pg ='--postgres ' if plan.postgres else ''
             run = f'tools/pytest-under-load.sh {pg}-m browser -n 4 --count {count} {r}'
             say(f'      {run}')
             if measures:

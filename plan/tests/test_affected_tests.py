@@ -752,6 +752,458 @@ class GitDiff(unittest.TestCase):
         self.assertIn('server/transfer/importer.py: database code, as a whole module', out)
 
 
+
+# D97's stand-in: a browser test file that moves BOUND, bound and ready into
+# helpers.py, as #313 moved them out of test_awards.py and test_kiosks.py.
+SHEET = 'server/ui/tests/browser/test_sheet.py'
+HELPERS = 'server/ui/tests/browser/helpers.py'
+MOVED = '''
+# True once htmx has bound it.
+BOUND = "root => true"
+
+
+def bound(page, locator):
+    """Wait until htmx has bound `locator`."""
+    page.wait_for_function(BOUND, arg=locator)
+
+
+def ready(page, body):
+    expect(body).to_be_visible()
+    bound(page, body)
+    return body
+'''
+TEST = '''
+
+def test_sheet(page):
+    expect(ready(page, page.locator("body"))).to_be_visible()
+    page.wait_for_timeout(10)
+    shoot(page, "sheet")
+'''
+BASE_SHEET = ('"""The sheet."""\n\nfrom playwright.sync_api import expect\n\n'
+              'from ui.tests.browser.conftest import shoot\n' + MOVED + TEST)
+MOVED_SHEET = ('"""The sheet."""\n\nfrom playwright.sync_api import expect\n\n'
+               'from ui.tests.browser.conftest import shoot\n'
+               'from ui.tests.browser.helpers import bound, ready\n' + TEST)
+BASE_HELPERS = '"""Shared helpers."""\n\nfrom playwright.sync_api import expect\n'
+MOVED_HELPERS = BASE_HELPERS + MOVED
+LOAD_RUN = 'pytest-under-load.sh -m browser -n 4 --count 25 ui/tests/browser/test_sheet.py'
+
+
+def git_env():
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
+               GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
+               GIT_CONFIG_NOSYSTEM='1')
+    return env
+
+
+def moved(sheet=MOVED_SHEET, helpers=MOVED_HELPERS, base=BASE_SHEET, commit=True,
+          extra=None):
+    """The tool's output for a branch that turns test_sheet.py from `base`
+    (None: no such file at BASE) into `sheet`, and helpers.py into `helpers`,
+    with the files of `extra` as they are at BASE and HEAD; `commit=False`
+    leaves the edits uncommitted."""
+    env = git_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+
+        def git(*argv):
+            subprocess.run(['git', *argv], cwd=root, env=env, check=True,
+                           capture_output=True)
+
+        def write(files):
+            for rel, text in files.items():
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text(text)
+
+        write({**TREE, HELPERS: BASE_HELPERS, **(extra or {})})
+        if base is not None:
+            write({SHEET: base})
+        git('init', '-q', '-b', 'master')
+        git('add', '.')
+        git('commit', '-q', '-m', 'base')
+        write({SHEET: sheet, HELPERS: helpers})
+        if commit:
+            git('add', '.')
+            git('commit', '-q', '-m', 'move')
+        return subprocess.run(
+            [sys.executable, '-I', str(AFFECTED), 'HEAD~1' if commit else 'HEAD'],
+            cwd=root, env=env, capture_output=True, text=True, check=True).stdout
+
+
+def repeats(out):
+    """The "Repeats under load" lines."""
+    return out.split('Repeats under load', 1)[1].split('\n\n', 1)[0]
+
+
+class ImportOnly(unittest.TestCase):
+    """D97: a browser test file whose diff only moves top-level code,
+    unchanged, into a module it imports takes no repeats under load. Each
+    case that keeps them changes the import-only move in one way, so the
+    check it names is what keeps them (#320)."""
+
+    def assert_keeps(self, out, why):
+        self.assertIn('ui/tests/browser/test_sheet.py: 25 repeats, involves timing',
+                      repeats(out))
+        self.assertIn(f'not an import-only move (D97): {why}', repeats(out))
+        self.assertIn(LOAD_RUN, repeats(out))
+
+    def test_a_move_takes_no_repeats(self):
+        out = moved()
+        self.assertIn('  ui/tests/browser/test_sheet.py: import-only (D97): none\n'
+                      '      moves BOUND, bound, ready unchanged to '
+                      'ui.tests.browser.helpers, which it imports; a flake ticket '
+                      'still repeats it 25 times', repeats(out))
+        self.assertNotIn('pytest-under-load.sh', repeats(out))
+        # Only its load run goes: it still runs, and its claims are listed.
+        self.assertIn('-m browser ui/tests/browser', commands(out))
+        self.assertIn('ui/tests/browser/test_sheet.py', before_hand_off(out))
+        self.assertNotIn('--stdin has no BASE', out)
+
+    def test_an_uncommitted_move_takes_no_repeats(self):
+        self.assertIn('test_sheet.py: import-only (D97): none', moved(commit=False))
+
+    def test_a_copy_that_differs_by_one_line_keeps_them(self):
+        helpers = MOVED_HELPERS.replace('    return body\n', '    return body.first\n')
+        self.assert_keeps(moved(helpers=helpers), 'ui.tests.browser.helpers has '
+                          'ready otherwise than the file had it')
+
+    def test_a_copy_with_a_new_docstring_keeps_them(self):
+        """#313's open_section: the copy gained a docstring."""
+        helpers = MOVED_HELPERS.replace('def ready(page, body):\n',
+                                        'def ready(page, body):\n    """Ready."""\n')
+        self.assert_keeps(moved(helpers=helpers), 'ui.tests.browser.helpers has '
+                          'ready otherwise than the file had it')
+
+    def test_a_deletion_with_no_import_keeps_them(self):
+        """A helper nothing reads, deleted with no import: no module the file
+        imports from has it."""
+        spare = '\n\ndef spare(page):\n    return page\n'
+        self.assert_keeps(moved(base=BASE_SHEET + spare, sheet=BASE_SHEET),
+                          'it deletes spare, and no module it imports from has it '
+                          'as it was')
+
+    def test_a_deleted_name_still_used_but_not_imported_keeps_them(self):
+        sheet = MOVED_SHEET.replace('import bound, ready', 'import bound')
+        self.assert_keeps(moved(sheet=sheet),
+                          'ready is deleted and still used, but not imported')
+
+    def test_a_test_added_beside_the_move_keeps_them(self):
+        sheet = MOVED_SHEET + '\n\ndef test_more(page):\n    shoot(page, "more")\n'
+        self.assert_keeps(moved(sheet=sheet), 'line 15 is new or changed')
+
+    def test_a_changed_body_keeps_them(self):
+        sheet = MOVED_SHEET.replace('wait_for_timeout(10)', 'wait_for_timeout(20)')
+        self.assert_keeps(moved(sheet=sheet), 'line 9 is new or changed')
+
+    def test_an_edited_docstring_keeps_them(self):
+        sheet = MOVED_SHEET.replace('"""The sheet."""', '"""The sheet, moved."""')
+        self.assert_keeps(moved(sheet=sheet), 'line 1 is new or changed')
+
+    def test_a_new_comment_keeps_them(self):
+        sheet = MOVED_SHEET.replace('def test_sheet', '# Moved.\ndef test_sheet')
+        self.assert_keeps(moved(sheet=sheet), 'a comment is new or changed: # Moved.')
+
+    def test_a_comment_on_an_import_line_does_not(self):
+        sheet = MOVED_SHEET.replace('import bound, ready', 'import bound, ready  # noqa')
+        self.assertIn('test_sheet.py: import-only (D97): none', moved(sheet=sheet))
+
+    def test_a_syntax_error_keeps_them(self):
+        for files, why in (
+                ({'sheet': MOVED_SHEET + 'def (:\n'}, 'cannot be parsed'),
+                ({'helpers': MOVED_HELPERS + 'def (:\n'},
+                 'ui.tests.browser.helpers cannot be parsed')):
+            with self.subTest(why=why):
+                self.assert_keeps(moved(**files), why)
+
+    def test_a_relative_import_keeps_them(self):
+        """Kept on both sides of a move that is otherwise import-only."""
+        add = 'from .conftest import shoot as snap\n'
+        self.assert_keeps(moved(base=add + BASE_SHEET, sheet=add + MOVED_SHEET),
+                          'BASE line 1: a relative import')
+
+    def test_a_star_import_keeps_them(self):
+        add = 'from ui.tests.browser.conftest import *\n'
+        self.assert_keeps(moved(base=add + BASE_SHEET, sheet=add + MOVED_SHEET),
+                          'BASE line 1: a star import')
+
+    def test_a_name_imported_from_outside_the_tree_keeps_them(self):
+        sheet = MOVED_SHEET.replace('ui.tests.browser.helpers', 'browser_helpers')
+        self.assert_keeps(moved(sheet=sheet), 'bound comes from browser_helpers, '
+                          'which is not in the tree')
+
+    def test_a_module_import_keeps_them(self):
+        """`import x`, with the moved name read as `x.f` or as before."""
+        add = MOVED_SHEET.replace('from ui.tests.browser.helpers import bound, ready',
+                                  'import ui.tests.browser.helpers')
+        for sheet, why in (
+                (add.replace('expect(ready(', 'expect(ui.tests.browser.helpers.ready('),
+                 'line 9 is new or changed'),
+                (add, 'ready is deleted and still used, but not imported')):
+            with self.subTest(why=why):
+                self.assert_keeps(moved(sheet=sheet), why)
+
+    def test_a_name_bound_twice_keeps_them(self):
+        sheet = MOVED_SHEET.replace('import bound, ready',
+                                    'import bound, ready, ready as ready')
+        self.assert_keeps(moved(sheet=sheet), 'the file binds ready more than once')
+
+    def test_moved_code_that_reads_a_name_bound_otherwise_keeps_them(self):
+        """ready's `expect` comes from another module in helpers.py."""
+        helpers = MOVED_HELPERS.replace('from playwright.sync_api import expect',
+                                        'from ui.tests.browser.conftest import expect')
+        self.assert_keeps(moved(helpers=helpers), 'ready reads expect, which '
+                          'ui.tests.browser.helpers binds otherwise than the file did')
+
+    def test_moved_code_that_reads_a_module_dunder_keeps_them(self):
+        """`__file__` names another file in helpers.py."""
+        base = BASE_SHEET.replace('BOUND = "root => true"', 'BOUND = __file__')
+        helpers = MOVED_HELPERS.replace('BOUND = "root => true"', 'BOUND = __file__')
+        self.assert_keeps(moved(base=base, helpers=helpers),
+                          'BOUND reads __file__, which ui.tests.browser.helpers binds '
+                          'otherwise than the file did')
+
+    def test_an_import_that_rebinds_a_name_keeps_them(self):
+        sheet = MOVED_SHEET.replace('from ui.tests.browser.conftest import shoot',
+                                    'from ui.tests.browser.helpers import shoot')
+        self.assert_keeps(moved(sheet=sheet), 'it imports shoot otherwise than BASE did')
+
+    def test_an_import_of_a_new_name_keeps_them(self):
+        sheet = MOVED_SHEET.replace('import shoot', 'import shoot, zoom')
+        self.assert_keeps(moved(sheet=sheet),
+                          'it imports zoom, which is no moved definition')
+
+    def test_an_import_dropped_while_still_used_keeps_them(self):
+        sheet = MOVED_SHEET.replace('from playwright.sync_api import expect\n', '')
+        self.assert_keeps(moved(sheet=sheet), 'expect is no longer imported but still used')
+
+    def test_moving_what_pytest_reads_keeps_them(self):
+        """A test, a hook or the marks, moved out of the file, no longer
+        reach pytest from it."""
+        for name, more in (
+                ('test_more', '\n\ndef test_more(page):\n    shoot(page, "more")\n'),
+                ('TestMore', '\n\nclass TestMore:\n    pass\n'),
+                ('pytest_runtest_setup',
+                 '\n\ndef pytest_runtest_setup(item):\n    return item\n'),
+                ('pytestmark', '\n\npytestmark = []\n'),
+                ('__all__', '\n\n__all__ = []\n')):
+            with self.subTest(name=name):
+                self.assert_keeps(
+                    moved(base=BASE_SHEET + more, helpers=MOVED_HELPERS + more),
+                    f'it deletes {name}, which pytest or Python reads')
+
+    def test_deleting_what_is_no_definition_keeps_them(self):
+        call = '\n\nexpect.set_options(timeout=5000)\n'
+        self.assert_keeps(moved(base=BASE_SHEET + call, helpers=MOVED_HELPERS + call),
+                          'it deletes line 28, which is not a def, a class or a '
+                          'constant')
+
+    def test_a_moved_name_imported_under_another_name_keeps_them(self):
+        """helpers.py has ready as it was, but the file binds ready to spare."""
+        spare = '\n\ndef spare(page, body):\n    return body\n'
+        sheet = MOVED_SHEET.replace('import bound, ready', 'import bound, spare as ready')
+        self.assert_keeps(moved(sheet=sheet, helpers=MOVED_HELPERS + spare),
+                          'ready is imported, but not as `from M import ready`')
+
+    def test_a_deleted_fixture_still_named_keeps_them(self):
+        """A fixture is read by its name, as a parameter or a string."""
+        fixture = '\n\n@pytest.fixture\ndef sheet_page(page):\n    return page\n'
+        base = 'import pytest\n' + BASE_SHEET + fixture
+        helpers = 'import pytest\n' + MOVED_HELPERS + fixture
+        for use in ('def test_sheet(page, sheet_page):',
+                    '@pytest.mark.usefixtures("sheet_page")\ndef test_sheet(page):'):
+            with self.subTest(use=use):
+                self.assert_keeps(
+                    moved(base=base.replace('def test_sheet(page):', use),
+                          sheet='import pytest\n' + MOVED_SHEET.replace(
+                              'def test_sheet(page):', use),
+                          helpers=helpers),
+                    'sheet_page is deleted and still used, but not imported')
+
+    def test_a_moved_fixture_imported_by_name_does_not(self):
+        fixture = '\n\n@pytest.fixture\ndef sheet_page(page):\n    return page\n'
+        use = 'def test_sheet(page, sheet_page):'
+        out = moved(base=('import pytest\n' + BASE_SHEET + fixture).replace(
+                        'def test_sheet(page):', use),
+                    sheet=('import pytest\n' + MOVED_SHEET).replace(
+                        'import bound, ready', 'import bound, ready, sheet_page').replace(
+                        'def test_sheet(page):', use),
+                    helpers='import pytest\n' + MOVED_HELPERS + fixture)
+        self.assertIn('moves BOUND, bound, ready, sheet_page unchanged to '
+                      'ui.tests.browser.helpers', out)
+
+    def test_only_imports_changed_keeps_them(self):
+        """No definition moved, so no move: the imports regrouped only."""
+        sheet = BASE_SHEET.replace('\n\nfrom ui.tests.browser.conftest',
+                                   '\nfrom ui.tests.browser.conftest')
+        self.assert_keeps(moved(sheet=sheet), 'it moves no top-level definition')
+
+    def test_a_file_new_on_the_branch_keeps_them(self):
+        self.assert_keeps(moved(base=None), 'new on the branch')
+
+    def test_a_moved_name_imported_as_a_module_keeps_them(self):
+        sheet = MOVED_SHEET.replace('import bound, ready', 'import bound\nimport ready')
+        self.assert_keeps(moved(sheet=sheet),
+                          'ready is imported, but not as `from M import ready`')
+
+    def test_a_deleted_assignment_of_no_one_name_keeps_them(self):
+        for line in ('SPARE = OTHER = 1', 'SPARE, OTHER = 1, 2', 'SPARE: int',
+                     'expect.x: int = 1'):
+            with self.subTest(line=line):
+                more = f'\n\n{line}\n'
+                self.assert_keeps(
+                    moved(base=BASE_SHEET + more, helpers=MOVED_HELPERS + more),
+                    'it deletes line 28, which is not a def, a class or a constant')
+
+    def test_a_moved_annotated_constant_takes_no_repeats(self):
+        base = BASE_SHEET.replace('BOUND = ', 'BOUND: str = ')
+        helpers = MOVED_HELPERS.replace('BOUND = ', 'BOUND: str = ')
+        self.assertIn('moves BOUND, bound, ready unchanged',
+                      moved(base=base, helpers=helpers))
+
+    def test_moved_code_that_reads_a_name_bound_in_a_block_keeps_them(self):
+        """bound reads LIMIT, which the file binds inside a statement that is
+        no plain def, assignment or import, and helpers.py lacks."""
+        for binder in ('if True:\n    LIMIT = 1\n',
+                       'if True:\n    def LIMIT():\n        pass\n',
+                       'try:\n    import json as LIMIT\nexcept ImportError:\n    pass\n',
+                       'try:\n    pass\nexcept Exception as LIMIT:\n    pass\n',
+                       'match 1:\n    case LIMIT:\n        pass\n',
+                       'match []:\n    case [*LIMIT]:\n        pass\n',
+                       'match {}:\n    case {**LIMIT}:\n        pass\n'):
+            with self.subTest(binder=binder):
+                reads = ('page.wait_for_function(BOUND, arg=locator)',
+                         'page.wait_for_function(BOUND, arg=locator, timeout=LIMIT)')
+                base = BASE_SHEET.replace(*reads).replace(
+                    '\n# True once', f'\n{binder}\n\n# True once')
+                sheet = MOVED_SHEET.replace('\n\ndef test_sheet', f'\n{binder}\n\ndef test_sheet')
+                self.assert_keeps(moved(base=base, sheet=sheet,
+                                        helpers=MOVED_HELPERS.replace(*reads)),
+                                  'BASE binds LIMIT more than once, or not by a plain '
+                                  'def, assignment or import')
+
+    def test_a_name_rebound_through_global_keeps_them(self):
+        """reset() rebinds the file's BOUND, which no longer moves helpers.py's."""
+        reset = '\n\ndef reset():\n    global BOUND\n    BOUND = ""\n'
+        self.assert_keeps(moved(base=BASE_SHEET + reset, sheet=MOVED_SHEET + reset),
+                          'the file binds BOUND more than once')
+
+    def test_a_module_and_its_submodule_imported_take_no_repeats(self):
+        """`import os` and `import os.path` both bind os, alike on both sides."""
+        imports = 'import os\nimport os.path\n'
+        reads = ('    return body\n', '    return body or os.sep\n')
+        out = moved(base=imports + BASE_SHEET.replace(*reads),
+                    sheet=imports + MOVED_SHEET,
+                    helpers=imports + MOVED_HELPERS.replace(*reads))
+        self.assertIn('moves BOUND, bound, ready unchanged', out)
+
+    def test_a_name_bound_by_a_def_and_an_import_keeps_them(self):
+        """helpers.py binds ready's `expect` twice, in either order."""
+        twice = '\n\ndef expect(x):\n    return x\n'
+        for helpers in (MOVED_HELPERS + twice,
+                        MOVED_HELPERS.replace('from playwright.sync_api import expect\n',
+                                              twice + '\n\nfrom playwright.sync_api '
+                                              'import expect\n')):
+            with self.subTest(helpers=helpers[:60]):
+                self.assert_keeps(moved(helpers=helpers), 'ui.tests.browser.helpers '
+                                  'binds expect more than once')
+
+    def test_moved_code_that_reads_a_module_alias_bound_otherwise_keeps_them(self):
+        reads = ('    return body\n', '    return body or c.X\n')
+        base = 'import ui.tests.browser.conftest as c\n' + BASE_SHEET.replace(*reads)
+        sheet = 'import ui.tests.browser.conftest as c\n' + MOVED_SHEET
+        helpers = 'import json as c\n' + MOVED_HELPERS.replace(*reads)
+        self.assert_keeps(moved(base=base, sheet=sheet, helpers=helpers),
+                          'ready reads c, which ui.tests.browser.helpers binds '
+                          'otherwise than the file did')
+
+    def test_moved_code_that_reads_a_name_the_module_lacks_keeps_them(self):
+        """helpers.py imports no `expect`, which ready reads."""
+        helpers = MOVED_HELPERS.replace('from playwright.sync_api import expect\n', '')
+        self.assert_keeps(moved(helpers=helpers), 'ready reads expect, which '
+                          'ui.tests.browser.helpers binds otherwise than the file did')
+
+    def test_moved_code_that_reads_a_builtin_the_module_shadows_keeps_them(self):
+        reads = ('    return body\n', '    return len(body)\n')
+        helpers = MOVED_HELPERS.replace(*reads) + '\n\ndef len(x):\n    return 0\n'
+        self.assert_keeps(moved(base=BASE_SHEET.replace(*reads), helpers=helpers),
+                          'ready reads len, which ui.tests.browser.helpers binds '
+                          'otherwise than the file did')
+
+    def test_moved_code_that_reads_a_name_the_module_defines_itself_keeps_them(self):
+        """ready's `expect`, imported in the file, is a def in helpers.py."""
+        helpers = MOVED_HELPERS.replace('from playwright.sync_api import expect\n',
+                                        'def expect(x):\n    return x\n')
+        self.assert_keeps(moved(helpers=helpers), 'ready reads expect, which '
+                          'ui.tests.browser.helpers binds otherwise than the file did')
+
+    def test_moved_code_that_reads_a_constant_the_module_imports_keeps_them(self):
+        helpers = MOVED_HELPERS.replace('BOUND = "root => true"',
+                                        'from ui.tests.browser.conftest import BOUND')
+        self.assert_keeps(moved(helpers=helpers), 'bound reads BOUND, which '
+                          'ui.tests.browser.helpers binds otherwise than the file did')
+
+    def test_a_copy_the_module_imports_from_elsewhere_keeps_them(self):
+        """helpers.py's ready is conftest's, not the file's def."""
+        helpers = MOVED_HELPERS.split('\n\ndef ready', 1)[0] + (
+            '\nfrom ui.tests.browser.conftest import ready\n')
+        self.assert_keeps(moved(helpers=helpers), 'ui.tests.browser.helpers has '
+                          'ready otherwise than the file had it')
+
+    def test_moved_code_that_calls_itself_in_a_cycle_takes_no_repeats(self):
+        cycle = ('\n\ndef ping(n):\n    return pong(n - 1)\n'
+                 '\n\ndef pong(n):\n    return n and ping(n)\n')
+        sheet = MOVED_SHEET.replace('import bound, ready', 'import bound, ping, ready')
+        out = moved(base=BASE_SHEET.replace(TEST, cycle + TEST), sheet=sheet,
+                    helpers=MOVED_HELPERS + cycle)
+        self.assertIn('moves BOUND, bound, ready, ping, pong unchanged', out)
+
+    def test_a_dropped_import_nothing_reads_takes_no_repeats(self):
+        """As ruff asks after a move: the file reads `re` no more."""
+        base = 'import re\n' + BASE_SHEET
+        self.assertIn('test_sheet.py: import-only (D97): none', moved(base=base))
+
+    def test_a_module_imported_whole_is_not_imported_from(self):
+        """`import M as m` is no `from M import`, so a deleted helper nothing
+        reads, which M has, is no move."""
+        spare = '\n\ndef spare(page):\n    return page\n'
+        sheet = 'import ui.tests.browser.helpers as helpers\n' + BASE_SHEET
+        self.assert_keeps(moved(base=BASE_SHEET + spare, sheet=sheet,
+                                helpers=MOVED_HELPERS + spare),
+                          'it deletes spare, and no module it imports from has it '
+                          'as it was')
+
+    def test_a_kept_line_reformatted_takes_no_repeats(self):
+        """Compared by AST: ruff's quotes or line breaks change no code."""
+        sheet = MOVED_SHEET.replace('shoot(page, "sheet")', "shoot(\n        page, 'sheet'\n    )")
+        self.assertIn('test_sheet.py: import-only (D97): none', moved(sheet=sheet))
+
+    def test_deleting_one_of_two_defs_of_a_name_keeps_them(self):
+        """The file still defines ready, so nothing moved it."""
+        stub = '\n\ndef ready(page, body):\n    return body\n'
+        base = BASE_SHEET.replace('\n\ndef test_sheet', stub + '\n\ndef test_sheet')
+        sheet = MOVED_SHEET.replace('import bound, ready', 'import bound').replace(
+            '\n\ndef test_sheet', stub + '\n\ndef test_sheet')
+        self.assert_keeps(moved(base=base, sheet=sheet), 'the file still defines ready')
+
+    def test_it_names_the_module_the_file_imports_from(self):
+        """conftest.py has the same copy, and sorts first; the file imports
+        bound and ready from helpers.py."""
+        conftest = 'server/ui/tests/browser/conftest.py'
+        out = moved(helpers=MOVED_HELPERS, extra={conftest: MOVED_HELPERS})
+        self.assertIn('moves bound, ready unchanged to ui.tests.browser.helpers', out)
+        self.assertIn('moves BOUND unchanged to ui.tests.browser.conftest', out)
+
+    def test_stdin_keeps_them(self):
+        """--stdin has no BASE to read the file at."""
+        tree = {**TREE, SHEET: MOVED_SHEET, HELPERS: MOVED_HELPERS}
+        out = run(SHEET, HELPERS, tree=tree)
+        self.assertIn('--stdin has no BASE to compare with, so no file counts as an '
+                      'import-only move, D97: each keeps its count', repeats(out))
+        self.assertIn(LOAD_RUN, repeats(out))
+        self.assertNotIn('import-only (D97): none', out)
+
+
 class RealTree(unittest.TestCase):
     """Every page file of the real tree reaches a test by a rule, not the
     fallback: a new page, template or script name that no test file is named
