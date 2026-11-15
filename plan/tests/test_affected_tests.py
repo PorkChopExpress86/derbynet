@@ -255,6 +255,15 @@ class Website(unittest.TestCase):
 
 
 class PlanTools(unittest.TestCase):
+    def test_a_plan_tool_runs_the_server_tests_that_name_it(self):
+        tree = {**TREE, 'plan/bin/tool': '',
+                'server/tests/test_tool_sweep.py': 'TOOL = "plan/bin/tool"\n'}
+        out = run('plan/bin/tool', tree=tree)
+        self.assertIn('tests/test_tool_sweep.py', section(out, 'plan/bin/tool'))
+        self.assertIn('uv run pytest -n auto tests/test_tool_sweep.py', commands(out))
+        out = run('plan/bin/other', tree={**tree, 'plan/bin/other': ''})
+        self.assertNotIn('test_tool_sweep', out)
+
     def test_a_plan_tool_runs_plan_tests_through_the_source_checks(self):
         """tools/source-checks.sh runs plan/tests, so a line of their own ran
         them twice at each hand-off (#338)."""
@@ -681,12 +690,14 @@ class BeforeTheHandOff(unittest.TestCase):
         mutants by hand (#320 retro). Paths are from server/."""
         tree = {**TREE, 'plan/bin/tool': '#!/usr/bin/env python3\nif a:\n    pass\n',
                 'plan/tests/test_tool.py': '"""2 runs."""\n',
-                'plan/bin/hook': '#! /bin/bash\n', 'plan/bin/tool.sh': '#!python\n'}
+                'plan/bin/hook': '#! /bin/bash\n', 'plan/bin/tool.sh': '#!python\n',
+                'plan/bin/notes': 'python, with no shebang\n'}
         out = run('plan/bin/tool', 'plan/tests/test_tool.py', tree=tree)
         self.assertIn('  uv run python tools/docstring_claims.py ../plan/tests/test_tool.py\n',
                       before_hand_off(out))
         self.assertIn('  uv run python tools/operand_mutants.py\n', before_hand_off(out))
-        out = run('plan/bin/hook', 'plan/bin/tool.sh', 'plan/bin/gone', 'plan/README.md',
+        out = run('plan/bin/hook', 'plan/bin/tool.sh', 'plan/bin/notes', 'plan/bin/gone',
+                  'plan/README.md',
                   'plan/tests/gone.py', tree=tree)
         self.assertNotIn('Before the first hand-off run', out)
 
@@ -1634,11 +1645,203 @@ def test_waits_again(page):
                 self.assert_whole('a docstring changes, and the file reads `__doc__`',
                                   head, base=base)
 
+    def test_a_new_test_method(self):
+        head = D101_BASE + '\n    def test_three(self, page):\n        pass\n'
+        self.assertEqual(d101(head), [('TestBoard::test_three', 'new')])
+
+    def test_a_test_that_reads_its_class_is_not_picked_for_it(self):
+        """TestBoard is a seed once test_two changes; test_one reads the name
+        TestBoard and changes nothing."""
+        base = edit('assert self.n\n', 'assert isinstance(self, TestBoard)\n')
+        head = edit('        start(page)\n', '        start(page)\n        page.reload()\n', base)
+        self.assertEqual(d101(head, base=base), [('TestBoard::test_two', 'changed')])
+
+    def test_a_test_that_calls_a_test_that_reads_a_changed_helper(self):
+        """#336 review, L1: test_more reads test_waits, which reads wait()."""
+        base = edit('''def test_waits(page):
+    page.wait_for_timeout(10)
+''', '''def wait(page):
+    page.wait_for_timeout(10)
+
+
+def test_waits(page):
+    wait(page)
+''') + '\n\ndef test_more(page):\n    test_waits(page)\n'
+        head = edit('wait_for_timeout(10)', 'wait_for_timeout(20)', base)
+        self.assertEqual(d101(head, base=base), [('test_waits', 'reads wait'),
+                                                 ('test_more', 'reads test_waits')])
+
+    def test_a_method_that_calls_a_changed_method_through_self(self):
+        """#336 review, L2: test_two reads self.test_one, and test_three reads
+        test_two through the class's name."""
+        base = edit('        start(page)\n', '        self.test_one(page)\n')
+        base += '\n    def test_three(self, page):\n        TestBoard.test_two(self, page)\n'
+        head = edit('assert self.n\n', 'assert self.n == 1\n', base)
+        self.assertEqual(d101(head, base=base), [
+            ('TestBoard::test_one', 'changed'),
+            ('TestBoard::test_two', 'reads test_one of TestBoard'),
+            ('TestBoard::test_three', 'reads test_two of TestBoard')])
+
+    def test_a_method_that_calls_a_deleted_method_through_self(self):
+        base = edit('        start(page)\n', '        self.test_one(page)\n')
+        head = edit('''    def test_one(self, page):
+        assert self.n
+
+''', '', base)
+        head = edit('wait_for_timeout(10)', 'wait_for_timeout(20)', head)
+        self.assertEqual(d101(head, base=base), [
+            ('test_waits', 'changed'), ('TestBoard::test_two', 'reads test_one of TestBoard')])
+
+    def test_a_class_helper_method_that_calls_a_changed_test(self):
+        base = edit('        self.n = 1\n', '        self.n = 1\n\n    def again(self, page):\n'
+                    '        self.test_one(page)\n')
+        head = edit('assert self.n\n', 'assert self.n == 1\n', base)
+        self.assert_whole('the class TestBoard reads test_one outside its test methods',
+                          head, base=base)
+
+    def test_a_deleted_test_another_reads(self):
+        base = D101_BASE + '\n\ndef test_more(page):\n    test_waits(page)\n'
+        head = edit('''def test_waits(page):
+    page.wait_for_timeout(10)
+    expect(page.locator("body")).to_be_visible()
+
+
+''', '', base)
+        self.assertEqual(d101(head, base=base), [('test_more', 'reads test_waits')])
+
+    def test_a_deleted_test_class_a_test_reads(self):
+        base = D101_BASE + '\n\nclass TestOld:\n    def test_a(self):\n        pass\n'
+        base = edit('    assert n\n', '    assert n and TestOld\n', base)
+        head = base.split('\n\nclass TestOld:')[0] + '\n'
+        self.assertEqual(d101(head, base=base), [('test_counts', 'reads TestOld')])
+
+    def test_a_deleted_method_of_a_subclassed_test_class(self):
+        base = D101_BASE + '\n\nclass TestMore(TestBoard):\n    pass\n'
+        head = edit('''    def test_one(self, page):
+        assert self.n
+
+''', '', base)
+        head = edit('wait_for_timeout(10)', 'wait_for_timeout(20)', head)
+        self.assert_whole('the class TestMore reads TestBoard', head, base=base)
+
+    def test_a_changed_helper_only_a_constant_reads(self):
+        base = edit('LANES = 4', 'LANES = 4\nSTEPS = [lambda: shout()]')
+        base += '\n\ndef shout():\n    return 1\n'
+        head = edit('    return 1\n', '    return 2\n', base)
+        self.assert_whole('the module-level STEPS reads shout', head, base=base)
+
+    def test_a_changed_helper_only_it_reads(self):
+        base = D101_BASE + '\n\ndef spare(n):\n    return spare(n - 1) if n else 0\n'
+        head = edit('else 0\n', 'else 1\n', base)
+        self.assert_whole('it adds or changes the helper spare, which nothing in the file '
+                          'reads', head, base=base)
+
+    def test_a_file_that_reads_doc_with_no_docstring_change(self):
+        base = edit('    assert n\n', '    assert n and __doc__\n')
+        head = edit('wait_for_timeout(10)', 'wait_for_timeout(20)', base)
+        self.assertEqual(d101(head, base=base), [('test_waits', 'changed')])
+
+    def test_a_docstring_change_where_only_head_reads_doc(self):
+        head = edit('    assert n\n', '    assert n and __doc__\n')
+        head = edit('"""The sheet."""', '"""Changed."""', head)
+        self.assert_whole('a docstring changes, and the file reads `__doc__`', head)
+
+    def test_a_class_docstring_read_by_getattr(self):
+        base = edit('    assert n\n', '    assert n and getattr(TestBoard, "__doc__")\n')
+        head = edit('"""The board."""', '"""Changed."""', base)
+        head = edit('wait_for_timeout(10)', 'wait_for_timeout(20)', head)
+        self.assert_whole('a docstring changes, and the file reads `__doc__`', head,
+                          base=base)
+
+    def test_the_d97_check_drops_docstrings_and_deleted_tests(self):
+        """Beside race()'s move: the module's docstring changes and a test is
+        deleted, which D97 alone would refuse."""
+        head = edit('''LANES = 4
+
+
+@pytest''', '''from ui.tests.browser.helpers import race
+
+
+@pytest''')
+        head = edit('''def race(page):
+    for lane in range(1, LANES + 1):
+        page.get_by_role("button", name=f"Stop lane {lane}").click()
+
+
+''', '', head)
+        head = edit('wait_for_timeout(10)', 'wait_for_timeout(20)', head)
+        head = edit('"""The sheet."""', '"""Changed."""', head)
+        head = edit('''@pytest.mark.parametrize("n", [1, 2])
+def test_counts(page, n):
+    assert n
+
+
+''', '', head)
+        self.assertEqual(d101(head), [('test_waits', 'changed')])
+
+    def test_each_xunit_name_is_a_hook(self):
+        """Each name pytest calls by its presence (XUNIT, swept from pytest
+        by server/tests/test_xunit_names.py) falls back, at module level and
+        in a test class, as a hook (#336 review, M1)."""
+        self.assertIn('setUpModule', TOOL.XUNIT)
+        for name in TOOL.XUNIT:
+            with self.subTest(name):
+                base = D101_BASE + f'\n\ndef {name}():\n    pass\n'
+                head = D101_BASE + f'\n\ndef {name}():\n    print()\n'
+                self.assert_whole(f'the hook {name} is new or changed', head, base=base)
+                base = edit('    def setup_method(self):\n',
+                            f'    def {name}(self):\n        pass\n\n'
+                            '    def setup_method(self):\n')
+                head = edit('        pass\n\n    def setup_method', '        print()\n\n'
+                            '    def setup_method', base)
+                self.assert_whole('the class TestBoard changes outside its test methods: '
+                                  f'the hook {name}', head, base=base)
+
+    def test_a_helper_named_like_no_xunit_name_is_a_helper(self):
+        base = edit('def start(page):', 'def setup_board(page):')
+        base = base.replace('    start(page)\n', '    setup_board(page)\n')
+        head = edit('name="Start").click()', 'name="Go").click()', base)
+        self.assertEqual(d101(head, base=base), [('test_races', 'reads setup_board'),
+                                                 ('TestBoard::test_two', 'reads setup_board')])
+
+    def test_a_changed_helper_class(self):
+        base = D101_BASE + '\n\nclass Board:\n    def test_a(self):\n        pass\n'
+        head = edit('        pass\n', '        print()\n', base)
+        self.assert_whole('the class Board is new or changed', head, base=base)
+
+    def test_a_test_class_with_an_init_is_no_test_class(self):
+        """pytest collects no class with an `__init__`."""
+        base = D101_BASE + ('\n\nclass TestHelper:\n    def __init__(self):\n        pass\n\n'
+                            '    def test_a(self):\n        pass\n')
+        head = edit('    def test_a(self):\n        pass\n',
+                    '    def test_a(self):\n        print()\n', base)
+        self.assert_whole('the class TestHelper is new or changed', head, base=base)
+
+    def test_a_non_string_first_statement_is_no_docstring(self):
+        base = 'b"x"\n' + D101_BASE
+        head = edit('wait_for_timeout(10)', 'wait_for_timeout(20)', 'b"y"\n' + D101_BASE)
+        self.assert_whole('the module-level code on line 1 is new or changed', head,
+                          base=base)
+
+    def test_a_relative_import(self):
+        head = edit('import pytest\n', 'import pytest\nfrom . import conftest\n')
+        self.assert_whole('the file line 4: a relative import', head)
+
+    def test_a_test_method_defined_twice(self):
+        head = edit('    def test_two(self, page):\n',
+                    '    def test_two(self, page):\n        pass\n\n'
+                    '    def test_two(self, page):\n')
+        self.assert_whole('the file defines TestBoard.test_two twice', head)
+
     # Each case below falls back to the whole file.
 
     def test_a_changed_fixture(self):
         self.assert_whole('the fixture board is new or changed',
                           edit('locator("#board")', 'locator("#sheet")'))
+        base = edit('import pytest\n', 'import pytest\nfrom pytest import fixture\n')
+        base = edit('@pytest.fixture\n', '@fixture\n', base)
+        self.assert_whole('the fixture board is new or changed',
+                          edit('locator("#board")', 'locator("#sheet")', base), base=base)
 
     def test_a_changed_constant(self):
         self.assert_whole('the module-level LANES is new or changed',
@@ -1646,7 +1849,7 @@ def test_waits_again(page):
 
     def test_a_changed_pytestmark(self):
         head = edit('LANES = 4', 'LANES = 4\npytestmark = pytest.mark.browser')
-        self.assert_whole('pytestmark is new or changed', head)
+        self.assert_whole('the module-level pytestmark is new or changed', head)
 
     def test_an_import_added_for_a_new_test(self):
         head = edit('import pytest\n', 'import pytest\nimport re\n')
@@ -1687,16 +1890,26 @@ def test_waits_again(page):
                           'file reads', head)
 
     def test_a_test_decorated_otherwise(self):
-        base = edit('@pytest.mark.parametrize("n", [1, 2])\n',
-                    '@pytest.mark.parametrize("n", [1, 2])\n@slow\n')
-        head = edit('assert n\n', 'assert n > 0\n', base)
-        self.assert_whole('the decorated def test_counts is new or changed', head, base=base)
+        """Only `pytest.mark.X` and its calls are a test's marks."""
+        for decorator in ('slow', 'unittest.mock.patch("os.sep", "/")', 'other.mark.slow',
+                          'a.pytest.mark.slow', 'pytest.fixture', 'pytest.mark',
+                          'pytest.helpers.slow'):
+            with self.subTest(decorator):
+                base = edit('@pytest.mark.parametrize("n", [1, 2])\n',
+                            f'@pytest.mark.parametrize("n", [1, 2])\n@{decorator}\n')
+                head = edit('assert n\n', 'assert n > 0\n', base)
+                self.assert_whole('test_counts is new or changed', head, base=base)
 
     def test_a_name_bound_twice(self):
         head = D101_BASE + '\n\ndef test_waits(page):\n    pass\n'
         self.assert_whole('the file binds test_waits more than once', head)
 
     def test_a_global(self):
+        """`nonlocal` binds no module name, so only `global` falls back."""
+        nonlocal_ = D101_BASE + ('\n\ndef outer():\n    x = 1\n\n    def inner():\n'
+                                 '        nonlocal x\n\n    return inner\n\n\n'
+                                 'def test_more():\n    outer()\n')
+        self.assertEqual(d101(nonlocal_), [('test_more', 'new')])
         head = edit('    assert n\n', '    global LANES\n    assert n\n')
         self.assert_whole("the file line 36: `global` lets a def rebind a module name",
                           head)
@@ -1842,7 +2055,7 @@ class BindingSweep(unittest.TestCase):
     def test_each_binding_form_is_seen_or_refused(self):
         """Each name a form binds when Python runs it is a key of bindings(),
         or no_walrus() refuses the module; a miss would let a moved name's
-        twin pass as the same object (D97), or a test or helper bound twice
+        twin pass as the same object (D97), or a test or helper bound again
         pass as one (D101)."""
         for label, source in BINDING_FORMS.items():
             with self.subTest(label):

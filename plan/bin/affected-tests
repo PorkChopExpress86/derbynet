@@ -23,14 +23,17 @@ targets, then:
   the whole file, of the tests its diff adds or changes, by node id (D101,
   amending D85 beside D97). Compared by AST at BASE and HEAD, a top-level
   test or a test class's test method repeats when it is new or changed, or
-  when it reads, directly or through another helper of the file, a helper
-  (an undecorated def that is no test and nothing pytest reads by its name)
-  the diff adds, changes or deletes; a new test class repeats whole. The
-  whole file repeats when anything else changes: a fixture, a hook
-  (setup_function and the like too), pytestmark, an import or other
+  when it reads, directly or through another helper or test of the file, a
+  helper (an undecorated def that is no test and nothing pytest reads by
+  its name) or a test the diff adds, changes or deletes; a test method also
+  when it reads such a method of its class through `self`, `cls` or the
+  class's name. A new test class repeats whole. The whole file repeats
+  when anything else changes: a fixture, a hook (an xunit setup or
+  teardown pytest calls by name too, `XUNIT`), pytestmark, an import or other
   module-level code that is no part of a D97 move, a test class outside its
   test methods; when a changed helper is read by nothing in the file, or by
-  such code; when a name is bound twice, by `global` or by an assignment
+  such code, or a changed test method is read by its class outside its test
+  methods; when a name is bound twice, by `global` or by an assignment
   expression (:=) outside a function; when a docstring changes and the file
   reads `__doc__`; when the diff changes no test or helper by AST; and for
   a file new on the branch, one that can't be parsed, or `--stdin`. The
@@ -547,7 +550,7 @@ def match_plan_tools(path):
 
 
 def python_script(tree, path):
-    """A `.py` file under plan/, or a plan/bin script whose shebang names
+    """A `.py` file, or a script with no extension whose shebang names
     Python, as tools/operand_mutants.py reads them."""
     if path.endswith('.py'):
         return (tree.root / path).is_file()
@@ -564,7 +567,7 @@ def python_script(tree, path):
 def cover_plan_tools(plan, tree, path):
     # #320's diff was a plan/bin tool and its test, and neither line of the
     # "before the first hand-off run" step was printed (#320 retro).
-    if path.startswith('plan/') and python_script(tree, path):
+    if python_script(tree, path):
         rel = f'../{path}'
         if Path(path).name.startswith('test_'):
             plan.changed_tests.append(rel)
@@ -574,6 +577,11 @@ def cover_plan_tools(plan, tree, path):
     # of their own ran them twice (#338).
     plan.add(path, 'plan-tools', 'plan/tests, which test the plan tools and the '
              'pre-push hook: tools/source-checks.sh runs them')
+    # A server test that runs a plan tool where plan/tests can't, such as
+    # pytest itself for affected-tests' XUNIT (#336 review, M1).
+    named = tree.mentions([path])
+    if named:
+        plan.add(path, 'plan-tools', 'the server tests that name it', named)
 
 
 def match_timer_build(path):
@@ -1483,11 +1491,16 @@ class WholeFile(Exception):
 
 
 FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
+# The xunit-style setups and teardowns pytest 9.2 calls by name, at module
+# and class level (`_pytest/python.py`, `_get_first_non_fixture_func`):
+# server/tests/test_xunit_names.py sweeps them from a pytest run (#336
+# review, M1).
+XUNIT = ('setUpModule', 'setup_module', 'tearDownModule', 'teardown_module',
+         'setup_function', 'teardown_function', 'setup_class', 'teardown_class',
+         'setup_method', 'teardown_method')
 # What pytest or Python reads from a module or a class by its presence: a
-# hook, setup_function and the other xunit-style setups and teardowns (#336),
-# pytestmark, a dunder.
-PYTEST_READS = re.compile(r'__\w+__|pytestmark|pytest_\w+|(setup|teardown)'
-                          r'(_function|_module|_method|_class)?')
+# hook, an xunit setup or teardown (#336), pytestmark, a dunder.
+PYTEST_READS = re.compile(r'__\w+__|pytestmark|pytest_\w+|' + '|'.join(XUNIT))
 
 
 def marks_only(node):
@@ -1517,10 +1530,10 @@ def is_test(node):
 
 
 def is_helper(node):
-    """A module-level def that is no test, no fixture or other decorated def,
-    and nothing pytest reads by its name."""
-    return isinstance(node, FUNCTIONS) and not node.name.startswith('test') \
-        and not node.decorator_list and not PYTEST_READS.fullmatch(node.name)
+    """A module-level def that is no fixture or other decorated def, and
+    nothing pytest reads by its name. Side reads a test first."""
+    return isinstance(node, FUNCTIONS) and not node.decorator_list \
+        and not PYTEST_READS.fullmatch(node.name)
 
 
 def is_test_class(node):
@@ -1547,8 +1560,6 @@ def what(node):
     if is_import(node):
         return f'the import on line {node.lineno}'
     name = defined_name(node)
-    if name == 'pytestmark':
-        return 'pytestmark'
     if name:
         return f'the module-level {name}'
     return f'the module-level code on line {node.lineno}'
@@ -1611,6 +1622,13 @@ class TestClass:
                                   decorator_list=node.decorator_list,
                                   type_params=node.type_params)
         self.rest = rest
+
+
+def attributes(node, owners):
+    """The attributes `node` reads off a name in `owners`, such as
+    `self.test_b` (#336 review, L2: mentions() reads no attribute)."""
+    return {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)
+            and isinstance(n.value, ast.Name) and n.value.id in owners}
 
 
 def reads_doc(module):
@@ -1678,15 +1696,15 @@ def changed_tests(base_text, head_text, module_text):
         except NotImportOnly as e:
             raise WholeFile(str(e)) from None
         for n in ast.walk(tree):
-            if isinstance(n, (ast.Global, ast.Nonlocal)):
-                raise WholeFile(f'{where} line {n.lineno}: `{type(n).__name__.lower()}` '
-                                'lets a def rebind a module name')
+            if isinstance(n, ast.Global):
+                raise WholeFile(f'{where} line {n.lineno}: `global` lets a def rebind '
+                                'a module name')
     base, head = Side(trees[0], 'BASE'), Side(trees[1], 'the file')
 
     docs = [(base.doc, head.doc)] + [(c.doc, head.classes[name].doc)
                                      for name, c in base.classes.items()
                                      if name in head.classes]
-    if any(a != b for a, b in docs) and (reads_doc(trees[0]) or reads_doc(trees[1])):
+    if any(a != b for a, b in docs) and reads_doc(trees[1]):
         raise WholeFile('a docstring changes, and the file reads `__doc__`')
 
     moved = set()
@@ -1737,10 +1755,12 @@ def changed_tests(base_text, head_text, module_text):
             seeds.add(name)
     seeds |= {name for name in base.classes if name not in head.classes}
 
-    # The helpers that read a seed, directly or through another helper.
+    # The helpers and tests that read a seed, directly or through another
+    # (#336 review, L1: a test that calls a test).
     reached = set(seeds)
-    for _ in range(len(head.helpers) + 1):
-        more = {name for name, node in head.helpers.items()
+    readers = {**head.helpers, **head.tests}
+    for _ in range(len(readers) + 1):
+        more = {name for name, node in readers.items()
                 if name not in reached and mentions(node) & reached}
         if not more:
             break
@@ -1750,11 +1770,36 @@ def changed_tests(base_text, head_text, module_text):
         if hit:
             raise WholeFile(f'{what(node)} reads {hit[0]}, which the diff adds, '
                             'changes or deletes, or which reads one')
+    # Within a test class, the test methods that read a changed one through
+    # `self`, `cls` or the class's name, directly or through another.
+    in_class = {}
+    for name, c in head.classes.items():
+        old = base.classes.get(name)
+        if old is None:
+            continue
+        owners = {'self', 'cls', name}
+        hit = {m for m in [*c.tests, *old.tests] if f'{name}::{m}' in ids
+               or m not in c.tests}
+        for _ in range(len(c.tests) + 1):
+            more = {m for m, node in c.tests.items()
+                    if m not in hit and attributes(node, owners) & hit}
+            if not more:
+                break
+            hit |= more
+        used = sorted(attributes(c.frame, owners) & hit)
+        if used:
+            raise WholeFile(f'the class {name} reads {used[0]} outside its test methods, '
+                            'which the diff adds, changes or deletes, or which reads one')
+        in_class[name] = (owners, hit)
 
     out = []
 
-    def pick(key, node, skip):
+    def pick(key, node, skip, method=None):
         hit = sorted(mentions(node) & (reached - {skip}))
+        if method is not None:
+            owners, changed = in_class[skip]
+            hit += sorted(f'{a} of {skip}' for a in attributes(node, owners)
+                          & (changed - {method}))
         if key in ids or hit:
             out.append((key, ids.get(key) or f'reads {", ".join(hit)}'))
 
@@ -1767,7 +1812,7 @@ def changed_tests(base_text, head_text, module_text):
                 out.append((name, 'new'))
                 continue
             for method, test in head.classes[name].tests.items():
-                pick(f'{name}::{method}', test, name)
+                pick(f'{name}::{method}', test, name, method)
     if not out:
         raise WholeFile('by AST it adds or changes no test, and no helper a test '
                         'reads: a comment, a docstring or a deletion')
