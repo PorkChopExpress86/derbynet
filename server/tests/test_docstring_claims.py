@@ -92,3 +92,5 @@ def test_a_claim_counts_only_on_a_line_that_names_its_test(tmp_path, capsys):
         "test_sample.py: 1920x1080\n</details>\n"
     )
     assert dc.main(["--check", str(body), str(path)]) == 0
+    body.write_text(body.read_text().replace("test_sample.py:", "| `module` |"))
+    assert dc.main(["--check", str(body), str(path)]) == 0

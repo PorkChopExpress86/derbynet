@@ -1490,14 +1490,19 @@ class RealTree(unittest.TestCase):
         fixture = 'tests/test_role_pages_fixture.py'
         views = [f'server/{v}' for v in TOOL.role_page_views(TOOL.Tree(REPO))]
         self.assertIn('server/ui/timer/views.py', views)
+        self.assertEqual(sorted(set(views)), sorted(views))
+        self.assertEqual([v for v in views if not (REPO / v).is_file()], [])
         files = ['testing/fixtures/role-pages.json', 'testing/fixtures/role-pages-django.json',
                  'server/accounts/defaults.py', 'server/accounts/permissions.py',
                  'server/ui/redirects.py', 'server/ui/navigation.py',
                  'server/derbynet/urls.py', 'server/ui/urls.py', *views]
-        out = run(*files, root=REPO)
+        out = run(*files, 'server/awards/editing.py', root=REPO)
         for path in files:
             with self.subTest(path=path):
                 self.assertIn(fixture, section(out, path))
+        self.assertIn('[role-gates] a URL conf', section(out, 'server/ui/urls.py'))
+        self.assertIn('OTHER_PAGES', section(out, 'server/ui/timer/views.py'))
+        self.assertNotIn('[role-gates]', section(out, 'server/awards/editing.py'))
 
     def test_every_command_and_server_tool_maps(self):
         server = REPO / 'server'

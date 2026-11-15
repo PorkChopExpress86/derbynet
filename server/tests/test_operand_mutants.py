@@ -97,3 +97,5 @@ def test_a_python_script_with_no_extension_is_read_as_python(tmp_path):
         ("plan/bin/hook", "x", "true"),
         ("plan/bin/hook", "x", "false"),
     ]
+    # With no tree to read, a file with no extension is no Python.
+    assert [m.new for m in om.mutants(diff)][:2] == ["true", "false"]

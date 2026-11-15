@@ -2,8 +2,9 @@
 
 #324's first hand-off logs held pytest's output alone, and the head lived in
 a summary file another agent's run shared, so nothing tied them to the
-worktree and commit, and the lead asked for the set again (#324 retro). pytest's own header prints `rootdir`, which names the worktree but
-not the commit."""
+worktree and commit, and the lead asked for the set again (#324 retro).
+pytest's own header prints `rootdir`, which names the worktree but not the
+commit."""
 
 import os
 import subprocess
