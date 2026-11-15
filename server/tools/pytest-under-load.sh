@@ -50,6 +50,12 @@ while [ "${pid:-0}" -gt 1 ]; do
   [ "$(ps -o comm= -p "$pid" || true)" = timeout ] && refuse "it runs under timeout"
   pid=$(ps -o ppid= -p "$pid" | tr -d ' ') || pid=1
 done
+# The lock needs util-linux's flock(1), which macOS lacks (#354 review).
+if ! command -v flock >/dev/null; then
+  echo "pytest-under-load.sh: it needs flock(1), for the lock that keeps one" \
+       "load run at a time: install util-linux, or on macOS \`brew install flock\`." >&2
+  exit 2
+fi
 
 SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER=(uv run pytest)
@@ -66,12 +72,17 @@ done
 OUT="${DERBYNET_LOAD_RUN_DIR:-$SERVER_DIR/var/load-runs/$(date +%Y%m%d-%H%M%S)-$$}"
 # A folder that already holds files is refused: #220 reused one, and a wait
 # for its junit.xml fired at once on an earlier session's results (#220
-# retro).  Wait on this script's own last line, "pytest exited N".
-if [ -d "$OUT" ] && [ -n "$(ls -A "$OUT")" ]; then
-  echo "pytest-under-load.sh: $OUT already holds files. Name a folder that" \
-       "does not exist yet, or leave DERBYNET_LOAD_RUN_DIR unset." >&2
-  exit 2
-fi
+# retro).  Wait on this script's own last line, "pytest exited N".  It is
+# checked again once the lock is taken, since two runs waiting on one new
+# folder both passed the first check (#354 review).
+refuse_used_folder() {
+  if [ -d "$OUT" ] && [ -n "$(ls -A "$OUT")" ]; then
+    echo "pytest-under-load.sh: $OUT already holds files. Name a folder that" \
+         "does not exist yet, or leave DERBYNET_LOAD_RUN_DIR unset." >&2
+    exit 2
+  fi
+}
+refuse_used_folder
 
 LOCK="${DERBYNET_LOAD_LOCK:-}"
 if [ -z "$LOCK" ]; then
@@ -82,22 +93,27 @@ if [ -z "$LOCK" ]; then
   fi
   LOCK="${XDG_CACHE_HOME:-$HOME/.cache}/derbynet/load-run.lock"
 fi
-mkdir -p "$(dirname "$LOCK")"
 # Appending, so a run that waits leaves the holder's lines in place.
-exec 9>>"$LOCK"
+if ! { mkdir -p "$(dirname "$LOCK")" && exec 9>>"$LOCK"; } 2>/dev/null; then
+  echo "pytest-under-load.sh: it cannot open the load lock $LOCK; name a" \
+       "writable file in DERBYNET_LOAD_LOCK." >&2
+  exit 2
+fi
+# The commit is read before the lock, so a slow git never leaves a waiter
+# reading half the holder's lines (#354 review).
+HEAD_SHA="$(git -C "$SERVER_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
 if ! flock -n -x 9; then
   echo "Waiting for the load lock $LOCK, held by:"
-  sed 's/^/  /' "$LOCK"
+  # Empty from the holder's truncation until its one write lands.
+  { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
   flock -x 9
   echo "Got the load lock after $(( $(date +%s) - since )) s"
 fi
-{
-  echo "pid $$, since $(date '+%Y-%m-%d %H:%M:%S')"
-  echo "cwd $PWD"
-  echo "head $(git -C "$SERVER_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
-  echo "args $ALL_ARGS"
-} >"$LOCK"
+refuse_used_folder
+# One write of the whole text.
+printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s\n' \
+  "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS" >"$LOCK"
 
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"

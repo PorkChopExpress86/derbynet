@@ -8,6 +8,7 @@ commit."""
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -182,3 +183,61 @@ def test_the_probe_keeps_no_lock(request, tmp_path, monkeypatch):
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # the next load run's
     finally:
         os.close(fd)
+
+
+SERVER = Path(__file__).resolve().parents[1]
+NODE = "tests/test_report_header.py::test_a_tree_outside_git_is_named_so"
+
+
+def _pytest_beside(lock, *args):
+    """A real pytest run in server/ while `lock` is held as a load run holds
+    it, with node ids in its arguments, as #354's review held it."""
+    env = {k: v for k, v in os.environ.items() if k != "DERBYNET_LOAD_LOCK_HELD"}
+    env.pop("PYTEST_ADDOPTS", None)
+    fd = _held(
+        lock,
+        holder=f"pid 1, since x\ncwd /x\nhead abc\nargs -m browser {NODE}\n",
+    )
+    try:
+        return subprocess.run(
+            [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", *args],
+            cwd=SERVER,
+            env={**env, "DERBYNET_LOAD_LOCK": str(lock)},
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    finally:
+        os.close(fd)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        ("--collect-only", "-q"),
+        ("--collect-only",),
+        ("--setup-plan",),
+        ("--setup-only",),
+    ],
+    ids=["collect-only-q", "collect-only", "setup-plan", "setup-only"],
+)
+def test_a_run_that_runs_no_test_names_no_load_run(tmp_path, mode):
+    """tests/test_parity_golden_selection.py reads `--collect-only -q` for
+    lines with `::`, and the holder's arguments held one, so it failed
+    beside a load run (#354 review)."""
+    done = _pytest_beside(tmp_path / "load.lock", *mode, "-n", "0", NODE)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "load run:" not in done.stdout + done.stderr
+    if mode == ("--collect-only", "-q"):
+        assert [line for line in done.stdout.splitlines() if "::" in line] == [NODE]
+
+
+def test_under_xdist_the_controller_names_it_once_per_section(tmp_path):
+    done = _pytest_beside(tmp_path / "load.lock", "-n", "2", NODE)
+    assert done.returncode == 0, done.stdout + done.stderr
+    lines = done.stdout.splitlines()
+    named = [i for i, line in enumerate(lines) if line.startswith("load run:")]
+    assert len(named) == 2, done.stdout
+    # The header, before xdist starts its workers; the summary, after them.
+    workers = next(i for i, line in enumerate(lines) if line.startswith("created:"))
+    assert named[0] < workers < named[1], done.stdout

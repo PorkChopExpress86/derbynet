@@ -32,19 +32,28 @@ def pytest_report_header(config):
         head = "unknown (not a git checkout)" if has_git else "unknown (no git)"
     elif git("status", "--porcelain", "--untracked-files=no")[0]:
         head += " with uncommitted changes"
-    return [f"cwd: {os.getcwd()}", f"head: {head}", *_load_run_lines()]
+    return [f"cwd: {os.getcwd()}", f"head: {head}", *_load_run_lines(config)]
 
 
-def _load_run_lines():
+def _load_run_lines(config):
     """A line naming the run that holds tools/pytest-under-load.sh's lock,
     or none. #316's hand-off ran beside #317's 25-count run at a load
     average of 35, failed a test that passes alone, and ran again (#316
     retro). The script's own pytest, which carries DERBYNET_LOAD_LOCK_HELD,
     names nothing. It only probes: it never waits for, keeps or creates the
-    lock (tests/test_report_header.py)."""
+    lock (tests/test_report_header.py). A run that runs no test
+    (`--collect-only`, `--setup-plan`, `--setup-only`) names nothing: the
+    holder's arguments can hold node ids, and tests read `--collect-only
+    -q` output for lines with `::` in them (#354 review)."""
     import fcntl
 
     if os.environ.get("DERBYNET_LOAD_LOCK_HELD"):
+        return []
+    option = getattr(config, "option", None)
+    if any(
+        getattr(option, name, False)
+        for name in ("collectonly", "setuponly")  # --setup-plan sets setuponly
+    ):
         return []
     path = os.environ.get("DERBYNET_LOAD_LOCK")
     if not path:
@@ -74,7 +83,7 @@ def _load_run_lines():
 
 def pytest_terminal_summary(terminalreporter, config):
     """The holder again at the end, since a load run may start mid-run."""
-    for line in _load_run_lines():
+    for line in _load_run_lines(config):
         terminalreporter.write_line(line, yellow=True, bold=True)
 
 
