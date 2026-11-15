@@ -39,7 +39,9 @@ each made true and made false, is what "each condition is mutated" means
 (#336 retro). It prints a row per mutant as it runs (`KILLED`, `SURVIVED`,
 or `REFUSED` or `ERROR` with pytest's last lines), then the count of each,
 and exits 0 when every one is KILLED, 1 when one survived, and 2 when one
-was refused or errored, or none is listed. A mutant whose text occurs more
+was refused or errored, or none is listed. It mutates `.py`, `.js` and
+`.css` files and Python scripts, not a `min()` a Markdown file quotes. A
+mutant whose text occurs more
 than once on its line is refused, to be run by hand. A stop restores each
 file and names the mutants not run. The cases the listing reads past are
 still mutated by hand, one per call.
@@ -75,6 +77,8 @@ OUTCOMES = {
     "pass": {0: "PASSED", 1: "BROKE"},
 }
 EXPECTED = {"fail": "KILLED", "pass": "PASSED"}
+# What --listed mutates: a `min()` a Markdown file quotes is no code.
+SOURCES = (".py", ".js", ".css")
 
 
 class Refused(Exception):
@@ -216,7 +220,12 @@ def listed(args) -> int:
     if diff.returncode:
         print(f"mutate.py: refused: git diff: {diff.stderr.strip()}", file=sys.stderr)
         return REFUSED
-    found = _listing().mutants(diff.stdout, root)
+    listing = _listing()
+    found = [
+        m
+        for m in listing.mutants(diff.stdout, root)
+        if m.path.endswith(SOURCES) or listing.is_python(root, m.path)
+    ]
     if not found:
         print("mutate.py: refused: no mutant listed for the diff", file=sys.stderr)
         return REFUSED

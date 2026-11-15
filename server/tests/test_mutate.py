@@ -361,6 +361,9 @@ def test_listed_refuses_a_text_twice_on_its_line(project):
 
 
 def test_listed_refuses_a_diff_with_no_mutant(project):
+    """A Markdown file's `min(a, b)` is prose, not a mutant."""
+    (project / "notes.md").write_text("Take min(a, b).\n")
+    subprocess.run([*GIT, "add", "notes.md"], cwd=project, check=True)
     commit(project, MODULE + "\n\ndef three():\n    return 3\n")
     run = listed(project, "test_mod.py::test_the_bound")
     assert run.returncode == 2

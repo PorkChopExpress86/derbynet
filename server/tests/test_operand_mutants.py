@@ -165,7 +165,7 @@ def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path
     ]
     assert {m.new for m in found[1::2]} == {"False"}
     assert str(found[6]) == "t.py:11  condition  q and not (q[0] or q[1])  ->  True"
-    # Line 7's `a and b` is on no added line.
+    assert 7 not in {m.line for m in found}, "line 7's `a and b` is on no added line"
 
 
 def test_a_python_file_that_does_not_parse_is_read_by_line(tmp_path):

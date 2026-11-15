@@ -2108,7 +2108,8 @@ class ReachShapes(unittest.TestCase):
         # each shape with no subclass and no class helper method resolves.
         plain = {s for s in shapes if not s[2] and 'again' not in s[1]}
         self.assertEqual(sorted(plain - resolved), [])
-        self.assertEqual((len(shapes), len(plain)), (252, 78))
+        longest = max(len(chain) for _, chain, _ in shapes)
+        self.assertEqual((len(shapes), len(plain), longest), (252, 78, 3))
 
 
 def lines(head, base=D101_BASE, postgres=False):
