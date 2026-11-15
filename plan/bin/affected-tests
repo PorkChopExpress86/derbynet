@@ -1717,7 +1717,7 @@ def changed_tests(base_text, head_text, module_text):
             raise WholeFile(f'{why}, and it is no import-only move (D97: {e})') from None
 
     # What the diff adds, changes or deletes: a test or a helper by its name,
-    # a test class by its own when any of its tests does.
+    # a new or deleted test class by its own.
     seeds, ids = set(), {}
     for name, node in head.tests.items():
         old = base.tests.get(name)
@@ -1749,10 +1749,8 @@ def changed_tests(base_text, head_text, module_text):
         for method, node in c.tests.items():
             was = old.tests.get(method)
             if was is None or ast.dump(was) != ast.dump(node):
-                seeds.add(name)
                 ids[f'{name}::{method}'] = 'new' if was is None else 'changed'
-        if set(old.tests) - set(c.tests):
-            seeds.add(name)
+        # A changed or deleted method makes its class reached below.
     seeds |= {name for name in base.classes if name not in head.classes}
 
     # The helpers and tests that read a seed, directly or through another

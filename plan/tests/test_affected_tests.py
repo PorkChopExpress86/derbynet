@@ -1651,8 +1651,10 @@ def test_waits_again(page):
 
     def test_a_test_that_reads_its_class_is_not_picked_for_it(self):
         """TestBoard is a seed once test_two changes; test_one reads the name
-        TestBoard and changes nothing."""
+        TestBoard and changes nothing, so test_three, which reads
+        self.test_one, doesn't repeat either."""
         base = edit('assert self.n\n', 'assert isinstance(self, TestBoard)\n')
+        base += '\n    def test_three(self, page):\n        self.test_one(page)\n'
         head = edit('        start(page)\n', '        start(page)\n        page.reload()\n', base)
         self.assertEqual(d101(head, base=base), [('TestBoard::test_two', 'changed')])
 
@@ -1713,10 +1715,17 @@ def test_waits(page):
 
     def test_a_test_that_reads_a_class_whose_method_reads_a_changed_helper(self):
         """TestBoard is reached through test_two's start(), and test_more,
-        unchanged, reads TestBoard: the module's reach runs again."""
-        base = D101_BASE + '\n\ndef test_more(page):\n    assert TestBoard\n'
+        unchanged, reads TestBoard, and test_last reads test_more: the
+        module's reach runs again. TestQuiet reaches nothing, so
+        test_quiet, which reads it, doesn't repeat."""
+        base = D101_BASE + ('\n\ndef test_more(page):\n    assert TestBoard\n'
+                            '\n\ndef test_last(page):\n    test_more(page)\n'
+                            '\n\nclass TestQuiet:\n    def test_q(self):\n        pass\n'
+                            '\n\ndef test_quiet(page):\n    assert TestQuiet\n')
         head = edit('name=f"Stop lane {lane}"', 'name=f"Stop {lane}"', base)
-        self.assertIn(('test_more', 'reads TestBoard'), d101(head, base=base))
+        self.assertEqual(d101(head, base=base), [
+            ('test_races', 'reads start'), ('TestBoard::test_two', 'reads start'),
+            ('test_more', 'reads TestBoard'), ('test_last', 'reads test_more')])
 
     def test_a_class_helper_method_that_calls_a_method_that_reads_a_changed_helper(self):
         base = edit('        self.n = 1\n', '        self.n = 1\n\n    def again(self, page):\n'
