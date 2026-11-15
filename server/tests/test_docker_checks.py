@@ -380,6 +380,16 @@ def test_root_on_purpose_passes_only_in_check_root():
     )
     assert len(root_execs(CHECKS_NAME, elsewhere)[0]) == 1
     assert len(root_execs("docs/database.md", text)[0]) == 3
+    # A command continued over lines carries the mark on its last line.
+    continued = (
+        '    out="$("${compose[@]}" exec -T server \\\n'
+        '        python manage.py check 2>&1)" || status=$?  ' + ROOT_ON_PURPOSE
+    )
+    inside = text.replace(marked, continued)
+    root, on_purpose = root_execs(CHECKS_NAME, inside)
+    assert root == [] and len(on_purpose) == 3
+    unmarked = text.replace(marked, continued.removesuffix(ROOT_ON_PURPOSE))
+    assert len(root_execs(CHECKS_NAME, unmarked)[0]) == 1
 
 
 def test_an_exec_without_derbynet_is_found():

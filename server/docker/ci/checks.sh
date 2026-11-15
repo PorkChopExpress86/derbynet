@@ -37,8 +37,10 @@
 #              Postgres stopped it fails with one message naming the host;
 #              with no profile, it reads the server's SQLite (#308)
 #   root       manage.py check, run with docker compose exec and no -u, fails
-#              with one line naming the command and -u derbynet, and passes
-#              with -u derbynet (D103)
+#              with one line naming the command and -u derbynet; a refused
+#              manage.py shell writes nothing; collectstatic, one of the
+#              build's commands, still runs as root; and manage.py check
+#              passes with -u derbynet (D103)
 #   bad-env    values that would reach nginx's configuration malformed stop
 #              the container with a message
 #   allowed-hosts
@@ -562,8 +564,8 @@ print(*Event.objects.values_list("name", flat=True))')"
 # the image manage.py then refuses to run (D103): an import run as root leaves
 # the event's photo folder root's (#327's review).  The refused command never
 # starts, the build's collectstatic still runs as root, and the same command
-# with -u derbynet runs.  Each exec here without -u carries ROOT_ON_PURPOSE
-# (tests/test_docker_checks.py).
+# with -u derbynet runs.  Each exec'd manage.py here without -u carries
+# ROOT_ON_PURPOSE (tests/test_docker_checks.py).
 check_root() {
     local project="$PREFIX-root"
     local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml")

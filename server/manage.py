@@ -21,7 +21,9 @@ def refuse_root(argv):
     its photos answer 404 (#327's review).  There is no override."""
     # The subcommand as Django's ManagementUtility.execute reads it.
     command = argv[1] if len(argv) > 1 else "help"
-    if os.geteuid() == 0 and IMAGE_MARKER.exists() and command not in ROOT_COMMANDS:
+    # The marker first: a host with no os.geteuid, such as Windows, never
+    # has it.
+    if IMAGE_MARKER.exists() and os.geteuid() == 0 and command not in ROOT_COMMANDS:
         sys.exit(
             f"derbynet: manage.py {command} refuses to run as root. Run it as "
             "the server's user: pass -u derbynet to docker exec or docker "

@@ -213,3 +213,12 @@ def test_the_marker_is_the_dockerfiles():
     written = text.index(f"> {marker}\n")
     assert written < DOCKERFILE_COMMAND.search(text).start()
     assert f"COPY --from=static {marker} {marker}\n" in text
+
+
+def test_a_host_with_no_geteuid_runs(monkeypatch, tmp_path):
+    """Windows has no os.geteuid, and never the marker: the marker is read
+    first, so manage.py runs there."""
+    manage = load_manage()
+    monkeypatch.setattr(manage, "IMAGE_MARKER", tmp_path / "docker-image")
+    monkeypatch.delattr(os, "geteuid")
+    manage.refuse_root(["manage.py", "check"])
