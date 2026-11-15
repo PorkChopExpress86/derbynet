@@ -18,7 +18,7 @@
 # (the browser fixture order among them, which only the full suite caught);
 # tests/test_source_checks.py now fails a test module that imports `ast` or
 # walks a tree with `rglob` and is neither listed here nor exempted.  They
-# take a few seconds, and
+# took 16 min at a load average of 34 (#311's pr-merge run), and
 # .githooks/pre-push runs them.  #48 found five of them failing
 # one full-suite round at a time (#48 retro); run this after each batch of
 # edits.
@@ -29,13 +29,13 @@ set -e -o pipefail
 
 # Under `timeout`, tests/test_pytest_under_load.py's runs of that script see
 # the timeout above them, are refused, and fail: #282 lost a round to it.
-# These take seconds, so they refuse it too.
+# These refuse it too; they took 16 min at a load average of 34 (#311).
 pid=$PPID
 while [ "${pid:-0}" -gt 1 ]; do
   if [ "$(ps -o comm= -p "$pid" || true)" = timeout ]; then
     echo "source-checks.sh: it runs under timeout, which" \
          "tests/test_pytest_under_load.py's tests would take for their own." \
-         "It takes seconds: run it with no timeout." >&2
+         "It took 16 min at a load average of 34 (#311): run it with no timeout." >&2
     exit 2
   fi
   pid=$(ps -o ppid= -p "$pid" | tr -d ' ') || pid=1

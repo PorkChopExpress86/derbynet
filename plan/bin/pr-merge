@@ -3,7 +3,36 @@
 # merge to that head SHA so a push after the check can't slip in. Then prints
 # each issue the PR closes with its state, and exits 1 if one is still open.
 #
-# It also refuses when origin/master has commits since the PR head's merge
+# A source check (a test server/tools/source-checks.sh runs, that script, or
+# plan/tests) reads code across the tree, in any area: #304 added
+# test_pipefail_pipes.py while #309 added `anchors ... | grep -q` pipes to
+# server/docs/adr/check-paths.sh, and the lead's trial merge of the two heads
+# found it (#61 retro). So when origin/master moved since the PR head's merge
+# base, and one side changed a source check while the other changed code one
+# reads (a .sh or .py file, a workflow, a git hook or a plan/bin tool), it
+# merges the PR's head with origin/master in a temporary worktree under
+# ${XDG_CACHE_HOME:-~/.cache}, runs server/tools/source-checks.sh there, and
+# removes the worktree whatever happens, Ctrl-C included (#311). The run took
+# 16 min on the lead's machine at a load average of 34, about 9 of them in
+# plan/tests; uv run --locked builds the worktree's server/.venv from uv's
+# cache in about a second. It needs uv on PATH, and it can't run under
+# `timeout`, which source-checks.sh refuses. The run has SIGINT back at its
+# default, which bash ignores in a background job: #311's own run hung in its
+# Ctrl-C tests, whose pr-merge could not trap it. That needs env's
+# --default-signal, which GNU coreutils 9.7's env and uutils 0.10's take. It refuses the PR
+# when the merge conflicts or a check fails, and prints the failures' summary
+# lines; the whole output stays in
+# ${XDG_CACHE_HOME:-~/.cache}/derbynet-pr-merge-<pr>-<suffix>.log. A worktree
+# that a killed pr-merge left (SIGKILL runs no trap) is stopped and removed by
+# the next pr-merge, once that pr-merge's pid is gone. Since the run takes
+# minutes, start pr-merge in the background when this rule may fire.
+# A passing run is recorded by its pair of PR head and origin/master SHAs in
+# $(git rev-parse --git-common-dir)/pr-merge-source-checks, and a later run
+# on the same pair, --base-checked or --dry-run included, skips it and says
+# so. A template, CSS, JavaScript or Markdown change against a new source
+# check is left to CI on master.
+#
+# Then it refuses when origin/master has commits since the PR head's merge
 # base that touch an area the PR touches too: plan/, .githooks/,
 # server/tools/, .github/, a conftest.py (any folder), server/pyproject.toml
 # or server/uv.lock. CI then ran on a base without them. #289 passed CI on a
@@ -12,27 +41,32 @@
 # plan/bin/affected-tests maps the combined diff to. After that run on the
 # PR merged with origin/master, --base-checked merges anyway.
 #
-# A source check (a test server/tools/source-checks.sh runs, that script, or
-# plan/tests) reads code across the tree, in any area: #304 added
-# test_pipefail_pipes.py while #309 added `anchors ... | grep -q` pipes to
-# server/docs/adr/check-paths.sh. The lead's trial merge of the two heads
-# found it; both PRs also changed .github/, so the area rule refused the
-# pair, but a PR like #309 with no shared area would have merged (#61
-# retro). So it also refuses when one side changed a source check and the
-# other changed code one reads: a .sh or .py file, a workflow, a git hook or
-# a plan/bin tool. A template, CSS, JavaScript or Markdown change against a
-# new source check is left to CI on master. Its run is
-# server/tools/source-checks.sh on the merge, which takes seconds.
+# Last, it fetches origin/master again and refuses when it moved since the
+# checks read it: a PR merged during the run was never checked with this one
+# (#333 review).
 #
-# Usage: plan/bin/pr-merge <pr> [--base-checked] [--squash|--rebase|--merge] [--delete-branch]
+# Usage: plan/bin/pr-merge <pr> [--base-checked] [--dry-run] [--squash|--rebase|--merge] [--delete-branch]
+#   --base-checked  skips the area rule, once the combined diff's affected
+#                   tests ran on the merge; the source-check run still runs
+#   --dry-run       runs every check above, and stops before the merge
+#   -h, --help      prints this
 # With no merge method it squashes and deletes the branch, as the plan's PRs do.
 set -euo pipefail
-PR=${1:?usage: pr-merge <pr> [--base-checked] [--squash|--rebase|--merge] [--delete-branch]}
+usage='usage: pr-merge <pr> [--base-checked] [--dry-run] [--squash|--rebase|--merge] [--delete-branch]'
+case ${1:-} in
+  -h|--help) sed -n '2,/^set -euo/{/^#/s/^# \{0,1\}//p}' "$0"; exit 0 ;;
+esac
+PR=${1:?$usage}
 shift
 base_checked=0
+dry_run=0
 rest=()
 for arg in "$@"; do
-  if [ "$arg" = --base-checked ]; then base_checked=1; else rest+=("$arg"); fi
+  case $arg in
+    --base-checked) base_checked=1 ;;
+    --dry-run) dry_run=1 ;;
+    *) rest+=("$arg") ;;
+  esac
 done
 set -- ${rest[@]+"${rest[@]}"}
 case " $* " in
@@ -43,6 +77,74 @@ GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 # GitHub closes the issues a few seconds after the merge.
 CLOSE_WAIT=${CLOSE_WAIT:-30}
+
+# The source-check run's worktree, and its process group while it runs. The
+# run has a session of its own, so a Ctrl-C reaches only this script, whose
+# trap stops the run, waits for it, and removes the worktree.
+wt=
+checks_pid=
+remove_worktree() {
+  # A second Ctrl-C during the wait below used to end the script there,
+  # leaving the run and its worktree (#333 review).
+  trap '' INT HUP TERM
+  if [ -n "$checks_pid" ]; then
+    kill -TERM -- "-$checks_pid" 2>/dev/null || true
+    wait "$checks_pid" 2>/dev/null || true
+    # uv and pytest, below source-checks.sh, get the TERM too; a run that
+    # ignores it is killed after about 10 s.
+    for _ in $(seq 50); do
+      kill -0 -- "-$checks_pid" 2>/dev/null || break
+      sleep 0.2
+    done
+    kill -KILL -- "-$checks_pid" 2>/dev/null || true
+    checks_pid=
+  fi
+  if [ -n "$wt" ]; then
+    git worktree remove --force --force "$wt" 2>/dev/null || true
+    rm -rf "$wt"
+    git worktree prune || true
+    wt=
+  fi
+  set_traps
+}
+set_traps() {
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+}
+trap remove_worktree EXIT
+set_traps
+cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}
+passed_file=$(git rev-parse --path-format=absolute --git-common-dir)/pr-merge-source-checks
+# A pr-merge killed with SIGKILL runs no trap, so its run and its worktree
+# stay (#333 review). Each worktree's git dir records its pr-merge's pid and
+# the run's process group (pr-merge-owner), and a worktree whose pr-merge is
+# gone is stopped and removed here. Only the group's processes that run in
+# that worktree are killed, since the group id may name another group by now.
+sweep_leftovers() {
+  local dir gitdir owner group pid
+  for dir in "$cache_dir"/derbynet-pr-merge.*/; do
+    dir=${dir%/}
+    [ -d "$dir" ] || continue
+    gitdir=$(sed -n 's/^gitdir: //p' "$dir/.git" 2>/dev/null) || true
+    [ -n "$gitdir" ] && [ -f "$gitdir/pr-merge-owner" ] || continue
+    owner=$(awk '$1 == "owner" { print $2 }' "$gitdir/pr-merge-owner")
+    group=$(awk '$1 == "group" { print $2 }' "$gitdir/pr-merge-owner")
+    [ -n "$owner" ] && [ ! -e "/proc/$owner" ] || continue
+    if [ -n "$group" ]; then
+      for pid in $(pgrep -g "$group" 2>/dev/null || true); do
+        case $(readlink "/proc/$pid/cwd" 2>/dev/null) in
+          "$dir"|"$dir"/*) kill -KILL "$pid" 2>/dev/null || true ;;
+        esac
+      done
+    fi
+    git worktree remove --force --force "$dir" 2>/dev/null || true
+    rm -rf "$dir"
+    git worktree prune 2>/dev/null || true
+    echo "removed $dir, left by pr-merge $owner, which is gone" >&2
+  done
+}
+sweep_leftovers
 
 head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
 # A push of the head commit to parity-check/<name> runs the parity gate on the
@@ -69,78 +171,135 @@ areas() {
     print a "\t" $0
   }'
 }
-if [ "$base_checked" = 0 ]; then
-  if ! git fetch -q origin master "refs/pull/$PR/head" 2>/dev/null ||
-     ! git cat-file -e "$head^{commit}" 2>/dev/null ||
-     ! base=$(git merge-base "$head" origin/master 2>/dev/null); then
-    echo "not merging #$PR; could not fetch origin/master and its head $head to check whether master moved since its merge base; fetch them, or check by hand and pass --base-checked" >&2
-    exit 1
+# source_checks_on_the_merge: runs server/tools/source-checks.sh on $head
+# merged with $master, or says the pair already passed. Fails, saying why,
+# when the merge conflicts, uv is missing, or a check fails.
+source_checks_on_the_merge() {
+  if grep -qFx "$head $master" "$passed_file" 2>/dev/null; then
+    echo "the source checks passed on ${head:0:8} merged with origin/master ${master:0:8} before ($passed_file); not running them again" >&2
+    return 0
   fi
-  pr_paths=$(git diff --name-only "$base" "$head" | areas)
-  master_paths=$(git diff --name-only "$base" origin/master | areas)
-  # One collation for sort and comm: this host's comm (uutils) compares
-  # bytes while sort follows en_US.UTF-8, which puts conftest.py before
-  # .github/: #295's merge printed "comm: file 1 is not in sorted order",
-  # and an area both sides changed could go unseen (#206 retro).
-  shared=$(LC_ALL=C comm -12 <(cut -f1 <<<"$pr_paths" | LC_ALL=C sort -u) \
-             <(cut -f1 <<<"$master_paths" | LC_ALL=C sort -u) | grep . || true)
-  pr_all=$(git diff --name-only "$base" "$head")
-  master_all=$(git diff --name-only "$base" origin/master)
-  # The source checks, as either side's source-checks.sh lists them.
-  checks=$({ git show "$head:server/tools/source-checks.sh" 2>/dev/null || true
-             git show "origin/master:server/tools/source-checks.sh" 2>/dev/null || true; } |
-           sed -nE 's,^[[:space:]]+([A-Za-z0-9_./-]+\.py).*,server/\1,p'
-           echo server/tools/source-checks.sh)
-  is_check() { # is_check <paths>: those that are source checks
-    { grep -Fx -f <(echo "$checks") <<<"$1"; grep '^plan/tests/' <<<"$1"; } | sort -u || true
-  }
-  # The code a source check reads, by kind of file.
-  is_code() { grep -E '\.(sh|py)$|^\.github/workflows/|^\.githooks/|^plan/bin/' <<<"$1" || true; }
-  pr_checks=$(is_check "$pr_all")
-  master_checks=$(is_check "$master_all")
-  pr_code=$(is_code "$pr_all")
-  master_code=$(is_code "$master_all")
-  checks_shared=0
-  if { [ -n "$pr_checks" ] && [ -n "$master_code" ]; } ||
-     { [ -n "$master_checks" ] && [ -n "$pr_code" ]; }; then
-    checks_shared=1
+  local out status tree merge log owner_file
+  out=$(git merge-tree --write-tree --name-only --no-messages "$master" "$head") && status=0 || status=$?
+  if [ "$status" = 1 ]; then
+    echo "not merging #$PR; it conflicts with origin/master ${master:0:8}, so the source checks can't run on the merge. Merge origin/master into the branch, push, and wait for CI again. The conflicts:" >&2
+    tail -n +2 <<<"$out" | sed 's/^/  /' >&2
+    return 1
+  elif [ "$status" != 0 ]; then
+    echo "not merging #$PR; git merge-tree could not merge ${head:0:8} with origin/master ${master:0:8}:" >&2
+    echo "$out" >&2
+    return 1
   fi
-  if [ -n "$shared" ] || [ "$checks_shared" = 1 ]; then
-    {
-      if [ -n "$shared" ]; then
-        echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, in an area the PR also changes, so CI ran without these commits:"
-      else
-        echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, and a source check one side changed reads code the other changed, so CI ran without these commits:"
-      fi
-      moved=()
-      [ -n "$shared" ] && mapfile -t moved < <(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
-      if [ "$checks_shared" = 1 ]; then
-        mapfile -t -O "${#moved[@]}" moved < <(printf '%s\n' "$master_checks" "$master_code" | grep . | sort -u)
-      fi
-      git log --format='  %h %s' "$base..origin/master" -- "${moved[@]}"
-      for area in $shared; do
-        echo "$area"
-        awk -F'\t' -v a="$area" '$1 == a { print "  master:  " $2 }' <<<"$master_paths"
-        awk -F'\t' -v a="$area" '$1 == a { print "  this PR: " $2 }' <<<"$pr_paths"
-      done
-      if [ "$checks_shared" = 1 ]; then
-        echo "source checks, and the code they read"
-        if [ -n "$master_checks" ] && [ -n "$pr_code" ]; then
-          sed 's/^/  master check:  /' <<<"$master_checks"
-          sed 's/^/  this PR code:  /' <<<"$pr_code"
-        fi
-        if [ -n "$pr_checks" ] && [ -n "$master_code" ]; then
-          sed 's/^/  this PR check: /' <<<"$pr_checks"
-          sed 's/^/  master code:   /' <<<"$master_code"
-        fi
-        echo "For the source checks, run server/tools/source-checks.sh on the PR merged with origin/master; it takes seconds."
-      fi
-      echo "Run what plan/bin/affected-tests prints for the combined diff on the PR merged with origin/master, then rerun with --base-checked; or update the branch (gh pr update-branch $PR) and wait for CI again. For the combined diff it prints:"
-      { git diff --name-only "$base" "$head"; git diff --name-only "$base" origin/master; } | sort -u |
-        "${AFFECTED:-$(dirname "$0")/affected-tests}" --stdin || echo "(affected-tests failed)"
-    } >&2
-    exit 1
+  if ! command -v uv >/dev/null; then
+    echo "not merging #$PR; uv is not on PATH, and server/tools/source-checks.sh needs it to run the source checks on the PR merged with origin/master. Install uv (server/README.md) and rerun." >&2
+    return 1
   fi
+  if ! env --default-signal=INT true 2>/dev/null; then
+    echo "not merging #$PR; env takes no --default-signal (GNU coreutils 9.7's env and uutils 0.10's take it), which the run needs to put back the SIGINT a background job ignores. Update coreutils and rerun." >&2
+    return 1
+  fi
+  tree=$(head -n 1 <<<"$out")
+  # set -e is off in a function called with ||, so each step says so itself.
+  if ! merge=$(GIT_AUTHOR_NAME=pr-merge GIT_AUTHOR_EMAIL=pr-merge@localhost \
+               GIT_COMMITTER_NAME=pr-merge GIT_COMMITTER_EMAIL=pr-merge@localhost \
+               git commit-tree --no-gpg-sign "$tree" -p "$master" -p "$head" \
+                 -m "pr-merge: #$PR merged with origin/master, for the source checks") ||
+     ! mkdir -p "$cache_dir" ||
+     ! wt=$(mktemp -d "$cache_dir/derbynet-pr-merge.XXXXXX") ||
+     ! git worktree add -q --detach "$wt" "$merge"; then
+    echo "not merging #$PR; could not make a worktree of the PR merged with origin/master under $cache_dir to run the source checks in" >&2
+    return 1
+  fi
+  owner_file=$(git -C "$wt" rev-parse --absolute-git-dir)/pr-merge-owner
+  echo "owner $$" >"$owner_file"
+  if [ ! -f "$wt/server/tools/source-checks.sh" ]; then
+    echo "not merging #$PR; the PR merged with origin/master has no server/tools/source-checks.sh to run" >&2
+    return 1
+  fi
+  # Its own name, since two runs on one PR shared one and a pass deleted a
+  # failure's log (#333 review).
+  log=$cache_dir/derbynet-pr-merge-$PR-${wt##*.}.log
+  echo "running server/tools/source-checks.sh on #$PR merged with origin/master (${merge:0:8}) in $wt; it took 16 min at a load average of 34, output in $log" >&2
+  (cd "$wt" && exec setsid env --default-signal=INT bash server/tools/source-checks.sh) \
+    </dev/null >"$log" 2>&1 &
+  checks_pid=$!
+  echo "group $checks_pid" >>"$owner_file"
+  wait "$checks_pid" && status=0 || status=$?
+  remove_worktree
+  if [ "$status" != 0 ]; then
+    echo "not merging #$PR; server/tools/source-checks.sh failed (exit $status) on the PR merged with origin/master ${master:0:8}. Its summary lines, and the whole output in $log:" >&2
+    out=$(grep -E '^(FAIL|ERROR): |^(FAILED|ERROR) |^FAILED \(|^Ran [0-9]+ tests? in |^(=+ )?[0-9]+ [a-z]+.* in [0-9.]+s' "$log" || true)
+    [ -n "$out" ] || out=$(tail -n 20 "$log")
+    echo "$out" >&2
+    return 1
+  fi
+  rm -f "$log"
+  echo "$head $master" >>"$passed_file"
+  echo "the source checks passed on #$PR merged with origin/master ${master:0:8}" >&2
+}
+if ! git fetch -q origin master "refs/pull/$PR/head" 2>/dev/null ||
+   ! git cat-file -e "$head^{commit}" 2>/dev/null ||
+   ! base=$(git merge-base "$head" origin/master 2>/dev/null); then
+  echo "not merging #$PR; could not fetch origin/master and its head $head, which the source checks and the area rule read; fetch them and rerun" >&2
+  exit 1
+fi
+master=$(git rev-parse origin/master)
+pr_paths=$(git diff --name-only "$base" "$head" | areas)
+master_paths=$(git diff --name-only "$base" "$master" | areas)
+# One collation for sort and comm: this host's comm (uutils) compares
+# bytes while sort follows en_US.UTF-8, which puts conftest.py before
+# .github/: #295's merge printed "comm: file 1 is not in sorted order",
+# and an area both sides changed could go unseen (#206 retro).
+shared=$(LC_ALL=C comm -12 <(cut -f1 <<<"$pr_paths" | LC_ALL=C sort -u) \
+           <(cut -f1 <<<"$master_paths" | LC_ALL=C sort -u) | grep . || true)
+pr_all=$(git diff --name-only "$base" "$head")
+master_all=$(git diff --name-only "$base" "$master")
+# The source checks, as either side's source-checks.sh lists them.
+checks=$({ git show "$head:server/tools/source-checks.sh" 2>/dev/null || true
+           git show "$master:server/tools/source-checks.sh" 2>/dev/null || true; } |
+         sed -nE 's,^[[:space:]]+([A-Za-z0-9_./-]+\.py).*,server/\1,p'
+         echo server/tools/source-checks.sh)
+is_check() { # is_check <paths>: those that are source checks
+  { grep -Fx -f <(echo "$checks") <<<"$1"; grep '^plan/tests/' <<<"$1"; } | sort -u || true
+}
+# The code a source check reads, by kind of file.
+is_code() { grep -E '\.(sh|py)$|^\.github/workflows/|^\.githooks/|^plan/bin/' <<<"$1" || true; }
+pr_checks=$(is_check "$pr_all")
+master_checks=$(is_check "$master_all")
+pr_code=$(is_code "$pr_all")
+master_code=$(is_code "$master_all")
+if { [ -n "$pr_checks" ] && [ -n "$master_code" ]; } ||
+   { [ -n "$master_checks" ] && [ -n "$pr_code" ]; }; then
+  {
+    echo "origin/master moved since #$PR's merge base ${base:0:8}, and a source check one side changed reads code the other changed:"
+    mapfile -t moved < <(printf '%s\n' "$master_checks" "$master_code" | grep . | sort -u)
+    git log --format='  %h %s' "$base..$master" -- "${moved[@]}"
+    if [ -n "$master_checks" ] && [ -n "$pr_code" ]; then
+      sed 's/^/  master check:  /' <<<"$master_checks"
+      sed 's/^/  this PR code:  /' <<<"$pr_code"
+    fi
+    if [ -n "$pr_checks" ] && [ -n "$master_code" ]; then
+      sed 's/^/  this PR check: /' <<<"$pr_checks"
+      sed 's/^/  master code:   /' <<<"$master_code"
+    fi
+  } >&2
+  source_checks_on_the_merge || exit 1
+fi
+if [ -n "$shared" ] && [ "$base_checked" = 0 ]; then
+  {
+    echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, in an area the PR also changes, so CI ran without these commits:"
+    mapfile -t moved < <(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
+    git log --format='  %h %s' "$base..$master" -- "${moved[@]}"
+    for area in $shared; do
+      echo "$area"
+      awk -F'\t' -v a="$area" '$1 == a { print "  master:  " $2 }' <<<"$master_paths"
+      awk -F'\t' -v a="$area" '$1 == a { print "  this PR: " $2 }' <<<"$pr_paths"
+    done
+    echo "Run what plan/bin/affected-tests prints for the combined diff on the PR merged with origin/master, then rerun with --base-checked; or update the branch (gh pr update-branch $PR) and wait for CI again. For the combined diff it prints:"
+    { git diff --name-only "$base" "$head"; git diff --name-only "$base" "$master"; } | sort -u |
+      "${AFFECTED:-$(dirname "$0")/affected-tests}" --stdin || echo "(affected-tests failed)"
+  } >&2
+  exit 1
 fi
 # An issue whose body has a "## Still open" section stays open for what that
 # section names (plan/README.md), so a PR that would close it is refused here
@@ -157,6 +316,23 @@ done
 if [ ${#held[@]} -gt 0 ]; then
   echo "not merging #$PR; it closes ${held[*]}, whose body has a \"## Still open\" section; write \"Part of #N\" in the PR body instead" >&2
   exit 1
+fi
+# The checks and the area rule read origin/master at $master. A PR that
+# merged since, during a 16-minute run say, was never checked with this one
+# (#333 review), so read it again just before the merge. GitHub still merges
+# onto whatever master is in the seconds after this.
+if ! git fetch -q origin master 2>/dev/null; then
+  echo "not merging #$PR; could not fetch origin/master again to see whether it moved during the run; rerun pr-merge" >&2
+  exit 1
+fi
+now=$(git rev-parse origin/master)
+if [ "$now" != "$master" ]; then
+  echo "not merging #$PR; origin/master moved during the run (${master:0:8}..${now:0:8}); rerun pr-merge" >&2
+  exit 1
+fi
+if [ "$dry_run" = 1 ]; then
+  echo "dry run: #$PR would merge at $head" >&2
+  exit 0
 fi
 "$GH" pr merge "$PR" --repo "$REPO" --match-head-commit "$head" "$@"
 "$GH" pr view "$PR" --repo "$REPO" --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"'
