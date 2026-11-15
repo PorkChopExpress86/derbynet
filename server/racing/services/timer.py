@@ -25,7 +25,13 @@ from core.models import ActionLog, Event, RaceSettings, RaceState
 from core.services import EventReadOnly, lock_race_state, require_writable
 from legacy_api.xml import php_escape
 from racing.engine import heat_state as hs
-from racing.engine.phpcompat import php_equals, php_int, php_numeric, php_truthy
+from racing.engine.phpcompat import (
+    php_equals,
+    php_int,
+    php_numeric,
+    php_time,
+    php_truthy,
+)
 from racing.models import HeatLane, Round, TimerSetting, TimerStatus
 from racing.services import audit, replay
 from racing.services.heats import transition
@@ -142,11 +148,6 @@ _STATE_FIELDS = [
     "malfunction_requires_reset",
     "malfunction_message",
 ]
-
-
-def php_time(moment: datetime) -> int:
-    """PHP's `time()` for `moment`: whole seconds."""
-    return int(moment.timestamp())
 
 
 def timed_out_at(last_contact: datetime) -> datetime:

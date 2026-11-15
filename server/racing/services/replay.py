@@ -7,7 +7,7 @@ a rollback drops them with the race-state change that sent them.
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.db import transaction
 from django.utils import timezone
@@ -15,26 +15,39 @@ from django.utils import timezone
 from core.models import RaceSettings
 from core.services import lock_race_state
 from kiosks.models import ReplayCommand, ReplayStatus
+from racing.engine.phpcompat import php_time
 
 logger = logging.getLogger(__name__)
 
-REPLAY_TIMEOUT = timedelta(seconds=10)
-"""PHP's `REPLAY_TIMEOUT_LIMIT`: a replay client that has not polled for
-longer gets no commands."""
+REPLAY_TIMEOUT = 10
+"""Seconds: PHP's `REPLAY_TIMEOUT_LIMIT` (`replay.inc:29`). A replay client
+that has not polled for longer is not connected and gets no commands."""
+
+
+def lapsed(last_contact: datetime | None, now: datetime) -> bool:
+    """`get_replay()`'s timeout: no contact, or none for longer than
+    `REPLAY_TIMEOUT`. Counted in whole seconds, as PHP's
+    `$last_contact + REPLAY_TIMEOUT_LIMIT < time()` counts them
+    (`replay.inc:35`, #307), so a contact 0.8 s past a whole second lapses
+    11 s after that whole second, 10.2 s after the contact (#341)."""
+    return last_contact is None or php_time(last_contact) + REPLAY_TIMEOUT < php_time(
+        now
+    )
 
 
 def connected(event_id: int, now: datetime) -> bool:
+    """`get_replay()`'s state is connected: `send_replay_message()` sends
+    only then (`replay.inc:59-60`), and `replay.message` greets the client
+    with `HELLO` otherwise (`action.replay.message.inc:12-24`)."""
     status = ReplayStatus.objects.get(event_id=event_id)
-    return (
-        status.state == ReplayStatus.State.CONNECTED
-        and status.last_contact is not None
-        and status.last_contact + REPLAY_TIMEOUT >= now
+    return status.state == ReplayStatus.State.CONNECTED and not lapsed(
+        status.last_contact, now
     )
 
 
 def send(event_id: int, command: str, now: datetime | None = None) -> bool:
-    """Queue `command` if a replay client polled within the last 10 s.
-    Returns whether it was queued."""
+    """Queue `command` while the replay client is `connected`: its last
+    poll has not `lapsed`. Returns whether it was queued."""
     if not connected(event_id, now or timezone.now()):
         return False
     ReplayCommand.objects.create(event_id=event_id, command=command)

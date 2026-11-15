@@ -2,6 +2,7 @@
 every control over the racing services."""
 
 import re
+from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 
 import pytest
@@ -149,6 +150,57 @@ def test_the_timer_age_alone_changes_no_signature(coordinator, event, wolves):
     assert "Timer: CONNECTED" in html and "sec.)" not in html
     shown = {"sig": signature(html), "round": "", "heat": "", "hold": 0}
     assert coordinator.get("/dashboard/live/", shown).status_code == 204
+
+
+SECOND = datetime(2026, 11, 14, 12, 0, 0, tzinfo=UTC)
+"""A whole second. The replay client's contact below comes 0.8 s past it,
+and the timer's a whole second earlier."""
+
+
+def ages(html: str) -> tuple[str | None, str | None]:
+    """The timer's and the replay client's `data-age` on the page."""
+    timer_part, replay_part = html.split("data-replay-status", 1)
+    timer_part = timer_part.split("data-timer-status", 1)[1]
+    replay_part = replay_part.split("</div>", 1)[0]
+    found = [re.search(r'data-age="(\d+)"', p) for p in (timer_part, replay_part)]
+    return tuple(m and m.group(1) for m in found)
+
+
+@pytest.mark.parametrize(
+    ("read", "expected"),
+    [
+        (timedelta(seconds=5) - timedelta(microseconds=1), ("5", "4")),
+        (timedelta(seconds=5), ("6", "5")),
+        (timedelta(seconds=5.2), ("6", "5")),
+        (-timedelta(microseconds=1), ("0", "0")),
+    ],
+    ids=["5-less-1us", "5", "5.2", "before-the-replay-contact"],
+)
+def test_the_timer_and_replay_ages_count_whole_seconds(
+    coordinator, event, monkeypatch, read, expected
+):
+    """#341: the dashboard's ages are PHP's whole seconds, the
+    `time() - $this->last_contact` of `timer-state.inc:97-102` and the
+    `time() - $replay['last_contact']` of `json-replay.inc:11` that
+    coordinator.php shows. A replay contact 0.8 s past SECOND is 4 s old
+    until 5 s past SECOND and 5 s old from then on: 5 at 5.2 s past SECOND,
+    as #341's PHP probe read. The timer's contact, a whole second earlier,
+    is a second older at each read. A clock behind the replay contact shows
+    0, never a negative age."""
+    from django.utils import timezone
+
+    from racing.models import TimerStatus
+
+    contact = SECOND + timedelta(seconds=0.8)
+    TimerStatus.objects.filter(event=event).update(
+        state=TimerStatus.State.CONNECTED, last_contact=contact - timedelta(seconds=1)
+    )
+    ReplayStatus.objects.filter(event=event).update(
+        state=ReplayStatus.State.CONNECTED, last_contact=contact
+    )
+    monkeypatch.setattr(timezone, "now", lambda: SECOND + read)
+
+    assert ages(page_of(coordinator)) == expected
 
 
 def test_a_finished_heat_holds_on_screen_for_10_seconds(
