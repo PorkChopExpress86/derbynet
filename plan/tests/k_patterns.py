@@ -4,10 +4,12 @@ unittest runs the tests that match any `-k`, so a misspelt pattern beside
 one that matches drops its tests without a word: #311's `-k run_them_again`
 matched nothing (the test says `runs_them_again`), and a broken test first
 failed in pr-merge's real run (#311 retro). Every plan test module imports
-this (test_k_patterns.py checks), so each way of running them is covered:
-`discover -s plan/tests`, with or without `-p`, and a module run as a script
-without `-I`. Under `-I` the script's folder is left off `sys.path`, and the
-import fails.
+this (test_k_patterns.py checks), so it covers `discover -s plan/tests`,
+with or without `-p`, a pytest node id from server/, and a module run as a
+script without `-I`. The import fails, and the run with it, where
+plan/tests is not on `sys.path`: a script run under `-I`, and
+`python3 -m unittest plan/tests/test_x.py` or `plan.tests.test_x` from the
+repository's root.
 
 The run stops before any test, with exit 2, unittest's usage error, naming
 each pattern and the test names closest to it.

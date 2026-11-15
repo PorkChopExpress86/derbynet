@@ -19,7 +19,7 @@ The shell suites in `testing/` run against Django one by one as their endpoints 
 - `testing/` is the PHP shell suite, now backend-agnostic, with no literal IDs, and run twice in CI with shifted IDs (#5, #6).
 - `server/tests/golden/` holds fixtures captured from PHP, checked in CI by the `golden-fixtures` workflow (#7). `deviations.json` (D25) lists approved differences.
 - `.github/workflows/`: `php-suite` (on pull requests only when the suite or the PHP image's inputs change), `golden-fixtures`, `server` (SQLite and Postgres 17, split into lint, pytest under pytest-xdist, and three shell-suite groups that run at once), and `plan-checks` (ADR path check plus the issue lint).
-- `.githooks/pre-push` runs the `server` workflow's lint checks in about 5 seconds before a push that changes `server/`.
+- `.githooks/pre-push` runs plan/tests on every push, and the `server` workflow's lint checks and `server/tools/source-checks.sh` before a push that changes `server/`; such a push took 5 to 8 min (retro-311's two pushes, 2026-11-15).
 - `plan/lint-issues.py` lints every plan issue body live from GitHub, and checks issue state against merged PRs and dependencies.
 - `plan/bin/pr-wait` and `plan/bin/pr-merge` wait for checks and merge only the head that passed.
 - `.claude/skills/verify/` is a project skill that launches an isolated PHP or Django server on port 8090 and drives it with the Playwright MCP.

@@ -77,7 +77,8 @@ class KPatterns(unittest.TestCase):
 
     def test_every_plan_test_module_imports_it(self):
         missing = []
-        for path in sorted(HERE.glob('test*.py')):
+        # discover recurses into packages below plan/tests.
+        for path in sorted(HERE.rglob('test*.py')):
             tree = ast.parse(path.read_text())
             names = {alias.name for node in tree.body if isinstance(node, ast.Import)
                      for alias in node.names}
