@@ -129,7 +129,7 @@ RANGE_LINE = (
         ("4294967294.5", "1", RANGE_LINE.format("DERBYNET_UID", "4294967294.5")),
         ("1000", "99999999999", RANGE_LINE.format("DERBYNET_GID", "99999999999")),
         ("abc", "1000", RANGE_LINE.format("DERBYNET_UID", "abc")),
-        # 2**64 + 1000, which bash's arithmetic would wrap to 1000.
+        # Past bash's arithmetic, which would wrap it to a small id.
         (
             "18446744073709552616",
             "1000",
