@@ -72,7 +72,8 @@ while pid > 1:
     pid = ppid
 EOF
 
-# Under a second, and plan/bin reads server/ and .github/, so on every push.
+# 37 s for 231 tests at a load of 3 (29e571ad, #320 retro), and plan/bin
+# reads server/ and .github/, so on every push.
 echo "pre-push: plan/tests" >&2
 if ! out="$(python3 -I -m unittest discover -s "$ROOT/plan/tests" 2>&1 </dev/null)"; then
   printf '%s\n' "$out" >&2
