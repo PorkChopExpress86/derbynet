@@ -302,8 +302,9 @@ check_upload() {
     echo "$reply" | grep -q '"code": "success"' || fail "the 30 MB upload did not succeed"
 }
 
-# The ids derbynet keeps when nothing gives it others (D106): the image's own.
-image_ids() { docker run --rm --entrypoint cat "$IMAGE" /opt/derbynet/derbynet-ids; }
+# The ids derbynet keeps when nothing gives it others (D106): the image's own,
+# as its /etc/passwd holds them before the entrypoint runs.
+image_ids() { docker run --rm --entrypoint sh "$IMAGE" -c 'echo "$(id -u derbynet) $(id -g derbynet)"'; }
 
 # ids <container>: "<uid> <gid>" a `docker exec -u derbynet` runs as, then
 # each gunicorn's, from /proc, since ps prints uid 4294967294 as -2.
@@ -362,7 +363,7 @@ check_bind_mount() {
     owned_by b1 4321 4321
     stop b1
 
-    say "a bind mount owned by uid 4321 in root's group keeps the image's gid ($default) (owner question, pending (#350))"
+    say "a bind mount owned by uid 4321 in root's group keeps the image's gid, ${default#* } (owner question, pending (#350))"
     docker run --rm -v "$RUNNER_TEMP_DIR:/t" --entrypoint sh "$IMAGE" -c \
         'rm -rf /t/bind && mkdir -p /t/bind && chown 4321:0 /t/bind && chmod 755 /t/bind'
     start b2 "$dir"
