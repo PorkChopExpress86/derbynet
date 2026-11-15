@@ -185,19 +185,23 @@ SECOND = datetime(2026, 11, 14, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.mark.parametrize(
-    ("after", "timed_out"),
-    [(timedelta(seconds=60.95), False), (timedelta(seconds=61), True)],
+    ("elapsed", "timed_out"),
+    [(60.05, False), (60.1, True)],
     ids=["60.05-s-later", "60.1-s-later"],
 )
-def test_the_timeout_counts_whole_seconds(event, after, timed_out):
+def test_the_timeout_counts_whole_seconds(event, elapsed, timed_out):
     """#307: PHP's `last_contact + 60 < time()` (`timer-state.inc:72`) compares
-    whole seconds. A contact at 0.9 s past a second is timed out from the
-    61st whole second on: 60.05 s after it is not, 60.1 s after it is."""
+    whole seconds. A contact 0.9 s past a whole second is timed out once the
+    clock reaches 61 s past that whole second: 60.05 s after the contact it
+    is not, 60.1 s after it is."""
     contact = SECOND + timedelta(seconds=0.9)
+    now = contact + timedelta(seconds=elapsed)
+    # 60.1 s after the contact is 61 s past SECOND; 60.05 s is short of it.
+    assert (now >= SECOND + timedelta(seconds=61)) is timed_out
     row = TimerStatus(
         event=event, state=TimerStatus.State.CONNECTED, last_contact=contact
     )
-    found = timer_service.TimerState.read(row, SECOND + after)
+    found = timer_service.TimerState.read(row, now)
     assert found.timed_out is timed_out
     assert (found.state == TimerStatus.State.NOT_CONNECTED) is timed_out
 
@@ -611,8 +615,10 @@ def test_long_user_agents_are_told_apart_by_every_character(event, second, compe
 
 
 def test_a_long_flag_name_keeps_its_description(event, coordinator, jar):
-    """#307: `desc-` finds a flag whose name is past 100 characters."""
+    """#307: `desc-` finds a flag whose name is 101 characters long, past
+    the 100 its column held."""
     name = "n" * 101
+    assert len(name) == 101
     message(jar, f"FLAGS&flag-{name}=bool:true&desc-{name}=Help")
     found = reply(coordinator.get("/action.php?query=timer.settings"))
     assert [(f["name"], f["description"]) for f in found["flags"]] == [(name, "Help")]
@@ -620,13 +626,21 @@ def test_a_long_flag_name_keeps_its_description(event, coordinator, jar):
 
 @pytest.mark.parametrize(
     ("lanes", "kept"),
-    [("32767", 32767), ("32768", 6), ("4.5", 4), ("1e3", 1000)],
-    ids=["largest", "one-over", "fraction", "exponent"],
+    [
+        ("1", 1),
+        ("0", 6),
+        ("32767", 32767),
+        ("32768", 6),
+        ("4.5", 4),
+        ("1e3", 1000),
+    ],
+    ids=["smallest", "one-under", "largest", "one-over", "fraction", "exponent"],
 )
 def test_a_lane_count_is_a_number_from_1_to_32767(event, coordinator, jar, lanes, kept):
     """D99 (#307): IDENTIFIED takes a lane count from 1 to 32767 that PHP
-    reads as a number, cut toward zero, and ignores 32768 with the same
-    reply. PHP stores each of these as sent (`action.timer-message.inc:99-104`)."""
+    reads as a number, cut toward zero, and ignores 0 and 32768 with the same
+    reply. PHP ignores 0 too, and stores the others as sent
+    (`action.timer-message.inc:99-104`)."""
     ok(coordinator, "action=settings.write&n-lanes=6")
     assert "<success/>" in message(jar, f"IDENTIFIED&lane_count={lanes}")
     assert timer_state(coordinator)["lanes"] == kept
