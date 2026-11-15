@@ -21,13 +21,20 @@ targets, then:
 - the repeats under load each changed browser test file takes (D85): 25 for
   one that involves timing, 5 per font for a deterministic one, and none for
   an import-only move (D97, amending D85): a diff that only changes imports
-  and deletes top-level defs, classes or constants that a module the file
-  now imports from has unchanged, by AST, each name they read bound alike
-  there. A changed body or docstring, a new test or comment, a copy that
-  differs, an import that binds any other name anew or a name otherwise,
-  or what can't be parsed or resolved (a relative or star import, a module
-  outside the tree) keeps the count, and so does a flake ticket, whatever
-  the tool prints;
+  and deletes top-level defs, classes or constants into a module M that
+  has them unchanged, by AST. Each deleted name is imported by name
+  (`from M import name`), or is a dependency the moved code took along
+  into M: a name the moved code reads, which nothing the file keeps reads,
+  and which is not decorated (nor, for a constant, built by a call), since
+  pytest finds a fixture by its presence. Each name the moved code reads is
+  bound alike in M, and one the file binds by a statement moved too. An
+  import goes only with the moved code that alone read it.
+  A changed body or docstring, a new test or comment, a copy that differs,
+  an import that binds any other name anew or a name otherwise, an
+  assignment expression (:=) outside a function, `from __future__` imports
+  that differ, or what can't be parsed or resolved (a relative or star
+  import, a module outside the tree) keeps the count, and so does a flake
+  ticket, whatever the tool prints;
 - before the commands, `tools/docstring_claims.py` on each changed test file
   and `tools/operand_mutants.py` when a changed hand-written source file can
   hold a condition (not a migration or vendored code): run both before the
@@ -1146,8 +1153,10 @@ def import_only(base_text, head_text, module_text):
     """D97's verdict on a browser test file: {module: [moved names]} when the
     diff from `base_text` to `head_text` only changes imports and deletes
     top-level definitions that a module it imports from (`module_text(name)`
-    gives its text, or None outside the tree) has unchanged. Raises
-    NotImportOnly with the reason otherwise."""
+    gives its text, or None outside the tree) has unchanged: each imported
+    by name from it, or a dependency of one that nothing the file keeps
+    reads and that is not decorated. Raises NotImportOnly with the reason
+    otherwise."""
     if base_text is None:
         raise NotImportOnly('new on the branch')
     try:
@@ -1181,6 +1190,9 @@ def import_only(base_text, head_text, module_text):
         if not any(comment == c for c in old):
             raise NotImportOnly(f'a comment is new or changed: {comment}')
 
+    for tree, where in ((base, 'BASE'), (head, 'the file')):
+        no_walrus(tree, where)
+
     modules = {}
 
     def parsed(name):
@@ -1194,12 +1206,18 @@ def import_only(base_text, head_text, module_text):
                 except SyntaxError as e:
                     raise NotImportOnly(f'{name} cannot be parsed ({e.msg}, '
                                         f'line {e.lineno})') from None
+                no_walrus(tree, name)
                 modules[name] = (tree, bindings(tree, name))
         return modules[name]
 
+    deleted_ids = {id(n) for n in deleted}
+    reached = {}  # a deleted name a moved def reads -> the module both are in
+
     def same(name, node, module, seen):
         """`module` has `name` as BASE's `node`, and each name it reads is
-        bound alike in both modules."""
+        bound alike in both modules. A name it reads that the file binds by a
+        statement must be deleted from the file too (#320 review, H2): kept,
+        the file and `module` would each have their own, such as a list."""
         if (module, name) in seen:
             return
         seen.add((module, name))
@@ -1216,14 +1234,16 @@ def import_only(base_text, head_text, module_text):
             if isinstance(ours, tuple) and ours == theirs:
                 continue
             if isinstance(ours, ast.stmt) and isinstance(theirs, ast.stmt):
+                if id(ours) not in deleted_ids:
+                    raise NotImportOnly(f'{name} reads {read}, which the file keeps, '
+                                        f'so the file and {module} would each have one')
+                reached.setdefault(read, module)
                 same(read, ours, module, seen)
                 continue
             raise NotImportOnly(f'{name} reads {read}, which {module} binds '
                                 'otherwise than the file did')
 
     used = mentions(head)
-    sources = sorted({b[1] for b in head_binds.values()
-                      if isinstance(b, tuple) and b[0] == 'from' and b[2]})
     # The names first, then the imported ones, then the rest, so that the
     # reason given is the most telling one.
     names = {}
@@ -1237,6 +1257,7 @@ def import_only(base_text, head_text, module_text):
                                 'from the file itself')
         names[name] = node
     moved = {}  # name -> the module that has it now
+    seen = set()
     for name, node in names.items():
         bound = lookup(head_binds, name, 'the file')
         if bound is None:
@@ -1248,30 +1269,40 @@ def import_only(base_text, head_text, module_text):
         if parsed(bound[1]) is None:
             raise NotImportOnly(f'{name} comes from {bound[1]}, which is not in '
                                 'the tree')
-        same(name, node, bound[1], set())
+        same(name, node, bound[1], seen)
         moved[name] = bound[1]
+    # A deleted name the file doesn't import is a dependency the moved code
+    # took along (#313's BOUND, read only by bound): the moved code reads it,
+    # and nothing the file keeps does. pytest reads a fixture or a hook by
+    # its presence in the file, so a decorated def, or a constant built by a
+    # call (`pytest.fixture(...)(f)`), is imported by name or keeps the
+    # repeats (#320 review, H1).
     for name in names:
         if name not in moved and name in used:
             raise NotImportOnly(f'{name} is deleted and still used, but not imported')
     for name, node in names.items():
         if name in moved:
             continue
-        why = f'it deletes {name}, and no module it imports from has it as it was'
-        for module in sources:
-            if parsed(module) is None or name not in parsed(module)[1]:
-                continue
-            try:
-                same(name, node, module, set())
-            except NotImportOnly as e:
-                why = str(e)
-                continue
-            moved[name] = module
-            break
-        else:
-            raise NotImportOnly(why)
+        if name not in reached:
+            raise NotImportOnly(f'it deletes {name}, which it neither imports by name '
+                                'nor moves with code it imports')
+        if getattr(node, 'decorator_list', None):
+            raise NotImportOnly(f'{name} moves with code that reads it, but is '
+                                'decorated: import it by name')
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) \
+                and any(isinstance(n, ast.Call) for n in ast.walk(node.value)):
+            raise NotImportOnly(f'{name} moves with code that reads it, but is built '
+                                'by a call: import it by name')
+        moved[name] = reached[name]
+    for module in sorted(set(moved.values())):
+        if futures(base) != futures(parsed(module)[0]):
+            raise NotImportOnly(f'the file and {module} differ in their '
+                                '`from __future__` imports')
 
     # The imports: one that binds a name anew binds a moved definition, and
-    # one that goes binds a name nothing reads any more.
+    # one that goes left with the moved code that read it, and that alone
+    # (#320 review, H3): an import read by nothing may be there for its
+    # effect, such as an autouse fixture or a plugin module.
     head_imported, base_imported = imported(head), imported(base)
     for name in sorted(head_imported - set(moved)):
         bound = lookup(head_binds, name, 'the file')
@@ -1279,13 +1310,42 @@ def import_only(base_text, head_text, module_text):
             raise NotImportOnly(f'it imports {name}, which is no moved definition')
         if lookup(base_binds, name, 'BASE') != bound:
             raise NotImportOnly(f'it imports {name} otherwise than BASE did')
+    moved_reads = set().union(*(mentions(n) for n in deleted))
     for name in sorted(base_imported - head_imported):
         if name in used:
             raise NotImportOnly(f'{name} is no longer imported but still used')
+        if name not in moved_reads:
+            raise NotImportOnly(f'it drops the import of {name}, which no moved code '
+                                'read: an import can matter by itself')
     by_module = {}
     for name in names:  # in BASE's order
         by_module.setdefault(moved[name], []).append(name)
     return by_module
+
+
+def no_walrus(tree, where):
+    """Fails on an assignment expression evaluated at module level, which
+    binds a module name that `bindings()` doesn't see (#320 review, H4): in
+    a statement, a comprehension, a default or a decorator, but not in a
+    function's or a lambda's body. Python refuses one in an annotation."""
+    stack = list(tree.body)
+    while stack:
+        n = stack.pop()
+        if isinstance(n, ast.NamedExpr):
+            raise NotImportOnly(f'{where} line {n.lineno}: an assignment expression '
+                                '(:=) outside a function')
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            stack += [*n.decorator_list, n.args]
+        elif isinstance(n, ast.Lambda):
+            stack.append(n.args)
+        else:
+            stack.extend(ast.iter_child_nodes(n))
+
+
+def futures(tree):
+    """The `from __future__` features a module turns on."""
+    return {a.name for n in tree.body if isinstance(n, ast.ImportFrom)
+            and n.module == '__future__' for a in n.names}
 
 
 def imported(module):
@@ -1409,7 +1469,7 @@ def report(plan, tree):
                     say(f'  {r}: import-only (D97): none')
                     for module, names in sorted(moved.items()):
                         say(f'      moves {", ".join(names)} unchanged to {module}, '
-                            'which it imports; a flake ticket still repeats it 25 times')
+                            'which it imports from; a flake ticket still repeats it 25 times')
                     continue
             timing = first_hit(tree, r, TIMING)
             measures = first_hit(tree, r, MEASURES)
