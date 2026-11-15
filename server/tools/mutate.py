@@ -1,5 +1,5 @@
-"""Runs one mutant: replaces a text in a file, runs the tests it targets,
-restores the file, and names the result (#319 retro).
+"""Runs a mutant, or every listed one: replaces a text in a file, runs the
+tests it targets, restores the file, and names the result (#319 retro).
 
 #319's hand-written mutation script asserted that its old text occurred once
 and, when it occurred twice, ran pytest on the unmutated tree, so two
@@ -40,7 +40,8 @@ each made true and made false, is what "each condition is mutated" means
 or `REFUSED` or `ERROR` with pytest's last lines), then the count of each,
 and exits 0 when every one is KILLED, 1 when one survived, and 2 when one
 was refused or errored, or none is listed. It mutates `.py`, `.js` and
-`.css` files and Python scripts, not a `min()` a Markdown file quotes. A
+`.css` files and Python scripts, and names each other file whose mutants
+it skips, such as a `min()` a Markdown file quotes. A
 mutant whose text occurs more
 than once on its line is refused, to be run by hand. A stop restores each
 file and names the mutants not run. The cases the listing reads past are
@@ -221,11 +222,14 @@ def listed(args) -> int:
         print(f"mutate.py: refused: git diff: {diff.stderr.strip()}", file=sys.stderr)
         return REFUSED
     listing = _listing()
-    found = [
-        m
-        for m in listing.mutants(diff.stdout, root)
-        if m.path.endswith(SOURCES) or listing.is_python(root, m.path)
-    ]
+    found, skipped = [], {}
+    for m in listing.mutants(diff.stdout, root):
+        if m.path.endswith(SOURCES) or listing.is_python(root, m.path):
+            found.append(m)
+        else:
+            skipped[m.path] = skipped.get(m.path, 0) + 1
+    for path, n in skipped.items():
+        print(f"SKIPPED   {path}: {n} listed, in no source file", flush=True)
     if not found:
         print("mutate.py: refused: no mutant listed for the diff", file=sys.stderr)
         return REFUSED

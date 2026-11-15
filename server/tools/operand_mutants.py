@@ -5,7 +5,7 @@ each condition a diff adds, for the mutation table (plan/AGENT-BRIEF.md:
 #283's caps were `min(1em, 2.85vw)` and `min(1em, 2.5vw)`. Its mutations
 removed whole caps or resized them, and none kept `2.85vw` alone, so the
 `1em` operand went untested until review (#283 retro). This lists those
-mutants; running them, and the table, stay with the implementer.
+mutants, and `tools/mutate.py --listed` runs every one (#336 retro).
 
     uv run python tools/operand_mutants.py                  # diff against origin/master
     uv run python tools/operand_mutants.py --base REV -- ui/static/ui/kiosk.css
@@ -20,10 +20,11 @@ that line of the new file. For each added line it lists:
   `min(x, hi)` (no lower bound);
 - a nested call's own mutants too, so `clamp(1rem, min(9vh, 11vw), 8rem)`
   lists `min(9vh, 11vw)`'s;
-- a condition, JavaScript's `if (...)` and `.filter(x => ...)` and
-  Python's `if ...:`, `elif ...:` and a one-line comprehension's `if`, made
-  true and made false (Python: a `.py` file, or a script with no extension
-  whose shebang names Python, such as `plan/bin/affected-tests`), and, when
+- a condition, JavaScript's `if (...)` and `.filter(x => ...)` and, when
+  the file can't be read or parsed, Python's `if ...:`, `elif ...:` and a
+  one-line comprehension's `if`, made true and made false (Python: a `.py`
+  file, or a script with no extension whose shebang names Python, such as
+  `plan/bin/affected-tests`), and, when
   it splits at the top level into `&&`/`||` (or `and`/`or`) operands, each
   operand made true and made false.
 
@@ -31,16 +32,14 @@ A Python file on disk is read by its AST instead, for its conditions:
 each `if`, `elif`, `while`, ternary and comprehension condition, and each
 operand of every `and` and `or` (a `return a and b` too), wherever it
 spans lines, when it touches an added line. Its `old` is then the text of
-its span, which can hold a newline; the line printed is the span's first.
+its span, which can hold a newline, printed on one line; the line printed
+is the span's first.
 The rest is read one line at a time, so a JavaScript call or condition that
 spans lines, a ternary, and a condition in a `while`, a `return` or an
 arrow function outside `.filter()` are left out, and so is every branch
 that is no condition in either language (a tuple element such as
 `(ast.Global, ast.Nonlocal)`, a set taken away, a loop's bound): list those
 by hand.
-
-`tools/mutate.py --listed` runs every mutant this lists, in one call
-(#336 retro).
 """
 
 from __future__ import annotations
@@ -68,11 +67,12 @@ class Mutant:
     old: str
     new: str
     # Where `old` sits in the file, as (start, end) offsets into its text;
-    # None when the file was not read, or `old` is on its line more than once.
+    # None when the file was not read, the line is past its end, or `old` is
+    # on its line more than once.
     span: tuple[int, int] | None = field(default=None, compare=False)
 
     def __str__(self) -> str:
-        old = " ".join(self.old.split()) if "\n" in self.old else self.old
+        old = " ".join(self.old.split())
         return f"{self.path}:{self.line}  {self.kind}  {old}  ->  {self.new}"
 
 

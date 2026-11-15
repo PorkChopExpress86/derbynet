@@ -368,6 +368,7 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
     run = listed(project, "test_mod.py::test_the_bound")
     assert run.returncode == 2
     assert "no mutant listed" in run.stderr
+    assert run.stdout == "SKIPPED   notes.md: 2 listed, in no source file\n"
 
 
 def test_listed_takes_no_old_or_new(project):

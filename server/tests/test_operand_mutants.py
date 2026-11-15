@@ -136,7 +136,7 @@ def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path
         "\n"
         "\n"
         "def old(a, b):\n"
-        "    return a and b\n"
+        "    return a if a and b else b\n"
         "\n"
         "\n"
         "def wait(q):\n"
@@ -144,14 +144,22 @@ def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path
         "                     q[1]):\n"
         "        q.pop()\n"
         "    return 1 if q else 0\n"
+        "    return [x for x in q if x]\n"
+        "    while True:\n"
+        "        break\n"
     )
     (tmp_path / "t.py").write_text(text)
     lines = text.splitlines()
     diff = "+++ b/t.py\n@@ -0,0 +1,3 @@\n" + "".join(f"+{x}\n" for x in lines[:3])
-    diff += "@@ -9,0 +10,5 @@\n" + "".join(f"+{x}\n" for x in lines[9:])
+    diff += "@@ -9,0 +10,8 @@\n" + "".join(f"+{x}\n" for x in lines[9:])
     found = om.mutants(diff, tmp_path)
     for m in found:
         assert text[m.span[0] : m.span[1]] == m.old, m
+    # `while True` made true changes nothing, so only its False is listed.
+    assert [(m.kind, m.old, m.new) for m in found if m.line == 16] == [
+        ("condition", "True", "False")
+    ]
+    found = [m for m in found if m.line != 16]
     assert [(m.line, m.kind, m.old, m.new) for m in found][::2] == [
         (2, "operand", "isinstance(node, Expr)", "True"),
         (2, "operand", "isinstance(node.value, Constant)", "True"),
@@ -162,10 +170,43 @@ def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path
         (11, "operand", "q[0]", "True"),
         (12, "operand", "q[1]", "True"),
         (14, "condition", "q", "True"),
+        (15, "condition", "x", "True"),
     ]
     assert {m.new for m in found[1::2]} == {"False"}
     assert str(found[6]) == "t.py:11  condition  q and not (q[0] or q[1])  ->  True"
-    assert 7 not in {m.line for m in found}, "line 7's `a and b` is on no added line"
+    assert 7 not in {m.line for m in found}, "line 7's condition is on no added line"
+
+
+def test_a_line_mutant_on_disk_has_its_span_where_its_text_is_once(tmp_path):
+    """--listed replaces a line mutant at its span: none when its text is
+    on its line twice, or when the diff names a line past the file's end,
+    and a stylesheet comment's call is no mutant. A file that is no Python
+    is read by line, even where its text parses as Python."""
+    css = (
+        ".a { font-size: min(1em, 2vw); }\n"
+        "/* was min(1em, 3vw) */ .b { width: max(1px, 2px) max(1px, 2px); }\n"
+    )
+    (tmp_path / "a.css").write_text(css)
+    (tmp_path / "notes.txt").write_text("seen = [n for n in seen if n]\n")
+    diff = "+++ b/a.css\n@@ -0,0 +1,2 @@\n" + "".join(
+        f"+{x}\n" for x in css.splitlines()
+    )
+    diff += "@@ -2,0 +5 @@\n+.c { height: min(1vh, 2vh); }\n"
+    diff += "+++ b/notes.txt\n@@ -0,0 +1 @@\n+seen = [n for n in seen if n]\n"
+    found = om.mutants(diff, tmp_path)
+    assert [(m.line, m.old, m.new) for m in found] == [
+        (1, "min(1em, 2vw)", "1em"),
+        (1, "min(1em, 2vw)", "2vw"),
+        (2, "max(1px, 2px)", "1px"),
+        (2, "max(1px, 2px)", "2px"),
+        (2, "max(1px, 2px)", "1px"),
+        (2, "max(1px, 2px)", "2px"),
+        (5, "min(1vh, 2vh)", "1vh"),
+        (5, "min(1vh, 2vh)", "2vh"),
+    ]
+    for m in found[:2]:
+        assert css[m.span[0] : m.span[1]] == "min(1em, 2vw)"
+    assert [m.span for m in found[2:]] == [None] * 6
 
 
 def test_a_python_file_that_does_not_parse_is_read_by_line(tmp_path):
