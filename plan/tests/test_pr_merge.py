@@ -592,7 +592,7 @@ class PrMerge(unittest.TestCase):
         self.assertIn('--base-checked  skips the area rule', done.stdout)
         self.assertIn('the source-check run still runs', done.stdout)
         self.assertIn('pr-merge-source-checks', done.stdout)
-        self.assertIn('14 min', done.stdout)
+        self.assertIn('16 min', done.stdout)
 
     def hang(self, sig, group, stub='hang'):
         """Starts a merge whose checks hang, writing into the worktree, and

@@ -13,7 +13,7 @@
 # merges the PR's head with origin/master in a temporary worktree under
 # ${XDG_CACHE_HOME:-~/.cache}, runs server/tools/source-checks.sh there, and
 # removes the worktree whatever happens, Ctrl-C included (#311). The run took
-# 14 min on the lead's machine at a load average of 31, about 7 of them in
+# 16 min on the lead's machine at a load average of 34, about 9 of them in
 # plan/tests; uv run --locked builds the worktree's server/.venv from uv's
 # cache in about a second. It needs uv on PATH, and it can't run under
 # `timeout`, which source-checks.sh refuses. The run has SIGINT back at its
@@ -165,7 +165,7 @@ source_checks_on_the_merge() {
     return 1
   fi
   log=$cache_dir/derbynet-pr-merge-$PR.log
-  echo "running server/tools/source-checks.sh on #$PR merged with origin/master (${merge:0:8}) in $wt; it took 14 min at a load average of 31, output in $log" >&2
+  echo "running server/tools/source-checks.sh on #$PR merged with origin/master (${merge:0:8}) in $wt; it took 16 min at a load average of 34, output in $log" >&2
   (cd "$wt" && exec setsid env --default-signal=INT bash server/tools/source-checks.sh) \
     </dev/null >"$log" 2>&1 &
   checks_pid=$!
