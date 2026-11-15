@@ -4,9 +4,10 @@
 {% block main %}
 {# fake-timer.php for a phone (#50). ui/fake-timer.js posts the legacy timer-message messages to action.php from this session, as js/fake-timer.js does (js/fake-timer.js:175-258). #}
 <div x-data="fakeTimer('{{ action_url|escapejs }}', '{{ home_url|escapejs }}', {{ lane_count }})" class="flex flex-col gap-4" data-fake-timer>
-  <section class="rounded-2xl border border-line bg-surface p-4 text-sm">
+  <section data-fake-intro class="rounded-2xl border border-line bg-surface p-4 text-sm">
     <p>This page acts as a timer connected to the server, so you can try DerbyNet without a real timer.</p>
-    <p class="mt-2">It works <b>only while this page is open</b>, and <b>only while racing or simulated racing is on</b>, from the <a href="{% url 'dashboard' %}" target="_blank" class="font-semibold text-accent underline underline-offset-2">race dashboard</a> or the <a href="{% url 'timer-test' %}" target="_blank" class="font-semibold text-accent underline underline-offset-2">timer test</a>.</p>
+    {# D98: a link only for a session that can open its page (fake_page); fake-timer.php:99-100 links coordinator.php and timer.php for every role. #}
+    <p class="mt-2">It works <b>only while this page is open</b>, and <b>only while racing or simulated racing is on</b>, from the {% if dashboard_url %}<a href="{{ dashboard_url }}" data-action="dashboard" target="_blank" class="font-semibold text-accent underline underline-offset-2">race dashboard</a>{% else %}race dashboard{% endif %} or the {% if timer_test_url %}<a href="{{ timer_test_url }}" data-action="timer-test" target="_blank" class="font-semibold text-accent underline underline-offset-2">timer test</a>{% else %}timer test{% endif %}.</p>
     <p class="mt-2">Connect and test your real timer before race day.</p>
   </section>
 
