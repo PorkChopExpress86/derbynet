@@ -30,6 +30,11 @@
 #              both directions
 #   postgres-password
 #              compose's postgres profile with a password holding @ : / # %
+#   exec-database
+#              docker compose exec ... python manage.py uses the server's
+#              database: under the postgres profile database.md's import lands
+#              in Postgres and no SQLite file appears, also with Postgres
+#              stopped; with no profile, it reads the server's SQLite (#308)
 #   bad-env    values that would reach nginx's configuration malformed stop
 #              the container with a message
 #   allowed-hosts
@@ -434,6 +439,116 @@ check_postgres_password() {
     "${compose[@]}" down --volumes
 }
 
+# The legacy database of transfer/tests/fixtures/legacy/v10.sql, with its photo
+# folders, as database.md's "A whole event with its photos" copies one in.
+legacy_folder() { # legacy_folder <dir>
+    local fixtures="$ROOT/server/transfer/tests/fixtures/legacy"
+    rm -rf "$1" && mkdir -p "$1"
+    cp -r "$fixtures/v10-photos/." "$1/"
+    python3 -I -c 'import sqlite3, sys
+c = sqlite3.connect(sys.argv[1]); c.executescript(open(sys.argv[2]).read()); c.commit()' \
+        "$1/derbynet.sqlite3" "$fixtures/v10.sql"
+    chmod -R a+rX "$1"
+}
+
+# The database a `docker compose exec ... python manage.py` reaches (#308).
+exec_database() { # exec_database <compose...>: "<vendor> <name> <host>"
+    "$@" exec -T -u derbynet server python manage.py shell --no-imports -c '
+from django.db import connection
+s = connection.settings_dict
+print(connection.vendor, s["NAME"], s["HOST"] or "-")'
+}
+
+# docker compose exec under the postgres profile reaches the server's
+# Postgres: database.md's import lands in Postgres, migrations show applied,
+# and no SQLite file appears on the volume, also once Postgres has stopped
+# (#308).  Without the profile, it reaches the server's SQLite.
+check_exec_database() {
+    local project="$PREFIX-execdb" password='p@ss:w/rd#%' work="$RUNNER_TEMP_DIR/execdb"
+    local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml"
+                   --profile postgres)
+    export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
+    legacy_folder "$work/pack42"
+    say "compose --profile postgres with POSTGRES_PASSWORD='$password'"
+    POSTGRES_PASSWORD="$password" "${compose[@]}" up -d --wait
+    local out status got
+    new_event "http://$("${compose[@]}" port server 80)"
+
+    say "database.md's import, run with docker compose exec"
+    "${compose[@]}" cp "$work/pack42" server:/tmp/pack42
+    status=0
+    out="$("${compose[@]}" exec -T -u derbynet server python manage.py import_derbynet \
+        /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025" 2>&1)" || status=$?
+    echo "$out" | tail -5
+    echo "exit status $status"
+    if [ "$status" != 0 ]; then
+        "${compose[@]}" exec -T server sh -c 'ls -l /var/lib/derbynet/*.sqlite3' || true
+        fail "the import failed"
+    fi
+    got="$(exec_database "${compose[@]}")"
+    echo "exec'd manage.py's database: $got"
+    [ "$got" = "postgresql derbynet postgres" ] || fail "an exec'd manage.py does not reach the server's Postgres"
+    say "psql in the postgres container: select name from core_event order by id"
+    got="$("${compose[@]}" exec -T postgres psql -U derbynet -d derbynet -tAc 'select name from core_event order by id')"
+    echo "$got"
+    [ "$got" = $'checks\nPack 42 2025' ] \
+        || fail "Postgres does not hold the server's event and then the import"
+    say "manage.py showmigrations --plan, run with docker compose exec"
+    out="$("${compose[@]}" exec -T -u derbynet server python manage.py showmigrations --plan)"
+    echo "$(grep -c '^\[X\]' <<<"$out" || true) applied, $(grep -c '^\[ \]' <<<"$out" || true) unapplied"
+    if grep -q '^\[ \]' <<<"$out"; then fail "an exec'd showmigrations sees unapplied migrations"; fi
+    "${compose[@]}" exec -T server sh -c '! ls /var/lib/derbynet/*.sqlite3 2>/dev/null' \
+        || fail "a SQLite database was made on the volume"
+
+    say "an explicit DATABASE_URL still wins"
+    got="$("${compose[@]}" exec -T -u derbynet -e DATABASE_URL=sqlite:////tmp/explicit.sqlite3 server \
+        python manage.py shell --no-imports -c '
+from django.db import connection
+print(connection.vendor, connection.settings_dict["NAME"])')"
+    echo "$got"
+    [ "$got" = "sqlite /tmp/explicit.sqlite3" ] || fail "DATABASE_URL did not win"
+
+    say "a config folder with no database-engine, as before a volume's first start"
+    got="$("${compose[@]}" exec -T -u derbynet -e DERBYNET_CONFIG_DIR=/tmp/no-engine server \
+        python manage.py shell --no-imports -c '
+from django.db import connection
+print(connection.vendor, connection.settings_dict["NAME"])')"
+    echo "$got"
+    [ "$got" = "sqlite /var/lib/derbynet/derbynet.sqlite3" ] || fail "no database-engine did not keep SQLite"
+
+    say "with the postgres container stopped, an exec'd manage.py fails"
+    "${compose[@]}" stop postgres
+    status=0
+    out="$("${compose[@]}" exec -T -u derbynet server python manage.py import_derbynet \
+        /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2026" 2>&1)" || status=$?
+    echo "$out" | tail -2
+    echo "exit status $status"
+    [ "$status" != 0 ] || fail "the import succeeded with Postgres stopped"
+    [[ "$out" != *"$password"* ]] || fail "the error shows the password"
+    "${compose[@]}" exec -T server sh -c '! ls /var/lib/derbynet/*.sqlite3 2>/dev/null' \
+        || fail "a SQLite database was made on the volume"
+    say "the server's log and docker inspect hold no database URL"
+    out="$("${compose[@]}" logs server 2>&1)"
+    [[ "$out" != *"postgres://"* ]] || fail "the server's log holds a database URL"
+    out="$(docker inspect "$("${compose[@]}" ps -q server)")"
+    [[ "$out" != *"DATABASE_URL"* ]] || fail "docker inspect shows a DATABASE_URL"
+    "${compose[@]}" down --volumes
+
+    say "compose with no profile: an exec'd manage.py reaches the server's SQLite"
+    compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml")
+    "${compose[@]}" up -d --wait
+    new_event "http://$("${compose[@]}" port server 80)"
+    got="$(exec_database "${compose[@]}")"
+    echo "exec'd manage.py's database: $got"
+    [ "$got" = "sqlite /var/lib/derbynet/derbynet.sqlite3 -" ] || fail "an exec'd manage.py does not reach SQLite"
+    got="$("${compose[@]}" exec -T -u derbynet server python manage.py shell --no-imports -c '
+from core.models import Event
+print(*Event.objects.values_list("name", flat=True))')"
+    echo "events: $got"
+    [ "$got" = checks ] || fail "an exec'd manage.py does not see the server's event"
+    "${compose[@]}" down --volumes
+}
+
 check_timeout() {
     start t1 "$PREFIX-timeout" -e DERBYNET_REQUEST_TIMEOUT=600
     say "DERBYNET_REQUEST_TIMEOUT=600"
@@ -757,7 +872,7 @@ check_timer() {
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
 [ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
-    reload timeout engine postgres-password bad-env allowed-hosts docs timer
+    reload timeout engine postgres-password exec-database bad-env allowed-hosts docs timer
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -772,6 +887,7 @@ for check in "$@"; do
         stop) check_stop ;;
         reload) check_reload ;;
         postgres-password) check_postgres_password ;;
+        exec-database) check_exec_database ;;
         bad-env) check_bad_env ;;
         allowed-hosts) check_allowed_hosts ;;
         upgrade) check_upgrade ;;

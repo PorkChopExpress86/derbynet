@@ -31,7 +31,9 @@ services:
       TZ: ${TZ:-America/New_York}
       # The entrypoint uses Postgres on this host when the postgres service
       # below runs, as it does under `--profile postgres`.  Otherwise the
-      # server keeps SQLite, one file on the data volume in WAL mode.
+      # server keeps SQLite, one file on the data volume in WAL mode.  A
+      # `docker compose exec server python manage.py ...` uses the same
+      # database as the server (#308).
       DERBYNET_POSTGRES_HOST: postgres
     volumes:
       - data:/var/lib/derbynet
