@@ -20,6 +20,9 @@ blocks lists and exits 1, or exits 0 when every claim is listed. A line
 lists a claim when it holds the claim's text as written (`2.85vw`,
 `"Heat 100"`, `two lines`), as a whole token, and names its scope: the
 test or class, or `module` or the file's name, as a row of the table does.
+A line that names no scope, such as a `same` row, lists for the scope of
+the line above it. A module claim counts on any line, since its row may
+name the constant a comment sits above, or the test that reads it.
 
 A claim is a number with its unit (`58.3 px`, `2.85vw`, `1920x1080`, `22`),
 a number word that counts something (`two lines`, `four tall windows`), or a
@@ -202,27 +205,52 @@ def claims(path: Path) -> list[tuple[Claim, list[int]]]:
     return out
 
 
-def listed_in(claim: Claim, file: Path, listed: str) -> bool:
+def scope_names(claim: Claim, file: Path) -> list[str]:
+    """What a line names a claim's scope by: the test or class, or for the
+    module the word `module` or the file's name, as the table above does."""
+    return [claim.scope] if claim.scope != "module" else ["module", file.name]
+
+
+def word(text: str) -> re.Pattern:
+    return re.compile(rf"(?<![\w.]){re.escape(text)}(?![\w])")
+
+
+def rows(blocks: list[str], names: set[str]) -> list[tuple[set[str], str]]:
+    """Each line of the `<details>` blocks with the scopes it lists claims
+    for: those it names, or, naming none (a `same` row, a wrapped line),
+    those of the line above it in its block."""
+    found = {n: word(n) for n in names}
+    out = []
+    for block in blocks:
+        current: set[str] = set()
+        for line in block.splitlines():
+            if named := {n for n, pattern in found.items() if pattern.search(line)}:
+                current = named
+            out.append((current, line))
+    return out
+
+
+def listed_in(claim: Claim, file: Path, listed: list[tuple[set[str], str]]) -> bool:
     """The claim as written, or a number word as its digits ("four
-    landscape" as "4 landscape"), as a whole token on one line that names
-    its scope: the test or class, or for the module the word `module` or
-    the file's name, as the table above prints them. #324's 2 passed for a
-    2 elsewhere in the block (#324 retro)."""
+    landscape" as "4 landscape"), as a whole token on a line that lists its
+    scope's claims (`rows()`). #324's 2 passed for a 2 in another test's
+    row (#324 retro). A module claim counts on any line."""
     forms = [claim.text]
-    word, _, rest = claim.text.partition(" ")
-    if word.lower() in WORDS[:12] and rest:
-        forms.append(f"{WORDS.index(word.lower()) + 1} {rest}")
-    names = [claim.scope] if claim.scope != "module" else ["module", file.name]
-    pattern = re.compile("|".join(rf"(?<![\w.]){re.escape(f)}(?![\w])" for f in forms))
+    first, _, rest = claim.text.partition(" ")
+    if first.lower() in WORDS[:12] and rest:
+        forms.append(f"{WORDS.index(first.lower()) + 1} {rest}")
+    pattern = re.compile("|".join(word(f).pattern for f in forms))
+    if claim.scope == "module":
+        # A module claim's row may name the constant a comment sits above,
+        # and a test that reads it (#333's `STUB` comment row).
+        return any(pattern.search(line) for _, line in listed)
     return any(
-        pattern.search(line)
-        and any(re.search(rf"(?<![\w.]){re.escape(n)}(?![\w])", line) for n in names)
-        for line in listed.splitlines()
+        claim.scope in scopes and pattern.search(line) for scopes, line in listed
     )
 
 
-def details(body: str) -> str:
-    return "\n".join(re.findall(r"<details>(.*?)</details>", body, re.S))
+def details(body: str) -> list[str]:
+    return re.findall(r"<details>(.*?)</details>", body, re.S)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -232,7 +260,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     found = [(f, c, hits) for f in args.files for c, hits in claims(f)]
     if args.check:
-        listed = details(args.check.read_text())
+        names = {n for f, c, _ in found for n in scope_names(c, f)}
+        listed = rows(details(args.check.read_text()), names)
         missing = [(f, c) for f, c, _ in found if not listed_in(c, f, listed)]
         for f, c in missing:
             print(

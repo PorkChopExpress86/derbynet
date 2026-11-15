@@ -72,7 +72,7 @@ def test_a_claim_counts_only_on_a_line_that_names_its_test(tmp_path, capsys):
     """#324's body listed "2" for no test, and `--check` passed
     `test_lane_two_off_leaves_it_out_of_heat_ready`'s 2 because a 2 stood
     elsewhere in a block; a 12 or another test's row counts no more (#324
-    retro). A module claim's line names the module or the file."""
+    retro). A module claim counts on any line of a block."""
     path = tmp_path / "test_sample.py"
     path.write_text(
         '"""1920x1080 here."""\n\n\ndef test_lanes():\n    """2 lanes."""\n\n\n'
@@ -89,8 +89,22 @@ def test_a_claim_counts_only_on_a_line_that_names_its_test(tmp_path, capsys):
     )
     body.write_text(
         "<details>\n| `test_lanes` | 2 lanes |\n| `test_heats` | 2 heats |\n"
-        "test_sample.py: 1920x1080\n</details>\n"
+        "| `CONSTANT` comment | 1920x1080 |\n</details>\n"
     )
     assert dc.main(["--check", str(body), str(path)]) == 0
-    body.write_text(body.read_text().replace("test_sample.py:", "| `module` |"))
+    body.write_text(body.read_text().replace("1920x1080", "1920x108"))
+    assert dc.main(["--check", str(body), str(path)]) == 1
+
+
+def test_a_same_row_lists_for_the_test_above_it(tmp_path):
+    """#330's table wrote `same` for a test's second row, as a reader
+    would."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_lanes():\n    """2 lanes in 58.3 px."""\n')
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n| `test_lanes` | 2 |\n| same | 58.3 px |\n</details>\n")
     assert dc.main(["--check", str(body), str(path)]) == 0
+    body.write_text(
+        "<details>\n| `test_lanes` | 2 |\n</details>\n<details>\n58.3 px\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1

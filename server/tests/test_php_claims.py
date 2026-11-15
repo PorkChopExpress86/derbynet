@@ -181,7 +181,7 @@ def test_a_divergence_that_says_what_php_does_is_found():
         "ROUTE_DIVERGENCES = {\n"
         '    "a.php": ("D1: x; a.php links b.php for every role.",),\n'
         '    "c.php": ("D2: x; c.php links d.php (fake-timer.php:9).",\n'
-        '              "D3: a.php\'s list."),\n'
+        '              "D3: a.php\'s list.", "D4: e.php for a role."),\n'
         "}\n"
     )
     assert uncited_divergences(source) == ["a.php (registry.py:2): a.php links"]
