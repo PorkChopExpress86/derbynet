@@ -54,8 +54,9 @@ targets, then:
   module outside the tree) is no import-only move. A flake ticket keeps 25
   repeats of the whole file, on the database it failed on, whatever the
   tool prints (D101);
-- before the commands, `tools/docstring_claims.py` on each changed test file
-  and `tools/operand_mutants.py` when a changed hand-written source file can
+- before the commands, `tools/docstring_claims.py` on each changed test file,
+  then with `--check` on the PR body draft over every one of them, since a
+  catch-all row fails (#341 retro), and `tools/operand_mutants.py` when a changed hand-written source file can
   hold a condition (not a migration or vendored code), plan/'s Python tools
   and tests among them, with `tools/mutate.py --listed`, which runs every
   mutant it lists (#336 retro): run them before the first hand-off run,
@@ -2002,6 +2003,10 @@ def report(plan, tree):
             'since an edit restarts the runs below (#312 retro):')
         if plan.changed_tests:
             say(f'  uv run python tools/docstring_claims.py {" ".join(plan.changed_tests)}')
+            # #341 checked two of its four changed test files, and a
+            # catch-all row for the rest failed review (#341 retro).
+            say('  uv run python tools/docstring_claims.py --check <the PR body draft> '
+                + ' '.join(plan.changed_tests))
         if plan.changed_source:
             base = f' --base {plan.base}' if plan.from_git else ''
             say(f'  uv run python tools/operand_mutants.py{base}')
