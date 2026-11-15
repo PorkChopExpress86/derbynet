@@ -231,3 +231,140 @@ def test_a_literal_limit_in_a_template_is_flagged(source):
 )
 def test_a_limit_from_the_view_passes(source):
     assert template_offenders(source) == []
+
+
+# PHP's whole seconds (#307 retro). PHP stores a contact as `time()` and
+# compares and subtracts whole seconds (`timer-state.inc:72`,
+# `replay.inc:35`). The port stores a `last_contact` datetime with its
+# fraction, so a `last_contact` added to, subtracted from or ordered against
+# a datetime counts time PHP never sees. The rule lives in
+# `racing.services.timer.php_time`. #307 moved the timer's timeout to whole
+# seconds in `TimerState.read`, left `polls._timer_status`'s age counting the
+# fraction, and dated the overdue row before the moment the rule first holds;
+# review found both, and the scan finds both in #307's lines before its fix
+# round (the cases below). The scan reads every module under server/ but tests,
+# migrations and tools; an age passed to a helper under another name
+# (`ui/dashboard/state.py`'s `_age(row.last_contact, now)`) is review's.
+CONTACT = "last_contact"
+CONTACT_SKIP = {".venv", "tests", "migrations", "tools", "node_modules"}
+# Arithmetic that counts whole seconds itself.
+WHOLE_SECONDS = {
+    "racing/services/timer.py::timed_out_at": "floors last_contact to its second",
+}
+# Known differences from PHP, each waiting on its fix.
+OPEN_DIFFERENCES = {
+    "racing/services/polls.py::replay_state": (
+        "#307 retro: PHP counts whole seconds (replay.inc:35, json-replay.inc:11)"
+    ),
+    "racing/services/replay.py::connected": (
+        "#307 retro: send_replay_message reads get_replay() (replay.inc:59, :35)"
+    ),
+}
+
+
+def _names_contact(node: ast.expr) -> bool:
+    return (isinstance(node, ast.Attribute) and node.attr == CONTACT) or (
+        isinstance(node, ast.Name) and node.id == CONTACT
+    )
+
+
+def contact_arithmetic(source: str) -> list[tuple[str, int, str]]:
+    """(function, line, expression) for each `last_contact` that is an
+    operand of `+`, `-` or an ordering comparison. A comparison with numbers
+    alone, such as a legacy `last_contact > 0`, is no datetime's."""
+    tree = ast.parse(source)
+    owner: dict[ast.AST, str] = {}
+    for fn in ast.walk(tree):
+        if isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
+            for node in ast.walk(fn):
+                owner[node] = fn.name  # an inner def walks later and wins
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add | ast.Sub):
+            operands = [node.left, node.right]
+        elif isinstance(node, ast.Compare) and any(
+            isinstance(op, ORDERING) for op in node.ops
+        ):
+            operands = [node.left, *node.comparators]
+            others = [o for o in operands if not _names_contact(o)]
+            if all(isinstance(o, ast.Constant) for o in others):
+                continue
+        else:
+            continue
+        if any(_names_contact(o) for o in operands):
+            found.append((owner.get(node, "<module>"), node.lineno, ast.unparse(node)))
+    return found
+
+
+def _contact_modules() -> list[Path]:
+    return sorted(
+        p
+        for p in SERVER.rglob("*.py")
+        if not CONTACT_SKIP.intersection(p.relative_to(SERVER).parts)
+    )
+
+
+def _contact_findings() -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    for path in _contact_modules():
+        rel = path.relative_to(SERVER).as_posix()
+        for function, line, text in contact_arithmetic(path.read_text()):
+            found.setdefault(f"{rel}::{function}", []).append(f"{rel}:{line} {text}")
+    return found
+
+
+def test_a_contact_counts_php_whole_seconds():
+    found = _contact_findings()
+    wrong = [
+        hit
+        for key, hits in found.items()
+        if key not in WHOLE_SECONDS and key not in OPEN_DIFFERENCES
+        for hit in hits
+    ]
+    assert wrong == [], "count whole seconds with racing.services.timer.php_time"
+
+
+def test_each_whole_seconds_entry_still_has_its_arithmetic():
+    found = _contact_findings()
+    assert [k for k in {**WHOLE_SECONDS, **OPEN_DIFFERENCES} if k not in found] == []
+
+
+# #307's own lines before its fix round (0a37f3a4).
+TIMER_AGE_307 = """
+def _timer_status(timer, now):
+    seconds = int((now - timer.last_contact).total_seconds())
+"""
+TIMEOUT_DATE_307 = """
+def time_out(event, row, timer, now):
+    at = None if timer.last_contact is None else timer.last_contact + CONTACT_TIMEOUT
+"""
+REPLAY_TIMEOUT_COMPARE = """
+def replay_state(event, now):
+    if replay.last_contact is None or replay.last_contact + REPLAY_TIMEOUT < now:
+        pass
+    if now > last_contact:
+        pass
+"""
+
+
+@pytest.mark.parametrize(
+    "source, count",
+    [(TIMER_AGE_307, 1), (TIMEOUT_DATE_307, 1), (REPLAY_TIMEOUT_COMPARE, 2)],
+    ids=["age-307", "timeout-date-307", "replay-compare"],
+)
+def test_contact_arithmetic_is_found(source, count):
+    assert len(contact_arithmetic(source)) == count
+
+
+WHOLE_SECONDS_USED = """
+def _timer_status(timer, now):
+    seconds = php_time(now) - php_time(timer.last_contact)
+    stale = php_time(timer.last_contact) + 60 < php_time(now)
+
+def decode(last_contact):
+    return _from_unix(last_contact) if last_contact > 0 else None, last_contact < 0
+"""
+
+
+def test_whole_seconds_and_legacy_numbers_pass():
+    assert contact_arithmetic(WHOLE_SECONDS_USED) == []
