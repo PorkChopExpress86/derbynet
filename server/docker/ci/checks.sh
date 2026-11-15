@@ -36,6 +36,11 @@
 #              import lands in Postgres and no SQLite file appears; with
 #              Postgres stopped it fails with one message naming the host;
 #              with no profile, it reads the server's SQLite (#308)
+#   root       manage.py check, run with docker compose exec and no -u, fails
+#              with one line naming the command and -u derbynet; a refused
+#              manage.py shell writes nothing; collectstatic, one of the
+#              build's commands, still runs as root; and manage.py check
+#              passes with -u derbynet (D103)
 #   bad-env    values that would reach nginx's configuration malformed stop
 #              the container with a message
 #   allowed-hosts
@@ -555,6 +560,53 @@ print(*Event.objects.values_list("name", flat=True))')"
     "${compose[@]}" down --volumes
 }
 
+# `docker exec` and `docker compose exec` run as root unless given -u, and in
+# the image manage.py then refuses to run (D103): an import run as root leaves
+# the event's photo folder root's (#327's review).  The refused command never
+# starts, the build's collectstatic still runs as root, and the same command
+# with -u derbynet runs.  Each exec'd manage.py here without -u carries
+# ROOT_ON_PURPOSE (tests/test_docker_checks.py).
+check_root() {
+    local project="$PREFIX-root"
+    local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml")
+    export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
+    "${compose[@]}" up -d --wait
+    local out status
+    say "manage.py check, run with docker compose exec and no -u"
+    status=0
+    out="$("${compose[@]}" exec -T server python manage.py check 2>&1)" || status=$?  # root on purpose (D103)
+    echo "$out"
+    echo "exit status $status"
+    [ "$status" != 0 ] || fail "manage.py check ran as root"
+    [ "$out" = "derbynet: manage.py check refuses to run as root. Run it as the server's user: pass -u derbynet to docker exec or docker compose exec." ] \
+        || fail "manage.py check as root did not print one line naming the command and -u derbynet"
+
+    say "a refused manage.py shell writes nothing"
+    status=0
+    out="$("${compose[@]}" exec -T server python manage.py shell --no-imports -c 'open("/var/lib/derbynet/ran-as-root", "w")' 2>&1)" || status=$?  # root on purpose (D103)
+    echo "$out"
+    echo "exit status $status"
+    [ "$status" != 0 ] || fail "manage.py shell ran as root"
+    "${compose[@]}" exec -T server sh -c '! ls -l /var/lib/derbynet/ran-as-root 2>/dev/null' \
+        || fail "the refused command wrote /var/lib/derbynet/ran-as-root"
+
+    say "the build's collectstatic still runs as root"
+    status=0
+    out="$("${compose[@]}" exec -T server python manage.py collectstatic --noinput --dry-run --verbosity 1 2>&1)" || status=$?  # root on purpose (D103)
+    echo "$out" | tail -1
+    echo "exit status $status"
+    [ "$status" = 0 ] || fail "collectstatic did not run as root"
+
+    say "docker compose exec -u derbynet server python manage.py check"
+    status=0
+    out="$("${compose[@]}" exec -T -u derbynet server python manage.py check 2>&1)" || status=$?
+    echo "$out"
+    echo "exit status $status"
+    [ "$status" = 0 ] || fail "manage.py check failed as derbynet"
+    [[ "$out" == "System check identified no issues"* ]] || fail "manage.py check did not run as derbynet"
+    "${compose[@]}" down --volumes
+}
+
 check_timeout() {
     start t1 "$PREFIX-timeout" -e DERBYNET_REQUEST_TIMEOUT=600
     say "DERBYNET_REQUEST_TIMEOUT=600"
@@ -878,7 +930,7 @@ check_timer() {
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
 [ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
-    reload timeout engine postgres-password exec-database bad-env allowed-hosts docs timer
+    reload timeout engine postgres-password exec-database root bad-env allowed-hosts docs timer
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -894,6 +946,7 @@ for check in "$@"; do
         reload) check_reload ;;
         postgres-password) check_postgres_password ;;
         exec-database) check_exec_database ;;
+        root) check_root ;;
         bad-env) check_bad_env ;;
         allowed-hosts) check_allowed_hosts ;;
         upgrade) check_upgrade ;;
