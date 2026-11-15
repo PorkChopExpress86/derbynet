@@ -380,7 +380,7 @@ check_bind_mount() {
     local url="http://$(docker port "$PREFIX-b3" 80/tcp)" head photo
     head="$(photo_racer "$url" "$RUNNER_TEMP_DIR/bind-work")"
     served "$url" "$head" "$RUNNER_TEMP_DIR/bind-work/cookies"
-    photo="$(find "$dir" -path "$dir/tls" -prune -o -name '*.jpg' -type f -print | sort | head -1)"
+    photo="$(sed -n 1p <<<"$(find "$dir" -path "$dir/tls" -prune -o -name '*.jpg' -type f -print | sort)")"
     [ -n "$photo" ] || fail "no photo on the bind mount"
     say "ls -ln, on the host, of the photo the server wrote; id -u and id -g are $(id -u) $(id -g)"
     (cd "$dir" && ls -ln "${photo#"$dir"/}")
@@ -443,6 +443,14 @@ check_uid_env() {
         echo "$out"
         [ "$out" = "exec -u derbynet: $uid $gid"$'\n'"gunicorn: $uid $gid" ] || fail "derbynet does not run as $uid:$gid"
         owned_by "$name" "$uid" "$gid"
+        if [ "$uid" = 1000 ]; then
+            # The base image's ubuntu account is gone (owner question,
+            # pending (#350)), so the usual first host user is derbynet's
+            # alone.
+            out="$(docker exec "$PREFIX-$name" getent passwd 1000 | cut -d: -f1 | xargs)"
+            echo "getent passwd 1000: $out"
+            [ "$out" = derbynet ] || fail "uid 1000 names $out, not derbynet alone"
+        fi
         stop "$name"
     done
 }

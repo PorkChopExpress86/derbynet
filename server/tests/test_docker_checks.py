@@ -482,8 +482,8 @@ def test_guide_env_lines_run_write_the_host_users_ids(tmp_path):
 
 
 def test_guide_env_lines_skip_other_blocks(tmp_path):
-    """A `docker run` naming DERBYNET_UID, and another line into .env, are not
-    the step."""
+    """A `docker run` naming DERBYNET_UID, another line into .env, and a
+    PowerShell block are not the step."""
     text = (
         "# T\n\n```sh\ndocker run -e DERBYNET_UID=$(id -u) image\n```\n\n"
         "```sh\necho DERBYNET_IMAGE=x >> .env\n```\n\n"
@@ -492,3 +492,8 @@ def test_guide_env_lines_skip_other_blocks(tmp_path):
     assert guide_env_lines(tmp_path, text) == ""
     step = "```sh\necho DERBYNET_UID=1 >> .env\n```\n"
     assert guide_env_lines(tmp_path, text + step) == "echo DERBYNET_UID=1 >> .env\n"
+    # A block in another language after the step closes no second copy.
+    after = "\n```powershell\nx\n```\n"
+    assert guide_env_lines(tmp_path, text + step + after) == (
+        "echo DERBYNET_UID=1 >> .env\n"
+    )
