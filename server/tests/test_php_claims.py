@@ -11,6 +11,7 @@ about 9.2 s, and the check matched only "as PHP does" and skipped `static/`
 (#252 retro).
 """
 
+import ast
 import re
 from pathlib import Path
 
@@ -139,3 +140,56 @@ def test_each_known_claim_is_still_uncited():
     only shrinks."""
     left = {(path, claim) for path, _, claim in tree_claims()}
     assert sorted(KNOWN - left) == []
+
+
+# A page divergence that says what a PHP page or script does: "fake-timer.php
+# links coordinator.php", "vote.js polls settings.list". #324's D98 line named
+# fake-timer.php without `:99-100`, which its view and template cite, until
+# review (#324 retro).
+DOES = re.compile(r"\b[\w./-]+\.(?:php|inc|js|kiosk)\s+[a-z]+s\b")
+REGISTRY = SERVER / "legacy_api" / "registry.py"
+
+
+def route_divergences(source: str) -> list[tuple[str, int, str]]:
+    """(page, line, text) of each `ROUTE_DIVERGENCES` text, from the source."""
+    for node in ast.parse(source).body:
+        target = (
+            node.target
+            if isinstance(node, ast.AnnAssign)
+            else (node.targets[0] if isinstance(node, ast.Assign) else None)
+        )
+        if isinstance(target, ast.Name) and target.id == "ROUTE_DIVERGENCES":
+            return [
+                (key.value, text.lineno, text.value)
+                for key, texts in zip(node.value.keys, node.value.values, strict=True)
+                for text in ast.walk(texts)
+                if isinstance(text, ast.Constant) and isinstance(text.value, str)
+            ]
+    return []
+
+
+def uncited_divergences(source: str) -> list[str]:
+    return [
+        f"{page} (registry.py:{line}): {DOES.search(text).group()}"
+        for page, line, text in route_divergences(source)
+        if DOES.search(text) and not CITATION.search(text)
+    ]
+
+
+def test_a_divergence_that_says_what_php_does_is_found():
+    source = (
+        "ROUTE_DIVERGENCES = {\n"
+        '    "a.php": ("D1: x; a.php links b.php for every role.",),\n'
+        '    "c.php": ("D2: x; c.php links d.php (fake-timer.php:9).",\n'
+        '              "D3: a.php\'s list."),\n'
+        "}\n"
+    )
+    assert uncited_divergences(source) == ["a.php (registry.py:2): a.php links"]
+
+
+def test_each_page_divergence_that_says_what_php_does_cites_where():
+    assert route_divergences(REGISTRY.read_text()), "ROUTE_DIVERGENCES is read"
+    assert uncited_divergences(REGISTRY.read_text()) == [], (
+        "Cite the PHP file and line (fake-timer.php:99-100) in each divergence"
+        " that says what a PHP page does"
+    )
