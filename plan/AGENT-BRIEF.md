@@ -15,6 +15,7 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 - Send the lead each gap you know of and have no test for before the push, with what you tried, so the lead or review can build the test while the branch is open. #239's implementer named a page that reloads mid-check in its report; review's stand-in page that reloads every second crashed the tool 8 of 8.
 - Before building, check each number, range and choice in the ticket's acceptance boxes against the PHP source, and send a mismatch to the lead then. #48's ticket said a fake roster "sees 30" where PHP adds -2 to +2 racers to each group at random (`action.racer.fake.inc:31-35`, C57), and its setting ranges came from the ticket instead of `settings.php`'s inputs; the review found both.
 - A behavior the ticket's Risks or the lead's condition states, such as "not on a timer", gets a test like an acceptance box. #250's fit() on every poll passed every test until review.
+- A tool under `plan/bin`, `server/tools` or `.githooks` that acts (merges, pushes, edits an issue) after a long step reads the state it acts on again just before acting, and a test changes that state during the step. A tool that cleans up in a trap is tested with a second signal during the cleanup, and with a SIGKILL followed by its next run. #311's pr-merge read origin/master once and merged 16 min later; the review pushed master mid-run and pr-merge merged anyway, and a second Ctrl-C or a SIGKILL left its run and worktree (#333 review).
 
 ## Django handlers
 

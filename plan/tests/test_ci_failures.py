@@ -10,6 +10,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 CI_FAILURES = Path(__file__).resolve().parent.parent / 'bin' / 'ci-failures'
 VOTE = 'ui/tests/browser/test_vote.py::test_the_sort_control_orders_the_grid_and_keeps_the_url[desktop-chromium]'
 EVENTS = 'ui/tests/browser/test_events.py::test_reopen_and_archive_from_the_page[desktop-chromium]'
