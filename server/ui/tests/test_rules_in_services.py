@@ -251,13 +251,13 @@ CONTACT_SKIP = {".venv", "tests", "migrations", "tools", "node_modules"}
 WHOLE_SECONDS = {
     "racing/services/timer.py::timed_out_at": "floors last_contact to its second",
 }
-# Known differences from PHP, each waiting on its fix.
+# Known differences from PHP, each waiting on its ticket.
 OPEN_DIFFERENCES = {
     "racing/services/polls.py::replay_state": (
-        "#307 retro: PHP counts whole seconds (replay.inc:35, json-replay.inc:11)"
+        "#341: PHP counts whole seconds (replay.inc:35, json-replay.inc:11)"
     ),
     "racing/services/replay.py::connected": (
-        "#307 retro: send_replay_message reads get_replay() (replay.inc:59, :35)"
+        "#341: send_replay_message reads get_replay() (replay.inc:59, :35)"
     ),
 }
 
