@@ -869,6 +869,60 @@ def cover_ui_page(plan, tree, path):
         plan.add(path, 'ui-page', note, sorted(set(targets)))
 
 
+ROLE_PAGES = 'tests/test_role_pages_fixture.py'
+
+
+def role_page_views(tree):
+    """The modules of the views `OTHER_PAGES` in the role-pages check names
+    (`"ui.timer.views.browser_timer"` is ui/timer/views.py), read from its
+    source so a row added there maps too."""
+    try:
+        module = ast.parse(tree.text(ROLE_PAGES))
+    except SyntaxError:
+        return []
+    found = []
+    for node in module.body:
+        target = node.target if isinstance(node, ast.AnnAssign) else (
+            node.targets[0] if isinstance(node, ast.Assign) else None)
+        if not (isinstance(target, ast.Name) and target.id == 'OTHER_PAGES'
+                and isinstance(node.value, ast.Dict)):
+            continue
+        for value in node.value.values:
+            first = value.elts[0] if isinstance(value, ast.Tuple) and value.elts else None
+            if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                parts = first.value.split('.')[:-1]
+                for rel in ('/'.join(parts) + '.py', '/'.join(parts) + '/__init__.py'):
+                    if tree.exists(rel) and rel not in found:
+                        found.append(rel)
+    return found
+
+
+def match_role_gates(path):
+    rel = s(path)
+    return rel is not None and not in_tests(rel) and rel.endswith('.py')
+
+
+def cover_role_gates(plan, tree, path):
+    """test_role_pages_fixture.py holds the shell suite's page lists to each
+    old page's gate before a push; only CI runs that suite, and #323's CI
+    failed 10 jobs on the fixture (#320 retro). The fixtures, the seeded
+    roles and the gates reach it by name or import; this adds the URL confs
+    its resolve() reads and the views its OTHER_PAGES names, whose gates it
+    holds by hand."""
+    rel = s(path)
+    if Path(rel).name != 'urls.py' and rel not in role_page_views(tree):
+        return
+    if Path(rel).name == 'urls.py':
+        note = ('a URL conf: the role-pages check resolves each old page '
+                'Django answers itself through it')
+    else:
+        note = ('answers an old page whose gate the role-pages check holds by '
+                'hand in OTHER_PAGES: a change to its check changes that row, and '
+                'the page\'s list in testing/fixtures/role-pages-django.json; only '
+                'CI\'s shell suite (testing/test-permissions.sh) checks the replies')
+    plan.add(path, 'role-gates', note, [ROLE_PAGES])
+
+
 def match_server_tools(path):
     rel = s(path)
     return rel is not None and rel.startswith('tools/')
@@ -940,6 +994,7 @@ RULES = (
     ('db-code', match_db_code, cover_db_code),
     ('shared-ui', match_shared_ui, cover_shared_ui),
     ('ui-page', match_ui_page, cover_ui_page),
+    ('role-gates', match_role_gates, cover_role_gates),
     ('server-tools', match_server_tools, cover_server_tools),
     ('docker', match_docker, cover_docker),
 )

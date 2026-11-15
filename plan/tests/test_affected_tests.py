@@ -1420,6 +1420,22 @@ class RealTree(unittest.TestCase):
                 self.assertTrue(set(named) - page_wide,
                                 'no test target beyond the page-wide checks')
 
+    def test_each_file_the_role_pages_check_reads_prints_it(self):
+        """The fixtures, the seeded roles, the gates, the URL confs that
+        resolve() reads, and each view its OTHER_PAGES names, read from the
+        real test: #323's CI failed 10 jobs on that fixture (#320 retro)."""
+        fixture = 'tests/test_role_pages_fixture.py'
+        views = [f'server/{v}' for v in TOOL.role_page_views(TOOL.Tree(REPO))]
+        self.assertIn('server/ui/timer/views.py', views)
+        files = ['testing/fixtures/role-pages.json', 'testing/fixtures/role-pages-django.json',
+                 'server/accounts/defaults.py', 'server/accounts/permissions.py',
+                 'server/ui/redirects.py', 'server/ui/navigation.py',
+                 'server/derbynet/urls.py', 'server/ui/urls.py', *views]
+        out = run(*files, root=REPO)
+        for path in files:
+            with self.subTest(path=path):
+                self.assertIn(fixture, section(out, path))
+
     def test_every_command_and_server_tool_maps(self):
         server = REPO / 'server'
         files = [str(p.relative_to(REPO)) for p in server.glob('*/management/commands/*.py')
