@@ -182,16 +182,32 @@ def replay_state(client) -> dict:
     return found["replay-state"]
 
 
+CONNECTED = (True, "Ready (10 sec.)", ["TEST 4000 2 50"])
+LAPSED = (False, "NOT CONNECTED", ["HELLO"])
+
+
+def read_at(client, clock, contact: timedelta, read: timedelta):
+    """A replay client's poll at `contact`, then at `read` the coordinator's
+    replay state, `replay.test` and the client's next poll: (connected, the
+    status message, the commands that poll gets)."""
+    clock[0] = contact
+    assert poll(client) == ["HELLO"]
+    clock[0] = read
+    found = replay_state(client)
+    act(client, "action=replay.test")
+    return found["connected"], found["message"], poll(client)
+
+
 @pytest.mark.parametrize(
-    ("contact", "read", "connected"),
+    ("contact", "read", "expected"),
     [
-        (0.8, timedelta(seconds=10), True),
-        (0.8, timedelta(seconds=10.9), True),
-        (0.8, timedelta(seconds=11) - MICROSECOND, True),
-        (0.8, timedelta(seconds=11), False),
-        (0, timedelta(seconds=10.5), True),
-        (0, timedelta(seconds=11) - MICROSECOND, True),
-        (0, timedelta(seconds=11), False),
+        (0.8, timedelta(seconds=10), CONNECTED),
+        (0.8, timedelta(seconds=10.9), CONNECTED),
+        (0.8, timedelta(seconds=11) - MICROSECOND, CONNECTED),
+        (0.8, timedelta(seconds=11), LAPSED),
+        (0, timedelta(seconds=10.5), CONNECTED),
+        (0, timedelta(seconds=11) - MICROSECOND, CONNECTED),
+        (0, timedelta(seconds=11), LAPSED),
     ],
     ids=[
         "0.8-read-10",
@@ -204,34 +220,38 @@ def replay_state(client) -> dict:
     ],
 )
 def test_the_replay_timeout_counts_whole_seconds(
-    coordinator, event, clock, contact, read, connected
+    coordinator, event, clock, contact, read, expected
 ):
     """#341: PHP's `$last_contact + REPLAY_TIMEOUT_LIMIT < time()`
     (`replay.inc:35`) compares whole seconds, so a contact at SECOND or
     0.8 s past it is connected until 11 s past SECOND, and not 1 microsecond
-    longer. Each read is a poll's replay state, then `replay.test`
+    longer. Each read is the coordinator's replay state, then `replay.test`
     (`send_replay_message()`, `replay.inc:59-60`), then the client's next
     poll, which gets the TEST command while connected and `HELLO` alone once
     not (`action.replay.message.inc:12-24`), as #341's PHP probe showed."""
-    clock[0] = SECOND + timedelta(seconds=contact)
-    assert poll(coordinator) == ["HELLO"]
-    clock[0] = SECOND + read
-    # 0.8 s past SECOND, the contact is first timed out 10.2 s after it.
-    if contact == 0.8 and not connected:
-        assert (clock[0] - (SECOND + timedelta(seconds=contact))) == timedelta(
-            seconds=10.2
-        )
+    found = read_at(
+        coordinator, clock, SECOND + timedelta(seconds=contact), SECOND + read
+    )
 
-    found = replay_state(coordinator)
-    act(coordinator, "action=replay.test")
-    commands = poll(coordinator)
+    assert found == expected
 
-    if connected:
-        assert (found["connected"], found["message"]) == (True, "Ready (10 sec.)")
-        assert commands == ["TEST 4000 2 50"]
-    else:
-        assert (found["connected"], found["message"]) == (False, "NOT CONNECTED")
-        assert commands == ["HELLO"]
+
+@pytest.mark.parametrize(
+    ("early", "expected"),
+    [(timedelta(0), LAPSED), (MICROSECOND, CONNECTED)],
+    ids=["at-10.2-s", "1us-before"],
+)
+def test_a_contact_lapses_10_2_seconds_after_it(
+    coordinator, event, clock, early, expected
+):
+    """#341: a contact 0.8 s past a whole second first reads as lapsed
+    10.2 s after it, 11 s past its whole second (`replay.lapsed`), and not
+    1 microsecond before."""
+    contact = SECOND + timedelta(seconds=0.8)
+    lapses = contact + timedelta(seconds=10.2)
+    assert lapses == SECOND + timedelta(seconds=11)
+
+    assert read_at(coordinator, clock, contact, lapses - early) == expected
 
 
 def test_the_replay_age_counts_whole_seconds(coordinator, event, clock):
