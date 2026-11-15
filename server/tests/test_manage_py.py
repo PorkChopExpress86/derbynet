@@ -7,6 +7,7 @@ Django's traceback. The host here, under `.invalid`, never resolves (RFC
 """
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -118,3 +119,95 @@ def test_an_error_after_the_connection_opened_keeps_the_traceback(
     monkeypatch.setattr(wrapper, "connection", object())
     with pytest.raises(OperationalError):
         load_manage().main()
+
+
+# ----- manage.py refuses root in the Docker image (D103, #345) ---------------
+
+DOCKERFILE = SERVER / "docker" / "Dockerfile"
+# A manage.py command the Dockerfile runs, as `.../python manage.py NAME`.
+DOCKERFILE_COMMAND = re.compile(r"\bpython[ \t]+manage\.py[ \t]+([a-z_]+)")
+MESSAGE = (
+    "derbynet: manage.py {} refuses to run as root. Run it as the server's "
+    "user: pass -u derbynet to docker exec or docker compose exec."
+)
+
+
+def run_as(monkeypatch, tmp_path, argv, *, euid=0, marker=True):
+    """manage.py's main() with `argv`, under effective uid `euid`, with the
+    image's marker present or not: the argv Django was handed, or the
+    SystemExit's message."""
+    import django.core.management
+
+    manage = load_manage()
+    path = tmp_path / "docker-image"
+    if marker:
+        path.write_text("marker\n")
+    ran = []
+    monkeypatch.setattr(manage, "IMAGE_MARKER", path)
+    monkeypatch.setattr(os, "geteuid", lambda: euid)
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(django.core.management, "execute_from_command_line", ran.append)
+    try:
+        manage.main()
+    except SystemExit as stopped:
+        assert ran == [], "Django ran the command before the refusal"
+        return str(stopped.code)
+    return ran
+
+
+def test_root_in_the_image_is_refused_with_one_line(monkeypatch, tmp_path):
+    for argv, command in (
+        (["manage.py", "check"], "check"),
+        (["manage.py", "import_derbynet", "x.sqlite3"], "import_derbynet"),
+        (["manage.py", "migrate", "--noinput"], "migrate"),
+        (["manage.py"], "help"),
+        (["manage.py", "--help"], "--help"),
+    ):
+        got = run_as(monkeypatch, tmp_path, argv)
+        assert got == MESSAGE.format(command), argv
+        assert len(got.splitlines()) == 1
+        assert "-u derbynet" in got
+
+
+def test_the_builds_commands_run_as_root_in_the_image(monkeypatch, tmp_path):
+    for command in ("collectstatic", "build_timer", "build_docs"):
+        argv = ["manage.py", command, "--noinput"]
+        assert run_as(monkeypatch, tmp_path, argv) == [argv]
+
+
+def test_root_outside_the_image_runs(monkeypatch, tmp_path):
+    """A host's `uv run python manage.py`, root or not, has no marker."""
+    argv = ["manage.py", "check"]
+    assert run_as(monkeypatch, tmp_path, argv, marker=False) == [argv]
+
+
+def test_another_user_in_the_image_runs(monkeypatch, tmp_path):
+    argv = ["manage.py", "import_derbynet", "x.sqlite3"]
+    assert run_as(monkeypatch, tmp_path, argv, euid=999) == [argv]
+
+
+def test_the_root_commands_are_the_dockerfiles():
+    """ROOT_COMMANDS is the commands the Dockerfile runs at build time, no
+    more: every other command is refused as root (D103)."""
+    built = set(DOCKERFILE_COMMAND.findall(DOCKERFILE.read_text()))
+    assert built == {"collectstatic", "build_timer", "build_docs"}
+    assert load_manage().ROOT_COMMANDS == built
+
+
+def test_every_other_command_is_refused_as_root(monkeypatch, tmp_path):
+    from django.core.management import get_commands
+
+    manage = load_manage()
+    for command in sorted(set(get_commands()) - manage.ROOT_COMMANDS):
+        argv = ["manage.py", command]
+        assert run_as(monkeypatch, tmp_path, argv) == MESSAGE.format(command)
+
+
+def test_the_marker_is_the_dockerfiles():
+    """The Dockerfile writes the marker manage.py reads, outside the server
+    folder a bind mount replaces, and copies it into the image."""
+    text = DOCKERFILE.read_text()
+    marker = str(load_manage().IMAGE_MARKER)
+    assert not marker.startswith("/opt/derbynet/server/")
+    assert f"> {marker}\n" in text
+    assert f"COPY --from=static {marker} {marker}\n" in text

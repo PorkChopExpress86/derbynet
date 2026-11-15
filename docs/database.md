@@ -50,6 +50,8 @@ docker cp /path/to/pack42 derbynet:/tmp/pack42
 docker exec -u derbynet derbynet python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"
 ```
 
+The `-u derbynet` runs it as the server's own user: without it the command runs as root, which `manage.py` refuses, since an import run as root leaves the event's photos readable only by root (D103).
+
 With Compose, run the same command through Compose. A command run this way uses the server's database, SQLite or the `postgres` profile's Postgres alike (#308):
 
 ```sh

@@ -231,7 +231,10 @@ def test_script_files_with_no_match_prints_nothing(tmp_path):
 # root unless told otherwise.  #308's first round wrote
 # `docker compose exec server python manage.py ...` in install-docker.md and a
 # compose.yaml comment.  Review found both: run that way, an import leaves the
-# event's photo folder root's (#327's commit message).
+# event's photo folder root's (#327's commit message).  Since D103 (#345)
+# manage.py in the image refuses root instead, so such a command fails with a
+# message; checks.sh's root check runs it on purpose, each line marked with
+# ROOT_ON_PURPOSE.
 
 # Where a command a reader or a script runs is written.  Python tests hold
 # stand-ins, this file's own among them.
@@ -287,6 +290,38 @@ def exec_commands(text: str) -> list[tuple[int, str | None]]:
     ]
 
 
+# The mark of an exec'd manage.py that runs as root on purpose, which only
+# checks.sh's check_root may carry.
+ROOT_ON_PURPOSE = "# root on purpose (D103)"
+CHECKS_NAME = "server/docker/ci/checks.sh"
+
+
+def root_execs(name: str, text: str) -> tuple[list[int], list[int]]:
+    """The lines of `text`'s exec'd manage.py commands that run as another
+    user than derbynet, and those of them marked ROOT_ON_PURPOSE inside
+    checks.sh's check_root, which pass."""
+    span = range(0)
+    if name == CHECKS_NAME:
+        match = re.search(r"^check_root\(\) \{.*?^\}$", text, re.M | re.S)
+        if match:
+            first = text.count("\n", 0, match.start()) + 1
+            span = range(first, first + match.group().count("\n") + 1)
+    lines = text.splitlines()
+    root, on_purpose = [], []
+    for line, user in exec_commands(text):
+        if user == "derbynet":
+            continue
+        # The command's last physical line, which holds a trailing comment.
+        end = line - 1
+        while lines[end].endswith("\\"):
+            end += 1
+        if line in span and lines[end].endswith(ROOT_ON_PURPOSE):
+            on_purpose.append(line)
+        else:
+            root.append(line)
+    return root, on_purpose
+
+
 def exec_files() -> list[str]:
     names = subprocess.run(
         ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True, check=True
@@ -305,23 +340,46 @@ def exec_files() -> list[str]:
 def test_every_execd_manage_py_runs_as_derbynet():
     found: dict[str, int] = {}
     root = []
+    on_purpose = []
     for name in exec_files():
         try:
             text = (ROOT / name).read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        for line, user in exec_commands(text):
-            found[name] = found.get(name, 0) + 1
-            if user != "derbynet":
-                root.append(f"{name}:{line} runs as {user or 'root'}")
+        found[name] = len(exec_commands(text))
+        flagged, marked = root_execs(name, text)
+        root += [f"{name}:{line}" for line in flagged]
+        on_purpose += [f"{name}:{line}" for line in marked]
     # The scan still reaches a guide and a script that hold such commands.
-    for name in ("docs/database.md", "server/docker/ci/checks.sh"):
+    for name in ("docs/database.md", CHECKS_NAME):
         assert found.get(name), f"no exec'd manage.py found in {name}"
+    # check_root's refused check and shell, and the build's collectstatic.
+    assert len(on_purpose) == 3, on_purpose
     assert root == [], (
         "pass `-u derbynet` before the container or service name: an exec runs "
-        "as root, and an import as root leaves the event's photo folder root's "
-        "(#308)\n" + "\n".join(root)
+        "as root, which manage.py in the image refuses (D103)\n" + "\n".join(root)
     )
+
+
+def test_root_on_purpose_passes_only_in_check_root():
+    """The mark passes a root exec inside check_root alone: the same line
+    without it, or marked in another check or another file, still fails."""
+    text = CHECKS.read_text()
+    root, on_purpose = root_execs(CHECKS_NAME, text)
+    assert root == [] and len(on_purpose) == 3
+    marked = next(
+        line
+        for line in text.splitlines()
+        if "exec -T server python manage.py check" in line
+    )
+    assert marked.endswith(ROOT_ON_PURPOSE)
+    unmarked = text.replace(marked, marked.removesuffix(ROOT_ON_PURPOSE))
+    assert len(root_execs(CHECKS_NAME, unmarked)[0]) == 1
+    elsewhere = text.replace(
+        "check_timeout() {\n", f"check_timeout() {{\n{marked}\n", 1
+    )
+    assert len(root_execs(CHECKS_NAME, elsewhere)[0]) == 1
+    assert len(root_execs("docs/database.md", text)[0]) == 3
 
 
 def test_an_exec_without_derbynet_is_found():
