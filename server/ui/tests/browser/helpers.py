@@ -1,8 +1,11 @@
 """Page helpers the browser tests and `tools/race_day_screens.py` share
-(#61 review): waiting on htmx, closing toasts, opening a settings section.
+(#61 review): waiting on htmx, closing toasts, opening a settings section,
+pausing the page's fake clock (#348).
 
 This module imports no Django, so a tool run outside pytest imports it too.
 """
+
+from datetime import timedelta
 
 from playwright.sync_api import expect
 
@@ -58,3 +61,15 @@ def open_section(page, key):
         section.locator("summary").click()
     expect(section).to_have_attribute("open", "")
     return section
+
+
+def pause_clock_at(page, at):
+    """Pause Playwright's clock at `at` (a datetime), before the page loads.
+    The clock runs from its install, so `pause_at(at)` after an install at
+    `at` itself failed "Cannot fast-forward to the past" once the two calls
+    were more than a moment apart, as under load (#317, #348). Installed a
+    minute early, the pause always moves forward
+    (`test_the_clock_pauses_after_a_slow_install` in
+    `test_kiosk_results_by_racer.py` and `test_kiosk_scale_mph.py`)."""
+    page.clock.install(time=at - timedelta(minutes=1))
+    page.clock.pause_at(at)
