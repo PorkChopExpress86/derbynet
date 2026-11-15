@@ -11,6 +11,8 @@
 # retro), a test that starts Playwright in the pytest process (#239 retro),
 # prose that calls a clamped font by its viewport term (#283 retro),
 # the first entry of a folder listing taken as it comes (#312 retro),
+# the role page lists of testing/test-permissions.sh against the page gates
+# (#319 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -59,6 +61,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_docker_checks.py \
   tests/test_pipefail_pipes.py \
   tests/test_listing_order.py \
+  tests/test_role_pages_fixture.py \
   transfer/tests/test_id_readers.py \
   ui/tests/test_no_copied_helpers.py \
   ui/tests/test_rules_in_services.py \

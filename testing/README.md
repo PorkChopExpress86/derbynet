@@ -177,6 +177,9 @@ allowed page answers 200 and a denied one redirects to the login page.  With
   and `RaceCoordinator` holds every bit.  The script fails
   when the override moves a page the PHP fixture doesn't have in the other
   list, and prints how many pages it checked for each role.
+  `server/tests/test_role_pages_fixture.py` holds both fixtures to the page
+  gates in the source, with no server, and `server/tools/source-checks.sh`
+  runs it before a push (#319 retro).
   `vote.php` needs no override: Django's ballot page is anonymous (#54, the
   `vote` entry of `server/ui/navigation.py`), and the Django leg finds its 301
   to `/vote/`, then 200, for every role.
