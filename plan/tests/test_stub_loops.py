@@ -62,7 +62,7 @@ def unbounded(source):
     return found
 
 
-def test_modules():
+def stand_in_modules():
     # This module's own examples are left out.
     yield from (p for p in sorted((REPO / 'plan' / 'tests').glob('*.py'))
                 if p != Path(__file__).resolve())
@@ -101,7 +101,7 @@ class StubLoops(unittest.TestCase):
 
     def test_every_stand_in_loop_has_a_bound(self):
         found = [f'{path.relative_to(REPO)}:{line}: {loop}'
-                 for path in test_modules() for line, loop in unbounded(path.read_text())]
+                 for path in stand_in_modules() for line, loop in unbounded(path.read_text())]
         self.assertEqual(found, [], 'bound each loop: see this module\'s docstring')
 
 

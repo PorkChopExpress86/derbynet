@@ -5,7 +5,9 @@ one that matches drops its tests without a word: #311's `-k run_them_again`
 matched nothing (the test says `runs_them_again`), and a broken test first
 failed in pr-merge's real run (#311 retro). Every plan test module imports
 this (test_k_patterns.py checks), so each way of running them is covered:
-`discover -s plan/tests`, with or without `-p`, and a module run as a script.
+`discover -s plan/tests`, with or without `-p`, and a module run as a script
+without `-I`. Under `-I` the script's folder is left off `sys.path`, and the
+import fails.
 
 The run stops before any test, with exit 2, unittest's usage error, naming
 each pattern and the test names closest to it.

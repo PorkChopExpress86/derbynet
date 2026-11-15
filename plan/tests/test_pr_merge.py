@@ -475,6 +475,27 @@ class PrMerge(unittest.TestCase):
         self.assertEqual(self.passed(), f'{head} {master}\n')
         self.assertEqual(list(self.cache.glob('*.log')), [])
 
+    def test_the_run_prints_its_own_time_and_load(self):
+        """#330's and #335's merges printed "it took 16 min at a load
+        average of 34", #333's time, as if it were the run they started
+        (#311 retro)."""
+        took = r' (in|after) \d+ s, with a load average of \d+\.\d+ at the end'
+        head = self.check_pair()
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("output in ", done.stderr)
+        self.assertIn("; #333's run took 16 min at a load average of 34\n", done.stderr)
+        self.assertNotIn('; it took', done.stderr)
+        self.assertRegex(done.stderr, r'the source checks passed on #7 merged with origin/master '
+                         r'[0-9a-f]{8}' + took + '\n')
+        # A new head, so the passed pair doesn't skip the run.
+        head = self.pr('server/tools/other.sh')
+        self.env['STUB_UV'] = 'fail'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertRegex(done.stderr, r'source-checks.sh failed \(exit 1\) on the PR merged with '
+                         r'origin/master [0-9a-f]{8},' + took + r'\. Its summary lines')
+
     def test_a_failing_check_refuses_and_prints_its_summary_lines(self):
         """Each half's failures, in the formats unittest and pytest -q print
         them; the rest of the output stays in the log."""
