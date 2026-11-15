@@ -206,6 +206,17 @@ def test_the_timeout_counts_whole_seconds(event, elapsed, timed_out):
     assert (found.state == TimerStatus.State.NOT_CONNECTED) is timed_out
 
 
+def test_a_rerun_leaves_a_searching_timer_searching(event, coordinator, jar):
+    """#307: heat.rerun moves only a staging or running timer back to
+    connected, as `action.heat.rerun.inc:60-63` does; a searching one is
+    left as it is."""
+    racing_round(coordinator)
+    message(jar, "HELLO")
+    assert TimerStatus.objects.get(event=event).state == TimerStatus.State.SEARCHING
+    ok(coordinator, "action=heat.rerun&heat=current")
+    assert TimerStatus.objects.get(event=event).state == TimerStatus.State.SEARCHING
+
+
 # ----- malfunctions -----
 
 
