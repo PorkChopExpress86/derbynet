@@ -24,12 +24,14 @@ from core.models import Event, RaceSettings, RaceState
 from core.setup_details import plural
 from kiosks.models import ReplayStatus
 from racing.engine import heat_state as hs
+from racing.engine.phpcompat import php_time
 from racing.engine.standings.ordinals import ordinal
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round, TimerStatus
 from racing.services import rounds as rounds_service
 from racing.services.heats import LastHeat, engine_state, load_chart
 from racing.services.playlist import apply_due_scene
-from racing.services.timer import TimerState, has_remote_start, php_time
+from racing.services.replay import lapsed as replay_lapsed
+from racing.services.timer import TimerState, has_remote_start
 from roster.models import Group, GroupConstituentSubgroup, Racer
 from roster.services import car_numbers, structure
 from roster.services.groups import labels
@@ -38,8 +40,6 @@ from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url, render_labe
 FULL_NAME = 0
 FIRST_NAME_LAST_INITIAL = 1
 
-REPLAY_TIMEOUT = timedelta(seconds=10)
-"""`REPLAY_TIMEOUT_LIMIT` in `website/inc/replay.inc`."""
 RESULTS_WINDOW = timedelta(seconds=300)
 """`poll.results` also lists every result written in the last five minutes."""
 
@@ -289,11 +289,12 @@ def timer_troubled(event: Event, now: datetime | None = None) -> bool:
 
 
 def replay_state(event: Event, now: datetime | None = None) -> dict:
-    """`json_replay()`."""
+    """`json_replay()`, with `get_replay()`'s timeout applied
+    (`replay_lapsed`)."""
     now = now or timezone.now()
     replay = ReplayStatus.objects.get(event=event)
     state = replay.state
-    if replay.last_contact is None or replay.last_contact + REPLAY_TIMEOUT < now:
+    if replay_lapsed(replay.last_contact, now):
         state = ReplayStatus.State.NOT_CONNECTED
     if state == ReplayStatus.State.NOT_CONNECTED:
         message, icon = "NOT CONNECTED", "img/status/not_connected.png"
@@ -302,7 +303,9 @@ def replay_state(event: Event, now: datetime | None = None) -> dict:
             code = int(replay.reported or 0)
         except ValueError:
             code = 0
-        seconds = int((now - replay.last_contact).total_seconds())
+        # Whole seconds, as PHP's `time() - $replay['last_contact']`
+        # (`json-replay.inc:11`).
+        seconds = php_time(now) - php_time(replay.last_contact)
         message = f"{REPLAY_STATUS.get(code, '')} ({seconds} sec.)"
         icon = "img/status/ok.png"
     else:

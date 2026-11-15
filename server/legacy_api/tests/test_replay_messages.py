@@ -3,7 +3,7 @@
 behind the replay login of D16."""
 
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 import pytest
@@ -159,3 +159,134 @@ def test_the_queue_is_per_event(coordinator, event):
     poll(coordinator)
 
     assert poll(coordinator) == []
+
+
+# ----- the contact timeout and age, in whole seconds (#341) -----
+
+SECOND = datetime(2026, 11, 14, 12, 0, 0, tzinfo=UTC)
+"""A whole second. #341's probe, whose output is in its PR, made its
+contacts at a fraction past one."""
+MICROSECOND = timedelta(microseconds=1)
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """`timezone.now()` for the server, set by the test before each request."""
+    now = [SECOND]
+    monkeypatch.setattr(timezone, "now", lambda: now[0])
+    return now
+
+
+def replay_state(client) -> dict:
+    found = json.loads(client.get("/action.php?query=poll&values=replay-state").content)
+    return found["replay-state"]
+
+
+CONNECTED = (True, "Ready (10 sec.)", ["TEST 4000 2 50"])
+LAPSED = (False, "NOT CONNECTED", ["HELLO"])
+
+
+def read_at(client, clock, contact: timedelta, read: timedelta):
+    """A replay client's poll at `contact`, then at `read` the coordinator's
+    replay state, `replay.test` and the client's next poll: (connected, the
+    status message, the commands that poll gets)."""
+    clock[0] = contact
+    assert poll(client) == ["HELLO"]
+    clock[0] = read
+    found = replay_state(client)
+    act(client, "action=replay.test")
+    return found["connected"], found["message"], poll(client)
+
+
+@pytest.mark.parametrize(
+    ("contact", "read", "expected"),
+    [
+        (0.8, timedelta(seconds=10), CONNECTED),
+        (0.8, timedelta(seconds=10.9), CONNECTED),
+        (0.8, timedelta(seconds=11) - MICROSECOND, CONNECTED),
+        (0.8, timedelta(seconds=11), LAPSED),
+        (0, timedelta(seconds=10.5), CONNECTED),
+        (0, timedelta(seconds=11) - MICROSECOND, CONNECTED),
+        (0, timedelta(seconds=11), LAPSED),
+    ],
+    ids=[
+        "0.8-read-10",
+        "0.8-read-10.9",
+        "0.8-read-11-less-1us",
+        "0.8-read-11",
+        "0-read-10.5",
+        "0-read-11-less-1us",
+        "0-read-11",
+    ],
+)
+def test_the_replay_timeout_counts_whole_seconds(
+    coordinator, event, clock, contact, read, expected
+):
+    """#341: PHP's `$last_contact + REPLAY_TIMEOUT_LIMIT < time()`
+    (`replay.inc:35`) compares whole seconds, so a contact at SECOND or
+    0.8 s past it is connected until 11 s past SECOND, and not 1 microsecond
+    longer. Each read is the coordinator's replay state, then `replay.test`
+    (`send_replay_message()`, `replay.inc:59-60`), then the client's next
+    poll, which gets the TEST command while connected and `HELLO` alone once
+    not (`action.replay.message.inc:12-24`), as #341's PHP probe showed."""
+    found = read_at(
+        coordinator, clock, SECOND + timedelta(seconds=contact), SECOND + read
+    )
+
+    assert found == expected
+
+
+@pytest.mark.parametrize(
+    ("early", "expected"),
+    [(timedelta(0), LAPSED), (MICROSECOND, CONNECTED)],
+    ids=["at-10.2-s", "1us-before"],
+)
+def test_a_contact_lapses_10_2_seconds_after_it(
+    coordinator, event, clock, early, expected
+):
+    """#341: a contact 0.8 s past a whole second first reads as lapsed
+    10.2 s after it, 11 s past its whole second (`replay.lapsed`), and not
+    1 microsecond before."""
+    contact = SECOND + timedelta(seconds=0.8)
+    lapses = contact + timedelta(seconds=10.2)
+    assert lapses == SECOND + timedelta(seconds=11)
+
+    assert read_at(coordinator, clock, contact, lapses - early) == expected
+
+
+def test_the_replay_age_counts_whole_seconds(coordinator, event, clock):
+    """#341: the age is PHP's `time() - $replay['last_contact']`
+    (`json-replay.inc:11`). A contact 0.8 s past SECOND, read 5.2 s past it,
+    is 5 sec. old, though only 4.4 s have passed, as #341's PHP probe
+    showed; 1 microsecond before 5 s past SECOND it is 4 sec. old."""
+    clock[0] = SECOND + timedelta(seconds=0.8)
+    poll(coordinator)
+    clock[0] = SECOND + timedelta(seconds=5.2)
+    assert (clock[0] - (SECOND + timedelta(seconds=0.8))).total_seconds() == (
+        pytest.approx(4.4)
+    )
+
+    assert replay_state(coordinator)["message"] == "Ready (5 sec.)"
+    clock[0] = SECOND + timedelta(seconds=5) - MICROSECOND
+    assert replay_state(coordinator)["message"] == "Ready (4 sec.)"
+
+
+@pytest.mark.parametrize(
+    "state", [ReplayStatus.State.NOT_CONNECTED, ReplayStatus.State.TROUBLE]
+)
+def test_a_live_contact_in_another_state_is_not_connected(
+    coordinator, event, clock, state
+):
+    """#341: `replay.connected` needs the stored state to be CONNECTED as
+    well as a contact that has not lapsed, as `send_replay_message()`
+    compares `get_replay()`'s state (`replay.inc:59-60`). A contact 0.8 s
+    past SECOND, read 5 s past it, is live, yet `replay.test` queues nothing
+    and the next poll gets `HELLO` alone."""
+    ReplayStatus.objects.filter(event=event).update(
+        state=state, last_contact=SECOND + timedelta(seconds=0.8)
+    )
+    clock[0] = SECOND + timedelta(seconds=5)
+    assert not replay.lapsed(SECOND + timedelta(seconds=0.8), clock[0])
+
+    act(coordinator, "action=replay.test")
+    assert poll(coordinator) == ["HELLO"]

@@ -309,7 +309,7 @@ def test_the_windows_are_djangos_and_phps():
     from tools.contact_windows import REPLAY_WINDOW, TIMER_WINDOW
 
     assert CONTACT_TIMEOUT.total_seconds() == TIMER_WINDOW
-    assert REPLAY_TIMEOUT.total_seconds() == REPLAY_WINDOW
+    assert REPLAY_TIMEOUT == REPLAY_WINDOW
     website = Path(__file__).resolve().parents[2] / "website" / "inc"
     timer = (website / "timer-state.inc").read_text().splitlines()
     replay = (website / "replay.inc").read_text().splitlines()
