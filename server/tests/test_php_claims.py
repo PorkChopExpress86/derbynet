@@ -143,10 +143,11 @@ def test_each_known_claim_is_still_uncited():
 
 
 # A page divergence that says what a PHP page or script does: "fake-timer.php
-# links coordinator.php", "vote.js polls settings.list". #324's D98 line named
+# links coordinator.php", "vote.js polls settings.list", or names a part of
+# it: "setup.php's status list" (#340 review). #324's D98 line named
 # fake-timer.php without `:99-100`, which its view and template cite, until
 # review (#324 retro).
-DOES = re.compile(r"\b[\w./-]+\.(?:php|inc|js|kiosk)\s+[a-z]+s\b")
+DOES = re.compile(r"\b[\w./-]+\.(?:php|inc|js|kiosk)(?:'s\s+[a-z]+|\s+[a-z]+s)\b")
 REGISTRY = SERVER / "legacy_api" / "registry.py"
 
 
@@ -184,7 +185,10 @@ def test_a_divergence_that_says_what_php_does_is_found():
         '              "D3: a.php\'s list.", "D4: e.php for a role."),\n'
         "}\n"
     )
-    assert uncited_divergences(source) == ["a.php (registry.py:2): a.php links"]
+    assert uncited_divergences(source) == [
+        "a.php (registry.py:2): a.php links",
+        "c.php (registry.py:4): a.php's list",
+    ]
 
 
 def test_each_page_divergence_that_says_what_php_does_cites_where():

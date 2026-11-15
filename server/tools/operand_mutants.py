@@ -183,16 +183,18 @@ def is_python(root: Path | None, path: str) -> bool:
 
 def line_mutants(path: str, text: str, python: bool) -> list[tuple[str, str, str]]:
     found = call_mutants(text)
-    m = None
+    py_if = None
+    if python and (m := PY_IF.match(text)):
+        found += condition_mutants(m.group(1).strip(), js=False)
+        py_if = len(text) - len(text.lstrip())
     if python:
-        m = PY_IF.match(text)
-        if m:
-            found += condition_mutants(m.group(1).strip(), js=False)
         found += comprehension_mutants(text)
         # JavaScript inside a Python string, as the browser tests keep it; a
         # Python `if (a, b) in seen:` is no JavaScript `if (...)`.
-    if not path.endswith(".css") and not m:
+    if not path.endswith(".css"):
         for m in JS_IF.finditer(text):
+            if m.start() == py_if:
+                continue
             end = closing(text, m.end())
             if end is not None:
                 found += condition_mutants(text[m.end() : end].strip(), js=True)

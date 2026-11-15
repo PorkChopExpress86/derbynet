@@ -101,3 +101,23 @@ def test_a_python_script_with_no_extension_is_read_as_python(tmp_path):
     ]
     # With no tree to read, a file with no extension is no Python.
     assert [m.new for m in om.mutants(diff)][:2] == ["true", "false"]
+
+
+def test_javascript_in_a_python_if_keeps_its_mutants():
+    """A browser test's `if page.evaluate("...")` line holds JavaScript in a
+    string: the Python condition is listed, and the JavaScript filter's
+    mutants too, but not the Python `if` read as JavaScript (#340 review)."""
+    line = 'if page.evaluate("() => items.filter(x => x.a && x.b).length"):'
+    diff = f"+++ b/t.py\n@@ -1,0 +1 @@\n+{line}\n"
+    found = [(m.kind, m.old, m.new) for m in om.mutants(diff)]
+    call = 'page.evaluate("() => items.filter(x => x.a && x.b).length")'
+    assert found == [
+        ("condition", call, "True"),
+        ("condition", call, "False"),
+        ("filter", "x => x.a && x.b", "x => true"),
+        ("filter", "x => x.a && x.b", "x => false"),
+        ("operand", "x.a", "true"),
+        ("operand", "x.a", "false"),
+        ("operand", "x.b", "true"),
+        ("operand", "x.b", "false"),
+    ]

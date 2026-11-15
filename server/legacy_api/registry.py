@@ -615,14 +615,16 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " PHP has no weigh-in.",
         "D9, D18: a Replay section sets the speed, the showings, the time"
         " before the finish, the post-roll and the longest clip; PHP sets the"
-        " first three in coordinator.php's dialog and has no other two.",
+        " first three in coordinator.php's dialog (coordinator.php:212-246) and"
+        " has no other two.",
         "D56: the page shows the server's time zone and how to change it.",
         "Q13: loading the page writes nothing; settings.php writes scoring=1"
         " for a legacy drop-slowest key (settings.php:95-96), which the importer"
         " converts once.",
         "D80: a number outside its field's range (settings.php's input min and"
-        " max, and coordinator.php's replay choices) is refused with an inline"
-        " error; PHP stores any number posted.",
+        " max, such as settings.php:128, and coordinator.php's replay choices,"
+        " coordinator.php:217-246) is refused with an inline error; PHP stores"
+        " any number posted.",
     ),
     "setup.php": (
         "D20: a 301 to /setup/, the query string kept.",
@@ -639,9 +641,9 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " what a snapshot does not restore.",
         "D56: the wizard shows the server's time zone and how to change it.",
         "D80: the wizard's steps and the health checks replace setup.php's"
-        " status list: the database takes writes, the configuration folders,"
-        " each photo folder, and Django's upload cap against the photo stand's"
-        " 30 MB.",
+        " status list (setup.php:85-86 opens it): the database takes writes,"
+        " the configuration folders, each photo folder, and Django's upload"
+        " cap against the photo stand's 30 MB.",
     ),
     "about.php": (
         "D20: a 301 to /about/, the query string kept.",

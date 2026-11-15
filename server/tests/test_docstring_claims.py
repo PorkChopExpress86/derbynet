@@ -64,7 +64,7 @@ def test_check_refuses_a_body_that_leaves_a_claim_out(tmp_path, capsys):
     assert dc.main(["--check", str(body), str(path)]) == 1
     assert capsys.readouterr().out.strip() == (
         f"{path}:12: test_labels: 58.3 px is in no <details> block line that"
-        " names test_labels"
+        " names test_labels (by its function name, not a nickname)"
     )
 
 
@@ -86,6 +86,7 @@ def test_a_claim_counts_only_on_a_line_that_names_its_test(tmp_path, capsys):
     assert dc.main(["--check", str(body), str(path)]) == 1
     assert capsys.readouterr().out.strip() == (
         f"{path}:5: test_lanes: 2 is in no <details> block line that names test_lanes"
+        " (by its function name, not a nickname)"
     )
     body.write_text(
         "<details>\n| `test_lanes` | 2 lanes |\n| `test_heats` | 2 heats |\n"
@@ -108,3 +109,19 @@ def test_a_same_row_lists_for_the_test_above_it(tmp_path):
         "<details>\n| `test_lanes` | 2 |\n</details>\n<details>\n58.3 px\n</details>\n"
     )
     assert dc.main(["--check", str(body), str(path)]) == 1
+
+
+def test_a_row_naming_another_test_by_nickname_lists_nothing(tmp_path):
+    """Only a `same` row or a wrapped line takes the scope above it: a row
+    that names a test by nickname is #324's failure again (#340 review)."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_lanes():\n    """2 lanes, 9 heats."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        "<details>\n| `test_lanes` | 9 |\n| the heats one | 2, 7 |\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    body.write_text(
+        "<details>\n- `test_lanes`: 9, and\n  2 in the lane count\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 0

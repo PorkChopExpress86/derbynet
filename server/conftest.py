@@ -12,20 +12,25 @@ import pytest
 BROWSER_TIMEOUT = 300
 
 
-def pytest_report_header():
+def pytest_report_header(config):
     """The folder and the commit atop every log: #324's hand-off logs named
-    neither, and the set ran again (tests/test_report_header.py)."""
+    neither, and the set ran again (tests/test_report_header.py). The
+    commit is the rootdir's, wherever pytest started (#340 review)."""
     import subprocess
 
     def git(*args):
         try:
-            found = subprocess.run(["git", *args], capture_output=True, text=True)
+            found = subprocess.run(
+                ["git", *args], cwd=config.rootpath, capture_output=True, text=True
+            )
         except OSError:  # no git, as in an image without it
-            return None
-        return found.stdout.strip() if found.returncode == 0 else None
+            return None, False
+        return (found.stdout.strip() if found.returncode == 0 else None), True
 
-    head = git("rev-parse", "HEAD") or "unknown (no git)"
-    if git("status", "--porcelain", "--untracked-files=no"):
+    head, has_git = git("rev-parse", "HEAD")
+    if head is None:
+        head = "unknown (not a git checkout)" if has_git else "unknown (no git)"
+    elif git("status", "--porcelain", "--untracked-files=no")[0]:
         head += " with uncommitted changes"
     return [f"cwd: {os.getcwd()}", f"head: {head}"]
 
