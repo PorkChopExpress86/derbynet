@@ -331,8 +331,17 @@ def test_reverse_lanes(request):
 # ----- the fake timer --------------------------------------------------------------
 
 
+def _url_if_open(request, key: str) -> str:
+    return reverse(key) if can_open(request, navigation.entry(key)) else ""
+
+
 @require_GET
 def fake_page(request):
+    """D98: the intro links the race dashboard and the timer test only for a
+    session that can open them, and names them as plain text otherwise.
+    `fake-timer.php:99-100` links coordinator.php ("Racing") and timer.php
+    ("Simulated Racing") for every role; #50 maps them to these pages, and
+    both need CONTROL_RACE, which Timer lacks (D5)."""
     settings = RaceSettings.objects.get(event=_event(request))
     return render(
         request,
@@ -343,6 +352,8 @@ def fake_page(request):
             "lanes_max": timer.FAKE_TIMER_LANES[1],
             "action_url": reverse("action-php"),
             "home_url": reverse("home"),
+            "dashboard_url": _url_if_open(request, "dashboard"),
+            "timer_test_url": _url_if_open(request, "timer-test"),
             "page_title": "Fake Timer",
         },
     )
