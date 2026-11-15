@@ -224,7 +224,7 @@ def test_a_sigkill_frees_the_lock_though_its_loops_and_pytest_live_on(tmp_path):
         os.kill(first.pid, signal.SIGKILL)
         first.wait(timeout=10)
         second = start(tmp_path, "second", lock)
-        wait_until((tmp_path / "second" / "started").exists, "second run", seconds=30)
+        wait_until((tmp_path / "second" / "started").exists, "second run")
         os.kill(stub, 0)  # the first run's pytest still runs
         assert "Waiting" not in (tmp_path / "second.out").read_text()
     finally:

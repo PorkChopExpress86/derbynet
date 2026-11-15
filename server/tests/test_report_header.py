@@ -11,6 +11,8 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 def test_the_header_names_the_folder_the_commit_and_uncommitted_changes(request):
     config = request.config
@@ -75,9 +77,11 @@ def _held(path, holder="pid 42, since now\ncwd /there\n"):
     return fd
 
 
+@pytest.mark.timeout(60)
 def test_a_load_run_holding_its_lock_is_named(request, tmp_path, monkeypatch):
     """#316's hand-off ran beside #317's load run and failed a test that
-    passes alone (#316 retro)."""
+    passes alone (#316 retro). The probe of a held lock returns, rather than
+    waiting for it, within the test's bound."""
     lock = tmp_path / "load.lock"
     monkeypatch.setenv("DERBYNET_LOAD_LOCK", str(lock))
     monkeypatch.delenv("DERBYNET_LOAD_LOCK_HELD", raising=False)
@@ -158,5 +162,23 @@ def test_the_default_lock_is_the_script_s(request, tmp_path, monkeypatch):
             line.startswith(f"load run: tools/pytest-under-load.sh holds {lock} ")
             for line in lines
         )
+    finally:
+        os.close(fd)
+
+
+def test_the_probe_keeps_no_lock(request, tmp_path, monkeypatch):
+    """A probe that kept its shared lock would queue every load run behind
+    every pytest session."""
+    import fcntl
+
+    lock = tmp_path / "load.lock"
+    lock.write_text("pid 42, since then\n")  # a load run that has ended
+    monkeypatch.setenv("DERBYNET_LOAD_LOCK", str(lock))
+    monkeypatch.delenv("DERBYNET_LOAD_LOCK_HELD", raising=False)
+    lines = _hook(request.config)(request.config)
+    assert not [line for line in lines if line.startswith("load run:")]
+    fd = os.open(lock, os.O_RDONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # the next load run's
     finally:
         os.close(fd)
