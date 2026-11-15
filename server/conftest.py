@@ -32,7 +32,53 @@ def pytest_report_header(config):
         head = "unknown (not a git checkout)" if has_git else "unknown (no git)"
     elif git("status", "--porcelain", "--untracked-files=no")[0]:
         head += " with uncommitted changes"
-    return [f"cwd: {os.getcwd()}", f"head: {head}"]
+    return [f"cwd: {os.getcwd()}", f"head: {head}", *_load_run_lines()]
+
+
+def _load_run_lines():
+    """A line naming the run that holds tools/pytest-under-load.sh's lock,
+    or none. #316's hand-off ran beside #317's 25-count run at a load
+    average of 35, failed a test that passes alone, and ran again (#316
+    retro). The script's own pytest, which carries DERBYNET_LOAD_LOCK_HELD,
+    names nothing. It only probes: it never waits for, keeps or creates the
+    lock (tests/test_report_header.py)."""
+    import fcntl
+
+    if os.environ.get("DERBYNET_LOAD_LOCK_HELD"):
+        return []
+    path = os.environ.get("DERBYNET_LOAD_LOCK")
+    if not path:
+        home = os.environ.get("HOME")
+        if not home:
+            return []
+        cache = os.environ.get("XDG_CACHE_HOME") or os.path.join(home, ".cache")
+        path = os.path.join(cache, "derbynet", "load-run.lock")
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:  # no load run has run here, as on CI
+        return []
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lines = os.read(fd, 4096).decode(errors="replace").splitlines()
+            holder = "; ".join(line for line in lines if line) or "no details yet"
+            return [
+                f"load run: tools/pytest-under-load.sh holds {path} ({holder}); "
+                "results beside it are not clean"
+            ]
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return []
+    finally:
+        os.close(fd)
+
+
+def pytest_terminal_summary(terminalreporter, config):
+    """The holder again at the end, since a load run may start mid-run."""
+    if hasattr(config, "workerinput"):
+        return
+    for line in _load_run_lines():
+        terminalreporter.write_line(line, yellow=True, bold=True)
 
 
 def pytest_configure():
