@@ -2,7 +2,7 @@
 
 Most pinewood derby timers talk to a computer over a serial or USB connection. A timer client reads the timer, and reports each heat to the DerbyNet server over HTTP. DerbyNet has two timer clients: the browser timer, a page of the server (`/timer.php`), and `derby-timer.jar`, the Java program. A timer that speaks HTTP itself could talk to the server directly with this protocol, and need neither.
 
-This guide is the contract between a timer client and the server. The Django server keeps it as the PHP server had it (ADR-02, ADR-11). Every message here is part of the contract (D17). A few details still differ from the PHP server in ways a client does not see in the replies: a lane count above 32767, timer text longer than the server keeps, and when a silent timer's timeout is recorded. #307 settles them. The server code is `server/legacy_api/handlers/timer.py` and `server/racing/services/timer.py`, and the PHP original is `website/ajax/action.timer-message.inc`.
+This guide is the contract between a timer client and the server. The Django server keeps it as the PHP server had it (ADR-02, ADR-11). Every message here is part of the contract (D17). Two details differ from the PHP server in ways a client does not see in the replies, each noted where it applies: a lane count the server cannot use ([IDENTIFIED](#identified)), and when a silent timer's timeout is recorded ([The contact timeout](#the-contact-timeout)). The server code is `server/legacy_api/handlers/timer.py` and `server/racing/services/timer.py`, and the PHP original is `website/ajax/action.timer-message.inc`.
 
 ## Requests
 
@@ -65,13 +65,13 @@ The client sends HELLO after it logs in, while it searches for the timer. The se
 
 The answer always carries `<query/>`, which asks for a [FLAGS](#flags) message.
 
-When another client has sent a message in the last second with a different `User-Agent`, the server answers `<competing>` with that client's `User-Agent`, and keeps the other client.
+When another client has sent a message in the last second with a different `User-Agent`, the server answers `<competing>` with that client's `User-Agent`, and keeps the other client. It still acts on this message, and on every later one from either client, as the PHP server does.
 
 ### IDENTIFIED
 
 The client sends IDENTIFIED once it has found the timer. Every parameter is optional:
 
-- `lane_count`: the number of lanes the timer reports. It sets the race's lane count only while no heat is scheduled. Once a schedule exists, the race keeps its count, and the timer status page and the race dashboard show the timer's count beside it (D74).
+- `lane_count`: the number of lanes the timer reports. It sets the race's lane count only while no heat is scheduled. Once a schedule exists, the race keeps its count, and the timer status page and the race dashboard show the timer's count beside it (D74). A count that is not a number from 1 to 32767 is ignored, and a fraction is cut to its whole number (D99). The PHP server stored any value above 0 as sent, such as `abc` or `4.5`.
 - `timer`: the timer's type. `derby-timer.jar` sends the name of its Java class.
 - `human`: a name for the timer that people read, such as its maker and model.
 - `ident`: the timer's own identity, such as a serial number.
@@ -140,6 +140,10 @@ action=timer-message&message=FLAGS&flag-x=bool:false&desc-x=Run+headless:+withou
 ### Any other message
 
 The server answers the failure `notunderstood`.
+
+## The contact timeout
+
+A timer that has sent no message for more than 60 seconds is not connected, and every page and poll shows it so. The server counts whole seconds, as the PHP server does. It records the timeout, shown as "Timer contact lost." in the race's history, when the timer next sends a message, or when the race coordinator reruns a heat, and dates it to when the 60 seconds ran out. A timer that never sends again, with no rerun, leaves no such record. The PHP server recorded the timeout when a page or poll first read the timer's state after the 60 seconds (D100).
 
 ## Answers from the server
 

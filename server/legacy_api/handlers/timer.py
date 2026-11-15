@@ -22,6 +22,14 @@ from racing.services import polls, timer
         "D81: on a read-only event, FINISHED answers event-read-only and records"
         " nothing, while HELLO, IDENTIFIED, HEARTBEAT, MALFUNCTION, flags and"
         " STARTED are taken; PHP has no read-only event.",
+        "D99: IDENTIFIED takes lane_count only as a PHP number from 1 to 32767,"
+        " cut toward zero, and ignores any other value with the same reply. PHP"
+        " stores any text that compares above 0, such as 32768 or abc"
+        " (action.timer-message.inc:99-104).",
+        "D100: reading the timer state writes nothing; the 60 s contact timeout"
+        " and its timer.*overdue row are written by the timer's next message,"
+        " dated to when the minute ran out. PHP writes them at the first read"
+        " after the minute, a page or poll included (timer-state.inc:72-79).",
     ),
 )
 def timer_message(ctx: LegacyContext) -> None:

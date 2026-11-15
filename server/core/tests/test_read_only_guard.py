@@ -81,7 +81,7 @@ UNGUARDED = {
     "racing/services/replay.py:send": UNDER_CALLERS_LOCK,
     "racing/services/replay.py:poll": FIELD_CLIENT,
     "racing/services/rounds.py:record_cut": UNDER_CALLERS_LOCK,
-    "racing/services/timer.py:check_contact": FIELD_CLIENT,
+    "racing/services/timer.py:time_out": UNDER_CALLERS_LOCK,
     "racing/services/timer.py:handle_message": "the timer's connection;"
     " FINISHED refuses its results",
     "racing/services/timer.py:decode_flags": FIELD_CLIENT,

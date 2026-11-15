@@ -3,7 +3,7 @@ lists beyond the PHP transcripts. A clock in the past is set by moving the
 stored contact time back."""
 
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.test import Client
@@ -12,7 +12,7 @@ from django.utils import timezone
 from accounts.permissions import Perm
 from core.models import ActionLog, RaceSettings, RaceState
 from legacy_api.tests.conftest import log_in, post
-from racing.models import AuditEvent, HeatLane, TimerStatus
+from racing.models import AuditEvent, HeatLane, TimerSetting, TimerStatus
 from racing.services import timer as timer_service
 
 pytestmark = pytest.mark.django_db
@@ -126,7 +126,7 @@ def test_a_timer_silent_for_over_a_minute_is_not_connected(event, coordinator, j
     assert timer_state(coordinator)["state"] == TimerStatus.State.CONNECTED
     move_contact_back(event, 2)
     assert timer_state(coordinator)["state"] == TimerStatus.State.NOT_CONNECTED
-    # The read wrote nothing: the timeout is written by the explicit check.
+    # D100: the read wrote nothing; the next message writes the timeout.
     assert TimerStatus.objects.get(event=event).state == TimerStatus.State.CONNECTED
     assert not ActionLog.objects.filter(request__action="timer.*overdue").exists()
 
@@ -140,13 +140,66 @@ def test_the_timeout_is_written_and_logged_by_the_next_message(event, coordinato
     assert timer_state(coordinator)["state"] == TimerStatus.State.CONNECTED
 
 
-def test_check_contact_writes_the_timeout_once(event, jar):
+@pytest.mark.parametrize(
+    ("silent", "state", "overdue"),
+    [
+        (59, TimerStatus.State.CONNECTED, 0),
+        (61, TimerStatus.State.NOT_CONNECTED, 1),
+    ],
+    ids=["59-s", "61-s"],
+)
+def test_a_rerun_applies_the_contact_timeout_first(
+    event, coordinator, jar, silent, state, overdue
+):
+    """D100 (#307): heat.rerun, a POST, applies the timeout before it moves a
+    staging timer back to connected, as PHP's `new TimerState()` does
+    (`action.heat.rerun.inc:59-63`). A timer silent for 59 s is connected
+    again; one silent for 61 s is not connected, with one overdue row and
+    its audited change from staging."""
+    racing_round(coordinator)
     connect(jar)
-    move_contact_back(event, 61)
-    assert timer_service.check_contact(event)
-    assert not timer_service.check_contact(event)
-    assert TimerStatus.objects.get(event=event).state == TimerStatus.State.NOT_CONNECTED
-    assert ActionLog.objects.filter(request__action="timer.*overdue").count() == 1
+    assert TimerStatus.objects.get(event=event).state == TimerStatus.State.STAGING
+    move_contact_back(event, silent)
+    ok(coordinator, "action=heat.rerun&heat=current")
+    assert TimerStatus.objects.get(event=event).state == state
+    assert ActionLog.objects.filter(request__action="timer.*overdue").count() == overdue
+    changes = AuditEvent.objects.filter(
+        action=Action.TIMER_STATE_CHANGED, detail__to=TimerStatus.State.NOT_CONNECTED
+    )
+    assert [c.detail["from"] for c in changes] == [TimerStatus.State.STAGING] * overdue
+
+
+def test_the_timeout_row_is_dated_when_the_minute_ran_out(event, jar):
+    """#307: the `timer.*overdue` row the next message writes is dated to
+    the end of the minute, where the Retrospective lists it; PHP writes it
+    at the first read after the minute (`timer-state.inc:72-79`)."""
+    connect(jar)
+    move_contact_back(event, 600)
+    silent_since = TimerStatus.objects.get(event=event).last_contact
+    message(jar, "HEARTBEAT")
+    row = ActionLog.objects.get(request__action="timer.*overdue")
+    assert row.received == silent_since + timedelta(seconds=60)
+
+
+SECOND = datetime(2026, 11, 14, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("after", "timed_out"),
+    [(timedelta(seconds=60.95), False), (timedelta(seconds=61), True)],
+    ids=["60.05-s-later", "60.1-s-later"],
+)
+def test_the_timeout_counts_whole_seconds(event, after, timed_out):
+    """#307: PHP's `last_contact + 60 < time()` (`timer-state.inc:72`) compares
+    whole seconds. A contact at 0.9 s past a second is timed out from the
+    61st whole second on: 60.05 s after it is not, 60.1 s after it is."""
+    contact = SECOND + timedelta(seconds=0.9)
+    row = TimerStatus(
+        event=event, state=TimerStatus.State.CONNECTED, last_contact=contact
+    )
+    found = timer_service.TimerState.read(row, SECOND + after)
+    assert found.timed_out is timed_out
+    assert (found.state == TimerStatus.State.NOT_CONNECTED) is timed_out
 
 
 # ----- malfunctions -----
@@ -188,6 +241,30 @@ def test_a_second_timer_competes_within_a_second(event, jar):
     # The first timer keeps the connection, so the second hears it competes.
     assert "<competing>" in message(other, "HEARTBEAT")
     assert "<competing>" not in message(jar, "HEARTBEAT")
+
+
+def test_a_competing_timers_messages_still_change_the_timer(event, jar):
+    """#307: the server acts on a second client's messages, as PHP does
+    (`action.timer-message.inc:72`, `:98-127`, `:170-190`): its HELLO is told
+    it competes and still sets searching, its IDENTIFIED renames the timer,
+    and its unhealthy heartbeat sets searching again. The status card says
+    so (`ui/timer/status.html`)."""
+    connect(jar)
+    other = Client(headers={"User-Agent": "Other/1.0"})
+    log_in(other, Perm.TIMER_MESSAGE, role="Timer")
+    State = TimerStatus.State
+
+    def status():
+        found = TimerStatus.objects.get(event=event)
+        return found.agent, found.state, found.timer_type
+
+    assert status() == (UA, State.CONNECTED, "TestTimer")
+    assert f"<competing>{UA}</competing>" in message(other, "HELLO")
+    assert status() == (UA, State.SEARCHING, "TestTimer")
+    assert "<competing>" not in message(other, "IDENTIFIED&timer=Other")
+    assert status() == (UA, State.CONNECTED, "Other")
+    assert f"<competing>{UA}</competing>" in message(other, "HEARTBEAT&unhealthy")
+    assert status() == (UA, State.SEARCHING, "Other")
 
 
 def test_a_second_timer_after_the_window_takes_over(event, jar):
@@ -452,19 +529,113 @@ def test_a_timeout_is_audited_as_its_own_change(event, coordinator, jar):
 # ----- odd input from the timer -----
 
 
-def test_overlong_timer_values_are_cut_to_fit(event, coordinator):
-    jar = Client(headers={"User-Agent": "U" * 300})
-    log_in(jar, Perm.TIMER_MESSAGE, role="Timer")
-    assert "<success/>" in message(jar, "HELLO&interface=" + "i" * 300)
-    body = message(jar, "IDENTIFIED&vid=" + "v" * 30 + "&options=" + "o" * 600)
+# Each text a timer message stores, with the width its column had before
+# #307: (id, message, model, column, width). PHP keeps every one whole,
+# since SQLite enforces no VARCHAR (the PHP probe in #307's PR body).
+TIMER_TEXT = [
+    ("interface", "HELLO&interface={}", TimerStatus, "interface", 200),
+    ("timer", "IDENTIFIED&timer={}", TimerStatus, "timer_type", 200),
+    ("human", "IDENTIFIED&human={}", TimerStatus, "human", 200),
+    ("ident", "IDENTIFIED&ident={}", TimerStatus, "ident", 200),
+    ("options", "IDENTIFIED&options={}", TimerStatus, "options", 500),
+    ("vid", "IDENTIFIED&vid={}", TimerStatus, "vid", 20),
+    ("pid", "IDENTIFIED&pid={}", TimerStatus, "pid", 20),
+    (
+        "error",
+        "MALFUNCTION&detectable=1&error={}",
+        TimerStatus,
+        "malfunction_message",
+        500,
+    ),
+    ("flag-name", "FLAGS&flag-{}=bool:true", TimerSetting, "name", 100),
+    ("flag-type", "FLAGS&flag-f={}:true", TimerSetting, "value_type", 10),
+    ("flag-value", "FLAGS&flag-f=bool:{}", TimerSetting, "value", 100),
+    ("desc", "FLAGS&flag-f=bool:true&desc-f={}", TimerSetting, "description", 500),
+    ("ports", "FLAGS&ports={}", TimerSetting, "value", 100),
+    ("device-name", "FLAGS&device-{}=Timer", TimerSetting, "name", 100),
+    ("device-desc", "FLAGS&device-T={}", TimerSetting, "description", 500),
+]
+
+
+def stored(model, event, column) -> list[str]:
+    return [
+        v for v in model.objects.filter(event=event).values_list(column, flat=True) if v
+    ]
+
+
+@pytest.mark.parametrize("over", [0, 1], ids=["at-width", "one-over"])
+@pytest.mark.parametrize(
+    ("fields", "model", "column", "width"),
+    [row[1:] for row in TIMER_TEXT],
+    ids=[row[0] for row in TIMER_TEXT],
+)
+def test_timer_text_is_kept_whole(event, jar, fields, model, column, width, over):
+    """#307: a text at its column's old width, and one character over it, is
+    stored whole with a plain success, on SQLite and Postgres, as PHP keeps
+    it (`write_raceinfo()`, `data.inc:108-119`; `decode_timer_flags()`,
+    `timer-flags.inc:24-59`)."""
+    text = "x" * (width + over)
+    body = message(jar, fields.format(text))
     assert "<success/>" in body
-    status = TimerStatus.objects.get(event=event)
-    assert (len(status.agent), len(status.interface)) == (200, 200)
-    assert (len(status.vid), len(status.options)) == (20, 500)
+    assert "<failure" not in body
+    assert text in stored(model, event, column)
+
+
+@pytest.mark.parametrize("over", [0, 1], ids=["at-width", "one-over"])
+def test_the_user_agent_is_kept_whole(event, over):
+    """#307: the client's User-Agent, at 200 characters and at 201, is stored
+    whole (`action.timer-message.inc:94`)."""
+    agent = "u" * (200 + over)
+    client = Client(headers={"User-Agent": agent})
+    log_in(client, Perm.TIMER_MESSAGE, role="Timer")
+    assert "<success/>" in message(client, "HELLO")
+    assert TimerStatus.objects.get(event=event).agent == agent
+
+
+@pytest.mark.parametrize(
+    ("second", "competes"),
+    [("u" * 200 + "a", False), ("u" * 200 + "b", True)],
+    ids=["same-agent", "differs-at-201"],
+)
+def test_long_user_agents_are_told_apart_by_every_character(event, second, competes):
+    """#307: two User-Agents equal in their first 200 characters are two
+    clients, as PHP compares them whole (`action.timer-message.inc:84-94`,
+    `:191-194`); the same User-Agent is one."""
+    first = Client(headers={"User-Agent": "u" * 200 + "a"})
+    other = Client(headers={"User-Agent": second})
+    log_in(first, Perm.TIMER_MESSAGE, role="Timer")
+    log_in(other, Perm.TIMER_MESSAGE, role="Timer")
+    message(first, "HELLO")
+    assert ("<competing>" in message(other, "HEARTBEAT")) is competes
+    assert ("<competing>" in message(other, "HELLO")) is competes
+
+
+def test_a_long_flag_name_keeps_its_description(event, coordinator, jar):
+    """#307: `desc-` finds a flag whose name is past 100 characters."""
+    name = "n" * 101
+    message(jar, f"FLAGS&flag-{name}=bool:true&desc-{name}=Help")
+    found = reply(coordinator.get("/action.php?query=timer.settings"))
+    assert [(f["name"], f["description"]) for f in found["flags"]] == [(name, "Help")]
+
+
+@pytest.mark.parametrize(
+    ("lanes", "kept"),
+    [("32767", 32767), ("32768", 6), ("4.5", 4), ("1e3", 1000)],
+    ids=["largest", "one-over", "fraction", "exponent"],
+)
+def test_a_lane_count_is_a_number_from_1_to_32767(event, coordinator, jar, lanes, kept):
+    """D99 (#307): IDENTIFIED takes a lane count from 1 to 32767 that PHP
+    reads as a number, cut toward zero, and ignores 32768 with the same
+    reply. PHP stores each of these as sent (`action.timer-message.inc:99-104`)."""
+    ok(coordinator, "action=settings.write&n-lanes=6")
+    assert "<success/>" in message(jar, f"IDENTIFIED&lane_count={lanes}")
+    assert timer_state(coordinator)["lanes"] == kept
+    assert reported_lanes(event) == (None if kept == 6 else kept)
 
 
 @pytest.mark.parametrize("lanes", ["1e400", "70000", "-3", "abc"])
 def test_an_unusable_lane_count_is_ignored(event, coordinator, jar, lanes):
+    """D99 (#307): PHP stores each but `-3` as sent."""
     ok(coordinator, "action=settings.write&n-lanes=6")
     assert "<success/>" in message(jar, f"IDENTIFIED&lane_count={lanes}")
     assert timer_state(coordinator)["lanes"] == 6
