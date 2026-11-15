@@ -656,6 +656,9 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         "D96: needs TIMER_MESSAGE, as the timer-message it sends does;"
         " fake-timer.php asks for CHECK_IN_RACERS, so a role without"
         " TIMER_MESSAGE opened it and had every message refused.",
+        "D98: the intro links the race dashboard and the timer test only for"
+        " a role that can open them, and names them as plain text otherwise;"
+        " fake-timer.php links coordinator.php and timer.php for every role.",
     ),
     "fakeroster.php": (
         "D20: a 301 to /setup/fake-roster/, the query string kept.",
