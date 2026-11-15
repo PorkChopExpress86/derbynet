@@ -51,7 +51,7 @@ The repo carries the code and the plan. The items below live outside it and must
 - `jq`.
 - In each clone, `git config core.hooksPath .githooks`, which turns on the pre-push lint (`.githooks/pre-push`). Worktrees share the clone's setting.
 - For the Playwright MCP browser, run `npx -y playwright install --with-deps chrome` once, with sudo.
-- Git commits use the owner's identity through `-c` flags, so the global git config is never changed: `git -c user.name=PorkChopExpress86 -c user.email=<owner email> commit`. Every commit also ends with a `Co-Authored-By` line for Claude.
+- Git commits use the owner's identity through `-c` flags, so the global git config is never changed: `git -c user.name=PorkChopExpress86 -c user.email="$(git -C <main clone> config user.email)" commit`, which reads the address from the main clone's config, so no brief or prompt types it (owner, 2026-11-15). Every commit also ends with a `Co-Authored-By` line for Claude.
 
 ### Claude Code configuration (in `~/.claude/`, not in this repo)
 
