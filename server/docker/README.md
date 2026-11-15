@@ -36,7 +36,7 @@ SQLite, one file on the data volume in WAL mode, is the default and suits a race
 docker compose --profile postgres up -d
 ```
 
-Nothing else changes: the server finds the `postgres` service and uses it (`DERBYNET_POSTGRES_HOST` in `compose.yaml`). Pass `--profile postgres` to every later `docker compose` command for this install too. Choose the profile when you first start an install: a data volume keeps the database engine it first ran on, and refuses to start on the other one rather than open an empty event and leave the race in the first. Delete `database-engine` on the volume to start again on the other engine. Set `POSTGRES_PASSWORD` before the first start to choose the database password; any character works, and the Postgres container has no published port either way. Any other database is set with `DATABASE_URL`.
+Nothing else changes: the server finds the `postgres` service and uses it (`DERBYNET_POSTGRES_HOST` in `compose.yaml`). Pass `--profile postgres` to every later `docker compose` command for this install too. Choose the profile when you first start an install: a data volume keeps the database engine it first ran on, and refuses to start on the other one rather than open an empty event and leave the race in the first. To start again on the other engine, stop the server and delete `database-engine` on the volume: deleted under a running server, the next gunicorn worker to start would use SQLite. A command run with `docker compose exec -u derbynet server python manage.py ...` uses the server's database too: `settings.py` builds the `postgres` service's URL from `DERBYNET_POSTGRES_HOST`, the `POSTGRES_*` variables and the `database-engine` the entrypoint wrote at start, so no `DATABASE_URL` is needed, and with Postgres stopped such a command prints one message naming the host rather than make a SQLite file (#308). `DERBYNET_DEBUG=1` shows the Postgres password on Django's error page, so never set it at a race. Set `POSTGRES_PASSWORD` before the first start to choose the database password; any character works, and the Postgres container has no published port either way. Any other database is set with `DATABASE_URL`.
 
 ## What it serves
 
@@ -59,7 +59,7 @@ The image sets these. `server/README.md`'s Settings table lists the rest, such a
 | `DERBYNET_CSRF_TRUSTED_ORIGINS` | empty | Extra origins for the manager pages behind another HTTPS proxy |
 | `DERBYNET_TRUSTED_PROXIES` | empty | Comma-separated addresses or networks of a proxy in front of the container (below). Only from these is a request's `X-Forwarded-Proto` believed; from anyone else, the scheme is the connection's |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server makes one on first start in `/var/lib/derbynet/secret_key`, mode 0600 |
-| `DATABASE_URL` | unset | Another database. Unset, SQLite on the volume, or the compose `postgres` service when it runs |
+| `DATABASE_URL` | unset | Another database. Unset, SQLite on the volume, or the compose `postgres` service when the volume runs on it, for the server and for a `docker compose exec`'d `manage.py` alike |
 | `DERBYNET_DATA_DIR`, `DERBYNET_CONFIG_DIR` | `/var/lib/derbynet` | Where the data and the install's files are. Keep both on the volume |
 | `DERBYNET_DOCS_ROOT` | `/opt/derbynet/docs` | The guides under `/docs/`, rendered from `docs/` when the image is built (#61). Leave it |
 | `GUNICORN_RELOAD` | `0` | `1` restarts gunicorn's workers when a Python file or a template changes, for development (README.md) |

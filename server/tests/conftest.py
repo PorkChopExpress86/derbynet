@@ -19,6 +19,10 @@ def load_settings(monkeypatch, tmp_path):
         for name in (
             "DJANGO_SECRET_KEY",
             "DATABASE_URL",
+            "DERBYNET_POSTGRES_HOST",
+            "POSTGRES_USER",
+            "POSTGRES_PASSWORD",
+            "POSTGRES_DB",
             "DERBYNET_URL_PREFIX",
             "DERBYNET_STATIC_ROOT",
             "MAX_UPLOAD_SIZE",
