@@ -1682,6 +1682,20 @@ def test_waits(page):
             ('TestBoard::test_two', 'reads test_one of TestBoard'),
             ('TestBoard::test_three', 'reads test_two of TestBoard')])
 
+    def test_methods_through_self_near_misses(self):
+        """test_two reads test_one through self, and itself; test_three reads
+        the unchanged test_four through self; test_four reads `test_one` off
+        `page`, which is no class, and `self.n.real`."""
+        base = edit('        start(page)\n', '        self.test_one(page)\n'
+                    '        if page is None:\n            self.test_two(None)\n')
+        base += ('\n    def test_three(self, page):\n        self.test_four(page)\n\n'
+                 '    def test_four(self, page):\n'
+                 '        assert page.test_one is None and self.n.real\n')
+        head = edit('assert self.n\n', 'assert self.n == 1\n', base)
+        self.assertEqual(d101(head, base=base), [
+            ('TestBoard::test_one', 'changed'),
+            ('TestBoard::test_two', 'reads test_one of TestBoard')])
+
     def test_a_method_that_calls_a_deleted_method_through_self(self):
         base = edit('        start(page)\n', '        self.test_one(page)\n')
         head = edit('''    def test_one(self, page):
