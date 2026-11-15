@@ -56,11 +56,18 @@ error during collection, a usage error) or when the run passes `--timeout`
 (seconds, 900 by default), naming why. The file is restored, and checked
 against its saved bytes, on every exit, a SIGTERM, SIGINT or SIGHUP
 included; a SIGKILL leaves it mutated, and the next run refuses it.
+
+A second SIGTERM, SIGINT or SIGHUP waits while the file is written or put
+back and the lock is taken or removed, so it can't leave either half done
+(#358 review). Before each write it checks that the file still holds what
+it last wrote. When it holds anything else, an edit by someone else, it
+stops, leaves the file as it is, names it, and exits 2.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib
 import os
@@ -85,6 +92,38 @@ SOURCES = (".py", ".js", ".css")
 
 class Refused(Exception):
     pass
+
+
+class Changed(Exception):
+    """The file holds something mutate.py didn't write."""
+
+
+STOPS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+
+
+@contextlib.contextmanager
+def _held():
+    """Holds SIGTERM, SIGINT and SIGHUP back; one that comes in meanwhile
+    is delivered, and stops the run, when the block ends."""
+    old = signal.pthread_sigmask(signal.SIG_BLOCK, STOPS)
+    try:
+        yield
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, old)
+
+
+def _swap(path: Path, expect: bytes, new: bytes) -> None:
+    """Writes `new` where the file still holds `expect`, with the stops held;
+    raises Changed and leaves the file when it holds anything else."""
+    with _held():
+        if path.read_bytes() != expect:
+            raise Changed(
+                f"{path} changed while mutate.py held it: it is not what"
+                f" mutate.py last wrote, so it is left as it is (git diff -- {path})"
+            )
+        path.write_bytes(new)
+        if path.read_bytes() != new:
+            raise Changed(f"{path} does not hold what mutate.py wrote")
 
 
 def counts(output: str) -> dict[str, int]:
@@ -189,17 +228,17 @@ def _listing():
 
 def _one(path: Path, data: bytes, m, args) -> tuple[str, str, str]:
     """One listed mutant's result word, why, and pytest's output; the file
-    holds `data` again when it returns or raises."""
+    holds `data` again when it returns or raises, unless it raises Changed."""
     text = data.decode()
     if m.span is None or text[m.span[0] : m.span[1]] != m.old:
         return "REFUSED", "not once on its line: run it by hand", ""
     start, end = m.span
+    mutated = (text[:start] + m.new + text[end:]).encode()
     try:
-        path.write_text(text[:start] + m.new + text[end:])
+        _swap(path, data, mutated)
         run, output = _pytest(args.pytest_args, args.timeout)
     finally:
-        path.write_bytes(data)
-        assert path.read_bytes() == data, f"{path} was not restored"
+        _swap(path, mutated, data)
     if run is None:
         return "ERROR", f"timed out after {args.timeout:g} s", output
     return (*_result(run, output, "fail"), output)
@@ -247,8 +286,9 @@ def listed(args) -> int:
             for path in paths:
                 _check_tracked(path)
                 lock = _lock_path(path)
-                _lock(lock, path)
-                locks.append(lock)
+                with _held():
+                    _lock(lock, path)
+                    locks.append(lock)
                 _check_clean(path)
                 saved[path] = path.read_bytes()
         except Refused as why:
@@ -262,18 +302,20 @@ def listed(args) -> int:
                 if word in ("REFUSED", "ERROR") and output:
                     for line in output.splitlines()[-15:]:
                         print(f"    {line}")
-        except SystemExit:
+        except (SystemExit, Changed) as stop:
             left = found[len(rows) :]
+            if isinstance(stop, Changed):
+                print(f"mutate.py: stopped: {stop}", file=sys.stderr)
             print(f"STOPPED  {len(left)} of {len(found)} not run:", flush=True)
             for m in left:
                 print(f"  NOT RUN  {m}", flush=True)
+            if isinstance(stop, Changed):
+                return REFUSED
             raise
     finally:
-        for path, data in saved.items():
-            if path.read_bytes() != data:
-                path.write_bytes(data)
-        for lock in locks:
-            lock.unlink()
+        with _held():
+            for lock in locks:
+                lock.unlink()
     tally = {
         w: sum(1 for word, _ in rows if word == w)
         for w in ("KILLED", "SURVIVED", "REFUSED", "ERROR")
@@ -325,41 +367,41 @@ def main(argv: list[str] | None = None) -> int:
         return listed(args)
     path = args.file[0]
 
+    lock = None
     try:
         if args.new == args.old:
             raise Refused("--new is --old: the mutant would change nothing")
         _check_tracked(path)
-        lock = _lock_path(path)
-        _lock(lock, path)
-    except Refused as why:
-        print(f"mutate.py: refused: {why}", file=sys.stderr)
-        return REFUSED
-
-    try:
-        try:
-            _check_clean(path)
-        except Refused as why:
-            print(f"mutate.py: refused: {why}", file=sys.stderr)
-            return REFUSED
+        lock_path = _lock_path(path)
+        with _held():
+            _lock(lock_path, path)
+            lock = lock_path
+        _check_clean(path)
         saved = path.read_bytes()
         text = saved.decode()
         if (times := text.count(args.old)) != 1:
-            print(
-                f"mutate.py: refused: --old occurs {times} times in {path};"
-                " it must occur once, so give more of the line around it",
-                file=sys.stderr,
+            raise Refused(
+                f"--old occurs {times} times in {path};"
+                " it must occur once, so give more of the line around it"
             )
-            return REFUSED
+        mutated = text.replace(args.old, args.new).encode()
         try:
-            path.write_text(text.replace(args.old, args.new))
+            _swap(path, saved, mutated)
             run, output = _pytest(args.pytest_args, args.timeout)
             if run is None:
                 print(output, end="" if output.endswith("\n") or not output else "\n")
         finally:
-            path.write_bytes(saved)
-            assert path.read_bytes() == saved, f"{path} was not restored"
+            _swap(path, mutated, saved)
+    except Refused as why:
+        print(f"mutate.py: refused: {why}", file=sys.stderr)
+        return REFUSED
+    except Changed as why:
+        print(f"mutate.py: stopped: {why}", file=sys.stderr)
+        return REFUSED
     finally:
-        lock.unlink()
+        if lock is not None:
+            with _held():
+                lock.unlink()
 
     mutant = f"{path}: {args.old!r} -> {args.new!r}"
     if run is None:

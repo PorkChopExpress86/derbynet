@@ -220,3 +220,42 @@ def test_a_python_file_that_does_not_parse_is_read_by_line(tmp_path):
         "b",
         "b",
     ]
+
+
+def test_a_crlf_file_s_spans_are_its_own(tmp_path):
+    """read_text() turned CRLF into LF, so every span fell short by a
+    character a line, and --listed refused each mutant (#358 review)."""
+    text = "x = 1\r\ny = 2\r\nif x and y:\r\n    w = min(x, y)\r\n"
+    (tmp_path / "t.py").write_bytes(text.encode())
+    diff = "+++ b/t.py\n@@ -2,0 +3,2 @@\n+if x and y:\n+    w = min(x, y)\n"
+    found = om.mutants(diff, tmp_path)
+    assert [(m.line, m.old) for m in found] == [
+        (3, "x and y"),
+        (3, "x and y"),
+        (3, "x"),
+        (3, "x"),
+        (3, "y"),
+        (3, "y"),
+        (4, "min(x, y)"),
+        (4, "min(x, y)"),
+    ]
+    for m in found:
+        assert text[m.span[0] : m.span[1]] == m.old, m
+
+
+def test_a_case_guard_is_a_condition(tmp_path):
+    """`case _:` has no guard, and lists nothing."""
+    text = (
+        "match v:\n    case [a, b] if a and b:\n        pass\n"
+        "    case _:\n        pass\n"
+    )
+    (tmp_path / "t.py").write_text(text)
+    diff = "+++ b/t.py\n@@ -0,0 +1,5 @@\n" + "".join(
+        f"+{x}\n" for x in text.splitlines()
+    )
+    found = om.mutants(diff, tmp_path)
+    assert [(m.kind, m.old, m.new) for m in found][:2] == [
+        ("condition", "a and b", "True"),
+        ("condition", "a and b", "False"),
+    ]
+    assert {m.line for m in found} == {2}

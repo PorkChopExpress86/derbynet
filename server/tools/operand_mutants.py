@@ -29,7 +29,8 @@ that line of the new file. For each added line it lists:
   operand made true and made false.
 
 A Python file on disk is read by its AST instead, for its conditions:
-each `if`, `elif`, `while`, ternary and comprehension condition, and each
+each `if`, `elif`, `while`, ternary, comprehension and `case` guard
+condition, and each
 operand of every `and` and `or` (a `return a and b` too), wherever it
 spans lines, when it touches an added line. Its `old` is then the text of
 its span, which can hold a newline, printed on one line; the line printed
@@ -270,6 +271,8 @@ def python_conditions(
             tests.append(node.test)
         elif isinstance(node, ast.comprehension):
             tests += node.ifs
+        elif isinstance(node, ast.match_case) and node.guard is not None:
+            tests.append(node.guard)
         elif isinstance(node, ast.BoolOp):
             ops += node.values
     out = []
@@ -299,14 +302,21 @@ def added_lines(diff: str):
             line += 1
 
 
+def read(path: Path) -> str:
+    """A file's text as `tools/mutate.py` reads it, bytes decoded as UTF-8
+    with no newline translation, so a CRLF file's spans are its own (#358
+    review: `read_text()` made them LF, and every mutant was refused)."""
+    return path.read_bytes().decode()
+
+
 def css_code(root: Path | None, path: str) -> list[str] | None:
     """A stylesheet's lines with its comments blanked, so the values a
     comment quotes are not listed; None when the file is not on disk."""
     if root is None or not path.endswith(".css"):
         return None
     try:
-        text = (root / path).read_text()
-    except OSError:
+        text = read(root / path)
+    except OSError, UnicodeDecodeError:
         return None
 
     def spaces(m: re.Match) -> str:
@@ -320,7 +330,7 @@ def source(root: Path | None, path: str) -> str | None:
     if root is None:
         return None
     try:
-        return (root / path).read_text()
+        return read(root / path)
     except OSError, UnicodeDecodeError:
         return None
 

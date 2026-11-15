@@ -440,6 +440,25 @@ class DbCode(unittest.TestCase):
         out = run('server/awards/editing.py', tree=tree)
         self.assertIn("server/awards/editing.py: database code ('.objects')", out)
 
+    def test_a_queryset_method_counts_only_where_django_is_imported(self):
+        """tools/operand_mutants.py's docstring and regex name `.filter(`
+        and it imports no Django: no Postgres (#358 review). A view that
+        imports Django and filters a queryset it is given still needs it."""
+        tool = ('"""Lists `.filter(x => ...)` mutants."""\nimport re\n\n'
+                'FILTER = re.compile(r"\\.filter\\(\\s*")\nrows = {}.values()\n')
+        view = 'from django.shortcuts import render\n\n\ndef v(qs):\n    return qs.filter(a=1)\n'
+        tree = {**TREE, 'server/tools/lister.py': tool, 'server/ui/listing.py': view}
+        self.assertIn('Postgres: not needed', run('server/tools/lister.py', tree=tree))
+        self.assertIn("server/ui/listing.py: database code ('.filter(')",
+                      run('server/ui/listing.py', tree=tree))
+        # The queryset rule adds to the others, and a test still needs raw SQL.
+        tree['server/ui/rows.py'] = 'from django.shortcuts import render\nAward.objects.all()\n'
+        tree['server/ui/tests/test_rows.py'] = ('from django.test import TestCase\n'
+                                                'Award.objects.filter(a=1)\n')
+        self.assertIn("server/ui/rows.py: database code ('.objects')",
+                      run('server/ui/rows.py', tree=tree))
+        self.assertIn('Postgres: not needed', run('server/ui/tests/test_rows.py', tree=tree))
+
     def test_css_needs_no_postgres(self):
         self.assertIn('Postgres: not needed', run('server/ui/static/ui/kiosk.css'))
 
