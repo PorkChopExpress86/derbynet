@@ -77,6 +77,8 @@ GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 # GitHub closes the issues a few seconds after the merge.
 CLOSE_WAIT=${CLOSE_WAIT:-30}
+# Seconds a source-check run that ignores TERM gets before SIGKILL.
+KILL_WAIT=${KILL_WAIT:-10}
 
 # The source-check run's worktree, and its process group while it runs. The
 # run has a session of its own, so a Ctrl-C reaches only this script, whose
@@ -91,8 +93,8 @@ remove_worktree() {
     kill -TERM -- "-$checks_pid" 2>/dev/null || true
     wait "$checks_pid" 2>/dev/null || true
     # uv and pytest, below source-checks.sh, get the TERM too; a run that
-    # ignores it is killed after about 10 s.
-    for _ in $(seq 50); do
+    # ignores it is killed after $KILL_WAIT s.
+    for _ in $(seq $((KILL_WAIT * 5))); do
       kill -0 -- "-$checks_pid" 2>/dev/null || break
       sleep 0.2
     done
@@ -219,15 +221,20 @@ source_checks_on_the_merge() {
   # Its own name, since two runs on one PR shared one and a pass deleted a
   # failure's log (#333 review).
   log=$cache_dir/derbynet-pr-merge-$PR-${wt##*.}.log
-  echo "running server/tools/source-checks.sh on #$PR merged with origin/master (${merge:0:8}) in $wt; it took 16 min at a load average of 34, output in $log" >&2
+  # #333's own run is the one measured; #330's and #335's merges printed
+  # its time as if it were theirs (#311 retro), so this run's comes after.
+  echo "running server/tools/source-checks.sh on #$PR merged with origin/master (${merge:0:8}) in $wt, output in $log; #333's run took 16 min at a load average of 34" >&2
+  started=$SECONDS
   (cd "$wt" && exec setsid env --default-signal=INT bash server/tools/source-checks.sh) \
     </dev/null >"$log" 2>&1 &
   checks_pid=$!
   echo "group $checks_pid" >>"$owner_file"
   wait "$checks_pid" && status=0 || status=$?
+  read -r load _ </proc/loadavg || load=unknown
+  took="$((SECONDS - started)) s, with a load average of $load at the end"
   remove_worktree
   if [ "$status" != 0 ]; then
-    echo "not merging #$PR; server/tools/source-checks.sh failed (exit $status) on the PR merged with origin/master ${master:0:8}. Its summary lines, and the whole output in $log:" >&2
+    echo "not merging #$PR; server/tools/source-checks.sh failed (exit $status) on the PR merged with origin/master ${master:0:8}, after $took. Its summary lines, and the whole output in $log:" >&2
     out=$(grep -E '^(FAIL|ERROR): |^(FAILED|ERROR) |^FAILED \(|^Ran [0-9]+ tests? in |^(=+ )?[0-9]+ [a-z]+.* in [0-9.]+s' "$log" || true)
     [ -n "$out" ] || out=$(tail -n 20 "$log")
     echo "$out" >&2
@@ -235,7 +242,7 @@ source_checks_on_the_merge() {
   fi
   rm -f "$log"
   echo "$head $master" >>"$passed_file"
-  echo "the source checks passed on #$PR merged with origin/master ${master:0:8}" >&2
+  echo "the source checks passed on #$PR merged with origin/master ${master:0:8} in $took" >&2
 }
 if ! git fetch -q origin master "refs/pull/$PR/head" 2>/dev/null ||
    ! git cat-file -e "$head^{commit}" 2>/dev/null ||

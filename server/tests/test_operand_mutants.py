@@ -75,3 +75,49 @@ def test_each_old_text_is_on_its_line_and_removed_lines_are_skipped():
     assert {m.line for m in found} == {2}
     for m in found:
         assert m.old in "if (x > Math.max(a, b)) {}"
+
+
+def test_a_python_script_with_no_extension_is_read_as_python(tmp_path):
+    """#320's `plan/bin/affected-tests` has no `.py`: the tool read it as
+    JavaScript, listed `if (module, name) in seen:` as a condition of
+    `module, name`, and missed each Python `if`, so every condition was
+    listed by hand (#320 retro). Its shebang names Python."""
+    script = tmp_path / "plan" / "bin" / "tool"
+    script.parent.mkdir(parents=True)
+    script.write_text("#!/usr/bin/env python3\nif (module, name) in seen:\n")
+    hook = "#! /bin/bash\nif (x) {}\necho [n for n in seen if n]\n"
+    (tmp_path / "plan" / "bin" / "hook").write_text(hook)
+    diff = (
+        "+++ b/plan/bin/tool\n@@ -1,0 +2 @@\n+if (module, name) in seen:\n"
+        "+++ b/plan/bin/hook\n@@ -1,0 +2,2 @@\n"
+        "+if (x) {}\n+echo [n for n in seen if n]\n"
+    )
+    found = [(m.path, m.old, m.new) for m in om.mutants(diff, tmp_path)]
+    assert found == [
+        ("plan/bin/tool", "(module, name) in seen", "True"),
+        ("plan/bin/tool", "(module, name) in seen", "False"),
+        ("plan/bin/hook", "x", "true"),
+        ("plan/bin/hook", "x", "false"),
+    ]
+    # With no tree to read, a file with no extension is no Python.
+    assert [m.new for m in om.mutants(diff)][:2] == ["true", "false"]
+
+
+def test_javascript_in_a_python_if_keeps_its_mutants():
+    """A browser test's `if page.evaluate("...")` line holds JavaScript in a
+    string: the Python condition is listed, and the JavaScript filter's
+    mutants too, but not the Python `if` read as JavaScript (#340 review)."""
+    line = 'if page.evaluate("() => items.filter(x => x.a && x.b).length"):'
+    diff = f"+++ b/t.py\n@@ -1,0 +1 @@\n+{line}\n"
+    found = [(m.kind, m.old, m.new) for m in om.mutants(diff)]
+    call = 'page.evaluate("() => items.filter(x => x.a && x.b).length")'
+    assert found == [
+        ("condition", call, "True"),
+        ("condition", call, "False"),
+        ("filter", "x => x.a && x.b", "x => true"),
+        ("filter", "x => x.a && x.b", "x => false"),
+        ("operand", "x.a", "true"),
+        ("operand", "x.a", "false"),
+        ("operand", "x.b", "true"),
+        ("operand", "x.b", "false"),
+    ]

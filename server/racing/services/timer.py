@@ -25,7 +25,7 @@ from core.models import ActionLog, Event, RaceSettings, RaceState
 from core.services import EventReadOnly, lock_race_state, require_writable
 from legacy_api.xml import php_escape
 from racing.engine import heat_state as hs
-from racing.engine.phpcompat import php_equals, php_numeric, php_truthy
+from racing.engine.phpcompat import php_equals, php_int, php_numeric, php_truthy
 from racing.models import HeatLane, Round, TimerSetting, TimerStatus
 from racing.services import audit, replay
 from racing.services.heats import transition
@@ -33,8 +33,11 @@ from racing.services.results import Outcome, timer_result_locked
 
 State = TimerStatus.State
 
-CONTACT_TIMEOUT = timedelta(seconds=60)
-"""`TimerState`: a timer that has not reported for longer is not connected."""
+CONTACT_SECONDS = 60
+"""`TimerState`: a timer that has not reported for longer is not connected.
+Counted in whole seconds, as PHP's `last_contact + 60 < time()` counts them
+(`timer-state.inc:72`)."""
+CONTACT_TIMEOUT = timedelta(seconds=CONTACT_SECONDS)
 MALFUNCTION_DURATION = timedelta(seconds=60)
 """How long a malfunction the timer cannot detect stays in force."""
 REMOTE_START_TIMEOUT = timedelta(seconds=60)
@@ -45,8 +48,9 @@ competes with the first."""
 
 SUCCESS = "\n  <success/>\n"
 MAX_LANES = 32767
-"""The largest lane count the settings hold; a timer reporting more is
-ignored."""
+"""The largest lane count the settings hold. IDENTIFIED ignores a larger
+count, and any text that is not a PHP number, with the same reply (D99);
+PHP stores either as sent (`action.timer-message.inc:99-104`)."""
 MAX_TEST_MASK = 2**31 - 1
 # The lane count fields of the timer pages (#50), as the PHP pages bound
 # them: timer-test.php's n-lanes field (min 0, max 20) and fake-timer.php's
@@ -63,8 +67,9 @@ FAKE_TIMER_LANES = (2, 8)
 @dataclass
 class TimerState:
     """`new TimerState()`: the stored state with the contact timeout and an
-    expired malfunction applied. Reading writes nothing; `timed_out` says
-    the timeout changed the state, for the caller to store and log."""
+    expired malfunction applied. Reading writes nothing (D100); `timed_out`
+    says the timeout changed the state, for a caller that writes to store
+    and log with `time_out`."""
 
     state: int
     last_contact: datetime | None
@@ -84,7 +89,9 @@ class TimerState:
             malfunction_requires_reset=row.malfunction_requires_reset,
             malfunction_message=row.malfunction_message,
         )
-        stale = found.last_contact is None or found.last_contact + CONTACT_TIMEOUT < now
+        stale = found.last_contact is None or php_time(
+            found.last_contact
+        ) + CONTACT_SECONDS < php_time(now)
         if not found.assume_connected and stale:
             found.timed_out = found.state != State.NOT_CONNECTED
             found.state = State.NOT_CONNECTED
@@ -137,30 +144,34 @@ _STATE_FIELDS = [
 ]
 
 
-def check_contact(event: Event, now: datetime | None = None) -> bool:
-    """The contact timeout, written: a timer silent for more than a minute
-    goes to `NOT_CONNECTED`, logged as `timer.*overdue`. PHP writes it on
-    every read of the state; Django writes it here and on each timer
-    message, and reads never write. The audit dates the change to when
-    the minute ran out. Returns whether it timed out."""
-    now = now or timezone.now()
-    with transaction.atomic():
-        row = TimerStatus.objects.select_for_update().get(event=event)
-        timer = TimerState.read(row, now)
-        if not timer.timed_out:
-            return False
-        record = _time_out(event, row, timer, now)
-    audit.write(event.id, [record])
-    return True
+def php_time(moment: datetime) -> int:
+    """PHP's `time()` for `moment`: whole seconds."""
+    return int(moment.timestamp())
 
 
-def _time_out(event: Event, row: TimerStatus, timer: TimerState, now) -> audit.Record:
-    """Store the timeout and log `timer.*overdue`. Returns its audit record."""
+def timed_out_at(last_contact: datetime) -> datetime:
+    """The first moment `TimerState.read` finds a contact at `last_contact`
+    timed out: the whole second 61 s after its own, since PHP's
+    `last_contact + 60 < time()` compares whole seconds (`timer-state.inc:72`)."""
+    return (
+        last_contact
+        - timedelta(microseconds=last_contact.microsecond)
+        + timedelta(seconds=CONTACT_SECONDS + 1)
+    )
+
+
+def time_out(event: Event, row: TimerStatus, timer: TimerState, now) -> audit.Record:
+    """Store the contact timeout that `TimerState.read` found, log
+    `timer.*overdue`, and return its audit record. Both are dated to when
+    the minute ran out (D100), the moment `TimerState.read` first finds
+    it (`timed_out_at`). The caller holds the timer's row lock."""
     was = row.state
     timer.store(row, now, renew=False)
     row.save(update_fields=_STATE_FIELDS)
-    ActionLog.objects.create(event=event, request={"action": "timer.*overdue"})
-    at = None if timer.last_contact is None else timer.last_contact + CONTACT_TIMEOUT
+    at = None if timer.last_contact is None else timed_out_at(timer.last_contact)
+    ActionLog.objects.create(
+        event=event, request={"action": "timer.*overdue"}, received=at or now
+    )
     return audit.timer_state_changed(None, was, timer.state, at)
 
 
@@ -256,7 +267,7 @@ def handle_message(
         race = lock_race_state(event.id, writable=False)
         row = TimerStatus.objects.select_for_update().get(event=event)
         timer = TimerState.read(row, now)
-        timed_out = _time_out(event, row, timer, now) if timer.timed_out else None
+        timed_out = time_out(event, row, timer, now) if timer.timed_out else None
         was = row.state
         message = _text(fields.get("message"))
         msg = _Message(
@@ -343,7 +354,7 @@ def _hello(msg: _Message) -> None:
         interface = msg.get("interface")
         if msg.has("build"):
             interface += "-" + msg.get("build")
-        msg.row.interface = _fit(TimerStatus, "interface", interface)
+        msg.row.interface = interface
     last = msg.timer.last_contact
     accept = True
     if (
@@ -352,25 +363,27 @@ def _hello(msg: _Message) -> None:
         and int(last.timestamp()) + COMPETING_WINDOW >= int(msg.now.timestamp())
     ):
         agent = msg.row.agent
-        if agent and agent != _fit(TimerStatus, "agent", msg.user_agent):
+        if agent and agent != msg.user_agent:
             accept = False
             msg.out.append(f"<competing>{php_escape(agent)}</competing>\n")
     # The timer that made contact most recently; the others compete with it.
     if accept:
-        msg.row.agent = _fit(TimerStatus, "agent", msg.user_agent)
+        msg.row.agent = msg.user_agent
     msg.out.append(SUCCESS + "    <query/>\n")
 
 
 def _identified(msg: _Message) -> None:
-    lanes = php_numeric(msg.get("lane_count")) if msg.has("lane_count") else None
-    if lanes is not None and 0 < lanes <= MAX_LANES:
+    number = php_numeric(msg.get("lane_count")) if msg.has("lane_count") else None
+    # D99: a PHP number, cut toward zero, then taken from 1 to MAX_LANES.
+    lanes = None if number is None else php_int(number)
+    if lanes is not None and 1 <= lanes <= MAX_LANES:
         # D74, C26: the timer's count is kept to show beside the race's, and
         # sets the race's only while no heat is scheduled, so a schedule
         # never meets a lane count it was not made for. PHP always writes
         # it. `handle_message` holds the race-state lock.
-        msg.row.reported_lane_count = int(lanes)
+        msg.row.reported_lane_count = lanes
         if not heats_scheduled(msg.event.id):
-            msg.settings.lane_count = int(lanes)
+            msg.settings.lane_count = lanes
             msg.settings.save(update_fields=["lane_count"])
     for key, column in (
         ("timer", "timer_type"),
@@ -379,10 +392,10 @@ def _identified(msg: _Message) -> None:
         ("options", "options"),
     ):
         if msg.has(key):
-            setattr(msg.row, column, _fit(TimerStatus, column, msg.get(key)))
+            setattr(msg.row, column, msg.get(key))
     for key in ("vid", "pid"):
         if php_truthy(msg.get(key)):
-            setattr(msg.row, key, _fit(TimerStatus, key, msg.get(key)))
+            setattr(msg.row, key, msg.get(key))
     if msg.has("confirmed") and php_equals(0, msg.get("confirmed")):
         msg.timer.state = State.UNCONFIRMED
     else:
@@ -469,7 +482,7 @@ def _heartbeat(msg: _Message) -> None:
     elif timer.unhealthy:
         timer.state = State.CONNECTED
     agent = msg.row.agent
-    if agent and agent != _fit(TimerStatus, "agent", msg.user_agent):
+    if agent and agent != msg.user_agent:
         msg.out.append(f"<competing>{php_escape(agent)}</competing>\n")
 
 
@@ -580,16 +593,6 @@ def heat_ready(current: _Current, settings: RaceSettings, test_mask: int) -> str
 # ----- flags, ports and devices (timer-flags.inc) -----
 
 
-def _fit(model, column: str, text: str) -> str:
-    """`text` cut to the column. PHP stores timer text of any length; a
-    longer value here would abort the whole message."""
-    return text[: model._meta.get_field(column).max_length]
-
-
-def _cut(text: str, column: str) -> str:
-    return _fit(TimerSetting, column, text)
-
-
 def decode_flags(event: Event, fields: Mapping) -> None:
     """A FLAGS message: every row with nothing pending is replaced by what
     the timer reports, in the order it reports it."""
@@ -604,25 +607,23 @@ def decode_flags(event: Event, fields: Mapping) -> None:
             TimerSetting.objects.create(
                 event=event,
                 kind=Kind.FLAG,
-                name=_cut(key[5:], "name"),
-                value_type=_cut(value_type, "value_type"),
-                value=_cut(flag_value, "value"),
+                name=key[5:],
+                value_type=value_type,
+                value=flag_value,
                 description=None,
             )
         elif key.startswith("desc-"):
-            rows.filter(kind=Kind.FLAG, name=key[5:]).update(
-                description=_cut(value, "description")
-            )
+            rows.filter(kind=Kind.FLAG, name=key[5:]).update(description=value)
         elif key == "ports":
             TimerSetting.objects.create(
-                event=event, kind=Kind.PORTS, name="ports", value=_cut(value, "value")
+                event=event, kind=Kind.PORTS, name="ports", value=value
             )
         elif key.startswith("device-"):
             TimerSetting.objects.create(
                 event=event,
                 kind=Kind.DEVICE,
-                name=_cut(key[7:], "name"),
-                description=_cut(value, "description"),
+                name=key[7:],
+                description=value,
             )
 
 
@@ -669,7 +670,7 @@ def assign_flag(event: Event, flag: str, value: str) -> None:
     _assign(
         event,
         lambda rows: rows.filter(kind=TimerSetting.Kind.FLAG, name=flag).update(
-            pending=_cut(value, "pending")
+            pending=value
         ),
     )
 
@@ -678,7 +679,7 @@ def assign_port(event: Event, port: str) -> None:
     _assign(
         event,
         lambda rows: rows.filter(kind=TimerSetting.Kind.PORTS, name="ports").update(
-            pending=_cut(port, "pending")
+            pending=port
         ),
     )
 
@@ -690,7 +691,7 @@ def assign_device(event: Event, device: str) -> None:
             event=event,
             kind=TimerSetting.Kind.PENDING_DEVICE,
             name="",
-            pending=_cut(device, "pending"),
+            pending=device,
         ),
     )
 

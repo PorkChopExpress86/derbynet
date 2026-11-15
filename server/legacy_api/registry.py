@@ -582,21 +582,22 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " opens the ballot.",
         "D86: a racer's voting code (the vote link /vote/code/<token>, shown"
         " as a QR code on the check-in page) lets a voter in, and without one"
-        " the page asks for a code; vote.php asks for the ballot password.",
+        " the page asks for a code; vote.php asks for the ballot password"
+        " (vote.php:184).",
         "S2: polls /ballot/status, which answers only whether balloting is"
-        " open; vote.js polls settings.list, which answers ballot_password to"
-        " anyone who asks for it.",
+        " open; vote.js polls settings.list (js/vote.js:208), which answers"
+        " ballot_password to anyone who asks for it.",
         "S14, D35: an award's racers are those vote.cast takes, partition"
         " lists included, and a choice the award can no longer take leaves"
         " the voter's list, so the next change replaces it; vote.js filters"
-        " by the page's eligible class and rank ids and shows every vote"
-        " ballot.get returns.",
+        " by the page's eligible class and rank ids (js/vote.js:65-70) and shows"
+        " every vote ballot.get returns.",
         "D77: a change of /ballot/status swaps the page's state in place;"
-        " vote.js reloads the page.",
+        " vote.js reloads the page (js/vote.js:215).",
         "D77: a refused vote.cast shows a toast naming the reason; vote.js"
-        " ignores the reply.",
+        " ignores the reply (js/vote.js:121-124).",
         "C33: the sort control keeps ?order= on this page; vote.php's links"
-        " open ballot.php, which does not exist.",
+        " open ballot.php (vote.php:53), which does not exist.",
         "D47: car numbers show three digits.",
     ),
     "photo.php/info": (
@@ -614,13 +615,16 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " PHP has no weigh-in.",
         "D9, D18: a Replay section sets the speed, the showings, the time"
         " before the finish, the post-roll and the longest clip; PHP sets the"
-        " first three in coordinator.php's dialog and has no other two.",
+        " first three in coordinator.php's dialog (coordinator.php:212-246) and"
+        " has no other two.",
         "D56: the page shows the server's time zone and how to change it.",
         "Q13: loading the page writes nothing; settings.php writes scoring=1"
-        " for a legacy drop-slowest key, which the importer converts once.",
+        " for a legacy drop-slowest key (settings.php:95-96), which the importer"
+        " converts once.",
         "D80: a number outside its field's range (settings.php's input min and"
-        " max, and coordinator.php's replay choices) is refused with an inline"
-        " error; PHP stores any number posted.",
+        " max, such as settings.php:128, and coordinator.php's replay choices,"
+        " coordinator.php:217-246) is refused with an inline error; PHP stores"
+        " any number posted.",
     ),
     "setup.php": (
         "D20: a 301 to /setup/, the query string kept.",
@@ -637,15 +641,15 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         " what a snapshot does not restore.",
         "D56: the wizard shows the server's time zone and how to change it.",
         "D80: the wizard's steps and the health checks replace setup.php's"
-        " status list: the database takes writes, the configuration folders,"
-        " each photo folder, and Django's upload cap against the photo stand's"
-        " 30 MB.",
+        " status list (setup.php:85-86 opens it): the database takes writes,"
+        " the configuration folders, each photo folder, and Django's upload"
+        " cap against the photo stand's 30 MB.",
     ),
     "about.php": (
         "D20: a 301 to /about/, the query string kept.",
         "S30: no phpinfo() or other configuration dump.",
         "C35: the timer's name is read from timer-human; about.php reads"
-        " timer-humant, so the name never shows.",
+        " timer-humant (about.php:226), so the name never shows.",
         "S5: the snapshot downloads show to SET_UP only, as snapshot.get needs.",
         "D80: the page drops the server's local URLs, the browser's user agent"
         " and its JavaScript version, and adds the setup health checks and the"
@@ -654,16 +658,18 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
     "fake-timer.php": (
         "D20: a 301 to /timer/fake/, the query string kept.",
         "D96: needs TIMER_MESSAGE, as the timer-message it sends does;"
-        " fake-timer.php asks for CHECK_IN_RACERS, so a role without"
+        " fake-timer.php asks for CHECK_IN_RACERS (fake-timer.php:9), so a role without"
         " TIMER_MESSAGE opened it and had every message refused.",
         "D98: the intro links the race dashboard and the timer test only for"
         " a role that can open them, and names them as plain text otherwise;"
-        " fake-timer.php links coordinator.php and timer.php for every role.",
+        " fake-timer.php links coordinator.php and timer.php for every role"
+        " (fake-timer.php:99-100).",
     ),
     "fakeroster.php": (
         "D20: a 301 to /setup/fake-roster/, the query string kept.",
         "C56: needs SET_UP, as racer.fake does; fakeroster.php asks for"
-        " CHECK_IN_RACERS, so its button failed for a role without SET_UP.",
+        " CHECK_IN_RACERS (fakeroster.php:10), so its button failed for a role"
+        " without SET_UP.",
         "C57: each group gets exactly the racers asked for; racer.fake adds or"
         " drops up to 2 per group at random.",
     ),
