@@ -410,10 +410,10 @@ def test_scene_editor_parity(login, event):
 
 
 def hold_the_tap(page):
-    """Holds the scene POST in a CDP session of the test's own, which sees
-    it before Playwright's interception does, and returns the function
-    that lets it go. The tap then reaches Playwright only after the test
-    has released the board's polls, as it may under load (#316)."""
+    """Holds the scene POST in a CDP session of the test's own and returns
+    the function that lets it go, so the test lets the tap through only
+    after it has released the board's polls (#316). Letting go ends the
+    hold, so a later tap posts as usual."""
     hold = page.context.new_cdp_session(page)
     paused = []
     hold.on("Fetch.requestPaused", lambda e: paused.append(e["requestId"]))
@@ -429,6 +429,8 @@ def hold_the_tap(page):
             page.wait_for_timeout(20)
         assert paused, "the tap sent no POST within 10 s"
         hold.send("Fetch.continueRequest", {"requestId": paused[0]})
+        hold.send("Fetch.disable")
+        hold.detach()
 
     return let_go
 
@@ -439,11 +441,9 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     the tap belonged to a button the reply then replaced, and htmx drops
     the request of a detached element (#46 CI: the switch never posted).
 
-    The board's route stays to the end of the test and lets polls through
-    once released. An unroute turns Playwright's interception off, and a
-    request that reaches the interceptor after that is never reported, so
-    `htmx_post` timed out waiting for a response event (#316).
-    `hold_the_tap` makes the POST arrive after the release on every run."""
+    The board's route stays to the end of the test and lets a later poll
+    through once released. `hold_the_tap` lets the tap's POST go only
+    after that release, on every run (#316)."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     racing = scene(event, "Racing")
@@ -482,3 +482,8 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     expect(scene_button(page, racing)).to_have_attribute("aria-pressed", "true")
     assert held, "no poll was out"
     next_polls(page, 1)  # the route lets a later poll through
+    # A second tap, after the hold has ended, posts as usual.
+    welcome = scene(event, "Welcome")
+    with htmx_post(page, "/kiosks/scene/"):
+        tap(page, scene_button(page, welcome))
+    expect(scene_button(page, welcome)).to_have_attribute("aria-pressed", "true")
