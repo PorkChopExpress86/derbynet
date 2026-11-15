@@ -295,7 +295,8 @@ def _names_contact(node: ast.expr, aliases=frozenset()) -> bool:
 
 
 def _reads_column(node: ast.expr) -> bool:
-    """`....values_list("completed", ...)...`: a query for a stored moment."""
+    """`...values_list("reschedule_started_at", flat=True)...`: a query for a
+    stored moment."""
     return any(
         isinstance(call, ast.Call)
         and isinstance(call.func, ast.Attribute)
