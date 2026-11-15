@@ -269,3 +269,24 @@ def test_the_replay_age_counts_whole_seconds(coordinator, event, clock):
     assert replay_state(coordinator)["message"] == "Ready (5 sec.)"
     clock[0] = SECOND + timedelta(seconds=5) - MICROSECOND
     assert replay_state(coordinator)["message"] == "Ready (4 sec.)"
+
+
+@pytest.mark.parametrize(
+    "state", [ReplayStatus.State.NOT_CONNECTED, ReplayStatus.State.TROUBLE]
+)
+def test_a_live_contact_in_another_state_is_not_connected(
+    coordinator, event, clock, state
+):
+    """#341: `replay.connected` needs the stored state to be CONNECTED as
+    well as a contact that has not lapsed, as `send_replay_message()`
+    compares `get_replay()`'s state (`replay.inc:59-60`). A contact 0.8 s
+    past SECOND, read 5 s past it, is live, yet `replay.test` queues nothing
+    and the next poll gets `HELLO` alone."""
+    ReplayStatus.objects.filter(event=event).update(
+        state=state, last_contact=SECOND + timedelta(seconds=0.8)
+    )
+    clock[0] = SECOND + timedelta(seconds=5)
+    assert not replay.lapsed(SECOND + timedelta(seconds=0.8), clock[0])
+
+    act(coordinator, "action=replay.test")
+    assert poll(coordinator) == ["HELLO"]
