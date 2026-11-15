@@ -1696,6 +1696,36 @@ def test_waits(page):
             ('TestBoard::test_one', 'changed'),
             ('TestBoard::test_two', 'reads test_one of TestBoard')])
 
+    def test_a_method_that_calls_through_self_a_method_that_reads_a_changed_helper(self):
+        """test_one reads self.test_two, which reads start(), which reads the
+        changed race()."""
+        base = edit('        assert self.n\n', '        self.test_two(page)\n')
+        head = edit('name=f"Stop lane {lane}"', 'name=f"Stop {lane}"', base)
+        self.assertEqual(d101(head, base=base), [
+            ('test_races', 'reads start'),
+            ('TestBoard::test_one', 'reads test_two of TestBoard'),
+            ('TestBoard::test_two', 'reads start')])
+
+    def test_a_subclass_of_a_class_whose_method_reads_a_changed_helper(self):
+        base = D101_BASE + '\n\nclass TestMore(TestBoard):\n    pass\n'
+        head = edit('name=f"Stop lane {lane}"', 'name=f"Stop {lane}"', base)
+        self.assert_whole('the class TestMore reads TestBoard', head, base=base)
+
+    def test_a_test_that_reads_a_class_whose_method_reads_a_changed_helper(self):
+        """TestBoard is reached through test_two's start(), and test_more,
+        unchanged, reads TestBoard: the module's reach runs again."""
+        base = D101_BASE + '\n\ndef test_more(page):\n    assert TestBoard\n'
+        head = edit('name=f"Stop lane {lane}"', 'name=f"Stop {lane}"', base)
+        self.assertIn(('test_more', 'reads TestBoard'), d101(head, base=base))
+
+    def test_a_class_helper_method_that_calls_a_method_that_reads_a_changed_helper(self):
+        base = edit('        self.n = 1\n', '        self.n = 1\n\n    def again(self, page):\n'
+                    '        self.test_two(page)\n')
+        base += '\n    def test_three(self, page):\n        self.again(page)\n'
+        head = edit('name=f"Stop lane {lane}"', 'name=f"Stop {lane}"', base)
+        self.assert_whole('the class TestBoard reads test_two outside its test methods',
+                          head, base=base)
+
     def test_a_method_that_calls_a_deleted_method_through_self(self):
         base = edit('        start(page)\n', '        self.test_one(page)\n')
         head = edit('''    def test_one(self, page):
@@ -2006,6 +2036,10 @@ class LoadRepeats(unittest.TestCase):
             'constant': edit('LANES = 4', 'LANES = 6'),
             'class': edit('self.n = 1', 'self.n = 2'),
             'parse': D101_BASE + '\ndef broken(:\n',
+            'hook': D101_BASE + '\n\ndef setup_module():\n    pass\n',
+            'pytestmark': edit('LANES = 4', 'LANES = 4\npytestmark = pytest.mark.browser'),
+            'import': edit('import pytest\n', 'import pytest\nimport re\n')
+            + '\n\ndef test_more(page):\n    assert re.escape("a")\n',
         }
         for name, head in cases.items():
             with self.subTest(name):

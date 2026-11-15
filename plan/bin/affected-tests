@@ -1756,41 +1756,49 @@ def changed_tests(base_text, head_text, module_text):
     seeds |= {name for name in base.classes if name not in head.classes}
 
     # The helpers and tests that read a seed, directly or through another
-    # (#336 review, L1: a test that calls a test).
+    # (#336 review, L1: a test that calls a test); within a test class, the
+    # test methods that read one, or read a reached method of their class
+    # through `self`, `cls` or the class's name (L2). A class with a
+    # reached method is reached itself, for a subclass or a test that
+    # reads it, and the module's reach runs again.
     reached = set(seeds)
     readers = {**head.helpers, **head.tests}
-    for _ in range(len(readers) + 1):
-        more = {name for name, node in readers.items()
-                if name not in reached and mentions(node) & reached}
-        if not more:
+    in_class = {}
+    for _ in range(len(head.classes) + 1):
+        for _ in range(len(readers) + 1):
+            more = {name for name, node in readers.items()
+                    if name not in reached and mentions(node) & reached}
+            if not more:
+                break
+            reached |= more
+        for name, c in head.classes.items():
+            old = base.classes.get(name)
+            if old is None:
+                continue
+            owners = {'self', 'cls', name}
+            hit = {m for m in [*c.tests, *old.tests] if f'{name}::{m}' in ids
+                   or m not in c.tests or mentions(c.tests[m]) & (reached - {name})}
+            for _ in range(len(c.tests) + 1):
+                more = {m for m, node in c.tests.items()
+                        if m not in hit and attributes(node, owners) & hit}
+                if not more:
+                    break
+                hit |= more
+            in_class[name] = (owners, hit)
+        grown = {name for name, (_, hit) in in_class.items() if hit} - reached
+        if not grown:
             break
-        reached |= more
+        reached |= grown
     for node in head.frame + [c.frame for c in head.classes.values()]:
         hit = sorted(mentions(node) & reached)
         if hit:
             raise WholeFile(f'{what(node)} reads {hit[0]}, which the diff adds, '
                             'changes or deletes, or which reads one')
-    # Within a test class, the test methods that read a changed one through
-    # `self`, `cls` or the class's name, directly or through another.
-    in_class = {}
-    for name, c in head.classes.items():
-        old = base.classes.get(name)
-        if old is None:
-            continue
-        owners = {'self', 'cls', name}
-        hit = {m for m in [*c.tests, *old.tests] if f'{name}::{m}' in ids
-               or m not in c.tests}
-        for _ in range(len(c.tests) + 1):
-            more = {m for m, node in c.tests.items()
-                    if m not in hit and attributes(node, owners) & hit}
-            if not more:
-                break
-            hit |= more
-        used = sorted(attributes(c.frame, owners) & hit)
+    for name, (owners, hit) in in_class.items():
+        used = sorted(attributes(head.classes[name].frame, owners) & hit)
         if used:
             raise WholeFile(f'the class {name} reads {used[0]} outside its test methods, '
                             'which the diff adds, changes or deletes, or which reads one')
-        in_class[name] = (owners, hit)
 
     out = []
 
