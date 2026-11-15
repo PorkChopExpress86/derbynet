@@ -409,17 +409,56 @@ def test_scene_editor_parity(login, event):
     expect(page.locator('a[aria-label="Back"]')).to_have_attribute("href", "/setup/")
 
 
+def hold_the_tap(page):
+    """Holds the scene POST in a CDP session of the test's own and returns
+    the function that lets it go, so the test lets the tap through only
+    after it has released the board's polls (#316). Letting go ends the
+    hold, so a later tap posts as usual."""
+    hold = page.context.new_cdp_session(page)
+    paused = []
+    hold.on("Fetch.requestPaused", lambda e: paused.append(e["requestId"]))
+    hold.send(
+        "Fetch.enable",
+        {"patterns": [{"urlPattern": "*/kiosks/scene/*", "requestStage": "Request"}]},
+    )
+
+    def let_go():
+        for _ in range(500):
+            if paused:
+                break
+            page.wait_for_timeout(20)
+        assert paused, "the tap sent no POST within 10 s"
+        hold.send("Fetch.continueRequest", {"requestId": paused[0]})
+        hold.send("Fetch.disable")
+        hold.detach()
+
+    return let_go
+
+
 def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     """A scene tapped while a board poll is in flight reaches the server,
     even when that poll's reply changes the board. Queued behind the poll,
     the tap belonged to a button the reply then replaced, and htmx drops
-    the request of a detached element (#46 CI: the switch never posted)."""
+    the request of a detached element (#46 CI: the switch never posted).
+
+    The board's route stays to the end of the test and lets a later poll
+    through once released. `hold_the_tap` lets the tap's POST go only
+    after that release, on every run (#316)."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     racing = scene(event, "Racing")
     htmx_settled(page)
     held = []
-    page.route("**/kiosks/board/**", lambda route: held.append(route))
+    released = []
+
+    def board(route):
+        if released:
+            route.continue_()
+        else:
+            held.append(route)
+
+    page.route("**/kiosks/board/**", board)
+    let_go = hold_the_tap(page)
     Kiosk.objects.filter(address="tv").update(name="Lobby")
     # Wait for the held poll itself, not the board's htmx-request class: a
     # poll sent before the route can still be out, and its reply, carrying
@@ -436,11 +475,15 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     expect(page.locator("#kiosk-board.htmx-request")).to_have_count(1)
     with htmx_post(page, "/kiosks/scene/"):
         scene_button(page, racing).click()
-        page.unroute("**/kiosks/board/**")
+        released.append(True)
         for route in held:
-            try:
-                route.continue_()
-            except Exception:
-                pass  # the tap aborted it
+            route.continue_()  # the poll the tap aborted
+        let_go()
     expect(scene_button(page, racing)).to_have_attribute("aria-pressed", "true")
     assert held, "no poll was out"
+    next_polls(page, 1)  # the route lets a later poll through
+    # A second tap, after the hold has ended, posts as usual.
+    welcome = scene(event, "Welcome")
+    with htmx_post(page, "/kiosks/scene/"):
+        tap(page, scene_button(page, welcome))
+    expect(scene_button(page, welcome)).to_have_attribute("aria-pressed", "true")
