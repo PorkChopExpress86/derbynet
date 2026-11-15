@@ -6,18 +6,29 @@ inside the kiosk, whose `body.kiosk-page` sets the light `--k-ink`
 (kiosk.css). Text with no color of its own took that ink onto the white
 cards of the light theme. The tests pause Playwright's clock before the
 page loads, so the list's glide (kiosk-results.js, a pixel every 40 ms)
-moves only when a test runs the clock."""
+moves only when a test runs the clock. A test that resumes the clock for
+axe stops the kiosk first (`stop_the_kiosk`)."""
 
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import Error, expect
 
-from ui.tests.browser.conftest import assert_accessible, shoot
+from ui.tests.browser.conftest import (
+    SETTLE_BARRIER,
+    _barrier,
+    assert_accessible,
+    shoot,
+    stop_timers,
+)
 from ui.tests.browser.test_kiosk_pages import day, open_kiosk  # noqa: F401
 from ui.tests.race import run_heat
 
 PAUSED_AT = datetime(2026, 11, 9, 12, 0, 0)
+KIOSK_JS = Path(__file__).resolve().parents[2] / "static" / "ui" / "kiosk.js"
+# Past kiosk.js's `GIVE_UP_MS`, after which the page aborts a request.
+PAST_GIVE_UP_MS = 16_000
 WCAG_AA = 4.5
 
 # The text of the results that sits on no opaque background of its own, so
@@ -100,6 +111,27 @@ def open_paused(page, event):
     expect(page.locator("[data-result] [data-shown]").first).not_to_be_empty()
 
 
+def stop_the_kiosk(page):
+    """On the paused clock, wait for the kiosk's requests to be answered,
+    then stop its polls and its glide, so the page sends nothing once the
+    clock resumes for axe. A results/rounds/ poll sent on the resumed clock
+    with no reply within 15 s of page time was given up by the page
+    (kiosk.js `GIVE_UP_MS`), and its `net::ERR_ABORTED` failed the test at
+    teardown (#317; `test_the_resumed_clock_sends_no_kiosk_request`).
+    Nothing sends between the drain and the stop, since no timer fires on
+    the paused clock, and a reply that landed after the stop would queue
+    its poll again (`test_a_poll_out_at_the_stop_is_answered_first`)."""
+    _barrier(page)
+    assert page.in_flight.drain(page) == []
+    stop_timers(page)
+
+
+def resume_for_axe(page):
+    """Resume the paused clock with the kiosk stopped (`stop_the_kiosk`)."""
+    stop_the_kiosk(page)
+    page.clock.resume()
+
+
 def assert_readable_on_gradient(page):
     """Wait for no text on the gradient below WCAG AA; on a timeout, fail
     with what is low."""
@@ -145,8 +177,80 @@ def test_racer_headers_and_heat_times_read_on_their_cards(page, event, day, sche
         expect(page.locator("[data-rounds]")).to_have_css("transform", "none")
         shoot(page, "kiosk-results-by-racer")
 
-    page.clock.resume()
+    resume_for_axe(page)
     assert_accessible(page)
+
+
+def hold_after_resume(page) -> list:
+    """Hold every request the page sends once `page.clock.resume()` runs,
+    unanswered, as a reply slower than the page waits for; return their
+    URLs as they come."""
+    resumed = []
+    held = []
+    resume = page.clock.resume
+
+    def resume_and_mark():
+        resume()
+        resumed.append(True)
+
+    page.clock.resume = resume_and_mark
+    page.route(lambda url: bool(resumed), lambda route: held.append(route.request.url))
+    return held
+
+
+def test_kiosk_js_gives_a_request_up_after_15_s():
+    assert "var GIVE_UP_MS = 15000;" in KIOSK_JS.read_text()
+    assert PAST_GIVE_UP_MS > 15000
+
+
+def test_the_resumed_clock_sends_no_kiosk_request(page, event, day, page_errors):  # noqa: F811
+    """The racer-header test's resume and axe (`resume_for_axe`), with
+    every request sent after the resume held and the page's clock then run
+    16 s, past kiosk.js's 15 s give-up. Before `stop_the_kiosk`, the
+    results/rounds/ poll sent after the resume was held, and the page
+    gave it up with `net::ERR_ABORTED`, #317's error at teardown; now the
+    page sends nothing."""
+    held = hold_after_resume(page)
+    open_paused(page, event)
+    resume_for_axe(page)
+    assert_accessible(page)
+    page.clock.run_for(PAST_GIVE_UP_MS)
+    assert page_errors.errors == []
+    assert held == []
+
+
+def test_a_poll_out_at_the_stop_is_answered_first(page, event, day):  # noqa: F811
+    """A results/rounds/ poll still out when the kiosk stops: its reply,
+    held until the settle barrier of `stop_the_kiosk` goes out, comes
+    before the stop, so it queues no poll for the resumed clock. With the
+    stop before the drain, the reply queued its poll again past the stop,
+    and that poll went out once the clock ran."""
+    first = []
+    out = []
+
+    def hold_the_first_poll(route):
+        if first:
+            route.continue_()
+        else:
+            first.append(route.request.url)
+            out.append(route)
+
+    def let_it_go(request):
+        if request.url.endswith(SETTLE_BARRIER) and out:
+            out.pop().continue_()
+
+    page.route("**/results/rounds/**", hold_the_first_poll)
+    page.on("request", let_it_go)
+    open_paused(page, event)
+    for _ in range(100):
+        if first:
+            break
+        page.wait_for_timeout(50)
+    assert len(first) == 1
+    held = hold_after_resume(page)
+    resume_for_axe(page)
+    page.clock.run_for(PAST_GIVE_UP_MS)
+    assert held == []
 
 
 # axe started with no await, so a test can wait on it with a bound.
@@ -163,9 +267,12 @@ def test_axe_passes_dark_text_on_the_gradient_and_waits_on_the_clock(page, event
     light-theme muted ink, #4b5563 (2.36:1 on `--k-bg`), axe finds no
     contrast violation, where `LOW_ON_GRADIENT` reports it. axe waits on
     page timers between rules, so on the paused clock it has not finished
-    after 2 s; it finishes once the clock resumes."""
+    after 2 s; it finishes once the clock resumes. The kiosk stops before
+    axe starts (`stop_the_kiosk`), so in the 16 s of page clock after it the
+    page sends nothing."""
     from ui.tests.browser.conftest import AXE, AXE_TAGS
 
+    held = hold_after_resume(page)
     open_paused(page, event)
     page.add_style_tag(content=".k-results [data-no-heats] { color: #4b5563; }")
     expect(page.locator("[data-no-heats]")).to_have_css("color", "rgb(75, 85, 99)")
@@ -173,6 +280,8 @@ def test_axe_passes_dark_text_on_the_gradient_and_waits_on_the_clock(page, event
     found = page.evaluate(LOW_ON_GRADIENT, WCAG_AA)
     assert [item["text"] for item in found["low"]] == ["No heats yet."]
 
+    # Before axe starts, since the stop clears every timer, axe's too.
+    stop_the_kiosk(page)
     page.add_script_tag(path=str(AXE))
     page.evaluate(START_AXE, AXE_TAGS)
     page.wait_for_timeout(2000)
@@ -188,6 +297,8 @@ def test_axe_passes_dark_text_on_the_gradient_and_waits_on_the_clock(page, event
         for node in rule["nodes"]
     ]
     assert flagged == []
+    page.clock.run_for(PAST_GIVE_UP_MS)
+    assert held == []
 
 
 # Every round heading, racer card and "No heats yet" line inside the kiosk's
