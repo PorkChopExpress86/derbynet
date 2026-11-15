@@ -12,6 +12,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 PLAN = Path(__file__).resolve().parent.parent
 LINT = PLAN / 'lint-issues.py'
 

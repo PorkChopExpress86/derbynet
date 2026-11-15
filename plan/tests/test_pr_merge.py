@@ -14,6 +14,8 @@ import time
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 PR_MERGE = Path(__file__).resolve().parent.parent / 'bin' / 'pr-merge'
 SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'source-checks.sh'
 
@@ -83,6 +85,24 @@ elif args[:2] == ['pr', 'merge']:
 '''
 
 
+def setUpModule():
+    """These tests run the real source-checks.sh, which refuses a `timeout`
+    above it, so under one they fail on that refusal: #311's timing run
+    under `timeout 300` failed 9 subtests, and its retro's mutant run failed
+    on it too (#311 retro). Fail once, before any test, saying so."""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            comm = Path(f'/proc/{pid}/comm').read_text().strip()
+            pid = int(Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return
+        if comm == 'timeout':
+            raise RuntimeError(
+                'test_pr_merge.py runs under timeout, which source-checks.sh refuses: '
+                'run it with no timeout')
+
+
 class PrMerge(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -90,7 +110,9 @@ class PrMerge(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
         self.env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
                         GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
-                        GIT_CONFIG_NOSYSTEM='1', CLOSE_WAIT='0')
+                        GIT_CONFIG_NOSYSTEM='1', CLOSE_WAIT='0',
+                        # A deaf run's 10 s waits took 21 s of plan/tests' 74 s (#311 retro).
+                        KILL_WAIT='3')
         stubs = self.tmp / 'stubs'
         stubs.mkdir()
         for name in ('python3', 'uv'):

@@ -77,6 +77,8 @@ GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 # GitHub closes the issues a few seconds after the merge.
 CLOSE_WAIT=${CLOSE_WAIT:-30}
+# Seconds a source-check run that ignores TERM gets before SIGKILL.
+KILL_WAIT=${KILL_WAIT:-10}
 
 # The source-check run's worktree, and its process group while it runs. The
 # run has a session of its own, so a Ctrl-C reaches only this script, whose
@@ -91,8 +93,8 @@ remove_worktree() {
     kill -TERM -- "-$checks_pid" 2>/dev/null || true
     wait "$checks_pid" 2>/dev/null || true
     # uv and pytest, below source-checks.sh, get the TERM too; a run that
-    # ignores it is killed after about 10 s.
-    for _ in $(seq 50); do
+    # ignores it is killed after $KILL_WAIT s.
+    for _ in $(seq $((KILL_WAIT * 5))); do
       kill -0 -- "-$checks_pid" 2>/dev/null || break
       sleep 0.2
     done

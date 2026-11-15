@@ -11,6 +11,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
+import k_patterns  # noqa: F401  a -k that matches no test is refused
+
 PR_EVIDENCE = Path(__file__).resolve().parent.parent / 'bin' / 'pr-evidence'
 
 # #61's boxes as the PR found them, one asking for nothing in the PR, one
