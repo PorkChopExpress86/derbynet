@@ -4,8 +4,11 @@ real tree, so every page file maps to a test without the fallback.
 
 Run: python3 -I -m unittest discover -s plan/tests
 """
+import ast
+import contextlib
 import importlib.machinery
 import importlib.util
+import io
 import os
 import subprocess
 import sys
@@ -1404,6 +1407,52 @@ class ImportOnly(unittest.TestCase):
         sheet = BASE_SHEET.replace('\n\nfrom ui.tests.browser.conftest',
                                    '\nfrom ui.tests.browser.conftest')
         self.assert_keeps('it moves no top-level definition', sheet=sheet)
+
+# Each way a module statement binds a name, run through Python itself
+# (plan/AGENT-BRIEF.md: a rule that mirrors a parser is built from a sweep).
+# #320's bindings() missed a module-level walrus until review (H4).
+BINDING_FORMS = {
+    'assign': 'a = 1', 'unpack': 'a, *b = 1, 2, 3', 'chained': 'a = b = 1',
+    'augmented': 'a = 0\na += 1', 'annotated': 'a: int = 1',
+    'for': 'for a in [1]:\n    pass\nelse:\n    b = 1',
+    'while': 'while not globals().get("a"):\n    a = 1', 'if': 'if True:\n    a = 1',
+    'with': 'import contextlib\nwith contextlib.nullcontext(1) as a:\n    b = 1',
+    'try': 'try:\n    raise ValueError\nexcept ValueError as e:\n    a = 1\nfinally:\n    b = 1',
+    'import': 'import os.path', 'import as': 'import os as a',
+    'from': 'from os import path, sep as a',
+    'def': 'def a():\n    pass', 'async def': 'async def a():\n    pass',
+    'class': 'class a:\n    b = 1', 'decorated': 'import functools\n@functools.cache\ndef a():\n    pass',
+    'match': 'match [1, {}]:\n    case [int() as a, {**b}, *c]:\n        pass\n    case d:\n        pass',
+    'type alias': 'type a = int',
+    'global': 'def f():\n    global a\n    a = 1\n\n\nf()',
+    'walrus': 'x = (a := 1)', 'walrus in a call': 'print((a := 1))',
+    'walrus in a comprehension': 'x = [(a := i) for i in [1]]',
+    'walrus in a default': 'def f(x=(a := 1)):\n    pass',
+    'walrus in a lambda default': 'f = lambda x=(a := 1): x',
+    'walrus in a decorator': 'def d(f):\n    return f\n\n\n@(b := d)\ndef f():\n    pass',
+    'walrus in a class keyword': 'class C(metaclass=(m := type)):\n    pass',
+    'walrus in an f-string': 'x = f"{(a := 1)}"', 'walrus in an assert': 'assert (a := 1)',
+}
+
+
+class BindingSweep(unittest.TestCase):
+    def test_each_binding_form_is_seen_or_refused(self):
+        """Each name a form binds when Python runs it is a key of bindings(),
+        or no_walrus() refuses the module; a miss would let a moved name's
+        twin pass as the same object."""
+        for label, source in BINDING_FORMS.items():
+            with self.subTest(label):
+                made = {}
+                with contextlib.redirect_stdout(io.StringIO()):
+                    exec(compile(source, label, 'exec'), made)
+                made = {n for n in made if not (n.startswith('__') and n.endswith('__'))}
+                tree = ast.parse(source)
+                try:
+                    TOOL.no_walrus(tree, label)
+                except TOOL.NotImportOnly:
+                    continue
+                self.assertEqual(made - set(TOOL.bindings(tree, label)), set())
+
 
 class RealTree(unittest.TestCase):
     """Every page file of the real tree reaches a test by a rule, not the
