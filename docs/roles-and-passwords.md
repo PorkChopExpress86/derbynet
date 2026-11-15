@@ -11,7 +11,7 @@ A new install starts with these roles and passwords:
 | RaceCoordinator | `doyourbest` | Everything: set-up, settings, racing, awards, and passwords. |
 | RaceCrew | `murphy` (as in Don Murphy, not Murphy's Law) | Check-in, adding and editing racers, photos, and judging. Not set-up, and not racing control. |
 | Photo | `flashbulb` | Uploading photos, for a photo stand. The login page lists it only after "Show all roles". |
-| Timer | none | Reporting heats, for `derby-timer.jar`. The login page lists it only after "Show all roles". |
+| Timer | none | Reporting heats, for `derby-timer.jar` and the fake timer (`/timer/fake/`, D96). The login page lists it only after "Show all roles". |
 
 A visitor who has not logged in can open the kiosk pages, the slideshow, racers on deck, results by racer, the vote page, standings, the results export, the about page, and these guides.
 
