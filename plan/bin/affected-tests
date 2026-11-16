@@ -1731,9 +1731,9 @@ def claims_readers(head, reached):
     that reads a reached name anywhere in it (its decorators, bases, class
     attributes, fixture methods, mixins), or is reached; a subclass of a
     named class is named too (#379 review). A helper or frame name that
-    reads a named class passes it on to the tests that read it. A reached hook, xunit setup,
-    pytestmark or autouse fixture, which pytest applies to every test it
-    covers, raises WholeFile: every claim counts."""
+    reads a named class passes it on to the tests that read it. A reached
+    hook, xunit setup, pytestmark or autouse fixture, which pytest applies
+    to every test it covers, raises WholeFile: every claim counts."""
     hit = sorted(n for n in reached if PYTEST_READS.fullmatch(n)
                  or n in autouse(head.module))
     if hit:
@@ -1753,7 +1753,9 @@ def claims_readers(head, reached):
     # changed_tests() passes on a seed: a helper that calls
     # `TestK().again1()` (#374 retro, ReachShapes' claims oracle).
     others = {**head.helpers}
-    others.update({name: node for node in head.frame for name in frame_names(node)})
+    others.update({name: node for node in head.frame
+                   for name in frame_names(node)})
+    # Each pass adds a name or stops, so the bound is only a cap.
     for _ in range(len(head.module.body) + len(others) + 1):
         grown = False
         for name, node in others.items():

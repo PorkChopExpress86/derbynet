@@ -162,7 +162,10 @@ class ImageWorkflow(unittest.TestCase):
     def test_an_image_yml_push_runs_the_server_checks(self):
         result = push('.github/workflows/image.yml', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('pre-push: server/docs/adr/check-paths.sh', result.stderr)
+        # Not `check-paths.sh` alone: the guides' check, run on every push,
+        # prints that too, and a hook without image.yml passed (#382 review
+        # round's mutant).
+        self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
 
     def test_another_workflow_push_runs_only_plan_tests(self):
         """And the guides' check, which runs on every push (Guides)."""

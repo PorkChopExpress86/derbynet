@@ -2337,6 +2337,19 @@ class ClaimsReadersOutsideTheFrame(unittest.TestCase):
         self.assertEqual(tops(body.format(1), body.format(2)),
                          ['TestBase', 'TestSub', 'TestSubSub'])
 
+    def test_a_frame_name_that_reads_a_named_class_passes_it_on(self):
+        """TestK is named because `again1` reads the change outside its
+        test methods; a constant bound from TestK carries it to the test
+        that reads the constant (the 9a57f3b8 review's probe)."""
+        klass = ('class TestK:\n    def again1(self):\n        return helper()\n\n'
+                 '    def test_k(self):\n        assert 1\n\n\n')
+        for frame, call in (('OBJ = TestK()', 'OBJ.again1()'),
+                            ('OBJ = TestK', 'OBJ().again1()'),
+                            ('OBJ = [TestK()]', 'OBJ[0].again1()')):
+            with self.subTest(frame=frame):
+                self.assert_tops(f'{klass}{frame}\n\n\ndef test_x():\n'
+                                 f'    assert {call}\n', ['TestK', 'test_x'])
+
     def test_a_class_with_no_test_is_not_named(self):
         self.assert_tops('class Page:\n    URL = helper()\n\n\ndef test_a():\n    pass\n',
                          [])

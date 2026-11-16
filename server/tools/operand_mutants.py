@@ -31,7 +31,8 @@ that line of the new file. For each added line it lists:
   `.on('name'` (htmx's, jQuery's) adds, its event renamed `never-name`, so
   it never fires. #344's review found an untested pointercancel listener,
   which no listed mutant removed (#344 retro). A registration that spans
-  lines, or takes its event from a variable, is left out.
+  lines, takes its event from a variable, or sits in JavaScript inside a
+  Python string (a browser test's helper) is left to hand mutants.
 
 A Python file on disk is read by its AST instead, for its conditions:
 each `if`, `elif`, `while`, ternary, comprehension and `case` guard

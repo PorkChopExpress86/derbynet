@@ -2,8 +2,8 @@
 #
 # Runs the quick checks of the `lint` job in .github/workflows/server.yml
 # before a push that changes server/, testing/, website/inc/generators/,
-# .github/workflows/image.yml or plan/, so a red lint shows up before the push
-# instead of after CI.  It also checks that the
+# .github/workflows/image.yml or plan/, so a red lint shows up before the
+# push instead of after CI.  It also checks that the
 # HTTP golden fixtures were captured from the testing/ scripts being pushed
 # (server/tools/golden_inputs.py), which the golden-fixtures workflow finds
 # only after a 25-minute capture, and the paths the ADRs cite, which
@@ -106,9 +106,9 @@ while read -r _ local_sha _ remote_sha; do
   if [ -n "$base" ]; then
     names="$(git diff --name-only "$base" "$local_sha" || true)"
   fi
-  if [ -z "$base" ] \
-       || grep -qE '^(server/|testing/|website/inc/generators/|\.github/workflows/image\.yml$|plan/)' \
-            <<<"$names"; then
+  checked='^(server/|testing/|website/inc/generators/|plan/'
+  checked+='|\.github/workflows/image\.yml$)'
+  if [ -z "$base" ] || grep -qE "$checked" <<<"$names"; then
     changed=1
   fi
 done
