@@ -157,6 +157,11 @@ QUIRK_DECISIONS = {
     # #48 review: the fake roster sheet makes exactly groups x per group, a
     # row of #64 (C57).
     "C57": "fix",
+    # #360: schedule.reschedule's replies PHP's include breaks, rows of #64:
+    # C58 `busy` overwritten by `unrecognized`, C59 an empty HTTP 500 for a
+    # roundid with no round.
+    "C58": "fix",
+    "C59": "fix",
     # The #64 rows #48 fixes, as its "PHP defects to fix" lists them: S30
     # about.php's phpinfo() and C35 its timer-humant.
     "S30": "fix",
