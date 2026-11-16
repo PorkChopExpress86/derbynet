@@ -4,7 +4,7 @@ remote camera, ported from `website/inc/messages.inc`.
 A message with a recipient is deleted when that recipient reads it. A
 broadcast has no recipient, reaches everyone who polls, and expires after a
 second. A directed message nobody reads expires after 15 s. Both count whole
-seconds, as PHP does (`_purge`).
+seconds, as PHP does (`messages.inc:58-62`, `messages.inc:95-98`, `_purge`).
 """
 
 import json

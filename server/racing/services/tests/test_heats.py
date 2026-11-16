@@ -2,11 +2,13 @@ import json
 from datetime import timedelta
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
-from core.models import RaceSettings
+from core.models import RaceSettings, RaceState
 from kiosks.models import Kiosk, Scene
-from legacy_api.tests.whole_seconds import Clock, near_misses
+from legacy_api.tests.whole_seconds import SECOND, Clock, near_misses
 from racing.engine.heat_state import Code
 from racing.engine.results import DID_NOT_FINISH
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
@@ -585,15 +587,65 @@ def test_a_finished_round_shows_its_scene_in_whole_seconds(
     assert state(event).playlist_scene_id == awards.id
     assert state(event).playlist_scene_at == finished + timedelta(seconds=10)
 
-    applied = playlist.apply_due_scene(event, read)
+    with CaptureQueriesContext(connection) as queries:
+        applied = playlist.apply_due_scene(event, read)
 
     assert (applied, Kiosk.objects.get(address="K1").page) == (
         page == AWARDS_PAGE,
         page,
     )
-    if applied:
+    if not applied:
+        # The query alone decides a scene not yet due: 1 query, no lock.
+        assert len(queries) == 1
+    else:
         assert state(event).current_scene_id == awards.id
         assert state(event).playlist_scene_at is None
+
+
+@pytest.mark.parametrize(("finished", "read", "applied"), near_misses(11, False, True))
+def test_the_scene_is_rechecked_under_the_lock_in_whole_seconds(
+    race, monkeypatch, finished, read, applied
+):
+    """#360: `apply_due_scene` reads the scene's moment again under the lock,
+    and that check counts whole seconds too. The query finds a scene long
+    due; a round that finishes at `finished` before the lock moves it to 10
+    s past that, so only the check under the lock decides: from the first
+    moment of the 11th second after the round's own, and not 1 microsecond
+    before."""
+    event, round = race
+    awards = Scene.objects.get(event=event, name="Awards")
+    rows = RaceState.objects.filter(event=event)
+    rows.update(playlist_scene=awards, playlist_scene_at=SECOND - timedelta(days=1))
+    real_lock = playlist.lock_race_state
+
+    def finish_then_lock(event_id, **kwargs):
+        rows.update(playlist_scene_at=finished + timedelta(seconds=10))
+        return real_lock(event_id, **kwargs)
+
+    monkeypatch.setattr(playlist, "lock_race_state", finish_then_lock)
+
+    assert playlist.apply_due_scene(event, read) == applied
+    assert (state(event).playlist_scene_at is None) == applied
+
+
+def test_a_scene_another_poll_applied_is_not_applied_again(race, monkeypatch):
+    """`apply_due_scene`'s check under the lock: a scene another poll applied
+    between the query and the lock has no moment left, and is not applied
+    again."""
+    event, round = race
+    awards = Scene.objects.get(event=event, name="Awards")
+    rows = RaceState.objects.filter(event=event)
+    rows.update(playlist_scene=awards, playlist_scene_at=SECOND)
+    real_lock = playlist.lock_race_state
+
+    def applied_then_lock(event_id, **kwargs):
+        rows.update(playlist_scene_at=None)
+        return real_lock(event_id, **kwargs)
+
+    monkeypatch.setattr(playlist, "lock_race_state", applied_then_lock)
+
+    assert not playlist.apply_due_scene(event, SECOND + timedelta(seconds=60))
+    assert state(event).current_scene_id != awards.id
 
 
 def test_racing_on_applies_the_racing_scene(race):
