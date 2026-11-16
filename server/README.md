@@ -12,6 +12,8 @@ uv sync
 
 `uv sync` creates `.venv/` with the locked versions from `uv.lock`, including the development tools.
 
+`manage.py`, `derbynet/settings.py` and what they import run on every developer's OS, Windows included. A POSIX-only call (`os.geteuid`, `os.getuid`, `fcntl`, `pwd`) there sits behind the image's own check or a `hasattr`: `refuse_root` in `manage.py` reads the image's marker before `os.geteuid()` (`tests/test_manage_py.py::test_a_host_with_no_geteuid_runs`, #345's review). A guard on `manage.py` reaches only `manage.py`: name the other ways in to the same code (`python -m django`, `django-admin`) and which the guard covers, as #345's PR did under `## Still open`.
+
 ## Test and lint
 
 ```sh
