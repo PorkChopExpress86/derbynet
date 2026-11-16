@@ -13,8 +13,9 @@
 # and waited about 2 h: #348's queued load runs took the lock again within
 # seconds of each other, so its gate waited for a 5-minute free window
 # (#348, #350 retro).  This script waits in flock instead, beside any load
-# run that waits, and the kernel hands the lock to a waiter as the holder
-# lets it go, ahead of a run started after that.
+# run that waits: a hand-off already waiting went ahead of a
+# pytest-under-load.sh started as the holder let go, 25 of 25 under load
+# (tests/test_pytest_under_load.py).
 #
 # It takes the lock as pytest-under-load.sh does (DERBYNET_LOAD_LOCK, or
 # ~/.cache/derbynet/load-run.lock), writes the same holder lines, with

@@ -201,9 +201,13 @@ def _stop(signum, frame):
 
 def _pytest(pytest_args: list[str], timeout: float):
     """pytest's run, or None and what it printed when it passes `timeout`."""
+    # -B: Python reuses a .pyc whose source has the same mtime, in whole
+    # seconds, and size, so the next mutant of the same length written in
+    # the same second ran the last one's bytecode: both members of ("a", "b")
+    # taken away read as KILLED (test_listed_runs_a_member_taken_away).
     try:
         run = subprocess.run(
-            [sys.executable, "-m", "pytest", "-p", "no:xdist", *pytest_args],
+            [sys.executable, "-B", "-m", "pytest", "-p", "no:xdist", *pytest_args],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

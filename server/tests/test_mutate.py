@@ -860,3 +860,23 @@ def test_listed_reads_the_diff_from_the_merge_base(project):
     # PICK's six: the branch's `a < 9`, which master changed, is not.
     assert "6 listed: " in run.stdout, run.stdout + run.stderr
     assert "a < 9" not in run.stdout
+
+
+def test_listed_runs_a_member_taken_away(project):
+    """operand_mutants.py lists each member of an `in` tuple taken away
+    (#356 retro), and the row runs with its empty replacement: the member a
+    test reads is killed, the one none reads survives. The two mutants have
+    one length, so written in one second the second ran the first one's
+    .pyc and read as KILLED too, in about half the runs; mutate.py's pytest
+    now writes no bytecode, which the empty __pycache__ shows every run."""
+    commit(
+        project,
+        MODULE + '\n\ndef kind(x):\n    return x in ("a", "b")\n',
+        '\n\ndef test_kind():\n    from mod import kind\n    assert kind("a")\n',
+    )
+    run = listed(project, "test_mod.py::test_kind")
+    rows = run.stdout.splitlines()
+    assert 'KILLED    mod.py:10  member  "a",  ->  ' in rows, run.stdout + run.stderr
+    assert 'SURVIVED  mod.py:10  member  , "b"  ->  ' in rows, run.stdout
+    assert (project / "mod.py").read_text().endswith('x in ("a", "b")\n')
+    assert list(project.glob("__pycache__/mod.*")) == []

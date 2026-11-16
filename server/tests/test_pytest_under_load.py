@@ -606,13 +606,13 @@ printf 'veth1 entered\\nveth2 left\\nveth3 entered\\neth0 up\\n'
 """
 
 
-def load_run_of(tmp_path, test_body, *args):
-    """pytest-under-load.sh on a stub test file holding `test_body`, with a
-    stand-in journalctl first on PATH: (its exit code, its output, the
-    journalctl arguments file)."""
+def load_run_of(tmp_path, test_body, *args, journalctl=JOURNALCTL):
+    """pytest-under-load.sh on a stub test file holding `test_body`, with
+    `journalctl` as a stand-in first on PATH: (its exit code, its output,
+    the journalctl arguments file)."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "journalctl").write_text(JOURNALCTL)
+    (bin_dir / "journalctl").write_text(journalctl)
     (bin_dir / "journalctl").chmod(0o755)
     (tmp_path / "test_net.py").write_text(
         f"def test_loads():\n{test_body}\n\n\ndef test_passes():\n    pass\n"
@@ -704,3 +704,43 @@ def test_a_passing_run_that_prints_the_error_names_neither(tmp_path):
     assert "kernel log" not in out
     assert "Rerun" not in out
     assert not args.exists()
+
+
+def test_a_failed_journalctl_is_named_not_counted(tmp_path):
+    """A journalctl that cannot read the window, as one refusing `@epoch`
+    would, prints its error: "0 veth lines" would read as a real failure."""
+    code, out, _ = load_run_of(
+        tmp_path,
+        "    raise AssertionError('net::ERR_NETWORK_CHANGED at app.css')",
+        journalctl="#! /bin/sh\necho 'Failed to parse timestamp' >&2\nexit 1\n",
+    )
+    assert code == 1, out
+    assert (
+        "the kernel log has no count (journalctl failed: Failed to parse timestamp)"
+        in out
+    )
+    assert "veth lines" not in out
+
+
+@pytest.mark.parametrize(
+    "signals", [("TERM", "TERM"), ("TERM", "INT")], ids=["TERM-TERM", "TERM-INT"]
+)
+def test_a_second_signal_during_the_hand_off_s_cleanup_still_frees_all(
+    tmp_path, signals
+):
+    """plan/AGENT-BRIEF.md: a tool that cleans up in a trap is tested with a
+    second signal during the cleanup."""
+    lock = tmp_path / "load.lock"
+    handoff = hold(tmp_path, lock, f"({HAND_OFF}) & wait")
+    wait_until((tmp_path / "handoff" / "started").exists, "the hand-off's command")
+    command = [pid for pid, _ in child_pids(handoff.pid)]
+    group = command + [pid for pid, _ in child_pids(command[0])]
+    assert len(group) == 2
+    try:
+        for name in signals:
+            os.kill(handoff.pid, getattr(signal, f"SIG{name}"))
+        handoff.wait(timeout=30)
+        assert free(lock)
+        wait_until(lambda: not any(alive(p) for p in group), "its command gone", 10)
+    finally:
+        kill_all(group)

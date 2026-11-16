@@ -178,7 +178,13 @@ grep -q 'short test summary info' "$OUT/pytest.log" || tail -n 5 "$OUT/pytest.lo
 if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; then
   veth="no journalctl here"
   if command -v journalctl >/dev/null; then
-    veth="$(journalctl -k --since "@$STARTED" --until "@$ENDED" 2>/dev/null | grep -c veth || true) veth lines"
+    # A failed read is named, not counted: 0 veth lines would read as a
+    # real failure under the rerun rule.
+    if journal=$(journalctl -k --since "@$STARTED" --until "@$ENDED" 2>&1); then
+      veth="$(grep -c veth <<<"$journal" || true) veth lines"
+    else
+      veth="no count (journalctl failed: $(head -n 1 <<<"$journal"))"
+    fi
   fi
   files=$(sed -n '/short test summary info/,$p' "$OUT/pytest.log" |
     sed -n 's/^\(FAILED\|ERROR\) \([^: ]*\.py\).*/\2/p' | sort -u | tr '\n' ' ')
