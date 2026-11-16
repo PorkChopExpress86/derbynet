@@ -82,7 +82,6 @@ import re
 import signal
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 REFUSED = 2
@@ -132,6 +131,20 @@ def _swap(path: Path, expect: bytes, new: bytes) -> None:
         path.write_bytes(new)
         if path.read_bytes() != new:
             raise Changed(f"{path} does not hold what mutate.py wrote")
+        _drop_bytecode(path)
+
+
+def _drop_bytecode(path: Path) -> None:
+    """Removes the file's .pyc files, pytest's rewritten ones too. Python
+    reuses a .pyc whose source has the same mtime, in whole seconds, and
+    size: the next mutant of the same length written in the same second ran
+    the last one's bytecode (test_listed_runs_a_member_taken_away), and a
+    mutant that keeps the file's length ran one any import of the original
+    wrote in its second (test_a_mutant_runs_past_a_stale_pyc_of_its_file).
+    _swap() calls it after each write, the restore's too, so the .pyc a
+    mutant's run writes goes with it."""
+    for pyc in (path.parent / "__pycache__").glob(f"{path.stem}.*.pyc"):
+        pyc.unlink(missing_ok=True)
 
 
 def counts(output: str) -> dict[str, int]:
@@ -202,24 +215,17 @@ def _stop(signum, frame):
 
 def _pytest(pytest_args: list[str], timeout: float):
     """pytest's run, or None and what it printed when it passes `timeout`."""
-    # Python reuses a .pyc whose source has the same mtime, in whole
-    # seconds, and size, so the next mutant of the same length written in
-    # the same second ran the last one's bytecode: both members of ("a", "b")
-    # taken away read as KILLED (test_listed_runs_a_member_taken_away). An
-    # empty PYTHONPYCACHEPREFIX, removed after the run, reads none, such as
-    # one another process wrote for the original in the mutant's second
-    # (test_a_mutant_runs_past_a_stale_pyc_of_its_file), and keeps the
-    # mutant's own out of __pycache__.
+    # A mutant's .pyc goes with each write (_drop_bytecode). An empty
+    # pycache prefix, tried first, recompiled every module each run, and the
+    # tool's timing tests missed their bounds (#370 review round).
     try:
-        with tempfile.TemporaryDirectory(prefix="mutate-pycache-") as cache:
-            run = subprocess.run(
-                [sys.executable, "-m", "pytest", "-p", "no:xdist", *pytest_args],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=timeout,
-                env={**os.environ, "PYTHONPYCACHEPREFIX": cache},
-            )
+        run = subprocess.run(
+            [sys.executable, "-m", "pytest", "-p", "no:xdist", *pytest_args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=timeout,
+        )
     except subprocess.TimeoutExpired as late:
         # Bytes whatever `text` says (the subprocess docs, TimeoutExpired).
         return None, (late.stdout or b"").decode()

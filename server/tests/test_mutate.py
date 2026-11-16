@@ -52,9 +52,8 @@ def test_waits():
     time.sleep(60)
 """
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
-# The project has no ini file, so no Django settings; and a mutate.py run
-# around this test sets PYTHONPYCACHEPREFIX, which would hide a stale .pyc.
-TOOL_UNSET = ("DJANGO_SETTINGS_MODULE", "PYTHONPYCACHEPREFIX")
+# The project has no ini file, so no Django settings.
+TOOL_UNSET = ("DJANGO_SETTINGS_MODULE",)
 
 
 @pytest.fixture
@@ -872,8 +871,8 @@ def test_listed_runs_a_member_taken_away(project):
     `("a",)` is still a tuple, not the string `"a"` (#370 review). The two
     mutants have one length, so written in one second the second ran the
     first one's .pyc and read as KILLED too, in about half the runs;
-    mutate.py's pytest now keeps its bytecode in a cache of its own, which
-    the empty __pycache__ shows every run."""
+    mutate.py now removes the file's .pyc after each write, the restore's
+    too, which the empty __pycache__ shows every run."""
     commit(
         project,
         MODULE + '\n\ndef kind(x):\n    return x in ("a", "b")\n',
@@ -907,7 +906,7 @@ def test_a_mutant_runs_past_a_stale_pyc_of_its_file(project):
     """A .pyc of the original that Python takes without checking the source
     stands for one another process wrote in the mutant's second, with the
     mutant's size: read, it runs the original, and the mutant survives
-    (#370 review round, mutant T5). The run reads no .pyc."""
+    (#370 review round, mutant T5). mutate.py removes it with the write."""
     import py_compile
 
     py_compile.compile(
