@@ -859,9 +859,8 @@ def wait_for_done(page, path):
 
 def move_off(page):
     """Move the mouse off a scene button, onto the switcher's heading."""
-    box = page.locator(
-        "#ks-scenes-h"
-    ).bounding_box()  # one read: a point off the button
+    heading = page.locator("#ks-scenes-h")
+    box = heading.bounding_box()  # one read: a point off the button
     page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
 
 
