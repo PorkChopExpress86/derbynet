@@ -68,6 +68,8 @@ window.sceneSheet = kioskSheetOf('scenes', 'sceneSheet');
 function holdBoardUnderPress(board, bound) {
   let pressed = null;
   let down = false;
+  // What holds the press: a pointer on the control, Space on it, or both.
+  let pointing = false;
   let keyed = false;
   let timer = null;
   let held = null;
@@ -83,6 +85,7 @@ function holdBoardUnderPress(board, bound) {
 
   function release() {
     pressed = null;
+    pointing = false;
     keyed = false;
     clearTimeout(timer);
     apply();
@@ -98,26 +101,40 @@ function holdBoardUnderPress(board, bound) {
     const control = e.target.closest('button, a[href]');
     // contains(null) is false: a press on no control holds nothing.
     if (!board.contains(control)) return;
+    // Space already down on this control keeps holding it with the pointer.
+    if (control !== pressed) keyed = false;
     hold(control);
-    keyed = false;
     down = true;
+    pointing = true;
   }, true);
   document.addEventListener('keydown', (e) => {
     if (e.key !== ' ' || e.repeat) return;
     const control = e.target.closest('button');
     if (!board.contains(control)) return;
+    if (control !== pressed) pointing = false;
     hold(control);
     keyed = true;
   }, true);
-  // A key's press is on the focused button, so any focusout leaves it.
+  // A key's press is on the focused button, so any focusout leaves it. The
+  // press ends once the focus has moved, a task later: a swap inside the
+  // focusout removed the control the focus was moving to, and D127 then
+  // gave the focus back to the one the crew left (#369 review). A pointer
+  // still down on the control keeps holding it.
   document.addEventListener('focusout', () => {
-    if (keyed) release();
+    if (!keyed) return;
+    keyed = false;
+    if (pointing) return;
+    const control = pressed;
+    setTimeout(() => { if (pressed === control) release(); });
   }, true);
   document.addEventListener('pointerup', () => { down = false; }, true);
   // Board controls hold text only (board.html), so a pointerout while the
-  // pointer is down leaves the pressed control.
+  // pointer is down leaves the pressed control. Space still down on it
+  // keeps holding it (#369 review).
   document.addEventListener('pointerout', () => {
-    if (down) release();
+    if (!down) return;
+    pointing = false;
+    if (!keyed) release();
   }, true);
   document.addEventListener('click', (e) => {
     if (pressed && pressed.contains(e.target)) setTimeout(release, 0);

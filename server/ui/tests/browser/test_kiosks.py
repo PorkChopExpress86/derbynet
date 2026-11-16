@@ -1247,14 +1247,25 @@ def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control)
     polls.end()
 
 
-def test_a_space_press_whose_focus_moves_off_applies_the_held_board(login, event):
+@pytest.mark.parametrize("key, step", [("Tab", 1), ("Shift+Tab", -1)])
+def test_a_space_press_whose_focus_moves_off_applies_the_held_board(
+    login, event, key, step
+):
     """D125: Space is down on Racing when a poll's reply (Lobby) comes, and
-    the board waits. Tab then moves the focus off Racing, which ends the
-    press: the board swaps to Lobby, and the keyup that follows taps
-    nothing, so no scene is posted and Racing stays off."""
+    the board waits. Tab or Shift+Tab then moves the focus off Racing to
+    the scene button after or before it, which ends the press: the board
+    swaps to Lobby, and the focus stays on the swapped-in copy of that
+    button, where the crew put it (D127). The keyup that follows taps
+    nothing, so no scene is posted and Racing stays off. Before the #369
+    review the swap ran inside the focusout, which removed the button the
+    focus was moving to, and D127 then gave the focus back to Racing."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     racing = scene_button(page, scene(event, "Racing"))
+    scenes = page.locator("#kiosk-board button[data-scene]")
+    ids = scenes.evaluate_all("bs => bs.map((b) => b.dataset.scene)")
+    neighbour = ids[ids.index(racing.get_attribute("data-scene")) + step]
+    moved_to = page.locator(f'#kiosk-board button[data-scene="{neighbour}"]')
     polls = hold_the_polls(page)
     Kiosk.objects.filter(address="tv").update(name="Lobby")
     polls.wait_for(1)
@@ -1264,9 +1275,10 @@ def test_a_space_press_whose_focus_moves_off_applies_the_held_board(login, event
     log = board_log(page)
     keydown = after(log, "keydown")
     assert swaps_since(log, keydown) == [], log
-    page.keyboard.press("Tab")
+    page.keyboard.press(key)
     wait_for_a_swap_after(page, keydown)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    expect(moved_to).to_be_focused()
     page.keyboard.up(" ")
     page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
     htmx_settled(page)
@@ -1276,6 +1288,71 @@ def test_a_space_press_whose_focus_moves_off_applies_the_held_board(login, event
     # returned.
     assert posts_since(log, keydown) == [], log
     expect(racing).to_have_attribute("aria-pressed", "false")
+    polls.end()
+
+
+@pytest.mark.parametrize(
+    "order, ends",
+    [
+        ("pointer then Space", "pointer moves off"),
+        ("Space then pointer", "pointer moves off"),
+        ("pointer then Space", "focus moves off"),
+    ],
+)
+def test_a_pointer_and_space_on_one_button_hold_until_both_end(
+    login, event, order, ends
+):
+    """D102 and D125 together (#369 review): the mouse and Space both go
+    down on Racing, in either order, and a poll's reply (Lobby) comes. The
+    mouse moving off Racing ends the pointer's part only, and Space still
+    holds the board; or Tab moves the focus off Racing, which ends Space's
+    part only, and the mouse still holds it. Nothing swaps. The other one
+    then taps Racing: Space's keyup with the focus still on it, or the
+    mouse's release over it. The scene's reply is the one swap after the
+    click."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, racing)
+    first, second = {
+        "pointer then Space": (
+            lambda: press(page, racing),
+            lambda: page.keyboard.down(" "),
+        ),
+        "Space then pointer": (
+            lambda: page.keyboard.down(" "),
+            lambda: press(page, racing),
+        ),
+    }[order]
+    first()
+    second()
+    expect(racing).to_be_focused()
+    polls.answer(0)
+    end, tap = {
+        "pointer moves off": (lambda: move_off(page), lambda: page.keyboard.up(" ")),
+        "focus moves off": (lambda: page.keyboard.press("Tab"), page.mouse.up),
+    }[ends]
+    end()
+    log = board_log(page)
+    down = after(log, "down")
+    start = min(down, after(log, "keydown"))
+    # one read: a pointerout's release swaps the board before the step
+    # returns, and a focusout's on a 0 ms timer queued before this one.
+    page.evaluate("() => new Promise((r) => setTimeout(r, 0))")
+    log = board_log(page)
+    assert swaps_since(log, start) == [], log
+    with htmx_post(page, "/kiosks/scene/"):
+        tap()
+    expect(racing).to_have_attribute("aria-pressed", "true")
+    log = board_log(page)
+    click = after(log, "click", start)
+    assert swaps_since(log[:click], start) == [], log
+    assert [r["name"] for r in swaps_since(log, click)] == ["Lobby"], log
+    page.keyboard.up(" ")
+    page.mouse.up()
     polls.end()
 
 
