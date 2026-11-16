@@ -511,6 +511,11 @@ BOARD_LOG = """() => {
     .observe(board, {childList: true});
   document.addEventListener(
     'pointerdown', (e) => log.push({what: 'down', at: e.timeStamp}), true);
+  const key = (e) => log.push({
+    what: e.type, at: e.timeStamp, key: e.key, repeat: e.repeat,
+    on: e.target === document.body ? 'BODY' : e.target.outerHTML.slice(0, 60)});
+  document.addEventListener('keydown', key, true);
+  document.addEventListener('keyup', key, true);
   document.addEventListener('click', () => log.push({what: 'click', at: now()}), true);
   document.addEventListener('htmx:beforeSend', (e) => log.push({
     what: 'send', at: now(), verb: e.detail.requestConfig.verb,
@@ -1161,6 +1166,51 @@ def test_a_press_never_released_holds_the_board_one_poll_interval(login, event):
     assert swap["name"] == "Lobby", log
     page.mouse.move(1, 1)
     page.mouse.up()
+    polls.end()
+
+
+RELOAD_BUTTON = '#kiosk-board [data-kiosk="tv"] button[data-action="reload"]'
+
+
+@pytest.mark.parametrize("control", ["scene", "reload"])
+def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control):
+    """#369: Space goes down on a focused board button, a poll's reply
+    (the kiosk renamed Lobby) comes, and Space comes up. The button still
+    taps: Racing's POST goes out and Racing shows on, or Reload's POST goes
+    out and the card shows Reloading. Before the fix the reply replaced the
+    focused button, the focus fell to the page's body, and Space's keyup
+    went to the body and sent no click (#344's probe, kept under the
+    ticket)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene(event, "Racing")
+    target = {
+        "scene": scene_button(page, racing),
+        "reload": page.locator(RELOAD_BUTTON),
+    }[control]
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    bound(page, target)
+    dismiss_toasts(page)
+    target.focus()
+    page.keyboard.down(" ")
+    polls.answer(0)
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    keyup = after(log, "keyup", keydown)
+    assert after(log, "poll", keydown) < keyup, log
+    assert log[keyup]["on"] != "BODY", log
+    if control == "scene":
+        expect(scene_button(page, racing)).to_have_attribute("aria-pressed", "true")
+    else:
+        expect(card(page, "tv")).to_contain_text("Reloading")
+    log = board_log(page)
+    path = {"scene": "/kiosks/scene/", "reload": "/kiosks/reload/"}[control]
+    assert [r["path"] for r in log[keydown:] if r.get("verb") == "post"] == [path], log
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
     polls.end()
 
 
