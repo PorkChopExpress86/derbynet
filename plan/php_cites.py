@@ -32,18 +32,22 @@ def _cite_pattern():
 
 CITE = _cite_pattern()
 # The ticket's examples (links, shows, stores, writes, answers, sets, refuses,
-# calls), the verbs the open issues used on 2026-11-16, and their past forms.
+# calls), every verb that followed a PHP file's name in an uncited sentence of
+# an open issue on 2026-11-16 (a snapshot, so a later issue's new verb is not
+# read until it is added here), and their past forms.
 VERBS = frozenset('''
     links shows stores writes answers sets refuses calls returns sends reads
     draws takes keeps uses checks polls lists prints redirects renders accepts
     rejects puts adds deletes removes saves loads counts sorts gives names opens
     starts runs waits hides displays records fetches updates inserts does echoes
-    serves defines parses requires maps posts needs has tests
+    serves defines parses requires maps posts needs has tests wraps holds
+    excludes preserves depends handles pauses leaves
     linked showed shown stored wrote answered refused called returned sent drew
     took kept used checked polled listed printed redirected rendered accepted
     rejected added deleted removed saved loaded counted sorted gave named opened
     started ran waited hid displayed recorded fetched updated inserted did
     echoed served defined parsed required mapped posted needed had tested
+    wrapped held excluded preserved depended handled paused left
     set read put
 '''.split())
 # The look-behind starts no name inside a URL or a longer path.
