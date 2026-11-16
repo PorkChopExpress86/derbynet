@@ -26,7 +26,13 @@ that line of the new file. For each added line it lists:
   file, or a script with no extension whose shebang names Python, such as
   `plan/bin/affected-tests`), and, when
   it splits at the top level into `&&`/`||` (or `and`/`or`) operands, each
-  operand made true and made false.
+  operand made true and made false;
+- in a JavaScript file, each listener an `addEventListener('name'` or
+  `.on('name'` (htmx's, jQuery's) adds, its event renamed `never-name`, so
+  it never fires. #344's review found an untested pointercancel listener,
+  which no listed mutant removed (#344 retro). A registration that spans
+  lines, takes its event from a variable, or sits in JavaScript inside a
+  Python string (a browser test's helper) is left to hand mutants.
 
 A Python file on disk is read by its AST instead, for its conditions:
 each `if`, `elif`, `while`, ternary, comprehension and `case` guard
@@ -62,6 +68,7 @@ from pathlib import Path
 CALL = re.compile(r"(?<![\w-])(min|max|clamp)\(")
 JS_IF = re.compile(r"\b(?:if|else if)\s*\(")
 FILTER = re.compile(r"\.filter\(\s*(\(?[\w, ]*\)?)\s*=>\s*")
+LISTENER = re.compile(r"(?:\baddEventListener|\.on)\(\s*(['\"`])([^'\"`]+)\1")
 PY_IF = re.compile(r"^\s*(?:if|elif)\s+(.+):\s*(?:#.*)?$")
 OPEN, CLOSE = "([{", ")]}"
 
@@ -235,6 +242,16 @@ def line_mutants(
             found.append(("filter", whole, f"{param} => true"))
             found.append(("filter", whole, f"{param} => false"))
             found += condition_mutants(body, js=True)[2:]
+    if not python:
+        for m in LISTENER.finditer(text):
+            quote, event = m.group(1), m.group(2)
+            found.append(
+                (
+                    "listener",
+                    text[m.start(1) : m.end()],
+                    f"{quote}never-{event}{quote}",
+                )
+            )
     return found
 
 

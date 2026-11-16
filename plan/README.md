@@ -31,10 +31,18 @@ A body for an issue not created yet lints with `--file 0=PATH`, as a new open is
 
 The lint reads every other issue live, so a reference or dependency is checked against the whole plan. It needs `gh` on `PATH`, or `GH=/path/to/gh`. CI runs it in `.github/workflows/plan-checks.yml`.
 
+Because plan-checks.yml lints the live bodies on every PR that changes `plan/`, a new lint rule that flags existing bodies keeps its own PR red until those bodies are edited, and bodies live in GitHub, not in the PR. The PR ships with a draft of each fixed body (`bodies/N.md` in the ticket's drafts folder), written by a script that asserts each replacement applies once, and `lint-issues.py --file N=bodies/N.md` on each as its evidence. The lead applies them with `gh issue edit` once review passes and before `plan/bin/pr-merge`. #346's rule flagged 52 sentences in 12 bodies, and the lead learned at merge time that "fixed in the same PR" could not happen (#346 retro).
+
 The lint counts a PR as merged when GitHub says so, or when GitHub shows it closed and its head commit is on `origin/master`, as when a PR is merged by hand. A PR closes an issue through GitHub's closing references or a `Closes #N`, `Fixes #N` or `Resolves #N` in its body. Two sections, placed anywhere in a body, tell the lint that a state is meant:
 
 - `## Still open` keeps an issue open after its work has merged. Write what is left under it, such as the acceptance boxes still to tick. A ticket that depends on it counts the dependency as done.
 - `## Waiting on` keeps `blocked` on a ticket whose dependencies are all closed. Write what it waits on under it, such as an owner decision.
+
+## Record a decision
+
+A decision is a row of `owner-decisions.md`: the next `D` number, the date the owner decided, the decision, and the issues or retro that record it. Add it in the same change that edits the issues it touches. A row that amends one says so first ("Amends D112.").
+
+A row that cites another decision names which part of it applies (D130). D123's "counted as D101 counts them" fit both D101's helper reach and its whole-file fallback, and Q32 came back to the owner after the build, settled as D124.
 
 ## Ship a PR
 
