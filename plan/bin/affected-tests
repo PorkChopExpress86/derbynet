@@ -58,10 +58,11 @@ targets, then:
   then with `--check` on the PR body draft over every one of them, since a
   catch-all row fails (#341 retro), with `--base BASE`, so that it asks only
   for the claims of the tests the diff adds or changes and of those that
-  read a helper it adds or changes (D123; not under `--stdin`), and `tools/operand_mutants.py` when a
-  changed hand-written source file can hold a condition (not a migration or
-  vendored code), plan/'s Python tools and tests among them, with
-  `tools/mutate.py --listed`, which runs every mutant it lists (#336 retro),
+  read a helper it adds or changes (D123; not under `--stdin`), and
+  `tools/operand_mutants.py` when a changed hand-written source file can
+  hold a condition (not a migration or vendored code), plan/'s Python
+  tools and tests among them, with `tools/mutate.py --listed`, which runs
+  every mutant it lists (#336 retro),
   and `--listed --file` on each changed test file for its helpers (#345
   retro): run them before the first hand-off run,
   since a claim or a mutant they find means an edit, and the run starts
@@ -1695,6 +1696,10 @@ def frame_seeds(base, head):
     changed += [n for n, d in zip(base.frame, old) if d not in new]
     out = set()
     for node in changed:
+        if not frame_names(node):
+            # `CASES.append(2)` changes what a name holds without binding
+            # it, and no reader can be found by name (#379 review).
+            raise WholeFile(f'{what(node)} changes and binds nothing')
         for name in frame_names(node):
             was, now = (b.get(name) for b in binds)
             # A def or an assignment binds its own node, which differs
@@ -1702,6 +1707,64 @@ def frame_seeds(base, head):
             if was is AMBIGUOUS or was != now:
                 out.add(name)
     return out
+
+
+def autouse(module):
+    """The module-level fixtures pytest applies to each test without its
+    asking: `autouse=` anything but a literal False."""
+    out = set()
+    for node in module.body:
+        for d in getattr(node, 'decorator_list', []):
+            if isinstance(d, ast.Call) and 'fixture' in mentions(d.func) | attributes(
+                    d.func, {'pytest'}) and any(
+                    k.arg == 'autouse' and not (isinstance(k.value, ast.Constant)
+                                                and k.value.value is False)
+                    for k in d.keywords):
+                out.add(node.name)
+    return out
+
+
+def claims_readers(head, reached):
+    """For changed_tests(claims=True): [(name, why)] for each top-level test
+    D101 holds in the frame (a test with another decorator than a mark) and
+    each class that holds a test, however it is named, or subclasses one,
+    that reads a reached name anywhere in it (its decorators, bases, class
+    attributes, fixture methods, mixins), or is reached; a subclass of a
+    named class is named too (#379 review). A reached hook, xunit setup,
+    pytestmark or autouse fixture, which pytest applies to every test it
+    covers, raises WholeFile: every claim counts."""
+    hit = sorted(n for n in reached if PYTEST_READS.fullmatch(n)
+                 or n in autouse(head.module))
+    if hit:
+        raise WholeFile(f'{hit[0]}, which pytest applies to each test it covers, '
+                        'changes or reads a change')
+    classes = [n for n in head.module.body if isinstance(n, ast.ClassDef)]
+    holding = {c.name for c in classes
+               if any(isinstance(n, FUNCTIONS) and n.name.startswith('test')
+                      for n in c.body)}
+    for _ in range(len(classes)):
+        holding |= {c.name for c in classes if mentions(ast.Module(body=c.bases,
+                                                                    type_ignores=[]))
+                    & holding}
+    found = {}
+    reached = set(reached)
+    for _ in range(len(head.module.body) + 1):
+        grown = False
+        for node in head.module.body:
+            name = getattr(node, 'name', None)
+            if name in found or not (
+                    isinstance(node, FUNCTIONS) and name.startswith('test')
+                    or isinstance(node, ast.ClassDef) and name in holding):
+                continue
+            read = mentions(node) & (reached - {name})
+            if name in reached or read:
+                found[name] = f'reads {", ".join(sorted(read))}' if read else 'reached'
+                reached.add(name)
+                grown = True
+        if not grown:
+            break
+    return [(n.name, found[n.name]) for n in head.module.body
+            if getattr(n, 'name', None) in found]
 
 
 def put_back(base, head):
@@ -1744,8 +1807,11 @@ def changed_tests(base_text, head_text, module_text, claims=False):
     statement that reads a seed passes it on to the tests that read the
     name it binds; a changed helper nothing in the file reads, or a diff
     that changes no test, gives no reason either, and the list may be
-    empty.
-    What can't be parsed or resolved still raises."""
+    empty. claims_readers() then names each top-level test or test-holding
+    class that reads a reached name outside what D101 resolves. What can't
+    be parsed or resolved still raises, and so does a changed frame
+    statement that binds nothing, or a reached hook, pytestmark or autouse
+    fixture (#379 review)."""
     if base_text is None:
         raise WholeFile('new on the branch, so each of its tests is new')
     try:
@@ -1892,6 +1958,10 @@ def changed_tests(base_text, head_text, module_text, claims=False):
                 continue
             for method, test in head.classes[name].tests.items():
                 pick(f'{name}::{method}', test, name, method)
+    if claims:
+        named = {key.split('::')[0] for key, _ in out}
+        out += [(name, why) for name, why in claims_readers(head, reached)
+                if name not in named]
     if not out and not claims:
         raise WholeFile('by AST it adds or changes no test, and no helper a test '
                         'reads: a comment, a docstring or a deletion')

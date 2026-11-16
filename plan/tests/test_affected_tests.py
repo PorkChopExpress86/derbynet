@@ -2261,6 +2261,101 @@ class ClaimsMode(unittest.TestCase):
             claims(D101_BASE, base=None)
 
 
+H0 = 'def helper():\n    return 1\n'
+FX = 'import pytest\n@pytest.fixture{}\ndef fx():\n    return {}\n'
+
+
+def tops(base, head):
+    """The top-level scopes changed_tests(claims=True) names, as
+    docstring_claims.py counts them: a method's as its class's."""
+    return sorted({key.split('::')[0] for key, _ in claims(head, base)})
+
+
+class ClaimsReadersOutsideTheFrame(unittest.TestCase):
+    """The #379 review's shapes: a test or test class that D101 holds in
+    the frame, or that reads a change outside its test methods, is named
+    when it reads a reached name, and so is a subclass of a named class
+    (#374, D123). A change pytest applies to every test, or a statement
+    that binds nothing, counts every claim."""
+
+    def assert_tops(self, body, expected, base_helper=H0):
+        base = base_helper + body
+        head = base_helper.replace('return 1', 'return 2') + body
+        self.assertEqual(tops(base, head), expected)
+
+    def test_a_test_with_another_decorator(self):  # A
+        self.assert_tops('@override_settings(X=1)\ndef test_a():\n    assert helper()\n',
+                         ['test_a'])
+
+    def test_a_decorator_that_reads_the_change(self):  # A2
+        self.assert_tops('@given(helper())\ndef test_a(x):\n    assert x\n', ['test_a'])
+
+    def test_a_test_case_not_named_test(self):  # S
+        self.assert_tops('class Reach(unittest.TestCase):\n    def test_a(self):\n'
+                         '        self.assertTrue(helper())\n', ['Reach'])
+
+    def test_a_class_attribute_read_through_self(self):  # B
+        self.assert_tops('class TestX:\n    URL = helper()\n\n    def test_a(self):\n'
+                         '        assert self.URL\n', ['TestX'])
+
+    def test_a_fixture_method(self):  # P
+        self.assert_tops('class TestX:\n    @pytest.fixture\n    def fx(self):\n'
+                         '        return helper()\n\n    def test_a(self, fx):\n'
+                         '        assert fx\n', ['TestX'])
+
+    def test_class_level_usefixtures(self):  # C
+        body = ('@pytest.mark.usefixtures("fx")\nclass TestX:\n    def test_a(self):\n'
+                '        assert 1\n\n\ndef test_b():\n    pass\n')
+        self.assertEqual(tops(FX.format('', 1) + body, FX.format('', 2) + body), ['TestX'])
+
+    def test_a_mixin_method_through_self(self):  # J
+        self.assert_tops('class Mixin:\n    def go(self):\n        return helper()\n\n\n'
+                         'class TestX(Mixin):\n    def test_a(self):\n'
+                         '        assert self.go()\n\n\nclass TestY:\n'
+                         '    def test_b(self):\n        pass\n', ['TestX'])
+
+    def test_a_base_method_called_from_a_subclass(self):  # J2
+        body = ('class TestBase:\n    def go(self):\n        return {}\n\n'
+                '    def test_b(self):\n        assert self.go()\n\n\n'
+                'class TestSub(TestBase):\n    def test_s(self):\n        assert self.go()\n'
+                '\n\nclass TestSubSub(TestSub):\n    pass\n\n\n'
+                'class TestOther:\n    def test_o(self):\n        pass\n')
+        self.assertEqual(tops(body.format(1), body.format(2)),
+                         ['TestBase', 'TestSub', 'TestSubSub'])
+
+    def test_a_class_with_no_test_is_not_named(self):
+        self.assert_tops('class Page:\n    URL = helper()\n\n\ndef test_a():\n    pass\n',
+                         [])
+
+    def test_a_changed_autouse_fixture_counts_every_claim(self):  # D
+        body = '\n\ndef test_a():\n    pass\n'
+        for deco in ('(autouse=True)', '(scope="module", autouse=True)'):
+            with self.subTest(deco=deco), self.assertRaises(TOOL.WholeFile) as caught:
+                claims(FX.format(deco, 2) + body, FX.format(deco, 1) + body)
+            self.assertIn('fx', str(caught.exception))
+        self.assertEqual(claims(FX.format('(autouse=False)', 2) + body,
+                                FX.format('(autouse=False)', 1) + body), [])
+
+    def test_an_autouse_fixture_that_reads_the_change_counts_every_claim(self):
+        body = ('import pytest\n@pytest.fixture(autouse=True)\ndef fx():\n'
+                '    return helper()\n\n\ndef test_a():\n    pass\n')
+        with self.assertRaises(TOOL.WholeFile):
+            claims(H0.replace('1', '2') + body, H0 + body)
+
+    def test_a_changed_pytestmark_counts_every_claim(self):  # R
+        base = 'import pytest\npytestmark = pytest.mark.django_db\n\n\ndef test_a():\n    pass\n'
+        head = base.replace('pytest.mark.django_db', '[pytest.mark.django_db]')
+        with self.assertRaises(TOOL.WholeFile) as caught:
+            claims(head, base)
+        self.assertIn('pytestmark', str(caught.exception))
+
+    def test_a_statement_that_binds_nothing_counts_every_claim(self):  # O
+        base = 'CASES = []\nCASES.append(1)\n\n\ndef test_a():\n    pass\n'
+        with self.assertRaises(TOOL.WholeFile) as caught:
+            claims(base.replace('append(1)', 'append(2)'), base)
+        self.assertIn('binds nothing', str(caught.exception))
+
+
 class ReachShapes(unittest.TestCase):
     """D101's reach against every chain of readers up to three long (#336
     retro). Review found a test that calls a test (L1) and a method that

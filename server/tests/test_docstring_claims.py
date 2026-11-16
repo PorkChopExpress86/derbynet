@@ -409,3 +409,29 @@ def test_the_base_is_the_merge_base_s_text(tmp_path, monkeypatch):
     path.write_text("A = 4\n")
     assert dc.base_text(path, "master") == "A = 1\n"
     assert dc.base_text(sub / "test_new.py", "master") is None
+
+
+def test_a_change_pytest_applies_to_every_test_counts_every_claim():
+    """A changed pytestmark or autouse fixture, or a statement that binds
+    nothing, has no reader by name (the lead's choice on #379)."""
+    for old, new in (
+        ("import pytest\n", "import pytest\npytestmark = pytest.mark.slow\n"),
+        ("    return LANES\n", "    return LANES\n\n\nLANES.bit_length()\n"),
+    ):
+        names, why = counted(edit(old, new))
+        assert names is None and why, (old, why)
+
+
+def test_a_decorated_test_or_a_test_case_that_reads_a_change_counts():
+    """D101 holds both in the frame: the #379 review's shapes A and S."""
+    body = (
+        "\n\n@override_settings(X=1)\ndef test_decorated(page):\n    race(page)\n"
+        "\n\nclass Reach(unittest.TestCase):\n"
+        "    def test_a(self):\n        race(self)\n"
+    )
+    base = SCOPED + body
+    head = edit("return LANES", "return LANES + 1", base)
+    assert counted(head, base) == (
+        {"race", "test_calls_helper", "test_decorated", "Reach"},
+        "",
+    )

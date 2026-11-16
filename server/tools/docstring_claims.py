@@ -33,14 +33,22 @@ included, or that is new, and those of each test `changed_tests()` in
 `plan/bin/affected-tests` names, which adds the tests that read, directly
 or through a helper, a fixture or a constant, a helper, fixture, constant
 or import the diff adds, changes or deletes, as D101 counts them for its
-repeats. A test method's claims count as its class's, the scope this tool
-lists them under. Every module claim counts when the module's docstring or
+repeats. Beyond D101's tests it names each top-level test with another
+decorator than a mark, and each class that holds a test, however it is
+named (a `unittest.TestCase`), or subclasses one, when it reads such a
+change anywhere: a decorator, a base, a class attribute, a fixture method,
+a mixin; and each subclass of a class it names (#379 review). A test
+method's claims count as its class's, the scope this tool lists them
+under. Every module claim counts when the module's docstring or
 a module comment changes (D123), or any module-level statement other than
 a def or class does, an import included (the lead's choice on #374, beyond
 D123's words). Every claim of the file counts, as without `--base`, for a
 file new since the merge base, or one `changed_tests()` can't resolve
 (it can't be parsed, `global`, an assignment expression or a name bound
-twice at module level), and the output says why. #356 owed 37 rows and
+twice at module level), for a changed module-level statement that binds
+nothing (`CASES.append(2)`), and for a change to or through a hook, an
+xunit setup, `pytestmark` or an autouse fixture, which pytest applies to
+every test (the lead's choice on #379), and the output says why. #356 owed 37 rows and
 #360 owed 75 for tests they never changed (D123). The scoped check trusts
 that the PR that last changed a test listed its claims.
 
