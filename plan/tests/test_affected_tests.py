@@ -2195,15 +2195,16 @@ class ClaimsMode(unittest.TestCase):
         self.assert_whole_without_claims(head)
         self.assertEqual(claims(head), [('test_races', 'reads board')])
 
-    def test_a_changed_def_seeds_its_name_only(self):
+    def test_a_fixture_passes_on_its_own_name_only(self):
         """Not the names its body binds: test_waits' own `box` is no read
-        of the fixture's."""
+        of the fixture's, which reads the changed race()."""
         base = edit('    return page.locator("#board")\n',
-                    '    box = page.locator("#board")\n    return box\n')
+                    '    box = start(page)\n    return box\n')
         base = edit('    expect(page.locator("body")).to_be_visible()\n',
                     '    box = page.locator("body")\n    expect(box).to_be_visible()\n', base)
-        head = edit('"#board"', '"#sheet"', base)
-        self.assertEqual(claims(head, base), [('test_races', 'reads board')])
+        head = edit('for lane in range(1, LANES + 1):', 'for lane in range(LANES):', base)
+        self.assertEqual([key for key, _ in claims(head, base)],
+                         ['test_races', 'TestBoard::test_two'])
 
     def test_an_added_or_deleted_statement_alone_seeds_its_name(self):
         """A name bound on one side only: a builtin the module shadows."""
