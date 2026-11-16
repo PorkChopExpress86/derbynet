@@ -1,0 +1,53 @@
+# Added to server/docker/compose.yaml by `checks.sh acme` (D121): Pebble,
+# Let's Encrypt's test ACME server, stands in for Let's Encrypt, and Caddy
+# gets a certificate for derby.test from it, which Pebble validates by
+# connecting to derby.test, Caddy's name on the compose network, on ports 80
+# and 443 as Let's Encrypt connects to a domain's.
+services:
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:2.10.3@sha256:0c81f05db371f436c97fb894bd6d2ab8fc9c8e2ce40f8bef8a8e15941bcd75ef
+    command: ["-config", "/pebble-config.json"]
+    environment:
+      # Pebble otherwise sleeps "a random number of seconds (from 0 to 15)
+      # between individual challenge validation attempts" (Pebble's
+      # README.md, "Testing at full speed").
+      PEBBLE_VA_NOSLEEP: "1"
+    configs:
+      - source: pebble-config
+        target: /pebble-config.json
+    volumes:
+      # The image's certificates, its root among them, which Docker copies
+      # into the new volume, so Caddy can trust Pebble's directory.
+      - pebble-certs:/test/certs
+
+  caddy:
+    environment:
+      DERBYNET_DOMAIN: derby.test
+      DERBYNET_ACME_CA: https://pebble:14000/dir
+      # Go reads its roots from this file, which holds Pebble's alone.
+      SSL_CERT_FILE: /pebble/pebble.minica.pem
+    volumes:
+      - pebble-certs:/pebble:ro
+    depends_on: [pebble]
+    networks:
+      default:
+        aliases: [derby.test]
+
+configs:
+  pebble-config:
+    content: |
+      {
+        "pebble": {
+          "listenAddress": "0.0.0.0:14000",
+          "managementListenAddress": "0.0.0.0:15000",
+          "certificate": "/test/certs/localhost/cert.pem",
+          "privateKey": "/test/certs/localhost/key.pem",
+          "httpPort": 80,
+          "tlsPort": 443,
+          "ocspResponderURL": "",
+          "externalAccountBindingRequired": false
+        }
+      }
+
+volumes:
+  pebble-certs:

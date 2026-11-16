@@ -62,7 +62,9 @@ services:
 
   # The production image (#58) running this checkout: server/ is mounted over
   # the image's copy, and gunicorn restarts its workers on a Python or
-  # template edit. `--profile image` starts it.
+  # template edit. `--profile image` starts it. Plain HTTP only, as the image
+  # serves (D107): http://localhost is a secure context, so the camera and
+  # Web Serial pages work in a browser on this computer without HTTPS.
   image:
     profiles: [image]
     build:
@@ -70,7 +72,6 @@ services:
       dockerfile: server/docker/Dockerfile
     ports:
       - "${DERBYNET_IMAGE_HTTP_PORT:-8081}:80"
-      - "${DERBYNET_IMAGE_HTTPS_PORT:-8443}:443"
     environment:
       DERBYNET_DEBUG: "1"
       GUNICORN_RELOAD: "1"

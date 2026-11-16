@@ -1,9 +1,11 @@
-"""#58's phone check (D88): check-in photo capture over the image's HTTPS.
+"""#58's phone check (D88): check-in photo capture over HTTPS, which
+compose.yaml's Caddy serves in front of the image (D107).
 
 Chromium in phone mode, the browser tests' 390x844 touch size
 (`SIZES["phone"]` in ui/tests/browser/conftest.py), opens
-`https://<LAN IP>/` after accepting the image's self-signed certificate
-(`ignore_https_errors`), logs in as RaceCrew, takes a racer's photo with the
+`https://<LAN IP>/` without checking Caddy's certificate
+(`ignore_https_errors`; image.yml's step before this one checks it with
+Caddy's root and `curl --cacert`), logs in as RaceCrew, takes a racer's photo with the
 live camera (Chromium's fake camera) and checks the racer in. The live camera
 is offered only in a secure context, so the check also asserts the page is
 one; over plain HTTP the sheet has only the file input
