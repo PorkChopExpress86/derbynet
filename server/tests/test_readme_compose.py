@@ -43,7 +43,7 @@ def without_build(text: str) -> str:
     out, skip = [], None
     for line in text.splitlines(keepends=True):
         indent = len(line) - len(line.lstrip())
-        if skip is not None and (not line.strip() or indent > skip):
+        if skip is not None and indent > skip:
             continue
         skip = None
         if line.strip() == "build:":

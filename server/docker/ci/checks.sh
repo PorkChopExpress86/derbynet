@@ -807,7 +807,7 @@ check_old_cert() {
 readme_block() {
     awk -v lang="$1" -v word="$2" '
         $0 == "```" lang {on=1; block=""; next}
-        /^```$/ {if (on && !done && index(block, word)) {printf "%s", block; done=1}; on=0; next}
+        /^```$/ {if (!done && index(block, word)) {printf "%s", block; done=1}; on=0; block=""; next}
         on {block = block $0 "\n"}' "$3"
 }
 
