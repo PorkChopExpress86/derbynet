@@ -6,9 +6,14 @@ about 100 ms, so `clock.install(time=T)` then `clock.pause_at(T)` fails
 "Cannot fast-forward to the past" once the two calls are further apart than
 that, as under load. #317's first head did this in `open_paused`, and its
 DejaVu hand-off run failed there, which cost a second commit, a second
-hand-off and both load runs. `test_kiosk_results_by_racer.py` now installs
-at `INSTALLED_AT`, a minute before `PAUSED_AT`
-(`test_the_clock_pauses_after_a_slow_install`).
+hand-off and both load runs. The browser tests now pause through
+`helpers.pause_clock_at`, which installs a minute before the pause
+(`test_the_clock_pauses_after_a_slow_install`, #348).
+
+`KNOWN` holds the functions left to fix. An entry the sweep no longer
+finds fails too: #348's fix merged with the scale-mph entry still in
+place, where a new pause at the install in that function would have
+passed (#348 retro).
 """
 
 import ast
@@ -21,8 +26,8 @@ BROWSER = Path(__file__).resolve().parent / "browser"
 # names. A function nested in another is read on its own and as part of
 # the outer one, so a pair inside it is named twice.
 
-# #348 fixes this one; remove the entry when it merges, and add none.
-KNOWN = {("test_kiosk_scale_mph.py", "open_paused")}
+# (file name, function) of each pause at the install left to fix; add none.
+KNOWN: set[tuple[str, str]] = set()
 
 
 def clock_call(node: ast.AST, name: str) -> ast.Call | None:
@@ -130,15 +135,31 @@ def open_paused(page, event):
 '''
 
 
-def unknown_pauses(folder: Path) -> list[str]:
-    """`file:line in function` for each pause at the install time in the
-    Python files under `folder` that KNOWN does not hold."""
-    found = []
-    for path in sorted(folder.rglob("*.py")):
-        for function, line in pauses_at_the_install(path.read_text()):
-            if (path.name, function) not in KNOWN:
-                found.append(f"{path.name}:{line} in {function}")
-    return found
+def sweep(folder: Path) -> list[tuple[str, str, int]]:
+    """`(file name, function, line)` of each pause at the install time in
+    the Python files under `folder`."""
+    return [
+        (path.name, function, line)
+        for path in sorted(folder.rglob("*.py"))
+        for function, line in pauses_at_the_install(path.read_text())
+    ]
+
+
+def unknown_pauses(folder: Path, known=KNOWN) -> list[str]:
+    """`file:line in function` for each pause the sweep finds that `known`
+    does not hold."""
+    return [
+        f"{name}:{line} in {function}"
+        for name, function, line in sweep(folder)
+        if (name, function) not in known
+    ]
+
+
+def stale_entries(folder: Path, known=KNOWN) -> list[str]:
+    """`file in function` for each entry of `known` the sweep no longer
+    finds, as `test_kiosk_scale_mph.py`'s after #348 fixed it."""
+    found = {(name, function) for name, function, _ in sweep(folder)}
+    return [f"{name} in {function}" for name, function in sorted(known - found)]
 
 
 def test_the_sweep_finds_317s_open_paused(tmp_path):
@@ -146,14 +167,44 @@ def test_the_sweep_finds_317s_open_paused(tmp_path):
     (tmp_path / "kiosk").mkdir()
     (tmp_path / "kiosk" / "test_kiosk_results_by_racer.py").write_text(OPEN_PAUSED_317)
     (tmp_path / "test_kiosk_scale_mph.py").write_text(OPEN_PAUSED_317)
-    assert unknown_pauses(tmp_path) == [
+    known = {("test_kiosk_scale_mph.py", "open_paused")}
+    assert unknown_pauses(tmp_path, known) == [
         "test_kiosk_results_by_racer.py:7 in open_paused"
     ]
+    assert stale_entries(tmp_path, known) == []
+
+
+# `open_paused` as #348's fix (1d97e769) left it.
+OPEN_PAUSED_348 = """
+def open_paused(page, event):
+    run_heat(event)
+    pause_clock_at(page, PAUSED_AT)
+    open_kiosk(page, event, "kiosks/scale-mph.kiosk")
+"""
+
+
+def test_an_entry_the_sweep_no_longer_finds_is_stale(tmp_path):
+    """#348 fixed `test_kiosk_scale_mph.py` and its entry stayed in KNOWN."""
+    (tmp_path / "test_kiosk_scale_mph.py").write_text(OPEN_PAUSED_348)
+    (tmp_path / "test_kiosk_results_by_racer.py").write_text(OPEN_PAUSED_317)
+    known = {
+        ("test_kiosk_scale_mph.py", "open_paused"),
+        ("test_kiosk_results_by_racer.py", "open_paused"),
+    }
+    assert stale_entries(tmp_path, known) == ["test_kiosk_scale_mph.py in open_paused"]
+    assert unknown_pauses(tmp_path, known) == []
 
 
 def test_no_browser_test_pauses_at_its_install_time():
     found = unknown_pauses(BROWSER)
     assert found == [], (
-        "install the clock before the moment it pauses at (INSTALLED_AT in "
-        f"test_kiosk_results_by_racer.py, #317): {found}"
+        "install the clock before the moment it pauses at, through "
+        f"helpers.pause_clock_at (#317, #348): {found}"
+    )
+
+
+def test_every_known_entry_is_still_found():
+    stale = stale_entries(BROWSER)
+    assert stale == [], (
+        f"remove these from KNOWN, which the sweep no longer finds: {stale}"
     )
