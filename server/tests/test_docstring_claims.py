@@ -4,6 +4,8 @@ leave one out (#283 retro)."""
 
 import textwrap
 
+import pytest
+
 from tools import docstring_claims as dc
 
 SAMPLE = textwrap.dedent(
@@ -139,3 +141,87 @@ def test_a_class_claim_counts_on_a_row_naming_its_method(tmp_path):
     assert dc.main(["--check", str(body), str(path)]) == 0
     body.write_text("<details>\n| `test_other` | PR 7 |\n</details>\n")
     assert dc.main(["--check", str(body), str(path)]) == 1
+
+
+# `pause_clock_at` as #348's second head (6d6ac602) had it, in part, and
+# the tree's own uses of the word that cite nothing (#370 review).
+PAUSE_CLOCK_AT = '''\
+def pause_clock_at(page, at):
+    """Pause the clock. A timer a loaded page queued between the install
+    and the pause fired once in the pause's jump (the #359 review's
+    probe)."""
+    page.clock.pause_at(at)
+
+
+def cites(page):
+    """As #341's PHP probe showed, and #360's probe, and probe-php.log's
+    probe."""
+
+
+def ticket(page):
+    """As #360's probe showed."""
+
+
+def stop(page):
+    """It probes the page, and `#1's probe` in backticks names code."""
+    # Probes run here, as a verb.
+    os.close(fd)  # which drops the probe's own shared lock
+    """The probe of a held lock returns. A probe that kept its shared lock
+    would queue. The download hung after a probe that passed, above the
+    probe's 50 kB/s floor, as when the probe passed and the stall came
+    later."""
+'''
+
+
+def test_a_cited_probe_is_a_claim(tmp_path, capsys):
+    """#348's docstring cited the review's probe, which no test held, and
+    cutting it cost a third head and its load runs (#348 retro). A probe
+    the code names as its own, as conftest.py, test_report_header.py and
+    test_ubuntu_mirror.py do, is no cite (#370 review)."""
+    path = tmp_path / "helpers.py"
+    path.write_text(PAUSE_CLOCK_AT)
+    found = [(c.scope, c.text, c.line) for c, _ in dc.claims(path)]
+    assert found == [
+        ("pause_clock_at", "probe", 4),
+        ("cites", "probe", 9),
+        ("ticket", "probe", 14),
+    ]
+    body = tmp_path / "body.md"
+    body.write_text(
+        "<details>\n| `pause_clock_at` | 1 | x |\n| `cites` | probe | y |\n"
+        "| `ticket` | probe | z |\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert (
+        "pause_clock_at: probe is in no <details> block line" in capsys.readouterr().out
+    )
+    body.write_text(
+        "<details>\n| `pause_clock_at` | probe | test_a_loaded_page_s_timer |\n"
+        "| `cites` | probe | test_cites |\n| `ticket` | probe | test_ticket |\n"
+        "</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 0
+
+
+@pytest.mark.parametrize(
+    "prose, cited",
+    [
+        ("the #359 review's probe", True),
+        ("the #342\n    review's probe", True),
+        ("#360's probe", True),
+        ("the review's PHP probe", True),
+        ("probe-php.log's probe", True),
+        ("#247 retro: a probe on a paused clock", False),
+        ("the probe's own shared lock", False),
+        ("(#316 retro). The probe of a held lock", False),
+        ("the #359 review probe", False),
+        ("#360's probes", False),
+    ],
+)
+def test_a_probe_counts_only_cited_as_a_ticket_s_review_s_or_log_s(
+    tmp_path, prose, cited
+):
+    path = tmp_path / "t.py"
+    path.write_text(f'def test_x():\n    """{prose}."""\n')
+    found = [c.text for c, _ in dc.claims(path) if c.text == "probe"]
+    assert found == ["probe"] * cited

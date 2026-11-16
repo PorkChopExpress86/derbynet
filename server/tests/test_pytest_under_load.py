@@ -424,3 +424,438 @@ def test_a_second_signal_during_the_cleanup_still_frees_all(tmp_path, signals):
         assert free(lock)
     finally:
         finish(tmp_path, first)
+
+
+HOLD_LOCK = Path(__file__).resolve().parents[1] / "tools" / "hold-load-lock.sh"
+
+# A stand-in hand-off: it records the lock it was told it holds, then holds
+# its run open until the test writes `go` beside it, for at most 60 s.
+HAND_OFF = (
+    'echo "$DERBYNET_LOAD_LOCK_HELD" > started; '
+    "for _ in $(seq 600); do [ -e go ] && exit 0; sleep 0.1; done; exit 1"
+)
+
+
+def hold(tmp_path, lock, command=HAND_OFF, name="handoff"):
+    """tools/hold-load-lock.sh running `command` through bash in
+    `tmp_path/name`, in a session of its own, with its output in
+    `tmp_path/name.out`."""
+    folder = tmp_path / name
+    folder.mkdir()
+    out = open(tmp_path / f"{name}.out", "w")
+    env = {**os.environ, "DERBYNET_LOAD_LOCK": str(lock)}
+    env.pop("DERBYNET_LOAD_LOCK_HELD", None)
+    run = subprocess.Popen(
+        [str(HOLD_LOCK), "bash", "-c", command],
+        stdout=out,
+        stderr=subprocess.STDOUT,
+        cwd=folder,
+        env=env,
+        start_new_session=True,
+    )
+    out.close()
+    return run
+
+
+def test_a_waiting_hand_off_goes_ahead_of_a_load_run_started_after_the_release(
+    tmp_path,
+):
+    """#350's hand-off polled for a free lock and waited about 2 h, since
+    #348's queued load runs took it again within seconds of each other. A
+    hand-off waiting in hold-load-lock.sh's flock takes the lock as the
+    holder lets it go, though a load run starts at once after the release,
+    and that run then waits for the hand-off and names it."""
+    lock = tmp_path / "load.lock"
+    lock.write_text("pid 1, since then\n")
+    held = os.open(lock, os.O_RDONLY)
+    fcntl.flock(held, fcntl.LOCK_EX)
+    handoff = hold(tmp_path, lock)
+    load = None
+    try:
+        out = tmp_path / "handoff.out"
+        wait_until(lambda: "flock" in children(handoff.pid), "flock under it", 30)
+        assert "Waiting for the load lock" in out.read_text()
+        assert holder_block(out) == ["  pid 1, since then"]
+        fcntl.flock(held, fcntl.LOCK_UN)
+        load = start(tmp_path, "load", lock, go=True)
+        wait_until((tmp_path / "handoff" / "started").exists, "the hand-off's command")
+        assert (tmp_path / "handoff" / "started").read_text() == f"{lock}\n"
+        load_out = tmp_path / "load.out"
+        wait_until(lambda: "Waiting" in load_out.read_text(), "the load run waiting")
+        assert not (tmp_path / "load" / "started").exists()
+        # It prints the holder's lines, then waits in flock (a read on
+        # "Waiting" alone found none printed yet, 1 of 25 under load).
+        wait_until(
+            lambda: "flock" in children(load.pid), "flock under the load run", 30
+        )
+        block = holder_block(load_out)
+        assert block[0].startswith(f"  pid {handoff.pid}, since "), block
+        assert block[3] == f"  args hold-load-lock.sh: bash -c {HAND_OFF}", block
+        (tmp_path / "handoff" / "go").write_text("")
+        assert handoff.wait(timeout=30) == 0
+        assert load.wait(timeout=90) == 0
+    finally:
+        os.close(held)
+        finish(tmp_path, handoff, *([load] if load else []))
+
+
+def test_a_hand_off_exits_with_its_command_s_status(tmp_path):
+    run = hold(tmp_path, tmp_path / "load.lock", "exit 3")
+    assert run.wait(timeout=30) == 3
+    assert free(tmp_path / "load.lock")
+
+
+@pytest.mark.parametrize("held", ["load.lock", "./sub/../load.lock"])
+@pytest.mark.parametrize("script", [SCRIPT, HOLD_LOCK], ids=lambda p: p.name)
+def test_a_run_under_a_holder_of_its_lock_is_refused(tmp_path, script, held):
+    """Its flock would wait for ever on the holder above it, though the
+    holder names the lock by another path (#370 review)."""
+    (tmp_path / "sub").mkdir()
+    lock = str(tmp_path / "load.lock")
+    result = subprocess.run(
+        # No such file, so a run that is not refused ends at once.
+        [str(script), "--loops", "0", "no_such_test.py"],
+        # A file, not a pipe, as run_in_background gives it.
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=60,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "HOME": str(tmp_path),
+            "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+            "DERBYNET_LOAD_LOCK": lock,
+            "DERBYNET_LOAD_LOCK_HELD": f"{tmp_path}/{held}",
+        },
+    )
+    assert result.returncode == 2
+    assert f"it runs under a holder of {lock}" in result.stderr
+    assert not (tmp_path / "run").exists()
+
+
+@pytest.mark.parametrize(
+    "script, args, code",
+    [
+        (HOLD_LOCK, ["bash", "-c", 'echo "$DERBYNET_LOAD_LOCK_HELD"'], 0),
+        # pytest finds no such file and exits 4, past the refusal.
+        (SCRIPT, ["--loops", "0", "no_such_test.py"], 4),
+    ],
+    ids=["hold-load-lock.sh", "pytest-under-load.sh"],
+)
+def test_a_run_under_a_holder_of_another_lock_takes_its_own(
+    tmp_path, script, args, code
+):
+    """A load run's pytest carries DERBYNET_LOAD_LOCK_HELD, and a test it
+    runs that starts either script on another lock is not refused (#370
+    review: `= "$LOCK"` made `-n` survived)."""
+    lock = tmp_path / "load.lock"
+    folder = tmp_path / "handoff"
+    folder.mkdir()
+    out = tmp_path / "out"
+    with out.open("w") as stdout:
+        result = subprocess.run(
+            [str(script), *args],
+            stdout=stdout,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=60,
+            cwd=folder,
+            env={
+                **os.environ,
+                "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+                "DERBYNET_LOAD_LOCK": str(lock),
+                "DERBYNET_LOAD_LOCK_HELD": str(tmp_path / "other.lock"),
+            },
+        )
+    assert result.returncode == code, result.stderr + out.read_text()
+    assert "runs under a holder" not in result.stderr
+    # Each held its own lock: its holder lines name it.
+    assert lock.read_text().startswith("pid ")
+
+
+def stop_a_hand_off(tmp_path, sig):
+    """A hand-off whose command runs a child that waits for `go`, stopped
+    by `sig` once that child has started: (the command's pid and its
+    child's, whether the lock is free once the hand-off has ended). No `go`
+    is written, so only a signal ends them."""
+    lock = tmp_path / "load.lock"
+    handoff = hold(tmp_path, lock, f"({HAND_OFF}) & wait")
+    wait_until((tmp_path / "handoff" / "started").exists, "the hand-off's command")
+    command = [pid for pid, _ in child_pids(handoff.pid)]
+    assert len(command) == 1
+    group = command + [pid for pid, _ in child_pids(command[0])]
+    assert len(group) == 2
+    os.kill(handoff.pid, sig)
+    handoff.wait(timeout=30)
+    return group, free(lock)
+
+
+def kill_all(pids):
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def test_a_sigterm_stops_the_hand_off_s_command_and_frees_the_lock(tmp_path):
+    """TaskStop sends SIGTERM; the command's whole group goes with it."""
+    group, freed = stop_a_hand_off(tmp_path, signal.SIGTERM)
+    try:
+        assert freed
+        wait_until(lambda: not any(alive(p) for p in group), "its command gone", 10)
+    finally:
+        kill_all(group)
+
+
+def test_a_sigkill_frees_the_lock_though_the_hand_off_s_command_lives_on(tmp_path):
+    """A SIGKILL skips the trap; the command holds no copy of the lock
+    (plan/AGENT-BRIEF.md: a SIGKILL followed by the next run)."""
+    group, freed = stop_a_hand_off(tmp_path, signal.SIGKILL)
+    try:
+        assert freed
+        assert all(alive(p) for p in group)
+    finally:
+        kill_all(group)
+
+
+# A stand-in journalctl: it records its arguments and prints three veth
+# lines and one other.
+JOURNALCTL = """#! /bin/sh
+echo "$@" > "$(dirname "$0")/journalctl.args"
+printf 'veth1 entered\\nveth2 left\\nveth3 entered\\neth0 up\\n'
+"""
+
+
+def load_run_of(tmp_path, test_body, *args, journalctl=JOURNALCTL):
+    """pytest-under-load.sh on a stub test file holding `test_body`, with
+    `journalctl` as a stand-in first on PATH: (its exit code, its output,
+    the journalctl arguments file)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "journalctl").write_text(journalctl)
+    (bin_dir / "journalctl").chmod(0o755)
+    (tmp_path / "test_net.py").write_text(
+        f"def test_loads():\n{test_body}\n\n\ndef test_passes():\n    pass\n"
+    )
+    command = f"'{SCRIPT}' --loops 0 -p no:cacheprovider {' '.join(args)} '{tmp_path}'"
+    result = subprocess.run(
+        ["bash", "-c", command + " >out"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+            "DERBYNET_BROWSER_FONT": "DejaVu Sans",
+        },
+    )
+    return (
+        result.returncode,
+        (tmp_path / "out").read_text(),
+        bin_dir / "journalctl.args",
+    )
+
+
+def test_a_network_change_names_the_veth_lines_and_the_rerun(tmp_path):
+    """#348 read the kernel log by hand for three load runs that failed only
+    on net::ERR_NETWORK_CHANGED (#348 retro). A failure and a setup error
+    each name their file; the run lasts past a second, so its window does
+    too. The status stays pytest's."""
+    (tmp_path / "test_net_setup.py").write_text(
+        "import pytest\n\n\n@pytest.fixture\ndef page():\n"
+        "    raise RuntimeError('net::ERR_NETWORK_CHANGED at index.php')\n\n\n"
+        "def test_opens(page):\n    pass\n"
+    )
+    code, out, args = load_run_of(
+        tmp_path,
+        "    import time\n\n    time.sleep(1.1)\n"
+        "    raise AssertionError('net::ERR_NETWORK_CHANGED at app.css')",
+    )
+    assert code == 1, out
+    found = re.search(
+        r"^net::ERR_NETWORK_CHANGED in the log; the kernel log has 3 veth lines from"
+        r" @(\d+) to @(\d+) \(journalctl -k --since @\1 --until @\2 \| grep veth\)\.$",
+        out,
+        re.M,
+    )
+    assert found, out
+    assert int(found[1]) < int(found[2])
+    assert args.read_text().split() == [
+        "-k",
+        "--since",
+        f"@{found[1]}",
+        "--until",
+        f"@{found[2]}",
+    ]
+    # pytest names the file from server/, where the rerun runs.
+    failed = [
+        os.path.relpath(tmp_path / name, SCRIPT.parents[1])
+        for name in ("test_net.py", "test_net_setup.py")
+    ]
+    assert (
+        "Rerun each failed file alone at once, and report both results: "
+        'DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -m browser -n 0 '
+        f"{failed[0]} {failed[1]}\n"
+    ) in out
+
+
+def test_another_failure_names_neither(tmp_path):
+    code, out, args = load_run_of(tmp_path, "    raise AssertionError('other')")
+    assert code == 1, out
+    assert "kernel log" not in out
+    assert "Rerun" not in out
+    assert not args.exists()
+
+
+def test_a_passing_run_that_prints_the_error_names_neither(tmp_path):
+    """A test that prints the error and passes, with `-s`, leaves it in
+    the log of a run that failed nothing."""
+    code, out, args = load_run_of(
+        tmp_path, "    print('net::ERR_NETWORK_CHANGED, as a page logs it')", "-s"
+    )
+    assert code == 0, out
+    assert (
+        "net::ERR_NETWORK_CHANGED, as a page logs it"
+        in (tmp_path / "run" / "pytest.log").read_text()
+    )
+    assert "kernel log" not in out
+    assert "Rerun" not in out
+    assert not args.exists()
+
+
+def test_a_failed_journalctl_is_named_not_counted(tmp_path):
+    """A journalctl that cannot read the window, as one refusing `@epoch`
+    would, prints its error: "0 veth lines" would read as a real failure."""
+    code, out, _ = load_run_of(
+        tmp_path,
+        "    raise AssertionError('net::ERR_NETWORK_CHANGED at app.css')",
+        journalctl=(
+            "#! /bin/sh\n"
+            "case \"$*\" in *--since*) ;; *) echo 'a kernel line'; exit 0;; esac\n"
+            "echo 'Failed to parse timestamp' >&2\nexit 1\n"
+        ),
+    )
+    assert code == 1, out
+    assert (
+        "the kernel log has no count (journalctl failed: Failed to parse timestamp)"
+        in out
+    )
+    assert "veth lines" not in out
+
+
+@pytest.mark.parametrize(
+    "signals", [("TERM", "TERM"), ("TERM", "INT")], ids=["TERM-TERM", "TERM-INT"]
+)
+def test_a_second_signal_during_the_hand_off_s_cleanup_still_frees_all(
+    tmp_path, signals
+):
+    """plan/AGENT-BRIEF.md: a tool that cleans up in a trap is tested with a
+    second signal during the cleanup."""
+    lock = tmp_path / "load.lock"
+    handoff = hold(tmp_path, lock, f"({HAND_OFF}) & wait")
+    wait_until((tmp_path / "handoff" / "started").exists, "the hand-off's command")
+    command = [pid for pid, _ in child_pids(handoff.pid)]
+    group = command + [pid for pid, _ in child_pids(command[0])]
+    assert len(group) == 2
+    try:
+        for name in signals:
+            os.kill(handoff.pid, getattr(signal, f"SIG{name}"))
+        handoff.wait(timeout=30)
+        assert free(lock)
+        wait_until(lambda: not any(alive(p) for p in group), "its command gone", 10)
+    finally:
+        kill_all(group)
+
+
+def test_a_journalctl_that_reads_no_kernel_log_is_named_not_counted(tmp_path):
+    """A journalctl without permission to read the kernel log exits 0 with
+    no lines (#370 review), which would count as "0 veth lines"."""
+    code, out, _ = load_run_of(
+        tmp_path,
+        "    raise AssertionError('net::ERR_NETWORK_CHANGED at app.css')",
+        journalctl="#! /bin/sh\nexit 0\n",
+    )
+    assert code == 1, out
+    assert "the kernel log has no count (journalctl reads no kernel log here)" in out
+    assert "veth lines" not in out
+
+
+def test_a_network_change_with_no_failed_file_prints_no_rerun(tmp_path):
+    """With no file named, `-m browser -n 0` alone would run every browser
+    test (#370 review)."""
+    code, out, _ = load_run_of(
+        tmp_path,
+        "    import pytest\n\n"
+        "    pytest.exit('net::ERR_NETWORK_CHANGED at app.css', returncode=3)",
+    )
+    assert code == 3, out
+    assert "veth lines" in out
+    assert "Rerun each failed file" not in out
+    assert "No failed file is named in the summary: rerun the run's own command." in out
+
+
+def hold_with(tmp_path, args, env=None, stdin=None):
+    """hold-load-lock.sh run with `args` in `tmp_path/handoff`: (its exit
+    code, its stderr)."""
+    folder = tmp_path / "handoff"
+    folder.mkdir(exist_ok=True)
+    result = subprocess.run(
+        [str(HOLD_LOCK), *args],
+        input=stdin,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        cwd=folder,
+        env={
+            "PATH": os.environ["PATH"],
+            "HOME": str(tmp_path),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+            **(env or {}),
+        },
+    )
+    return result.returncode, result.stderr
+
+
+def test_a_hand_off_with_no_command_is_refused(tmp_path):
+    code, err = hold_with(tmp_path, [])
+    assert code == 2
+    assert err == "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]\n"
+    assert not (tmp_path / "load.lock").exists()
+
+
+def test_a_hand_off_with_no_flock_is_refused_with_how_to_install_it(tmp_path):
+    """macOS has no `flock(1)` (#354 review)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for tool in ("dirname", "mkdir"):
+        (bin_dir / tool).symlink_to(shutil.which(tool))
+    code, err = hold_with(tmp_path, ["true"], {"PATH": str(bin_dir)})
+    assert code == 2
+    assert "it needs flock(1)" in err
+    assert "brew install flock" in err
+    assert "not found" not in err
+
+
+def test_a_hand_off_on_an_unwritable_lock_is_refused_by_name(tmp_path):
+    folder = tmp_path / "locked"
+    folder.mkdir()
+    folder.chmod(0o555)
+    lock = folder / "load.lock"
+    try:
+        code, err = hold_with(tmp_path, ["true"], {"DERBYNET_LOAD_LOCK": str(lock)})
+    finally:
+        folder.chmod(0o755)
+    assert code == 2
+    assert f"it cannot open the load lock {lock}" in err
+    assert "Permission denied" not in err
+
+
+def test_a_hand_off_s_command_reads_its_stdin(tmp_path):
+    """bash gives a background command /dev/null for stdin (#370 review)."""
+    code, err = hold_with(tmp_path, ["bash", "-c", "cat > got"], stdin="a line\n")
+    assert code == 0, err
+    assert (tmp_path / "handoff" / "got").read_text() == "a line\n"

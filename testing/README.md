@@ -47,6 +47,12 @@ build the images once with `run-suite.sh harness assets server` and then run
 
     testing/docker/php-scratch.sh test-points-racing.sh
 
+The images are named after `DERBYNET_TEST_PREFIX`, or `DERBYNET_PHP_IMAGES` when
+it is set, so a run under a prefix of its own uses images built under another
+without retagging them; the container and volume keep the prefix:
+
+    DERBYNET_TEST_PREFIX=r4x DERBYNET_PHP_IMAGES=derbynet-pollres testing/docker/php-scratch.sh test-points-racing.sh
+
 It starts a throwaway PHP server, creates the event, runs the script against
 it, and removes the server. Pass `--no-event` for a script that sets the event
 up itself, such as `exercise-one-database.sh`. A fresh PHP server has no event,

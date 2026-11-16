@@ -248,12 +248,17 @@ def schedule_unschedule(ctx: LegacyContext) -> None:
         "Q5: a dry run leaves racing on.",
         "Q20, Q21, Q25: the charts and failures #20 decided.",
         "R6: `trace` adds no `adjuster`; `timing` holds 0 seconds.",
+        "C58: a reschedule underway answers `busy`, which PHP's `return` from"
+        " the include lets action.php overwrite with `unrecognized`.",
+        "C59: a roundid with no round answers `nochart`, where PHP answers"
+        " HTTP 500 with an empty body.",
     ),
 )
 def schedule_reschedule(ctx: LegacyContext) -> None:
     """Fit late racers in and take departed racers out of a round's unraced
     heats. Only one runs at a time per event: another answers `busy` until
-    the first finishes, or for 120 s if it died without finishing."""
+    the first finishes, or for 120 whole seconds if it died without
+    finishing."""
     round = ctx.resolve(Round, _text(ctx, "roundid"))
     racer_text = _text(ctx, "racerid")
     racer_id = None

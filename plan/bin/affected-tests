@@ -188,6 +188,9 @@ class Plan:
     changed_browser_tests: list = field(default_factory=list)
     changed_tests: list = field(default_factory=list)
     changed_source: list = field(default_factory=list)
+    # A helper's docstrings make claims too: #348's pause_clock_at cited
+    # the review's probe, which no test held (#348 retro).
+    changed_helpers: list = field(default_factory=list)
     untracked: list = field(default_factory=list)
     merge_base: str = None
 
@@ -654,6 +657,8 @@ def cover_test_helper(plan, tree, path):
     if '.' in dirs:
         plan.everything.append(f'{path}: the root conftest imports it')
     targets = tests + [d for d in dirs if d != '.']
+    if tree.exists(rel):  # match_test_helper took only .py files
+        plan.changed_helpers.append(rel)
     plan.add(path, 'test-helper', 'a test helper: the tests and conftest folders '
              'that import it', targets)
 
@@ -2000,15 +2005,16 @@ def report(plan, tree):
 
     # #312 restarted its hand-off run for a docstring's numbers no assert
     # read, and never listed its operand mutants.
-    if plan.changed_tests or plan.changed_source:
+    claimed = plan.changed_tests + plan.changed_helpers
+    if claimed or plan.changed_source:
         say('Before the first hand-off run, from server/: settle what these list, '
             'since an edit restarts the runs below (#312 retro):')
-        if plan.changed_tests:
-            say(f'  uv run python tools/docstring_claims.py {" ".join(plan.changed_tests)}')
+        if claimed:
+            say(f'  uv run python tools/docstring_claims.py {" ".join(claimed)}')
             # #341 checked two of its four changed test files, and a
             # catch-all row for the rest failed review (#341 retro).
             say('  uv run python tools/docstring_claims.py --check <the PR body draft> '
-                + ' '.join(plan.changed_tests))
+                + ' '.join(claimed))
         base = f' --base {plan.base}' if plan.from_git else ''
         if plan.changed_source:
             say(f'  uv run python tools/operand_mutants.py{base}')

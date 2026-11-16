@@ -11,7 +11,7 @@ result. Permission checks belong to the handler and the view.
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
 from typing import NoReturn
 
@@ -23,6 +23,7 @@ from core.models import RaceSettings, RaceState
 from core.services import lock_race_state, require_writable
 from kiosks.models import Kiosk
 from racing.engine.heat_state import RacingOff
+from racing.engine.phpcompat import from_php_time, php_time
 from racing.engine.scheduling.adjuster import (
     INJECTION_TIME_LIMIT,
     OVERALL_TIME_LIMIT,
@@ -46,8 +47,10 @@ from racing.services.schedule import after_chart_change
 from racing.services.standings import closed_lanes_by_round
 from roster.models import Racer
 
-GUARD_EXPIRY = timedelta(seconds=2 * OVERALL_TIME_LIMIT)
-"""A guard older than this is from a request that died without clearing it."""
+GUARD_SECONDS = 2 * OVERALL_TIME_LIMIT
+"""A guard this old is from a request that died without clearing it: PHP
+refuses while `time() - $conflicting < 2 * OVERALL_TIME_LIMIT`
+(`action.schedule.reschedule.inc:769`), in whole seconds."""
 
 _UNDERWAY = "Another schedule adjustment is already underway"
 
@@ -292,9 +295,14 @@ def _adjust(
     if close:
         adjuster.close_lanes(close)
         return adjuster
-    started = clock()
+    # PHP's `time() - $t1 < OVERALL_TIME_LIMIT`
+    # (`action.schedule.reschedule.inc:784`, `:800`), in whole seconds
+    # (#360): with `$t1` taken 0.6 s past a whole second, late racers are
+    # fitted in until 60 s past that second, 59.4 s after it
+    # (`test_late_racers_are_fitted_in_for_60_whole_seconds`).
+    started = php_time(clock())
     for late in (racer_id,) if racer_id is not None else snapshot.unscheduled:
-        if (clock() - started).total_seconds() < OVERALL_TIME_LIMIT:
+        if php_time(clock()) - started < OVERALL_TIME_LIMIT:
             adjuster.inject(late)
     adjuster.squeeze_out_byes()
     if adjuster.updated_chart() is None:
@@ -377,12 +385,19 @@ def _hold_emptied_heats(
 
 def _take_guard(event_id: int, now: datetime, held: datetime | None = None) -> bool:
     """Set `reschedule_started_at` to `now` if it is free or expired, or, to
-    renew it, if it is still `held`."""
+    renew it, if it is still `held`.
+
+    PHP's guard expires once `time() - $conflicting < 2 * OVERALL_TIME_LIMIT`
+    fails (`action.schedule.reschedule.inc:769`), in whole seconds (#360),
+    so a guard of second `php_time(now) - 120` or earlier is expired: the
+    bound is the first moment of the second after it. A guard taken 0.6 s
+    past a whole second expires 120 s past that second, 119.4 s after it
+    was taken (`test_the_guard_expires_in_whole_seconds`)."""
     free = (
         Q(reschedule_started_at=held)
         if held
         else Q(reschedule_started_at__isnull=True)
-        | Q(reschedule_started_at__lte=now - GUARD_EXPIRY)
+        | Q(reschedule_started_at__lt=from_php_time(php_time(now) - GUARD_SECONDS + 1))
     )
     return bool(
         RaceState.objects.filter(event_id=event_id)
@@ -402,7 +417,8 @@ def refuse_missing_round(
         .values_list("reschedule_started_at", flat=True)
         .get()
     )
-    if started is not None and started > clock() - GUARD_EXPIRY:
+    # `_take_guard`'s rule, `time() - $conflicting < 2 * OVERALL_TIME_LIMIT`.
+    if started is not None and php_time(clock()) - php_time(started) < GUARD_SECONDS:
         raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
     raise RescheduleFailure(Failure.NOCHART, "Unable to build new schedule")
 
