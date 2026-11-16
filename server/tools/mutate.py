@@ -7,7 +7,10 @@ mutants read as survivors until the traceback was read. Its `-k` misspelt a
 test name, and pytest deselected the test without a word. This refuses:
 
 - an old text that does not occur exactly once in the file; give more
-  context. A new text equal to it, which would change nothing (#324 retro);
+  context. A new text equal to it, which would change nothing (#324 retro).
+  A mutant of a Python file (a `.py` file, or a script whose shebang names
+  Python) that no longer parses, where the file did: a test that loads the
+  file only when it runs fails on it, which reads as KILLED (#345 retro);
 - a run that deselects a test, runs none, or errors with no failure, so name
   the tests by node id (`path::test`, with `[param]` for one case of a
   parametrized test) and give `-m browser` for a browser test, which
@@ -43,7 +46,10 @@ was refused or errored, or none is listed. It mutates `.py`, `.js` and
 `.css` files and Python scripts, and names each other file whose mutants
 it skips: a `min()` a Markdown file quotes, and a test file's own
 conditions, since `affected-tests` prints this line with no `--file` and
-#336 retro's last diff held 115 in its three test files. A mutant whose text occurs
+#336 retro's last diff held 115 in its three test files. A test file that
+`--file` names has the mutants of its helpers run, outside its test
+functions, for a guard that lives beside its tests, such as #345's scanner
+in `tests/test_docker_checks.py` (#345 retro). A mutant whose text occurs
 more than once on its line is refused, to be run by hand. A stop restores each
 file and names the mutants not run. The cases the listing reads past are
 still mutated by hand, one per call.
@@ -67,6 +73,7 @@ stops, leaves the file as it is, names it, and exits 2.
 from __future__ import annotations
 
 import argparse
+import ast
 import contextlib
 import hashlib
 import importlib
@@ -226,6 +233,49 @@ def _listing():
         return importlib.import_module("tools.operand_mutants")
 
 
+def _unparsed(path: Path, saved: bytes, mutated: bytes) -> str | None:
+    """Why a mutant of a Python file that parsed no longer parses, or None.
+    A test that loads the file only when it runs fails on a broken file, and
+    reads as KILLED: #345's m28 lost a newline to `$(...)` (#345 retro)."""
+    if not _listing().is_python(Path.cwd(), str(path)):
+        return None
+    try:
+        ast.parse(saved)
+    except SyntaxError:
+        return None
+    try:
+        ast.parse(mutated)
+    except SyntaxError as err:
+        return (
+            f"the mutant does not parse as Python (line {err.lineno}: {err.msg});"
+            " build --old and --new from a file or a heredoc, since $(...) drops"
+            " trailing newlines"
+        )
+    return None
+
+
+def _test_lines(path: Path) -> set[int]:
+    """The lines of each test function in a test file, as pytest finds
+    them: a top-level function named `test*`, `async def` too, or such a
+    method of a top-level class, from its first decorator's line. A helper
+    nested in a function is no test, whatever its name. Every line when the
+    file does not parse."""
+    text = path.read_bytes().decode()
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return set(range(1, text.count("\n") + 2))
+    lines = set()
+    for node in tree.body:
+        for f in node.body if isinstance(node, ast.ClassDef) else [node]:
+            if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
+                f.name.startswith("test")
+            ):
+                start = f.decorator_list[0].lineno if f.decorator_list else f.lineno
+                lines |= set(range(start, f.end_lineno + 1))
+    return lines
+
+
 def _one(path: Path, data: bytes, m, args) -> tuple[str, str, str]:
     """One listed mutant's result word, why, and pytest's output; the file
     holds `data` again when it returns or raises, unless it raises Changed."""
@@ -262,18 +312,28 @@ def listed(args) -> int:
         print(f"mutate.py: refused: git diff: {diff.stderr.strip()}", file=sys.stderr)
         return REFUSED
     listing = _listing()
-    found, skipped = [], {}
+    named = {Path(f).resolve() for f in args.file or []}
+    found, skipped, tests = [], {}, {}
     for m in listing.mutants(diff.stdout, root):
         if Path(m.path).name.startswith("test_"):
-            why = "in a test file"
+            # A test file named by --file has its helpers mutated, such as
+            # #345's scanner in tests/test_docker_checks.py (#345 retro).
+            if (root / m.path).resolve() not in named:
+                why = "in a test file (name it with --file to mutate its helpers)"
+            else:
+                if m.path not in tests:
+                    tests[m.path] = _test_lines(root / m.path)
+                if m.line not in tests[m.path]:
+                    found.append(m)
+                    continue
+                why = "in a test function"
         elif m.path.endswith(SOURCES) or listing.is_python(root, m.path):
             found.append(m)
             continue
         else:
             why = "in no source file"
-        n, _ = skipped.get(m.path, (0, why))
-        skipped[m.path] = (n + 1, why)
-    for path, (n, why) in skipped.items():
+        skipped[m.path, why] = skipped.get((m.path, why), 0) + 1
+    for (path, why), n in skipped.items():
         print(f"SKIPPED   {path}: {n} listed, {why}", flush=True)
     if not found:
         print("mutate.py: refused: no mutant listed for the diff", file=sys.stderr)
@@ -385,6 +445,8 @@ def main(argv: list[str] | None = None) -> int:
                 " it must occur once, so give more of the line around it"
             )
         mutated = text.replace(args.old, args.new).encode()
+        if why := _unparsed(path, saved, mutated):
+            raise Refused(why)
         try:
             _swap(path, saved, mutated)
             run, output = _pytest(args.pytest_args, args.timeout)

@@ -290,6 +290,63 @@ def test_the_counts_come_from_the_last_summary_line():
     assert counts(output) == {"passed": 1, "deselected": 3}
 
 
+# A test that loads the module only when it runs, as a test of a script it
+# starts in a subprocess does: a module that no longer parses fails it, and
+# no collection error says why.
+LAZY_TESTS = """
+
+def test_runs_lazily():
+    import subprocess, sys
+    load = "import mod; assert mod.bound(1, 2)"
+    subprocess.run([sys.executable, "-c", load], check=True)
+"""
+
+
+def run_tool(project, name, old, new, *pytest_args):
+    command = [sys.executable, str(TOOL), "--file", name, "--old", old, "--new", new]
+    command += ["--", "-p", "no:cacheprovider", *pytest_args]
+    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
+
+
+def test_a_python_mutant_that_does_not_parse_is_refused(project):
+    """#345's m28 lost a newline to `$(...)` and glued two lines, and its
+    test failed on a file that no longer parsed, which read as KILLED
+    (#345 retro)."""
+    (project / "test_mod.py").write_text(TESTS + LAZY_TESTS)
+    subprocess.run([*GIT, "commit", "-qam", "lazy"], cwd=project, check=True)
+    run = mutate(project, "a < b", "a < b)", "test_mod.py::test_runs_lazily")
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "the mutant does not parse as Python (line 2" in run.stderr
+    assert "passed" not in run.stdout and "failed" not in run.stdout, "no test runs"
+    assert (project / "mod.py").read_text() == MODULE
+
+
+def test_a_python_script_mutant_that_does_not_parse_is_refused(project):
+    """A script with no extension whose shebang names Python, such as
+    `plan/bin/affected-tests`, is Python too."""
+    (project / "tool").write_text("#!/usr/bin/env python3\nif 1 < 2:\n    pass\n")
+    subprocess.run([*GIT, "add", "tool"], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "tool"], cwd=project, check=True)
+    run = run_tool(project, "tool", "1 < 2", "1 <", "test_mod.py::test_other")
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "does not parse as Python" in run.stderr
+
+
+def test_a_mutant_of_a_file_that_is_no_python_or_never_parsed_runs(project):
+    """The refusal is for a mutant that breaks Python in a Python file: a
+    text file whose text parses as Python before the mutant and not after,
+    and a `.py` file that did not parse before, still run."""
+    for name, text in (("notes.txt", "a < b\n"), ("old.py", "print 'a < b'\n")):
+        (project / name).write_text(text)
+    subprocess.run([*GIT, "add", "notes.txt", "old.py"], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "files"], cwd=project, check=True)
+    for name in ("notes.txt", "old.py"):
+        run = run_tool(project, name, "a < b", "a <", "test_mod.py::test_other")
+        assert run.returncode == 1, (name, run.stdout + run.stderr)
+        assert run.stdout.splitlines()[-1].startswith("SURVIVED"), name
+
+
 # --listed (#336 retro): every mutant tools/operand_mutants.py lists.
 PICK = """
 
@@ -374,8 +431,77 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
     assert "no mutant listed" in run.stderr
     assert run.stdout == (
         "SKIPPED   notes.md: 2 listed, in no source file\n"
-        "SKIPPED   test_mod.py: 2 listed, in a test file\n"
+        "SKIPPED   test_mod.py: 2 listed, in a test file"
+        " (name it with --file to mutate its helpers)\n"
     )
+
+
+# A guard that lives in a test file, as #345's `root_execs` scanner does in
+# tests/test_docker_checks.py, with the test that holds it. Its body reads
+# the next line, so the loop made `while True` ends in an IndexError, not a
+# hang that runs to --timeout.
+GUARD_TESTS = """
+
+def ends(lines, end):
+    def test_from(end):
+        while lines[end].endswith("\\\\"):
+            end = lines.index(lines[end + 1], end + 1)
+        return end
+
+    return test_from(end)
+
+
+def test_ends():
+    if ends(["b"], 0) == 0:
+        assert ends(["a \\\\", "b"], 0) == 1
+
+
+class TestEnds:
+    def test_in_a_class(self):
+        if ends(["b"], 0) == 0:
+            assert ends(["a \\\\", "b"], 0) == 1
+
+
+@pytest.mark.parametrize(
+    "x", [1 if len("b") == 1 else 2]
+)
+def test_decorated(x):
+    assert x
+
+
+async def test_async():
+    if ends(["b"], 0) == 0:
+        pass
+"""
+
+
+def test_listed_mutates_a_guard_in_a_test_file_named_by_file(project):
+    """#345's scanner loop survived review's `break` mutant, and --listed
+    would have skipped it, since every test file was skipped (#345 retro).
+    Named by --file, a test file's helpers are mutated, a function nested
+    in one too, whatever its name, and the conditions of its test functions
+    and test methods still are not: an `async def` test's, and a decorator's
+    (PR #364's review found both counted as helpers)."""
+    commit(project, MODULE, GUARD_TESTS)
+    run = listed(project, "test_mod.py::test_ends", tool=("--file", "test_mod.py"))
+    rows = run.stdout.splitlines()
+    assert rows[1:3] == [
+        'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  True',
+        'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  False',
+    ], run.stdout
+    assert "SKIPPED   test_mod.py: 8 listed, in a test function" in rows, run.stdout
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert (project / "test_mod.py").read_text() == TESTS + GUARD_TESTS
+
+
+def test_listed_skips_a_test_file_it_is_not_named(project):
+    commit(project, MODULE + PICK, PICK_TESTS + GUARD_TESTS)
+    run = listed(project, "test_mod.py::test_pick")
+    assert (
+        "SKIPPED   test_mod.py: 10 listed, in a test file"
+        " (name it with --file to mutate its helpers)" in run.stdout
+    ), run.stdout
+    assert "test_mod.py:" not in run.stdout.replace("SKIPPED   test_mod.py:", "")
 
 
 def test_listed_takes_no_old_or_new(project):

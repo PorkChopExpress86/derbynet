@@ -687,6 +687,27 @@ class BeforeTheHandOff(unittest.TestCase):
         self.assertNotIn('docstring_claims', commands(out))
         self.assertNotIn('operand_mutants', out)
 
+    def test_the_body_is_checked_against_every_changed_test_file(self):
+        """#341 ran `--check` on its two files with new tests and covered two
+        other changed files with one catch-all row; review's `--check` on
+        every changed file found 28 claims unlisted, and the hand-off
+        restarted. #317 added 11 rows after a merge (#317 and #341 retro)."""
+        out = run('server/ui/tests/test_dashboard.py', 'server/ui/tests/test_kiosk_pages.py')
+        self.assertIn('  uv run python tools/docstring_claims.py --check <the PR body draft> '
+                      'ui/tests/test_dashboard.py ui/tests/test_kiosk_pages.py\n',
+                      before_hand_off(out))
+
+    def test_a_changed_test_file_lists_its_helpers_mutants(self):
+        """--listed skips a test file unless --file names it: #345's
+        scanner lived in tests/test_docker_checks.py (#345 retro, PR #364's
+        review)."""
+        out = run('server/ui/tests/test_dashboard.py', 'server/ui/tests/test_kiosk_pages.py')
+        for path in ('ui/tests/test_dashboard.py', 'ui/tests/test_kiosk_pages.py'):
+            self.assertIn(f'  uv run python tools/mutate.py --listed --file {path} -- '
+                          '<the node ids of the tests that call its helpers>\n',
+                          before_hand_off(out))
+        self.assertNotIn('mutate.py', commands(out))
+
     def test_a_changed_source_file_lists_its_operand_mutants(self):
         for path in ('server/awards/editing.py', 'server/ui/static/ui/kiosk.css',
                      'server/ui/static/ui/kiosk-ondeck.js'):
