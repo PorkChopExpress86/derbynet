@@ -82,6 +82,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REFUSED = 2
@@ -201,18 +202,24 @@ def _stop(signum, frame):
 
 def _pytest(pytest_args: list[str], timeout: float):
     """pytest's run, or None and what it printed when it passes `timeout`."""
-    # -B: Python reuses a .pyc whose source has the same mtime, in whole
+    # Python reuses a .pyc whose source has the same mtime, in whole
     # seconds, and size, so the next mutant of the same length written in
     # the same second ran the last one's bytecode: both members of ("a", "b")
-    # taken away read as KILLED (test_listed_runs_a_member_taken_away).
+    # taken away read as KILLED (test_listed_runs_a_member_taken_away). An
+    # empty PYTHONPYCACHEPREFIX, removed after the run, reads none, such as
+    # one another process wrote for the original in the mutant's second
+    # (test_a_mutant_runs_past_a_stale_pyc_of_its_file), and keeps the
+    # mutant's own out of __pycache__.
     try:
-        run = subprocess.run(
-            [sys.executable, "-B", "-m", "pytest", "-p", "no:xdist", *pytest_args],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=timeout,
-        )
+        with tempfile.TemporaryDirectory(prefix="mutate-pycache-") as cache:
+            run = subprocess.run(
+                [sys.executable, "-m", "pytest", "-p", "no:xdist", *pytest_args],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=timeout,
+                env={**os.environ, "PYTHONPYCACHEPREFIX": cache},
+            )
     except subprocess.TimeoutExpired as late:
         # Bytes whatever `text` says (the subprocess docs, TimeoutExpired).
         return None, (late.stdout or b"").decode()

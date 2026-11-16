@@ -420,3 +420,10 @@ def test_a_crowded_collection_lists_no_members_and_is_named(
         "mod.py:2: 21 members, over 20: no member rows; take away by hand the"
         " ones a rule reads\n"
     )
+
+
+def test_a_file_the_diff_names_but_the_tree_lacks_is_not_crowded(tmp_path):
+    """A diff read from stdin can name a file the tree does not hold."""
+    many = ", ".join(f'"n{i}"' for i in range(21))
+    diff = f"+++ b/gone.py\n@@ -0,0 +1 @@\n+S = {{{many}}}\n"
+    assert om.crowded_in(diff, tmp_path) == []

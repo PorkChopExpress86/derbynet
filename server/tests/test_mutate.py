@@ -52,6 +52,9 @@ def test_waits():
     time.sleep(60)
 """
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
+# The project has no ini file, so no Django settings; and a mutate.py run
+# around this test sets PYTHONPYCACHEPREFIX, which would hide a stale .pyc.
+TOOL_UNSET = ("DJANGO_SETTINGS_MODULE", "PYTHONPYCACHEPREFIX")
 
 
 @pytest.fixture
@@ -76,7 +79,7 @@ def mutate(project, old, new, *pytest_args, expect="fail", wait=False, tool=()):
     command += ["--new", new, "--expect", expect, *tool]
     command += ["--", "-p", "no:cacheprovider", *pytest_args]
     # The project has no ini file, so no `addopts` and no Django settings.
-    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
     if wait:
         return subprocess.Popen(command, cwd=project, env=env, text=True)
     return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
@@ -305,7 +308,7 @@ def test_runs_lazily():
 def run_tool(project, name, old, new, *pytest_args):
     command = [sys.executable, str(TOOL), "--file", name, "--old", old, "--new", new]
     command += ["--", "-p", "no:cacheprovider", *pytest_args]
-    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
     return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
 
 
@@ -367,7 +370,7 @@ def test_pick():
 def listed(project, *pytest_args, tool=(), wait=False):
     command = [sys.executable, str(TOOL), "--listed", "--base", "HEAD~1", *tool]
     command += ["--", "-p", "no:cacheprovider", *pytest_args]
-    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
     if wait:
         return subprocess.Popen(
             command, cwd=project, env=env, text=True, stdout=subprocess.PIPE
@@ -684,7 +687,7 @@ def wrapped(project, patch, mode, *pytest_args, tool=()):
         ["--listed", "--base", "HEAD~1"] if mode == "listed" else first
     )
     command += [*tool, "--", "-p", "no:cacheprovider", *pytest_args]
-    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
     return subprocess.Popen(
         command,
         cwd=project,
@@ -855,7 +858,7 @@ def test_listed_reads_the_diff_from_the_merge_base(project):
     subprocess.run([*GIT, "checkout", "-q", "branch"], cwd=project, check=True)
     command = [sys.executable, str(TOOL), "--listed", "--base", master]
     command += ["--", "-p", "no:cacheprovider", "test_mod.py::test_pick"]
-    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
     run = subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
     # PICK's six: the branch's `a < 9`, which master changed, is not.
     assert "6 listed: " in run.stdout, run.stdout + run.stderr
@@ -869,8 +872,8 @@ def test_listed_runs_a_member_taken_away(project):
     `("a",)` is still a tuple, not the string `"a"` (#370 review). The two
     mutants have one length, so written in one second the second ran the
     first one's .pyc and read as KILLED too, in about half the runs;
-    mutate.py's pytest now writes no bytecode, which the empty __pycache__
-    shows every run."""
+    mutate.py's pytest now keeps its bytecode in a cache of its own, which
+    the empty __pycache__ shows every run."""
     commit(
         project,
         MODULE + '\n\ndef kind(x):\n    return x in ("a", "b")\n',
@@ -898,3 +901,20 @@ def test_listed_kills_each_member_a_test_reads(project):
     )
     run = listed(project, "test_mod.py::test_reads")
     assert "2 listed: 2 KILLED, 0 SURVIVED" in run.stdout, run.stdout + run.stderr
+
+
+def test_a_mutant_runs_past_a_stale_pyc_of_its_file(project):
+    """A .pyc of the original that Python takes without checking the source
+    stands for one another process wrote in the mutant's second, with the
+    mutant's size: read, it runs the original, and the mutant survives
+    (#370 review round, mutant T5). The run reads no .pyc."""
+    import py_compile
+
+    py_compile.compile(
+        str(project / "mod.py"),
+        cfile=str(project / "__pycache__" / f"mod.{sys.implementation.cache_tag}.pyc"),
+        invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH,
+    )
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
