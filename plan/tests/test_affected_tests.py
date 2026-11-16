@@ -2195,6 +2195,31 @@ class ClaimsMode(unittest.TestCase):
         self.assert_whole_without_claims(head)
         self.assertEqual(claims(head), [('test_races', 'reads board')])
 
+    def test_a_changed_def_seeds_its_name_only(self):
+        """Not the names its body binds: test_waits' own `box` is no read
+        of the fixture's."""
+        base = edit('    return page.locator("#board")\n',
+                    '    box = page.locator("#board")\n    return box\n')
+        base = edit('    expect(page.locator("body")).to_be_visible()\n',
+                    '    box = page.locator("body")\n    expect(box).to_be_visible()\n', base)
+        head = edit('"#board"', '"#sheet"', base)
+        self.assertEqual(claims(head, base), [('test_races', 'reads board')])
+
+    def test_an_added_or_deleted_statement_alone_seeds_its_name(self):
+        """A name bound on one side only: a builtin the module shadows."""
+        base = edit('    assert n\n', '    assert len([n])\n')
+        head = edit('LANES = 4\n', 'LANES = 4\nlen = max\n', base)
+        self.assertEqual(claims(head, base), [('test_counts', 'reads len')])
+        self.assertEqual(claims(base, head), [('test_counts', 'reads len')])
+
+    def test_a_class_frame_that_reads_a_changed_method_is_no_reason(self):
+        base = edit('    def test_one(self, page):',
+                    '    def alias(self):\n        return self.test_one\n\n'
+                    '    def test_one(self, page):')
+        head = edit('        assert self.n\n', '        assert not self.n\n', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual(claims(head, base), [('TestBoard::test_one', 'changed')])
+
     def test_a_constant_that_reads_a_changed_helper_passes_it_on(self):
         base = edit('\n\ndef test_races', '\n\nRUN = race\n\n\ndef test_races')
         base = edit('    assert n\n', '    assert n and RUN\n', base)

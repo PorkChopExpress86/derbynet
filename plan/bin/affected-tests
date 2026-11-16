@@ -1697,7 +1697,9 @@ def frame_seeds(base, head):
     for node in changed:
         for name in frame_names(node):
             was, now = (b.get(name) for b in binds)
-            if not is_import(node) or was is AMBIGUOUS or was != now:
+            # A def or an assignment binds its own node, which differs
+            # between the two parses: only an import's binding can be equal.
+            if was is AMBIGUOUS or was != now:
                 out.add(name)
     return out
 
@@ -1769,7 +1771,7 @@ def changed_tests(base_text, head_text, module_text, claims=False):
 
     moved, seeds = set(), set()
     why = frame_change(base, head)
-    if why and claims:
+    if claims:
         seeds = frame_seeds(base, head)
     elif why:
         try:

@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import functools
 import importlib.machinery
 import importlib.util
 import io
@@ -319,6 +320,7 @@ def listed_in(claim: Claim, file: Path, listed: list[tuple[set[str], str]]) -> b
 AFFECTED_TESTS = Path(__file__).resolve().parents[2] / "plan" / "bin" / "affected-tests"
 
 
+@functools.cache
 def affected_tests():
     """plan/bin/affected-tests as a module, for its `changed_tests()`."""
     loader = importlib.machinery.SourceFileLoader("affected_tests", str(AFFECTED_TESTS))
@@ -329,13 +331,11 @@ def affected_tests():
 
 
 def frame(source: str) -> list[str]:
-    """The module-level statements less the docstring and the top-level
-    defs and classes, which are scopes of their own, by AST."""
-    tree = ast.parse(source)
-    body = tree.body[1:] if ast.get_docstring(tree, clean=False) else tree.body
+    """The module-level statements less the top-level defs and classes,
+    which are scopes of their own, by AST."""
     return [
         ast.dump(n)
-        for n in body
+        for n in ast.parse(source).body
         if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
     ]
 
@@ -349,13 +349,13 @@ def texts(source: str) -> dict[str, list[list[str]]]:
     return out
 
 
-def counted(base: str | None, head: str, tool=None) -> tuple[set[str] | None, str]:
+def counted(base: str | None, head: str) -> tuple[set[str] | None, str]:
     """The scopes whose claims `--check --base` asks for, from `base`, the
     file's text at the merge base (None when it is new), to `head`: a set
     of scope names, or None and why when every claim counts."""
     if base is None:
         return None, "new since the merge base"
-    tool = tool or affected_tests()
+    tool = affected_tests()
     try:
         picked = tool.changed_tests(base, head, lambda name: None, claims=True)
     except tool.WholeFile as why:
@@ -403,9 +403,8 @@ def main(argv: list[str] | None = None) -> int:
         listed = rows(details(args.check.read_text()), names)
         scoped = {}
         if args.base:
-            tool = affected_tests()
             for f in dict.fromkeys(args.files):
-                names, why = counted(base_text(f, args.base), f.read_text(), tool)
+                names, why = counted(base_text(f, args.base), f.read_text())
                 scoped[f] = names
                 if names is None:
                     print(f"{f}: every claim counts (D123): {why}")

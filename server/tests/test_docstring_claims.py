@@ -365,9 +365,11 @@ def test_a_new_file_or_one_that_cannot_be_resolved_counts_every_claim(
     assert "test_unchanged: 9 is" in out
 
 
-def test_base_needs_check(tmp_path):
+def test_base_needs_check(tmp_path, capsys):
     path = tmp_path / "test_scoped.py"
     path.write_text(SCOPED)
+    assert dc.main([str(path)]) == 0
+    assert "| test_scoped.py:20 `test_changed` | 3 | ? |" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         dc.main(["--base", "HEAD", str(path)])
 
