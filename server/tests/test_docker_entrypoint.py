@@ -160,6 +160,7 @@ def test_root_and_malformed_ids_stop_with_one_line(uid, gid, line):
             "DERBYNET_GID, or neither.\n",
         ),
     ],
+    ids=["uid-alone", "uid-and-empty-gid", "gid-alone"],
 )
 def test_one_without_the_other_stops_with_one_line(env, line):
     """D108: the line names the unset one."""
