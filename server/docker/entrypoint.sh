@@ -36,16 +36,24 @@ for name in DERBYNET_DATA_DIR DERBYNET_CONFIG_DIR; do
     [[ "${!name}" =~ ^/[A-Za-z0-9._/-]*$ ]] \
         || die "$name must be an absolute path of letters, digits and . _ - /, not '${!name}'"
 done
-# Client addresses or networks whose X-Forwarded-Proto is believed: a proxy in
-# front of this container.  From anyone else it is replaced by the scheme of
-# the connection.
+# Client addresses or networks of a proxy in front of this container, whose
+# X-Forwarded-Proto, X-Forwarded-For and X-Real-Port are believed (D118).
+# From anyone else the scheme is the connection's, and the client's address
+# and port are the connection's.
 trusted="${DERBYNET_TRUSTED_PROXIES:-}"
 trusted_geo=""
+real_ip=""
 for net in ${trusted//,/ }; do
     [[ "$net" =~ ^[0-9A-Fa-f.:]+(/[0-9]{1,3})?$ ]] \
         || die "DERBYNET_TRUSTED_PROXIES holds addresses or networks such as 172.17.0.1 or 10.0.0.0/8, not '$net'"
     trusted_geo+="        $net 1;"$'\n'
+    real_ip+="    set_real_ip_from $net;"$'\n'
 done
+if [ -n "$real_ip" ]; then
+    # The client's address is the last one in X-Forwarded-For that no trusted
+    # proxy holds, so an address a client put in front is passed over.
+    real_ip+="    real_ip_header X-Forwarded-For;"$'\n'"    real_ip_recursive on;"$'\n'
+fi
 prefix="${DERBYNET_URL_PREFIX:-}"
 prefix="${prefix#"${prefix%%[!/]*}"}"
 prefix="${prefix%"${prefix##*[!/]}"}"
@@ -170,7 +178,7 @@ proxy_set_header Host \$derbynet_host;
 proxy_set_header X-Forwarded-Proto \$derbynet_proto;
 proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
 proxy_set_header X-Real-IP \$remote_addr;
-proxy_set_header X-Real-Port \$remote_port;
+proxy_set_header X-Real-Port \$derbynet_port;
 proxy_read_timeout ${DERBYNET_REQUEST_TIMEOUT}s;
 proxy_send_timeout ${DERBYNET_REQUEST_TIMEOUT}s;
 proxy_redirect off;
@@ -200,14 +208,22 @@ http {
     client_max_body_size $MAX_UPLOAD_SIZE;
 
     # A trusted proxy in front of this one (DERBYNET_TRUSTED_PROXIES) says
-    # the client's scheme; for anyone else it is this connection's.
-    geo \$derbynet_trusted {
+    # the client's scheme, address (X-Forwarded-For, which sets
+    # \$remote_addr) and port (X-Real-Port); for anyone else they are this
+    # connection's.  The geo reads the connection's own address, which
+    # \$realip_remote_addr keeps after the realip module replaces
+    # \$remote_addr (D118).
+$real_ip    geo \$realip_remote_addr \$derbynet_trusted {
         default 0;
 $trusted_geo    }
     map "\$derbynet_trusted:\$http_x_forwarded_proto" \$derbynet_proto {
         default \$scheme;
         "1:http" http;
         "1:https" https;
+    }
+    map "\$derbynet_trusted:\$http_x_real_port" \$derbynet_port {
+        default \$remote_port;
+        "~^1:(?<port>[0-9]{1,5})\$" \$port;
     }
     map \$http_host \$derbynet_host {
         "" \$host;

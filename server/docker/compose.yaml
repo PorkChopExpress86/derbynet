@@ -1,11 +1,13 @@
-# The DerbyNet server for a race (#58).  server/docker/README.md says how to
-# run it.
+# The DerbyNet server for a race (#58), with Caddy in front of it for HTTPS
+# (D107).  server/docker/README.md says how to run it.
 #
 #   docker compose up -d                      # SQLite on the data volume
 #   docker compose --profile postgres up -d   # Postgres in a second container
 #
 # server/compose.yaml, one folder up, is the developers' side-by-side PHP and
-# Django setup; this file is the one a race runs.
+# Django setup; this file is the one a race runs.  The top-level README.md
+# holds this file without its `build:`, as an example to copy
+# (server/tests/test_readme_compose.py keeps the two the same).
 
 name: derbynet
 
@@ -23,9 +25,8 @@ services:
       context: ../..
       dockerfile: server/docker/Dockerfile
     restart: unless-stopped
-    ports:
-      - "${DERBYNET_HTTP_PORT:-80}:80"
-      - "${DERBYNET_HTTPS_PORT:-443}:443"
+    # No ports: phones, kiosks and timers reach the server through Caddy, on
+    # plain HTTP and HTTPS alike (D117).
     environment:
       <<: *postgres
       TZ: ${TZ:-America/New_York}
@@ -35,6 +36,10 @@ services:
       # folder's owner, or its own default.
       DERBYNET_UID: ${DERBYNET_UID:-}
       DERBYNET_GID: ${DERBYNET_GID:-}
+      # Only the containers of this file reach the server, so every client
+      # is Caddy, and the server believes the scheme, address and port
+      # Caddy passes on (D117, D118).
+      DERBYNET_TRUSTED_PROXIES: 0.0.0.0/0,::/0
       # The entrypoint uses Postgres on this host when the postgres service
       # below runs, as it does under `--profile postgres`.  Otherwise the
       # server keeps SQLite, one file on the data volume in WAL mode.  A
@@ -48,6 +53,35 @@ services:
         condition: service_healthy
         # Without the profile there is no postgres service to wait for.
         required: false
+
+  # Plain HTTP on port 80, never redirected, and HTTPS on 443, both passed to
+  # the server (D107, D117).  The start script below picks the certificate.
+  caddy:
+    image: caddy:2.11.9@sha256:4e2425f6009577e7c651010f16679c28f7d12df3e7b1914f941a7a3370746b3c
+    restart: unless-stopped
+    ports:
+      - "${DERBYNET_HTTP_PORT:-80}:80"
+      - "${DERBYNET_HTTPS_PORT:-443}:443"
+    environment:
+      # This computer's address on the race's network, such as 192.168.1.20,
+      # which docs/install-docker.md writes into .env (D116).  Several are
+      # separated by commas.
+      DERBYNET_ADDRESS: ${DERBYNET_ADDRESS:-}
+      # A domain name that reaches this computer from the internet, for a
+      # Let's Encrypt certificate (D119).
+      DERBYNET_DOMAIN: ${DERBYNET_DOMAIN:-}
+      # Another ACME directory than Let's Encrypt's (D121).
+      DERBYNET_ACME_CA: ${DERBYNET_ACME_CA:-}
+    volumes:
+      # Caddy's certificates and its own certificate authority.
+      - caddy:/data
+      # The server's volume, read-only, for the tls/ folder an image from
+      # before D107 made (D119).
+      - data:/derbynet:ro
+    configs:
+      - source: caddy-start
+        target: /etc/caddy/derbynet-start.sh
+    entrypoint: ["sh", "/etc/caddy/derbynet-start.sh"]
 
   postgres:
     image: postgres:17@sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07
@@ -63,6 +97,98 @@ services:
       timeout: 5s
       retries: 30
 
+configs:
+  # Caddy's start: it writes the Caddyfile and runs Caddy.  The certificate
+  # for HTTPS is, in this order (D119):
+  # - with DERBYNET_DOMAIN, one from Let's Encrypt, or DERBYNET_ACME_CA;
+  # - with tls/cert.pem and key.pem on the server's volume, those two, as
+  #   they are, for every name and address;
+  # - otherwise one from Caddy's own certificate authority, for localhost,
+  #   127.0.0.1 and each DERBYNET_ADDRESS; the first address is also the
+  #   one a phone gets when it names none, as it does for an IP address
+  #   (D116); any other name or address gets one when first asked for
+  #   (on_demand), which a browser warns about until trusted.
+  # /derbynet-ca.crt serves that authority's root, for phones to install.
+  # The $$ are Compose's escape for a $ the script itself reads.
+  caddy-start:
+    content: |
+      set -eu
+      say() { echo "derbynet-caddy: $$*" >&2; }
+      for name in $$(echo "$$DERBYNET_DOMAIN $$DERBYNET_ADDRESS" | tr , ' '); do
+        case "$$name" in
+          *[!A-Za-z0-9.:-]*)
+            say "DERBYNET_DOMAIN and DERBYNET_ADDRESS hold names and addresses, not '$$name'"
+            exit 1 ;;
+        esac
+      done
+      case "$$DERBYNET_ACME_CA" in
+        *[!A-Za-z0-9.:/_-]*)
+          say "DERBYNET_ACME_CA is a URL, not '$$DERBYNET_ACME_CA'"
+          exit 1 ;;
+      esac
+      addresses=$$(echo "$$DERBYNET_ADDRESS" | tr , ' ')
+      set -- $$addresses
+      first=$${1:-}
+      tls=/derbynet/tls
+      fallback=""
+      if [ -n "$$DERBYNET_DOMAIN" ]; then
+        say "a certificate for $$DERBYNET_DOMAIN from $${DERBYNET_ACME_CA:-Let's Encrypt}"
+        sites="https://$$DERBYNET_DOMAIN"
+        tls_line=""
+      elif [ -f "$$tls/cert.pem" ] && [ -f "$$tls/key.pem" ]; then
+        say "serving tls/cert.pem and tls/key.pem from the server's volume"
+        sites="https://"
+        tls_line="tls $$tls/cert.pem $$tls/key.pem"
+      else
+        for half in cert.pem key.pem; do
+          if [ -e "$$tls/$$half" ]; then
+            say "tls/ holds $$half alone; using Caddy's own certificate authority"
+          fi
+        done
+        sites="https://localhost, https://127.0.0.1"
+        for address in $$addresses; do sites="$$sites, https://$$address"; done
+        say "certificates from Caddy's own authority for $$sites"
+        tls_line="tls internal"
+        fallback="https:// {
+        tls internal {
+          on_demand
+        }
+        import derbynet
+      }"
+      fi
+      cat > /config/Caddyfile <<END
+      {
+        auto_https disable_redirects
+        skip_install_trust
+        $${first:+default_sni $$first}
+        $${DERBYNET_ACME_CA:+acme_ca $$DERBYNET_ACME_CA}
+      }
+      (derbynet) {
+        handle /derbynet-ca.crt {
+          root * /data/caddy/pki/authorities/local
+          rewrite * /root.crt
+          header Content-Type application/x-x509-ca-cert
+          file_server
+        }
+        handle {
+          reverse_proxy server:80 {
+            header_up X-Real-Port {remote_port}
+          }
+        }
+      }
+      http:// {
+        import derbynet
+      }
+      $$sites {
+        $$tls_line
+        import derbynet
+      }
+      $$fallback
+      END
+      caddy fmt --overwrite /config/Caddyfile
+      exec caddy run --config /config/Caddyfile --adapter caddyfile
+
 volumes:
   data:
   postgres:
+  caddy:
