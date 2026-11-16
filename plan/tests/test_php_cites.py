@@ -112,6 +112,12 @@ class Rule(unittest.TestCase):
                                  [f'`a.php` {noun} shows'])
         self.assertEqual(claims('The `a.php` button shows y.'), [])
 
+    def test_50_72s_plural_have(self):
+        """#50:72 said "`post-timer-log.php` have no permission checks in
+        PHP" with no cite (the review of PR #377)."""
+        self.assertEqual(claims('`timer.log` and `post-timer-log.php` have no permission checks.'),
+                         ['`post-timer-log.php` have'])
+
     def test_known_misses(self):
         """Forms the rule doesn't read, listed in #346's PR: an appositive,
         a Markdown link's name, a plural subject, a modal or a negated verb,
