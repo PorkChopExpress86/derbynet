@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.mutate import counts, main
+from tools.mutate import counts, main, stopped_on_error
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "mutate.py"
 MODULE = "def bound(a, b):\n    return a < b\n\n\ndef twice():\n    return 1 + 1\n"
@@ -270,6 +270,65 @@ def test_a_failure_beside_an_error_is_killed(project):
     )
     assert run.returncode == 0, run.stdout + run.stderr
     assert run.stdout.splitlines()[-1].startswith("KILLED")
+
+
+def test_a_killed_run_stops_at_its_first_failure(project):
+    """#344's `--listed` rounds ran every test after the one that killed
+    each mutant, and were stopped part-way (#344 retro)."""
+    run = mutate(
+        project,
+        "a < b",
+        "a <= b",
+        "test_mod.py::test_the_bound",
+        "test_mod.py::test_waits",
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "stopping after 1 failures" in run.stdout, run.stdout
+    assert not (project / "started").exists(), "test_waits ran"
+
+
+def test_an_error_before_the_failure_still_kills(project):
+    """`-x` stops at the error, which shows nothing about the mutant, so
+    the run goes again without it and reaches the failure."""
+    run = mutate(
+        project,
+        "a < b",
+        "a <= b",
+        "test_mod.py::test_broken",
+        "test_mod.py::test_the_bound",
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1].startswith("KILLED")
+
+
+@pytest.mark.parametrize(
+    ("found", "again"),
+    [
+        ({"error": 1}, True),
+        ({"error": 1, "failed": 1}, False),
+        ({"error": 1, "passed": 2}, True),
+        ({"passed": 2}, False),
+        ({"failed": 1}, False),
+        ({}, False),
+    ],
+)
+def test_only_a_run_stopped_on_an_error_with_no_failure_goes_again(found, again):
+    """A KILLED or SURVIVED run, or a timed-out run with no summary line,
+    takes no second run."""
+    assert stopped_on_error(found) is again
+
+
+def test_a_maxfail_given_wins_over_x(project):
+    run = mutate(
+        project,
+        "a < b",
+        "a <= b",
+        "--maxfail=2",
+        "test_mod.py::test_the_bound",
+        "test_mod.py::test_other",
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "1 failed, 1 passed" in run.stdout, run.stdout
 
 
 def test_a_run_past_its_bound_is_stopped(project):

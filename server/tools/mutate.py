@@ -54,7 +54,9 @@ more than once on its line is refused, to be run by hand. A stop restores each
 file and names the mutants not run. The cases the listing reads past are
 still mutated by hand, one per call.
 
-It prints pytest's output, then one line: `KILLED` (a test failed),
+Each run stops at its first failure (`-x`; a `--maxfail` given after it
+wins), since one failure kills the mutant (#344 retro). It prints
+pytest's output, then one line: `KILLED` (a test failed),
 `SURVIVED` (every test passed), or with `--expect pass`, for a should-pass
 mutant, `PASSED` or `BROKE`. It exits 0 when the result is the one
 expected, 1 when it is not, and 2 when it refuses, when pytest errors (an
@@ -213,7 +215,26 @@ def _stop(signum, frame):
     sys.exit(128 + signum)
 
 
+def stopped_on_error(found: dict[str, int]) -> bool:
+    """Whether a `-x` run stopped on an error before any failure: an error
+    shows nothing about the mutant, so the run goes again without `-x`."""
+    return bool(found.get("error")) and not found.get("failed")
+
+
 def _pytest(pytest_args: list[str], timeout: float):
+    """pytest's run, stopped at its first failure, or None and what it
+    printed when it passes `timeout`. One failure kills the mutant, so the
+    tests after it only cost time: #344's first `--listed` rounds ran
+    without `-x` and were stopped part-way, their mutants NOT RUN (#344
+    retro). A `--maxfail` in the arguments comes after `-x` and wins. `-x`
+    stops at a fixture's error too (stopped_on_error())."""
+    run, output = _pytest_once(["-x", *pytest_args], timeout)
+    if stopped_on_error(counts(output)):
+        return _pytest_once(pytest_args, timeout)
+    return run, output
+
+
+def _pytest_once(pytest_args: list[str], timeout: float):
     """pytest's run, or None and what it printed when it passes `timeout`."""
     # A mutant's .pyc goes with each write (_drop_bytecode). An empty
     # pycache prefix, tried first, recompiled every module each run, and the

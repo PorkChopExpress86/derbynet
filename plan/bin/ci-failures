@@ -19,6 +19,9 @@ whether master fails it too:
       not in this PR's diff: before a rerun, repeat it on origin/master, from server/:
       tools/pytest-under-load.sh --loops 12 -n auto --count 180 media/tests/...
 
+A parametrized id repeats only its own case, spelled as each repeat's node
+id (`'path::test[param-'{1..180}'-180]'`).
+
 #58's PR failed that photo race test in server runs 43490392723 and
 43497485339. It was `new`, since no failed master run named it, and the
 lead's rerun failed again; under load on master it failed too, a race #302
@@ -61,6 +64,7 @@ only a 50-run local repro showed it was no regression (#212 retro).
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -179,12 +183,21 @@ def no_test_id(run_id: str, log: str, names: str) -> tuple[list[str], bool]:
     return out, outage
 
 
-def repro(test: str) -> str:
-    """The load run that repeats `test` on origin/master. A parametrized id
-    loses its brackets, since pytest-repeat renames each parameter."""
-    target = test.split("[", 1)[0]
-    browser = "-m browser " if "/browser/" in target else ""
-    return f"tools/pytest-under-load.sh --loops 12 {browser}-n auto --count 180 {target}"
+def repro(test: str, count: int = 180) -> str:
+    """The load run that repeats `test` on origin/master, `count` times.
+    pytest-repeat renames a parametrized id `[param]` to `[param-N-COUNT]`,
+    so `[param]` itself selects no test under `--count`, and the bare
+    function repeats every parameter: #374's lead added the brackets back
+    to repeat one smoke case and the run collected 0 items. A parametrized
+    id is spelled as each repeat's node id, by bash brace expansion."""
+    browser = "-m browser " if "/browser/" in test else ""
+    if test.endswith("]"):
+        target = (shlex.quote(test[:-1] + "-") + "{1.." + str(count) + "}"
+                  + shlex.quote(f"-{count}]"))
+    else:
+        target = test
+    return (f"tools/pytest-under-load.sh --loops 12 {browser}-n auto"
+            f" --count {count} {target}")
 
 
 def main(argv: list[str]) -> int:

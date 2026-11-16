@@ -95,12 +95,17 @@ while read -r _ local_sha _ remote_sha; do
   # which server/tests/test_docker_checks.py reads (#58 retro).
   # With no base, the server checks run; a base this clone lacks lists
   # nothing, as the diff inside the test did before.
+  # Source checks read plan/ too: owner-decisions.md
+  # (legacy_api/tests/test_registry.py, tests/test_deviations.py) and its
+  # Python (tests/test_listing_order.py). server.yml skips a plan-only PR,
+  # so #346's push and CI ran none of them, and its hand-off queued about
+  # 1.5 h for the run D112 says the push makes (#346 retro).
   names=
   if [ -n "$base" ]; then
     names="$(git diff --name-only "$base" "$local_sha" || true)"
   fi
   if [ -z "$base" ] \
-       || grep -qE '^(server/|testing/|website/inc/generators/|\.github/workflows/image\.yml$)' \
+       || grep -qE '^(server/|testing/|website/inc/generators/|\.github/workflows/image\.yml$|plan/owner-decisions\.md$|plan/bin/|plan/.*\.py$)' \
             <<<"$names"; then
     changed=1
   fi

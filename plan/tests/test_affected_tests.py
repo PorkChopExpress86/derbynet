@@ -2413,6 +2413,32 @@ class ReachShapes(unittest.TestCase):
         longest = max(len(chain) for _, chain, _ in shapes)
         self.assertEqual((len(shapes), len(plain), longest), (252, 78, 3))
 
+    def test_claims_name_every_test_that_calls_the_changed_leaf(self):
+        """The same shapes in claims mode (D123), against the same runtime
+        oracle: a test left out drops its claims from the check. #379's
+        first head dropped eight shapes that review found one at a time
+        (#374 retro), and this oracle found four more after the merge: a
+        helper that calls `TestK().again1()`, where `again1` reads the
+        change, left `test_t3` out. A class named for what it reads outside
+        its test methods is named whole, so a name the oracle doesn't call
+        is no miss."""
+        misses, resolved = [], 0
+        for leaf, chain, subclass in reach_shapes():
+            base, _ = reach_shape(leaf, chain, subclass, 1)
+            head, name = reach_shape(leaf, chain, subclass, 2)
+            try:
+                named = set(tops(base, head))
+            except TOOL.WholeFile:
+                continue
+            resolved += 1
+            expected = {key.split('::')[0] for key in tests_that_call(head, name)}
+            if expected - named:
+                misses.append(f'{leaf} <- {" <- ".join(chain)}'
+                              f'{" + TestSub" if subclass else ""}: missing '
+                              f'{sorted(expected - named)}')
+        self.assertEqual(misses, [])
+        self.assertEqual(resolved, 252)
+
 
 def lines(head, base=D101_BASE, postgres=False):
     files = {**TREE, HELPERS: D101_HELPERS}

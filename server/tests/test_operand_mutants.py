@@ -67,6 +67,32 @@ def test_conditions_and_each_top_level_operand():
     ]
 
 
+def test_a_javascript_listener_is_renamed_so_it_never_fires():
+    """#344's review found an untested pointercancel listener, and guards
+    that htmx made moot survived round after round (#344 retro)."""
+    diff = (
+        "+++ b/server/ui/static/ui/kiosks.js\n"
+        "@@ -1,0 +1,4 @@\n"
+        '+board.addEventListener("htmx:beforeSwap", (e) => {\n'
+        "+  htmx.on('htmx:afterRequest', f);\n"
+        "+  el.addEventListener(`pointercancel`, g, {once: true});\n"
+        "+  x.on(name, g);\n"
+    )
+    assert listed(diff) == [
+        (1, "listener", '"htmx:beforeSwap"', '"never-htmx:beforeSwap"'),
+        (2, "listener", "'htmx:afterRequest'", "'never-htmx:afterRequest'"),
+        (3, "listener", "`pointercancel`", "`never-pointercancel`"),
+    ]
+
+
+def test_a_python_on_call_is_no_listener():
+    """Playwright's `page.on("request", ...)` in a test helper is Python."""
+    diff = (
+        '+++ b/ui/tests/browser/test_x.py\n@@ -1,0 +1 @@\n+page.on("request", seen)\n'
+    )
+    assert listed(diff) == []
+
+
 def test_each_old_text_is_on_its_line_and_removed_lines_are_skipped():
     diff = (
         "+++ b/x.js\n"
