@@ -2,8 +2,8 @@
 #
 # Runs the quick checks of the `lint` job in .github/workflows/server.yml
 # before a push that changes server/, testing/, website/inc/generators/,
-# .github/workflows/image.yml, plan/owner-decisions.md, plan/bin/ or plan/'s
-# Python, so a red lint shows up before the push instead of after CI.  It also checks that the
+# .github/workflows/image.yml or plan/, so a red lint shows up before the push
+# instead of after CI.  It also checks that the
 # HTTP golden fixtures were captured from the testing/ scripts being pushed
 # (server/tools/golden_inputs.py), which the golden-fixtures workflow finds
 # only after a 25-minute capture, and the paths the ADRs cite, which
@@ -96,16 +96,18 @@ while read -r _ local_sha _ remote_sha; do
   # With no base, the server checks run; a base this clone lacks lists
   # nothing, as the diff inside the test did before.
   # Source checks read plan/ too: owner-decisions.md
-  # (legacy_api/tests/test_registry.py, tests/test_deviations.py) and its
-  # Python (tests/test_listing_order.py). server.yml skips a plan-only PR,
-  # so #346's push and CI ran none of them, and its hand-off queued about
-  # 1.5 h for the run D112 says the push makes (#346 retro).
+  # (legacy_api/tests/test_registry.py, tests/test_deviations.py), its
+  # Python (tests/test_listing_order.py), every tracked .md and .py
+  # (tests/test_docker_checks.py) and plan/bin's bash scripts
+  # (tests/test_pipefail_pipes.py). #346's push ran none of them, and its
+  # hand-off queued about 1.5 h for the run D112 said the push makes
+  # (#346 retro; D129). plan-checks.yml runs them on a PR (D128).
   names=
   if [ -n "$base" ]; then
     names="$(git diff --name-only "$base" "$local_sha" || true)"
   fi
   if [ -z "$base" ] \
-       || grep -qE '^(server/|testing/|website/inc/generators/|\.github/workflows/image\.yml$|plan/owner-decisions\.md$|plan/bin/|plan/.*\.py$)' \
+       || grep -qE '^(server/|testing/|website/inc/generators/|\.github/workflows/image\.yml$|plan/)' \
             <<<"$names"; then
     changed=1
   fi

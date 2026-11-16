@@ -38,6 +38,12 @@ The lint counts a PR as merged when GitHub says so, or when GitHub shows it clos
 - `## Still open` keeps an issue open after its work has merged. Write what is left under it, such as the acceptance boxes still to tick. A ticket that depends on it counts the dependency as done.
 - `## Waiting on` keeps `blocked` on a ticket whose dependencies are all closed. Write what it waits on under it, such as an owner decision.
 
+## Record a decision
+
+A decision is a row of `owner-decisions.md`: the next `D` number, the date the owner decided, the decision, and the issues or retro that record it. Add it in the same change that edits the issues it touches. A row that amends one says so first ("Amends D112.").
+
+A row that cites another decision names which part of it applies (D130). D123's "counted as D101 counts them" fit both D101's helper reach and its whole-file fallback, and Q32 came back to the owner after the build, settled as D124.
+
 ## Ship a PR
 
 ```bash

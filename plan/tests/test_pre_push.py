@@ -127,16 +127,17 @@ class PrePush(unittest.TestCase):
         self.assertIn('pytest -q -p no:cacheprovider', result.ran)
 
     def test_a_push_outside_server_runs_plan_tests_once(self):
-        result = push('plan/README.md', PASSING)
+        result = push('docs/x.md', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
 
-    def test_a_push_of_what_source_checks_read_in_plan_runs_them(self):
+    def test_a_push_of_plan_runs_the_source_checks_that_read_it(self):
         """test_registry.py and test_deviations.py read owner-decisions.md,
-        test_listing_order.py plan/'s Python; server.yml skips a plan-only
-        PR, and #346's push ran none of them (#346 retro)."""
+        test_listing_order.py plan/'s Python, test_docker_checks.py every
+        tracked .md, and test_pipefail_pipes.py plan/bin's bash; #346's push
+        ran none of them (#346 retro, D129)."""
         for path in ('plan/owner-decisions.md', 'plan/php_cites.py',
-                     'plan/bin/ci-failures'):
+                     'plan/bin/ci-failures', 'plan/README.md'):
             with self.subTest(path=path):
                 result = push(path, PASSING)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -144,12 +145,12 @@ class PrePush(unittest.TestCase):
                 self.assertEqual(result.ran.count('plan/tests'), 1, result.ran)
 
     def test_a_failing_plan_test_stops_a_push_outside_server(self):
-        result = push('plan/README.md', FAILING)
+        result = push('docs/x.md', FAILING)
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('the plan test failed', result.stderr)
 
     def test_passing_plan_tests_let_a_push_outside_server_through(self):
-        result = push('plan/README.md', PASSING)
+        result = push('docs/x.md', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
