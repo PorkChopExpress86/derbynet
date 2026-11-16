@@ -925,6 +925,26 @@ def test_a_tap_whose_request_fails_still_applies_the_held_board(
     polls.end()
 
 
+def test_a_change_from_a_sheet_swaps_its_board_at_once(login, event):
+    """With no press on, a change's board out of band swaps in with its
+    reply (#344): the kiosk named from its sheet shows on the board while
+    every poll is held. Held to the request's end instead, the board never
+    showed the name (#344's round-5 mutant)."""
+    kiosk(event, "tv")
+    page = open_dashboard(login("RaceCoordinator"))
+    polls = hold_the_polls(page)
+    tap(page, card(page, "tv").locator('[data-action="name"]'))
+    form = ready(page, sheet(page, "kiosks").locator("[data-name-sheet]"))
+    form.locator('[data-name-chips] button[data-value="Main"]').click()
+    expect(form.get_by_label("Name for this kiosk")).to_have_value("Main")
+    with htmx_post(page, "/kiosks/name/"):
+        form.locator("[data-submit]").click()
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Main")
+    assert polls.answered() == 0, board_log(page)
+    polls.end()
+
+
 def test_a_poll_with_no_change_during_a_press_swaps_nothing(login, event):
     """A poll that answers 204 while the pointer is down holds nothing, and
     the press's end swaps nothing (D102). No kiosk checks in, so nothing on
