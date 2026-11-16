@@ -40,23 +40,26 @@ window.sceneSheet = kioskSheetOf('scenes', 'sceneSheet');
 // pointerup and pointerout, so a pointerout after the pointerup is no cancel.
 //
 // The held board is applied once the press has ended and no request a board
-// control sent is out: a swap before then detached that control, and htmx
-// then looks for its reply's out-of-band board in the detached control's tree
-// and drops it (htmx 2.0.4 `swap()`, `contextElement`); a request sent while
-// the board swapped went out with no CSRF header (#344 review). A request
-// that ends aborted was replaced by a board control's request, which brings a
-// newer board, so the held one is dropped; and so it is while a sheet is
-// open (`derbynet.pollable`), where a swap would detach the sheet's opener,
-// and the next poll after the sheet closes brings the board.
+// control sent is out, which htmx marks with its request class on the control
+// until just before `htmx:afterRequest`: a swap before then detached that
+// control, and htmx then looks for its reply's out-of-band board in the
+// detached control's tree and drops it (htmx 2.0.4 `swap()`,
+// `contextElement`); a request sent while the board swapped went out with no
+// CSRF header (#344 review). A control is detached only by a swap the board
+// let through, which dropped the held board, so a detached control's request
+// has nothing to wait for. A request that ends with no reply (status 0:
+// replaced by a newer one, or a network error) drops the held board, and so
+// does an open sheet (`derbynet.pollable`), where a swap would detach the
+// sheet's opener: the board's signature (#kiosks-sig) is still the old one,
+// so the next poll brings the board again.
 function holdBoardUnderPress(board, bound) {
   let pressed = null;
   let down = false;
   let timer = null;
   let held = null;
-  const out = new Set();
 
   function apply() {
-    if (held === null || pressed || out.size) return;
+    if (held === null || pressed || board.querySelector('.htmx-request')) return;
     const html = held;
     held = null;
     if (!derbynet.pollable(board)) return;
@@ -88,17 +91,9 @@ function holdBoardUnderPress(board, bound) {
   document.addEventListener('click', (e) => {
     if (pressed && pressed.contains(e.target)) setTimeout(release, 0);
   });
-  document.addEventListener('htmx:beforeSend', (e) => {
-    const control = e.detail.elt;
-    if (control === board || !board.contains(control)) return;
-    out.add(control);
-    // On the control itself: once a swap detaches it, its events no longer
-    // reach the document.
-    control.addEventListener('htmx:afterRequest', (end) => {
-      out.delete(control);
-      if (end.detail.xhr.status === 0) held = null;
-      apply();
-    }, { once: true });
+  document.addEventListener('htmx:afterRequest', (e) => {
+    if (e.detail.xhr.status === 0) held = null;
+    apply();
   });
 
   board.addEventListener('htmx:beforeSwap', (e) => {
