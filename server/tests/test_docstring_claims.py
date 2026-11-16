@@ -139,3 +139,39 @@ def test_a_class_claim_counts_on_a_row_naming_its_method(tmp_path):
     assert dc.main(["--check", str(body), str(path)]) == 0
     body.write_text("<details>\n| `test_other` | PR 7 |\n</details>\n")
     assert dc.main(["--check", str(body), str(path)]) == 1
+
+
+# `pause_clock_at` as #348's second head (6d6ac602) had it, in part.
+PAUSE_CLOCK_AT = '''\
+def pause_clock_at(page, at):
+    """Pause the clock. A timer a loaded page queued between the install
+    and the pause fired once in the pause's jump (the #359 review's
+    probe)."""
+    page.clock.pause_at(at)
+
+
+def stop(page):
+    """It probes the page, and `probe` in backticks names code: no cite."""
+    # Probes run here, as a verb.
+    page.clock.pause_at(0)
+'''
+
+
+def test_a_cited_probe_is_a_claim(tmp_path, capsys):
+    """#348's docstring cited the review's probe, which no test held, and
+    cutting it cost a third head and its load runs (#348 retro)."""
+    path = tmp_path / "helpers.py"
+    path.write_text(PAUSE_CLOCK_AT)
+    found = [(c.scope, c.text, c.line) for c, _ in dc.claims(path)]
+    assert found == [("pause_clock_at", "probe", 4)]
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n| `pause_clock_at` | 1 | x |\n</details>\n")
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert (
+        "pause_clock_at: probe is in no <details> block line" in capsys.readouterr().out
+    )
+    body.write_text(
+        "<details>\n| `pause_clock_at` | probe | test_a_loaded_page_s_timer |\n"
+        "</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 0

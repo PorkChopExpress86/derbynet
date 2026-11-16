@@ -26,10 +26,12 @@ claim counts on any line, since its row may name the constant a comment
 sits above, or the test that reads it.
 
 A claim is a number with its unit (`58.3 px`, `2.85vw`, `1920x1080`, `22`),
-a number word that counts something (`two lines`, `four tall windows`), or a
-double-quoted string. Ticket and decision ids (`#273`, `D10`, `ADR-10`,
-`C25`), file:line cites (`ondeck.css:49-51`) and numbers inside backticks
-are left out: their own checks cover them (tests/test_php_cite_lines.py).
+a number word that counts something (`two lines`, `four tall windows`), a
+double-quoted string, or a cited probe (`probe`, listed as that word): the
+row names the test that holds what the probe showed. Ticket and decision
+ids (`#273`, `D10`, `ADR-10`, `C25`), file:line cites (`ondeck.css:49-51`)
+and numbers inside backticks are left out: their own checks cover them
+(tests/test_php_cite_lines.py).
 """
 
 from __future__ import annotations
@@ -56,6 +58,11 @@ WORD = re.compile(rf"\b(?:{'|'.join(WORDS)})(?:-|\s+)(?:[a-z]+)\b", re.IGNORECAS
 IDIOM = re.compile(
     r"\bone\s+(?:read|task|that|of|by|at|another|way|place|out)\b", re.IGNORECASE
 )
+# A probe the prose cites: its finding is a claim like a number, listed
+# beside the test that now asserts it. #348's helper docstring cited "the
+# review's probe", which no test held, and cutting it cost a third head and
+# its load runs (#348 retro).
+PROBE = re.compile(r"\bprobe\b", re.IGNORECASE)
 QUOTED = re.compile(r"\"([^\"]{1,120})\"|“([^”\n]{1,80})”")
 # Spans whose numbers are ids or cites, not claims.
 SKIP = re.compile(
@@ -100,6 +107,8 @@ def claims_in(text: str) -> list[tuple[int, str]]:
         found.append((m.start(), m.group(0).strip()))
     for m in WORD.finditer(rest):
         found.append((m.start(), m.group(0)))
+    for m in PROBE.finditer(rest):
+        found.append((m.start(), "probe"))
     return sorted(found)
 
 
