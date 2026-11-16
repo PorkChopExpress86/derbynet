@@ -57,9 +57,10 @@ targets, then:
 - before the commands, `tools/docstring_claims.py` on each changed test file
   and `tools/operand_mutants.py` when a changed hand-written source file can
   hold a condition (not a migration or vendored code), plan/'s Python tools
-  and tests among them: run both before the first hand-off run, since a
-  claim or a mutant they find means an edit, and the run starts again (#312
-  retro);
+  and tests among them, with `tools/mutate.py --listed`, which runs every
+  mutant it lists (#336 retro): run them before the first hand-off run,
+  since a claim or a mutant they find means an edit, and the run starts
+  again (#312 retro);
 - the commands, from server/.
 
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
@@ -151,9 +152,16 @@ MEASURES = re.compile(
     r'fontSize|font-size|font_size')
 DB_CODE = re.compile(
     r'django\.db|\.objects\b|transaction\.|select_for_update|\.raw\(|'
-    r'cursor\(|RawSQL|connection\.|\.filter\(|\.exclude\(|\.annotate\(|'
-    r'\.aggregate\(|\.values(_list)?\(|\.order_by\(|\bF\(|\bQ\(|Subquery|'
+    r'cursor\(|RawSQL|connection\.|Subquery|'
     r'OuterRef|bulk_create|bulk_update|update_or_create|get_or_create')
+# A queryset's methods, which a dict or a string names too: they count only
+# in a module that imports Django. tools/operand_mutants.py's docstring and
+# regex name `.filter(`, and asked for Postgres (#358 review); no module
+# under server/ that imports no Django calls one on a queryset (#336 retro).
+QUERYSET = re.compile(
+    r'\.filter\(|\.exclude\(|\.annotate\(|\.aggregate\(|\.values(_list)?\(|'
+    r'\.order_by\(|\bF\(|\bQ\(')
+DJANGO_IMPORT = re.compile(r'^\s*(?:from|import)\s+django\b', re.M)
 RAW_SQL = re.compile(r'cursor\(|\.raw\(|RawSQL|connection\.vendor')
 # What tools/operand_mutants.py reads conditions and min()/max() calls from,
 # and the folders of code nobody here writes by hand.
@@ -845,6 +853,8 @@ def cover_db_code(plan, tree, path):
     pattern = RAW_SQL if in_tests(rel) else DB_CODE
     text = diff_text(plan, path) if plan.from_git else tree.text(rel)
     hit = pattern.search(text)
+    if not hit and not in_tests(rel) and DJANGO_IMPORT.search(tree.text(rel)):
+        hit = QUERYSET.search(text)
     if hit:
         plan.postgres.append(f'{path}: database code ({hit.group(0)!r})')
 
@@ -1995,6 +2005,10 @@ def report(plan, tree):
         if plan.changed_source:
             base = f' --base {plan.base}' if plan.from_git else ''
             say(f'  uv run python tools/operand_mutants.py{base}')
+            # #336 picked its mutants by hand, mostly one way, and 21 of 98
+            # survived on branches no test reached (#336 retro).
+            say(f'  uv run python tools/mutate.py --listed{base} -- '
+                '<the node ids of the tests that cover them>')
         say('')
 
     say('Run from server/ (start a run longer than a minute in the background):')
