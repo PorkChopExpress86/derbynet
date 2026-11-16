@@ -26,10 +26,13 @@ claim counts on any line, since its row may name the constant a comment
 sits above, or the test that reads it.
 
 A claim is a number with its unit (`58.3 px`, `2.85vw`, `1920x1080`, `22`),
-a number word that counts something (`two lines`, `four tall windows`), or a
-double-quoted string. Ticket and decision ids (`#273`, `D10`, `ADR-10`,
-`C25`), file:line cites (`ondeck.css:49-51`) and numbers inside backticks
-are left out: their own checks cover them (tests/test_php_cite_lines.py).
+a number word that counts something (`two lines`, `four tall windows`), a
+double-quoted string, or a probe cited as a ticket's, a review's or a
+log's (`#360's probe`, listed as `probe`): the row names the test that
+holds what the probe showed. Ticket and decision
+ids (`#273`, `D10`, `ADR-10`, `C25`), file:line cites (`ondeck.css:49-51`)
+and numbers inside backticks are left out: their own checks cover them
+(tests/test_php_cite_lines.py).
 """
 
 from __future__ import annotations
@@ -56,6 +59,18 @@ WORD = re.compile(rf"\b(?:{'|'.join(WORDS)})(?:-|\s+)(?:[a-z]+)\b", re.IGNORECAS
 IDIOM = re.compile(
     r"\bone\s+(?:read|task|that|of|by|at|another|way|place|out)\b", re.IGNORECASE
 )
+# A probe the prose cites as a ticket's, a review's or a log's ("#360's
+# probe", "the #359 review's probe", "#341's PHP probe"): its finding is a
+# claim like a number, listed beside the test that now asserts it. #348's
+# helper docstring cited "the review's probe", which no test held, and
+# cutting it cost a third head and its load runs (#348 retro). A probe
+# named otherwise ("the probe's own shared lock", "after a probe that
+# passed") is the code's own, not a cite (#370 review).
+PROBE = re.compile(
+    r"(?:#\d+(?:\s+review)?|\breview|\.log|\blog)['’]s\s+(?:[\w-]+\s+)?probe\b",
+    re.IGNORECASE,
+)
+BACKTICKS = re.compile(r"`[^`\n]*`")
 QUOTED = re.compile(r"\"([^\"]{1,120})\"|“([^”\n]{1,80})”")
 # Spans whose numbers are ids or cites, not claims.
 SKIP = re.compile(
@@ -100,6 +115,10 @@ def claims_in(text: str) -> list[tuple[int, str]]:
         found.append((m.start(), m.group(0).strip()))
     for m in WORD.finditer(rest):
         found.append((m.start(), m.group(0)))
+    # On the text less its quotes and code spans: SKIP would blank the
+    # ticket's id the cite needs.
+    for m in PROBE.finditer(blank(blank(text, QUOTED), BACKTICKS)):
+        found.append((m.end() - len("probe"), "probe"))
     return sorted(found)
 
 

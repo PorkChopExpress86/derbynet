@@ -721,12 +721,28 @@ class BeforeTheHandOff(unittest.TestCase):
                 self.assertNotIn('mutate.py', commands(out))
                 self.assertNotIn('docstring_claims', out)
 
-    def test_a_test_helper_a_deleted_file_or_a_doc_lists_neither(self):
-        out = run('server/core/tests/factories.py', 'server/awards/gone.py',
-                  'server/docs/x.md', 'server/tools/source-checks.sh')
+    def test_a_deleted_file_or_a_doc_lists_neither(self):
+        out = run('server/awards/gone.py', 'server/docs/x.md',
+                  'server/tools/source-checks.sh')
         self.assertNotIn('operand_mutants', out)
         self.assertNotIn('docstring_claims', out)
         self.assertNotIn('Before the first hand-off run', out)
+
+    def test_a_test_helper_lists_its_docstring_claims_and_no_operand_mutants(self):
+        """#348's `pause_clock_at` docstring in `ui/tests/browser/helpers.py`
+        cited the review's probe, which no test held; cutting it cost a
+        third head and its load runs (#348 retro)."""
+        out = run('server/core/tests/factories.py', 'server/ui/tests/test_dashboard.py')
+        self.assertIn('  uv run python tools/docstring_claims.py ui/tests/test_dashboard.py '
+                      'core/tests/factories.py\n', before_hand_off(out))
+        self.assertIn('  uv run python tools/docstring_claims.py --check <the PR body draft> '
+                      'ui/tests/test_dashboard.py core/tests/factories.py\n',
+                      before_hand_off(out))
+        self.assertNotIn('operand_mutants', out)
+        self.assertNotIn('--file core/tests/factories.py', out)
+        out = run('server/core/tests/gone_helper.py', 'server/ui/tests/test_dashboard.py')
+        self.assertIn('  uv run python tools/docstring_claims.py ui/tests/test_dashboard.py\n',
+                      before_hand_off(out))
 
     def test_a_plan_tool_and_its_test_list_both(self):
         """#320's diff was `plan/bin/affected-tests` and its test, and the

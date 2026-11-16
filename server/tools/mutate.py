@@ -30,8 +30,8 @@ Run it from server/, in the worktree under test, for one mutant:
         -- ui/tests/test_views.py::test_the_bound
 
 or, with `--listed`, for every mutant `tools/operand_mutants.py` lists for
-the diff from `--base` (origin/master by default), narrowed to each
-`--file` given, one after another against the same tests:
+the diff from the merge base with `--base` (origin/master by default),
+narrowed to each `--file` given, one after another against the same tests:
 
     uv run python tools/mutate.py --listed --file ../plan/bin/affected-tests \\
         -- ../plan/tests/test_affected_tests.py::ChangedTests
@@ -131,6 +131,20 @@ def _swap(path: Path, expect: bytes, new: bytes) -> None:
         path.write_bytes(new)
         if path.read_bytes() != new:
             raise Changed(f"{path} does not hold what mutate.py wrote")
+        _drop_bytecode(path)
+
+
+def _drop_bytecode(path: Path) -> None:
+    """Removes the file's .pyc files, pytest's rewritten ones too. Python
+    reuses a .pyc whose source has the same mtime, in whole seconds, and
+    size: the next mutant of the same length written in the same second ran
+    the last one's bytecode (test_listed_runs_a_member_taken_away), and a
+    mutant that keeps the file's length ran one any import of the original
+    wrote in its second (test_a_mutant_runs_past_a_stale_pyc_of_its_file).
+    _swap() calls it after each write, the restore's too, so the .pyc a
+    mutant's run writes goes with it."""
+    for pyc in (path.parent / "__pycache__").glob(f"{path.stem}.*.pyc"):
+        pyc.unlink(missing_ok=True)
 
 
 def counts(output: str) -> dict[str, int]:
@@ -201,6 +215,9 @@ def _stop(signum, frame):
 
 def _pytest(pytest_args: list[str], timeout: float):
     """pytest's run, or None and what it printed when it passes `timeout`."""
+    # A mutant's .pyc goes with each write (_drop_bytecode). An empty
+    # pycache prefix, tried first, recompiled every module each run, and the
+    # tool's timing tests missed their bounds (#370 review round).
     try:
         run = subprocess.run(
             [sys.executable, "-m", "pytest", "-p", "no:xdist", *pytest_args],
@@ -304,7 +321,16 @@ def listed(args) -> int:
         return REFUSED
     root = Path(top.stdout.strip())
     diff = subprocess.run(
-        ["git", "diff", "-U0", args.base, "--", *map(str, args.file or [])],
+        # From the merge base, as operand_mutants.py diffs (#348 retro).
+        [
+            "git",
+            "diff",
+            "-U0",
+            "--merge-base",
+            args.base,
+            "--",
+            *map(str, args.file or []),
+        ],
         capture_output=True,
         text=True,
     )
