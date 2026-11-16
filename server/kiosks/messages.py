@@ -2,9 +2,10 @@
 remote camera, ported from `website/inc/messages.inc`.
 
 A message with a recipient is deleted when that recipient reads it. A
-broadcast has no recipient, reaches everyone who polls, and expires after a
-second. A directed message nobody reads expires after 15 s. Both count whole
-seconds, as PHP does (`messages.inc:58-62`, `messages.inc:95-98`, `_purge`).
+broadcast has no recipient and reaches everyone who polls until 2 whole
+seconds after its own second; a directed message nobody reads lives until 16,
+as PHP's `time() + $timeout` and `expiration < time()` count them
+(`messages.inc:58-62`, `messages.inc:95-98`, `_purge`).
 """
 
 import json
@@ -49,19 +50,23 @@ def decoded(text: str):
 def _purge(event, now: datetime) -> None:
     """`purge_stale_messages()`: PHP stores `time() + $timeout`
     (`messages.inc:58-62`) and deletes at `expiration < time()`
-    (`messages.inc:95-98`), in whole seconds (#360). The port stores
-    `now + life` with its fraction, whose second is PHP's, so a message
-    goes once `php_time(now)` passes that second: the bound is the first
-    moment of `php_time(now)`. A broadcast sent 0.6 s past a whole second
-    lives until 2 s past that second, 1.4 s after it was sent
-    (`test_a_broadcast_expires_in_whole_seconds`)."""
+    (`messages.inc:95-98`), in whole seconds (#360). `send` stores the same
+    whole second, so a message goes once `php_time(now)` passes it: the
+    bound is the first moment of `php_time(now)`. A broadcast sent 0.6 s
+    past a whole second lives until 2 s past that second, 1.4 s after it
+    was sent (`test_a_broadcast_expires_in_whole_seconds`)."""
     SignalMessage.objects.filter(
         event=event, expires_at__lt=from_php_time(php_time(now))
     ).delete()
 
 
 def send(event, recipient: str, payload, now: datetime) -> None:
-    """`send_message()`. Raises `TooLarge` past `SIZE_LIMIT`."""
+    """`send_message()`. Raises `TooLarge` past `SIZE_LIMIT`.
+
+    The expiry is the first moment of the message's PHP second plus its
+    life, as PHP stores `time() + $timeout` (`messages.inc:58-62`), so
+    messages whose expiries share a second keep send order in `retrieve`
+    (#360, `test_messages_expiring_in_one_second_come_in_send_order`)."""
     if len(json.dumps(payload)) > SIZE_LIMIT:
         raise TooLarge
     life = DIRECTED_LIFE if recipient else BROADCAST_LIFE
@@ -70,14 +75,19 @@ def send(event, recipient: str, payload, now: datetime) -> None:
         payload = Value(None, JSONField())
     with transaction.atomic():
         SignalMessage.objects.create(
-            event=event, recipient=recipient, expires_at=now + life, payload=payload
+            event=event,
+            recipient=recipient,
+            expires_at=from_php_time(php_time(now)) + life,
+            payload=payload,
         )
         _purge(event, now)
 
 
 def retrieve(event, recipient: str | None, now: datetime) -> list:
     """`retrieve_messages()`: the recipient's messages and the broadcasts, in
-    order of expiry. The recipient's own are deleted in the same
+    order of expiry, and in send order within one expiry second, as PHP's
+    `ORDER BY expiration` (`messages.inc:71-73`) answered on SQLite in
+    #360's review probe. The recipient's own are deleted in the same
     transaction, so two polls never both get one."""
     with transaction.atomic():
         _purge(event, now)
