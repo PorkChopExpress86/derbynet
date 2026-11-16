@@ -29,8 +29,10 @@
 #              the container with one line (D106)
 #   uid-takeover
 #              a volume of the image's uid goes to a new DERBYNET_UID at the
-#              next start, with one log line; a restart and a new container
-#              with the same uid log none and change no file (D106)
+#              next start, with one log line; a restart, with derbynet's
+#              home left away as a killed start leaves it, and a new container
+#              with the same uid log none and change no file, and the
+#              restart puts the home back (D106)
 #   uid-exec   with the .env lines docs/install-docker.md writes, docker
 #              compose exec -u derbynet runs manage.py check as the host user
 #   client-ip  Django sees the client's address, not the unix socket's, and
@@ -486,7 +488,7 @@ EOF_CASES
 # to a new DERBYNET_UID at the next start with one line (D106).  A restart,
 # and a new container, with the same uid log no line and change no file.
 check_uid_takeover() {
-    local default line lines before after
+    local default line lines before after out
     default="$(image_ids)"
     say "a volume made with the image's ids ($default)"
     start ut1 "$PREFIX-uid-takeover"
@@ -502,12 +504,17 @@ check_uid_takeover() {
     owned_by ut2 2345 2346
     before="$(docker exec "$PREFIX-ut2" stat -c '%n %z' /var/lib/derbynet/secret_key /var/lib/derbynet/kept /var/lib/derbynet/kept/file)"
 
-    say "docker restart, with the same uid: no line, and no file changed"
+    say "docker restart, with the same uid and derbynet's home left at /nonexistent, as by a start killed between its two usermods: no line, no file changed, and the home back"
+    docker exec "$PREFIX-ut2" usermod -d /nonexistent derbynet
     docker restart "$PREFIX-ut2" >/dev/null
     wait_ready "$PREFIX-ut2"
     lines="$(docker logs "$PREFIX-ut2" 2>&1 | grep -cF 'giving them to' || true)"
     echo "takeover lines in the log of both starts: $lines"
     [ "$lines" = 1 ] || fail "the restart logged a takeover"
+    out="$(docker exec "$PREFIX-ut2" getent passwd derbynet)"
+    echo "$out"
+    [ "$out" = "derbynet:x:2345:2346::/var/lib/derbynet:/usr/sbin/nologin" ] \
+        || fail "derbynet's home stayed away from /var/lib/derbynet"
     after="$(docker exec "$PREFIX-ut2" stat -c '%n %z' /var/lib/derbynet/secret_key /var/lib/derbynet/kept /var/lib/derbynet/kept/file)"
     echo "$after"
     [ "$before" = "$after" ] || fail "the restart changed a file's ctime"

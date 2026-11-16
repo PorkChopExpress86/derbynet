@@ -40,7 +40,7 @@ What each part does:
 | `-p 80:80 -p 443:443` | Serves plain HTTP on port 80 and HTTPS on port 443 of this computer. |
 | `-v derbynet:/var/lib/derbynet` | Keeps everything in a Docker volume named `derbynet`: the database, photos, videos, and the server's keys. |
 | `-e TZ=America/Chicago` | The race's time zone. Use a name from <https://en.wikipedia.org/wiki/List_of_tz_database_time_zones>. |
-| `-e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g)` | On Linux only. The server runs as your own user and group, so the files it keeps belong to you, in a volume and in a folder of yours alike (D106). On a Mac or Windows, leave these out: there Docker Desktop runs the containers in a Linux virtual machine it manages (Docker's [permission requirements for Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/)). |
+| `-e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g)` | On Linux only. The server runs as your own user and group, so the files it keeps belong to you, in a volume and in a folder of yours alike (D106). The guide leaves them out on a Mac or Windows, where Docker Desktop runs the containers in a Linux virtual machine of its own: on a Mac, "the Docker daemon and containers run in a lightweight Linux VM managed by Docker" ([Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/)), and on Windows, "Docker Desktop runs inside its own `docker-desktop` WSL distribution" ([Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)). |
 
 Docker downloads the image the first time, which takes a minute or two. On Linux, put `sudo` in front of each `docker` command unless your user is in the `docker` group. Run the command from your own user's shell, not a root shell: the shell fills in `$(id -u)` before `sudo` runs, so it is still your own id, but in a root shell it is 0, and the server refuses to run as root.
 
@@ -61,7 +61,7 @@ echo "DERBYNET_UID=$(id -u)" >> .env
 echo "DERBYNET_GID=$(id -g)" >> .env
 ```
 
-On a Mac or Windows, skip that step, for the reasons above. Then run this from the folder:
+On a Mac or Windows, skip that step, as the guide leaves the ids out there. Then run this from the folder:
 
 ```sh
 docker compose up -d

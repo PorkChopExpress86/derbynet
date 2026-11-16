@@ -21,7 +21,7 @@ docker run -d --name derbynet --restart unless-stopped \
   ghcr.io/porkchopexpress86/derbynet_server
 ```
 
-On a Mac or Windows, leave out the two ids (D106): Docker Desktop runs the containers in a Linux virtual machine it manages (Docker's [permission requirements for Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/)). Or with `compose.yaml` from this folder, which does the same, after writing the ids into `.env` on Linux:
+The guide leaves the two ids out on a Mac or Windows (D106), where Docker Desktop runs the containers in a Linux virtual machine of its own ([Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/); on Windows, its own `docker-desktop` WSL distribution, [Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)). Or with `compose.yaml` from this folder, which does the same, after writing the ids into `.env` on Linux:
 
 ```sh
 echo "DERBYNET_UID=$(id -u)" >> .env

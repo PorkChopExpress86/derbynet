@@ -117,14 +117,17 @@ read -r uid gid <<<"$ids"
 # -o: a uid or gid another account or group in the image holds, such as
 # www-data's 33, is shared.  usermod -u would also re-own the files under
 # derbynet's home, the data folder, unlogged and past the chown hint below,
-# so the uid changes with the home pointed away, and then back.
+# so the uid changes with the home pointed away, and then back.  The home
+# goes back on every start whose home is elsewhere, as one is when a start
+# was killed between the two calls; the Dockerfile's useradd sets it.
 if [ "$(id -g derbynet)" != "$gid" ]; then
     groupmod -o -g "$gid" derbynet
 fi
 if [ "$(id -u derbynet)" != "$uid" ]; then
-    home="$(getent passwd derbynet | cut -d: -f6)"
     usermod -o -u "$uid" -d /nonexistent derbynet
-    usermod -d "$home" derbynet
+fi
+if [ "$(getent passwd derbynet | cut -d: -f6)" != /var/lib/derbynet ]; then
+    usermod -d /var/lib/derbynet derbynet
 fi
 # shellcheck disable=SC2046
 takeover $(stat -c '%u %g' "$DERBYNET_DATA_DIR") "$uid" "$gid" "$DERBYNET_DATA_DIR"
