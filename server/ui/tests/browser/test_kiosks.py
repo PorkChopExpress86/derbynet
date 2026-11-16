@@ -899,6 +899,32 @@ def test_a_press_during_a_taps_request_still_taps(login, event):
     polls.end()
 
 
+def test_a_tap_whose_request_fails_still_applies_the_held_board(
+    login, event, page_errors
+):
+    """The mouse taps Identify while a poll's reply (Lobby) is held, so the
+    held board waits for Identify's POST, which its route holds. The POST
+    then fails with a 500, whose reply carries no board, and the held board
+    swaps in when the request ends: no later poll is let through (#344)."""
+    page_errors.allow(r"500")
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    posts = held_at_route(page, "**/kiosks/identify/**")
+    polls = a_press_spans_a_swap(page, event, page.locator(IDENTIFY_BUTTON))
+    page.mouse.up()
+    wait_for_held(page, posts, "Identify POST")
+    log = board_log(page)
+    click = after(log, "click", after(log, "down"))
+    assert swaps_since(log, click) == [], log
+    posts[0].fulfill(status=500, body="refused")
+    expect(page.locator("#toasts [role=alert]")).to_contain_text("HTTP 500")
+    wait_for_a_swap_after(page, click)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    log = board_log(page)
+    assert [r["name"] for r in swaps_since(log, click)] == ["Lobby"], log
+    polls.end()
+
+
 def test_a_poll_with_no_change_during_a_press_swaps_nothing(login, event):
     """A poll that answers 204 while the pointer is down holds nothing, and
     the press's end swaps nothing (D102). No kiosk checks in, so nothing on
