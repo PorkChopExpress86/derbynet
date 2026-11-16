@@ -46,6 +46,7 @@ VERBS = frozenset('''
     echoed served defined parsed required mapped posted needed had tested
     set read put
 '''.split())
+# The look-behind starts no name inside a URL or a longer path.
 FILE = r"(?<![\w/.-])(?:[\w-]+/)*[\w.-]+\.(?:php|inc)\b"
 CLAIM = re.compile(
     r"`?(?P<file>" + FILE + r")`?"
@@ -53,14 +54,13 @@ CLAIM = re.compile(
     r"\s+(?:(?:also|still|only|never|always|then|first|\w+ly)\s+)?"
     r"(?P<verb>" + "|".join(sorted(VERBS)) + r")\b"
 )
-URL = re.compile(r'https?://\S+')
 SENTENCE_END = re.compile(r'(?<=[.!?])\s+')
 
 
 def claim(sentence):
     """The words of the sentence's first claim about what a PHP file does,
     or None."""
-    match = CLAIM.search(URL.sub('URL', sentence))
+    match = CLAIM.search(sentence)
     return match.group() if match else None
 
 

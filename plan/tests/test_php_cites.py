@@ -43,6 +43,10 @@ EXEMPT = {
 }
 
 
+# The verbs #346's Scope gives as examples.
+TICKET_VERBS = ('links', 'shows', 'stores', 'writes', 'answers', 'sets', 'refuses', 'calls')
+
+
 def claims(text):
     return [words for _, words, _ in php_cites.uncited(text)]
 
@@ -115,11 +119,16 @@ class Rule(unittest.TestCase):
         self.assertEqual(claims('`templates/banner.inc` links b.'),
                          ['`templates/banner.inc` links'])
 
+    def test_the_tickets_examples(self):
+        found = [claims(f'`a.php` {verb} b.') for verb in TICKET_VERBS]
+        self.assertEqual(found, [[f'`a.php` {verb}'] for verb in TICKET_VERBS])
+
     def test_each_verb(self):
-        for verb in sorted(php_cites.VERBS):
-            with self.subTest(verb=verb):
-                self.assertEqual(claims(f'`a.php` {verb} b.'), [f'`a.php` {verb}'])
+        found = [claims(f'`a.php` {verb} b.') for verb in sorted(php_cites.VERBS)]
+        self.assertEqual(found, [[f'`a.php` {verb}'] for verb in sorted(php_cites.VERBS)])
         self.assertEqual(claims('`a.php` frobs b.'), [])
+        # A verb is a whole word: "set" is no claim inside "setting".
+        self.assertEqual(claims('`a.php` setting b.'), [])
 
 
 class Decisions(unittest.TestCase):
