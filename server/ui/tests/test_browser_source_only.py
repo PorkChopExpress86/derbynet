@@ -112,9 +112,12 @@ def test_the_sweep_finds_317s_source_text_test(tmp_path):
 
 
 def test_every_browser_test_takes_a_fixture():
+    """A KNOWN entry whose test is gone or takes a fixture now is removed,
+    so the list only shrinks; the one sweep holds both."""
+    seen = fixtureless(BROWSER)
     found = [
         f"{name}:{line} {test}"
-        for name, test, line in fixtureless(BROWSER)
+        for name, test, line in seen
         if (name, test) not in KNOWN
     ]
     assert found == [], (
@@ -122,10 +125,4 @@ def test_every_browser_test_takes_a_fixture():
         "source: test the page's behaviour, or move it to a source check "
         f"listed in tools/source-checks.sh (plan/AGENT-BRIEF.md): {found}"
     )
-
-
-def test_each_known_test_is_still_there():
-    """A KNOWN entry whose test is gone or takes a fixture now is removed,
-    so the list only shrinks."""
-    left = {(name, test) for name, test, _ in fixtureless(BROWSER)}
-    assert sorted(KNOWN - left) == []
+    assert sorted(KNOWN - {(name, test) for name, test, _ in seen}) == []
