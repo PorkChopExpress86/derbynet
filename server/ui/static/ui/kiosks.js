@@ -96,8 +96,14 @@ function holdBoardUnderPress(board, bound) {
     apply();
   });
 
+  // htmx fires both on the swap's target (htmx 2.0.4 `handleAjaxResponse`,
+  // `oobSwap`), and no board control's reply targets anything inside the
+  // board, so the board hears only its own swaps: a poll's reply, and a
+  // change's reply out of band (views.changed). A poll's 204 and an error
+  // come with shouldSwap false; an out-of-band swap always comes with it
+  // true.
   board.addEventListener('htmx:beforeSwap', (e) => {
-    if (e.detail.target !== board || !e.detail.shouldSwap) return;
+    if (!e.detail.shouldSwap) return;
     if (!pressed) {
       held = null;
       return;
@@ -105,10 +111,6 @@ function holdBoardUnderPress(board, bound) {
     held = e.detail.serverResponse;
     e.detail.shouldSwap = false;
   });
-  // htmx fires this on the out-of-band target itself, with shouldSwap true
-  // (htmx 2.0.4 `oobSwap`), and a change's reply has one, the board
-  // (views.changed). A poll's or a sheet's reply bubbles its beforeSwap up
-  // from the control or the board instead, hence the target check above.
   board.addEventListener('htmx:oobBeforeSwap', (e) => {
     if (!pressed) {
       held = null;

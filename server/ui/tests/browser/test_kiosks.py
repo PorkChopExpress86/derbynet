@@ -1001,9 +1001,9 @@ def test_a_newer_board_during_a_taps_request_wins(login, event):
 def test_a_sheets_reply_during_a_press_is_not_held(login, event):
     """Page is tapped from the keyboard, and the sheet's GET is held at its
     route. The sheet is closed, the mouse goes down on Welcome, and the GET
-    then answers: its body goes to the sheet, not the board, so the hold
-    lets it through, and it opens the sheet again (`kioskSheet.show`). The
-    board does not swap."""
+    then answers: htmx fires its swap's events on the sheet's body, not the
+    board, so the hold never sees it, and the body opens the sheet again
+    (`kioskSheet.show`). The board does not swap."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     welcome = scene_button(page, scene(event, "Welcome"))
