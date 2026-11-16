@@ -7,7 +7,7 @@
 A race runs the server image with Caddy in front of it, which serves HTTPS
 for the phone cameras and the browser timer (D107). `docs/install-docker.md`
 walks through it step by step, and `server/docker/README.md` describes the
-image. This is the whole setup in one file: save it as `docker-compose.yml`
+image. This is the whole setup in one file: save it as `compose.yaml`
 in a folder of its own, write your settings into a file named `.env` beside
 it, and start it from that folder. On Linux:
 
@@ -23,8 +23,12 @@ Phones then open `https://<DERBYNET_ADDRESS>/`, after installing Caddy's
 certificate authority from `http://<DERBYNET_ADDRESS>/derbynet-ca.crt`
 (`docs/secure-contexts.md`). Kiosks and timers use `http://`, which is never
 redirected. Add `--profile postgres` to every `docker compose` command to keep
-the race in Postgres instead of SQLite. `server/docker/ci/checks.sh
-readme-compose` runs this file and these commands as written.
+the race in Postgres instead of SQLite. The file pulls the image's `latest`
+tag, which only a full release sets (D89); until the first one, add a line
+naming a test release to `.env`, such as
+`DERBYNET_IMAGE=ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc2`. `server/docker/ci/checks.sh
+readme-compose` runs this file and these commands, with the image under test
+in `DERBYNET_IMAGE` and the project named for the run.
 
 ```yaml
 name: derbynet
@@ -155,11 +159,11 @@ configs:
         sites="https://"
         tls_line="tls $$tls/cert.pem $$tls/key.pem"
       else
-        for half in cert.pem key.pem; do
-          if [ -e "$$tls/$$half" ]; then
-            say "tls/ holds $$half alone; using Caddy's own certificate authority"
-          fi
-        done
+        if [ -e "$$tls/cert.pem" ] && [ ! -e "$$tls/key.pem" ]; then
+          say "tls/ has no key.pem beside cert.pem; using Caddy's own certificate authority"
+        elif [ -e "$$tls/key.pem" ] && [ ! -e "$$tls/cert.pem" ]; then
+          say "tls/ has no cert.pem beside key.pem; using Caddy's own certificate authority"
+        fi
         sites="https://localhost, https://127.0.0.1"
         for address in $$addresses; do sites="$$sites, https://$$address"; done
         say "certificates from Caddy's own authority for $$sites"

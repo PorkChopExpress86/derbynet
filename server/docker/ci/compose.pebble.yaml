@@ -8,7 +8,9 @@ services:
     image: ghcr.io/letsencrypt/pebble:2.10.3@sha256:0c81f05db371f436c97fb894bd6d2ab8fc9c8e2ce40f8bef8a8e15941bcd75ef
     command: ["-config", "/pebble-config.json"]
     environment:
-      # Pebble otherwise waits up to 15 s before each validation.
+      # Pebble otherwise sleeps "a random number of seconds (from 0 to 15)
+      # between individual challenge validation attempts" (Pebble's
+      # README.md, "Testing at full speed").
       PEBBLE_VA_NOSLEEP: "1"
     configs:
       - source: pebble-config

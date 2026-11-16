@@ -91,7 +91,7 @@ def test_without_build_leaves_out_the_block_alone():
     ],
     ids=["header-only", "changed-line", "changed-first-line"],
 )
-def test_a_difference_past_the_header_fails(example, same):
+def test_only_a_difference_past_the_header_counts(example, same):
     assert (body(without_build(example)) == body(without_build(STAND_IN))) is same
 
 
@@ -106,3 +106,20 @@ def test_a_difference_past_the_header_fails(example, same):
 )
 def test_the_readme_holds_one_yaml_block(readme, count):
     assert len(YAML_FENCE.findall(readme)) == count
+
+
+@pytest.mark.parametrize(
+    "readme",
+    [
+        "text\n```yaml\na: 1\n```\n```yaml\nb: 2\n```\n",
+        "text\n```sh\na\n```\n",
+    ],
+    ids=["two", "none"],
+)
+def test_readme_example_refuses_other_than_one_block(readme):
+    with pytest.raises(AssertionError, match="yaml blocks, not one"):
+        readme_example(readme)
+
+
+def test_readme_example_gives_the_one_block():
+    assert readme_example("text\n```yaml\na: 1\n```\n") == "a: 1\n"

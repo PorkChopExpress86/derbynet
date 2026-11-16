@@ -146,7 +146,7 @@ Caddy picks the certificate for HTTPS in this order (D119):
 
 1. With a `DERBYNET_DOMAIN` line in `.env`, such as `DERBYNET_DOMAIN=derby.example.org`, a certificate from Let's Encrypt for that domain. The domain must reach this computer from the internet, on ports 80 and 443. Every phone trusts it with no step.
 2. With `cert.pem` and `key.pem` in the `tls` folder of the data volume, as an install from before Caddy made them, those two, as they are, even once expired. Phones that accepted that certificate before keep it.
-3. Otherwise a certificate from Caddy's own certificate authority, for `localhost`, `127.0.0.1` and each address in `DERBYNET_ADDRESS`. A phone that opens another name or address gets one too, with a warning it can accept. With only one of the two files in `tls`, Caddy uses its authority, and its log names the file that is there.
+3. Otherwise a certificate from Caddy's own certificate authority, for `localhost`, `127.0.0.1` and each address in `DERBYNET_ADDRESS`. A phone that opens another name or address gets one too, with a warning it can accept. With only one of the two files in `tls`, Caddy uses its authority, and its log names the file that is missing, as in "tls/ has no key.pem beside cert.pem".
 
 Caddy's certificate authority belongs to this install alone. Its root lasts years, and Caddy renews the certificates it signs by itself. Install the root once on each device, as [Secure contexts](secure-contexts.md) shows, and keep the `derbynet_caddy` volume: a new one makes a new authority, which every phone must install again.
 
@@ -303,7 +303,7 @@ A snapshot from Set-Up is not a full backup. It leaves out videos and some race 
 
 ## Upgrade
 
-With Compose: `docker compose pull`, then `docker compose up -d`. The new server updates the database when it starts. Take a backup first.
+With Compose: `docker compose pull`, then `docker compose up -d`. The new server updates the database when it starts. Take a backup first. An install from before Caddy (D107) first needs the new Compose file: see [HTTPS after an upgrade from an older image](#https-after-an-upgrade-from-an-older-image).
 
 With `docker run`, pull the new image, and start a new container on the same volume:
 
@@ -329,7 +329,12 @@ docker rm derbynet
 docker compose up -d
 ```
 
-A Compose install from before Caddy keeps its volume, and serves its old certificate the same way after `docker compose pull` and `docker compose up -d`.
+A Compose install from before Caddy has a `compose.yaml` with no Caddy in it, whose server publishes port 443 where the new image no longer listens. Save the new `compose.yaml` over the old one, add the `DERBYNET_ADDRESS` line to `.env` as in [Start DerbyNet](#start-derbynet), then pull and start it. The volume is kept, and Caddy serves its old certificate the same way:
+
+```sh
+docker compose pull
+docker compose up -d
+```
 
 To move from the old certificate to Caddy's certificate authority, delete the `tls` folder and restart Caddy. Each phone then installs the authority once, as [Secure contexts](secure-contexts.md) shows:
 

@@ -481,7 +481,9 @@ def test_guide_env_lines_run_write_the_host_users_ids(tmp_path):
     subprocess.run(["bash", "-euo", "pipefail", "-c", lines], cwd=work, check=True)
     address = subprocess.run(
         ["hostname", "-I"], capture_output=True, text=True, check=True
-    ).stdout.split()[0]
+    ).stdout.split()
+    # A host with no network address prints none, and cut gives an empty value.
+    address = address[0] if address else ""
     assert (work / ".env").read_text() == (
         f"DERBYNET_UID={os.getuid()}\nDERBYNET_GID={os.getgid()}\n"
         f"DERBYNET_ADDRESS={address}\nTZ=America/Chicago\n"

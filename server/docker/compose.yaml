@@ -140,11 +140,11 @@ configs:
         sites="https://"
         tls_line="tls $$tls/cert.pem $$tls/key.pem"
       else
-        for half in cert.pem key.pem; do
-          if [ -e "$$tls/$$half" ]; then
-            say "tls/ holds $$half alone; using Caddy's own certificate authority"
-          fi
-        done
+        if [ -e "$$tls/cert.pem" ] && [ ! -e "$$tls/key.pem" ]; then
+          say "tls/ has no key.pem beside cert.pem; using Caddy's own certificate authority"
+        elif [ -e "$$tls/key.pem" ] && [ ! -e "$$tls/cert.pem" ]; then
+          say "tls/ has no cert.pem beside key.pem; using Caddy's own certificate authority"
+        fi
         sites="https://localhost, https://127.0.0.1"
         for address in $$addresses; do sites="$$sites, https://$$address"; done
         say "certificates from Caddy's own authority for $$sites"
