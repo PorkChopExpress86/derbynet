@@ -259,3 +259,41 @@ def test_a_case_guard_is_a_condition(tmp_path):
         ("condition", "a and b", "False"),
     ]
     assert {m.line for m in found} == {2}
+
+
+def test_a_for_loop_lists_a_body_that_never_runs(tmp_path):
+    """#345's scanner walked a command's continued lines in a loop, and
+    `end += 1` made `break` survived review: no stand-in needed one pass
+    (#345 retro). A `while` gets that mutant as its condition made False;
+    a `for` loop gets its iterable made empty. A loop the diff leaves alone
+    lists nothing."""
+    text = (
+        "def ends(lines):\n"
+        "    for line in lines:\n"
+        "        pass\n"
+        "    async def a(xs):\n"
+        "        async for x in (\n"
+        "            xs\n"
+        "        ):\n"
+        "            pass\n"
+        "    for kept in lines:\n"
+        "        pass\n"
+    )
+    (tmp_path / "t.py").write_text(text)
+    lines = text.splitlines()
+    diff = "+++ b/t.py\n@@ -0,0 +1,8 @@\n" + "".join(f"+{x}\n" for x in lines[:8])
+    found = om.mutants(diff, tmp_path)
+    assert [(m.line, m.kind, m.old, m.new) for m in found] == [
+        (2, "loop", "lines", "()"),
+        (6, "loop", "xs", "()"),
+    ]
+    for m in found:
+        assert text[m.span[0] : m.span[1]] == m.old, m
+
+
+def test_a_loop_whose_header_is_unchanged_lists_nothing(tmp_path):
+    """Only the body changed: the loop is older than the diff."""
+    text = "for line in lines:\n    print(line)\n"
+    (tmp_path / "t.py").write_text(text)
+    diff = "+++ b/t.py\n@@ -2,0 +2,1 @@\n+    print(line)\n"
+    assert om.mutants(diff, tmp_path) == []

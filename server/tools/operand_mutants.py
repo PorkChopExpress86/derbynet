@@ -34,7 +34,9 @@ condition, and each
 operand of every `and` and `or` (a `return a and b` too), wherever it
 spans lines, when it touches an added line. Its `old` is then the text of
 its span, which can hold a newline, printed on one line; the line printed
-is the span's first.
+is the span's first. A loop whose header touches an added line gets a
+mutant whose body never runs: a `while` its condition made False, a `for`
+its iterable made `()` (#345's scanner loop survived `break` in review).
 The rest is read one line at a time, so a JavaScript call or condition that
 spans lines, a ternary, and a condition in a `while`, a `return` or an
 arrow function outside `.filter()` are left out, and so is every branch
@@ -265,9 +267,11 @@ def python_conditions(
     def touches(node: ast.expr) -> bool:
         return any(n in added for n in range(node.lineno, node.end_lineno + 1))
 
-    tests, ops = [], []
+    tests, ops, loops = [], [], []
     for node in ast.walk(tree):
-        if isinstance(node, (ast.If, ast.While, ast.IfExp)):
+        if isinstance(node, (ast.For, ast.AsyncFor)):
+            loops.append(node)
+        elif isinstance(node, (ast.If, ast.While, ast.IfExp)):
             tests.append(node.test)
         elif isinstance(node, ast.comprehension):
             tests += node.ifs
@@ -282,6 +286,10 @@ def python_conditions(
     for node in ops:
         if touches(node):
             out += [entry(node, "operand", "True"), entry(node, "operand", "False")]
+    # A loop's body that never runs (#345 retro); a `while` has it above.
+    for node in loops:
+        if touches(node.target) or touches(node.iter):
+            out.append(entry(node.iter, "loop", "()"))
     return sorted(out, key=lambda e: (e[4][0], e[1] != "condition", -e[4][1]))
 
 
