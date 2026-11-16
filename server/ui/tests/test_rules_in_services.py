@@ -248,10 +248,18 @@ def test_a_limit_from_the_view_passes(source):
 #
 # #356 widened it to every stored moment PHP holds as a `time()` value
 # (TIMES), to a local name bound to one (`seen = row.remote_start_seen_at`,
-# or a `values_list` of it), and to a queryset bound on one, such as
+# or a `values` or `values_list` of it), and to a queryset bound on one, such as
 # `last_contact__gt=now - LISTED_FOR`, which compares the fraction inside
 # the database. A bound that is `from_php_time(...)`, the first moment of a
 # PHP second, gives PHP's answer at every moment of the edge second.
+#
+# Shapes the scan reads past, which stay review's (#356's review; none is in
+# the tree at #356): a transform before the lookup
+# (`last_contact__second__lt`), a bound passed as `filter(**{...})`,
+# `.timestamp()` arithmetic, `F("malfunction_expires_at") - X`, an annotated
+# alias (`seen: datetime = ...`), a fraction inside `from_php_time(...)`,
+# and a local clock difference such as reschedule's
+# `(clock() - started).total_seconds()` (#360).
 CONTACT = "last_contact"
 TIMES = frozenset(
     {
@@ -310,13 +318,12 @@ def _aliases(tree: ast.AST, owner: dict[ast.AST, str]) -> dict[str, set[str]]:
     """Per function, the local names bound to a stored moment."""
     found: dict[str, set[str]] = {}
     for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-            and (_names_contact(node.value) or _reads_column(node.value))
+        if isinstance(node, ast.Assign) and (
+            _names_contact(node.value) or _reads_column(node.value)
         ):
-            found.setdefault(owner.get(node, "<module>"), set()).add(node.targets[0].id)
+            found.setdefault(owner.get(node, "<module>"), set()).update(
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            )
     return found
 
 
@@ -441,6 +448,20 @@ def request_remote_start(event, now):
         event=event, remote_start_seen_at__gte=now - REMOTE_START_TIMEOUT
     ).update(remote_start_requested=True)
 """
+RANGE_BOUND = """
+def recent(event, now):
+    return Kiosk.objects.filter(last_contact__range=(now - LISTED_FOR, now))
+"""
+VALUES_ALIAS = """
+def busy(event_id, now):
+    started = RaceState.objects.values("reschedule_started_at").get()["x"]
+    return started > now - GUARD_EXPIRY
+"""
+CHAINED_ALIAS = """
+def has_remote_start(row, now):
+    first = seen = row.remote_start_seen_at
+    return seen is not None and seen + REMOTE_START_TIMEOUT >= now
+"""
 RELATED_BOUND = """
 def stale(event, now):
     return Kiosk.objects.filter(event__kiosk__last_contact__lt=now)
@@ -465,6 +486,9 @@ def read(cls, row, now):
         (REMOTE_START_FILTER_356, 1),
         (MALFUNCTION_356, 1),
         (RELATED_BOUND, 1),
+        (RANGE_BOUND, 1),
+        (VALUES_ALIAS, 1),
+        (CHAINED_ALIAS, 1),
     ],
     ids=[
         "age-307",
@@ -476,6 +500,9 @@ def read(cls, row, now):
         "remote-start-filter-356",
         "malfunction-356",
         "related-bound",
+        "range-bound",
+        "values-alias",
+        "chained-alias",
     ],
 )
 def test_contact_arithmetic_is_found(source, count):
