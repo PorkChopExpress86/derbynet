@@ -14,9 +14,9 @@ PHP's dashboard loses a mouse press or a Space key when a kiosk's data
 changes under it, since it rebuilds every kiosk's controls with `.empty()`
 (kiosk-dashboard.js:99) when its hash of the kiosks changes
 (kiosk-dashboard.js:76-92). A held Enter is one tap (D126), and after each
-swap the focus goes back to the swapped-in button that stands for the
-focused one, where PHP leaves it on the page's body (D127,
-`keepFocusAcrossSwaps`).
+swap the focus goes back to the swapped-in copy of the focused board
+control, a button or a card's Preview link, where PHP leaves it on the
+page's body (D127, `keepFocusAcrossSwaps`).
 
 The page needs PRESENT_AWARDS, its page gate, but every change needs
 CONTROL_RACE, as `kiosk.assign`, `kiosk.reload` and `scene.apply` do: a role

@@ -1438,14 +1438,15 @@ def test_a_held_enter_is_one_tap(login, event, control):
     assert posts_since(log, first) == [POST_PATHS[control]] * 2, log
 
 
-@pytest.mark.parametrize("control", ["scene", "identify", "page"])
+@pytest.mark.parametrize("control", ["scene", "identify", "page", "preview"])
 def test_the_focus_comes_back_after_a_board_swap(login, event, control):
-    """D127: the focus is on a board button, Racing, the card's Identify or
-    its Page, with no key held, when a poll's reply (Lobby) swaps the board.
-    The focus comes back to the swapped-in button that stands for it: the
-    same name, value, data-action and card. Identify shares its name and
-    value with Reload, and Page has neither; a second kiosk, unnamed, whose
-    card comes first on the board, has the same buttons as the tv's."""
+    """D127: the focus is on a board control, Racing, the card's Identify,
+    its Page or its Preview link, with no key held, when a poll's reply
+    (Lobby) swaps the board. The focus comes back to the swapped-in copy of
+    it: the same name, value, data-action and card. Identify shares its name
+    and value with Reload, and Page and Preview have neither; a second
+    kiosk, unnamed, whose card comes first on the board, has the same
+    controls as the tv's."""
     kiosk(event, "hall")
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
@@ -1453,6 +1454,7 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
         "scene": scene_button(page, scene(event, "Racing")),
         "identify": page.locator(IDENTIFY_BUTTON),
         "page": page.locator(PAGE_BUTTON),
+        "preview": page.locator(PREVIEW_LINK),
     }[control]
     polls = hold_the_polls(page)
     Kiosk.objects.filter(address="tv").update(name="Lobby")
@@ -1467,23 +1469,21 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
     polls.end()
 
 
-@pytest.mark.parametrize("where", ["off the board", "blurred", "gone", "preview"])
+@pytest.mark.parametrize("where", ["off the board", "blurred", "gone"])
 def test_the_focus_stays_where_the_crew_put_it(login, event, where):
     """Near misses for D127: the focus is on the Scene editor link, off the
     board; or on Racing and then blurred to the page's body, as a tap on the
     page's background does; or on the card's Identify, and the kiosk drops
-    off the board; or on the card's Preview link, which is no button. A
-    poll's reply swaps the board, a second poll answers after it, and no
-    element takes the focus in all that time. The second poll may have gone
-    out before the first reply, with the old board's signature, and then it
-    swaps the board again."""
+    off the board. A poll's reply swaps the board, a second poll answers
+    after it, and no element takes the focus in all that time. The second
+    poll may have gone out before the first reply, with the old board's
+    signature, and then it swaps the board again."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     target = {
         "off the board": page.locator('[data-action="scene-editor"]'),
         "blurred": scene_button(page, scene(event, "Racing")),
         "gone": page.locator(IDENTIFY_BUTTON),
-        "preview": page.locator(PREVIEW_LINK),
     }[where]
     focused_after = {"off the board": target}.get(where, page.locator("body"))
     tv = Kiosk.objects.filter(address="tv")

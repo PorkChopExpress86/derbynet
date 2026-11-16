@@ -166,12 +166,14 @@ function ignoreEnterRepeats(board) {
   }, true);
 }
 
-// The board's controls that D127 gives the focus back to.
-const BOARD_FOCUS_CONTROLS = 'button';
+// The board's controls that D127 gives the focus back to: its buttons and
+// each card's Preview link.
+const BOARD_FOCUS_CONTROLS = 'button, a[href]';
 
 // D127 (#369): after each swap of the board, a poll's, a change's reply out
 // of band or a held board applied (D102, D125), the focus goes back to the
-// swapped-in control that stands for the one that had it. PHP leaves the
+// swapped-in copy of the board control that had it, a button or a card's
+// Preview link. PHP leaves the
 // focus on the page's body (the PR's probe). "The same control" is the same
 // name, value, data-action and kiosk card (D127): Reload and Identify share a
 // name and value, and Page, Name and Configure have neither. The focus is
