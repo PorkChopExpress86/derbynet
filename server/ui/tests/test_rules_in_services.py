@@ -257,9 +257,13 @@ def test_a_limit_from_the_view_passes(source):
 # the tree at #356): a transform before the lookup
 # (`last_contact__second__lt`), a bound passed as `filter(**{...})`,
 # `.timestamp()` arithmetic, `F("malfunction_expires_at") - X`, an annotated
-# alias (`seen: datetime = ...`), a fraction inside `from_php_time(...)`,
-# and a local clock difference such as reschedule's
-# `(clock() - started).total_seconds()` (#360).
+# alias (`seen: datetime = ...`) and a fraction inside `from_php_time(...)`.
+#
+# A difference of two local `clock()` reads names no stored moment, so the
+# scan can't see it, and it is review's job too: #356's review found
+# reschedule's overall time limit,
+# `(clock() - started).total_seconds() < OVERALL_TIME_LIMIT`, which #360
+# moved to `php_time` (`test_late_racers_are_fitted_in_for_60_whole_seconds`).
 CONTACT = "last_contact"
 TIMES = frozenset(
     {
@@ -286,14 +290,9 @@ PORT_ONLY = {
     ),
 }
 # Known differences from PHP, each waiting on its ticket. #341 settled
-# replay's two (polls.replay_state, replay.connected).
-OPEN_DIFFERENCES: dict[str, str] = {
-    "kiosks/messages.py::_purge": "#360",
-    "racing/services/playlist.py::apply_due_scene": "#360",
-    "racing/services/polls.py::poll_results": "#360",
-    "racing/services/reschedule.py::_take_guard": "#360",
-    "racing/services/reschedule.py::refuse_missing_round": "#360",
-}
+# replay's two (polls.replay_state, replay.connected), and #360 the message
+# purge, the playlist's scene, poll.results' window and the reschedule guard.
+OPEN_DIFFERENCES: dict[str, str] = {}
 
 
 def _names_contact(node: ast.expr, aliases=frozenset()) -> bool:
@@ -473,6 +472,46 @@ def read(cls, row, now):
         pass
 """
 
+# The lines #360 fixed, as origin/master had them (18d171c2).
+MESSAGE_PURGE_360 = """
+def _purge(event, now):
+    SignalMessage.objects.filter(event=event, expires_at__lt=now).delete()
+"""
+PLAYLIST_SCENE_360 = """
+def apply_due_scene(event, now):
+    due = RaceState.objects.filter(event=event, playlist_scene_at__lt=now)
+    with transaction.atomic():
+        if state.playlist_scene_at is None or not state.playlist_scene_at < now:
+            return False
+"""
+RESULTS_WINDOW_360 = """
+def poll_results(event, raw_round=None, details=False, now=None):
+    rows = (
+        HeatLane.objects.filter(event=event)
+        .filter(Q(round_id=round_id) | Q(completed__gt=results_cutoff(now)))
+        .order_by("id")
+    )
+"""
+GUARD_TAKE_360 = """
+def _take_guard(event_id, now, held=None):
+    free = (
+        Q(reschedule_started_at=held)
+        if held
+        else Q(reschedule_started_at__isnull=True)
+        | Q(reschedule_started_at__lte=now - GUARD_EXPIRY)
+    )
+"""
+GUARD_MISSING_ROUND_360 = """
+def refuse_missing_round(event_id, clock=timezone.now):
+    started = (
+        RaceState.objects.filter(event_id=event_id)
+        .values_list("reschedule_started_at", flat=True)
+        .get()
+    )
+    if started is not None and started > clock() - GUARD_EXPIRY:
+        raise RescheduleFailure(Failure.BUSY, _UNDERWAY)
+"""
+
 
 @pytest.mark.parametrize(
     "source, count",
@@ -485,6 +524,11 @@ def read(cls, row, now):
         (REMOTE_START_READ_356, 1),
         (REMOTE_START_FILTER_356, 1),
         (MALFUNCTION_356, 1),
+        (MESSAGE_PURGE_360, 1),
+        (PLAYLIST_SCENE_360, 2),
+        (RESULTS_WINDOW_360, 1),
+        (GUARD_TAKE_360, 1),
+        (GUARD_MISSING_ROUND_360, 1),
         (RELATED_BOUND, 1),
         (RANGE_BOUND, 1),
         (VALUES_ALIAS, 1),
@@ -499,6 +543,11 @@ def read(cls, row, now):
         "remote-start-read-356",
         "remote-start-filter-356",
         "malfunction-356",
+        "message-purge-360",
+        "playlist-scene-360",
+        "results-window-360",
+        "guard-take-360",
+        "guard-missing-round-360",
         "related-bound",
         "range-bound",
         "values-alias",

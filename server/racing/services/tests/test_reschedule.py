@@ -9,18 +9,19 @@ from django.utils import timezone
 
 from core.models import RaceSettings, RaceState
 from kiosks.models import Kiosk
+from legacy_api.tests.whole_seconds import near_misses
 from racing.engine.scheduling.adjuster import NodeBudget
 from racing.engine.scheduling.master import master_target
 from racing.engine.tests.golden import GOLDEN_DIR, read_transcript
 from racing.models import HAS_RESULT, HeatLane, RosterEntry, Round
 from racing.services.master import master_index, reassign_master_heats
 from racing.services.reschedule import (
-    GUARD_EXPIRY,
     Failure,
     RescheduleFailure,
     _adjust,
     _snapshot,
     _write,
+    refuse_missing_round,
     reschedule,
 )
 from racing.services.rounds import Adjustments, adjustments
@@ -427,17 +428,75 @@ def test_nothing_to_change_is_nochart_and_releases_the_guard():
     assert state_of(round).reschedule_started_at is None
 
 
-def test_a_recent_guard_is_busy_and_an_expired_one_is_not():
+def outcome_of(call) -> str:
+    try:
+        call()
+    except RescheduleFailure as failure:
+        return failure.code
+    return "success"
+
+
+@pytest.mark.parametrize(
+    ("taken", "read", "outcomes"),
+    near_misses(120, (Failure.BUSY, Failure.BUSY), (Failure.NOCHART, "success")),
+)
+def test_the_guard_expires_in_whole_seconds(taken, read, outcomes):
+    """#360: PHP refuses a reschedule while
+    `time() - $conflicting < 2 * OVERALL_TIME_LIMIT`, 120 s
+    (`action.schedule.reschedule.inc:769`), and writes the guard as `time()`
+    (`:773`), so a guard left at a whole second or a fraction past it holds
+    until the first moment of the 120th second after its own, and not 1
+    microsecond longer: for a `roundid` with no round
+    (`refuse_missing_round`) and for a round (`_take_guard`), which then
+    takes the guard and clears it."""
     round = q5_round()
-    now = timezone.now()
-    state = RaceState.objects.filter(event=round.event)
+    RaceState.objects.filter(event=round.event).update(reschedule_started_at=taken)
+    clock = lambda: read  # noqa: E731
 
-    state.update(reschedule_started_at=now - GUARD_EXPIRY + timedelta(seconds=1))
-    assert failure_of(lambda: reschedule(round, dry_run=True)).code == Failure.BUSY
+    found = (
+        outcome_of(lambda: refuse_missing_round(round.event_id, clock=clock)),
+        outcome_of(
+            lambda: reschedule(
+                round, dry_run=True, budget=NodeBudget(UNLIMITED), clock=clock
+            )
+        ),
+    )
 
-    state.update(reschedule_started_at=now - GUARD_EXPIRY)
-    reschedule(round, dry_run=True, budget=NodeBudget(UNLIMITED), clock=lambda: now)
-    assert state_of(round).reschedule_started_at is None
+    assert found == outcomes
+    held = None if outcomes[1] == "success" else taken
+    assert state_of(round).reschedule_started_at == held
+
+
+@pytest.mark.parametrize(
+    ("started", "read", "outcome"), near_misses(60, "fitted", Failure.NOCHART)
+)
+def test_late_racers_are_fitted_in_for_60_whole_seconds(started, read, outcome):
+    """#360: PHP fits each late racer in only while
+    `time() - $t1 < OVERALL_TIME_LIMIT`, 60 s
+    (`action.schedule.reschedule.inc:784`, `:800`), in whole seconds, so with
+    `$t1` at a whole second or a fraction past it a racer is fitted in until
+    the first moment of the 60th second after its own, and not 1 microsecond
+    longer. The clock reads `started` for the guard and for `$t1`, then
+    `read` for the check: 3 reads. A round with nothing else to change
+    answers `nochart` once its one late racer is skipped."""
+    round = new_round(range(101, 109))
+    late_racer(round, 120)
+    reads = []
+
+    def clock():
+        reads.append(started if len(reads) < 2 else read)
+        return reads[-1]
+
+    try:
+        done = reschedule(
+            round, dry_run=True, budget=NodeBudget(UNLIMITED), clock=clock
+        )
+    except RescheduleFailure as failure:
+        found = failure.code
+    else:
+        found = "fitted" if "120" in " ".join(cars_of(round, done.chart)) else "not"
+
+    assert (found, reads) == (outcome, [started, started, read])
 
 
 @pytest.mark.django_db(transaction=True, serialized_rollback=True)

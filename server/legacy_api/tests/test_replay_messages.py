@@ -12,6 +12,7 @@ from django.utils import timezone
 from accounts.permissions import Perm
 from kiosks.models import ReplayStatus, SignalMessage
 from legacy_api.tests.conftest import log_in, post
+from legacy_api.tests.whole_seconds import Clock, near_misses
 from racing.services import replay
 
 pytestmark = pytest.mark.django_db
@@ -68,6 +69,42 @@ def test_directed_messages_expire_after_15_seconds(coordinator):
 
     assert 14 < expiry["AA"] <= 16
     assert 0 < expiry[""] <= 2
+
+
+@pytest.mark.parametrize(("sent", "read", "count"), near_misses(2, 1, 0))
+def test_a_broadcast_expires_in_whole_seconds(
+    coordinator, monkeypatch, sent, read, count
+):
+    """#360: PHP stores a broadcast's expiry as `time() + 1`
+    (`messages.inc:58-62`) and deletes it once `expiration < time()`
+    (`messages.inc:95-98`), in whole seconds, so a broadcast sent at a whole
+    second or a fraction past it is read until the first moment of the 2nd
+    second after its own, and not 1 microsecond longer."""
+    clock = Clock(monkeypatch)
+    clock.now = sent
+    send(coordinator, type="broadcast")
+    clock.now = read
+
+    assert len(retrieve(coordinator, "AA")) == count
+
+
+@pytest.mark.parametrize(
+    ("sent", "read", "found"), near_misses(16, [{"recipient": "AA"}], [])
+)
+def test_a_directed_message_expires_in_whole_seconds(
+    coordinator, monkeypatch, sent, read, found
+):
+    """#360: PHP stores a directed message's expiry as `time() + 15`
+    (`messages.inc:58-62`) and deletes it once `expiration < time()`
+    (`messages.inc:95-98`), so one sent at a whole second or a fraction past
+    it reaches its recipient until the first moment of the 16th second after
+    its own, and not 1 microsecond longer."""
+    clock = Clock(monkeypatch)
+    clock.now = sent
+    send(coordinator, recipient="AA")
+    clock.now = read
+
+    assert retrieve(coordinator, "AA") == found
 
 
 def test_the_text_form_is_decoded_when_read(coordinator):

@@ -3,7 +3,8 @@ remote camera, ported from `website/inc/messages.inc`.
 
 A message with a recipient is deleted when that recipient reads it. A
 broadcast has no recipient, reaches everyone who polls, and expires after a
-second. A directed message nobody reads expires after 15 s.
+second. A directed message nobody reads expires after 15 s. Both count whole
+seconds, as PHP does (`_purge`).
 """
 
 import json
@@ -14,6 +15,7 @@ from django.db import transaction
 from django.db.models import JSONField, Value
 
 from kiosks.models import SignalMessage
+from racing.engine.phpcompat import from_php_time, php_time
 
 BROADCAST_LIFE = timedelta(seconds=1)
 DIRECTED_LIFE = timedelta(seconds=15)
@@ -45,8 +47,17 @@ def decoded(text: str):
 
 
 def _purge(event, now: datetime) -> None:
-    """`purge_stale_messages()`."""
-    SignalMessage.objects.filter(event=event, expires_at__lt=now).delete()
+    """`purge_stale_messages()`: PHP stores `time() + $timeout`
+    (`messages.inc:58-62`) and deletes at `expiration < time()`
+    (`messages.inc:95-98`), in whole seconds (#360). The port stores
+    `now + life` with its fraction, whose second is PHP's, so a message
+    goes once `php_time(now)` passes that second: the bound is the first
+    moment of `php_time(now)`. A broadcast sent 0.6 s past a whole second
+    lives until 2 s past that second, 1.4 s after it was sent
+    (`test_a_broadcast_expires_in_whole_seconds`)."""
+    SignalMessage.objects.filter(
+        event=event, expires_at__lt=from_php_time(php_time(now))
+    ).delete()
 
 
 def send(event, recipient: str, payload, now: datetime) -> None:
