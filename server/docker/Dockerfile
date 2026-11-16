@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
 #
-# The DerbyNet server image (#58): nginx on 80 and 443 in front of gunicorn,
-# with every install's data on the /var/lib/derbynet volume.  The build
-# context is the repository root:
+# The DerbyNet server image (#58): nginx on 80, plain HTTP, in front of
+# gunicorn, with every install's data on the /var/lib/derbynet volume.  HTTPS
+# comes from a proxy in front of it, such as compose.yaml's Caddy (D107).  The
+# build context is the repository root:
 #
 #   docker buildx build -f server/docker/Dockerfile -t derbynet_server .
 #
@@ -80,8 +81,8 @@ RUN python3 -I ui/css_build.py fetch \
  && /opt/derbynet/venv/bin/python manage.py collectstatic --noinput --verbosity 0
 
 FROM ${UBUNTU}
-# tzdata for ZoneInfo, openssl for the first start's certificate, curl for the
-# health check, tini to reap and to pass signals on.  No compiler.
+# tzdata for ZoneInfo, curl for the health check, tini to reap and to pass
+# signals on.  No compiler.  The image makes no certificate (D107).
 # derbynet runs gunicorn.  www-data, nginx's user, is in derbynet's group to
 # open gunicorn's socket, and stays in it when the entrypoint changes the
 # group's gid, since /etc/group lists it by name.  derbynet-ids holds the ids
@@ -90,7 +91,7 @@ FROM ${UBUNTU}
 # uid 1000, the first user on most Linux hosts, and a derbynet sharing it
 # would show as ubuntu in ps and ls.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 nginx openssl tzdata \
+ && apt-get install -y --no-install-recommends python3 nginx tzdata \
       tini curl ca-certificates \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled/* \
  && userdel -r ubuntu \
@@ -126,7 +127,7 @@ ENV PATH=/opt/derbynet/venv/bin:$PATH \
 
 WORKDIR /opt/derbynet/server
 VOLUME /var/lib/derbynet
-EXPOSE 80 443
+EXPOSE 80
 
 # A 301 to the home page is Django answering (D20); curl fails on a 5xx or
 # no answer.

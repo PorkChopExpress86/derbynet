@@ -7,9 +7,9 @@
 #   IMAGE=derbynet_server:dev server/docker/ci/checks.sh tls secret user ...
 #
 # Checks:
-#   tls        curl -k https://localhost/index.php answers; the certificate
-#              stays the same for a new container on the same volume and
-#              differs on a fresh volume; the image holds no key (#64 S35)
+#   tls        the image serves plain HTTP alone (D107): it exposes port 80
+#              only, nothing listens on 443, a new volume gets no tls/, and
+#              the image holds no key
 #   secret     secret_key: mode 0600, kept across containers, new per volume,
 #              and not written when DJANGO_SECRET_KEY is set
 #   user       ps -o user,comm: gunicorn runs as derbynet, not root
@@ -36,7 +36,9 @@
 #   uid-exec   with the .env lines docs/install-docker.md writes, docker
 #              compose exec -u derbynet runs manage.py check as the host user
 #   client-ip  Django sees the client's address, not the unix socket's, and
-#              not an X-Real-IP the client sent
+#              not an X-Real-IP the client sent; from DERBYNET_TRUSTED_PROXIES
+#              it sees the address X-Forwarded-For names and the port
+#              X-Real-Port names, and from anyone else neither (D118)
 #   forwarded-proto
 #              a client's X-Forwarded-Proto counts only from
 #              DERBYNET_TRUSTED_PROXIES
@@ -76,8 +78,30 @@
 #              images its scripts load, answer 200 with their type (#312)
 #   backup     server/docker/README.md's backup and restore, with compose:
 #              an event with a racer photo, a car photo and a video, backed
-#              up, restored into fresh volumes, and all there.  PROFILE=postgres
+#              up, restored into fresh volumes, and all there, with Caddy's
+#              certificate authority the same (D120).  PROFILE=postgres
 #              runs it under the postgres profile.
+#   caddy      compose.yaml on this computer's network address with
+#              DERBYNET_ADDRESS: the server publishes no port; HTTPS is
+#              trusted through Caddy's root, served at /derbynet-ca.crt, for
+#              the address with no name sent and for another name
+#              (on_demand); one on_demand warning; plain HTTP with no
+#              redirect; X-Forwarded-Proto and the client's address through
+#              Caddy, and a client's forged headers ignored; tls/ with
+#              one of cert.pem and key.pem alone logs one line naming the
+#              missing one and uses Caddy's authority; a
+#              malformed DERBYNET_ADDRESS stops Caddy (D116-D119)
+#   old-cert   a volume the v0.1.0-rc2 image made keeps its certificate
+#              under compose.yaml's Caddy, with and without a name sent, and
+#              its tls/ becomes the host user's; an expired pair put there
+#              is served as it is (D107, D119)
+#   readme-compose
+#              the top-level README's Compose example and commands, run as
+#              written, serve HTTPS trusted through Caddy's root (D107);
+#              docker compose is 2.23.1 or later
+#   acme       with DERBYNET_DOMAIN and DERBYNET_ACME_CA, Caddy gets a
+#              certificate for the domain from Pebble, over a pair in tls/
+#              (D119, D121)
 #
 # IMAGE names the image (default derbynet_server:dev).  DERBYNET_TEST_PREFIX
 # (default derbynet-checks) prefixes every container and volume, and each
@@ -128,94 +152,73 @@ wait_ready() {
 
 stop() { docker rm -f "$PREFIX-$1" >/dev/null; }
 
-served_fingerprint() {
-    docker exec "$PREFIX-$1" sh -c \
-        'openssl s_client -connect 127.0.0.1:443 </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256'
+# The image of the test release v0.1.0-rc2, the last published before D107,
+# whose entrypoint made tls/cert.pem and key.pem on a new volume and whose
+# nginx served them on 443.  Pinned by digest, so the old volume is one an
+# install of that release made, whatever the PR's base holds.
+OLD_TLS_IMAGE="${OLD_TLS_IMAGE:-ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc2@sha256:f94d9dd6260addcb46b496ff2528f939f8ffd57fcd0aaa81ea18038084b9bb8b}"
+
+# old_tls_volume <volume>: starts OLD_TLS_IMAGE on a fresh volume, prints the
+# SHA-256 fingerprint its nginx served on 443, and removes the container.
+# Fails unless that is the fingerprint of the volume's tls/cert.pem.
+old_tls_volume() {
+    local name="$PREFIX-oldtls" served file
+    docker run -d --name "$name" -v "$1:/var/lib/derbynet" "$OLD_TLS_IMAGE" >/dev/null
+    wait_ready "$name"
+    served="$(docker exec "$name" sh -c \
+        'timeout 30 openssl s_client -connect 127.0.0.1:443 </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256')"
+    file="$(docker exec "$name" openssl x509 -noout -fingerprint -sha256 -in /var/lib/derbynet/tls/cert.pem)"
+    echo "$OLD_TLS_IMAGE served: $served" >&2
+    echo "its tls/cert.pem:      $file" >&2
+    [ -n "$served" ] && [ "$served" = "$file" ] || fail "$OLD_TLS_IMAGE did not serve its tls/cert.pem"
+    docker rm -f "$name" >/dev/null
+    echo "$served"
 }
 
+# compose_version_at_least <major.minor.patch>: docker compose is that
+# version or later.  compose.yaml's Caddyfile is a `configs: content:`, which
+# Compose has taken since 2.23.1 ("Introduced in Docker Compose version
+# 2.23.1", https://docs.docker.com/reference/compose-file/configs/).
+compose_version_at_least() {
+    local have
+    have="$(docker compose version --short)"
+    have="${have#v}"
+    echo "docker compose $have" >&2
+    local lowest
+    lowest="$(sort -V <<<"$1"$'\n'"${have%%[+-]*}")"
+    [ "${lowest%%$'\n'*}" = "$1" ]
+}
+
+# The image serves plain HTTP alone (D107): nothing of TLS in it or on a new
+# volume, and no listener on 443.
 check_tls() {
     say "the image holds no TLS key or secret: /var/lib/derbynet in the image is"
-    local baked
+    local baked exposed code listening
     baked="$(docker run --rm --entrypoint ls "$IMAGE" -A /var/lib/derbynet)"
     echo "[${baked}]"
     [ -z "$baked" ] || fail "the image ships files in /var/lib/derbynet: $baked"
+    exposed="$(docker image inspect -f '{{range $p, $_ := .Config.ExposedPorts}}{{$p}} {{end}}' "$IMAGE")"
+    echo "EXPOSE: $exposed"
+    [ "$exposed" = "80/tcp " ] || fail "the image exposes $exposed, not 80/tcp alone"
 
     start tls1 "$PREFIX-tls-a"
-    say "curl -k https://localhost/index.php"
-    local code
-    code="$(docker exec "$PREFIX-tls1" curl -sk -o /dev/null -w '%{http_code} %{redirect_url}' https://localhost/index.php)"
-    echo "$code"
-    case "$code" in 200*|301*) ;; *) fail "https://localhost/index.php answered $code" ;; esac
-    code="$(docker exec "$PREFIX-tls1" curl -skL -o /dev/null -w '%{http_code}' https://localhost/index.php)"
-    echo "after redirects: $code"
-    [ "$code" = 200 ] || fail "https://localhost/index.php ends in $code"
     say "plain HTTP is served, with no redirect to HTTPS"
     code="$(docker exec "$PREFIX-tls1" curl -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://localhost/action.php?query=role.list')"
     echo "$code"
-    case "$code" in *https:*) fail "plain HTTP redirects to HTTPS: $code" ;; esac
-
-    say "openssl x509 -fingerprint, first container on volume A"
-    local first file second other
-    first="$(served_fingerprint tls1)"
-    file="$(docker exec "$PREFIX-tls1" openssl x509 -noout -fingerprint -sha256 -in /var/lib/derbynet/tls/cert.pem)"
-    echo "served:  $first"
-    echo "on disk: $file"
-    [ -n "$first" ] && [ "$first" = "$file" ] || fail "nginx serves another certificate than tls/cert.pem"
-    docker exec "$PREFIX-tls1" ls -l /var/lib/derbynet/tls
-
+    # With no event yet, Django answers 302 to setup.php over the same scheme.
+    case "$code" in *https:*) fail "plain HTTP redirects to HTTPS: $code" ;; [23]??*) ;; *) fail "plain HTTP answered $code" ;; esac
+    say "the listening sockets, from /proc/net/tcp and tcp6 (port 80 is 0050, 443 is 01BB)"
+    listening="$(docker exec "$PREFIX-tls1" sh -c 'cat /proc/net/tcp /proc/net/tcp6' \
+        | awk '$4 == "0A" {split($2, a, ":"); print a[2]}' | sort -u | xargs)"
+    echo "$listening"
+    [[ " $listening " == *" 0050 "* ]] || fail "nothing listens on port 80"
+    [[ " $listening " != *" 01BB "* ]] || fail "something listens on port 443"
+    say "a new volume gets no tls/"
+    docker exec "$PREFIX-tls1" ls -A /var/lib/derbynet
+    if docker exec "$PREFIX-tls1" test -e /var/lib/derbynet/tls; then
+        fail "the server made tls/ on a new volume"
+    fi
     stop tls1
-    start tls2 "$PREFIX-tls-a"
-    second="$(served_fingerprint tls2)"
-    say "after docker rm and a new container on volume A"
-    echo "served:  $second"
-    [ "$first" = "$second" ] || fail "the certificate changed with the container"
-
-    start tls3 "$PREFIX-tls-b"
-    other="$(served_fingerprint tls3)"
-    say "a fresh volume B"
-    echo "served:  $other"
-    [ "$other" != "$first" ] || fail "two fresh volumes got the same certificate"
-
-    say "the generated certificate lasts 825 days"
-    docker exec "$PREFIX-tls3" openssl x509 -noout -startdate -enddate -in /var/lib/derbynet/tls/cert.pem
-    docker exec "$PREFIX-tls3" sh -c 'openssl x509 -noout -checkend $((825 * 86400 - 3600)) -in /var/lib/derbynet/tls/cert.pem && ! openssl x509 -noout -checkend $((825 * 86400 + 3600)) -in /var/lib/derbynet/tls/cert.pem' \
-        || fail "the certificate does not last 825 days"
-    stop tls3
-
-    say "an expired certificate the container made is made again"
-    docker run --rm -v "$PREFIX-tls-b:/var/lib/derbynet" --entrypoint sh "$IMAGE" -c \
-        'cd /var/lib/derbynet/tls && openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
-             -nodes -subj /CN=DerbyNet -not_before 20200101000000Z -not_after 20200201000000Z \
-             -keyout key.pem -out cert.pem 2>/dev/null &&
-         openssl x509 -noout -fingerprint -sha256 -in cert.pem > .generated'
-    start tls5 "$PREFIX-tls-b"
-    docker logs "$PREFIX-tls5" 2>&1 | grep 'expired' || fail "no new certificate was made"
-    docker exec "$PREFIX-tls5" openssl x509 -noout -checkend 0 -in /var/lib/derbynet/tls/cert.pem \
-        || fail "the certificate is still expired"
-    stop tls5
-
-    say "an expired certificate the user put there is left alone"
-    docker run --rm -v "$PREFIX-tls-b:/var/lib/derbynet" --entrypoint sh "$IMAGE" -c \
-        'cd /var/lib/derbynet/tls && openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
-             -nodes -subj /CN=theirs -not_before 20200101000000Z -not_after 20200201000000Z \
-             -keyout key.pem -out cert.pem 2>/dev/null'
-    start tls6 "$PREFIX-tls-b"
-    docker exec "$PREFIX-tls6" openssl x509 -noout -subject -in /var/lib/derbynet/tls/cert.pem | grep theirs \
-        || fail "the user's certificate was replaced"
-    stop tls6
-
-    say "a cert.pem and key.pem the user put there are used as they are"
-    local mine
-    mine="$(docker run --rm -v "$PREFIX-tls-c:/var/lib/derbynet" --entrypoint sh "$IMAGE" -c \
-        'mkdir -p /var/lib/derbynet/tls && cd /var/lib/derbynet/tls &&
-         openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=user-supplied \
-             -keyout key.pem -out cert.pem 2>/dev/null &&
-         openssl x509 -noout -fingerprint -sha256 -in cert.pem')"
-    start tls4 "$PREFIX-tls-c"
-    echo "theirs:  $mine"
-    echo "served:  $(served_fingerprint tls4)"
-    [ "$(served_fingerprint tls4)" = "$mine" ] || fail "the user's certificate was not served"
-    stop tls4
 }
 
 check_secret() {
@@ -317,13 +320,11 @@ ids() {
 }
 
 # owned_by <container> <uid> <gid>: lists the data folder, and fails on a file
-# there with another owner, but tls/, which stays root's (#351 removes it).
+# there with another owner.
 owned_by() {
     docker exec "$PREFIX-$1" ls -lnA /var/lib/derbynet
-    docker exec "$PREFIX-$1" sh -c "! find /var/lib/derbynet -path /var/lib/derbynet/tls -prune -o \
+    docker exec "$PREFIX-$1" sh -c "! find /var/lib/derbynet \
         \( ! -uid $2 -o ! -gid $3 \) -print | grep ." || fail "files under /var/lib/derbynet belong to another uid or gid than $2:$3"
-    [ "$(docker exec "$PREFIX-$1" stat -c '%u:%g %a' /var/lib/derbynet/tls)" = "0:0 700" ] \
-        || fail "tls/ is not root's, mode 0700"
 }
 
 # An event with the roster, and racer 1's photo uploaded: prints the racer
@@ -383,12 +384,12 @@ check_bind_mount() {
     local url="http://$(docker port "$PREFIX-b3" 80/tcp)" head photo
     head="$(photo_racer "$url" "$RUNNER_TEMP_DIR/bind-work")"
     served "$url" "$head" "$RUNNER_TEMP_DIR/bind-work/cookies"
-    photo="$(sed -n 1p <<<"$(find "$dir" -path "$dir/tls" -prune -o -name '*.jpg' -type f -print | sort)")"
+    photo="$(sed -n 1p <<<"$(find "$dir" -name '*.jpg' -type f -print | sort)")"
     [ -n "$photo" ] || fail "no photo on the bind mount"
     say "ls -ln, on the host, of the photo the server wrote; id -u and id -g are $(id -u) $(id -g)"
     (cd "$dir" && ls -ln "${photo#"$dir"/}")
     [ "$(stat -c '%u %g' "$photo")" = "$(id -u) $(id -g)" ] || fail "the photo is not the host user's"
-    if find "$dir" -path "$dir/tls" -prune -o \( ! -uid "$(id -u)" -o ! -gid "$(id -g)" \) -print | grep .; then
+    if find "$dir" \( ! -uid "$(id -u)" -o ! -gid "$(id -g)" \) -print | grep .; then
         fail "files on the bind mount are not the host user's"
     fi
     stop b3
@@ -560,30 +561,48 @@ check_uid_exec() {
     [ "$status" = 0 ] || fail "manage.py check failed as derbynet"
     [[ "$out" == "$(id -u)"$'\n'"$(id -g)"$'\n'"System check identified no issues"* ]] \
         || fail "manage.py check did not run as the host user, $(id -u):$(id -g)"
-    "${compose[@]}" exec -T server sh -c "! find /var/lib/derbynet -path /var/lib/derbynet/tls -prune -o \
+    "${compose[@]}" exec -T server sh -c "! find /var/lib/derbynet \
         \( ! -uid $(id -u) -o ! -gid $(id -g) \) -print | grep ." || fail "files on the volume are not the host user's"
     "${compose[@]}" down --volumes
 }
 
+# kiosk_address <url> <client address> [curl options]: kiosk.php with no
+# address answers 302 to ?address=<client address>+<port>, from REMOTE_ADDR
+# and REMOTE_PORT, as PHP's kiosk.php:8-10 does (ui/kiosk_pages/views.py);
+# with no port it would stand in 100 to 200.  Fails unless the address is the
+# client's and the port a real one; prints the port.
+kiosk_address() {
+    local url="$1" client="$2" target
+    shift 2
+    target="$(curl -s -m 30 -o /dev/null -w '%{redirect_url}' "$@" "$url/kiosk.php")"
+    echo "$target" >&2
+    [[ "$target" =~ address=${client//./\\.}%2B([0-9]+)$ ]] \
+        || fail "the kiosk's address is not the client's ($client)"
+    (( BASH_REMATCH[1] > 200 )) || fail "the kiosk's port is the stand-in ${BASH_REMATCH[1]}"
+    echo "${BASH_REMATCH[1]}"
+}
+
 check_client_ip() {
     start ip1 "$PREFIX-ip" -p 127.0.0.1::80
-    local url="http://$(docker port "$PREFIX-ip1" 80/tcp)" gateway target
-    # kiosk.php with no address answers 302 to ?address=<client address>+<port>,
-    # from REMOTE_ADDR and REMOTE_PORT, as PHP's kiosk.php:8-10 does
-    # (ui/kiosk_pages/views.py); with no port it would stand in 100 to 200.
-    target="$(curl -s -o /dev/null -w '%{redirect_url}' "$url/kiosk.php")"
+    local url="http://$(docker port "$PREFIX-ip1" 80/tcp)" gateway port
     gateway="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$PREFIX-ip1")"
     say "kiosk.php from the host, whose address in the container's network is $gateway"
-    echo "$target"
-    [[ "$target" =~ address=${gateway//./\\.}%2B([0-9]+)$ ]] \
-        || fail "the kiosk's address is not the client's ($gateway)"
-    (( BASH_REMATCH[1] > 200 )) || fail "the kiosk's port is the stand-in ${BASH_REMATCH[1]}"
+    kiosk_address "$url" "$gateway" >/dev/null
     say "the same with a forged X-Real-IP: 10.9.8.7"
-    target="$(curl -s -o /dev/null -H 'X-Real-IP: 10.9.8.7' -H 'X-Real-Port: 4242' \
-        -w '%{redirect_url}' "$url/kiosk.php")"
-    echo "$target"
-    [[ "$target" =~ address=${gateway//./\\.}%2B([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" != 4242 ] \
-        || fail "a client's X-Real-IP or X-Real-Port reached Django"
+    port="$(kiosk_address "$url" "$gateway" -H 'X-Real-IP: 10.9.8.7' -H 'X-Real-Port: 4242')"
+    [ "$port" != 4242 ] || fail "a client's X-Real-Port reached Django"
+    say "and with a forged X-Forwarded-For: 10.9.8.7"
+    kiosk_address "$url" "$gateway" -H 'X-Forwarded-For: 10.9.8.7' >/dev/null
+    stop ip1
+    say "from DERBYNET_TRUSTED_PROXIES=$gateway: the address X-Forwarded-For names, and X-Real-Port (D118)"
+    start ip2 "$PREFIX-ip" -p 127.0.0.1::80 -e DERBYNET_TRUSTED_PROXIES="$gateway"
+    url="http://$(docker port "$PREFIX-ip2" 80/tcp)"
+    port="$(kiosk_address "$url" 10.9.8.7 -H 'X-Forwarded-For: 10.9.8.7' -H 'X-Real-Port: 4242')"
+    [ "$port" = 4242 ] || fail "the trusted proxy's X-Real-Port did not reach Django"
+    say "the last address in X-Forwarded-For that is no trusted proxy's: of 10.9.8.6, 10.9.8.7, $gateway it is 10.9.8.7"
+    kiosk_address "$url" 10.9.8.7 -H "X-Forwarded-For: 10.9.8.6, 10.9.8.7, $gateway" >/dev/null
+    say "and with no X-Forwarded-For, the connection's address"
+    kiosk_address "$url" "$gateway" >/dev/null
 }
 
 # action.php refuses a POST whose Origin is not this server's own
@@ -594,7 +613,7 @@ check_client_ip() {
 origin_post() { # origin_post <url> [curl options]: the refusal code, or "passed"
     local url="$1" body
     shift
-    body="$(curl -s "$@" -H "Origin: https://${url#http://}" -d 'action=role.login&name=' \
+    body="$(curl -s -m 30 "$@" -H "Origin: https://${url#http://}" -d 'action=role.login&name=' \
         "$url/action.php")"
     if echo "$body" | grep -q notauthorized; then echo notauthorized; else echo passed; fi
 }
@@ -618,6 +637,277 @@ check_forwarded_proto() {
     code="$(origin_post "$url")"
     echo "$code"
     [ "$code" = notauthorized ] || fail "Django took plain HTTP for HTTPS"
+}
+
+# lan_address: this computer's first address on its network, as the guide's
+# Compose steps write it into .env (D116).
+lan_address() { hostname -I | awk '{print $1}'; }
+
+# served_cert <host:port> [openssl s_client options]: the SHA-256 fingerprint
+# and the names of the certificate served there.
+served_cert() {
+    local at="$1"
+    shift
+    timeout 30 openssl s_client -connect "$at" "$@" </dev/null 2>/dev/null \
+        | openssl x509 -noout -fingerprint -sha256 -ext subjectAltName
+}
+
+# caddy_port <port> <compose...>: host:port where the Caddy of that compose
+# command publishes <port>, or a failure naming it, as when Caddy stopped.
+caddy_port() {
+    local port="$1" at
+    shift
+    at="$("$@" port caddy "$port" 2>/dev/null)" || true
+    [ -n "$at" ] || fail "Caddy publishes no port $port: it is not running ($("$@" ps -a --format '{{.Service}} {{.State}}' caddy 2>&1))"
+    echo "$at"
+}
+
+# compose.yaml's Caddy in front of the server (D107, D116-D118), on this
+# computer's network address as a phone reaches it.
+check_caddy() {
+    local project="$PREFIX-caddy" work="$RUNNER_TEMP_DIR/caddy" lan http https code ports port out status
+    local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml")
+    lan="$(lan_address)"
+    mkdir -p "$work"
+    export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT="$lan:0" DERBYNET_HTTPS_PORT="$lan:0" DERBYNET_ADDRESS="$lan"
+    say "compose.yaml with DERBYNET_ADDRESS=$lan"
+    "${compose[@]}" up -d --wait
+    http="$lan:$(caddy_port 80 "${compose[@]}" | sed 's/.*://')"
+    https="$lan:$(caddy_port 443 "${compose[@]}" | sed 's/.*://')"
+
+    say "the server publishes no port; Caddy publishes 80 and 443 (D117)"
+    ports="$(docker inspect -f '{{json .NetworkSettings.Ports}}' "$project-server-1")"
+    echo "server: $ports"
+    [[ "$ports" != *HostPort* ]] || fail "the server publishes a port"
+
+    say "Caddy's root, from http://$http/derbynet-ca.crt and over https"
+    # 200 and no redirect: plain HTTP is never sent to HTTPS (D117).
+    code="$(curl -sS -m 30 -o "$work/root.crt" -w '%{http_code} %{redirect_url}' "http://$http/derbynet-ca.crt")"
+    [ "$code" = "200 " ] || fail "http://$http/derbynet-ca.crt answered $code, not the root"
+    curl -fsSk -m 30 -o "$work/root-https.crt" "https://$https/derbynet-ca.crt" \
+        || fail "https://$https/derbynet-ca.crt serves no root"
+    openssl x509 -noout -subject -in "$work/root.crt"
+    cmp "$work/root.crt" "$work/root-https.crt" || fail "http and https serve different roots"
+
+    say "https://$https/ trusted through that root alone, with no name sent, as for an IP address (D116)"
+    out="$(served_cert "$https" -noservername)"
+    echo "$out"
+    [[ "$out" == *"IP Address:$lan"* ]] || fail "the certificate does not name $lan"
+    code="$(curl -sS -m 30 --cacert "$work/root.crt" -o /dev/null -w '%{http_code}' "https://$https/index.php")"
+    echo "curl --cacert root.crt https://$https/index.php: $code"
+    [[ "$code" == [23]?? ]] || fail "https://$https/ answered $code"
+    say "another name gets a certificate from that root when first asked for (on_demand)"
+    port="${https##*:}"
+    code="$(curl -sS -m 30 --cacert "$work/root.crt" --resolve "derby.lan:$port:$lan" -o /dev/null \
+        -w '%{http_code}' "https://derby.lan:$port/index.php")"
+    echo "https://derby.lan:$port/index.php: $code"
+    [[ "$code" == [23]?? ]] || fail "derby.lan answered $code"
+    say "Caddy's log warns once about on_demand with no protections"
+    out="$("${compose[@]}" logs caddy 2>&1)"
+    echo "$out" | grep 'derbynet-caddy'
+    [ "$(grep -c 'on-demand TLS is enabled, but no protections are in place' <<<"$out")" = 1 ] \
+        || fail "not one on_demand warning"
+
+    say "plain HTTP is served, with no redirect to HTTPS"
+    code="$(curl -s -m 30 -o /dev/null -w '%{http_code} %{redirect_url}' "http://$http/action.php?query=role.list")"
+    echo "$code"
+    case "$code" in *https:*) fail "plain HTTP redirects to HTTPS: $code" ;; [23]??*) ;; *) fail "plain HTTP answered $code" ;; esac
+
+    say "a post with an https Origin passes over https, and over http with a forged X-Forwarded-Proto it does not"
+    code="$(curl -s -m 30 --cacert "$work/root.crt" -H "Origin: https://$https" -d 'action=role.login&name=' \
+        "https://$https/action.php")"
+    if grep -q notauthorized <<<"$code"; then fail "Django took HTTPS through Caddy for HTTP"; fi
+    echo "https: passed"
+    code="$(origin_post "http://$http" -H 'X-Forwarded-Proto: https')"
+    echo "http, forged: $code"
+    [ "$code" = notauthorized ] || fail "Django took a client's X-Forwarded-Proto through Caddy"
+
+    say "kiosk.php through Caddy sees the client's address, $lan, over http and https (D118)"
+    kiosk_address "http://$http" "$lan" >/dev/null
+    kiosk_address "https://$https" "$lan" --cacert "$work/root.crt" >/dev/null
+    say "and not the X-Forwarded-For, X-Real-IP or X-Real-Port a client sends"
+    port="$(kiosk_address "http://$http" "$lan" -H 'X-Forwarded-For: 10.9.8.7' -H 'X-Real-IP: 10.9.8.6' \
+        -H 'X-Real-Port: 4242')"
+    [ "$port" != 4242 ] || fail "a client's X-Real-Port reached Django"
+    "${compose[@]}" down --volumes
+
+    local half missing
+    for half in cert.pem key.pem; do
+        missing=key.pem
+        [ "$half" = cert.pem ] || missing=cert.pem
+        say "tls/ holding $half alone: Caddy's own authority, and one line naming the missing $missing (D119)"
+        "${compose[@]}" create
+        docker run --rm -v "${project}_data:/d" --entrypoint sh "$IMAGE" -c \
+            "mkdir -p /d/tls && echo half > /d/tls/$half"
+        "${compose[@]}" up -d --wait
+        https="$lan:$(caddy_port 443 "${compose[@]}" | sed 's/.*://')"
+        http="$lan:$(caddy_port 80 "${compose[@]}" | sed 's/.*://')"
+        out="$("${compose[@]}" logs caddy 2>&1)"
+        echo "$out" | grep 'derbynet-caddy'
+        grep -q "tls/ has no $missing beside $half; using Caddy's own certificate authority" <<<"$out" \
+            || fail "no line names the missing $missing"
+        curl -fsS -m 30 -o "$work/root2.crt" "http://$http/derbynet-ca.crt" \
+            || fail "http://$http/derbynet-ca.crt serves no root"
+        curl -fsS -m 30 --cacert "$work/root2.crt" -o /dev/null "https://$https/index.php" \
+            || fail "Caddy's own certificate was not served"
+        "${compose[@]}" down --volumes
+    done
+
+    say "a DERBYNET_ADDRESS that is no address stops Caddy with a message"
+    status=0
+    # Bounded: a Caddy that takes the value runs on, and would hold the check.
+    out="$(DERBYNET_ADDRESS='192.168.1.20;x' timeout 60 "${compose[@]}" run --rm --no-deps -T caddy 2>&1)" || status=$?
+    echo "$out" | tail -1
+    echo "exit status $status"
+    # 124 is timeout's: Caddy ran on past the message.
+    [ "$status" != 0 ] && [ "$status" != 124 ] || fail "Caddy did not stop at the malformed address"
+    [[ "$out" == *"DERBYNET_DOMAIN and DERBYNET_ADDRESS hold names and addresses, not '192.168.1.20;x'"* ]] \
+        || fail "no message names the value"
+    "${compose[@]}" down --volumes
+    unset DERBYNET_ADDRESS
+}
+
+# put_pair <volume> <dir>: copies <dir>/cert.pem and key.pem into the
+# volume's tls/, as a user puts their own there.
+put_pair() {
+    docker run --rm -v "$1:/d" -v "$2:/pair:ro" --entrypoint sh "$IMAGE" -c \
+        'mkdir -p /d/tls && cp /pair/cert.pem /pair/key.pem /d/tls/'
+}
+
+# expired_pair <dir>: an expired self-signed pair in <dir>.  It is made in the
+# image under test, whose OpenSSL takes -not_before and -not_after (3.4 and
+# later); the runner's Ubuntu 24.04 has 3.0, which refuses them (#376's first
+# CI run).  The files go to the host user, who reads them back.
+expired_pair() {
+    mkdir -p "$1"
+    docker run --rm -v "$1:/pair" --entrypoint sh "$IMAGE" -c \
+        "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj /CN=expired \
+             -not_before 20200101000000Z -not_after 20200201000000Z \
+             -keyout /pair/key.pem -out /pair/cert.pem \
+         && chmod 644 /pair/key.pem && chown $(id -u):$(id -g) /pair/key.pem /pair/cert.pem" \
+        || fail "no expired pair was made"
+}
+
+# A volume the last image before D107 made keeps its certificate under
+# compose.yaml's Caddy, so no phone trusts again (D107, D119).
+check_old_cert() {
+    local project="$PREFIX-oldcert" before after named https
+    local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml")
+    export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
+    "${compose[@]}" create
+    say "a volume $OLD_TLS_IMAGE made"
+    before="$(old_tls_volume "${project}_data")"
+    say "the same volume under compose.yaml, with DERBYNET_UID=$(id -u) DERBYNET_GID=$(id -g)"
+    DERBYNET_UID="$(id -u)" DERBYNET_GID="$(id -g)" "${compose[@]}" up -d --wait
+    https="$(caddy_port 443 "${compose[@]}")"
+    "${compose[@]}" logs caddy 2>&1 | grep 'derbynet-caddy'
+    after="$(served_cert "$https" | sed -n 1p)"
+    named="$(served_cert "$https" -servername derby.lan | sed -n 1p)"
+    echo "before:               $before"
+    echo "after, no name:       $after"
+    echo "after, for derby.lan: $named"
+    [ "$before" = "$after" ] && [ "$before" = "$named" ] || fail "Caddy serves another certificate"
+    say "tls/ is the host user's, and key.pem readable by its owner alone (D119)"
+    "${compose[@]}" exec -T server stat -c '%u:%g %a %n' /var/lib/derbynet/tls/cert.pem /var/lib/derbynet/tls/key.pem \
+        | tee "$RUNNER_TEMP_DIR/oldcert-stat.txt"
+    grep -qx "$(id -u):$(id -g) 600 /var/lib/derbynet/tls/key.pem" "$RUNNER_TEMP_DIR/oldcert-stat.txt" \
+        || fail "key.pem is not the host user's, mode 0600"
+    grep -q "^$(id -u):$(id -g) [0-7]* /var/lib/derbynet/tls/cert.pem$" "$RUNNER_TEMP_DIR/oldcert-stat.txt" \
+        || fail "cert.pem is not the host user's"
+    "${compose[@]}" down
+
+    say "an expired pair in tls/ is served as it is (D119)"
+    expired_pair "$RUNNER_TEMP_DIR/expired"
+    before="$(openssl x509 -noout -fingerprint -sha256 -in "$RUNNER_TEMP_DIR/expired/cert.pem")"
+    put_pair "${project}_data" "$RUNNER_TEMP_DIR/expired"
+    "${compose[@]}" up -d --wait
+    https="$(caddy_port 443 "${compose[@]}")"
+    after="$(served_cert "$https" | sed -n 1p)"
+    echo "expired: $before"
+    echo "served:  $after"
+    [ "$before" = "$after" ] || fail "Caddy does not serve the expired pair"
+    "${compose[@]}" down --volumes
+}
+
+# readme_block <lang> <word> <file>: the body of the first ```<lang> block of
+# the file that holds <word>.
+readme_block() {
+    awk -v lang="$1" -v word="$2" '
+        $0 == "```" lang {on=1; block=""; next}
+        /^```$/ {if (!done && index(block, word)) {printf "%s", block; done=1}; on=0; block=""; next}
+        on {block = block $0 "\n"}' "$3"
+}
+
+# The top-level README's Compose example and its commands, run as written
+# (D107): the file, saved as compose.yaml, and the commands that write
+# .env and start it.  Three things come from the run, not the README: the
+# project name gets this run's prefix, the image is the one under test, and
+# README_HTTP_PORT and README_HTTPS_PORT, when the caller sets them, become
+# DERBYNET_HTTP_PORT and DERBYNET_HTTPS_PORT, to move the ports off 80 and
+# 443 on a computer where those are taken.  CI sets neither.
+check_readme_compose() {
+    local work="$RUNNER_TEMP_DIR/readme" project="$PREFIX-readme" lines lan http https code
+    compose_version_at_least 2.23.1 \
+        || fail "docker compose is older than 2.23.1, which compose.yaml's configs: content needs"
+    unset DERBYNET_HTTP_PORT DERBYNET_HTTPS_PORT DERBYNET_ADDRESS
+    [ -z "${README_HTTP_PORT:-}" ] || export DERBYNET_HTTP_PORT="$README_HTTP_PORT"
+    [ -z "${README_HTTPS_PORT:-}" ] || export DERBYNET_HTTPS_PORT="$README_HTTPS_PORT"
+    mkdir -p "$work"
+    readme_block yaml services: "$ROOT/README.md" > "$work/compose.yaml"
+    [ -s "$work/compose.yaml" ] || fail "README.md holds no Compose example"
+    lines="$(readme_block sh 'docker compose up' "$ROOT/README.md")"
+    [ -n "$lines" ] || fail "README.md has no commands that start the example"
+    say "the README's commands, in the folder holding its compose.yaml"
+    echo "$lines"
+    (cd "$work" && COMPOSE_PROJECT_NAME="$project" DERBYNET_IMAGE="$IMAGE" bash -euo pipefail -c "$lines")
+    cat "$work/.env"
+    local compose=(docker compose -p "$project" -f "$work/compose.yaml")
+    export DERBYNET_IMAGE="$IMAGE"
+    "${compose[@]}" up -d --wait
+    lan="$(sed -n 's/^DERBYNET_ADDRESS=//p' "$work/.env")"
+    [ "$lan" = "$(lan_address)" ] || fail ".env's DERBYNET_ADDRESS is not $(lan_address)"
+    http="$lan:$(caddy_port 80 "${compose[@]}" | sed 's/.*://')"
+    https="$lan:$(caddy_port 443 "${compose[@]}" | sed 's/.*://')"
+    say "HTTPS at https://$https/, trusted through Caddy's root from http://$http/derbynet-ca.crt"
+    curl -fsS -m 30 -o "$work/root.crt" "http://$http/derbynet-ca.crt" \
+        || fail "http://$http/derbynet-ca.crt serves no root"
+    code="$(curl -sS -m 30 --cacert "$work/root.crt" -o /dev/null -w '%{http_code}' "https://$https/index.php")"
+    echo "$code"
+    [[ "$code" == [23]?? ]] || fail "https://$https/ answered $code"
+    say "the server runs as the host user, in the .env's time zone"
+    "${compose[@]}" exec -T server sh -c "! find /var/lib/derbynet \\( ! -uid $(id -u) -o ! -gid $(id -g) \\) -print | grep ." \
+        || fail "files on the volume are not the host user's"
+    [ "$("${compose[@]}" exec -T server printenv TZ)" = America/Chicago ] || fail "TZ is not .env's"
+    "${compose[@]}" down --volumes
+}
+
+# DERBYNET_DOMAIN gets a certificate from an ACME server (D119, D121):
+# Pebble, through server/docker/ci/compose.pebble.yaml, stands in for
+# Let's Encrypt.
+check_acme() {
+    local project="$PREFIX-acme" https out
+    local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml"
+                   -f "$ROOT/server/docker/ci/compose.pebble.yaml")
+    export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
+    say "DERBYNET_DOMAIN=derby.test, DERBYNET_ACME_CA=https://pebble:14000/dir, over a pair in tls/ (D119)"
+    "${compose[@]}" create
+    expired_pair "$RUNNER_TEMP_DIR/acme-pair"
+    put_pair "${project}_data" "$RUNNER_TEMP_DIR/acme-pair"
+    "${compose[@]}" up -d --wait
+    for _ in $(seq 60); do
+        out="$("${compose[@]}" logs caddy 2>&1)"
+        grep -q '"certificate obtained successfully","identifier":"derby.test"' <<<"$out" && break
+        sleep 1
+    done
+    grep -E 'derbynet-caddy|certificate obtained' <<<"$out" || true
+    https="$(caddy_port 443 "${compose[@]}")"
+    out="$(timeout 30 openssl s_client -connect "$https" -servername derby.test </dev/null 2>/dev/null \
+        | openssl x509 -noout -issuer -ext subjectAltName)"
+    echo "$out"
+    # OpenSSL 3.0, the runner's, prints "issuer=CN = Pebble ..."; 3.5 drops the spaces.
+    [[ "$out" == issuer=*"Pebble Intermediate CA"* && "$out" == *"DNS:derby.test"* ]] \
+        || fail "Caddy serves no certificate from Pebble for derby.test"
+    "${compose[@]}" down --volumes
 }
 
 # The bare `wait` this guards against spun on about half the stops (2 of 4
@@ -734,7 +1024,7 @@ check_exec_database() {
     say "compose --profile postgres with POSTGRES_PASSWORD='$password'"
     POSTGRES_PASSWORD="$password" "${compose[@]}" up -d --wait
     local out status got
-    new_event "http://$("${compose[@]}" port server 80)"
+    new_event "http://$(caddy_port 80 "${compose[@]}")"
 
     say "database.md's import, run with docker compose exec"
     "${compose[@]}" cp "$work/pack42" server:/tmp/pack42
@@ -802,7 +1092,7 @@ print(connection.vendor, connection.settings_dict["NAME"])')"
     say "compose with no profile: an exec'd manage.py reaches the server's SQLite"
     compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml")
     "${compose[@]}" up -d --wait
-    new_event "http://$("${compose[@]}" port server 80)"
+    new_event "http://$(caddy_port 80 "${compose[@]}")"
     got="$(exec_database "${compose[@]}")"
     echo "exec'd manage.py's database: $got"
     [ "$got" = "sqlite /var/lib/derbynet/derbynet.sqlite3 -" ] || fail "an exec'd manage.py does not reach SQLite"
@@ -965,7 +1255,7 @@ check_backup() {
     export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
     suite_copy "$work"
     "${compose[@]}" up -d --wait
-    local url="http://$("${compose[@]}" port server 80)"
+    local url="http://$(caddy_port 80 "${compose[@]}")"
     new_event "$url"
     (cd "$work" && bash testing/reset-database.sh "$url" && bash testing/import-roster.sh "$url") \
         >"$work/populate.log" 2>&1 || { tail "$work/populate.log"; fail "no event"; }
@@ -986,14 +1276,16 @@ check_backup() {
     echo "$before"
 
     say "backup: stop the server, copy the volumes, start it again"
-    local data postgres
+    local data caddy postgres
     data="$("${compose[@]}" volumes -q | grep '_data$')"
+    caddy="$("${compose[@]}" volumes -q | grep '_caddy$')"
     postgres="$("${compose[@]}" volumes -q | grep '_postgres$' || true)"
     "${compose[@]}" stop
     (
         cd "$work"
         umask 077
         docker run --rm -v "$data:/data:ro" --entrypoint tar "$IMAGE" -C /data -czf - . > derbynet-data.tgz
+        docker run --rm -v "$caddy:/data:ro" --entrypoint tar "$IMAGE" -C /data -czf - . > derbynet-caddy.tgz
         if [ "$profile" = postgres ]; then
             docker run --rm -v "$postgres:/data:ro" --entrypoint tar "$IMAGE" \
                 -C /data -czf - . > derbynet-postgres.tgz
@@ -1009,12 +1301,13 @@ check_backup() {
     "${compose[@]}" down --volumes
     "${compose[@]}" create
     docker run --rm -i -v "$data:/data" --entrypoint tar "$IMAGE" -C /data -xzf - < "$work/derbynet-data.tgz"
+    docker run --rm -i -v "$caddy:/data" --entrypoint tar "$IMAGE" -C /data -xzf - < "$work/derbynet-caddy.tgz"
     if [ "$profile" = postgres ]; then
         docker run --rm -i -v "$postgres:/data" --entrypoint tar "$IMAGE" \
             -C /data -xzf - < "$work/derbynet-postgres.tgz"
     fi
     "${compose[@]}" up -d --wait
-    url="http://$("${compose[@]}" port server 80)"
+    url="http://$(caddy_port 80 "${compose[@]}")"
     rm -f "$jar"
     login "$url" "$jar" RaceCoordinator
     after="$(backup_state "$url" "$jar" "$racer")"
@@ -1036,6 +1329,13 @@ backup_state() { # backup_state <url> <jar> <racerid>
     echo "racer photo $(curl -s -b "$2" "$1/$head" | sha256sum | cut -c1-16)"
     echo "car photo $(curl -s -b "$2" "$1/$car" | sha256sum | cut -c1-16)"
     echo "video $("${compose[@]}" exec -T server sh -c 'find /var/lib/derbynet -name Heat-1.mkv -exec sha256sum {} +' | cut -c1-16)"
+    # Caddy's certificate authority (D120): a restore that made a new one
+    # would have every phone install it again.
+    local root
+    root="$(curl -fsS -m 30 "$1/derbynet-ca.crt" | openssl x509 -noout -fingerprint -sha256)" \
+        || fail "$1/derbynet-ca.crt serves no root"
+    [ -n "$root" ] || fail "$1/derbynet-ca.crt serves no root"
+    echo "Caddy's root $root"
 }
 
 # fetch <container> <path>: the status, the content type and the body, from
@@ -1187,7 +1487,8 @@ RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
 [ $# -gt 0 ] || set -- tls secret user upload bind-mount uid-env uid-root uid-takeover \
     uid-exec client-ip forwarded-proto stop \
-    reload timeout engine postgres-password exec-database root bad-env allowed-hosts docs timer
+    reload timeout engine postgres-password exec-database root bad-env allowed-hosts docs timer \
+    caddy old-cert readme-compose acme
 for check in "$@"; do
     case "$check" in
         tls) check_tls ;;
@@ -1212,6 +1513,10 @@ for check in "$@"; do
         allowed-hosts) check_allowed_hosts ;;
         upgrade) check_upgrade ;;
         backup) check_backup ;;
+        caddy) check_caddy ;;
+        old-cert) check_old_cert ;;
+        readme-compose) check_readme_compose ;;
+        acme) check_acme ;;
         docs) check_docs ;;
         timer) check_timer ;;
         *) fail "no check named $check" ;;
