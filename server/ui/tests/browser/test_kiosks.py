@@ -1446,7 +1446,10 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
     it: the same name, value, data-action and card. Identify shares its name
     and value with Reload, and Page and Preview have neither; a second
     kiosk, unnamed, whose card comes first on the board, has the same
-    controls as the tv's."""
+    controls as the tv's. Shift+Tab then moves the focus to the control
+    before it, and the next swap (Hall) gives the focus back to that one:
+    each control that takes the focus, a restored one too, is the one the
+    next swap gives it back to."""
     kiosk(event, "hall")
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
@@ -1466,6 +1469,20 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
     assert not old.evaluate("e => e.isConnected")
     expect(page.locator("[data-kiosk]").first).to_have_attribute("data-kiosk", "hall")
     expect(target).to_be_focused()
+    page.keyboard.press("Shift+Tab")
+    page.wait_for_function("document.activeElement !== document.body")
+    before = page.evaluate_handle("document.activeElement")
+    markup = before.evaluate("e => e.outerHTML")
+    Kiosk.objects.filter(address="tv").update(name="Hall")
+    polls.wait_for(2)
+    polls.answer(1)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
+    assert not before.evaluate("e => e.isConnected")
+    page.wait_for_function(
+        "m => document.activeElement.isConnected"
+        " && document.activeElement.outerHTML === m",
+        arg=markup,
+    )
     polls.end()
 
 
