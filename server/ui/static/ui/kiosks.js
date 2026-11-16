@@ -105,8 +105,11 @@ function holdBoardUnderPress(board, bound) {
     held = e.detail.serverResponse;
     e.detail.shouldSwap = false;
   });
+  // htmx fires this on the out-of-band target itself, with shouldSwap true
+  // (htmx 2.0.4 `oobSwap`), and a change's reply has one, the board
+  // (views.changed). A poll's or a sheet's reply bubbles its beforeSwap up
+  // from the control or the board instead, hence the target check above.
   board.addEventListener('htmx:oobBeforeSwap', (e) => {
-    if (e.detail.target !== board || !e.detail.shouldSwap) return;
     if (!pressed) {
       held = null;
       return;

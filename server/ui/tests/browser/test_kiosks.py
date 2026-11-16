@@ -998,6 +998,33 @@ def test_a_newer_board_during_a_taps_request_wins(login, event):
     polls.end()
 
 
+def test_a_sheets_reply_during_a_press_is_not_held(login, event):
+    """Page is tapped from the keyboard, and the sheet's GET is held at its
+    route. The sheet is closed, the mouse goes down on Welcome, and the GET
+    then answers: its body goes to the sheet, not the board, so the hold
+    lets it through, and it opens the sheet again (`kioskSheet.show`). The
+    board does not swap."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    welcome = scene_button(page, scene(event, "Welcome"))
+    gets = held_at_route(page, "**/kiosks/page/**")
+    polls = hold_the_polls(page)
+    page.locator(PAGE_BUTTON).focus()
+    page.keyboard.press("Enter")
+    wait_for_held(page, gets, "Page GET")
+    page.keyboard.press("Escape")
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    press(page, welcome)
+    gets[0].continue_()
+    expect(sheet(page, "kiosks").locator("form")).to_be_visible()
+    log = board_log(page)
+    assert swaps_since(log, after(log, "down")) == [], log
+    page.mouse.up()
+    page.keyboard.press("Escape")
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    polls.end()
+
+
 # The scene POST that a second tap's `hx-sync="#kiosk-board:replace"`
 # aborts, allowed in that test alone.
 ABORTED_SCENE = r"request failed: \S*/kiosks/scene/\S* net::ERR_ABORTED$"
