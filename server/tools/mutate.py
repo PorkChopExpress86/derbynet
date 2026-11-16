@@ -255,19 +255,22 @@ def _unparsed(path: Path, saved: bytes, mutated: bytes) -> str | None:
 
 
 def _test_lines(path: Path) -> set[int]:
-    """The lines of each function named `test*` in a test file, at any
-    depth; every line when the file does not parse."""
+    """The lines of each test function in a test file, as pytest finds
+    them: a top-level function named `test*`, or such a method of a
+    top-level class. A helper nested in a function is no test, whatever its
+    name. Every line when the file does not parse."""
     text = path.read_bytes().decode()
     try:
         tree = ast.parse(text)
     except SyntaxError:
         return set(range(1, text.count("\n") + 2))
     lines = set()
-    for f in ast.walk(tree):
-        if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name.startswith(
-            "test"
-        ):
-            lines |= set(range(f.lineno, f.end_lineno + 1))
+    for node in tree.body:
+        for f in node.body if isinstance(node, ast.ClassDef) else [node]:
+            if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
+                f.name.startswith("test")
+            ):
+                lines |= set(range(f.lineno, f.end_lineno + 1))
     return lines
 
 

@@ -443,30 +443,40 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
 GUARD_TESTS = """
 
 def ends(lines, end):
-    while lines[end].endswith("\\\\"):
-        end = lines.index(lines[end + 1], end + 1)
-    return end
+    def test_from(end):
+        while lines[end].endswith("\\\\"):
+            end = lines.index(lines[end + 1], end + 1)
+        return end
+
+    return test_from(end)
 
 
 def test_ends():
     if ends(["b"], 0) == 0:
         assert ends(["a \\\\", "b"], 0) == 1
+
+
+class TestEnds:
+    def test_in_a_class(self):
+        if ends(["b"], 0) == 0:
+            assert ends(["a \\\\", "b"], 0) == 1
 """
 
 
 def test_listed_mutates_a_guard_in_a_test_file_named_by_file(project):
     """#345's scanner loop survived review's `break` mutant, and --listed
     would have skipped it, since every test file was skipped (#345 retro).
-    Named by --file, a test file's helpers are mutated, and its test
-    functions' own conditions still are not."""
+    Named by --file, a test file's helpers are mutated, a function nested
+    in one too, whatever its name, and the conditions of its test functions
+    and test methods still are not."""
     commit(project, MODULE, GUARD_TESTS)
     run = listed(project, "test_mod.py::test_ends", tool=("--file", "test_mod.py"))
     rows = run.stdout.splitlines()
     assert rows[1:3] == [
-        'KILLED    test_mod.py:38  condition  lines[end].endswith("\\\\")  ->  True',
-        'KILLED    test_mod.py:38  condition  lines[end].endswith("\\\\")  ->  False',
+        'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  True',
+        'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  False',
     ], run.stdout
-    assert "SKIPPED   test_mod.py: 2 listed, in a test function" in rows, run.stdout
+    assert "SKIPPED   test_mod.py: 4 listed, in a test function" in rows, run.stdout
     assert run.returncode == 0, run.stdout + run.stderr
     assert (project / "test_mod.py").read_text() == TESTS + GUARD_TESTS
 
@@ -475,7 +485,7 @@ def test_listed_skips_a_test_file_it_is_not_named(project):
     commit(project, MODULE + PICK, PICK_TESTS + GUARD_TESTS)
     run = listed(project, "test_mod.py::test_pick")
     assert (
-        "SKIPPED   test_mod.py: 4 listed, in a test file"
+        "SKIPPED   test_mod.py: 6 listed, in a test file"
         " (name it with --file to mutate its helpers)" in run.stdout
     ), run.stdout
     assert "test_mod.py:" not in run.stdout.replace("SKIPPED   test_mod.py:", "")

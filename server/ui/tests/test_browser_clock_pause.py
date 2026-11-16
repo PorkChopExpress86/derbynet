@@ -33,6 +33,13 @@ def clock_call(node: ast.AST, name: str) -> ast.Call | None:
     return None
 
 
+def time_of(call: ast.Call) -> str | None:
+    """The time a clock call names, by its `time` keyword or its first
+    argument, as an AST dump; None when it names none."""
+    times = [k.value for k in call.keywords if k.arg == "time"] + call.args[:1]
+    return ast.dump(times[0]) if times else None
+
+
 def pauses_at_the_install(source: str) -> list[tuple[str, int]]:
     """`(function, line)` of each `clock.pause_at(T)` in a function that
     also calls `clock.install(time=T)` with the same expression."""
@@ -43,14 +50,13 @@ def pauses_at_the_install(source: str) -> list[tuple[str, int]]:
         installs, pauses = set(), []
         for node in ast.walk(function):
             if call := clock_call(node, "install"):
-                times = [k.value for k in call.keywords if k.arg == "time"]
-                installs |= {ast.dump(t) for t in times + call.args[:1]}
-            elif (call := clock_call(node, "pause_at")) and call.args:
+                installs.add(time_of(call))
+            elif call := clock_call(node, "pause_at"):
                 pauses.append(call)
         found += [
             (function.name, call.lineno)
             for call in pauses
-            if ast.dump(call.args[0]) in installs
+            if time_of(call) is not None and time_of(call) in installs
         ]
     return sorted(set(found), key=lambda f: f[1])
 
@@ -79,8 +85,32 @@ def another_object(page, other):
 
 def installed_elsewhere(page):
     page.clock.pause_at(PAUSED_AT)
+
+
+def by_keyword(page):
+    page.clock.install(time=PAUSED_AT)
+    page.clock.pause_at(time=PAUSED_AT)
+
+
+def not_the_clock(page):
+    page.clock.install(time=PAUSED_AT)
+    page.mouse.pause_at(PAUSED_AT)
+
+
+def another_keyword(page):
+    page.clock.install(tz=PAUSED_AT)
+    page.clock.pause_at(PAUSED_AT)
+
+
+def no_times(page):
+    page.clock.install()
+    page.clock.pause_at()
 """
-    assert pauses_at_the_install(source) == [("open_paused", 4), ("by_position", 9)]
+    assert pauses_at_the_install(source) == [
+        ("open_paused", 4),
+        ("by_position", 9),
+        ("by_keyword", 28),
+    ]
 
 
 # `open_paused` as #317's first head (1b7c62ef) had it.
