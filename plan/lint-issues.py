@@ -9,6 +9,9 @@ Reads every issue labeled django-migration, then checks each body for:
   "caused by") while Current PHP behavior or Scope marks an observation or
   a cause unverified ("not yet verified", "observed once", "not reproduced",
   "suspect")
+- in an open kind:ticket or kind:spec, a sentence that says what a PHP file
+  does ("`fake-timer.php` links ...") with no `file:line` cite in it
+  (plan/php_cites.py, #346)
 - cited repository paths that exist in this checkout, and for a --file
   draft on origin/master too (LINT_BASE)
 - #N references that name an existing issue
@@ -29,6 +32,9 @@ labels `--labels` names (default kind:ticket). Exits 1 on any finding.
 import json, os, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# -I leaves this script's folder off sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import php_cites  # noqa: E402
 GH = os.environ.get('GH', 'gh')
 args = sys.argv[1:]
 repo = 'PorkChopExpress86/derbynet'
@@ -225,6 +231,16 @@ def unverified_cause(n, text):
             'leaves the mechanism to the first box')
 
 
+def uncited_php(n, text):
+    """Each sentence of an open ticket or spec that says what a PHP file does
+    with no `file:line` cite (#346): D98 first said PHP's `fake-timer.php`
+    links the dashboard and the timer test, where `fake-timer.php:99-100`
+    links `coordinator.php` and `timer.php`."""
+    for ln, words, _ in php_cites.uncited(text):
+        findings.append(f'#{n}:{ln}: "{words}" says what a PHP file does with no '
+                        'file:line cite in its sentence; cite the line (`fake-timer.php:99-100`)')
+
+
 def kind(issue):
     names = {l['name'] for l in issue['labels']}
     return 'spec' if 'kind:spec' in names else 'ticket' if 'kind:ticket' in names else 'epic'
@@ -240,6 +256,7 @@ for n, issue in sorted(issues.items()):
         want = SPEC if k == 'spec' else TICKET
         if heads != want:
             findings.append(f'#{n}: sections {heads} != {want}')
+        uncited_php(n, text)
         if k == 'ticket':
             unverified_cause(n, text)
     in_fence = False

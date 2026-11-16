@@ -51,6 +51,10 @@ ISSUES = [{'number': 2, 'state': 'OPEN', 'body': 'Roadmap.', 'labels': []},
            'labels': [{'name': 'kind:ticket'}]},
           # Closed, so its history is left alone.
           {'number': 282, 'state': 'CLOSED', 'body': ticket(GOAL_282, PHP_282),
+           'labels': [{'name': 'kind:ticket'}]},
+          # Closed, so its uncited PHP claim is left alone (#346).
+          {'number': 325, 'state': 'CLOSED',
+           'body': ticket('`fake-timer.php` links them for every role.'),
            'labels': [{'name': 'kind:ticket'}]}]
 
 FAKE_GH = '''import json, sys
@@ -161,6 +165,12 @@ class CitedPathsInABranch(unittest.TestCase):
         self.repo = self.tmp / 'repo'
         (self.repo / 'plan').mkdir(parents=True)
         shutil.copy(LINT, self.repo / 'plan' / 'lint-issues.py')
+        # The lint imports plan/php_cites.py, which reads the cite pattern
+        # from server/tests/test_php_cite_lines.py (#346).
+        shutil.copy(PLAN / 'php_cites.py', self.repo / 'plan' / 'php_cites.py')
+        (self.repo / 'server' / 'tests').mkdir(parents=True)
+        shutil.copy(PLAN.parent / 'server' / 'tests' / 'test_php_cite_lines.py',
+                    self.repo / 'server' / 'tests' / 'test_php_cite_lines.py')
         (self.repo / '.github' / 'workflows').mkdir(parents=True)
         (self.repo / '.github' / 'workflows' / 'electron.yml').write_text('on: push\n')
         env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -308,6 +318,45 @@ class UnverifiedCause(Lint):
             with self.subTest(words=words):
                 done = self.lint(ticket(GOAL_282, f'- The fault is {words}.'))
                 self.assertIn(f'says "{words}"', done.stdout)
+
+
+# D98's first wording (d9438939, #325) and its current one (64cdde2e).
+D98_FIRST = ("The fake timer page shows its intro links to the race dashboard and the timer "
+             "test only to a role that can open them, and the words as plain text otherwise, "
+             "where PHP's `fake-timer.php` links them for every role.")
+D98_NOW = ("PHP's `fake-timer.php:99-100` links its own targets, `coordinator.php` "
+           '("Racing") and `timer.php` ("Simulated Racing"), for every role.')
+
+
+class PhpCites(Lint):
+    """A sentence in an open ticket or spec that says what a PHP file does
+    cites the line (#346, plan/php_cites.py)."""
+
+    def test_a_claim_without_a_cite_is_a_finding(self):
+        done = self.lint(ticket(php=D98_FIRST))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('#0:7: "`fake-timer.php` links" says what a PHP file does with no '
+                      'file:line cite in its sentence; cite the line (`fake-timer.php:99-100`)',
+                      done.stdout)
+        self.assertIn('1 findings', done.stdout)
+
+    def test_a_claim_with_a_cite_passes(self):
+        done = self.lint(ticket(php=D98_NOW))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_plain_mention_passes(self):
+        done = self.lint(ticket(php='The port replaces `fake-timer.php` and `timer.php`.'))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_spec_is_checked(self):
+        done = self.lint(ticket(php=D98_FIRST), '--labels', 'kind:spec')
+        self.assertIn('"`fake-timer.php` links" says what a PHP file does', done.stdout)
+
+    def test_an_epic_and_a_closed_ticket_are_not_checked(self):
+        """The fake gh's closed #325 makes the claim in its Goal."""
+        done = self.lint(ticket(php=D98_FIRST), '--labels', 'kind:epic')
+        self.assertNotIn('says what a PHP file does', done.stdout)
+        self.assertIn('0 findings', done.stdout, done.stdout)
 
 
 if __name__ == '__main__':
