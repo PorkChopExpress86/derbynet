@@ -22,17 +22,22 @@
 # next harness run no longer had, and default.passwords (#250 retro).
 #
 # The images must exist already: the harness and the server image that
-# run-suite.sh builds, named after DERBYNET_TEST_PREFIX (default
-# "derbynet-test").  Build them once from a regular clone with
+# run-suite.sh builds, named after DERBYNET_PHP_IMAGES, or else
+# DERBYNET_TEST_PREFIX (default "derbynet-test").  Build them once from a
+# regular clone with
 #   testing/docker/run-suite.sh harness assets server
-# This script reads them only; it removes its own container and volume.
+# This script reads them only; it removes its own container and volume, both
+# named after DERBYNET_TEST_PREFIX.  DERBYNET_PHP_IMAGES lets a run with a
+# prefix of its own use images built under another: #356 and #360 each
+# tagged and untagged derbynet-pollres-* as t356-* and t360-* (#360 retro).
 
 set -e -E -o pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PREFIX="${DERBYNET_TEST_PREFIX:-derbynet-test}"
-HARNESS_IMAGE="$PREFIX-harness"
-SERVER_IMAGE="$PREFIX-server"
+IMAGES="${DERBYNET_PHP_IMAGES:-$PREFIX}"
+HARNESS_IMAGE="$IMAGES-harness"
+SERVER_IMAGE="$IMAGES-server"
 SERVER="$PREFIX-scratch-$$"
 VOLUME="$PREFIX-scratch-$$"
 
@@ -51,7 +56,7 @@ done
 for image in "$HARNESS_IMAGE" "$SERVER_IMAGE"; do
   docker image inspect "$image" >/dev/null 2>&1 || {
     echo "No image $image.  From a regular clone, run:" >&2
-    echo "  DERBYNET_TEST_PREFIX=$PREFIX testing/docker/run-suite.sh harness assets server" >&2
+    echo "  DERBYNET_TEST_PREFIX=$IMAGES testing/docker/run-suite.sh harness assets server" >&2
     exit 1
   }
 done
