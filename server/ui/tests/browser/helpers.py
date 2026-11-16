@@ -67,9 +67,7 @@ def pause_clock_at(page, at):
     """Pause Playwright's clock at `at` (a datetime), on a page that has not
     navigated (about:blank), so the page loads on the paused clock. It
     refuses any other page (`test_pause_clock_at_refuses_a_page_that_has_loaded`
-    in `test_kiosk_scale_mph.py`): a timer a loaded page queued between the
-    install and the pause fired once in the pause's jump forward (the #359
-    review's probe).
+    in `test_kiosk_scale_mph.py`).
 
     The clock runs from its install, so `pause_at(at)` after an install at
     `at` itself failed "Cannot fast-forward to the past" once the two calls
