@@ -9,8 +9,10 @@ would render is what the page holds; it waits while a sheet is open
 `RaceState` lock, and answers with the board again, out of band. While a
 pointer is down on a board control, the board's swap waits until the press
 ends, so a press that spans a refresh still taps its control (D102,
-`holdBoardUnderPress` in `kiosks.js`); PHP's dashboard rebuilds its kiosk
-controls under a mouse press and loses it (#344's probe).
+`holdBoardUnderPress` in `kiosks.js`). PHP's dashboard loses a mouse press
+when a kiosk's data changes under it, since it rebuilds every kiosk's
+controls with `.empty()` (kiosk-dashboard.js:99) when its hash of the kiosks
+changes (kiosk-dashboard.js:76-92).
 
 The page needs PRESENT_AWARDS, its page gate, but every change needs
 CONTROL_RACE, as `kiosk.assign`, `kiosk.reload` and `scene.apply` do: a role

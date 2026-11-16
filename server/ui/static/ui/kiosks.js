@@ -26,84 +26,85 @@ window.sceneSheet = kioskSheetOf('scenes', 'sceneSheet');
 // board's swap waits, whether a poll's reply or a change's reply out of band
 // brings it, so the press still taps the control it went down on. A swap
 // under the press replaced the control, and the browser sent no click for a
-// mouse press (#316's swap_mid_click probe; PHP's kiosk-dashboard.php loses
-// one the same way, #344's probe). Only the newest board held is kept.
+// mouse press (#316's swap_mid_click probe). PHP's dashboard loses such a
+// press when a kiosk's data changes under it: it rebuilds every kiosk's
+// controls with `.empty()` (kiosk-dashboard.js:99) when its hash of the
+// kiosks changes (kiosk-dashboard.js:76-92). Only the newest board held is
+// kept, and a board swapped in unheld drops it.
 //
 // The press ends on the control's click, once its own handlers and default
-// action have run; on a pointercancel; when the pointer moves off the
-// control while still down; or at the bound, from the pointerdown, for a
-// pointer that never comes up. A touch sends its click after its pointerup
-// and pointerout, so a pointerout after the pointerup is no cancel.
+// action have run; when the pointer leaves the control while still down,
+// which Chromium also does after a pointercancel; or at the bound, from the
+// latest pointerdown, for a pointer that never comes up. A second pointer
+// down keeps the hold for the newer press. A touch sends its click after its
+// pointerup and pointerout, so a pointerout after the pointerup is no cancel.
 //
-// The held board is applied when the press ends, or, when the click sent a
-// request, once that request ends: a swap before then detached the control,
-// and htmx then looks for its reply's out-of-band board in the detached
-// control's tree and drops it (htmx 2.0.4 `swap()`, `contextElement`). A
-// reply that brought the board brought a newer one, and the held one is
-// dropped.
+// The held board is applied once the press has ended and no request a board
+// control sent is out: a swap before then detached that control, and htmx
+// then looks for its reply's out-of-band board in the detached control's tree
+// and drops it (htmx 2.0.4 `swap()`, `contextElement`); a request sent while
+// the board swapped went out with no CSRF header (#344 review). A request
+// that ends aborted was replaced by a board control's request, which brings a
+// newer board, so the held one is dropped; and so it is while a sheet is
+// open (`derbynet.pollable`), where a swap would detach the sheet's opener,
+// and the next poll after the sheet closes brings the board.
 function holdBoardUnderPress(board, bound) {
   let pressed = null;
-  let up = false;
+  let down = false;
   let timer = null;
-  let sent = null;
   let held = null;
-  let swaps = 0;
+  const out = new Set();
 
   function apply() {
-    if (held === null) return;
+    if (held === null || pressed || out.size) return;
     const html = held;
     held = null;
+    if (!derbynet.pollable(board)) return;
     htmx.swap(board, html, { swapStyle: 'innerHTML' },
               { eventInfo: { elt: board, target: board } });
   }
 
   function release() {
-    if (!pressed) return;
     pressed = null;
     clearTimeout(timer);
-    const request = sent;
-    sent = null;
-    if (!request) {
-      apply();
-      return;
-    }
-    const before = swaps;
-    request.addEventListener('htmx:afterRequest', () => {
-      if (pressed) return;
-      if (swaps === before) apply();
-      else held = null;
-    }, { once: true });
+    apply();
   }
 
   document.addEventListener('pointerdown', (e) => {
     const control = e.target.closest('button, a[href]');
     // contains(null) is false: a press on no control holds nothing.
     if (!board.contains(control)) return;
-    release();
     pressed = control;
-    up = false;
+    down = true;
+    clearTimeout(timer);
     timer = setTimeout(release, bound());
   }, true);
-  document.addEventListener('pointerup', () => { up = true; }, true);
-  document.addEventListener('pointercancel', release, true);
-  // While pressed, the pointer is over the control, so a pointerout leaves
-  // the control or goes to a child of it.
-  document.addEventListener('pointerout', (e) => {
-    if (pressed && !up && !pressed.contains(e.relatedTarget)) release();
+  document.addEventListener('pointerup', () => { down = false; }, true);
+  // Board controls hold text only (board.html), so a pointerout while the
+  // pointer is down leaves the pressed control.
+  document.addEventListener('pointerout', () => {
+    if (down) release();
   }, true);
   document.addEventListener('click', (e) => {
     if (pressed && pressed.contains(e.target)) setTimeout(release, 0);
   });
   document.addEventListener('htmx:beforeSend', (e) => {
-    if (pressed && pressed.contains(e.detail.elt)) sent = e.detail.elt;
+    const control = e.detail.elt;
+    if (control === board || !board.contains(control)) return;
+    out.add(control);
+    // On the control itself: once a swap detaches it, its events no longer
+    // reach the document.
+    control.addEventListener('htmx:afterRequest', (end) => {
+      out.delete(control);
+      if (end.detail.xhr.status === 0) held = null;
+      apply();
+    }, { once: true });
   });
 
-  // `swaps` counts the boards htmx swaps in unheld, so a deferred apply
-  // knows whether the click's reply brought one.
   board.addEventListener('htmx:beforeSwap', (e) => {
     if (e.detail.target !== board || !e.detail.shouldSwap) return;
     if (!pressed) {
-      swaps += 1;
+      held = null;
       return;
     }
     held = e.detail.serverResponse;
@@ -112,7 +113,7 @@ function holdBoardUnderPress(board, bound) {
   board.addEventListener('htmx:oobBeforeSwap', (e) => {
     if (e.detail.target !== board || !e.detail.shouldSwap) return;
     if (!pressed) {
-      swaps += 1;
+      held = null;
       return;
     }
     // htmx hands over the out-of-band element itself; its children are
