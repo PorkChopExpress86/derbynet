@@ -55,7 +55,9 @@ def without_build(text: str) -> str:
 
 def test_the_readme_example_is_compose_yaml_without_build():
     example = readme_example(README.read_text())
-    assert "build:" not in example, "the README's example builds; a crew has no checkout"
+    assert "build:" not in example, (
+        "the README's example builds; a crew has no checkout"
+    )
     assert body(example) == body(without_build(COMPOSE.read_text()))
 
 
@@ -75,7 +77,8 @@ services:
 
 def test_without_build_leaves_out_the_block_alone():
     assert body(without_build(STAND_IN)) == (
-        "name: derbynet\n\nservices:\n  server:\n    image: x\n    restart: unless-stopped\n"
+        "name: derbynet\n\nservices:\n  server:\n    image: x\n"
+        "    restart: unless-stopped\n"
     )
 
 

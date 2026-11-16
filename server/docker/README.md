@@ -2,7 +2,7 @@
 
 `derbynet_server` runs the Django server for a race (#58). Docker is the only way DerbyNet is installed (D3, ADR-14), so a laptop at the race and a hosted server run this same image. It is built for `linux/amd64` and `linux/arm64`; the arm64 image is for Apple Silicon Macs and arm64 servers, not for running the server on a Raspberry Pi (D21; #59 covers the Pi's timer and photo stand images).
 
-Inside the container, nginx answers on port 80 (plain HTTP) and 443 (HTTPS) and passes requests to gunicorn, which runs Django as the unprivileged `derbynet` user. On Linux, `derbynet` takes the host user's uid and gid (D106), so the volume's files belong to that user. Everything an install keeps is on one volume, `/var/lib/derbynet`: the SQLite database, photos, videos, the secret key and the TLS key.
+Inside the container, nginx answers on port 80, plain HTTP only, and passes requests to gunicorn, which runs Django as the unprivileged `derbynet` user. HTTPS comes from a proxy in front of the image: `compose.yaml` runs Caddy for it (D107). On Linux, `derbynet` takes the host user's uid and gid (D106), so the volume's files belong to that user. Everything the server keeps is on one volume, `/var/lib/derbynet`: the SQLite database, photos, videos and the secret key. Caddy keeps its certificate authority and certificates on a second volume.
 
 Release tags are published to `ghcr.io/porkchopexpress86/derbynet_server` (D89). To build the image from a checkout, from the repository root:
 
@@ -12,24 +12,27 @@ docker buildx build -f server/docker/Dockerfile -t derbynet_server .
 
 ## Start it
 
-With one command:
-
-```sh
-docker run -d --name derbynet --restart unless-stopped \
-  -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet \
-  -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) \
-  ghcr.io/porkchopexpress86/derbynet_server
-```
-
-The guide leaves the two ids out on a Mac or Windows (D106), where Docker Desktop runs the containers in a Linux virtual machine of its own ([Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/); on Windows, its own `docker-desktop` WSL distribution, [Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)). Or with `compose.yaml` from this folder, which does the same, after writing the ids into `.env` on Linux:
+With `compose.yaml` from this folder, which runs the server and Caddy, after writing the host user's ids and this computer's address into `.env` on Linux:
 
 ```sh
 echo "DERBYNET_UID=$(id -u)" >> .env
 echo "DERBYNET_GID=$(id -g)" >> .env
+echo "DERBYNET_ADDRESS=$(hostname -I | cut -d' ' -f1)" >> .env
 docker compose up -d
 ```
 
-Then open `http://<this computer's address>/` from any device on the network. The first visit sets up the first event.
+The guide leaves the two ids out on a Mac or Windows (D106), where Docker Desktop runs the containers in a Linux virtual machine of its own ([Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/); on Windows, its own `docker-desktop` WSL distribution, [Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)). Then open `http://<this computer's address>/` from any device on the network, or `https://` once the device trusts Caddy's certificate authority (`docs/secure-contexts.md`). The first visit sets up the first event.
+
+Or the server alone, on plain HTTP, with one command:
+
+```sh
+docker run -d --name derbynet --restart unless-stopped \
+  -p 80:80 -v derbynet:/var/lib/derbynet \
+  -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) \
+  ghcr.io/porkchopexpress86/derbynet_server
+```
+
+The pages that need a secure context (the browser timer, replay, the replay camera and check-in's live camera) then work only at `http://localhost/`, on this computer.
 
 ### Postgres instead of SQLite
 
@@ -43,8 +46,8 @@ Nothing else changes: the server finds the `postgres` service and uses it (`DERB
 
 ## What it serves
 
-- **Plain HTTP on 80**, with no redirect to HTTPS. Kiosks, `derby-timer.jar` and the Pi scripts use `http://`.
-- **HTTPS on 443**, for phone cameras, which browsers open only on a secure page. On first start the container makes a key and a self-signed certificate in `/var/lib/derbynet/tls/`, so every install has its own key. Each phone warns once about the certificate; accept it to go on. The certificate lasts 825 days, and a new one is made when it has expired. To use your own, put `cert.pem` and `key.pem` in that folder before starting the container.
+- **Plain HTTP on 80**, with no redirect to HTTPS. Kiosks, `derby-timer.jar` and the Pi scripts use `http://`. Under `compose.yaml`, Caddy publishes port 80 and passes it on, and the server publishes no port (D117).
+- **HTTPS on 443**, under `compose.yaml`, from Caddy, for phone cameras, which browsers open only on a secure page (D107). The image itself has no TLS. Caddy's start script, in `compose.yaml`, picks the certificate (D119): with `DERBYNET_DOMAIN`, one from Let's Encrypt (or `DERBYNET_ACME_CA`); with `tls/cert.pem` and `tls/key.pem` on the data volume, as an image from before D107 made them, those, as they are; otherwise one from Caddy's own certificate authority for `localhost`, `127.0.0.1` and each `DERBYNET_ADDRESS`, the first of which is also served to a client that sends no server name, as a phone opening an IP address does (D116). Any other name gets one on demand, with a warning until trusted, and Caddy logs one "no protections in place" warning for that at each start. Caddy serves the authority's root at `/derbynet-ca.crt`. `checks.sh caddy`, `old-cert` and `acme` check each case. The server has no websocket endpoint yet (`racing/services/replay.py` renders the replay page's websocket URL empty), so there is nothing for Caddy to carry; its `reverse_proxy` passes websockets by default (D121).
 - The legacy routes (`action.php` and the other PHP paths) also answer under `/derbynet/`, as the Debian install served them, so `derby-timer.jar` works at `http://<host>/` and `http://<host>/derbynet/`.
 
 ## Settings
@@ -53,7 +56,7 @@ The image sets these. `server/README.md`'s Settings table lists the rest, such a
 
 | Variable | Default | Effect |
 |---|---|---|
-| `DERBYNET_UID`, `DERBYNET_GID` | unset | The uid and gid the `derbynet` user runs gunicorn, migrate and a `docker exec -u derbynet` as, and the volume's files belong to (D106). Set both or neither. Unset, `derbynet` takes the data folder's owner when that is not root, or else the image's own ids (`/opt/derbynet/derbynet-ids`). 0 is refused, and an id another account in the image holds, such as `www-data`'s 33, is shared. When the folder's owner differs, the start gives every file but `tls/` to the new ids, once, and logs one line naming the old and new uids |
+| `DERBYNET_UID`, `DERBYNET_GID` | unset | The uid and gid the `derbynet` user runs gunicorn, migrate and a `docker exec -u derbynet` as, and the volume's files belong to (D106). Set both or neither. Unset, `derbynet` takes the data folder's owner when that is not root, or else the image's own ids (`/opt/derbynet/derbynet-ids`). 0 is refused, and an id another account in the image holds, such as `www-data`'s 33, is shared. When the folder's owner differs, the start gives every file to the new ids, once, and logs one line naming the old and new uids. An old volume's `tls/` goes to them too, still mode 0600 for `key.pem`, and Caddy reads it as root through a read-only mount (D119) |
 | `TZ` | `America/New_York` | The race's time zone, which Django reads for `TIME_ZONE`. Set it with `-e TZ=...`: an `/etc/localtime` mount does not exist on Windows, and the server would fall back to UTC |
 | `MAX_UPLOAD_SIZE` | `100M` | The largest request nginx takes (`client_max_body_size`), and Django's cap on a request's form fields (`DATA_UPLOAD_MAX_MEMORY_SIZE`). An nginx size: `16M`, `512k`, `1G`. The default, 104857600 bytes, is above the largest upload Django takes, a 100000000-byte replay clip (`DERBYNET_VIDEO_UPLOAD_MAX_MB`); `checks.sh upload` sends the photo stand's 30 MB photo through it |
 | `DERBYNET_REQUEST_TIMEOUT` | `30` | Seconds a request may take: gunicorn's `--timeout` and nginx's `proxy_read_timeout`. Raise it for very long schedules, such as `600` |
@@ -61,7 +64,7 @@ The image sets these. `server/README.md`'s Settings table lists the rest, such a
 | `DERBYNET_URL_PREFIX` | empty | Serves the server under a path, such as `/derbynet`, as well as at `/`. Django builds its links with the prefix (`FORCE_SCRIPT_NAME`) |
 | `DERBYNET_ALLOWED_HOSTS` | `*` | Comma-separated host names the server answers to. Phones reach a LAN server by an address the image can't know, so it answers any; a server on the internet should name its host, because a client could otherwise set the host that absolute links, such as check-in QR codes, are built with. A list always keeps `localhost`, `127.0.0.1` and `[::1]`, which the HEALTHCHECK asks for (#61) |
 | `DERBYNET_CSRF_TRUSTED_ORIGINS` | empty | Extra origins for the manager pages behind another HTTPS proxy |
-| `DERBYNET_TRUSTED_PROXIES` | empty | Comma-separated addresses or networks of a proxy in front of the container (below). Only from these is a request's `X-Forwarded-Proto` believed; from anyone else, the scheme is the connection's |
+| `DERBYNET_TRUSTED_PROXIES` | empty | Comma-separated addresses or networks of a proxy in front of the container (below). Only from these are a request's `X-Forwarded-Proto`, `X-Forwarded-For` (nginx's `set_real_ip_from`, the last address in it that is no trusted proxy's) and `X-Real-Port` believed; from anyone else, the scheme, address and port are the connection's (D118). `compose.yaml` sets `0.0.0.0/0,::/0`, since only Caddy reaches the server there (D117) |
 | `DJANGO_SECRET_KEY` | unset | When unset, the server makes one on first start in `/var/lib/derbynet/secret_key`, mode 0600 |
 | `DATABASE_URL` | unset | Another database. Unset, SQLite on the volume, or the compose `postgres` service when the volume runs on it, for the server and for a `docker compose exec`'d `manage.py` alike |
 | `DERBYNET_DATA_DIR`, `DERBYNET_CONFIG_DIR` | `/var/lib/derbynet` | Where the data and the install's files are. Keep both on the volume |
@@ -90,11 +93,12 @@ location /my-derbynet/ {
     proxy_pass http://127.0.0.1:8000/;
     proxy_set_header Host $http_host;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     client_max_body_size 100M;
 }
 ```
 
-`Host` keeps absolute links, such as QR codes, on the site's own name, and `X-Forwarded-Proto` tells the server when the site was reached over HTTPS. The server then sees the proxy's address as every client's. `.github/workflows/image.yml` runs the shell suite through this `location` block, read from this file.
+`Host` keeps absolute links, such as QR codes, on the site's own name, `X-Forwarded-Proto` tells the server when the site was reached over HTTPS, and `X-Forwarded-For` gives it the client's address, for the kiosks and ballots (D118). `docs/install-docker.md`'s "Use your own proxy" names the settings for Nginx Proxy Manager and Traefik too, untested (D107). `.github/workflows/image.yml` runs the shell suite through this `location` block, read from this file.
 
 ## Your data
 
@@ -106,13 +110,15 @@ Run one container per volume. Each start applies the database migrations, and tw
 
 ### Back up
 
-A full backup is a copy of the data volume, and also the Postgres volume under the `postgres` profile, taken with the server stopped (D65). It holds the install's TLS private key and secret key, so keep the backup files private: `tar` writes to its output, the shell saves it, and `umask 077` makes the file readable by you alone. From this folder, with compose (name your volumes `derbynet_data` and `derbynet_postgres`, as compose does):
+A full backup is a copy of the data volume and Caddy's volume, and also the Postgres volume under the `postgres` profile, taken with the server stopped (D65). Caddy's volume holds its certificate authority, so phones keep trusting it after a restore (D120). The backup holds the install's secret key and the authority's private key, so keep the backup files private: `tar` writes to its output, the shell saves it, and `umask 077` makes the file readable by you alone. From this folder, with compose (name your volumes `derbynet_data`, `derbynet_caddy` and `derbynet_postgres`, as compose does):
 
 ```sh
 umask 077
 docker compose stop
 docker run --rm -v derbynet_data:/data:ro --entrypoint tar \
   ghcr.io/porkchopexpress86/derbynet_server -C /data -czf - . > derbynet-data.tgz
+docker run --rm -v derbynet_caddy:/data:ro --entrypoint tar \
+  ghcr.io/porkchopexpress86/derbynet_server -C /data -czf - . > derbynet-caddy.tgz
 docker compose start
 ```
 
@@ -125,7 +131,7 @@ docker run --rm -v derbynet_postgres:/data:ro --entrypoint tar \
 
 On Windows, run these in WSL as written. PowerShell 7.4 or later, which keeps a command's output byte for byte, runs them with three changes: each command on one line, since PowerShell continues a line with a backtick, not `\`; no `umask 077`, which PowerShell lacks, so save the files in your own user folder, not a shared one; and the restore below reads its file from a mounted folder, since PowerShell has no `<`.
 
-The backup holds the whole race: the database, photos, car photos, videos, the secret key and the TLS key. A snapshot from the settings page leaves out videos and some race state (D65).
+The backup holds the whole race: the database, photos, car photos, videos, the secret key and Caddy's certificate authority. A snapshot from the settings page leaves out videos and some race state (D65).
 
 ### Restore
 
@@ -136,6 +142,8 @@ docker compose down --volumes
 docker compose create
 docker run --rm -i -v derbynet_data:/data --entrypoint tar \
   ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf - < derbynet-data.tgz
+docker run --rm -i -v derbynet_caddy:/data --entrypoint tar \
+  ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf - < derbynet-caddy.tgz
 docker compose up -d
 ```
 
@@ -150,15 +158,16 @@ In PowerShell, each restore reads the backup from the folder that holds it:
 
 ```powershell
 docker run --rm -v derbynet_data:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-data.tgz
+docker run --rm -v derbynet_caddy:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-caddy.tgz
 docker run --rm -v derbynet_postgres:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-postgres.tgz
 ```
 
-`.github/workflows/image.yml` runs these steps, with SQLite and with Postgres, on an event holding a racer photo, a car photo and a video (`server/docker/ci/checks.sh backup`).
+`.github/workflows/image.yml` runs these steps, with SQLite and with Postgres, on an event holding a racer photo, a car photo and a video, and checks that Caddy's root is the same after the restore (`server/docker/ci/checks.sh backup`).
 
 ### Upgrade
 
-Pull the new image and start a new container on the same volume (`docker compose pull && docker compose up -d`). The new container applies its migrations at start.
+Pull the new image and start a new container on the same volume (`docker compose pull && docker compose up -d`). The new container applies its migrations at start. An install from before D107 keeps serving its `tls/` certificate through Caddy; `docs/install-docker.md` says how to move a `docker run` install to Compose, and how to move to Caddy's certificate authority.
 
 ## Logs
 
-`docker logs` shows nginx's request log and gunicorn's log. Request bodies are never logged, so a role login's password never reaches the log (#64 S36).
+`docker compose logs` shows nginx's request log, gunicorn's log and Caddy's. Request bodies are never logged, so a role login's password never reaches the log (#64 S36).

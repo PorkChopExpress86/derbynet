@@ -18,7 +18,7 @@ name: image
 #   GitHub's ubuntu-24.04-arm runner.
 # - checks: every check of server/docker/ci/checks.sh (its header lists
 #   them), backup, upgrade, and the phone check, Chromium in phone mode over
-#   https://<LAN IP>/ (D88).
+#   https://<LAN IP>/ through compose.yaml's Caddy (D88, D107).
 # - publish: on a release tag only, the archive to
 #   ghcr.io/porkchopexpress86/derbynet_server with the repository's
 #   GITHUB_TOKEN (D89), and `latest` for a release that is not a prerelease
@@ -375,7 +375,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends libxml2-utils imagemagick
 
       # Every check checks.sh runs with no arguments.
-      - name: TLS, secret key, user, uploads, bind mounts, host uid and gid, client address, proxies, stop, reload, timeout, engine guard, Postgres password, exec'd manage.py database, manage.py as root, bad settings, allowed hosts, guides, browser timer
+      - name: HTTP only, secret key, user, uploads, bind mounts, host uid and gid, client address, proxies, stop, reload, timeout, engine guard, Postgres password, exec'd manage.py database, manage.py as root, bad settings, allowed hosts, guides, browser timer, Caddy, an old volume's certificate, the README's Compose example, ACME
         run: server/docker/ci/checks.sh
 
       - name: Backup and restore, SQLite
@@ -447,12 +447,12 @@ jobs:
 
       # The runner's own address on its network, as a phone on the LAN
       # reaches the server.
-      - name: Start the server, with an event and racers
+      - name: Start the server behind Caddy, with an event and racers
         run: |
-          docker run -d --name derbynet -v derbynet-data:/var/lib/derbynet \
-            -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 80:80 -p 443:443 "$IMAGE"
           lan="$(hostname -I | awk '{print $1}')"
           echo "LAN=$lan" >> "$GITHUB_ENV"
+          DERBYNET_IMAGE="$IMAGE" DERBYNET_ADDRESS="$lan" docker compose -p derbynet \
+            -f server/docker/compose.yaml -f server/docker/ci/compose.ci.yaml up -d --wait
           for _ in $(seq 120); do
             curl -fsS -o /dev/null "http://$lan/index.php" && break
             sleep 1
@@ -460,6 +460,14 @@ jobs:
           grep -q success <<<"$(curl -sf -d 'action=setup.nodata&ez-new=phone' "http://$lan/action.php")"
           bash testing/reset-database.sh "http://$lan"
           bash testing/import-roster.sh "http://$lan"
+
+      # The certificate names the LAN address, and Caddy's root, as a phone
+      # installs it, makes it trusted; the phone check below skips that
+      # trust (ignore_https_errors), so this step is the one that checks it.
+      - name: https://<LAN IP>/ is trusted through Caddy's root
+        run: |
+          curl -fsS -o "$RUNNER_TEMP/root.crt" "http://$LAN/derbynet-ca.crt"
+          curl -fsS --cacert "$RUNNER_TEMP/root.crt" -o /dev/null -w '%{http_code} %{url_effective}\n' "https://$LAN/index.php"
 
       - name: Take a check-in photo with the live camera over https://<LAN IP>/
         working-directory: server
@@ -479,6 +487,10 @@ jobs:
           name: phone-checkin
           path: ${{ runner.temp }}/phone-checkin.png
           if-no-files-found: warn
+
+      - name: Show the logs
+        if: failure()
+        run: docker compose -p derbynet -f server/docker/compose.yaml logs --no-color
 
   publish:
     name: publish to ghcr.io
