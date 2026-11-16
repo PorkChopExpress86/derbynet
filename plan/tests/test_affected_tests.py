@@ -794,6 +794,7 @@ class GitDiff(unittest.TestCase):
             git('add', '.')
             git('commit', '-q', '-m', 'base')
             editing.write_text('Award.objects.all()\n\n\nNAME = "b"\n')
+            (root / 'server/ui/tests/test_dashboard.py').write_text('"""2 rows."""\n')
             git('commit', '-q', '-am', 'rename')
 
             def affected():
@@ -808,6 +809,10 @@ class GitDiff(unittest.TestCase):
                           before_hand_off(out))
             self.assertIn('  uv run python tools/mutate.py --listed --base HEAD~1 -- ',
                           before_hand_off(out))
+            # D123: from git, --check asks only for the claims the diff adds
+            # or changes (#374); --stdin keeps every claim (BeforeTheHandOff).
+            self.assertIn('  uv run python tools/docstring_claims.py --check '
+                          '<the PR body draft> --base HEAD~1 ', before_hand_off(out))
             editing.write_text('Award.objects.all()\n\n\nNAME = Award.objects.get()\n')
             out = affected()
             self.assertIn('Postgres: needed', out)
@@ -2129,6 +2134,247 @@ def reach_shapes():
                 for end in ('test', 'method'):
                     for subclass in (False, True):
                         yield leaf, (*middle, end), subclass
+
+
+def claims(head, base=D101_BASE):
+    """changed_tests(claims=True) on test_sheet.py, for
+    tools/docstring_claims.py --check --base (D123, #374)."""
+    return TOOL.changed_tests(base, head, lambda name: None, claims=True)
+
+
+class ClaimsMode(unittest.TestCase):
+    """D123: the claims to list are those of the tests the diff adds or
+    changes and of those that read what it adds or changes; a changed
+    frame or class frame is a seed there, not the whole file (#374).
+    Each case below raises WholeFile without `claims`."""
+
+    def assert_whole_without_claims(self, head, base=D101_BASE):
+        with self.assertRaises(TOOL.WholeFile):
+            d101(head, base=base)
+
+    def test_a_new_import_reaches_only_its_readers(self):
+        head = edit('import pytest\n', 'import pytest\nimport time\n')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+        head = edit('    page.wait_for_timeout(10)\n', '    time.sleep(0)\n', head)
+        self.assertEqual(claims(head), [('test_waits', 'changed')])
+
+    def test_a_widened_import_reaches_no_reader_of_its_old_names(self):
+        head = edit('import expect\n', 'import Page, expect\n')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+
+    def test_a_changed_import_reaches_the_readers_of_the_name(self):
+        head = edit('from playwright.sync_api import expect',
+                    'from playwright.async_api import expect')
+        self.assertEqual(claims(head), [('test_races', 'reads expect'),
+                                        ('test_waits', 'reads expect')])
+
+    def test_an_import_of_a_name_bound_twice_reaches_its_readers(self):
+        base = edit('LANES = 4\n', 'LANES = 4\nexpect = expect\n')
+        head = edit('from playwright.sync_api import expect',
+                    'from playwright.sync_api import expect, Page', base)
+        self.assertEqual(claims(head, base), [('test_races', 'reads expect'),
+                                              ('test_waits', 'reads expect')])
+
+    def test_a_changed_constant_reaches_the_tests_that_read_it(self):
+        head = edit('LANES = 4', 'LANES = 5')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [('test_races', 'reads start'),
+                                        ('TestBoard::test_two', 'reads start')])
+
+    def test_a_changed_statement_seeds_each_name_it_binds(self):
+        base = edit('LANES = 4\n', 'LANES = 4\nfor STEP in [1]:\n    pass\n')
+        base = edit('    assert n\n', '    assert n + STEP\n', base)
+        head = edit('for STEP in [1]:', 'for STEP in [2]:', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual(claims(head, base), [('test_counts', 'reads STEP')])
+
+    def test_a_changed_fixture_reaches_the_tests_that_take_it(self):
+        head = edit('return page.locator("#board")', 'return page.locator("#sheet")')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [('test_races', 'reads board')])
+
+    def test_a_fixture_passes_on_its_own_name_only(self):
+        """Not the names its body binds: test_waits' own `box` is no read
+        of the fixture's, which reads the changed race()."""
+        base = edit('    return page.locator("#board")\n',
+                    '    box = start(page)\n    return box\n')
+        base = edit('    expect(page.locator("body")).to_be_visible()\n',
+                    '    box = page.locator("body")\n    expect(box).to_be_visible()\n', base)
+        head = edit('for lane in range(1, LANES + 1):', 'for lane in range(LANES):', base)
+        self.assertEqual([key for key, _ in claims(head, base)],
+                         ['test_races', 'TestBoard::test_two'])
+
+    def test_an_added_or_deleted_statement_alone_seeds_its_name(self):
+        """A name bound on one side only: a builtin the module shadows."""
+        base = edit('    assert n\n', '    assert len([n])\n')
+        head = edit('LANES = 4\n', 'LANES = 4\nlen = max\n', base)
+        self.assertEqual(claims(head, base), [('test_counts', 'reads len')])
+        self.assertEqual(claims(base, head), [('test_counts', 'reads len')])
+
+    def test_a_class_frame_that_reads_a_changed_method_is_no_reason(self):
+        base = edit('    def test_one(self, page):',
+                    '    def alias(self):\n        return self.test_one\n\n'
+                    '    def test_one(self, page):')
+        head = edit('        assert self.n\n', '        assert not self.n\n', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual(claims(head, base), [('TestBoard::test_one', 'changed')])
+
+    def test_a_constant_that_reads_a_changed_helper_passes_it_on(self):
+        base = edit('\n\ndef test_races', '\n\nRUN = race\n\n\ndef test_races')
+        base = edit('    assert n\n', '    assert n and RUN\n', base)
+        head = edit('for lane in range(1, LANES + 1):', 'for lane in range(LANES):', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual([key for key, _ in claims(head, base)],
+                         ['test_races', 'test_counts', 'TestBoard::test_two'])
+
+    def test_a_class_changed_outside_its_tests_counts_whole(self):
+        head = edit('self.n = 1', 'self.n = 2')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [('TestBoard', 'changed outside its test methods')])
+
+    def test_a_new_helper_nothing_reads_reaches_no_test(self):
+        head = D101_BASE + '\n\ndef unused():\n    pass\n'
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+
+    def test_a_comment_alone_changes_no_test(self):
+        head = edit('    start(page)\n    expect', '    start(page)  # 4 lanes\n    expect')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+
+    def test_a_docstring_the_file_reads_changes_no_test(self):
+        base = edit('    assert n\n', '    assert __doc__\n')
+        head = edit('"""The sheet."""', '"""The sheet, 4 lanes."""', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual(claims(head, base), [])
+
+    def test_what_cannot_be_resolved_still_raises(self):
+        for head in (edit('    assert n\n', '    global LANES\n'),
+                     edit('LANES = 4\n', 'LANES = 4\nLANES = 5\n'.replace(
+                         'LANES = 5', 'def test_waits(): pass')),
+                     'def broken(:\n'):
+            with self.subTest(head=head[:40]), self.assertRaises(TOOL.WholeFile):
+                claims(head)
+        with self.assertRaises(TOOL.WholeFile):
+            claims(D101_BASE, base=None)
+
+
+H0 = 'def helper():\n    return 1\n'
+FX = 'import pytest\n@pytest.fixture{}\ndef fx():\n    return {}\n'
+
+
+def tops(base, head):
+    """The top-level scopes changed_tests(claims=True) names, as
+    docstring_claims.py counts them: a method's as its class's."""
+    return sorted({key.split('::')[0] for key, _ in claims(head, base)})
+
+
+class ClaimsReadersOutsideTheFrame(unittest.TestCase):
+    """The #379 review's shapes: a test or test class that D101 holds in
+    the frame, or that reads a change outside its test methods, is named
+    when it reads a reached name, and so is a subclass of a named class
+    (#374, D123). A change pytest applies to every test, or a statement
+    that binds nothing, counts every claim."""
+
+    def assert_tops(self, body, expected, base_helper=H0):
+        base = base_helper + body
+        head = base_helper.replace('return 1', 'return 2') + body
+        self.assertEqual(tops(base, head), expected)
+
+    def test_a_test_with_another_decorator(self):  # A
+        body = '@override_settings(X=1)\ndef test_a():\n    assert helper()\n'
+        self.assert_tops(body, ['test_a'])
+        self.assertEqual(claims(H0.replace('1', '2') + body, H0 + body),
+                         [('test_a', 'reads helper')])
+
+    def test_a_changed_test_with_another_decorator(self):
+        """Seeded by its own change, it reads nothing reached."""
+        base = H0 + '@override_settings(X=1)\ndef test_a():\n    assert 1\n'
+        self.assertEqual(claims(base.replace('assert 1', 'assert 2'), base),
+                         [('test_a', 'reached')])
+
+    def test_a_test_above_the_class_it_reads(self):
+        """Named on the second pass, once the class below it is."""
+        self.assert_tops('def test_uses():\n    assert TestX.URL\n\n\n'
+                         'class TestX:\n    URL = helper()\n\n    def test_a(self):\n'
+                         '        assert self.URL\n', ['TestX', 'test_uses'])
+
+    def test_a_decorator_that_reads_the_change(self):  # A2
+        self.assert_tops('@given(helper())\ndef test_a(x):\n    assert x\n', ['test_a'])
+
+    def test_a_test_case_not_named_test(self):  # S
+        self.assert_tops('class Reach(unittest.TestCase):\n    def test_a(self):\n'
+                         '        self.assertTrue(helper())\n', ['Reach'])
+
+    def test_a_class_attribute_read_through_self(self):  # B
+        self.assert_tops('class TestX:\n    URL = helper()\n\n    def test_a(self):\n'
+                         '        assert self.URL\n', ['TestX'])
+
+    def test_a_fixture_method(self):  # P
+        self.assert_tops('class TestX:\n    @pytest.fixture\n    def fx(self):\n'
+                         '        return helper()\n\n    def test_a(self, fx):\n'
+                         '        assert fx\n', ['TestX'])
+
+    def test_class_level_usefixtures(self):  # C
+        body = ('@pytest.mark.usefixtures("fx")\nclass TestX:\n    def test_a(self):\n'
+                '        assert 1\n\n\ndef test_b():\n    pass\n')
+        self.assertEqual(tops(FX.format('', 1) + body, FX.format('', 2) + body), ['TestX'])
+
+    def test_a_mixin_method_through_self(self):  # J
+        self.assert_tops('class Mixin:\n    def go(self):\n        return helper()\n\n\n'
+                         'class TestX(Mixin):\n    def test_a(self):\n'
+                         '        assert self.go()\n\n\nclass TestY:\n'
+                         '    def test_b(self):\n        pass\n', ['TestX'])
+
+    def test_a_base_method_called_from_a_subclass(self):  # J2
+        body = ('class TestBase:\n    def go(self):\n        return {}\n\n'
+                '    def test_b(self):\n        assert self.go()\n\n\n'
+                'class TestSub(TestBase):\n    def test_s(self):\n        assert self.go()\n'
+                '\n\nclass TestSubSub(TestSub):\n    pass\n\n\n'
+                'class TestOther:\n    def test_o(self):\n        pass\n')
+        self.assertEqual(tops(body.format(1), body.format(2)),
+                         ['TestBase', 'TestSub', 'TestSubSub'])
+
+    def test_a_class_with_no_test_is_not_named(self):
+        self.assert_tops('class Page:\n    URL = helper()\n\n\ndef test_a():\n    pass\n',
+                         [])
+
+    def test_a_changed_autouse_fixture_counts_every_claim(self):  # D
+        body = '\n\ndef test_a():\n    pass\n'
+        for deco in ('(autouse=True)', '(scope="module", autouse=True)'):
+            with self.subTest(deco=deco), self.assertRaises(TOOL.WholeFile) as caught:
+                claims(FX.format(deco, 2) + body, FX.format(deco, 1) + body)
+            self.assertIn('fx', str(caught.exception))
+        self.assertEqual(claims(FX.format('(autouse=False)', 2) + body,
+                                FX.format('(autouse=False)', 1) + body), [])
+        self.assertEqual(claims(FX.format('(scope="module")', 2) + body,
+                                FX.format('(scope="module")', 1) + body), [])
+        with self.assertRaises(TOOL.WholeFile):  # not a literal False
+            claims(FX.format('(autouse=AUTO)', 2) + body, FX.format('(autouse=AUTO)', 1) + body)
+        other = FX.replace('@pytest.fixture{}', '@cache{}')
+        self.assertEqual(claims(other.format('(autouse=True)', 2) + body,
+                                other.format('(autouse=True)', 1) + body), [])
+
+    def test_an_autouse_fixture_that_reads_the_change_counts_every_claim(self):
+        body = ('import pytest\n@pytest.fixture(autouse=True)\ndef fx():\n'
+                '    return helper()\n\n\ndef test_a():\n    pass\n')
+        with self.assertRaises(TOOL.WholeFile):
+            claims(H0.replace('1', '2') + body, H0 + body)
+
+    def test_a_changed_pytestmark_counts_every_claim(self):  # R
+        base = 'import pytest\npytestmark = pytest.mark.django_db\n\n\ndef test_a():\n    pass\n'
+        head = base.replace('pytest.mark.django_db', '[pytest.mark.django_db]')
+        with self.assertRaises(TOOL.WholeFile) as caught:
+            claims(head, base)
+        self.assertIn('pytestmark', str(caught.exception))
+
+    def test_a_statement_that_binds_nothing_counts_every_claim(self):  # O
+        base = 'CASES = []\nCASES.append(1)\n\n\ndef test_a():\n    pass\n'
+        with self.assertRaises(TOOL.WholeFile) as caught:
+            claims(base.replace('append(1)', 'append(2)'), base)
+        self.assertIn('binds nothing', str(caught.exception))
 
 
 class ReachShapes(unittest.TestCase):
