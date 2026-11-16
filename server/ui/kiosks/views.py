@@ -7,12 +7,16 @@ identify itself. The board polls every 2 s and answers 204 while what it
 would render is what the page holds; it waits while a sheet is open
 (`derbynet.pollable`). Each change is one service call under the
 `RaceState` lock, and answers with the board again, out of band. While a
-pointer is down on a board control, the board's swap waits until the press
-ends, so a press that spans a refresh still taps its control (D102,
-`holdBoardUnderPress` in `kiosks.js`). PHP's dashboard loses a mouse press
-when a kiosk's data changes under it, since it rebuilds every kiosk's
-controls with `.empty()` (kiosk-dashboard.js:99) when its hash of the kiosks
-changes (kiosk-dashboard.js:76-92).
+pointer is down on a board control, or Space on a focused board button, the
+board's swap waits until the press ends, so a press that spans a refresh
+still taps its control (D102, D125, `holdBoardUnderPress` in `kiosks.js`).
+PHP's dashboard loses a mouse press or a Space key when a kiosk's data
+changes under it, since it rebuilds every kiosk's controls with `.empty()`
+(kiosk-dashboard.js:99) when its hash of the kiosks changes
+(kiosk-dashboard.js:76-92). A held Enter is one tap (D126), and after each
+swap the focus goes back to the swapped-in button that stands for the
+focused one, where PHP leaves it on the page's body (D127,
+`keepFocusAcrossSwaps`).
 
 The page needs PRESENT_AWARDS, its page gate, but every change needs
 CONTROL_RACE, as `kiosk.assign`, `kiosk.reload` and `scene.apply` do: a role
