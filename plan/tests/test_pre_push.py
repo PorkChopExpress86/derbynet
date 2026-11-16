@@ -250,7 +250,9 @@ class ChainedPush(unittest.TestCase):
     """#238 chained `git push` after the full suite, and #282 after printing
     a red run's output, and each pushed a red head (#282 retro). The hook reads every
     shell above it, so these fail when the command that runs them names a
-    pytest run before a push, which the hook would refuse anyway."""
+    pytest run before a push, which the hook would refuse anyway. Each
+    pushes a docs/ file, whose let-through push runs plan/tests alone: a
+    push that changes plan/ runs the source checks (D129)."""
 
     def refused(self, result):
         self.assertEqual(result.returncode, 1, result.stderr)
@@ -258,26 +260,26 @@ class ChainedPush(unittest.TestCase):
         self.assertNotIn('pre-push: plan/tests', result.stderr)
 
     def test_a_push_after_a_pytest_run_in_one_command_is_refused(self):
-        self.refused(push('plan/README.md', PASSING, ': uv run pytest -q; : git push'))
+        self.refused(push('docs/x.md', PASSING, ': uv run pytest -q; : git push'))
 
     def test_a_push_with_options_before_push_is_refused(self):
-        self.refused(push('plan/README.md', PASSING,
+        self.refused(push('docs/x.md', PASSING,
                           ': uv run pytest -q; : git -c core.hooksPath=.githooks push'))
 
     def test_a_push_after_reading_a_background_runs_output_is_refused(self):
         """#282's push, from its session log, with the paths shortened: the
         `.output` file it printed held a red Postgres browser run."""
-        self.refused(push('plan/README.md', PASSING,
+        self.refused(push('docs/x.md', PASSING,
                           'cat /tmp/x/tasks/bcz7l8rxe.output; tail -2 /tmp/x/browser-pg.txt; '
                           'cd . && git status --short; : git push -q -u origin issue-282 2>&1 '
                           '| tail -3; git log --oneline -2'))
 
     def test_a_push_after_reading_a_junit_file_is_refused(self):
-        self.refused(push('plan/README.md', PASSING,
+        self.refused(push('docs/x.md', PASSING,
                           'grep -c failure var/load-runs/a/junit.xml; : git push'))
 
     def test_a_push_after_a_postgres_run_is_refused(self):
-        self.refused(push('plan/README.md', PASSING,
+        self.refused(push('docs/x.md', PASSING,
                           ': tools/pytest-postgres.sh -m browser ui && : git push'))
 
     def test_the_bash_tools_eval_wrapper_is_read(self):
@@ -285,7 +287,7 @@ class ChainedPush(unittest.TestCase):
         each quote in the command written `'"'"'`."""
         command = ": uv run pytest -k 'x'; : git push"
         wrapped = "eval '" + command.replace("'", "'\"'\"'") + "' && :"
-        self.refused(push('plan/README.md', PASSING, wrapped))
+        self.refused(push('docs/x.md', PASSING, wrapped))
 
     def test_pytest_in_a_message_a_comment_or_after_the_push_is_let_through(self):
         for shell in (': git commit -m "uv run pytest passed" && : git push',
@@ -297,7 +299,7 @@ class ChainedPush(unittest.TestCase):
                       # test that pushes to a scratch repository.
                       ': uv run pytest -q'):
             with self.subTest(shell=shell):
-                result = push('plan/README.md', PASSING, shell)
+                result = push('docs/x.md', PASSING, shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('pre-push: plan/tests', result.stderr)
 
