@@ -12,7 +12,8 @@
 # prose that calls a clamped font by its viewport term (#283 retro),
 # the first entry of a folder listing taken as it comes (#312 retro),
 # the role page lists of testing/test-permissions.sh against the page gates
-# (#319 retro),
+# (#319 retro), a fake clock paused at its install time and a browser test
+# that takes no fixture (#317 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -70,6 +71,8 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   ui/tests/test_browser_one_shot_reads.py \
   ui/tests/test_browser_empty_fulfill.py \
   ui/tests/test_browser_missing_allowance.py \
+  ui/tests/test_browser_clock_pause.py \
+  ui/tests/test_browser_source_only.py \
   ui/tests/test_php_libraries.py \
   legacy_api/tests/test_registry.py \
   core/tests/test_read_only_guard.py \
