@@ -63,7 +63,6 @@ function holdBoardUnderPress(board, bound) {
     clearTimeout(timer);
     const request = sent;
     sent = null;
-    if (held === null) return;
     if (!request) {
       apply();
       return;
@@ -77,8 +76,9 @@ function holdBoardUnderPress(board, bound) {
   }
 
   document.addEventListener('pointerdown', (e) => {
-    const control = e.target.closest && e.target.closest('button, a[href]');
-    if (!control || !board.contains(control)) return;
+    const control = e.target.closest('button, a[href]');
+    // contains(null) is false: a press on no control holds nothing.
+    if (!board.contains(control)) return;
     release();
     pressed = control;
     up = false;
@@ -86,9 +86,10 @@ function holdBoardUnderPress(board, bound) {
   }, true);
   document.addEventListener('pointerup', () => { up = true; }, true);
   document.addEventListener('pointercancel', release, true);
+  // While pressed, the pointer is over the control, so a pointerout leaves
+  // the control or goes to a child of it.
   document.addEventListener('pointerout', (e) => {
-    if (pressed && !up && pressed.contains(e.target) &&
-        !pressed.contains(e.relatedTarget)) release();
+    if (pressed && !up && !pressed.contains(e.relatedTarget)) release();
   }, true);
   document.addEventListener('click', (e) => {
     if (pressed && pressed.contains(e.target)) setTimeout(release, 0);

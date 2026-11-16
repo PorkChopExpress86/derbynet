@@ -575,16 +575,16 @@ class HeldPolls:
             self.page.wait_for_timeout(20)
         raise AssertionError(f"{len(self.held)} of {count} polls held within 10 s")
 
-    def answer(self, index):
+    def answer(self, index, status=200):
         """Let poll `index` through and wait until the page has handled its
-        reply, a new board (200)."""
+        reply: a new board (200), or no change (204)."""
         self.held[index].continue_()
         self.page.wait_for_function(
             "n => window.boardLog.filter((r) => r.what === 'poll').length >= n",
             arg=index + 1,
         )
         polls = [r for r in board_log(self.page) if r["what"] == "poll"]
-        assert polls[index]["status"] == 200, polls
+        assert polls[index]["status"] == status, polls
 
     def end(self):
         self.ended = True
@@ -788,9 +788,7 @@ def test_a_cancelled_press_applies_only_the_newest_held_board(login, event, canc
     down = after(log, "down")
     assert swaps_since(log, down) == [], log
     if cancel == "moved off":
-        heading = page.locator("#ks-scenes-h")
-        box = heading.bounding_box()  # one read: a point off the button
-        page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
+        move_off(page)
     else:
         cdp.send("Input.dispatchTouchEvent", {"type": "touchCancel", "touchPoints": []})
     wait_for_a_swap_after(page, down)
@@ -825,9 +823,7 @@ def test_a_change_reply_during_a_press_waits_too(login, event):
     log = board_log(page)
     down = after(log, "down")
     assert swaps_since(log, down) == [], log
-    heading = page.locator("#ks-scenes-h")
-    box = heading.bounding_box()  # one read: a point off the button
-    page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
+    move_off(page)
     wait_for_a_swap_after(page, down)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
     page.mouse.up()
@@ -835,6 +831,130 @@ def test_a_change_reply_during_a_press_waits_too(login, event):
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Hall"], log
     expect(welcome).to_have_attribute("aria-pressed", "false")
+    polls.end()
+
+
+def held_at_route(page, pattern) -> list:
+    """Hold each request matching `pattern` at its route; the test lets it
+    go with `continue_()`."""
+    held = []
+    page.route(pattern, lambda route: held.append(route))
+    return held
+
+
+def wait_for_held(page, held, what):
+    for _ in range(500):
+        if held:
+            return
+        page.wait_for_timeout(20)
+    raise AssertionError(f"no {what} within 10 s")
+
+
+def wait_for_done(page, path):
+    page.wait_for_function(
+        "p => window.boardLog.some((r) => r.what === 'done' && r.path.startsWith(p))",
+        arg=path,
+    )
+
+
+def move_off(page):
+    """Move the mouse off a scene button, onto the switcher's heading."""
+    box = page.locator(
+        "#ks-scenes-h"
+    ).bounding_box()  # one read: a point off the button
+    page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
+
+
+def test_a_press_during_a_taps_request_still_taps(login, event):
+    """The mouse taps Identify while a poll's reply is held, so the held
+    board waits for Identify's POST, which its route holds. While that POST
+    is out, the mouse goes down on Welcome, and Identify's reply then comes:
+    its board waits under the new press, and so does the board held before
+    (D102). Welcome's POST still goes out."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    welcome = scene_button(page, scene(event, "Welcome"))
+    posts = held_at_route(page, "**/kiosks/identify/**")
+    polls = a_press_spans_a_swap(page, event, page.locator(IDENTIFY_BUTTON))
+    page.mouse.up()
+    wait_for_held(page, posts, "Identify POST")
+    press(page, welcome)
+    posts[0].continue_()
+    wait_for_done(page, "/kiosks/identify/")
+    log = board_log(page)
+    second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
+    assert swaps_since(log, second) == [], log
+    with htmx_post(page, "/kiosks/scene/"):
+        page.mouse.up()
+    expect(welcome).to_have_attribute("aria-pressed", "true")
+    log = board_log(page)
+    click = after(log, "click", second)
+    assert swaps_since(log[:click], second) == [], log
+    polls.end()
+
+
+def test_a_poll_with_no_change_during_a_press_swaps_nothing(login, event):
+    """A poll that answers 204 while the pointer is down holds nothing, and
+    the press's end swaps nothing (D102). No kiosk checks in, so nothing on
+    the board changes with the clock (a quiet kiosk's card gains its last
+    contact, board.html) and the poll answers 204."""
+    page = open_dashboard(login("RaceCoordinator"))
+    buttons = page.locator("#kiosk-board button[data-scene]")
+    count = buttons.count()
+    assert count, "no scene buttons: the test checks nothing"
+    polls = hold_the_polls(page)
+    polls.wait_for(1)
+    press(page, scene_button(page, scene(event, "Racing")))
+    polls.answer(0, status=204)
+    move_off(page)
+    page.mouse.up()
+    htmx_settled(page)
+    log = board_log(page)
+    # one read: the move off applies a held board at once, before it returns.
+    assert swaps_since(log, after(log, "down")) == [], log
+    expect(buttons).to_have_count(count)
+    polls.end()
+
+
+def test_a_newer_board_during_a_taps_request_wins(login, event):
+    """The mouse taps Page while a poll's reply, the kiosk renamed Lobby, is
+    held, and the sheet's GET is held at its route. A poll sent before the
+    click then answers with the kiosk renamed Hall, and swaps the board at
+    once, since no press is on. When the GET ends, the held board, the
+    older, is dropped: the board swapped once after the click, to Hall
+    (D102)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    gets = held_at_route(page, "**/kiosks/page/**")
+    polls = a_press_spans_a_swap(page, event, page.locator(PAGE_BUTTON))
+    polls.wait_for(2)
+    page.mouse.up()
+    wait_for_held(page, gets, "Page GET")
+    Kiosk.objects.filter(address="tv").update(name="Hall")
+    polls.answer(1)
+    gets[0].continue_()
+    # The Hall board detached the Page button, and the log's listener on
+    # the document hears no end of the GET (asserted below); the sheet's
+    # form shows in the task that ends it.
+    expect(sheet(page, "kiosks").locator("form")).to_be_visible()
+    log = board_log(page)
+    click = after(log, "click", after(log, "down"))
+    # one read: a held board is applied in the GET's end, the task that
+    # swapped the form in.
+    assert [r["name"] for r in swaps_since(log, click)] == ["Hall"], log
+    assert [r for r in log if r["what"] == "done"] == [], log
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
+    # The Lobby board was dropped, not left waiting: a later press that ends
+    # with nothing new held swaps nothing.
+    page.keyboard.press("Escape")
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    later = len(board_log(page))
+    press(page, scene_button(page, scene(event, "Racing")))
+    move_off(page)
+    page.mouse.up()
+    log = board_log(page)
+    # one read: the move off applies a held board at once, before it returns.
+    assert swaps_since(log, later) == [], log
     polls.end()
 
 
