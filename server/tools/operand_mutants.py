@@ -7,7 +7,7 @@ removed whole caps or resized them, and none kept `2.85vw` alone, so the
 `1em` operand went untested until review (#283 retro). This lists those
 mutants, and `tools/mutate.py --listed` runs every one (#336 retro).
 
-    uv run python tools/operand_mutants.py                  # diff against origin/master
+    uv run python tools/operand_mutants.py      # from the merge base with origin/master
     uv run python tools/operand_mutants.py --base REV -- ui/static/ui/kiosk.css
     git diff A B | uv run python tools/operand_mutants.py --stdin
 
@@ -41,8 +41,12 @@ The rest is read one line at a time, so a JavaScript call or condition that
 spans lines, a ternary, and a condition in a `while`, a `return` or an
 arrow function outside `.filter()` are left out, and so is every branch
 that is no condition in either language (a tuple element such as
-`(ast.Global, ast.Nonlocal)`, a set taken away, a loop's bound): list those
-by hand.
+`(ast.Global, ast.Nonlocal)`, a loop's bound): list those by hand.
+
+A Python file read by its AST also lists each member of a set literal
+(`frozenset({...})`'s too) and of the tuple or list an `in` or `not in`
+tests, taken away with its comma (#356's review took `"range"` out of a
+lookup set, and the mutant survived).
 """
 
 from __future__ import annotations
@@ -267,8 +271,19 @@ def python_conditions(
     def touches(node: ast.expr) -> bool:
         return any(n in added for n in range(node.lineno, node.end_lineno + 1))
 
-    tests, ops, loops = [], [], []
+    tests, ops, loops, members = [], [], [], {}
     for node in ast.walk(tree):
+        # A set literal, `frozenset({...})`'s too, and the tuple or list an
+        # `in` tests: #356's review took `"range"` out of LOOKUPS and
+        # `"values"` out of `("values_list", "values")`, and both survived.
+        if isinstance(node, ast.Set):
+            members[id(node)] = node
+        elif isinstance(node, ast.Compare):
+            for op, right in zip(node.ops, node.comparators, strict=True):
+                if isinstance(op, (ast.In, ast.NotIn)) and isinstance(
+                    right, (ast.Tuple, ast.List, ast.Set)
+                ):
+                    members[id(right)] = right
         if isinstance(node, (ast.For, ast.AsyncFor)):
             loops.append(node)
         elif isinstance(node, (ast.If, ast.While, ast.IfExp)):
@@ -291,6 +306,29 @@ def python_conditions(
         header = range(node.lineno, node.iter.end_lineno + 1)
         if any(n in added for n in header):
             out.append(entry(node.iter, "loop", "()"))
+    # Each member taken away, with the comma beside it: the one after it,
+    # or for the last, the one before it. A lone member's span is empty,
+    # so mutants() drops it (old == new). A starred member is left whole:
+    # `(*a, b)` less `b` no longer parses.
+    for node in members.values():
+        elts = node.elts
+        if any(isinstance(e, ast.Starred) for e in elts):
+            continue
+        for i, elt in enumerate(elts):
+            if not touches(elt):
+                continue
+            if i + 1 < len(elts):
+                span = (
+                    at(elt.lineno, elt.col_offset),
+                    at(elts[i + 1].lineno, elts[i + 1].col_offset),
+                )
+            else:
+                before = elts[i - 1]
+                span = (
+                    at(before.end_lineno, before.end_col_offset),
+                    at(elt.end_lineno, elt.end_col_offset),
+                )
+            out.append((elt.lineno, "member", text[span[0] : span[1]], "", span))
     return sorted(out, key=lambda e: (e[4][0], e[1] != "condition", -e[4][1]))
 
 
@@ -404,7 +442,10 @@ def main(argv: list[str] | None = None) -> int:
         diff = sys.stdin.read()
     else:
         diff = subprocess.run(
-            ["git", "diff", "-U0", args.base, "--", *args.paths],
+            # From the merge base, as affected-tests diffs: from BASE itself,
+            # a line master changed after the branch left it read as added
+            # (#348 retro).
+            ["git", "diff", "-U0", "--merge-base", args.base, "--", *args.paths],
             check=True,
             capture_output=True,
             text=True,

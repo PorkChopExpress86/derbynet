@@ -1,6 +1,8 @@
 """tools/operand_mutants.py lists the operand mutations of a diff's
 `min()`, `max()`, `clamp()` and conditions (#283 retro)."""
 
+import subprocess
+
 from tools import operand_mutants as om
 
 
@@ -297,3 +299,70 @@ def test_a_loop_whose_header_is_unchanged_lists_nothing(tmp_path):
     (tmp_path / "t.py").write_text(text)
     diff = "+++ b/t.py\n@@ -2,0 +2,1 @@\n+    print(line)\n"
     assert om.mutants(diff, tmp_path) == []
+
+
+def test_the_listing_reads_the_diff_from_the_merge_base(tmp_path, monkeypatch, capsys):
+    """#348's listing, run after master moved, held master's own lines: from
+    BASE itself, a line master changed after the branch left it reads as
+    added (#348 retro)."""
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
+
+    def run(*args):
+        return subprocess.run(
+            [*git, *args], cwd=tmp_path, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    (tmp_path / "mod.py").write_text("def f(a, b):\n    if a < b:\n        return 1\n")
+    run("init", "-q")
+    run("add", ".")
+    run("commit", "-qm", "base")
+    master = run("branch", "--show-current")
+    run("checkout", "-qb", "branch")
+    with open(tmp_path / "mod.py", "a") as f:
+        f.write("    if b:\n        return 2\n")
+    run("commit", "-qam", "the branch's condition")
+    run("checkout", "-q", master)
+    (tmp_path / "mod.py").write_text("def f(a, b):\n    if a <= b:\n        return 1\n")
+    run("commit", "-qam", "master moves on")
+    run("checkout", "-q", "branch")
+    monkeypatch.chdir(tmp_path)
+    assert om.main(["--base", master]) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "mod.py:4  condition  b  ->  True",
+        "mod.py:4  condition  b  ->  False",
+    ]
+
+
+def test_each_member_of_a_set_and_of_an_in_tuple_is_taken_away(tmp_path):
+    """#356's review took `"range"` out of LOOKUPS and `"values"` out of
+    `("values_list", "values")`; both survived, and no listing had them
+    (#356 retro). A tuple no `in` tests, one an `==` tests, a name an `in`
+    tests, a one-member tuple, a tuple with a starred member (`(*PAIR)`
+    does not parse) and an unchanged line list none."""
+    text = (
+        'LOOKUPS = frozenset({"gt", "range"})\n'
+        "def f(attr, lookup, kind):\n"
+        '    return attr in ("values_list", "values") or lookup not in [1, 2,]\n'
+        'PAIR = ("a", "b")\n'
+        'ONE = attr in ("a",)\n'
+        'SAME = kind == ("a", "b") or kind in LOOKUPS\n'
+        'STAR = kind in (*PAIR, "c")\n'
+        'OLD = {"x", "y"}\n'
+    )
+    (tmp_path / "t.py").write_text(text)
+    diff = "+++ b/t.py\n@@ -0,0 +1,7 @@\n" + "".join(
+        f"+{x}\n" for x in text.splitlines()[:7]
+    )
+    found = [m for m in om.mutants(diff, tmp_path) if m.kind == "member"]
+    assert [(m.line, m.old) for m in found] == [
+        (1, '"gt", '),
+        (1, ', "range"'),
+        (3, '"values_list", '),
+        (3, ', "values"'),
+        (3, "1, "),
+        (3, ", 2"),
+    ]
+    for m in found:
+        assert text[m.span[0] : m.span[1]] == m.old, m
+        mutated = text[: m.span[0]] + m.new + text[m.span[1] :]
+        compile(mutated, "t.py", "exec")

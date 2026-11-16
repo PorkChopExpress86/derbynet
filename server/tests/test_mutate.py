@@ -833,3 +833,30 @@ def test_listed_runs_a_crlf_files_mutants(project):
     assert (project / "mod.py").read_bytes() == (MODULE + PICK).replace(
         "\n", "\r\n"
     ).encode()
+
+
+def test_listed_reads_the_diff_from_the_merge_base(project):
+    """#348's listing, run after master moved, held master's own lines: from
+    BASE itself, a line master changed after the branch left it reads as
+    added (#348 retro)."""
+    master = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=project,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    gate = "\n\ndef gate(a):\n    return a > 0 and a < 9\n"
+    commit(project, MODULE + gate)
+    subprocess.run([*GIT, "checkout", "-qb", "branch"], cwd=project, check=True)
+    commit(project, MODULE + gate + PICK, PICK_TESTS)
+    subprocess.run([*GIT, "checkout", "-q", master], cwd=project, check=True)
+    commit(project, MODULE + gate.replace("a < 9", "a < 10"))
+    subprocess.run([*GIT, "checkout", "-q", "branch"], cwd=project, check=True)
+    command = [sys.executable, str(TOOL), "--listed", "--base", master]
+    command += ["--", "-p", "no:cacheprovider", "test_mod.py::test_pick"]
+    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    run = subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
+    # PICK's six: the branch's `a < 9`, which master changed, is not.
+    assert "6 listed: " in run.stdout, run.stdout + run.stderr
+    assert "a < 9" not in run.stdout

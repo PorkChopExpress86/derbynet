@@ -30,8 +30,8 @@ Run it from server/, in the worktree under test, for one mutant:
         -- ui/tests/test_views.py::test_the_bound
 
 or, with `--listed`, for every mutant `tools/operand_mutants.py` lists for
-the diff from `--base` (origin/master by default), narrowed to each
-`--file` given, one after another against the same tests:
+the diff from the merge base with `--base` (origin/master by default),
+narrowed to each `--file` given, one after another against the same tests:
 
     uv run python tools/mutate.py --listed --file ../plan/bin/affected-tests \\
         -- ../plan/tests/test_affected_tests.py::ChangedTests
@@ -304,7 +304,16 @@ def listed(args) -> int:
         return REFUSED
     root = Path(top.stdout.strip())
     diff = subprocess.run(
-        ["git", "diff", "-U0", args.base, "--", *map(str, args.file or [])],
+        # From the merge base, as operand_mutants.py diffs (#348 retro).
+        [
+            "git",
+            "diff",
+            "-U0",
+            "--merge-base",
+            args.base,
+            "--",
+            *map(str, args.file or []),
+        ],
         capture_output=True,
         text=True,
     )
