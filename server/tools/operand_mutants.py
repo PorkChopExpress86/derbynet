@@ -247,6 +247,34 @@ def offsets(text: str) -> list[int]:
     return starts
 
 
+# More members than this in one collection make a table, not a rule: its
+# members get no rows, and main() names it (#370 review: a 400-name set
+# listed 400 mutants).
+MAX_MEMBERS = 20
+
+
+def crowded(text: str, added: set[int]) -> list[tuple[int, int]]:
+    """(line, members) of each set literal, or tuple or list an `in` tests,
+    that touches a line in `added` and has more than MAX_MEMBERS members."""
+    tree = ast.parse(text)
+    found = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Set):
+            found[id(node)] = node
+        elif isinstance(node, ast.Compare):
+            for op, right in zip(node.ops, node.comparators, strict=True):
+                if isinstance(op, (ast.In, ast.NotIn)) and isinstance(
+                    right, (ast.Tuple, ast.List, ast.Set)
+                ):
+                    found[id(right)] = right
+    return sorted(
+        (node.lineno, len(node.elts))
+        for node in found.values()
+        if len(node.elts) > MAX_MEMBERS
+        and any(n in added for n in range(node.lineno, node.end_lineno + 1))
+    )
+
+
 def python_conditions(
     text: str, added: set[int]
 ) -> list[tuple[int, str, str, str, tuple[int, int]]]:
@@ -309,13 +337,38 @@ def python_conditions(
     # Each member taken away, with the comma beside it: the one after it,
     # or for the last, the one before it. A lone member's span is empty,
     # so mutants() drops it (old == new). A starred member is left whole:
-    # `(*a, b)` less `b` no longer parses.
+    # `(*a, b)` less `b` no longer parses. A tuple of two keeps its comma,
+    # since `("values_list")` is a string, and `in` on it a substring test
+    # that `"values"` passes (#370 review). A collection of more than
+    # MAX_MEMBERS is a table, not a rule: crowded() names it instead.
     for node in members.values():
         elts = node.elts
-        if any(isinstance(e, ast.Starred) for e in elts):
+        if any(isinstance(e, ast.Starred) for e in elts) or len(elts) > MAX_MEMBERS:
             continue
+        pair = (
+            isinstance(node, ast.Tuple)
+            and len(elts) == 2
+            and not text[at(elts[1].end_lineno, elts[1].end_col_offset) :]
+            .lstrip()
+            .startswith(",")
+        )
         for i, elt in enumerate(elts):
             if not touches(elt):
+                continue
+            if pair:
+                span = (
+                    at(elts[0].lineno, elts[0].col_offset),
+                    at(elts[1].end_lineno, elts[1].end_col_offset),
+                )
+                other = elts[1 - i]
+                kept = text[
+                    at(other.lineno, other.col_offset) : at(
+                        other.end_lineno, other.end_col_offset
+                    )
+                ]
+                out.append(
+                    (elt.lineno, "member", text[span[0] : span[1]], kept + ",", span)
+                )
                 continue
             if i + 1 < len(elts):
                 span = (
@@ -428,6 +481,24 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
     return out
 
 
+def crowded_in(diff: str, root: Path | None) -> list[tuple[str, int, int]]:
+    """(path, line, members) of each crowded() collection in the diff's
+    Python files on disk."""
+    added: dict[str, set[int]] = {}
+    for path, line, _ in added_lines(diff):
+        added.setdefault(path, set()).add(line)
+    out = []
+    for path, lines in added.items():
+        text = source(root, path)
+        if text is None or not is_python(root, path):
+            continue
+        try:
+            out += [(path, line, n) for line, n in crowded(text, lines)]
+        except SyntaxError:
+            continue
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--base", default="origin/master")
@@ -453,6 +524,12 @@ def main(argv: list[str] | None = None) -> int:
     found = mutants(diff, root)
     for m in found:
         print(m)
+    for path, line, members in crowded_in(diff, root):
+        print(
+            f"{path}:{line}: {members} members, over {MAX_MEMBERS}: no member rows;"
+            " take away by hand the ones a rule reads",
+            file=sys.stderr,
+        )
     if not found:
         print("no min(), max(), clamp() or condition on an added line", file=sys.stderr)
     return 0

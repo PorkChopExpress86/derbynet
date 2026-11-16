@@ -3,6 +3,8 @@
 
 import subprocess
 
+import pytest
+
 from tools import operand_mutants as om
 
 
@@ -354,15 +356,62 @@ def test_each_member_of_a_set_and_of_an_in_tuple_is_taken_away(tmp_path):
         f"+{x}\n" for x in text.splitlines()[:7]
     )
     found = [m for m in om.mutants(diff, tmp_path) if m.kind == "member"]
-    assert [(m.line, m.old) for m in found] == [
-        (1, '"gt", '),
-        (1, ', "range"'),
-        (3, '"values_list", '),
-        (3, ', "values"'),
-        (3, "1, "),
-        (3, ", 2"),
+    assert [(m.line, m.old, m.new) for m in found] == [
+        (1, '"gt", ', ""),
+        (1, ', "range"', ""),
+        (3, '"values_list", "values"', '"values",'),
+        (3, '"values_list", "values"', '"values_list",'),
+        (3, "1, ", ""),
+        (3, ", 2", ""),
     ]
     for m in found:
         assert text[m.span[0] : m.span[1]] == m.old, m
         mutated = text[: m.span[0]] + m.new + text[m.span[1] :]
         compile(mutated, "t.py", "exec")
+
+
+@pytest.mark.parametrize(
+    "collection",
+    ['("values_list", "values")', '("a", "b",)', '("a", "b", "c")', '["a", "b"]'],
+)
+def test_a_member_taken_away_leaves_the_same_kind_of_collection(tmp_path, collection):
+    """#370's review: `("values_list", "values")` less `, "values"` was
+    `("values_list")`, a string, and `in` on it a substring test, so the
+    mutant survived a test that asserts `"values"` is refused. Each mutant
+    evaluates to the type it started as, one member shorter."""
+    text = f"KIND = x in {collection}\n"
+    (tmp_path / "t.py").write_text(text)
+    found = om.mutants(f"+++ b/t.py\n@@ -0,0 +1 @@\n+{text}", tmp_path)
+    start = text.index(collection)
+    whole = eval(collection)
+    assert len(found) == len(whole)
+    for m in found:
+        mutated = text[: m.span[0]] + m.new + text[m.span[1] :]
+        value = eval(mutated[start:].rstrip("\n"))
+        assert type(value) is type(whole), (m, value)
+        assert len(value) == len(whole) - 1, m
+
+
+def test_a_crowded_collection_lists_no_members_and_is_named(
+    tmp_path, monkeypatch, capsys
+):
+    """#370's review: a set of 400 names listed 400 mutants. Over
+    MAX_MEMBERS, the listing names the collection and lists none; at
+    MAX_MEMBERS it lists each."""
+    many = ", ".join(f'"n{i}"' for i in range(om.MAX_MEMBERS + 1))
+    enough = ", ".join(f'"n{i}"' for i in range(om.MAX_MEMBERS))
+    (tmp_path / "mod.py").write_text("")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
+    for args in (["init", "-q"], ["add", "."], ["commit", "-qm", "base"]):
+        subprocess.run([*git, *args], cwd=tmp_path, check=True)
+    (tmp_path / "mod.py").write_text(f"MANY = {{{many}}}\nENOUGH = {{{enough}}}\n")
+    monkeypatch.chdir(tmp_path)
+    assert om.main(["--base", "HEAD"]) == 0
+    out, err = capsys.readouterr()
+    assert [line.split("  ")[0] for line in out.splitlines()] == ["mod.py:2"] * (
+        om.MAX_MEMBERS
+    )
+    assert err == (
+        f"mod.py:1: {om.MAX_MEMBERS + 1} members, over {om.MAX_MEMBERS}: no member"
+        " rows; take away by hand the ones a rule reads\n"
+    )

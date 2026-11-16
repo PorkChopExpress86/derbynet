@@ -96,7 +96,9 @@ fi
 # Under a holder of the same lock, such as tools/hold-load-lock.sh's
 # command or a load run's own pytest, flock would wait on that holder for
 # ever.
-if [ "${DERBYNET_LOAD_LOCK_HELD:-}" = "$LOCK" ]; then
+# Compared as real paths: `dir/./load.lock` or a link is the same lock.
+if [ -n "${DERBYNET_LOAD_LOCK_HELD:-}" ] &&
+   [ "$(realpath -m -- "$DERBYNET_LOAD_LOCK_HELD")" = "$(realpath -m -- "$LOCK")" ]; then
   echo "pytest-under-load.sh: it runs under a holder of $LOCK, such as" \
        "tools/hold-load-lock.sh, and would wait on it for ever. Run it after" \
        "that holder ends." >&2
@@ -179,8 +181,11 @@ if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; t
   veth="no journalctl here"
   if command -v journalctl >/dev/null; then
     # A failed read is named, not counted: 0 veth lines would read as a
-    # real failure under the rerun rule.
-    if journal=$(journalctl -k --since "@$STARTED" --until "@$ENDED" 2>&1); then
+    # real failure under the rerun rule.  So is a journalctl that reads no
+    # kernel log at all, as one without permission exits 0 with no lines.
+    if [ -z "$(journalctl -k -n 1 -q 2>/dev/null)" ]; then
+      veth="no count (journalctl reads no kernel log here)"
+    elif journal=$(journalctl -k --since "@$STARTED" --until "@$ENDED" 2>&1); then
       veth="$(grep -c veth <<<"$journal" || true) veth lines"
     else
       veth="no count (journalctl failed: $(head -n 1 <<<"$journal"))"
@@ -190,8 +195,13 @@ if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; t
     sed -n 's/^\(FAILED\|ERROR\) \([^: ]*\.py\).*/\2/p' | sort -u | tr '\n' ' ')
   echo "net::ERR_NETWORK_CHANGED in the log; the kernel log has $veth from" \
        "@$STARTED to @$ENDED (journalctl -k --since @$STARTED --until @$ENDED | grep veth)."
-  echo "Rerun each failed file alone at once, and report both results:" \
-       "${DERBYNET_BROWSER_FONT:+DERBYNET_BROWSER_FONT=\"$DERBYNET_BROWSER_FONT\" }${RUNNER[*]} -m browser -n 0 ${files% }"
+  # With no file named, the command would run every browser test.
+  if [ -n "$files" ]; then
+    echo "Rerun each failed file alone at once, and report both results:" \
+         "${DERBYNET_BROWSER_FONT:+DERBYNET_BROWSER_FONT=\"$DERBYNET_BROWSER_FONT\" }${RUNNER[*]} -m browser -n 0 ${files% }"
+  else
+    echo "No failed file is named in the summary: rerun the run's own command."
+  fi
 fi
 echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml"
 exit "$status"

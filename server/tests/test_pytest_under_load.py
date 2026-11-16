@@ -505,9 +505,12 @@ def test_a_hand_off_exits_with_its_command_s_status(tmp_path):
     assert free(tmp_path / "load.lock")
 
 
+@pytest.mark.parametrize("held", ["load.lock", "./sub/../load.lock"])
 @pytest.mark.parametrize("script", [SCRIPT, HOLD_LOCK], ids=lambda p: p.name)
-def test_a_run_under_a_holder_of_its_lock_is_refused(tmp_path, script):
-    """Its flock would wait for ever on the holder above it."""
+def test_a_run_under_a_holder_of_its_lock_is_refused(tmp_path, script, held):
+    """Its flock would wait for ever on the holder above it, though the
+    holder names the lock by another path (#370 review)."""
+    (tmp_path / "sub").mkdir()
     lock = str(tmp_path / "load.lock")
     result = subprocess.run(
         # No such file, so a run that is not refused ends at once.
@@ -522,7 +525,7 @@ def test_a_run_under_a_holder_of_its_lock_is_refused(tmp_path, script):
             "HOME": str(tmp_path),
             "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
             "DERBYNET_LOAD_LOCK": lock,
-            "DERBYNET_LOAD_LOCK_HELD": lock,
+            "DERBYNET_LOAD_LOCK_HELD": f"{tmp_path}/{held}",
         },
     )
     assert result.returncode == 2
@@ -530,26 +533,44 @@ def test_a_run_under_a_holder_of_its_lock_is_refused(tmp_path, script):
     assert not (tmp_path / "run").exists()
 
 
-def test_a_run_under_a_holder_of_another_lock_takes_its_own(tmp_path):
+@pytest.mark.parametrize(
+    "script, args, code",
+    [
+        (HOLD_LOCK, ["bash", "-c", 'echo "$DERBYNET_LOAD_LOCK_HELD"'], 0),
+        # pytest finds no such file and exits 4, past the refusal.
+        (SCRIPT, ["--loops", "0", "no_such_test.py"], 4),
+    ],
+    ids=["hold-load-lock.sh", "pytest-under-load.sh"],
+)
+def test_a_run_under_a_holder_of_another_lock_takes_its_own(
+    tmp_path, script, args, code
+):
     """A load run's pytest carries DERBYNET_LOAD_LOCK_HELD, and a test it
-    runs that starts a hand-off on another lock is not refused."""
+    runs that starts either script on another lock is not refused (#370
+    review: `= "$LOCK"` made `-n` survived)."""
     lock = tmp_path / "load.lock"
     folder = tmp_path / "handoff"
     folder.mkdir()
-    result = subprocess.run(
-        [str(HOLD_LOCK), "bash", "-c", 'echo "$DERBYNET_LOAD_LOCK_HELD"'],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        cwd=folder,
-        env={
-            **os.environ,
-            "DERBYNET_LOAD_LOCK": str(lock),
-            "DERBYNET_LOAD_LOCK_HELD": str(tmp_path / "other.lock"),
-        },
-    )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines()[-1] == str(lock)
+    out = tmp_path / "out"
+    with out.open("w") as stdout:
+        result = subprocess.run(
+            [str(script), *args],
+            stdout=stdout,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=60,
+            cwd=folder,
+            env={
+                **os.environ,
+                "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+                "DERBYNET_LOAD_LOCK": str(lock),
+                "DERBYNET_LOAD_LOCK_HELD": str(tmp_path / "other.lock"),
+            },
+        )
+    assert result.returncode == code, result.stderr + out.read_text()
+    assert "runs under a holder" not in result.stderr
+    # Each held its own lock: its holder lines name it.
+    assert lock.read_text().startswith("pid ")
 
 
 def stop_a_hand_off(tmp_path, sig):
@@ -712,7 +733,11 @@ def test_a_failed_journalctl_is_named_not_counted(tmp_path):
     code, out, _ = load_run_of(
         tmp_path,
         "    raise AssertionError('net::ERR_NETWORK_CHANGED at app.css')",
-        journalctl="#! /bin/sh\necho 'Failed to parse timestamp' >&2\nexit 1\n",
+        journalctl=(
+            "#! /bin/sh\n"
+            "case \"$*\" in *--since*) ;; *) echo 'a kernel line'; exit 0;; esac\n"
+            "echo 'Failed to parse timestamp' >&2\nexit 1\n"
+        ),
     )
     assert code == 1, out
     assert (
@@ -744,3 +769,93 @@ def test_a_second_signal_during_the_hand_off_s_cleanup_still_frees_all(
         wait_until(lambda: not any(alive(p) for p in group), "its command gone", 10)
     finally:
         kill_all(group)
+
+
+def test_a_journalctl_that_reads_no_kernel_log_is_named_not_counted(tmp_path):
+    """A journalctl without permission to read the kernel log exits 0 with
+    no lines (#370 review), which would count as "0 veth lines"."""
+    code, out, _ = load_run_of(
+        tmp_path,
+        "    raise AssertionError('net::ERR_NETWORK_CHANGED at app.css')",
+        journalctl="#! /bin/sh\nexit 0\n",
+    )
+    assert code == 1, out
+    assert "the kernel log has no count (journalctl reads no kernel log here)" in out
+    assert "veth lines" not in out
+
+
+def test_a_network_change_with_no_failed_file_prints_no_rerun(tmp_path):
+    """With no file named, `-m browser -n 0` alone would run every browser
+    test (#370 review)."""
+    code, out, _ = load_run_of(
+        tmp_path,
+        "    import pytest\n\n"
+        "    pytest.exit('net::ERR_NETWORK_CHANGED at app.css', returncode=3)",
+    )
+    assert code == 3, out
+    assert "veth lines" in out
+    assert "Rerun each failed file" not in out
+    assert "No failed file is named in the summary: rerun the run's own command." in out
+
+
+def hold_with(tmp_path, args, env=None, stdin=None):
+    """hold-load-lock.sh run with `args` in `tmp_path/handoff`: (its exit
+    code, its stderr)."""
+    folder = tmp_path / "handoff"
+    folder.mkdir(exist_ok=True)
+    result = subprocess.run(
+        [str(HOLD_LOCK), *args],
+        input=stdin,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        cwd=folder,
+        env={
+            "PATH": os.environ["PATH"],
+            "HOME": str(tmp_path),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+            **(env or {}),
+        },
+    )
+    return result.returncode, result.stderr
+
+
+def test_a_hand_off_with_no_command_is_refused(tmp_path):
+    code, err = hold_with(tmp_path, [])
+    assert code == 2
+    assert err == "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]\n"
+    assert not (tmp_path / "load.lock").exists()
+
+
+def test_a_hand_off_with_no_flock_is_refused_with_how_to_install_it(tmp_path):
+    """macOS has no `flock(1)` (#354 review)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for tool in ("dirname", "mkdir"):
+        (bin_dir / tool).symlink_to(shutil.which(tool))
+    code, err = hold_with(tmp_path, ["true"], {"PATH": str(bin_dir)})
+    assert code == 2
+    assert "it needs flock(1)" in err
+    assert "brew install flock" in err
+    assert "not found" not in err
+
+
+def test_a_hand_off_on_an_unwritable_lock_is_refused_by_name(tmp_path):
+    folder = tmp_path / "locked"
+    folder.mkdir()
+    folder.chmod(0o555)
+    lock = folder / "load.lock"
+    try:
+        code, err = hold_with(tmp_path, ["true"], {"DERBYNET_LOAD_LOCK": str(lock)})
+    finally:
+        folder.chmod(0o755)
+    assert code == 2
+    assert f"it cannot open the load lock {lock}" in err
+    assert "Permission denied" not in err
+
+
+def test_a_hand_off_s_command_reads_its_stdin(tmp_path):
+    """bash gives a background command /dev/null for stdin (#370 review)."""
+    code, err = hold_with(tmp_path, ["bash", "-c", "cat > got"], stdin="a line\n")
+    assert code == 0, err
+    assert (tmp_path / "handoff" / "got").read_text() == "a line\n"
