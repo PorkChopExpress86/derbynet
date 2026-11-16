@@ -903,7 +903,8 @@ check_acme() {
     out="$(timeout 30 openssl s_client -connect "$https" -servername derby.test </dev/null 2>/dev/null \
         | openssl x509 -noout -issuer -ext subjectAltName)"
     echo "$out"
-    [[ "$out" == *"issuer=CN=Pebble Intermediate CA"* && "$out" == *"DNS:derby.test"* ]] \
+    # OpenSSL 3.0, the runner's, prints "issuer=CN = Pebble ..."; 3.5 drops the spaces.
+    [[ "$out" == issuer=*"Pebble Intermediate CA"* && "$out" == *"DNS:derby.test"* ]] \
         || fail "Caddy serves no certificate from Pebble for derby.test"
     "${compose[@]}" down --volumes
 }
