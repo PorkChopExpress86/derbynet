@@ -178,8 +178,8 @@ def _due_scene(event, name="Awards"):
 
 
 def test_the_coordinator_poll_alone_shows_the_finished_steps_scene(coordinator, event):
-    """With no kiosk polling, the scene still changes 10 s after the round
-    ends: the race dashboard polls every 2 s."""
+    """With no kiosk polling, the scene still changes once it is due: the
+    race dashboard polls every 2 s."""
     _due_scene(event)
 
     coordinator.get("/action.php", {"query": "poll.coordinator"})

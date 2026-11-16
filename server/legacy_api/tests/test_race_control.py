@@ -15,6 +15,7 @@ from accounts.permissions import Perm
 from core.models import RaceState
 from legacy_api.registry import REGISTRY
 from legacy_api.tests.conftest import log_in, post
+from legacy_api.tests.whole_seconds import SECOND, Clock, near_misses
 from racing.models import HeatLane, Round, TimerStatus
 from racing.services import polls, results
 from roster.models import Racer
@@ -351,13 +352,56 @@ def test_poll_results_lists_the_round_and_the_last_five_minutes(client, event):
     assert found["next-heat"] == {"roundid": lions.pk, "heat": 2}
 
 
-def test_the_results_window_does_not_depend_on_the_time_zone(event, settings):
-    now = timezone.now()
-    cutoffs = set()
+def _recent_results() -> int:
+    """How many results `poll.results` lists for a round with no heats, at
+    the moment the test's `Clock` reads."""
+    found = reply(
+        Client().get("/action.php", {"query": "poll.results", "roundid": "9999"})
+    )
+    return len(found["results"])
+
+
+@pytest.mark.parametrize(("completed", "read", "listed"), near_misses(300, 4, 0))
+def test_poll_results_counts_whole_seconds(
+    client, event, monkeypatch, completed, read, listed
+):
+    """#360: PHP lists a result of another round while
+    `completed > date('Y-m-d H:i:s', time() - 300)`
+    (`query.poll.results.inc:27-31`), and `dbnow_expr()` writes `completed`
+    in whole seconds (`data.inc:25-31`), so a heat finished at a whole second
+    or a fraction past it is listed until the first moment of the 300th
+    second after its own, and not 1 microsecond longer. The heat's 4 lanes
+    are its 4 results."""
+    rounds = setup_race(client)
+    ok(client, f"action=heat.select&roundid={rounds['Tigers'].pk}&now_racing=1")
+    clock = Clock(monkeypatch)
+    clock.now = completed
+    finish(event)
+    clock.now = read
+
+    assert _recent_results() == listed
+
+
+def test_the_results_window_does_not_depend_on_the_time_zone(
+    client, event, monkeypatch, settings
+):
+    """The window's bound is an aware UTC datetime, so in each zone a heat
+    finished 0.6 s past a whole second is listed 1 microsecond before the
+    300th second after its own, and not from it."""
+    rounds = setup_race(client)
+    ok(client, f"action=heat.select&roundid={rounds['Tigers'].pk}&now_racing=1")
+    clock = Clock(monkeypatch)
+    clock.now = SECOND + timedelta(microseconds=600_000)
+    finish(event)
+    edge = SECOND + timedelta(seconds=300)
+    counts = {}
     for zone in ("UTC", "America/New_York", "Pacific/Kiritimati"):
         settings.TIME_ZONE = zone
-        cutoffs.add(polls.results_cutoff(now))
-    assert cutoffs == {now - timedelta(seconds=300)}
+        clock.now = edge - timedelta(microseconds=1)
+        before = _recent_results()
+        clock.now = edge
+        counts[zone] = (before, _recent_results())
+    assert set(counts.values()) == {(4, 0)}
 
 
 def test_poll_results_is_anonymous_and_formats_times_as_text(client, event):
@@ -432,23 +476,38 @@ def test_a_heat_with_no_current_round_names_roundid_minus_1(client, event):
     }
 
 
-def test_a_reschedule_underway_is_busy_even_for_an_unknown_round(client, event):
+@pytest.mark.parametrize("round_name", ["unknown", "Lions"])
+def test_a_reschedule_underway_is_busy_even_for_an_unknown_round(
+    client, event, round_name
+):
     """`action.schedule.reschedule.inc` checks its marker before it builds the
-    adjuster for the round."""
-    setup_race(client)
+    adjuster for the round, so an unknown round is `busy` too. #64 C58: PHP
+    sends `busy` and then `return`s from the include (`:769-771`), so
+    `action.php`'s `!@include` (`:93-95`) overwrites it with `unrecognized`,
+    "Unrecognized action: schedule.reschedule" (#360's probe); the port
+    answers `busy`."""
+    rounds = setup_race(client)
+    roundid = rounds[round_name].pk if round_name in rounds else 9999
     RaceState.objects.filter(event=event).update(reschedule_started_at=timezone.now())
 
-    found = reply(post(client, "action=schedule.reschedule&roundid=9999"))
+    found = reply(post(client, f"action=schedule.reschedule&roundid={roundid}"))
 
-    assert found["outcome"]["code"] == "busy"
+    assert found["outcome"] == {
+        "summary": "failure",
+        "code": "busy",
+        "description": "Another schedule adjustment is already underway",
+    }
 
 
 def test_an_unknown_round_with_no_reschedule_underway_is_nochart(client, event):
+    """#64 C59: PHP answers HTTP 500 with an empty body here (#360's probe);
+    the port answers 200 and `nochart`, as the adjuster finds no chart."""
     setup_race(client)
 
-    found = reply(post(client, "action=schedule.reschedule&roundid=9999"))
+    response = post(client, "action=schedule.reschedule&roundid=9999")
 
-    assert found["outcome"]["code"] == "nochart"
+    assert response.status_code == 200
+    assert reply(response)["outcome"]["code"] == "nochart"
     assert RaceState.objects.get(event=event).reschedule_started_at is None
 
 

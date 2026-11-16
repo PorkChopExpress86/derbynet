@@ -28,6 +28,7 @@ from core.services import lock_race_state
 from kiosks.models import Scene
 from kiosks.services import apply_scene
 from racing.engine import heat_state as hs
+from racing.engine.phpcompat import from_php_time, php_time
 from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
 from racing.services import heats, schedule
 from racing.services.rounds import (
@@ -444,15 +445,26 @@ def apply_due_scene(event, now: datetime) -> bool:
     `query=poll.coordinator` call it, so the scene changes while either a
     kiosk or the PHP coordinator page polls. Returns whether it applied the
     scene. The polls call it every few seconds, so the lock is
-    taken only when a scene is due."""
-    due = RaceState.objects.filter(event=event, playlist_scene_at__lt=now)
+    taken only when a scene is due.
+
+    PHP writes `time() + 10` (`playlist.inc:157`) and applies the scene at
+    `$when < time()` (`scenes.inc:110`), in whole seconds (#360). The port
+    stores `now + PLAYLIST_SCENE_DELAY` with its fraction, whose second is
+    PHP's, so a step finished 0.6 s past a whole second shows its scene
+    from 11 s past that second, 10.4 s after it finished
+    (`test_a_finished_round_shows_its_scene_in_whole_seconds`). The query's
+    bound is the first moment of `php_time(now)`."""
+    due = RaceState.objects.filter(
+        event=event, playlist_scene_at__lt=from_php_time(php_time(now))
+    )
     if not due.exists():
         return False
     with transaction.atomic():
         # A kiosk poll of a read-only event still shows a scene that fell
         # due before the switch: the scene is display state (#212).
         state = lock_race_state(event.id, writable=False)
-        if state.playlist_scene_at is None or not state.playlist_scene_at < now:
+        at = state.playlist_scene_at
+        if at is None or not php_time(at) < php_time(now):
             return False
         state.playlist_scene_at = None
         if state.playlist_scene_id is not None:
