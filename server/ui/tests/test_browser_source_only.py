@@ -42,8 +42,8 @@ def fixtureless_tests(source: str) -> list[tuple[str, int]]:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 args = node.args
                 names = [a.arg for a in args.posonlyargs + args.args + args.kwonlyargs]
-                if method and names[:1] == ["self"]:
-                    names = names[1:]
+                if method:
+                    names = names[1:]  # self
                 if node.name.startswith("test") and not names:
                     found.append((node.name, node.lineno))
             elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
@@ -72,6 +72,11 @@ class TestKiosk:
         pass
 
     def test_method_on_a_page(self, page):
+        pass
+
+
+class Helpers:
+    def test_like(self):
         pass
 """
     assert fixtureless_tests(source) == [
