@@ -94,8 +94,36 @@ class Rule(unittest.TestCase):
                          ["`setup.php`'s status list shows"])
         self.assertEqual(claims('`setup.php` also links it.'), ['`setup.php` also links'])
         self.assertEqual(claims('`setup.php` quietly links it.'), ['`setup.php` quietly links'])
+        self.assertEqual(claims("`setup.php`'s long status list shows it."),
+                         ["`setup.php`'s long status list shows"])
         # Four words after the possessive are past the rule's three.
         self.assertEqual(claims("`setup.php`'s long status list here shows it."), [])
+        self.assertEqual(claims('`setup.php`’s list shows it.'), ['`setup.php`’s list shows'])
+
+    def test_each_adverb(self):
+        adverbs = ('also', 'still', 'only', 'never', 'always', 'then', 'first')
+        found = [claims(f'`a.php` {adverb} links b.') for adverb in adverbs]
+        self.assertEqual(found, [[f'`a.php` {adverb} links'] for adverb in adverbs])
+
+    def test_page_file_or_script_after_the_name(self):
+        for noun in ('page', 'file', 'script'):
+            with self.subTest(noun=noun):
+                self.assertEqual(claims(f'The `a.php` {noun} shows y.'),
+                                 [f'`a.php` {noun} shows'])
+        self.assertEqual(claims('The `a.php` button shows y.'), [])
+
+    def test_known_misses(self):
+        """Forms the rule doesn't read, listed in #346's PR: an appositive,
+        a Markdown link's name, a plural subject, a modal or a negated verb,
+        and a cite of another file elsewhere in the sentence."""
+        for text in ('`a.php`, the setup page, shows y.',
+                     '[x](website/a.php) shows y.',
+                     '`a.php` and `b.php` link x.',
+                     '`a.php` will show x.',
+                     "`a.php` doesn't link x.",
+                     '`a.php` shows y (`b.php:9`).'):
+            with self.subTest(text=text):
+                self.assertEqual(claims(text), [])
 
     def test_the_cite_is_looked_for_in_the_claims_own_sentence(self):
         self.assertEqual(claims('`a.php` links b. See `a.php:3`.'), ['`a.php` links'])
@@ -113,6 +141,10 @@ class Rule(unittest.TestCase):
         self.assertEqual(claims('  ```sh\n`a.php` links b.\n  ```'), [])
         self.assertEqual(claims('```\nx\n```\n`a.php` links b.'), ['`a.php` links'])
         self.assertEqual(claims('Open http://localhost/index.php returns 200.'), [])
+        # No name starts after a `.` or a `-` either: neither `com/.a.php`
+        # nor `y/a.php` is a name here.
+        self.assertEqual(claims('Open https://x.com/.a.php links b.'), [])
+        self.assertEqual(claims('Open https://x-y/a.php links b.'), [])
 
     def test_only_php_and_inc_files(self):
         self.assertEqual(claims('`kiosk.js` links b.'), [])

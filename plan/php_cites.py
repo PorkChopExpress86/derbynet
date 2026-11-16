@@ -3,10 +3,12 @@
 D98 first said PHP's `fake-timer.php` links the dashboard and the timer test,
 where `fake-timer.php:99-100` links `coordinator.php` and `timer.php`; #307's
 ticket carried three cites one line off and one wrong target. A sentence that
-names a PHP file (`*.php` or `*.inc`, under `website/` or the `templates/`
-build.xml copies into it) with a verb right after the name, or after the
-name's possessive and up to three words ("`setup.php`'s status list shows"),
-needs a `file:line` cite in that sentence. A name with no such verb after it
+names a PHP file (any path ending in `.php` or `.inc`, so `templates/` files,
+which build.xml copies into `website/`, count too) with a verb right after
+the name, after "page", "file" or "script" ("The `a.php` page shows"), or
+after the name's possessive (`'s` or a curly `’s`) and up to three words
+("`setup.php`'s status list shows"), needs a `file:line` cite in that
+sentence. A name with no such verb after it
 is a plain mention, and passes. Whether the cited line says what the sentence
 claims still takes a read.
 
@@ -40,7 +42,7 @@ VERBS = frozenset('''
     draws takes keeps uses checks polls lists prints redirects renders accepts
     rejects puts adds deletes removes saves loads counts sorts gives names opens
     starts runs waits hides displays records fetches updates inserts does echoes
-    serves defines parses requires maps posts needs has tests wraps holds
+    serves defines parses requires maps posts needs has have tests wraps holds
     excludes preserves depends handles pauses leaves
     linked showed shown stored wrote answered refused called returned sent drew
     took kept used checked polled listed printed redirected rendered accepted
@@ -54,7 +56,8 @@ VERBS = frozenset('''
 FILE = r"(?<![\w/.-])(?:[\w-]+/)*[\w.-]+\.(?:php|inc)\b"
 CLAIM = re.compile(
     r"`?(?P<file>" + FILE + r")`?"
-    r"(?:'s(?:\s+[\w`()-]+){0,3}?)?"
+    r"(?:\s+(?:page|file|script))?"
+    r"(?:['’]s(?:\s+[\w`()-]+){0,3}?)?"
     r"\s+(?:(?:also|still|only|never|always|then|first|\w+ly)\s+)?"
     r"(?P<verb>" + "|".join(sorted(VERBS)) + r")\b"
 )
