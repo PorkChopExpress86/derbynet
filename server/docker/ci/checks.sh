@@ -735,7 +735,8 @@ check_caddy() {
 
     say "a DERBYNET_ADDRESS that is no address stops Caddy with a message"
     status=0
-    out="$(DERBYNET_ADDRESS='192.168.1.20;x' "${compose[@]}" run --rm --no-deps -T caddy 2>&1)" || status=$?
+    # Bounded: a Caddy that takes the value runs on, and would hold the check.
+    out="$(DERBYNET_ADDRESS='192.168.1.20;x' timeout 60 "${compose[@]}" run --rm --no-deps -T caddy 2>&1)" || status=$?
     echo "$out" | tail -1
     echo "exit status $status"
     [ "$status" != 0 ] || fail "Caddy started"
