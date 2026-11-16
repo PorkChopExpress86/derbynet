@@ -2,7 +2,7 @@
 
 Browsers give a web page the camera and the serial port only when the page is secure. The page must come over HTTPS, or from the same computer as `localhost`. The web standard calls such a page a secure context.
 
-On a race's own network, DerbyNet serves both plain HTTP and HTTPS. This guide says which pages need HTTPS, and how each phone accepts the server's certificate.
+On a race's own network, DerbyNet serves both plain HTTP and HTTPS: Caddy, the container in front of the server, serves HTTPS (D107). This guide says which pages need HTTPS, and how each phone comes to trust it.
 
 ## Which pages need HTTPS
 
@@ -15,38 +15,47 @@ On a race's own network, DerbyNet serves both plain HTTP and HTTPS. This guide s
 
 Every other page works over plain HTTP: check-in without the live camera, the race dashboard, the kiosks, standings, and these guides. Kiosk screens, `derby-timer.jar`, and the Raspberry Pi scripts use plain HTTP, and the server never redirects them to HTTPS.
 
-On the computer that runs the server, `http://localhost/` is already secure. Every other device uses the HTTPS address, such as `https://192.168.1.20/`.
+On the computer that runs the server, `http://localhost/` is already secure. Every other device uses the HTTPS address, such as `https://192.168.1.20/`. The one-command `docker run` setup has no HTTPS, so there the four pages above work only at `http://localhost/` ([Plain HTTP with one command](install-docker.md#plain-http-with-one-command)).
 
-## The certificate of this install
+## Trust this install's certificate authority
 
-HTTPS needs a certificate, which tells the browser who the server is. On its first start, the DerbyNet container makes a certificate and a private key for this install, and keeps them in the `tls` folder of the data volume. Every install has its own key, and nobody else has a copy. The certificate lasts 825 days, and the container makes a new one when it has expired.
+HTTPS needs a certificate, which tells the browser who the server is. On its first start, Caddy makes a certificate authority for this install, and keeps it in the `derbynet_caddy` volume. It signs the certificates for `https://localhost/` and for the address in `DERBYNET_ADDRESS` ([Start DerbyNet](install-docker.md#start-derbynet)). Every install has its own authority, and nobody else has its key.
 
-The certificate is self-signed: no certificate authority vouches for it, so each browser warns the first time it opens the HTTPS address. The warning is expected for this server on your own network. Accept it once on each device, and the browser remembers it.
+No browser knows this authority until you install its root, once on each phone, tablet and laptop. After that, the browser trusts the HTTPS address with no warning, for as long as the `derbynet_caddy` volume is kept. Caddy serves the root at `/derbynet-ca.crt`, such as `http://192.168.1.20/derbynet-ca.crt`. Without the root, each browser warns the first time it opens the HTTPS address, and you can accept the warning instead, as below.
 
-A browser warns again when the certificate changes: after it expires, or after you start a new data volume.
+These steps are not tested by the project's checks; menu names change between versions.
 
-### Accept it on an iPhone or iPad
+### Install it on an iPhone or iPad
 
-1. Open the HTTPS address in Safari, such as `https://192.168.1.20/`.
-2. Safari says "This Connection Is Not Private". Tap "Show Details".
-3. Tap "visit this website", then "Visit Website" to confirm.
+1. Open `http://192.168.1.20/derbynet-ca.crt` in Safari. Safari asks whether to allow a configuration profile. Tap "Allow".
+2. Open Settings. Tap "Profile Downloaded", then "Install", and enter the passcode.
+3. In Settings, open General, then About, then Certificate Trust Settings. Turn on full trust for "Caddy Local Authority".
 
-### Accept it on an Android phone
+### Install it on an Android phone
 
-1. Open the HTTPS address in Chrome.
-2. Chrome says "Your connection is not private". Tap "Advanced".
-3. Tap "Proceed to" the address.
+1. Open `http://192.168.1.20/derbynet-ca.crt` in Chrome, which saves the file.
+2. Open Settings, then Security, then Encryption and credentials, then Install a certificate, then CA certificate. Choose the saved file.
 
-### Accept it on a laptop
+Phone makers name these menus differently. Search Settings for "CA certificate".
 
-In Chrome or Edge, the warning page has an "Advanced" button, then a link to go on to the address. Firefox has "Advanced", then "Accept the Risk and Continue". On a Mac, Safari works as on an iPhone.
+### Install it on a laptop
+
+- On a Mac, open the saved file. Keychain Access adds it. Double-click "Caddy Local Authority", open Trust, and choose "Always Trust".
+- On Windows, open the saved file, choose "Install Certificate", and place it in "Trusted Root Certification Authorities".
+- Firefox keeps its own list: Settings, Privacy & Security, Certificates, View Certificates, Authorities, Import.
+
+### Or accept the warning
+
+Without the root, each browser warns the first time, and remembers the answer. On an iPhone, Safari says "This Connection Is Not Private": tap "Show Details", then "visit this website". In Chrome on Android or a laptop, tap "Advanced", then "Proceed to" the address. Firefox has "Advanced", then "Accept the Risk and Continue".
+
+An install from before Caddy keeps its old certificate in the `tls` folder of the data volume, and Caddy serves it as it is, so phones that accepted it keep it (D119). [HTTPS after an upgrade from an older image](install-docker.md#https-after-an-upgrade-from-an-older-image) says how to move to the authority instead.
 
 ## Use a certificate of your own
 
-A server reached by a real host name, such as `derby.example.org`, can have a certificate that browsers trust, so nobody sees a warning. Let's Encrypt (<https://letsencrypt.org/>) gives them at no charge.
+A server reached by a real host name, such as `derby.example.org`, can have a certificate that browsers trust, so nobody installs anything. Let's Encrypt (<https://letsencrypt.org/>) gives them at no charge.
 
-- Put the certificate as `cert.pem`, and its private key as `key.pem`, in the `tls` folder of the data volume, before you start the container. The container then uses them, and makes none of its own.
-- Or run DerbyNet behind your web site's own web server, which holds the certificate. See [Host DerbyNet on a web server](install-docker.md#host-derbynet-on-a-web-server).
+- Put a `DERBYNET_DOMAIN=derby.example.org` line in `.env`, and Caddy gets one from Let's Encrypt. See [HTTPS and the certificate](install-docker.md#https-and-the-certificate).
+- Or run DerbyNet behind your own web server or proxy, which holds the certificate. See [Use your own proxy](install-docker.md#use-your-own-proxy).
 
 ## Take photos without HTTPS
 
