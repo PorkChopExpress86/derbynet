@@ -32,9 +32,20 @@ KNOWN = {
 }
 
 
+def uses_fixtures(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Whether a `@pytest.mark.usefixtures(...)` decorates `function`."""
+    return any(
+        isinstance(d, ast.Call)
+        and isinstance(d.func, ast.Attribute)
+        and d.func.attr == "usefixtures"
+        for d in function.decorator_list
+    )
+
+
 def fixtureless_tests(source: str) -> list[tuple[str, int]]:
     """`(test, line)` of each test function, top-level or a method of a
-    `Test*` class, that takes no fixture."""
+    `Test*` class, that takes no fixture, by argument or by
+    `usefixtures`."""
     found = []
 
     def tests(body, method):
@@ -44,7 +55,11 @@ def fixtureless_tests(source: str) -> list[tuple[str, int]]:
                 names = [a.arg for a in args.posonlyargs + args.args + args.kwonlyargs]
                 if method:
                     names = names[1:]  # self
-                if node.name.startswith("test") and not names:
+                if (
+                    node.name.startswith("test")
+                    and not names
+                    and not uses_fixtures(node)
+                ):
                     found.append((node.name, node.lineno))
             elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
                 tests(node.body, True)
@@ -78,10 +93,27 @@ class TestKiosk:
 class Helpers:
     def test_like(self):
         pass
+
+
+@pytest.mark.usefixtures("live_server")
+def test_uses_a_fixture():
+    pass
+
+
+@pytest.mark.slow
+def test_marked_only():
+    pass
+
+
+@helper()
+def test_decorated_by_a_call():
+    pass
 """
     assert fixtureless_tests(source) == [
         ("test_reads_the_source", 2),
         ("test_method_with_none", 15),
+        ("test_marked_only", 33),
+        ("test_decorated_by_a_call", 38),
     ]
 
 

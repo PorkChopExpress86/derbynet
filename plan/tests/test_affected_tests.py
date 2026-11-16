@@ -697,6 +697,17 @@ class BeforeTheHandOff(unittest.TestCase):
                       'ui/tests/test_dashboard.py ui/tests/test_kiosk_pages.py\n',
                       before_hand_off(out))
 
+    def test_a_changed_test_file_lists_its_helpers_mutants(self):
+        """--listed skips a test file unless --file names it: #345's
+        scanner lived in tests/test_docker_checks.py (#345 retro, PR #364's
+        review)."""
+        out = run('server/ui/tests/test_dashboard.py', 'server/ui/tests/test_kiosk_pages.py')
+        for path in ('ui/tests/test_dashboard.py', 'ui/tests/test_kiosk_pages.py'):
+            self.assertIn(f'  uv run python tools/mutate.py --listed --file {path} -- '
+                          '<the node ids of the tests that call its helpers>\n',
+                          before_hand_off(out))
+        self.assertNotIn('mutate.py', commands(out))
+
     def test_a_changed_source_file_lists_its_operand_mutants(self):
         for path in ('server/awards/editing.py', 'server/ui/static/ui/kiosk.css',
                      'server/ui/static/ui/kiosk-ondeck.js'):

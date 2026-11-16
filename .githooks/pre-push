@@ -13,10 +13,10 @@
 # push, as plan-checks.yml does: #222 changed the parity gate a plan test read,
 # and only CI found it (#218 retro).  They run once: source-checks.sh runs
 # them on a push it checks, and the hook runs them itself on any other push
-# (#311 retro).  It runs check-paths.sh --docs, as plan-checks.yml does, on a
-# push that changes a guide in docs/, the check or the docs build, whatever
-# else the push changes: #345's backticked `manage.py` passed the hook and
-# failed the hand-off (#345 retro).  It refuses a push typed in the same
+# (#311 retro).  It runs check-paths.sh --docs, as plan-checks.yml does, on
+# every push of a branch, about 3 s: #345's backticked `manage.py` passed the
+# hook and failed the hand-off, and a push that moves a path a guide cites
+# changes no guide (#345 retro, PR #364's review).  It refuses a push typed in the same
 # command after a pytest run or a read of its output (#282 retro).  Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
@@ -80,9 +80,10 @@ EOF
 # Git sends one "<local ref> <local sha> <remote ref> <remote sha>" line per
 # ref it pushes.  A new branch has no remote sha; compare it with master.
 changed=
-guides=
+pushed=
 while read -r _ local_sha _ remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue  # a deleted ref
+  pushed=1
   if [ "$remote_sha" = "$ZERO" ]; then
     base="$(git merge-base "$local_sha" origin/master 2>/dev/null \
               || git merge-base "$local_sha" master 2>/dev/null || true)"
@@ -92,8 +93,8 @@ while read -r _ local_sha _ remote_sha; do
   # The whole list first: under pipefail, grep -q's early exit can fail the
   # pipe (server/tests/test_pipefail_pipes.py).  image.yml runs checks.sh,
   # which server/tests/test_docker_checks.py reads (#58 retro).
-  # With no base, both checks run; a base this clone lacks lists nothing,
-  # as the diff inside the test did before.
+  # With no base, the server checks run; a base this clone lacks lists
+  # nothing, as the diff inside the test did before.
   names=
   if [ -n "$base" ]; then
     names="$(git diff --name-only "$base" "$local_sha" || true)"
@@ -103,15 +104,10 @@ while read -r _ local_sha _ remote_sha; do
             <<<"$names"; then
     changed=1
   fi
-  if [ -z "$base" ] \
-       || grep -qE '^(docs/|server/docs/adr/check-paths\.sh$|server/ui/docs/build\.py$)' \
-            <<<"$names"; then
-    guides=1
-  fi
 done
 # The guides' check, as plan-checks.yml runs it, printing only its failures
-# and its count.
-if [ -n "$guides" ]; then
+# and its count, whatever the push changes: a guide can cite any path.
+if [ -n "$pushed" ]; then
   echo "pre-push: server/docs/adr/check-paths.sh --docs docs" >&2
   (cd "$ROOT" && bash server/docs/adr/check-paths.sh --docs docs) \
     | grep -v -e '^ok ' -e '^allowed '

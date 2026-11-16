@@ -16,6 +16,11 @@ from pathlib import Path
 
 BROWSER = Path(__file__).resolve().parent / "browser"
 
+# What it reads past, left to review: a clock taken into a name first
+# (`clock = page.clock`, then `clock.pause_at(T)`), and a time held in two
+# names. A function nested in another is read on its own and as part of
+# the outer one, so a pair inside it is named twice.
+
 # #348 fixes this one; remove the entry when it merges, and add none.
 KNOWN = {("test_kiosk_scale_mph.py", "open_paused")}
 

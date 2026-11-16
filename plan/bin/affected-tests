@@ -56,10 +56,12 @@ targets, then:
   tool prints (D101);
 - before the commands, `tools/docstring_claims.py` on each changed test file,
   then with `--check` on the PR body draft over every one of them, since a
-  catch-all row fails (#341 retro), and `tools/operand_mutants.py` when a changed hand-written source file can
-  hold a condition (not a migration or vendored code), plan/'s Python tools
-  and tests among them, with `tools/mutate.py --listed`, which runs every
-  mutant it lists (#336 retro): run them before the first hand-off run,
+  catch-all row fails (#341 retro), and `tools/operand_mutants.py` when a
+  changed hand-written source file can hold a condition (not a migration or
+  vendored code), plan/'s Python tools and tests among them, with
+  `tools/mutate.py --listed`, which runs every mutant it lists (#336 retro),
+  and `--listed --file` on each changed test file for its helpers (#345
+  retro): run them before the first hand-off run,
   since a claim or a mutant they find means an edit, and the run starts
   again (#312 retro);
 - the commands, from server/.
@@ -2007,13 +2009,18 @@ def report(plan, tree):
             # catch-all row for the rest failed review (#341 retro).
             say('  uv run python tools/docstring_claims.py --check <the PR body draft> '
                 + ' '.join(plan.changed_tests))
+        base = f' --base {plan.base}' if plan.from_git else ''
         if plan.changed_source:
-            base = f' --base {plan.base}' if plan.from_git else ''
             say(f'  uv run python tools/operand_mutants.py{base}')
             # #336 picked its mutants by hand, mostly one way, and 21 of 98
             # survived on branches no test reached (#336 retro).
             say(f'  uv run python tools/mutate.py --listed{base} -- '
                 '<the node ids of the tests that cover them>')
+        # --listed skips a test file unless --file names it, and then
+        # mutates its helpers, such as #345's scanner (#345 retro, PR #364).
+        for path in plan.changed_tests:
+            say(f'  uv run python tools/mutate.py --listed{base} --file {path} -- '
+                '<the node ids of the tests that call its helpers>')
         say('')
 
     say('Run from server/ (start a run longer than a minute in the background):')

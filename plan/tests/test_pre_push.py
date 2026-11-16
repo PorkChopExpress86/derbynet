@@ -18,10 +18,15 @@ HOOK = Path(__file__).resolve().parents[2] / '.githooks' / 'pre-push'
 SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'source-checks.sh'
 # The server checks' stand-ins: each notes its arguments and passes.
 UV = '#!/bin/sh\necho "uv $*" >>"$STUB_LOG"\n'
-# It notes its arguments, and fails the guides' check when the guide holds
-# BROKEN, as #345's `manage.py` did.
+# It notes its arguments, and fails the guides' check when a guide holds
+# BROKEN, as #345's `manage.py` did, or cites a `server/` path that is gone.
 CHECK_PATHS = '''echo "check-paths.sh $*" >>"$STUB_LOG"
-if [ "$1" = --docs ] && grep -qs BROKEN docs/*.md; then echo "MISSING  manage.py"; exit 1; fi
+if [ "$1" = --docs ]; then
+  if grep -qs BROKEN docs/*.md; then echo "MISSING  manage.py"; exit 1; fi
+  for p in $(grep -ohs '`server/[^`]*`' docs/*.md | tr -d '`'); do
+    [ -e "$p" ] || { echo "MISSING  $p"; exit 1; }
+  done
+fi
 echo "0 failures"
 '''
 FAILING = '''import os
@@ -37,12 +42,15 @@ class Plan(unittest.TestCase):
 
 
 def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
-         remote: str = 'base') -> subprocess.CompletedProcess:
+         remote: str = 'base', base_files: dict | None = None, delete: tuple = (),
+         local: str = 'head') -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
     sends: the base commit; 'orphan', a new branch with no common history
-    (no base); or 'missing', a commit this clone lacks."""
+    (no base); or 'missing', a commit this clone lacks. `base_files` are
+    committed in the base, `delete` is removed by the change, and `local`
+    'deleted' pushes a deletion of the branch."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -70,6 +78,9 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         env.update(PATH=f'{stubs}:{os.environ["PATH"]}', STUB_LOG=str(Path(tmp, 'ran')))
         (repo / 'plan' / 'tests').mkdir(parents=True)
         (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
+        for name, body in (base_files or {}).items():
+            (repo / name).parent.mkdir(parents=True, exist_ok=True)
+            (repo / name).write_text(body)
         git('add', '.')
         git('commit', '-q', '-m', 'base')
         base = git('rev-parse', 'HEAD')
@@ -79,6 +90,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
             path = repo / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
+        for name in delete:
+            git('rm', '-q', name)
         git('add', '.')
         git('commit', '-q', '-m', 'change')
         head = git('rev-parse', 'HEAD')
@@ -88,7 +101,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
             hook = ['bash', '-c', f'{shell}\nbash .githooks/pre-push origin url; exit $?']
         result = subprocess.run(
             hook, cwd=repo, env=env,
-            input=f'refs/heads/b {head} refs/heads/b {REMOTES.get(remote, base)}\n',
+            input=f'refs/heads/b {head if local == "head" else "0" * 40} refs/heads/b '
+                  f'{REMOTES.get(remote, base)}\n',
             capture_output=True, text=True)
         ran = Path(tmp, 'ran')
         result.ran = ran.read_text() if ran.exists() else ''
@@ -115,7 +129,7 @@ class PrePush(unittest.TestCase):
     def test_a_push_outside_server_runs_plan_tests_once(self):
         result = push('plan/README.md', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.ran, 'plan/tests\n')
+        self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
 
     def test_a_failing_plan_test_stops_a_push_outside_server(self):
         result = push('plan/README.md', FAILING)
@@ -138,9 +152,11 @@ class ImageWorkflow(unittest.TestCase):
         self.assertIn('pre-push: server/docs/adr/check-paths.sh', result.stderr)
 
     def test_another_workflow_push_runs_only_plan_tests(self):
+        """And the guides' check, which runs on every push (Guides)."""
         result = push('.github/workflows/server.yml', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('check-paths.sh', result.stderr)
+        self.assertNotIn('pre-push: server/docs/adr/check-paths.sh\n', result.stderr)
+        self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
 
 
 PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
@@ -152,8 +168,10 @@ class Guides(unittest.TestCase):
     check-paths.sh --docs reads as a missing top-level path. The hook ran
     check-paths.sh on the ADRs alone, so the push passed and the hand-off
     failed, and a new head cost a second push and a restart (#345 retro).
-    plan-checks.yml runs the guides' check, so the hook runs it when a push
-    changes a guide or the check, with or without a change to server/."""
+    plan-checks.yml runs the guides' check, so the hook runs it on every
+    push of a branch: a guide can cite any path, and PR #364's review moved
+    a cited `server/accounts/permissions.py` past a hook that ran it only
+    for a push that changed a guide."""
 
     def test_a_guide_push_runs_the_guides_check(self):
         result = push('docs/install-docker.md', PASSING)
@@ -174,15 +192,19 @@ class Guides(unittest.TestCase):
         self.assertIn('MISSING  manage.py', result.stdout)
         self.assertIn('check-paths.sh --docs docs\n', result.ran)
 
-    def test_a_change_to_the_check_or_the_docs_build_runs_it(self):
-        # The push writes its text into the changed file, so the stand-in
-        # check is pushed with a line added.
-        for changed, text in (('server/docs/adr/check-paths.sh', CHECK_PATHS + '# changed\n'),
-                              ('server/ui/docs/build.py', 'changed\n')):
-            with self.subTest(changed=changed):
-                result = push(changed, PASSING, text=text)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn('check-paths.sh --docs docs\n', result.ran)
+    def test_a_move_of_a_cited_path_stops_the_push(self):
+        """PR #364's review: `git mv server/accounts/permissions.py`, which
+        a guide cites, changes no guide."""
+        cited = 'server/accounts/permissions.py'
+        result = push('server/accounts/moved.py', PASSING, delete=(cited,),
+                      base_files={'docs/roles.md': f'See `{cited}`.\n', cited: 'x\n'})
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(f'MISSING  {cited}', result.stdout)
+
+    def test_a_branch_deletion_alone_runs_no_guides_check(self):
+        result = push('plan/README.md', PASSING, local='deleted')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.ran, 'plan/tests\n')
 
     def test_a_push_with_no_base_runs_every_check(self):
         """A new branch with no history in common with master has no base:
@@ -193,18 +215,19 @@ class Guides(unittest.TestCase):
         self.assertIn('check-paths.sh --docs docs\n', result.ran)
         self.assertIn('uv run --locked ruff check', result.ran)
 
-    def test_a_base_the_clone_lacks_runs_only_plan_tests(self):
-        """As before the guides' check: the diff lists nothing."""
+    def test_a_base_the_clone_lacks_runs_the_guides_check_and_plan_tests(self):
+        """The diff lists nothing, so the server checks are skipped, as
+        before the guides' check."""
         result = push('docs/install-docker.md', PASSING, remote='missing')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.ran, 'plan/tests\n')
+        self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
 
-    def test_a_push_with_no_guide_skips_the_guides_check(self):
+    def test_every_branch_push_runs_the_guides_check(self):
         for changed in ('plan/README.md', 'server/tools/parity_gate.py', 'server/docs/adr/README.md'):
             with self.subTest(changed=changed):
-                result = push(changed, PASSING, text='BROKEN\n')
+                result = push(changed, PASSING)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertNotIn('--docs', result.ran)
+                self.assertIn('check-paths.sh --docs docs\n', result.ran)
 
 
 class ChainedPush(unittest.TestCase):
