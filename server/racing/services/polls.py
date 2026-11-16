@@ -12,7 +12,7 @@ timer that has timed out; here the poll only reports it.
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
 
@@ -24,7 +24,7 @@ from core.models import Event, RaceSettings, RaceState
 from core.setup_details import plural
 from kiosks.models import ReplayStatus
 from racing.engine import heat_state as hs
-from racing.engine.phpcompat import php_time
+from racing.engine.phpcompat import from_php_time, php_time
 from racing.engine.standings.ordinals import ordinal
 from racing.models import HeatLane, PlaylistEntry, RosterEntry, Round, TimerStatus
 from racing.services import rounds as rounds_service
@@ -40,8 +40,10 @@ from roster.services.racers import CAR_PHOTOS, HEADSHOTS, photo_url, render_labe
 FULL_NAME = 0
 FIRST_NAME_LAST_INITIAL = 1
 
-RESULTS_WINDOW = timedelta(seconds=300)
-"""`poll.results` also lists every result written in the last five minutes."""
+RESULTS_SECONDS = 300
+"""`poll.results` also lists every result written in the last five minutes:
+`completed > date('Y-m-d H:i:s', time() - 300)`
+(`query.poll.results.inc:27-31`)."""
 
 # `$fps_to_scale_mph` in `json-heat-results.inc`: feet per second to scale
 # miles per hour, for a 7" car that scales to 14.5 feet.
@@ -493,8 +495,9 @@ def ready_aggregates(event: Event) -> list[dict]:
 
 def poll_coordinator(event: Event, shown_round=None, shown_heat=None) -> dict:
     """`query=poll.coordinator`: first show a finished playlist step's scene
-    once it is due (#34), so the scene changes 10 s after the round ends
-    even when no kiosk polls, then the coordinator payload."""
+    once it is due (#34, `apply_due_scene`), so the scene changes 10 to 11 s
+    after the round ends even when no kiosk polls, then the coordinator
+    payload."""
     apply_due_scene(event, timezone.now())
     return coordinator(event, shown_round, shown_heat)
 
@@ -868,12 +871,6 @@ def next_heat(run: Running) -> hs.HeatRef | tuple[int | None, int] | None:
     return found
 
 
-def results_cutoff(now: datetime) -> datetime:
-    """The start of `poll.results`'s window. The comparison is made on
-    aware datetimes, so the server's time zone never splits the window."""
-    return now - RESULTS_WINDOW
-
-
 def schedule_signature(event: Event) -> dict | list:
     """`schedule_signature()` in `website/inc/rounds.inc`: per round,
     `resultid-racerid` for each heat lane in heat and lane order, or "" for
@@ -915,9 +912,18 @@ def poll_results(
         round_id = int(raw_round) if raw_round is not None else run.roundid
     except ValueError:
         round_id = None
+    # PHP's `completed > date(..., time() - 300)` compares whole seconds
+    # (#360): `dbnow_expr()` writes `completed` without its fraction
+    # (`data.inc:25-31`), so PHP lists a result of second
+    # `php_time(now) - 299` or later, and the bound is that second's first
+    # moment. A result completed 0.6 s past a whole second is listed until
+    # 300 s past that second, 299.4 s after it was written
+    # (`test_poll_results_counts_whole_seconds`). The bound is an aware UTC
+    # datetime, so the server's time zone never splits the window.
+    recent = Q(completed__gte=from_php_time(php_time(now) - RESULTS_SECONDS + 1))
     rows = (
         HeatLane.objects.filter(event=event)
-        .filter(Q(round_id=round_id) | Q(completed__gt=results_cutoff(now)))
+        .filter(Q(round_id=round_id) | recent)
         .order_by("id")
     )
     results = []
