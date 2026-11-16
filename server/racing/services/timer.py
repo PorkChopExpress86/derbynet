@@ -26,6 +26,7 @@ from core.services import EventReadOnly, lock_race_state, require_writable
 from legacy_api.xml import php_escape
 from racing.engine import heat_state as hs
 from racing.engine.phpcompat import (
+    from_php_time,
     php_equals,
     php_int,
     php_numeric,
@@ -45,9 +46,11 @@ Counted in whole seconds, as PHP's `last_contact + 60 < time()` counts them
 (`timer-state.inc:72`)."""
 CONTACT_TIMEOUT = timedelta(seconds=CONTACT_SECONDS)
 MALFUNCTION_DURATION = timedelta(seconds=60)
-"""How long a malfunction the timer cannot detect stays in force."""
-REMOTE_START_TIMEOUT = timedelta(seconds=60)
-"""`has_remote_start()`: a timer offered remote start within the last minute."""
+"""How long a malfunction the timer cannot detect stays in force:
+`set_malfunction(60, ...)` (`action.timer-message.inc:206`)."""
+REMOTE_START_SECONDS = 60
+"""`has_remote_start()`: a timer offered remote start within the last minute,
+`remote-start + 60 >= time()` (`remote-start.inc:14`)."""
 COMPETING_WINDOW = 1
 """Seconds, as PHP's `time()` counts them, in which a second timer's HELLO
 competes with the first."""
@@ -101,8 +104,13 @@ class TimerState:
         if not found.assume_connected and stale:
             found.timed_out = found.state != State.NOT_CONNECTED
             found.state = State.NOT_CONNECTED
+        # PHP's `malfunction_expiration <= time()` (`timer-state.inc:82`),
+        # in whole seconds (#307, #356): PHP stores `time() + 60`
+        # (`timer-state.inc:126`), so a malfunction 0.6 s past a whole second
+        # ends 60 s past that second, 59.4 s after it began
+        # (`test_a_malfunction_expires_in_whole_seconds`).
         expires = found.malfunction_expires_at
-        if expires is not None and expires <= now:
+        if expires is not None and php_time(expires) <= php_time(now):
             found.malfunction_expires_at = None
             found.malfunction_message = ""
         return found
@@ -736,18 +744,29 @@ def details(event: Event) -> dict:
 
 
 def has_remote_start(row: TimerStatus, now: datetime) -> bool:
+    """`has_remote_start()`'s `remote-start + 60 >= time()`
+    (`remote-start.inc:14`), in whole seconds (#307, #356): PHP stores the
+    offer as `time()` (`remote-start.inc:7`), so an offer 0.6 s past a whole
+    second holds until 61 s past that second, 60.4 s after it
+    (`test_remote_start_counts_whole_seconds`)."""
     seen = row.remote_start_seen_at
-    return seen is not None and seen + REMOTE_START_TIMEOUT >= now
+    return seen is not None and php_time(seen) + REMOTE_START_SECONDS >= php_time(now)
 
 
 def request_remote_start(event: Event, now: datetime | None = None) -> bool:
     """`timer.remote-start`: queue a start for the next timer message, if
-    the timer offered remote start within the last minute."""
+    the timer offered remote start within the last minute
+    (`has_remote_start`). Its `remote-start + 60 >= time()` holds for an
+    offer in second `php_time(now) - 60` or later, so the bound is the first
+    moment of that second (#356)."""
     now = now or timezone.now()
     with transaction.atomic():
         lock_race_state(event.id)
         queued = TimerStatus.objects.filter(
-            event=event, remote_start_seen_at__gte=now - REMOTE_START_TIMEOUT
+            event=event,
+            remote_start_seen_at__gte=from_php_time(
+                php_time(now) - REMOTE_START_SECONDS
+            ),
         ).update(remote_start_requested=True)
     return queued == 1
 
