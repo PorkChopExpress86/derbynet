@@ -108,12 +108,18 @@ def test_marked_only():
 @helper()
 def test_decorated_by_a_call():
     pass
+
+
+@pytest.mark.timeout(5)
+def test_marked_with_a_call():
+    pass
 """
     assert fixtureless_tests(source) == [
         ("test_reads_the_source", 2),
         ("test_method_with_none", 15),
         ("test_marked_only", 33),
         ("test_decorated_by_a_call", 38),
+        ("test_marked_with_a_call", 43),
     ]
 
 
