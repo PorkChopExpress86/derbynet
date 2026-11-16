@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.mutate import counts
+from tools.mutate import counts, main
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "mutate.py"
 MODULE = "def bound(a, b):\n    return a < b\n\n\ndef twice():\n    return 1 + 1\n"
@@ -86,6 +86,7 @@ def test_a_killed_mutant_exits_0_and_the_file_is_restored(project):
     run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
     assert run.returncode == 0, run.stdout + run.stderr
     assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
+    assert run.stdout.count("test session starts") == 1, "pytest's output once"
     assert (project / "mod.py").read_text() == MODULE
 
 
@@ -278,6 +279,7 @@ def test_a_run_past_its_bound_is_stopped(project):
     assert run.returncode == 2
     assert run.stdout.splitlines()[-1].startswith("ERROR")
     assert "timed out" in run.stdout.splitlines()[-1]
+    assert "test_mod.py" in run.stdout, "what pytest printed before the bound"
     assert (project / "mod.py").read_text() == MODULE
 
 
@@ -286,3 +288,422 @@ def test_the_counts_come_from_the_last_summary_line():
     summary."""
     output = "1 failed, 2 passed in 0.5s\n1 passed, 3 deselected in 0.1s\nwarning\n"
     assert counts(output) == {"passed": 1, "deselected": 3}
+
+
+# --listed (#336 retro): every mutant tools/operand_mutants.py lists.
+PICK = """
+
+def pick(a, b):
+    if a > 0 and b > 0:
+        return 1
+    return 0
+"""
+PICK_TESTS = """
+
+def test_pick():
+    from mod import pick
+    assert pick(1, 1) == 1
+    assert pick(0, 1) == 0
+"""
+
+
+def listed(project, *pytest_args, tool=(), wait=False):
+    command = [sys.executable, str(TOOL), "--listed", "--base", "HEAD~1", *tool]
+    command += ["--", "-p", "no:cacheprovider", *pytest_args]
+    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    if wait:
+        return subprocess.Popen(
+            command, cwd=project, env=env, text=True, stdout=subprocess.PIPE
+        )
+    return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
+
+
+def commit(project, module, tests=""):
+    (project / "mod.py").write_text(module)
+    (project / "test_mod.py").write_text(TESTS + tests)
+    subprocess.run([*GIT, "commit", "-qam", "change"], cwd=project, check=True)
+
+
+def test_listed_runs_each_mutant_and_names_each_survivor(project):
+    """`pick(1, 1)` and `pick(0, 1)` leave `b > 0` made true alive: no case
+    has b at 0 or below."""
+    commit(project, MODULE + PICK, PICK_TESTS)
+    run = listed(project, "test_mod.py::test_pick")
+    assert run.stdout.splitlines()[:6] == [
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  True",
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  False",
+        "KILLED    mod.py:10  operand  a > 0  ->  True",
+        "KILLED    mod.py:10  operand  a > 0  ->  False",
+        "SURVIVED  mod.py:10  operand  b > 0  ->  True",
+        "KILLED    mod.py:10  operand  b > 0  ->  False",
+    ], run.stdout
+    assert "6 listed: 5 KILLED, 1 SURVIVED, 0 REFUSED, 0 ERROR" in run.stdout
+    assert (
+        run.stdout.splitlines()[-1] == "  SURVIVED  mod.py:10  operand  b > 0  ->  True"
+    )
+    assert run.returncode == 1
+    assert (project / "mod.py").read_text() == MODULE + PICK
+
+
+def test_listed_exits_0_when_every_mutant_is_killed(project):
+    commit(project, MODULE + PICK, PICK_TESTS + "    assert pick(1, 0) == 0\n")
+    run = listed(project, "test_mod.py::test_pick")
+    assert "6 listed: 6 KILLED" in run.stdout
+    assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_listed_refuses_a_text_twice_on_its_line(project):
+    """A line mutant's text is placed by its line, and a line that holds it
+    twice is left to a run by hand."""
+    commit(project, MODULE + "\n\ndef low(a, b):\n    return min(a, b) + min(a, b)\n")
+    run = listed(project, "test_mod.py::test_the_bound")
+    assert run.stdout.splitlines()[0].startswith("REFUSED   mod.py:10  min"), run.stdout
+    assert "not once on its line" in run.stdout.splitlines()[0]
+    assert run.returncode == 2
+
+
+def test_listed_refuses_a_diff_with_no_mutant(project):
+    """A Markdown file's `min(a, b)` is prose, not a mutant, and a test
+    file's own condition is no code under test."""
+    (project / "notes.md").write_text("Take min(a, b).\n")
+    subprocess.run([*GIT, "add", "notes.md"], cwd=project, check=True)
+    test_if = "\n\ndef test_if():\n    if bound(1, 2):\n        pass\n"
+    commit(project, MODULE + "\n\ndef three():\n    return 3\n", test_if)
+    run = listed(project, "test_mod.py::test_the_bound")
+    assert run.returncode == 2
+    assert "no mutant listed" in run.stderr
+    assert run.stdout == (
+        "SKIPPED   notes.md: 2 listed, in no source file\n"
+        "SKIPPED   test_mod.py: 2 listed, in a test file\n"
+    )
+
+
+def test_listed_takes_no_old_or_new(project):
+    run = listed(project, "test_mod.py", tool=("--old", "a"))
+    assert run.returncode == 2
+    assert "--listed takes no --old" in run.stderr
+
+
+@pytest.mark.parametrize(
+    "signum", [signal.SIGTERM, signal.SIGINT, signal.SIGHUP], ids=lambda s: s.name
+)
+def test_a_stopped_listed_run_restores_the_file_and_names_what_it_left(project, signum):
+    commit(project, MODULE + PICK, PICK_TESTS)
+    tool = listed(project, "test_mod.py::test_waits", wait=True)
+    deadline = time.monotonic() + 30
+    while not (project / "started").exists() or not (project / "started").read_text():
+        assert time.monotonic() < deadline, "the test never started"
+        assert tool.poll() is None
+        time.sleep(0.05)
+    assert "if True:" in (project / "mod.py").read_text(), "mutated while it runs"
+    tool.send_signal(signum)
+    out, _ = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signum
+    assert (project / "mod.py").read_text() == MODULE + PICK
+    assert "STOPPED  6 of 6 not run:" in out
+    assert out.count("  NOT RUN  mod.py:10") == 6
+    run = listed(project, "test_mod.py::test_pick")
+    assert run.returncode == 1, "no lock is left behind: " + run.stderr
+
+
+@pytest.mark.parametrize(
+    ("argv", "why"),
+    [
+        (["--listed", "--old", "a"], "--listed takes no --old"),
+        (["--listed", "--new", "a"], "--listed takes no --old, --new"),
+        (["--listed", "--expect", "pass"], "or --expect"),
+        (["--old", "a", "--new", "b"], "give one --file"),
+        (["--file", "m.py", "--new", "b"], "give one --file"),
+        (["--file", "m.py", "--old", "a"], "give one --file"),
+        (["--file", "m.py", "--file", "n.py", "--old", "a", "--new", "b"], "give one"),
+    ],
+)
+def test_a_mode_given_the_other_modes_arguments_is_a_usage_error(argv, why, capsys):
+    with pytest.raises(SystemExit) as stopped:
+        main([*argv, "--", "test_mod.py"])
+    assert stopped.value.code == 2
+    assert why in capsys.readouterr().err
+
+
+def test_listed_narrows_to_each_file_given_and_lists_scripts_and_stylesheets(project):
+    """A stylesheet's call and a Python script with no extension are
+    mutated; a file left out of --file is not."""
+    (project / "tool").write_text("#!/usr/bin/env python3\nif a:\n    pass\n")
+    (project / "a.css").write_text(".a { width: min(1px, 2px); }\n")
+    subprocess.run([*GIT, "add", "tool", "a.css"], cwd=project, check=True)
+    commit(project, MODULE + PICK, PICK_TESTS)
+    run = listed(project, "test_mod.py::test_the_bound", tool=("--file", "tool"))
+    assert [line.split()[1] for line in run.stdout.splitlines()[:2]] == [
+        "tool:2",
+        "tool:2",
+    ], run.stdout
+    assert "2 listed" in run.stdout
+    run = listed(project, "test_mod.py::test_the_bound", tool=("--file", "a.css"))
+    # The row names the stylesheet and its line 1; split, so no cite check
+    # takes it for a cite of a real file.
+    where = ("a.css", "1")
+    assert any(
+        line.split()[1] == ":".join(where)
+        and line.endswith("  min  min(1px, 2px)  ->  1px")
+        for line in run.stdout.splitlines()
+    ), run.stdout
+    assert "2 listed" in run.stdout
+
+
+def test_listed_names_an_error_with_pytests_last_lines_and_exits_2(project):
+    commit(project, MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n")
+    run = listed(project, "test_mod.py::test_no_such")
+    assert run.stdout.splitlines()[0].startswith("ERROR     mod.py:10  min"), run.stdout
+    assert "\n    ERROR: not found: " in run.stdout
+    assert "2 listed: 0 KILLED, 0 SURVIVED, 0 REFUSED, 2 ERROR" in run.stdout
+    assert run.returncode == 2
+
+
+@pytest.mark.parametrize(
+    ("tool", "why"),
+    [(("--base", "no-such-rev"), "git diff"), ((), "not in a git work tree")],
+)
+def test_listed_refuses_a_base_git_cannot_read_or_no_git_tree(project, tool, why):
+    if not tool:
+        subprocess.run(["rm", "-rf", str(project / ".git")], check=True)
+    command = [sys.executable, str(TOOL), "--listed", *tool, "--", "test_mod.py"]
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["GIT_CEILING_DIRECTORIES"] = str(project.parent)
+    run = subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
+    assert run.returncode == 2
+    assert why in run.stderr
+
+
+def test_a_listed_mutant_past_its_bound_is_an_error(project):
+    commit(project, MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n")
+    run = listed(project, "test_mod.py::test_waits", tool=("--timeout", "3"))
+    assert run.stdout.splitlines()[0].startswith("ERROR     mod.py:10  min"), run.stdout
+    assert "(timed out after 3 s)" in run.stdout.splitlines()[0]
+    assert "0 KILLED, 0 SURVIVED, 0 REFUSED, 2 ERROR" in run.stdout
+    assert run.returncode == 2
+    assert (project / "mod.py").read_text().endswith("return min(a, b)\n")
+
+
+def test_a_run_past_its_bound_that_printed_nothing_is_an_error(project):
+    """With -q pytest prints nothing before test_waits ends."""
+    run = mutate(
+        project, "1 + 1", "2", "-q", "test_mod.py::test_waits", tool=("--timeout", "3")
+    )
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1].startswith("ERROR")
+    assert (project / "mod.py").read_text() == MODULE
+
+
+# A stand-in run of the tool with one of its steps slowed or followed by an
+# edit, for the #358 review's cases: a second signal while the file is put
+# back or the lock is taken, and an edit by someone else during the run.
+WRAPPER = """\
+import os, pathlib, sys, time
+sys.path.insert(0, {tools!r})
+import mutate
+ORIGINAL = pathlib.Path("mod.py").read_bytes()
+write_bytes, fdopen, result = pathlib.Path.write_bytes, os.fdopen, mutate._result
+unlink = pathlib.Path.unlink
+
+
+def mark(name):
+    open(name, "w").close()
+
+
+def slow_restore(self, data):
+    if self.name != "mod.py" or data != ORIGINAL:
+        return write_bytes(self, data)
+    with open(self, "wb") as f:
+        f.write(data[: len(data) // 2])
+        f.flush()
+        mark("restoring")
+        time.sleep(2)
+        f.write(data[len(data) // 2 :])
+    return len(data)
+
+
+def slow_lock(fd, *args, **kwargs):
+    os.fdopen = fdopen
+    mark("locking")
+    time.sleep(2)
+    return fdopen(fd, *args, **kwargs)
+
+
+def slow_unlock(self, *args):
+    if self.name.startswith("mutate-"):
+        mark("unlocking")
+        time.sleep(2)
+    return unlink(self, *args)
+
+
+def edit_after_first(*args):
+    mutate._result = result
+    with open("mod.py", "a") as f:
+        f.write("# an edit\\n")
+    return result(*args)
+
+
+{patch}
+sys.exit(mutate.main(sys.argv[1:]))
+"""
+
+
+def wrapped(project, patch, mode, *pytest_args, tool=()):
+    """The tool, under `patch`, in `mode` (single: `1 + 1` -> `2`)."""
+    (project / "wrap.py").write_text(
+        WRAPPER.format(tools=str(TOOL.parent), patch=patch)
+    )
+    first = ["--file", "mod.py", "--old", "1 + 1", "--new", "2"]
+    command = [sys.executable, "wrap.py"] + (
+        ["--listed", "--base", "HEAD~1"] if mode == "listed" else first
+    )
+    command += [*tool, "--", "-p", "no:cacheprovider", *pytest_args]
+    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
+    return subprocess.Popen(
+        command,
+        cwd=project,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
+def wait_for(project, name, tool):
+    deadline = time.monotonic() + 30
+    while not (project / name).exists():
+        assert time.monotonic() < deadline, f"no {name}"
+        assert tool.poll() is None, tool.communicate()
+        time.sleep(0.02)
+
+
+def no_lock(project):
+    return not list((project / ".git").glob("mutate-*.lock"))
+
+
+@pytest.mark.parametrize("mode", ["single", "listed"])
+def test_a_second_signal_while_the_file_is_put_back_waits_for_it(project, mode):
+    """A SIGTERM comes each time a restore is half done: the restore
+    finishes once, the lock goes, and the run ends on the signal. Before
+    #358's fix the second left the file half written in a single run, and
+    a third did in a listed run, which restored twice."""
+    module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
+    commit(project, module)
+    tool = wrapped(
+        project,
+        "pathlib.Path.write_bytes = slow_restore",
+        mode,
+        "test_mod.py::test_waits",
+    )
+    wait_for(project, "started", tool)
+    tool.send_signal(signal.SIGTERM)
+    restores, deadline = 0, time.monotonic() + 60
+    while tool.poll() is None:
+        assert time.monotonic() < deadline, "the run never ended"
+        if (project / "restoring").exists():
+            (project / "restoring").unlink()
+            restores += 1
+            tool.send_signal(signal.SIGTERM)
+        time.sleep(0.02)
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signal.SIGTERM
+    assert (project / "mod.py").read_bytes() == module.encode()
+    assert no_lock(project)
+    assert restores == 1
+    assert "stopped:" not in err, "a signal is no edit by someone else"
+
+
+@pytest.mark.parametrize("mode", ["single", "listed"])
+@pytest.mark.parametrize(
+    ("patch", "marker"),
+    [
+        ("os.fdopen = slow_lock", "locking"),
+        ("pathlib.Path.unlink = slow_unlock", "unlocking"),
+    ],
+    ids=["taken", "removed"],
+)
+def test_a_signal_while_the_lock_is_taken_or_removed_leaves_no_lock(
+    project, mode, patch, marker
+):
+    module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
+    commit(project, module)
+    tool = wrapped(project, patch, mode, "test_mod.py::test_the_bound")
+    wait_for(project, marker, tool)
+    tool.send_signal(signal.SIGTERM)
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signal.SIGTERM
+    assert no_lock(project)
+    assert (project / "mod.py").read_text() == module
+    assert "stopped:" not in err, "a signal is no edit by someone else"
+
+
+@pytest.mark.parametrize("mode", ["single", "listed"])
+def test_an_edit_during_the_run_is_left_as_it_is_and_named(project, mode):
+    """Someone appends a line while the mutant's test runs: the tool puts
+    nothing back over it, and names the file."""
+    module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
+    commit(project, module)
+    tool = wrapped(
+        project, "", mode, "test_mod.py::test_waits", tool=("--timeout", "3")
+    )
+    wait_for(project, "started", tool)
+    mutant = (project / "mod.py").read_text()
+    with open(project / "mod.py", "a") as f:
+        f.write("# someone's edit\n")
+    out, err = tool.communicate(timeout=60)
+    assert tool.returncode == 2, out + err
+    assert "mod.py changed while mutate.py held it" in err
+    assert (project / "mod.py").read_text() == mutant + "# someone's edit\n"
+    assert no_lock(project)
+    if mode == "listed":
+        assert "STOPPED  2 of 2 not run:" in out
+
+
+def test_listed_stops_when_the_file_changes_between_mutants(project):
+    """The edit lands after the first mutant's file is put back: the second
+    mutant is never written over it."""
+    module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
+    commit(project, module)
+    tool = wrapped(
+        project,
+        "mutate._result = edit_after_first",
+        "listed",
+        "test_mod.py::test_the_bound",
+    )
+    out, err = tool.communicate(timeout=60)
+    assert tool.returncode == 2, out + err
+    assert "mod.py changed while mutate.py held it" in err
+    assert "STOPPED  1 of 2 not run:" in out
+    assert (project / "mod.py").read_text() == module + "# an edit\n"
+    assert no_lock(project)
+
+
+def test_after_a_sigkill_the_next_listed_run_is_refused(project):
+    commit(project, MODULE + PICK, PICK_TESTS)
+    tool = listed(project, "test_mod.py::test_waits", wait=True)
+    deadline = time.monotonic() + 30
+    while not (project / "started").exists() or not (project / "started").read_text():
+        assert time.monotonic() < deadline, "the test never started"
+        time.sleep(0.05)
+    tool.kill()
+    tool.wait(timeout=30)
+    assert "if True:" in (project / "mod.py").read_text(), "the mutant is left"
+    run = listed(project, "test_mod.py::test_pick")
+    assert run.returncode == 2
+    assert "refused" in run.stderr
+    assert "if True:" in (project / "mod.py").read_text(), "and left alone"
+
+
+def test_listed_runs_a_crlf_files_mutants(project):
+    """Each span of a CRLF file is its own, so its mutants run (#358 review:
+    every one was refused)."""
+    (project / "mod.py").write_bytes((MODULE + PICK).replace("\n", "\r\n").encode())
+    (project / "test_mod.py").write_text(
+        TESTS + PICK_TESTS + "    assert pick(1, 0) == 0\n"
+    )
+    subprocess.run([*GIT, "commit", "-qam", "crlf"], cwd=project, check=True)
+    run = listed(project, "test_mod.py::test_pick")
+    assert "6 listed: 6 KILLED" in run.stdout, run.stdout
+    assert (project / "mod.py").read_bytes() == (MODULE + PICK).replace(
+        "\n", "\r\n"
+    ).encode()

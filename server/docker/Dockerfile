@@ -67,6 +67,10 @@ ENV DJANGO_SECRET_KEY=static-stage-only \
     DERBYNET_CONFIG_DIR=/tmp/static-stage/config \
     DERBYNET_STATIC_ROOT=/opt/derbynet/static \
     DERBYNET_DOCS_ROOT=/opt/derbynet/docs
+# The marker that makes manage.py refuse to run as root but for these three
+# commands (D103, ROOT_COMMANDS in manage.py), written before they run, so the
+# build runs them under the refusal the image has.
+RUN echo 'manage.py refuses root here (D103)' > /opt/derbynet/docker-image
 # build_docs renders the guides in docs/ for /docs/ (#61), so a request only
 # reads files and no page needs the network.
 RUN python3 -I ui/css_build.py fetch \
@@ -88,6 +92,7 @@ RUN apt-get update \
 COPY --from=venv /opt/derbynet/venv /opt/derbynet/venv
 COPY --from=static /opt/derbynet/static /opt/derbynet/static
 COPY --from=static /opt/derbynet/docs /opt/derbynet/docs
+COPY --from=static /opt/derbynet/docker-image /opt/derbynet/docker-image
 # nginx serves /static/ from /opt/derbynet/static.  The server's own static
 # folders, which a dev bind mount replaces, hold only the committed files: the
 # browser timer's js/, css/ and img/, which Django serves at the paths
