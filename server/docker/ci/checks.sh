@@ -739,7 +739,8 @@ check_caddy() {
     out="$(DERBYNET_ADDRESS='192.168.1.20;x' timeout 60 "${compose[@]}" run --rm --no-deps -T caddy 2>&1)" || status=$?
     echo "$out" | tail -1
     echo "exit status $status"
-    [ "$status" != 0 ] || fail "Caddy started"
+    # 124 is timeout's: Caddy ran on past the message.
+    [ "$status" != 0 ] && [ "$status" != 124 ] || fail "Caddy did not stop at the malformed address"
     [[ "$out" == *"DERBYNET_DOMAIN and DERBYNET_ADDRESS hold names and addresses, not '192.168.1.20;x'"* ]] \
         || fail "no message names the value"
     "${compose[@]}" down --volumes
