@@ -245,48 +245,135 @@ def test_a_limit_from_the_view_passes(source):
 # round (the cases below). The scan reads every module under server/ but tests,
 # migrations and tools; an age passed to a helper under another name
 # (`ui/dashboard/state.py`'s `_age(row.last_contact, now)`) is review's.
+#
+# #356 widened it to every stored moment PHP holds as a `time()` value
+# (TIMES), to a local name bound to one (`seen = row.remote_start_seen_at`,
+# or a `values` or `values_list` of it), and to a queryset bound on one, such as
+# `last_contact__gt=now - LISTED_FOR`, which compares the fraction inside
+# the database. A bound that is `from_php_time(...)`, the first moment of a
+# PHP second, gives PHP's answer at every moment of the edge second.
+#
+# Shapes the scan reads past, which stay review's (#356's review; none is in
+# the tree at #356): a transform before the lookup
+# (`last_contact__second__lt`), a bound passed as `filter(**{...})`,
+# `.timestamp()` arithmetic, `F("malfunction_expires_at") - X`, an annotated
+# alias (`seen: datetime = ...`), a fraction inside `from_php_time(...)`,
+# and a local clock difference such as reschedule's
+# `(clock() - started).total_seconds()` (#360).
 CONTACT = "last_contact"
+TIMES = frozenset(
+    {
+        CONTACT,
+        "remote_start_seen_at",  # remote-start.inc:7
+        "malfunction_expires_at",  # timer-state.inc:126
+        "expires_at",  # messages.inc:62
+        "playlist_scene_at",  # playlist.inc:157
+        "completed",  # data.inc:28, a whole-second datetime('now')
+        "reschedule_started_at",  # action.schedule.reschedule.inc:773
+    }
+)
+LOOKUPS = frozenset({"gt", "gte", "lt", "lte", "range"})
+WHOLE_SECOND_BOUND = "from_php_time"
 CONTACT_SKIP = {".venv", "tests", "migrations", "tools", "node_modules"}
 # Arithmetic that counts whole seconds itself.
 WHOLE_SECONDS = {
     "racing/services/timer.py::timed_out_at": "floors last_contact to its second",
 }
+# Moments no PHP rule reads.
+PORT_ONLY = {
+    "racing/services/master.py::_emptied_heats": (
+        "D39's held emptied heat against a later result, which PHP never holds"
+    ),
+}
 # Known differences from PHP, each waiting on its ticket. #341 settled
 # replay's two (polls.replay_state, replay.connected).
-OPEN_DIFFERENCES: dict[str, str] = {}
+OPEN_DIFFERENCES: dict[str, str] = {
+    "kiosks/messages.py::_purge": "#360",
+    "racing/services/playlist.py::apply_due_scene": "#360",
+    "racing/services/polls.py::poll_results": "#360",
+    "racing/services/reschedule.py::_take_guard": "#360",
+    "racing/services/reschedule.py::refuse_missing_round": "#360",
+}
 
 
-def _names_contact(node: ast.expr) -> bool:
-    return (isinstance(node, ast.Attribute) and node.attr == CONTACT) or (
-        isinstance(node, ast.Name) and node.id == CONTACT
+def _names_contact(node: ast.expr, aliases=frozenset()) -> bool:
+    return (isinstance(node, ast.Attribute) and node.attr in TIMES) or (
+        isinstance(node, ast.Name) and (node.id in TIMES or node.id in aliases)
+    )
+
+
+def _reads_column(node: ast.expr) -> bool:
+    """`...values_list("reschedule_started_at", flat=True)...`: a query for a
+    stored moment."""
+    return any(
+        isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Attribute)
+        and call.func.attr in ("values_list", "values")
+        and any(isinstance(a, ast.Constant) and a.value in TIMES for a in call.args)
+        for call in ast.walk(node)
+    )
+
+
+def _aliases(tree: ast.AST, owner: dict[ast.AST, str]) -> dict[str, set[str]]:
+    """Per function, the local names bound to a stored moment."""
+    found: dict[str, set[str]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and (
+            _names_contact(node.value) or _reads_column(node.value)
+        ):
+            found.setdefault(owner.get(node, "<module>"), set()).update(
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            )
+    return found
+
+
+def _whole_second_bound(value: ast.expr) -> bool:
+    return (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Name)
+        and value.func.id == WHOLE_SECOND_BOUND
     )
 
 
 def contact_arithmetic(source: str) -> list[tuple[str, int, str]]:
-    """(function, line, expression) for each `last_contact` that is an
-    operand of `+`, `-` or an ordering comparison. A comparison with numbers
-    alone, such as a legacy `last_contact > 0`, is no datetime's."""
+    """(function, line, expression) for each stored moment (TIMES, or a name
+    bound to one) that is an operand of `+`, `-` or an ordering comparison,
+    and each queryset bound on one that is not `from_php_time(...)`. A
+    comparison with numbers alone, such as a legacy `last_contact > 0`, is no
+    datetime's."""
     tree = ast.parse(source)
     owner: dict[ast.AST, str] = {}
     for fn in ast.walk(tree):
         if isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
             for node in ast.walk(fn):
                 owner[node] = fn.name  # an inner def walks later and wins
+    aliases = _aliases(tree, owner)
     found = []
     for node in ast.walk(tree):
+        function = owner.get(node, "<module>")
+        local = aliases.get(function, set())
+        if isinstance(node, ast.keyword) and node.arg is not None:
+            *_, field, lookup = ["", *node.arg.split("__")]
+            if (
+                lookup in LOOKUPS
+                and field in TIMES
+                and not _whole_second_bound(node.value)
+            ):
+                found.append((function, node.lineno, ast.unparse(node)))
+            continue
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add | ast.Sub):
             operands = [node.left, node.right]
         elif isinstance(node, ast.Compare) and any(
             isinstance(op, ORDERING) for op in node.ops
         ):
             operands = [node.left, *node.comparators]
-            others = [o for o in operands if not _names_contact(o)]
+            others = [o for o in operands if not _names_contact(o, local)]
             if all(isinstance(o, ast.Constant) for o in others):
                 continue
         else:
             continue
-        if any(_names_contact(o) for o in operands):
-            found.append((owner.get(node, "<module>"), node.lineno, ast.unparse(node)))
+        if any(_names_contact(o, local) for o in operands):
+            found.append((function, node.lineno, ast.unparse(node)))
     return found
 
 
@@ -312,7 +399,7 @@ def test_a_contact_counts_php_whole_seconds():
     wrong = [
         hit
         for key, hits in found.items()
-        if key not in WHOLE_SECONDS and key not in OPEN_DIFFERENCES
+        if key not in {**WHOLE_SECONDS, **PORT_ONLY, **OPEN_DIFFERENCES}
         for hit in hits
     ]
     assert wrong == [], "count whole seconds with racing.engine.phpcompat.php_time"
@@ -320,7 +407,8 @@ def test_a_contact_counts_php_whole_seconds():
 
 def test_each_whole_seconds_entry_still_has_its_arithmetic():
     found = _contact_findings()
-    assert [k for k in {**WHOLE_SECONDS, **OPEN_DIFFERENCES} if k not in found] == []
+    entries = {**WHOLE_SECONDS, **PORT_ONLY, **OPEN_DIFFERENCES}
+    assert [k for k in entries if k not in found] == []
 
 
 # #307's own lines before its fix round (0a37f3a4).
@@ -340,11 +428,82 @@ def replay_state(event, now):
         pass
 """
 
+# The lines #356 fixed, as origin/master had them (c19031c7).
+KIOSK_LIST_356 = """
+def listed_kiosks(event, now):
+    listed = Kiosk.objects.filter(event=event, last_contact__gt=now - LISTED_FOR)
+"""
+KIOSK_DROP_356 = """
+def all_kiosks(event, now):
+    Kiosk.objects.filter(event=event, last_contact__lt=now - DROPPED_AFTER).delete()
+"""
+REMOTE_START_READ_356 = """
+def has_remote_start(row, now):
+    seen = row.remote_start_seen_at
+    return seen is not None and seen + REMOTE_START_TIMEOUT >= now
+"""
+REMOTE_START_FILTER_356 = """
+def request_remote_start(event, now):
+    queued = TimerStatus.objects.filter(
+        event=event, remote_start_seen_at__gte=now - REMOTE_START_TIMEOUT
+    ).update(remote_start_requested=True)
+"""
+RANGE_BOUND = """
+def recent(event, now):
+    return Kiosk.objects.filter(last_contact__range=(now - LISTED_FOR, now))
+"""
+VALUES_ALIAS = """
+def busy(event_id, now):
+    started = RaceState.objects.values("reschedule_started_at").get()["x"]
+    return started > now - GUARD_EXPIRY
+"""
+CHAINED_ALIAS = """
+def has_remote_start(row, now):
+    first = seen = row.remote_start_seen_at
+    return seen is not None and seen + REMOTE_START_TIMEOUT >= now
+"""
+RELATED_BOUND = """
+def stale(event, now):
+    return Kiosk.objects.filter(event__kiosk__last_contact__lt=now)
+"""
+MALFUNCTION_356 = """
+def read(cls, row, now):
+    expires = found.malfunction_expires_at
+    if expires is not None and expires <= now:
+        pass
+"""
+
 
 @pytest.mark.parametrize(
     "source, count",
-    [(TIMER_AGE_307, 1), (TIMEOUT_DATE_307, 1), (REPLAY_TIMEOUT_COMPARE, 2)],
-    ids=["age-307", "timeout-date-307", "replay-compare"],
+    [
+        (TIMER_AGE_307, 1),
+        (TIMEOUT_DATE_307, 1),
+        (REPLAY_TIMEOUT_COMPARE, 2),
+        (KIOSK_LIST_356, 1),
+        (KIOSK_DROP_356, 1),
+        (REMOTE_START_READ_356, 1),
+        (REMOTE_START_FILTER_356, 1),
+        (MALFUNCTION_356, 1),
+        (RELATED_BOUND, 1),
+        (RANGE_BOUND, 1),
+        (VALUES_ALIAS, 1),
+        (CHAINED_ALIAS, 1),
+    ],
+    ids=[
+        "age-307",
+        "timeout-date-307",
+        "replay-compare",
+        "kiosk-list-356",
+        "kiosk-drop-356",
+        "remote-start-read-356",
+        "remote-start-filter-356",
+        "malfunction-356",
+        "related-bound",
+        "range-bound",
+        "values-alias",
+        "chained-alias",
+    ],
 )
 def test_contact_arithmetic_is_found(source, count):
     assert len(contact_arithmetic(source)) == count
@@ -357,6 +516,18 @@ def _timer_status(timer, now):
 
 def decode(last_contact):
     return _from_unix(last_contact) if last_contact > 0 else None, last_contact < 0
+
+def listed_kiosks(event, now):
+    listed = Kiosk.objects.filter(
+        last_contact__gte=from_php_time(php_time(now) - LISTED_SECONDS + 1)
+    )
+
+def has_remote_start(row, now):
+    seen = row.remote_start_seen_at
+    return seen is not None and php_time(seen) + 60 >= php_time(now)
+
+def never_heard(event):
+    return Kiosk.objects.filter(event=event, last_contact__isnull=True)
 """
 
 

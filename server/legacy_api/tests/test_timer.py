@@ -12,6 +12,7 @@ from django.utils import timezone
 from accounts.permissions import Perm
 from core.models import ActionLog, RaceSettings, RaceState
 from legacy_api.tests.conftest import log_in, post
+from legacy_api.tests.whole_seconds import Clock, near_misses
 from racing.models import AuditEvent, HeatLane, TimerSetting, TimerStatus
 from racing.services import polls
 from racing.services import timer as timer_service
@@ -268,6 +269,30 @@ def test_an_undetectable_malfunction_lasts_a_minute(event, coordinator, jar):
     assert found["message"].startswith("CONNECTED")
 
 
+TROUBLE = ("t356", "img/status/trouble.png")
+CONNECTED = ("CONNECTED (60 sec.)", "img/status/ok.png")
+
+
+@pytest.mark.parametrize(("at", "read", "shown"), near_misses(60, TROUBLE, CONNECTED))
+def test_a_malfunction_expires_in_whole_seconds(
+    event, coordinator, jar, monkeypatch, at, read, shown
+):
+    """#356: PHP sets an undetectable malfunction to expire at
+    `time() + 60` (`timer-state.inc:126`, `action.timer-message.inc:206`)
+    and clears it once `malfunction_expiration <= time()`
+    (`timer-state.inc:82`), so a malfunction at a whole second or a fraction
+    past it ends at the first moment of the 60th second after its own, and
+    not 1 microsecond before."""
+    clock = Clock(monkeypatch)
+    clock.now = at
+    connect(jar)
+    message(jar, "MALFUNCTION&detectable=0&error=t356")
+    clock.now = read
+    found = timer_state(coordinator)
+
+    assert (found["message"], found["icon"]) == shown
+
+
 def test_a_malfunction_is_audited_once_while_troubled(event, jar):
     connect(jar)
     message(jar, "MALFUNCTION&error=Unplugged")
@@ -406,6 +431,33 @@ def test_remote_start_is_refused_a_minute_after_the_offer(event, coordinator, ja
     )
     found = reply(post(coordinator, "action=timer.remote-start"))
     assert found["outcome"]["code"] == "no-remote-start"
+
+
+OFFERED = (True, "success")
+WITHDRAWN = (False, "no-remote-start")
+
+
+@pytest.mark.parametrize(
+    ("offer", "read", "expected"), near_misses(61, OFFERED, WITHDRAWN)
+)
+def test_remote_start_counts_whole_seconds(
+    event, coordinator, jar, monkeypatch, offer, read, expected
+):
+    """#356: PHP stores a remote-start offer as `time()`
+    (`remote-start.inc:7`) and holds it while `remote-start + 60 >= time()`
+    (`remote-start.inc:14`), in whole seconds, so an offer at a whole second
+    or a fraction past it lasts until the first moment of the 61st second
+    after its own, and not 1 microsecond longer. Both the coordinator's
+    timer state and `timer.remote-start`, which queues a start only then
+    (`action.timer.remote-start.inc:6-8`), read it."""
+    clock = Clock(monkeypatch)
+    clock.now = offer
+    message(jar, "HELLO&remote-start=YES")
+    clock.now = read
+    shown = timer_state(coordinator)["remote-start"]
+    found = reply(post(coordinator, "action=timer.remote-start"))
+
+    assert (shown, found["outcome"]["code"]) == expected
 
 
 # ----- flags -----

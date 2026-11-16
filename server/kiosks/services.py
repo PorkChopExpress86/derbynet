@@ -5,7 +5,7 @@ Each function returns PHP's JSON shapes as plain data, and the legacy
 handlers encode them. A kiosk is found by its address within the event.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.db import models, transaction
 
@@ -14,15 +14,18 @@ from core.services import lock_race_state
 from kiosks import pages, parameters
 from kiosks.madlib import madlib
 from kiosks.models import Kiosk, Scene, SceneKiosk
+from racing.engine.phpcompat import from_php_time, php_time
 from racing.models import PlaylistEntry
 
 IDENTIFY = pages.IDENTIFY
 NO_PARAMS = pages.NO_PARAMS
 
-LISTED_FOR = timedelta(seconds=60)
-"""`all_kiosks()` lists a kiosk heard from in the last 60 s."""
-DROPPED_AFTER = timedelta(seconds=3600)
-"""`drop_old_kiosks()` deletes a kiosk silent for an hour."""
+LISTED_SECONDS = 60
+"""`all_kiosks()` lists a kiosk while `time() - last_contact < 60`
+(`kiosks.inc:202`)."""
+DROPPED_SECONDS = 3600
+"""`drop_old_kiosks()` deletes a kiosk once `time() - last_contact > 3600`
+(`kiosks.inc:279`)."""
 
 
 def apply_scene(state: RaceState, scene_id: int) -> None:
@@ -70,16 +73,30 @@ def _sort_key(kiosk: Kiosk):
 
 def listed_kiosks(event, now: datetime) -> list[Kiosk]:
     """The kiosks heard from in the last 60 s, in `all_kiosks()` order. Reads
-    only: the kiosk dashboard page polls it (#46)."""
-    listed = Kiosk.objects.filter(event=event, last_contact__gt=now - LISTED_FOR)
+    only: the kiosk dashboard page polls it (#46).
+
+    PHP's `time() - last_contact < 60` counts whole seconds (#307, #356): it
+    lists a contact in second `php_time(now) - 59` or later, so the bound is
+    the first moment of that second."""
+    listed = Kiosk.objects.filter(
+        event=event,
+        last_contact__gte=from_php_time(php_time(now) - LISTED_SECONDS + 1),
+    )
     return sorted(listed, key=_sort_key)
 
 
 def all_kiosks(event, now: datetime) -> list[dict]:
     """`all_kiosks()`, which first runs `drop_old_kiosks()`. Each kiosk
-    carries its own parameters, where PHP's are always null (C20)."""
+    carries its own parameters, where PHP's are always null (C20).
+
+    `drop_old_kiosks()`'s `time() - last_contact > 3600` counts whole seconds
+    (#307, #356): it deletes a contact before second `php_time(now) - 3600`,
+    whose first moment is the bound."""
     with transaction.atomic():
-        Kiosk.objects.filter(event=event, last_contact__lt=now - DROPPED_AFTER).delete()
+        Kiosk.objects.filter(
+            event=event,
+            last_contact__lt=from_php_time(php_time(now) - DROPPED_SECONDS),
+        ).delete()
         listed = listed_kiosks(event, now)
     return [
         {
