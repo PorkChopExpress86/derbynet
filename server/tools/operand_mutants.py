@@ -30,10 +30,8 @@ that line of the new file. For each added line it lists:
 - in a JavaScript file, each listener an `addEventListener('name'` or
   `.on('name'` (htmx's, jQuery's) adds, its event renamed `never-name`, so
   it never fires. #344's review found an untested pointercancel listener,
-  and mutants it never listed survived on guards htmx made moot: the
-  listener whose event fires elsewhere than its code assumed (htmx
-  dispatches `htmx:beforeSwap` on the swap target) is the one no test
-  needs (#344 retro).
+  which no listed mutant removed (#344 retro). A registration that spans
+  lines, or takes its event from a variable, is left out.
 
 A Python file on disk is read by its AST instead, for its conditions:
 each `if`, `elif`, `while`, ternary, comprehension and `case` guard
