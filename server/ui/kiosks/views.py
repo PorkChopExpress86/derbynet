@@ -6,7 +6,13 @@ kiosk names it, picks its page, configures the page, reloads it or makes it
 identify itself. The board polls every 2 s and answers 204 while what it
 would render is what the page holds; it waits while a sheet is open
 (`derbynet.pollable`). Each change is one service call under the
-`RaceState` lock, and answers with the board again, out of band.
+`RaceState` lock, and answers with the board again, out of band. While a
+pointer is down on a board control, the board's swap waits until the press
+ends, so a press that spans a refresh still taps its control (D102,
+`holdBoardUnderPress` in `kiosks.js`). PHP's dashboard loses a mouse press
+when a kiosk's data changes under it, since it rebuilds every kiosk's
+controls with `.empty()` (kiosk-dashboard.js:99) when its hash of the kiosks
+changes (kiosk-dashboard.js:76-92).
 
 The page needs PRESENT_AWARDS, its page gate, but every change needs
 CONTROL_RACE, as `kiosk.assign`, `kiosk.reload` and `scene.apply` do: a role
