@@ -498,8 +498,8 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
 # pointerdown, keydown and keyup (at its event's timeStamp, which is no later
 # than any listener that handles it), each element that takes the focus, each
 # click and each htmx request sent, each board poll answered and each other
-# request ended, and each swap of the board's children with the name the tv
-# card shows after it.
+# request ended, each swap of the board's children with the name the tv card
+# shows after it, and each script error the page reports at the window.
 BOARD_LOG = """() => {
   const log = window.boardLog = [];
   const board = document.getElementById('kiosk-board');
@@ -519,6 +519,8 @@ BOARD_LOG = """() => {
   document.addEventListener('keyup', key, true);
   document.addEventListener(
     'focusin', (e) => log.push({what: 'focus', at: now(), on: on(e.target)}), true);
+  window.addEventListener(
+    'error', (e) => log.push({what: 'error', message: e.message}));
   document.addEventListener('click', () => log.push({what: 'click', at: now()}), true);
   document.addEventListener('htmx:beforeSend', (e) => log.push({
     what: 'send', at: now(), verb: e.detail.requestConfig.verb,
@@ -1236,7 +1238,7 @@ def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control)
     keyup = after(log, "keyup", keydown)
     click = after(log, "click", keydown)
     assert after(log, "poll", keydown) < keyup < click, log
-    assert log[keyup]["on"] != "BODY", log
+    assert log[keyup]["on"] != "BODY", log[keydown:]
     assert swaps_since(log[:click], keydown) == [], log
     assert posts_since(log, keydown) == [POST_PATHS[control]], log
     # one read: htmx applies the reply's board and ends the request in one
@@ -1337,17 +1339,22 @@ OUTSIDE_BUTTON = """() => {
 }"""
 
 
-@pytest.mark.parametrize("where", ["shift on Racing", "space off the board"])
+@pytest.mark.parametrize(
+    "where", ["shift on Racing", "space off the board", "space on Preview"]
+)
 def test_a_key_off_the_space_hold_holds_nothing(login, event, where):
     """Near misses for D125's hold: Shift held on a focused board button,
-    and Space held on a button off the board. The poll's reply swaps the
-    board while the key is down."""
+    Space held on a button off the board, and Space held on a card's
+    Preview link, which Space does not activate (the PR's probe,
+    `space-preview-*.log`). The poll's reply swaps the board while the key
+    is down."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     page.evaluate(OUTSIDE_BUTTON)
     target, key = {
         "shift on Racing": (scene_button(page, scene(event, "Racing")), "Shift"),
         "space off the board": (page.locator("#outside"), " "),
+        "space on Preview": (page.locator(PREVIEW_LINK), " "),
     }[where]
     polls = hold_the_polls(page)
     Kiosk.objects.filter(address="tv").update(name="Lobby")
@@ -1449,7 +1456,7 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
     controls as the tv's. Shift+Tab then moves the focus to the control
     before it, and the next swap (Hall) gives the focus back to that one:
     each control that takes the focus, a restored one too, is the one the
-    next swap gives it back to."""
+    next swap gives it back to. The page reports no script error."""
     kiosk(event, "hall")
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
@@ -1483,6 +1490,7 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
         " && document.activeElement.outerHTML === m",
         arg=markup,
     )
+    assert [r for r in board_log(page) if r["what"] == "error"] == []
     polls.end()
 
 
@@ -1492,7 +1500,8 @@ def test_the_focus_stays_where_the_crew_put_it(login, event, where):
     board; or on Racing and then blurred to the page's body, as a tap on the
     page's background does; or on the card's Identify, and the kiosk drops
     off the board. A poll's reply swaps the board, a second poll answers
-    after it, and no element takes the focus in all that time. The second
+    after it, and no element takes the focus and the page reports no script
+    error in all that time. The second
     poll may have gone out before the first reply, with the old board's
     signature, and then it swaps the board again."""
     kiosk(event, "tv", name="Main")
@@ -1518,8 +1527,35 @@ def test_the_focus_stays_where_the_crew_put_it(login, event, where):
     polls.answer(1, status=None)
     log = board_log(page)
     assert swaps_since(log, start), log
-    assert [r for r in log[start:] if r["what"] == "focus"] == [], log
+    assert [r for r in log[start:] if r["what"] in ("focus", "error")] == [], log
     expect(focused_after).to_be_focused()
+    polls.end()
+
+
+def test_the_focus_comes_back_without_scrolling_the_page(login, event):
+    """D127: ten unnamed kiosks' cards come before the tv's, so its Identify
+    is below the screen once the page is scrolled to the top. The focus is
+    on it there when a poll's reply (Lobby) swaps the board: the focus
+    comes back to the swapped-in Identify and the page does not scroll to
+    it (`preventScroll`), so the crew's view stays where it was."""
+    for n in range(10):
+        kiosk(event, f"spare{n}")
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    identify = page.locator(IDENTIFY_BUTTON)
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, identify)
+    page.evaluate("scrollTo(0, 0)")
+    page.wait_for_function("scrollY === 0")
+    assert identify.evaluate("e => e.getBoundingClientRect().top > innerHeight")
+    polls.answer(0)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    expect(identify).to_be_focused()
+    # one read: a focus() that scrolls does so before it returns, inside
+    # the swap's task, which has run once the focus is back.
+    assert page.evaluate("scrollY") == 0
     polls.end()
 
 

@@ -54,15 +54,17 @@ window.sceneSheet = kioskSheetOf('scenes', 'sceneSheet');
 // so the next poll brings the board again.
 //
 // D125 (#369): a Space key held on a focused board button holds the swap the
-// same way. Chromium clicks a button on Space's keyup, and only the button
-// the keydown went down on: a swap under the key moved the focus to the
-// page's body and the keyup there sent no click
-// (`test_a_space_press_that_spans_a_board_swap_still_taps`; PHP's dashboard
-// loses the key the same way when a rename rebuilds its controls with
-// `.empty()`, kiosk-dashboard.js:99, the PR's probe). The key's press starts
-// on its first keydown, not an auto-repeat, and ends on the button's click;
-// when the focus leaves the button, since a keyup elsewhere clicks nothing;
-// or at the same bound from that keydown, for a keyup that never comes.
+// same way. Chromium clicks a button on Space's keyup only when the key
+// went down on that button, by its keydown or an auto-repeat (the PR's
+// stand-in probes): a swap under the key moved the focus to the page's body
+// and the keyup there sent no click
+// (`test_a_space_press_that_spans_a_board_swap_still_taps`). PHP's dashboard
+// loses the key on Reload the same way when a rename rebuilds its controls
+// with `.empty()` (kiosk-dashboard.js:99, the PR's probe). The key's press
+// starts on its first keydown, not an auto-repeat, and ends on the button's
+// click; when the focus leaves the button, since a keyup elsewhere clicks
+// nothing; or at the same bound from that keydown, for a keyup that never
+// comes.
 function holdBoardUnderPress(board, bound) {
   let pressed = null;
   let down = false;
@@ -173,16 +175,16 @@ const BOARD_FOCUS_CONTROLS = 'button, a[href]';
 // D127 (#369): after each swap of the board, a poll's, a change's reply out
 // of band or a held board applied (D102, D125), the focus goes back to the
 // swapped-in copy of the board control that had it, a button or a card's
-// Preview link. PHP leaves the
-// focus on the page's body (the PR's probe). "The same control" is the same
-// name, value, data-action and kiosk card (D127): Reload and Identify share a
-// name and value, and Page, Name and Configure have neither. The focus is
-// given back only when the control that had it is gone and nothing else has
-// taken the focus since, so a crew member who moved it elsewhere keeps it
-// there.
+// Preview link. When a rename rebuilds PHP's controls, PHP leaves the focus
+// that was on Reload on the page's body (the PR's probe). "The same control"
+// is the same name, value, data-action and kiosk card (D127): Reload and
+// Identify share a name and value, and Page, Name, Configure and Preview
+// have neither. The focus is given back only when the control that had it
+// is gone and nothing else has taken the focus since, so a crew member who
+// moved it elsewhere keeps it there.
 function keepFocusAcrossSwaps(board) {
   let focused = null;
-  const sameAs = (el) => {
+  const controlKey = (el) => {
     const card = el.closest('[data-kiosk]');
     return JSON.stringify([el.tagName, el.getAttribute('name'), el.getAttribute('value'),
       el.dataset.action, card && card.dataset.kiosk]);
@@ -204,10 +206,10 @@ function keepFocusAcrossSwaps(board) {
     if (!focused || focused.isConnected) return;
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    const key = sameAs(focused);
+    const key = controlKey(focused);
     focused = null;
     const match = [...board.querySelectorAll(BOARD_FOCUS_CONTROLS)]
-      .find((el) => sameAs(el) === key);
+      .find((el) => controlKey(el) === key);
     if (match) match.focus({ preventScroll: true });
   }).observe(board, { childList: true });
 }
