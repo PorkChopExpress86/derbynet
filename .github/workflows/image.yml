@@ -43,6 +43,8 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
+      # The Compose example checks.sh readme-compose runs as written (D107).
+      - README.md
       - .github/workflows/image.yml
   pull_request:
     paths:
@@ -59,6 +61,8 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
+      # The Compose example checks.sh readme-compose runs as written (D107).
+      - README.md
       - .github/workflows/image.yml
   workflow_dispatch:
 
@@ -186,7 +190,8 @@ jobs:
           compose() { DERBYNET_IMAGE="$IMAGE" docker compose -p derbynet \
                         -f server/docker/compose.yaml -f server/docker/ci/compose.ci.yaml "$@"; }
           case "$VARIANT" in
-            docker-run) run -p 80:80 -p 443:443; url=http://localhost ;;
+            # Plain HTTP alone: the image has no TLS (D107).
+            docker-run) run -p 80:80; url=http://localhost ;;
             timeout) run -p 80:80 -e DERBYNET_REQUEST_TIMEOUT=600; url=http://localhost ;;
             url-prefix) run -p 80:80 -e DERBYNET_URL_PREFIX=/derbynet; url=http://localhost/derbynet ;;
             compose-sqlite) compose up -d --wait; url=http://localhost ;;
@@ -327,7 +332,7 @@ jobs:
       - name: Start the server on a fresh volume
         run: |
           docker run -d --name derbynet -v derbynet-data:/var/lib/derbynet \
-            -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 80:80 -p 443:443 "$IMAGE"
+            -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 80:80 "$IMAGE"
           for _ in $(seq 120); do
             curl -fsS -o /dev/null http://localhost/index.php && break
             sleep 1

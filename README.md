@@ -16,9 +16,11 @@ You need Docker (Docker Desktop on a Mac or Windows) and nothing else.
    docker compose -f server/compose.yaml --profile image up --build image
    ```
 
-   It serves `http://localhost:8081/` and `https://localhost:8443/`
-   (`DERBYNET_IMAGE_HTTP_PORT` and `DERBYNET_IMAGE_HTTPS_PORT` change them).
-   The first visit sets up an event.
+   It serves `http://localhost:8081/` (`DERBYNET_IMAGE_HTTP_PORT` changes
+   the port), plain HTTP only, as the image serves (D107). A browser on this
+   computer treats `localhost` as a secure context, so the camera pages and
+   the browser timer work there without HTTPS. The first visit sets up an
+   event.
 
 2. Edit the code. `server/` is mounted read-only over the image's copy, so
    gunicorn restarts its workers after a Python or template edit
@@ -33,8 +35,8 @@ You need Docker (Docker Desktop on a Mac or Windows) and nothing else.
 
 The same `server/compose.yaml` also runs the PHP server and Django's
 `runserver` side by side (`server/README.md`, "Run both servers").
-`server/docker/README.md` describes the image itself: its settings, TLS,
-Postgres, and backups.
+`server/docker/README.md` describes the image itself: its settings, the
+Caddy container that serves HTTPS in front of it, Postgres, and backups.
 
 The guides for race crews and developers are Markdown files in `docs/`, starting
 with `docs/install-docker.md` and `docs/developer-guide.md`. The server shows

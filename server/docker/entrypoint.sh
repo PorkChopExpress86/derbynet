@@ -2,9 +2,10 @@
 #
 # The image's entrypoint (#58), run by tini as root.  It gives the derbynet
 # user the host user's uid and gid (D106), makes the data folders writable by
-# derbynet, creates the TLS key and certificate
-# when they are missing, writes nginx's configuration from the environment,
-# runs the migrations as derbynet, then starts gunicorn as derbynet and nginx.
+# derbynet, writes nginx's configuration from the environment, runs the
+# migrations as derbynet, then starts gunicorn as derbynet and nginx.  The
+# image serves plain HTTP on port 80 alone; HTTPS comes from a proxy in front
+# of it, such as compose.yaml's Caddy (D107).
 # It exits as soon as either of the two exits, so Docker's restart policy can
 # start the container again.  server/docker/README.md lists the variables.
 
@@ -50,8 +51,6 @@ prefix="${prefix#"${prefix%%[!/]*}"}"
 prefix="${prefix%"${prefix##*[!/]}"}"
 [[ "$prefix" =~ ^[A-Za-z0-9._~/-]*$ ]] \
     || die "DERBYNET_URL_PREFIX may hold only letters, digits and . _ ~ - /, not '$DERBYNET_URL_PREFIX'"
-
-TLS="$DERBYNET_CONFIG_DIR/tls"
 
 # --- the server's uid and gid (D106) -----------------------------------------
 # derbynet runs as the host user's uid and gid, so the data folder's files
@@ -133,15 +132,16 @@ fi
 takeover $(stat -c '%u %g' "$DERBYNET_DATA_DIR") "$uid" "$gid" "$DERBYNET_DATA_DIR"
 
 # --- the data folders -------------------------------------------------------
-# A bind mount can belong to any uid.  Give everything to derbynet but the TLS
-# folder, which only nginx's root master reads.  This runs on every start and
-# gives only a file whose owner differs, such as one a root `docker exec`
-# left, so a start with the same uid changes no file.  When chown can't (a
+# A bind mount can belong to any uid.  Give everything to derbynet, the tls/
+# folder an image from before D107 made too, which compose.yaml's Caddy reads
+# as root and serves (D107).  This runs on every start and gives only a file
+# whose owner differs, such as one a root `docker exec` left, so a start with
+# the same uid changes no file.  When chown can't (a
 # share that squashes root, a container without CAP_CHOWN), say what to do
 # rather than open the folder to everyone.
 as_derbynet() { setpriv --reuid=derbynet --regid=derbynet --init-groups "$@"; }
 
-find "$DERBYNET_DATA_DIR" "$DERBYNET_CONFIG_DIR" -path "$TLS" -prune -o \
+find "$DERBYNET_DATA_DIR" "$DERBYNET_CONFIG_DIR" \
      \( \! -user derbynet -o \! -group derbynet \) -print0 \
   | xargs -0r chown -h derbynet:derbynet 2>/dev/null \
   || log "could not give every file under $DERBYNET_DATA_DIR to derbynet"
@@ -149,44 +149,11 @@ for dir in "$DERBYNET_DATA_DIR" "$DERBYNET_CONFIG_DIR"; do
     as_derbynet test -w "$dir" -a -x "$dir" || die "$dir is not writable by the derbynet user (uid $(id -u derbynet)). On a bind mount, run 'sudo chown -R $(id -u derbynet):$(id -g derbynet) <folder>' on the host, or use a named volume."
 done
 
-# --- TLS --------------------------------------------------------------------
-# Each install makes its own key on first start (#64 S35).  A cert.pem and
-# key.pem put here by the user are used as they are.  A certificate this
-# script made, whose fingerprint .generated holds, is made again once it has
-# expired.
-mkdir -p "$TLS"
-chown root:root "$TLS"
-chmod 0700 "$TLS"
-if [ -e "$TLS/cert.pem" ] && [ -e "$TLS/key.pem" ]; then
-    fingerprint="$(openssl x509 -noout -fingerprint -sha256 -in "$TLS/cert.pem" 2>/dev/null || true)"
-    if [ -n "$fingerprint" ] && [ "$(cat "$TLS/.generated" 2>/dev/null)" = "$fingerprint" ] \
-       && ! openssl x509 -checkend 0 -noout -in "$TLS/cert.pem" >/dev/null; then
-        log "the generated TLS certificate has expired; making a new one"
-        rm -f "$TLS/cert.pem" "$TLS/key.pem"
-    fi
-elif [ -e "$TLS/cert.pem" ] || [ -e "$TLS/key.pem" ]; then
-    die "$TLS holds only one of cert.pem and key.pem. Add the other, or remove it to have a certificate made."
-fi
-if [ ! -e "$TLS/cert.pem" ]; then
-    log "making a TLS key and self-signed certificate in $TLS"
-    # 825 days, because Apple's support article HT210176 ("Requirements for
-    # trusted certificates in iOS 13 and macOS 10.15") names it as the longest
-    # validity Apple's devices accept for a TLS server certificate.
-    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -sha256 \
-        -days 825 -nodes -subj "/CN=DerbyNet" \
-        -addext "subjectAltName=DNS:derbynet,DNS:localhost,IP:127.0.0.1" \
-        -keyout "$TLS/key.pem.new" -out "$TLS/cert.pem.new" 2>/dev/null
-    chmod 0600 "$TLS/key.pem.new"
-    mv "$TLS/key.pem.new" "$TLS/key.pem"
-    mv "$TLS/cert.pem.new" "$TLS/cert.pem"
-    openssl x509 -noout -fingerprint -sha256 -in "$TLS/cert.pem" > "$TLS/.generated"
-fi
-chmod 0600 "$TLS/key.pem"
-
 # --- nginx ------------------------------------------------------------------
 # Plain HTTP on 80 with no redirect: kiosks, derby-timer.jar and the Pi
-# scripts use http://.  The log format has no $request_body, which held
-# role.login's password in the PHP image (#64 S36).
+# scripts use http://.  No TLS: HTTPS is the proxy's (D107).  The log format
+# has no $request_body, which held role.login's password in the PHP image
+# (#64 S36).
 prefix_locations=""
 if [ -n "$prefix" ]; then
     prefix_locations="
@@ -253,9 +220,6 @@ $trusted_geo    }
 
     server {
         listen 80 default_server;
-        listen 443 ssl default_server;
-        ssl_certificate $TLS/cert.pem;
-        ssl_certificate_key $TLS/key.pem;
         absolute_redirect off;
 $prefix_locations
         location /static/ { alias /opt/derbynet/static/; }
@@ -342,7 +306,7 @@ done
 
 nginx -e stderr -g 'daemon off;' &
 nginx_pid=$!
-log "serving on ports 80 and 443${prefix:+, and under /$prefix/}"
+log "serving plain HTTP on port 80${prefix:+, and under /$prefix/}"
 
 status=0
 wait -n "$gunicorn_pid" "$nginx_pid" || status=$?

@@ -7,9 +7,9 @@
 #   IMAGE=derbynet_server:dev server/docker/ci/checks.sh tls secret user ...
 #
 # Checks:
-#   tls        curl -k https://localhost/index.php answers; the certificate
-#              stays the same for a new container on the same volume and
-#              differs on a fresh volume; the image holds no key (#64 S35)
+#   tls        the image serves plain HTTP alone (D107): it exposes port 80
+#              only, nothing listens on 443, a new volume gets no tls/, and
+#              the image holds no key
 #   secret     secret_key: mode 0600, kept across containers, new per volume,
 #              and not written when DJANGO_SECRET_KEY is set
 #   user       ps -o user,comm: gunicorn runs as derbynet, not root
@@ -128,94 +128,73 @@ wait_ready() {
 
 stop() { docker rm -f "$PREFIX-$1" >/dev/null; }
 
-served_fingerprint() {
-    docker exec "$PREFIX-$1" sh -c \
-        'openssl s_client -connect 127.0.0.1:443 </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256'
+# The image of the test release v0.1.0-rc2, the last published before D107,
+# whose entrypoint made tls/cert.pem and key.pem on a new volume and whose
+# nginx served them on 443.  Pinned by digest, so the old volume is one an
+# install of that release made, whatever the PR's base holds.
+OLD_TLS_IMAGE="${OLD_TLS_IMAGE:-ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc2@sha256:f94d9dd6260addcb46b496ff2528f939f8ffd57fcd0aaa81ea18038084b9bb8b}"
+
+# old_tls_volume <volume>: starts OLD_TLS_IMAGE on a fresh volume, prints the
+# SHA-256 fingerprint its nginx served on 443, and removes the container.
+# Fails unless that is the fingerprint of the volume's tls/cert.pem.
+old_tls_volume() {
+    local name="$PREFIX-oldtls" served file
+    docker run -d --name "$name" -v "$1:/var/lib/derbynet" "$OLD_TLS_IMAGE" >/dev/null
+    wait_ready "$name"
+    served="$(docker exec "$name" sh -c \
+        'openssl s_client -connect 127.0.0.1:443 </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256')"
+    file="$(docker exec "$name" openssl x509 -noout -fingerprint -sha256 -in /var/lib/derbynet/tls/cert.pem)"
+    echo "$OLD_TLS_IMAGE served: $served" >&2
+    echo "its tls/cert.pem:      $file" >&2
+    [ -n "$served" ] && [ "$served" = "$file" ] || fail "$OLD_TLS_IMAGE did not serve its tls/cert.pem"
+    docker rm -f "$name" >/dev/null
+    echo "$served"
 }
 
+# compose_version_at_least <major.minor.patch>: docker compose is that
+# version or later.  compose.yaml's Caddyfile is a `configs: content:`, which
+# Compose has taken since 2.23.1 ("Introduced in Docker Compose version
+# 2.23.1", https://docs.docker.com/reference/compose-file/configs/).
+compose_version_at_least() {
+    local have
+    have="$(docker compose version --short)"
+    have="${have#v}"
+    echo "docker compose $have" >&2
+    local lowest
+    lowest="$(sort -V <<<"$1"$'\n'"${have%%[+-]*}")"
+    [ "${lowest%%$'\n'*}" = "$1" ]
+}
+
+# The image serves plain HTTP alone (D107): nothing of TLS in it or on a new
+# volume, and no listener on 443.
 check_tls() {
     say "the image holds no TLS key or secret: /var/lib/derbynet in the image is"
-    local baked
+    local baked exposed code listening
     baked="$(docker run --rm --entrypoint ls "$IMAGE" -A /var/lib/derbynet)"
     echo "[${baked}]"
     [ -z "$baked" ] || fail "the image ships files in /var/lib/derbynet: $baked"
+    exposed="$(docker image inspect -f '{{range $p, $_ := .Config.ExposedPorts}}{{$p}} {{end}}' "$IMAGE")"
+    echo "EXPOSE: $exposed"
+    [ "$exposed" = "80/tcp " ] || fail "the image exposes $exposed, not 80/tcp alone"
 
     start tls1 "$PREFIX-tls-a"
-    say "curl -k https://localhost/index.php"
-    local code
-    code="$(docker exec "$PREFIX-tls1" curl -sk -o /dev/null -w '%{http_code} %{redirect_url}' https://localhost/index.php)"
-    echo "$code"
-    case "$code" in 200*|301*) ;; *) fail "https://localhost/index.php answered $code" ;; esac
-    code="$(docker exec "$PREFIX-tls1" curl -skL -o /dev/null -w '%{http_code}' https://localhost/index.php)"
-    echo "after redirects: $code"
-    [ "$code" = 200 ] || fail "https://localhost/index.php ends in $code"
     say "plain HTTP is served, with no redirect to HTTPS"
     code="$(docker exec "$PREFIX-tls1" curl -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://localhost/action.php?query=role.list')"
     echo "$code"
-    case "$code" in *https:*) fail "plain HTTP redirects to HTTPS: $code" ;; esac
-
-    say "openssl x509 -fingerprint, first container on volume A"
-    local first file second other
-    first="$(served_fingerprint tls1)"
-    file="$(docker exec "$PREFIX-tls1" openssl x509 -noout -fingerprint -sha256 -in /var/lib/derbynet/tls/cert.pem)"
-    echo "served:  $first"
-    echo "on disk: $file"
-    [ -n "$first" ] && [ "$first" = "$file" ] || fail "nginx serves another certificate than tls/cert.pem"
-    docker exec "$PREFIX-tls1" ls -l /var/lib/derbynet/tls
-
+    # With no event yet, Django answers 302 to setup.php over the same scheme.
+    case "$code" in *https:*) fail "plain HTTP redirects to HTTPS: $code" ;; [23]??*) ;; *) fail "plain HTTP answered $code" ;; esac
+    say "the listening sockets, from /proc/net/tcp and tcp6 (port 80 is 0050, 443 is 01BB)"
+    listening="$(docker exec "$PREFIX-tls1" sh -c 'cat /proc/net/tcp /proc/net/tcp6' \
+        | awk '$4 == "0A" {split($2, a, ":"); print a[2]}' | sort -u | xargs)"
+    echo "$listening"
+    [[ " $listening " == *" 0050 "* ]] || fail "nothing listens on port 80"
+    [[ " $listening " != *" 01BB "* ]] || fail "something listens on port 443"
+    say "a new volume gets no tls/"
+    docker exec "$PREFIX-tls1" ls -A /var/lib/derbynet
+    if docker exec "$PREFIX-tls1" test -e /var/lib/derbynet/tls; then
+        fail "the server made tls/ on a new volume"
+    fi
     stop tls1
-    start tls2 "$PREFIX-tls-a"
-    second="$(served_fingerprint tls2)"
-    say "after docker rm and a new container on volume A"
-    echo "served:  $second"
-    [ "$first" = "$second" ] || fail "the certificate changed with the container"
-
-    start tls3 "$PREFIX-tls-b"
-    other="$(served_fingerprint tls3)"
-    say "a fresh volume B"
-    echo "served:  $other"
-    [ "$other" != "$first" ] || fail "two fresh volumes got the same certificate"
-
-    say "the generated certificate lasts 825 days"
-    docker exec "$PREFIX-tls3" openssl x509 -noout -startdate -enddate -in /var/lib/derbynet/tls/cert.pem
-    docker exec "$PREFIX-tls3" sh -c 'openssl x509 -noout -checkend $((825 * 86400 - 3600)) -in /var/lib/derbynet/tls/cert.pem && ! openssl x509 -noout -checkend $((825 * 86400 + 3600)) -in /var/lib/derbynet/tls/cert.pem' \
-        || fail "the certificate does not last 825 days"
-    stop tls3
-
-    say "an expired certificate the container made is made again"
-    docker run --rm -v "$PREFIX-tls-b:/var/lib/derbynet" --entrypoint sh "$IMAGE" -c \
-        'cd /var/lib/derbynet/tls && openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
-             -nodes -subj /CN=DerbyNet -not_before 20200101000000Z -not_after 20200201000000Z \
-             -keyout key.pem -out cert.pem 2>/dev/null &&
-         openssl x509 -noout -fingerprint -sha256 -in cert.pem > .generated'
-    start tls5 "$PREFIX-tls-b"
-    docker logs "$PREFIX-tls5" 2>&1 | grep 'expired' || fail "no new certificate was made"
-    docker exec "$PREFIX-tls5" openssl x509 -noout -checkend 0 -in /var/lib/derbynet/tls/cert.pem \
-        || fail "the certificate is still expired"
-    stop tls5
-
-    say "an expired certificate the user put there is left alone"
-    docker run --rm -v "$PREFIX-tls-b:/var/lib/derbynet" --entrypoint sh "$IMAGE" -c \
-        'cd /var/lib/derbynet/tls && openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
-             -nodes -subj /CN=theirs -not_before 20200101000000Z -not_after 20200201000000Z \
-             -keyout key.pem -out cert.pem 2>/dev/null'
-    start tls6 "$PREFIX-tls-b"
-    docker exec "$PREFIX-tls6" openssl x509 -noout -subject -in /var/lib/derbynet/tls/cert.pem | grep theirs \
-        || fail "the user's certificate was replaced"
-    stop tls6
-
-    say "a cert.pem and key.pem the user put there are used as they are"
-    local mine
-    mine="$(docker run --rm -v "$PREFIX-tls-c:/var/lib/derbynet" --entrypoint sh "$IMAGE" -c \
-        'mkdir -p /var/lib/derbynet/tls && cd /var/lib/derbynet/tls &&
-         openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=user-supplied \
-             -keyout key.pem -out cert.pem 2>/dev/null &&
-         openssl x509 -noout -fingerprint -sha256 -in cert.pem')"
-    start tls4 "$PREFIX-tls-c"
-    echo "theirs:  $mine"
-    echo "served:  $(served_fingerprint tls4)"
-    [ "$(served_fingerprint tls4)" = "$mine" ] || fail "the user's certificate was not served"
-    stop tls4
 }
 
 check_secret() {
@@ -317,13 +296,11 @@ ids() {
 }
 
 # owned_by <container> <uid> <gid>: lists the data folder, and fails on a file
-# there with another owner, but tls/, which stays root's (#351 removes it).
+# there with another owner.
 owned_by() {
     docker exec "$PREFIX-$1" ls -lnA /var/lib/derbynet
-    docker exec "$PREFIX-$1" sh -c "! find /var/lib/derbynet -path /var/lib/derbynet/tls -prune -o \
+    docker exec "$PREFIX-$1" sh -c "! find /var/lib/derbynet \
         \( ! -uid $2 -o ! -gid $3 \) -print | grep ." || fail "files under /var/lib/derbynet belong to another uid or gid than $2:$3"
-    [ "$(docker exec "$PREFIX-$1" stat -c '%u:%g %a' /var/lib/derbynet/tls)" = "0:0 700" ] \
-        || fail "tls/ is not root's, mode 0700"
 }
 
 # An event with the roster, and racer 1's photo uploaded: prints the racer
@@ -383,12 +360,12 @@ check_bind_mount() {
     local url="http://$(docker port "$PREFIX-b3" 80/tcp)" head photo
     head="$(photo_racer "$url" "$RUNNER_TEMP_DIR/bind-work")"
     served "$url" "$head" "$RUNNER_TEMP_DIR/bind-work/cookies"
-    photo="$(sed -n 1p <<<"$(find "$dir" -path "$dir/tls" -prune -o -name '*.jpg' -type f -print | sort)")"
+    photo="$(sed -n 1p <<<"$(find "$dir" -name '*.jpg' -type f -print | sort)")"
     [ -n "$photo" ] || fail "no photo on the bind mount"
     say "ls -ln, on the host, of the photo the server wrote; id -u and id -g are $(id -u) $(id -g)"
     (cd "$dir" && ls -ln "${photo#"$dir"/}")
     [ "$(stat -c '%u %g' "$photo")" = "$(id -u) $(id -g)" ] || fail "the photo is not the host user's"
-    if find "$dir" -path "$dir/tls" -prune -o \( ! -uid "$(id -u)" -o ! -gid "$(id -g)" \) -print | grep .; then
+    if find "$dir" \( ! -uid "$(id -u)" -o ! -gid "$(id -g)" \) -print | grep .; then
         fail "files on the bind mount are not the host user's"
     fi
     stop b3
@@ -560,30 +537,36 @@ check_uid_exec() {
     [ "$status" = 0 ] || fail "manage.py check failed as derbynet"
     [[ "$out" == "$(id -u)"$'\n'"$(id -g)"$'\n'"System check identified no issues"* ]] \
         || fail "manage.py check did not run as the host user, $(id -u):$(id -g)"
-    "${compose[@]}" exec -T server sh -c "! find /var/lib/derbynet -path /var/lib/derbynet/tls -prune -o \
+    "${compose[@]}" exec -T server sh -c "! find /var/lib/derbynet \
         \( ! -uid $(id -u) -o ! -gid $(id -g) \) -print | grep ." || fail "files on the volume are not the host user's"
     "${compose[@]}" down --volumes
 }
 
+# kiosk_address <url> <client address> [curl options]: kiosk.php with no
+# address answers 302 to ?address=<client address>+<port>, from REMOTE_ADDR
+# and REMOTE_PORT, as PHP's kiosk.php:8-10 does (ui/kiosk_pages/views.py);
+# with no port it would stand in 100 to 200.  Fails unless the address is the
+# client's and the port a real one; prints the port.
+kiosk_address() {
+    local url="$1" client="$2" target
+    shift 2
+    target="$(curl -s -o /dev/null -w '%{redirect_url}' "$@" "$url/kiosk.php")"
+    echo "$target" >&2
+    [[ "$target" =~ address=${client//./\\.}%2B([0-9]+)$ ]] \
+        || fail "the kiosk's address is not the client's ($client)"
+    (( BASH_REMATCH[1] > 200 )) || fail "the kiosk's port is the stand-in ${BASH_REMATCH[1]}"
+    echo "${BASH_REMATCH[1]}"
+}
+
 check_client_ip() {
     start ip1 "$PREFIX-ip" -p 127.0.0.1::80
-    local url="http://$(docker port "$PREFIX-ip1" 80/tcp)" gateway target
-    # kiosk.php with no address answers 302 to ?address=<client address>+<port>,
-    # from REMOTE_ADDR and REMOTE_PORT, as PHP's kiosk.php:8-10 does
-    # (ui/kiosk_pages/views.py); with no port it would stand in 100 to 200.
-    target="$(curl -s -o /dev/null -w '%{redirect_url}' "$url/kiosk.php")"
+    local url="http://$(docker port "$PREFIX-ip1" 80/tcp)" gateway port
     gateway="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$PREFIX-ip1")"
     say "kiosk.php from the host, whose address in the container's network is $gateway"
-    echo "$target"
-    [[ "$target" =~ address=${gateway//./\\.}%2B([0-9]+)$ ]] \
-        || fail "the kiosk's address is not the client's ($gateway)"
-    (( BASH_REMATCH[1] > 200 )) || fail "the kiosk's port is the stand-in ${BASH_REMATCH[1]}"
+    kiosk_address "$url" "$gateway" >/dev/null
     say "the same with a forged X-Real-IP: 10.9.8.7"
-    target="$(curl -s -o /dev/null -H 'X-Real-IP: 10.9.8.7' -H 'X-Real-Port: 4242' \
-        -w '%{redirect_url}' "$url/kiosk.php")"
-    echo "$target"
-    [[ "$target" =~ address=${gateway//./\\.}%2B([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" != 4242 ] \
-        || fail "a client's X-Real-IP or X-Real-Port reached Django"
+    port="$(kiosk_address "$url" "$gateway" -H 'X-Real-IP: 10.9.8.7' -H 'X-Real-Port: 4242')"
+    [ "$port" != 4242 ] || fail "a client's X-Real-Port reached Django"
 }
 
 # action.php refuses a POST whose Origin is not this server's own
