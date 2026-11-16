@@ -1444,7 +1444,9 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
     its Page, with no key held, when a poll's reply (Lobby) swaps the board.
     The focus comes back to the swapped-in button that stands for it: the
     same name, value, data-action and card. Identify shares its name and
-    value with Reload, and Page has neither."""
+    value with Reload, and Page has neither; a second kiosk, unnamed, whose
+    card comes first on the board, has the same buttons as the tv's."""
+    kiosk(event, "hall")
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     target = {
@@ -1460,6 +1462,7 @@ def test_the_focus_comes_back_after_a_board_swap(login, event, control):
     polls.answer(0)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
     assert not old.evaluate("e => e.isConnected")
+    expect(page.locator("[data-kiosk]").first).to_have_attribute("data-kiosk", "hall")
     expect(target).to_be_focused()
     polls.end()
 
