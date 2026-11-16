@@ -92,13 +92,15 @@
 #              malformed DERBYNET_ADDRESS stops Caddy (D116-D119)
 #   old-cert   a volume the v0.1.0-rc2 image made keeps its certificate
 #              under compose.yaml's Caddy, with and without a name sent, and
-#              its tls/ becomes the host user's (D107, D119)
+#              its tls/ becomes the host user's; an expired pair put there
+#              is served as it is (D107, D119)
 #   readme-compose
 #              the top-level README's Compose example and commands, run as
 #              written, serve HTTPS trusted through Caddy's root (D107);
 #              docker compose is 2.23.1 or later
 #   acme       with DERBYNET_DOMAIN and DERBYNET_ACME_CA, Caddy gets a
-#              certificate for the domain from Pebble (D121)
+#              certificate for the domain from Pebble, over a pair in tls/
+#              (D119, D121)
 #
 # IMAGE names the image (default derbynet_server:dev).  DERBYNET_TEST_PREFIX
 # (default derbynet-checks) prefixes every container and volume, and each
@@ -743,6 +745,22 @@ check_caddy() {
     unset DERBYNET_ADDRESS
 }
 
+# put_pair <volume> <dir>: copies <dir>/cert.pem and key.pem into the
+# volume's tls/, as a user puts their own there.
+put_pair() {
+    docker run --rm -v "$1:/d" -v "$2:/pair:ro" --entrypoint sh "$IMAGE" -c \
+        'mkdir -p /d/tls && cp /pair/cert.pem /pair/key.pem /d/tls/'
+}
+
+# expired_pair <dir>: an expired self-signed pair in <dir>, made on the host.
+expired_pair() {
+    mkdir -p "$1"
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj /CN=expired \
+        -not_before 20200101000000Z -not_after 20200201000000Z \
+        -keyout "$1/key.pem" -out "$1/cert.pem" 2>/dev/null
+    chmod 644 "$1/key.pem"
+}
+
 # A volume the last image before D107 made keeps its certificate under
 # compose.yaml's Caddy, so no phone trusts again (D107, D119).
 check_old_cert() {
@@ -769,6 +787,18 @@ check_old_cert() {
         || fail "key.pem is not the host user's, mode 0600"
     grep -q "^$(id -u):$(id -g) [0-7]* /var/lib/derbynet/tls/cert.pem$" "$RUNNER_TEMP_DIR/oldcert-stat.txt" \
         || fail "cert.pem is not the host user's"
+    "${compose[@]}" down
+
+    say "an expired pair in tls/ is served as it is (D119)"
+    expired_pair "$RUNNER_TEMP_DIR/expired"
+    before="$(openssl x509 -noout -fingerprint -sha256 -in "$RUNNER_TEMP_DIR/expired/cert.pem")"
+    put_pair "${project}_data" "$RUNNER_TEMP_DIR/expired"
+    "${compose[@]}" up -d --wait
+    https="$("${compose[@]}" port caddy 443)"
+    after="$(served_cert "$https" | sed -n 1p)"
+    echo "expired: $before"
+    echo "served:  $after"
+    [ "$before" = "$after" ] || fail "Caddy does not serve the expired pair"
     "${compose[@]}" down --volumes
 }
 
@@ -831,7 +861,10 @@ check_acme() {
     local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml"
                    -f "$ROOT/server/docker/ci/compose.pebble.yaml")
     export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
-    say "DERBYNET_DOMAIN=derby.test, DERBYNET_ACME_CA=https://pebble:14000/dir"
+    say "DERBYNET_DOMAIN=derby.test, DERBYNET_ACME_CA=https://pebble:14000/dir, over a pair in tls/ (D119)"
+    "${compose[@]}" create
+    expired_pair "$RUNNER_TEMP_DIR/acme-pair"
+    put_pair "${project}_data" "$RUNNER_TEMP_DIR/acme-pair"
     "${compose[@]}" up -d --wait
     for _ in $(seq 60); do
         out="$("${compose[@]}" logs caddy 2>&1)"

@@ -221,9 +221,13 @@ $trusted_geo    }
         "1:http" http;
         "1:https" https;
     }
+    # The realip module leaves \$remote_port empty when it takes the address
+    # from X-Forwarded-For, so a trusted proxy that sends no X-Real-Port
+    # gives the port of its own connection.
     map "\$derbynet_trusted:\$http_x_real_port" \$derbynet_port {
         default \$remote_port;
         "~^1:(?<port>[0-9]{1,5})\$" \$port;
+        "~^1:" \$realip_remote_port;
     }
     map \$http_host \$derbynet_host {
         "" \$host;
