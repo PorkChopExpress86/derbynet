@@ -1754,7 +1754,7 @@ def claims_readers(head, reached):
             name = getattr(node, 'name', None)
             if name in found or not (
                     isinstance(node, FUNCTIONS) and name.startswith('test')
-                    or isinstance(node, ast.ClassDef) and name in holding):
+                    or name in holding):
                 continue
             read = mentions(node) & (reached - {name})
             if name in reached or read:

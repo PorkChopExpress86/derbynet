@@ -2284,8 +2284,22 @@ class ClaimsReadersOutsideTheFrame(unittest.TestCase):
         self.assertEqual(tops(base, head), expected)
 
     def test_a_test_with_another_decorator(self):  # A
-        self.assert_tops('@override_settings(X=1)\ndef test_a():\n    assert helper()\n',
-                         ['test_a'])
+        body = '@override_settings(X=1)\ndef test_a():\n    assert helper()\n'
+        self.assert_tops(body, ['test_a'])
+        self.assertEqual(claims(H0.replace('1', '2') + body, H0 + body),
+                         [('test_a', 'reads helper')])
+
+    def test_a_changed_test_with_another_decorator(self):
+        """Seeded by its own change, it reads nothing reached."""
+        base = H0 + '@override_settings(X=1)\ndef test_a():\n    assert 1\n'
+        self.assertEqual(claims(base.replace('assert 1', 'assert 2'), base),
+                         [('test_a', 'reached')])
+
+    def test_a_test_above_the_class_it_reads(self):
+        """Named on the second pass, once the class below it is."""
+        self.assert_tops('def test_uses():\n    assert TestX.URL\n\n\n'
+                         'class TestX:\n    URL = helper()\n\n    def test_a(self):\n'
+                         '        assert self.URL\n', ['TestX', 'test_uses'])
 
     def test_a_decorator_that_reads_the_change(self):  # A2
         self.assert_tops('@given(helper())\ndef test_a(x):\n    assert x\n', ['test_a'])
@@ -2335,6 +2349,13 @@ class ClaimsReadersOutsideTheFrame(unittest.TestCase):
             self.assertIn('fx', str(caught.exception))
         self.assertEqual(claims(FX.format('(autouse=False)', 2) + body,
                                 FX.format('(autouse=False)', 1) + body), [])
+        self.assertEqual(claims(FX.format('(scope="module")', 2) + body,
+                                FX.format('(scope="module")', 1) + body), [])
+        with self.assertRaises(TOOL.WholeFile):  # not a literal False
+            claims(FX.format('(autouse=AUTO)', 2) + body, FX.format('(autouse=AUTO)', 1) + body)
+        other = FX.replace('@pytest.fixture{}', '@cache{}')
+        self.assertEqual(claims(other.format('(autouse=True)', 2) + body,
+                                other.format('(autouse=True)', 1) + body), [])
 
     def test_an_autouse_fixture_that_reads_the_change_counts_every_claim(self):
         body = ('import pytest\n@pytest.fixture(autouse=True)\ndef fx():\n'
