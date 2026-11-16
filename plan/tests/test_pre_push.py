@@ -36,10 +36,13 @@ class Plan(unittest.TestCase):
 '''
 
 
-def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n') -> subprocess.CompletedProcess:
+def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
+         remote: str = 'base') -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
-    that runs `shell` first when it is given."""
+    that runs `shell` first when it is given. `remote` is the remote sha git
+    sends: the base commit; 'orphan', a new branch with no common history
+    (no base); or 'missing', a commit this clone lacks."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -70,6 +73,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n') -> s
         git('add', '.')
         git('commit', '-q', '-m', 'base')
         base = git('rev-parse', 'HEAD')
+        if remote == 'orphan':
+            git('checkout', '-q', '--orphan', 'b')
         for name in (changed,) if isinstance(changed, str) else changed:
             path = repo / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -83,7 +88,7 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n') -> s
             hook = ['bash', '-c', f'{shell}\nbash .githooks/pre-push origin url; exit $?']
         result = subprocess.run(
             hook, cwd=repo, env=env,
-            input=f'refs/heads/b {head} refs/heads/b {base}\n',
+            input=f'refs/heads/b {head} refs/heads/b {REMOTES.get(remote, base)}\n',
             capture_output=True, text=True)
         ran = Path(tmp, 'ran')
         result.ran = ran.read_text() if ran.exists() else ''
@@ -139,6 +144,7 @@ class ImageWorkflow(unittest.TestCase):
 
 
 PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
+REMOTES = {'orphan': '0' * 40, 'missing': '1' * 40}
 
 
 class Guides(unittest.TestCase):
@@ -177,6 +183,21 @@ class Guides(unittest.TestCase):
                 result = push(changed, PASSING, text=text)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('check-paths.sh --docs docs\n', result.ran)
+
+    def test_a_push_with_no_base_runs_every_check(self):
+        """A new branch with no history in common with master has no base:
+        both checks run, and the hook does not die on `git diff` with an
+        empty base (the #345 retro's first hook did)."""
+        result = push('plan/README.md', PASSING, remote='orphan')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('check-paths.sh --docs docs\n', result.ran)
+        self.assertIn('uv run --locked ruff check', result.ran)
+
+    def test_a_base_the_clone_lacks_runs_only_plan_tests(self):
+        """As before the guides' check: the diff lists nothing."""
+        result = push('docs/install-docker.md', PASSING, remote='missing')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.ran, 'plan/tests\n')
 
     def test_a_push_with_no_guide_skips_the_guides_check(self):
         for changed in ('plan/README.md', 'server/tools/parity_gate.py', 'server/docs/adr/README.md'):

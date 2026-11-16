@@ -255,24 +255,19 @@ def _unparsed(path: Path, saved: bytes, mutated: bytes) -> str | None:
 
 
 def _test_lines(path: Path) -> set[int]:
-    """The lines of each test function in a test file, top-level or in a
-    `Test*` class; every line when the file does not parse."""
+    """The lines of each function named `test*` in a test file, at any
+    depth; every line when the file does not parse."""
     text = path.read_bytes().decode()
     try:
         tree = ast.parse(text)
     except SyntaxError:
         return set(range(1, text.count("\n") + 2))
     lines = set()
-    for node in tree.body:
-        body = node.body if isinstance(node, ast.ClassDef) else [node]
-        if isinstance(node, ast.ClassDef) and not node.name.startswith("Test"):
-            continue
-        for f in body:
-            if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
-                f.name.startswith("test")
-            ):
-                start = min([f.lineno] + [d.lineno for d in f.decorator_list])
-                lines |= set(range(start, f.end_lineno + 1))
+    for f in ast.walk(tree):
+        if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name.startswith(
+            "test"
+        ):
+            lines |= set(range(f.lineno, f.end_lineno + 1))
     return lines
 
 
@@ -319,7 +314,7 @@ def listed(args) -> int:
             # A test file named by --file has its helpers mutated, such as
             # #345's scanner in tests/test_docker_checks.py (#345 retro).
             if (root / m.path).resolve() not in named:
-                why = "in a test file"
+                why = "in a test file (name it with --file to mutate its helpers)"
             else:
                 if m.path not in tests:
                     tests[m.path] = _test_lines(root / m.path)

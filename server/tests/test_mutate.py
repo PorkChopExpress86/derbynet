@@ -334,9 +334,10 @@ def test_a_python_script_mutant_that_does_not_parse_is_refused(project):
 
 
 def test_a_mutant_of_a_file_that_is_no_python_or_never_parsed_runs(project):
-    """The refusal is for a mutant that breaks the file: a text file, and a
-    `.py` file that did not parse before, still run."""
-    for name, text in (("notes.txt", "a < b (\n"), ("old.py", "print 'a < b'\n")):
+    """The refusal is for a mutant that breaks Python in a Python file: a
+    text file whose text parses as Python before the mutant and not after,
+    and a `.py` file that did not parse before, still run."""
+    for name, text in (("notes.txt", "a < b\n"), ("old.py", "print 'a < b'\n")):
         (project / name).write_text(text)
     subprocess.run([*GIT, "add", "notes.txt", "old.py"], cwd=project, check=True)
     subprocess.run([*GIT, "commit", "-qm", "files"], cwd=project, check=True)
@@ -430,17 +431,20 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
     assert "no mutant listed" in run.stderr
     assert run.stdout == (
         "SKIPPED   notes.md: 2 listed, in no source file\n"
-        "SKIPPED   test_mod.py: 2 listed, in a test file\n"
+        "SKIPPED   test_mod.py: 2 listed, in a test file"
+        " (name it with --file to mutate its helpers)\n"
     )
 
 
 # A guard that lives in a test file, as #345's `root_execs` scanner does in
-# tests/test_docker_checks.py, with the test that holds it.
+# tests/test_docker_checks.py, with the test that holds it. Its body reads
+# the next line, so the loop made `while True` ends in an IndexError, not a
+# hang that runs to --timeout.
 GUARD_TESTS = """
 
 def ends(lines, end):
     while lines[end].endswith("\\\\"):
-        end += 1
+        end = lines.index(lines[end + 1], end + 1)
     return end
 
 
@@ -458,7 +462,7 @@ def test_listed_mutates_a_guard_in_a_test_file_named_by_file(project):
     commit(project, MODULE, GUARD_TESTS)
     run = listed(project, "test_mod.py::test_ends", tool=("--file", "test_mod.py"))
     rows = run.stdout.splitlines()
-    assert rows[:2] == [
+    assert rows[1:3] == [
         'KILLED    test_mod.py:38  condition  lines[end].endswith("\\\\")  ->  True',
         'KILLED    test_mod.py:38  condition  lines[end].endswith("\\\\")  ->  False',
     ], run.stdout
@@ -470,7 +474,10 @@ def test_listed_mutates_a_guard_in_a_test_file_named_by_file(project):
 def test_listed_skips_a_test_file_it_is_not_named(project):
     commit(project, MODULE + PICK, PICK_TESTS + GUARD_TESTS)
     run = listed(project, "test_mod.py::test_pick")
-    assert "SKIPPED   test_mod.py: 4 listed, in a test file" in run.stdout, run.stdout
+    assert (
+        "SKIPPED   test_mod.py: 4 listed, in a test file"
+        " (name it with --file to mutate its helpers)" in run.stdout
+    ), run.stdout
     assert "test_mod.py:" not in run.stdout.replace("SKIPPED   test_mod.py:", "")
 
 

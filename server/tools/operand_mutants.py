@@ -288,7 +288,8 @@ def python_conditions(
             out += [entry(node, "operand", "True"), entry(node, "operand", "False")]
     # A loop's body that never runs (#345 retro); a `while` has it above.
     for node in loops:
-        if touches(node.target) or touches(node.iter):
+        header = range(node.lineno, node.iter.end_lineno + 1)
+        if any(n in added for n in header):
             out.append(entry(node.iter, "loop", "()"))
     return sorted(out, key=lambda e: (e[4][0], e[1] != "condition", -e[4][1]))
 

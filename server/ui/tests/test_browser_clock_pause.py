@@ -83,9 +83,8 @@ def installed_elsewhere(page):
     assert pauses_at_the_install(source) == [("open_paused", 4), ("by_position", 9)]
 
 
-def test_317s_first_open_paused_is_found():
-    """`open_paused` as #317's first head (1b7c62ef) had it."""
-    source = '''
+# `open_paused` as #317's first head (1b7c62ef) had it.
+OPEN_PAUSED_317 = '''
 def open_paused(page, event):
     """The kiosk ... on a clock paused before the page loads."""
     run_heat(event)
@@ -94,17 +93,32 @@ def open_paused(page, event):
     page.clock.pause_at(PAUSED_AT)
     open_kiosk(page, event, "kiosks/results-by-racer.kiosk")
 '''
-    assert pauses_at_the_install(source) == [("open_paused", 7)]
 
 
-def test_no_browser_test_pauses_at_its_install_time():
+def unknown_pauses(folder: Path) -> list[str]:
+    """`file:line in function` for each pause at the install time in the
+    Python files under `folder` that KNOWN does not hold."""
     found = []
-    for path in sorted(BROWSER.rglob("*.py")):
+    for path in sorted(folder.rglob("*.py")):
         for function, line in pauses_at_the_install(path.read_text()):
             if (path.name, function) not in KNOWN:
                 found.append(f"{path.name}:{line} in {function}")
+    return found
+
+
+def test_the_sweep_finds_317s_open_paused(tmp_path):
+    """Under a folder, and past a KNOWN entry."""
+    (tmp_path / "kiosk").mkdir()
+    (tmp_path / "kiosk" / "test_kiosk_results_by_racer.py").write_text(OPEN_PAUSED_317)
+    (tmp_path / "test_kiosk_scale_mph.py").write_text(OPEN_PAUSED_317)
+    assert unknown_pauses(tmp_path) == [
+        "test_kiosk_results_by_racer.py:7 in open_paused"
+    ]
+
+
+def test_no_browser_test_pauses_at_its_install_time():
+    found = unknown_pauses(BROWSER)
     assert found == [], (
-        "install the clock before the moment it pauses at, as "
-        "test_kiosk_results_by_racer.py's INSTALLED_AT does (#317): "
-        f"{found}"
+        "install the clock before the moment it pauses at (INSTALLED_AT in "
+        f"test_kiosk_results_by_racer.py, #317): {found}"
     )

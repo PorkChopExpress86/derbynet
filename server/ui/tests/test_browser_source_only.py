@@ -80,23 +80,43 @@ class TestKiosk:
     ]
 
 
-def test_317s_source_text_test_is_found():
-    """The test as #317's first head (1b7c62ef) had it."""
-    source = """
+# The test as #317's first head (1b7c62ef) had it.
+SOURCE_TEXT_317 = """
 def test_kiosk_js_gives_a_request_up_after_15_s():
     assert "var GIVE_UP_MS = 15000;" in KIOSK_JS.read_text()
 """
-    assert fixtureless_tests(source) == [
-        ("test_kiosk_js_gives_a_request_up_after_15_s", 2)
+
+
+def fixtureless(folder: Path) -> list[tuple[str, str, int]]:
+    """`(file, test, line)` for each fixture-free test in the `test_*.py`
+    files under `folder`."""
+    return [
+        (path.name, test, line)
+        for path in sorted(folder.rglob("test_*.py"))
+        for test, line in fixtureless_tests(path.read_text())
+    ]
+
+
+def test_the_sweep_finds_317s_source_text_test(tmp_path):
+    """Under a folder, in a `test_*.py` file only."""
+    (tmp_path / "kiosk").mkdir()
+    (tmp_path / "kiosk" / "test_kiosk_results_by_racer.py").write_text(SOURCE_TEXT_317)
+    (tmp_path / "helpers.py").write_text(SOURCE_TEXT_317)
+    assert fixtureless(tmp_path) == [
+        (
+            "test_kiosk_results_by_racer.py",
+            "test_kiosk_js_gives_a_request_up_after_15_s",
+            2,
+        )
     ]
 
 
 def test_every_browser_test_takes_a_fixture():
-    found = []
-    for path in sorted(BROWSER.rglob("test_*.py")):
-        for test, line in fixtureless_tests(path.read_text()):
-            if (path.name, test) not in KNOWN:
-                found.append(f"{path.name}:{line} {test}")
+    found = [
+        f"{name}:{line} {test}"
+        for name, test, line in fixtureless(BROWSER)
+        if (name, test) not in KNOWN
+    ]
     assert found == [], (
         "a browser test with no fixture opens no page and checks only the "
         "source: test the page's behaviour, or move it to a source check "
@@ -107,7 +127,5 @@ def test_every_browser_test_takes_a_fixture():
 def test_each_known_test_is_still_there():
     """A KNOWN entry whose test is gone or takes a fixture now is removed,
     so the list only shrinks."""
-    left = set()
-    for path in sorted(BROWSER.rglob("test_*.py")):
-        left |= {(path.name, test) for test, _ in fixtureless_tests(path.read_text())}
+    left = {(name, test) for name, test, _ in fixtureless(BROWSER)}
     assert sorted(KNOWN - left) == []
