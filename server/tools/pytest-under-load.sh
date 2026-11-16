@@ -93,6 +93,15 @@ if [ -z "$LOCK" ]; then
   fi
   LOCK="${XDG_CACHE_HOME:-$HOME/.cache}/derbynet/load-run.lock"
 fi
+# Under a holder of the same lock, such as tools/hold-load-lock.sh's
+# command or a load run's own pytest, flock would wait on that holder for
+# ever.
+if [ "${DERBYNET_LOAD_LOCK_HELD:-}" = "$LOCK" ]; then
+  echo "pytest-under-load.sh: it runs under a holder of $LOCK, such as" \
+       "tools/hold-load-lock.sh, and would wait on it for ever. Run it after" \
+       "that holder ends." >&2
+  exit 2
+fi
 # Appending, so a run that waits leaves the holder's lines in place.
 if ! { mkdir -p "$(dirname "$LOCK")" && exec 9>>"$LOCK"; } 2>/dev/null; then
   echo "pytest-under-load.sh: it cannot open the load lock $LOCK; name a" \
@@ -141,6 +150,7 @@ rm -f "$READY"
 DERBYNET_PG_READY_FILE="$READY" DERBYNET_LOAD_LOCK_HELD="$LOCK" \
   "${RUNNER[@]}" -rfE --junitxml="$OUT/junit.xml" "$@" >"$OUT/pytest.log" 2>&1 9>&- &
 RUN_PID=$!
+STARTED=$(date +%s)
 if [ "${RUNNER[0]}" != uv ]; then
   while [ ! -e "$READY" ] && kill -0 "$RUN_PID" 2>/dev/null; do sleep 1; done
 fi
@@ -150,6 +160,7 @@ for _ in $(seq 1 "$LOOPS"); do
 done
 status=0
 wait "$RUN_PID" || status=$?
+ENDED=$(date +%s)
 RUN_PID=
 stop_loops
 
@@ -158,5 +169,23 @@ stop_loops
 # error such as a wrong path as well as the counts.
 sed -n '/short test summary info/,$p' "$OUT/pytest.log"
 grep -q 'short test summary info' "$OUT/pytest.log" || tail -n 5 "$OUT/pytest.log"
+# Chromium's net::ERR_NETWORK_CHANGED marks the machine's network changing,
+# as another project's container joins or leaves a Docker bridge. The rule
+# for it (rerun the failed file alone at once, and report both) needs the
+# kernel log's veth lines over the run, which #348 read by hand three times
+# (#348 retro). This names them and the files to rerun; the status stays
+# pytest's.
+if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; then
+  veth="no journalctl here"
+  if command -v journalctl >/dev/null; then
+    veth="$(journalctl -k --since "@$STARTED" --until "@$ENDED" 2>/dev/null | grep -c veth || true) veth lines"
+  fi
+  files=$(sed -n '/short test summary info/,$p' "$OUT/pytest.log" |
+    sed -n 's/^\(FAILED\|ERROR\) \([^: ]*\.py\).*/\2/p' | sort -u | tr '\n' ' ')
+  echo "net::ERR_NETWORK_CHANGED in the log; the kernel log has $veth from" \
+       "@$STARTED to @$ENDED (journalctl -k --since @$STARTED --until @$ENDED | grep veth)."
+  echo "Rerun each failed file alone at once, and report both results:" \
+       "${DERBYNET_BROWSER_FONT:+DERBYNET_BROWSER_FONT=\"$DERBYNET_BROWSER_FONT\" }${RUNNER[*]} -m browser -n 0 ${files% }"
+fi
 echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml"
 exit "$status"
