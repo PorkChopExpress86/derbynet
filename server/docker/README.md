@@ -2,7 +2,7 @@
 
 `derbynet_server` runs the Django server for a race (#58). Docker is the only way DerbyNet is installed (D3, ADR-14), so a laptop at the race and a hosted server run this same image. It is built for `linux/amd64` and `linux/arm64`; the arm64 image is for Apple Silicon Macs and arm64 servers, not for running the server on a Raspberry Pi (D21; #59 covers the Pi's timer and photo stand images).
 
-Inside the container, nginx answers on port 80 (plain HTTP) and 443 (HTTPS) and passes requests to gunicorn, which runs Django as the unprivileged `derbynet` user. Everything an install keeps is on one volume, `/var/lib/derbynet`: the SQLite database, photos, videos, the secret key and the TLS key.
+Inside the container, nginx answers on port 80 (plain HTTP) and 443 (HTTPS) and passes requests to gunicorn, which runs Django as the unprivileged `derbynet` user. On Linux, `derbynet` takes the host user's uid and gid (D106), so the volume's files belong to that user. Everything an install keeps is on one volume, `/var/lib/derbynet`: the SQLite database, photos, videos, the secret key and the TLS key.
 
 Release tags are published to `ghcr.io/porkchopexpress86/derbynet_server` (D89). To build the image from a checkout, from the repository root:
 
@@ -17,12 +17,15 @@ With one command:
 ```sh
 docker run -d --name derbynet --restart unless-stopped \
   -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet \
-  -e TZ=America/Chicago ghcr.io/porkchopexpress86/derbynet_server
+  -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) \
+  ghcr.io/porkchopexpress86/derbynet_server
 ```
 
-Or with `compose.yaml` from this folder, which does the same:
+The guide leaves the two ids out on a Mac or Windows (D106), where Docker Desktop runs the containers in a Linux virtual machine of its own ([Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/); on Windows, its own `docker-desktop` WSL distribution, [Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)). Or with `compose.yaml` from this folder, which does the same, after writing the ids into `.env` on Linux:
 
 ```sh
+echo "DERBYNET_UID=$(id -u)" >> .env
+echo "DERBYNET_GID=$(id -g)" >> .env
 docker compose up -d
 ```
 
@@ -50,6 +53,7 @@ The image sets these. `server/README.md`'s Settings table lists the rest, such a
 
 | Variable | Default | Effect |
 |---|---|---|
+| `DERBYNET_UID`, `DERBYNET_GID` | unset | The uid and gid the `derbynet` user runs gunicorn, migrate and a `docker exec -u derbynet` as, and the volume's files belong to (D106). Set both or neither. Unset, `derbynet` takes the data folder's owner when that is not root, or else the image's own ids (`/opt/derbynet/derbynet-ids`). 0 is refused, and an id another account in the image holds, such as `www-data`'s 33, is shared. When the folder's owner differs, the start gives every file but `tls/` to the new ids, once, and logs one line naming the old and new uids |
 | `TZ` | `America/New_York` | The race's time zone, which Django reads for `TIME_ZONE`. Set it with `-e TZ=...`: an `/etc/localtime` mount does not exist on Windows, and the server would fall back to UTC |
 | `MAX_UPLOAD_SIZE` | `100M` | The largest request nginx takes (`client_max_body_size`), and Django's cap on a request's form fields (`DATA_UPLOAD_MAX_MEMORY_SIZE`). An nginx size: `16M`, `512k`, `1G`. The default, 104857600 bytes, is above the largest upload Django takes, a 100000000-byte replay clip (`DERBYNET_VIDEO_UPLOAD_MAX_MB`); `checks.sh upload` sends the photo stand's 30 MB photo through it |
 | `DERBYNET_REQUEST_TIMEOUT` | `30` | Seconds a request may take: gunicorn's `--timeout` and nginx's `proxy_read_timeout`. Raise it for very long schedules, such as `600` |
@@ -77,7 +81,7 @@ To serve DerbyNet under a path of an existing web site, publish the container on
 ```sh
 docker run -d --name derbynet --restart unless-stopped -p 127.0.0.1:8000:80 \
   -v derbynet:/var/lib/derbynet -e DERBYNET_URL_PREFIX=/my-derbynet \
-  -e DERBYNET_TRUSTED_PROXIES=172.17.0.1 \
+  -e DERBYNET_TRUSTED_PROXIES=172.17.0.1 -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) \
   ghcr.io/porkchopexpress86/derbynet_server
 ```
 
@@ -96,7 +100,7 @@ location /my-derbynet/ {
 
 ### Volumes and bind mounts
 
-Use a named volume, as above. A bind mount of a host folder works too: the container gives the folder's files to the `derbynet` user on each start. When it can't (a network share that maps root to nobody, say), it stops with a message naming the folder and the `chown` to run on the host.
+Use a named volume, as above. A bind mount of a host folder works too. With no `DERBYNET_UID`, `derbynet` takes the folder's owner when that is not root, so a folder the host user made stays that user's (D106). Each start gives `derbynet` any file under the folder that another owner holds, and a start whose ids match changes no file. When it can't (a network share that maps root to nobody, say), it stops with a message naming the folder and the `chown` to run on the host.
 
 Run one container per volume. Each start applies the database migrations, and two containers on one volume could apply them at once.
 

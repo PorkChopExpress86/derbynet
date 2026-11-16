@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# The image's entrypoint (#58), run by tini as root.  It makes the data
-# folders writable by the derbynet user, creates the TLS key and certificate
+# The image's entrypoint (#58), run by tini as root.  It gives the derbynet
+# user the host user's uid and gid (D106), makes the data folders writable by
+# derbynet, creates the TLS key and certificate
 # when they are missing, writes nginx's configuration from the environment,
 # runs the migrations as derbynet, then starts gunicorn as derbynet and nginx.
 # It exits as soon as either of the two exits, so Docker's restart policy can
@@ -52,14 +53,94 @@ prefix="${prefix%"${prefix##*[!/]}"}"
 
 TLS="$DERBYNET_CONFIG_DIR/tls"
 
-# --- the data folders -------------------------------------------------------
-# A bind mount can belong to any uid.  Give everything to derbynet but the TLS
-# folder, which only nginx's root master reads.  When chown can't (a share
-# that squashes root, a container without CAP_CHOWN), say what to do rather
-# than open the folder to everyone.
-as_derbynet() { setpriv --reuid=derbynet --regid=derbynet --init-groups "$@"; }
+# --- the server's uid and gid (D106) -----------------------------------------
+# derbynet runs as the host user's uid and gid, so the data folder's files
+# belong to that user on a bind mount and a named volume alike.
+# DERBYNET_UID and DERBYNET_GID set them.  When both are unset and the data
+# folder belongs to a user other than root, as a bind mount the user made
+# does, derbynet takes that owner.  Otherwise it keeps the image's own ids,
+# which the Dockerfile writes to /opt/derbynet/derbynet-ids.  An empty value,
+# as compose.yaml passes for a line .env lacks, counts as unset.
+
+# derbynet_ids <owner uid> <owner gid> <image uid> <image gid>: prints the uid
+# and gid derbynet runs as, from DERBYNET_UID and DERBYNET_GID or the data
+# folder's owner, or stops with one line.
+derbynet_ids() {
+    local uid="${DERBYNET_UID:-}" gid="${DERBYNET_GID:-}" name value
+    # One without the other stops (D108): the guide always sets both, and a
+    # default gid would put the files in a group the host user is not in.
+    if [ -n "$uid" ] && [ -z "$gid" ]; then
+        die "DERBYNET_GID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither."
+    fi
+    if [ -z "$uid" ] && [ -n "$gid" ]; then
+        die "DERBYNET_UID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither."
+    fi
+    if [ -z "$uid" ]; then
+        uid="$3" gid="$4"
+        if [ "$1" != 0 ]; then
+            uid="$1"
+            # A user's folder in root's group, as 'sudo mkdir' and then
+            # 'sudo chown <user>' leave it, keeps the image's gid (D109).
+            # The refusal of gid 0 is for DERBYNET_GID alone.
+            [ "$2" = 0 ] || gid="$2"
+        fi
+        echo "$uid $gid"
+        return 0
+    fi
+    for name in DERBYNET_UID DERBYNET_GID; do
+        value="${!name}"
+        # 4294967294 is the largest id usermod and groupmod take; 4294967295
+        # is (uid_t)-1, which means no id.
+        [[ "$value" =~ ^[0-9]{1,10}$ ]] && (( 10#$value <= 4294967294 )) \
+            || die "$name must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '$value'"
+        (( 10#$value != 0 )) \
+            || die "$name=$value is root's id, and the image refuses to run the server as root. Set it to your own user's, as 'id -u' and 'id -g' print them."
+    done
+    echo "$((10#$uid)) $((10#$gid))"
+}
+
+# takeover <owner uid> <owner gid> <uid> <gid> <folder>: logs one line for a
+# folder whose files go to another uid or gid, as after an upgrade or a
+# changed DERBYNET_UID.  Nothing for a folder already derbynet's, or for an
+# empty one, such as a new volume (D110).  A folder with files logs it, a
+# root-owned one too.
+takeover() {
+    [ "$1:$2" != "$3:$4" ] || return 0
+    [ -n "$(ls -A "$5")" ] || return 0
+    log "the files under $5 belong to uid $1 (gid $2); giving them to uid $3 (gid $4), once, which takes longer the more photos the folder holds"
+}
 
 mkdir -p "$DERBYNET_DATA_DIR" "$DERBYNET_CONFIG_DIR"
+# shellcheck disable=SC2046 # each stat and the file print two words
+ids="$(derbynet_ids $(stat -c '%u %g' "$DERBYNET_DATA_DIR") $(cat /opt/derbynet/derbynet-ids))"
+read -r uid gid <<<"$ids"
+# -o: a uid or gid another account or group in the image holds, such as
+# www-data's 33, is shared.  usermod -u would also re-own the files under
+# derbynet's home, the data folder, unlogged and past the chown hint below,
+# so the uid changes with the home pointed away, and then back.  The home
+# goes back on every start whose home is elsewhere, as one is when a start
+# was killed between the two calls; the Dockerfile's useradd sets it.
+if [ "$(id -g derbynet)" != "$gid" ]; then
+    groupmod -o -g "$gid" derbynet
+fi
+if [ "$(id -u derbynet)" != "$uid" ]; then
+    usermod -o -u "$uid" -d /nonexistent derbynet
+fi
+if [ "$(getent passwd derbynet | cut -d: -f6)" != /var/lib/derbynet ]; then
+    usermod -d /var/lib/derbynet derbynet
+fi
+# shellcheck disable=SC2046
+takeover $(stat -c '%u %g' "$DERBYNET_DATA_DIR") "$uid" "$gid" "$DERBYNET_DATA_DIR"
+
+# --- the data folders -------------------------------------------------------
+# A bind mount can belong to any uid.  Give everything to derbynet but the TLS
+# folder, which only nginx's root master reads.  This runs on every start and
+# gives only a file whose owner differs, such as one a root `docker exec`
+# left, so a start with the same uid changes no file.  When chown can't (a
+# share that squashes root, a container without CAP_CHOWN), say what to do
+# rather than open the folder to everyone.
+as_derbynet() { setpriv --reuid=derbynet --regid=derbynet --init-groups "$@"; }
+
 find "$DERBYNET_DATA_DIR" "$DERBYNET_CONFIG_DIR" -path "$TLS" -prune -o \
      \( \! -user derbynet -o \! -group derbynet \) -print0 \
   | xargs -0r chown -h derbynet:derbynet 2>/dev/null \

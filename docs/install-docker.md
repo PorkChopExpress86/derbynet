@@ -17,7 +17,15 @@ This guide covers:
 
 ## Start DerbyNet
 
-Open a terminal: Terminal on a Mac, PowerShell on Windows, or a shell on Linux. Then run this one command, with your own time zone:
+Open a terminal: Terminal on a Mac, PowerShell on Windows, or a shell on Linux. Then run this one command, with your own time zone.
+
+On Linux:
+
+```sh
+docker run -d --name derbynet --restart unless-stopped -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) ghcr.io/porkchopexpress86/derbynet_server
+```
+
+On a Mac or Windows:
 
 ```sh
 docker run -d --name derbynet --restart unless-stopped -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago ghcr.io/porkchopexpress86/derbynet_server
@@ -32,8 +40,11 @@ What each part does:
 | `-p 80:80 -p 443:443` | Serves plain HTTP on port 80 and HTTPS on port 443 of this computer. |
 | `-v derbynet:/var/lib/derbynet` | Keeps everything in a Docker volume named `derbynet`: the database, photos, videos, and the server's keys. |
 | `-e TZ=America/Chicago` | The race's time zone. Use a name from <https://en.wikipedia.org/wiki/List_of_tz_database_time_zones>. |
+| `-e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g)` | On Linux only. The server runs as your own user and group, so the files it keeps belong to you, in a volume and in a folder of yours alike (D106). The guide leaves them out on a Mac or Windows, where Docker Desktop runs the containers in a Linux virtual machine of its own: on a Mac, "the Docker daemon and containers run in a lightweight Linux VM managed by Docker" ([Docker Desktop on Mac](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/)), and on Windows, "Docker Desktop runs inside its own `docker-desktop` WSL distribution" ([Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)). |
 
-Docker downloads the image the first time, which takes a minute or two. On Linux, put `sudo` in front of each `docker` command unless your user is in the `docker` group.
+Docker downloads the image the first time, which takes a minute or two. On Linux, put `sudo` in front of each `docker` command unless your user is in the `docker` group. Run the command from your own user's shell, not a root shell: the shell fills in `$(id -u)` before `sudo` runs, so it is still your own id, but in a root shell it is 0, and the server refuses to run as root.
+
+The later `docker run` commands in this guide are the Linux ones. On a Mac or Windows, leave out `-e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g)`.
 
 The image is published when the project tags a release (D89). The commands here use the image's `latest` tag, which only a full release sets. Until the first one, only test releases are published, so add the newest test release's tag from the project's [Releases page](https://github.com/PorkChopExpress86/derbynet/releases) to the end of the image name in each command, after a colon, for example `:v0.1.0-rc2`. Use `v0.1.0-rc2` or later, since `v0.1.0-rc1` cannot run the browser timer. If the command says the image is not found, build it from a copy of the repository instead. From the repository's top folder, run `docker buildx build -f server/docker/Dockerfile -t derbynet_server .` and use `derbynet_server` in place of the image name.
 
@@ -43,7 +54,14 @@ Another web server on the computer may already use port 80 or 443. Docker then r
 
 ### With Docker Compose
 
-The repository holds the same setup as a Compose file, `server/docker/compose.yaml`. Save that file in a folder of its own, then run this from that folder:
+The repository holds the same setup as a Compose file, `server/docker/compose.yaml`. Save that file in a folder of its own. On Linux, first write your user's ids into a file named `.env` beside it, from that folder, so the server runs as you (D106):
+
+```sh
+echo "DERBYNET_UID=$(id -u)" >> .env
+echo "DERBYNET_GID=$(id -g)" >> .env
+```
+
+On a Mac or Windows, skip that step, as the guide leaves the ids out there. Then run this from the folder:
 
 ```sh
 docker compose up -d
@@ -79,7 +97,7 @@ To change the zone later, remove the container and start it again with the new `
 
 ```sh
 docker rm -f derbynet
-docker run -d --name derbynet --restart unless-stopped -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet -e TZ=America/Denver ghcr.io/porkchopexpress86/derbynet_server
+docker run -d --name derbynet --restart unless-stopped -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet -e TZ=America/Denver -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) ghcr.io/porkchopexpress86/derbynet_server
 ```
 
 ## Your data
@@ -94,7 +112,9 @@ Removing the container keeps the volume. `docker volume rm derbynet` deletes it,
 
 Run one container per volume. Each start applies the database migrations, and two containers on one volume could apply them at once.
 
-You can use a folder on the host instead of a named volume, such as `-v /srv/derbynet:/var/lib/derbynet` on Linux. The container gives the folder's files to its own user on each start. When it cannot, as on a network share, it stops with a message naming the folder and the `chown` command to run on the host.
+You can use a folder on the host instead of a named volume, such as `-v /srv/derbynet:/var/lib/derbynet` on Linux. The server runs as the user that `DERBYNET_UID` and `DERBYNET_GID` name, and without them as the folder's owner, unless that is root. Either way the folder's files belong to that user, so you can read and copy them on the host. When the container cannot give a file to that user, as on a network share, it stops with a message naming the folder and the `chown` command to run on the host.
+
+When the files belong to another user, as after an upgrade from an older image or with a new `DERBYNET_UID`, the next start gives them all to the new user, once. Its log says so in one line. On a large photo folder that start takes longer.
 
 ## Connect the timer
 
@@ -134,6 +154,7 @@ The container reads these variables. Pass each with `-e NAME=value` on `docker r
 | Variable | Default | Effect |
 |---|---|---|
 | `TZ` | `America/New_York` | The race's time zone. |
+| `DERBYNET_UID`, `DERBYNET_GID` | unset | The user and group ids the server runs as, which own its files. On Linux, set both, to `$(id -u)` and `$(id -g)`. Unset, the server takes the owner of a folder you mount, or else its own default. Root's id, 0, is refused. |
 | `DERBYNET_TIME_ZONE` | unset | A time zone that wins over `TZ`. |
 | `MAX_UPLOAD_SIZE` | `100M` | The largest request the server takes, such as a replay clip. A size such as `16M`, `512k` or `1G`. |
 | `DERBYNET_REQUEST_TIMEOUT` | `30` | Seconds a request may take. Raise it for a very long schedule, such as `600`. |
@@ -154,7 +175,7 @@ To add DerbyNet to an existing web site, run the container on a local port, and 
 For DerbyNet at `/my-derbynet` of your site:
 
 ```sh
-docker run -d --name derbynet --restart unless-stopped -p 127.0.0.1:8000:80 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_URL_PREFIX=/my-derbynet -e DERBYNET_TRUSTED_PROXIES=172.17.0.1 -e DERBYNET_ALLOWED_HOSTS=derby.example.org ghcr.io/porkchopexpress86/derbynet_server
+docker run -d --name derbynet --restart unless-stopped -p 127.0.0.1:8000:80 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) -e DERBYNET_URL_PREFIX=/my-derbynet -e DERBYNET_TRUSTED_PROXIES=172.17.0.1 -e DERBYNET_ALLOWED_HOSTS=derby.example.org ghcr.io/porkchopexpress86/derbynet_server
 ```
 
 In nginx:
@@ -216,10 +237,12 @@ Pull the new image, and start a new container on the same volume:
 ```sh
 docker pull ghcr.io/porkchopexpress86/derbynet_server
 docker rm -f derbynet
-docker run -d --name derbynet --restart unless-stopped -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago ghcr.io/porkchopexpress86/derbynet_server
+docker run -d --name derbynet --restart unless-stopped -p 80:80 -p 443:443 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) ghcr.io/porkchopexpress86/derbynet_server
 ```
 
-With Compose: `docker compose pull`, then `docker compose up -d`. The new container updates the database when it starts. Take a backup first.
+With Compose: `docker compose pull`, then `docker compose up -d`. On Linux, add the `.env` lines from [With Docker Compose](#with-docker-compose) first, if your `.env` has none. The new container updates the database when it starts. Take a backup first.
+
+An install from before the server ran as your user keeps its files under the image's own user. The first start with `DERBYNET_UID` gives them to you, once, and logs one line naming both users.
 
 ## Stop, start, and logs
 

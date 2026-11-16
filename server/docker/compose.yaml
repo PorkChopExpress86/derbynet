@@ -29,6 +29,12 @@ services:
     environment:
       <<: *postgres
       TZ: ${TZ:-America/New_York}
+      # The host user's uid and gid, which the files on the data volume
+      # belong to (D106).  On Linux, docs/install-docker.md writes both into
+      # .env beside this file.  Left empty, the server takes the data
+      # folder's owner, or its own default.
+      DERBYNET_UID: ${DERBYNET_UID:-}
+      DERBYNET_GID: ${DERBYNET_GID:-}
       # The entrypoint uses Postgres on this host when the postgres service
       # below runs, as it does under `--profile postgres`.  Otherwise the
       # server keeps SQLite, one file on the data volume in WAL mode.  A

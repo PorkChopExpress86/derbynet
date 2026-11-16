@@ -16,8 +16,25 @@
 #   upload     with MAX_UPLOAD_SIZE=16M a 15 MiB photo.upload succeeds and a
 #              17 MiB one answers 413; at the default (100M) the photo
 #              stand's 30 MB photo succeeds
-#   bind-mount a bind mount owned by another uid is given to derbynet, and
-#              one it can't be given to stops the container with a message
+#   bind-mount with no DERBYNET_UID, derbynet takes a bind mount's non-root
+#              owner (D106); with the host user's DERBYNET_UID and
+#              DERBYNET_GID, a photo the server writes is the host user's
+#              (ls -ln); one it can't be given to stops the container with a
+#              message
+#   uid-env    DERBYNET_UID and DERBYNET_GID on a named volume: the server,
+#              an exec -u derbynet and the volume's files take them, www-data
+#              still serves a photo, and ids other accounts and groups hold
+#              and the range's ends work (D106)
+#   uid-root   uid or gid 0, a malformed id, and one without the other (D108)
+#              stop the container with one line (D106)
+#   uid-takeover
+#              a volume of the image's uid goes to a new DERBYNET_UID at the
+#              next start, with one log line; a restart, with derbynet's
+#              home left away as a killed start leaves it, and a new container
+#              with the same uid log none and change no file, and the
+#              restart puts the home back (D106)
+#   uid-exec   with the .env lines docs/install-docker.md writes, docker
+#              compose exec -u derbynet runs manage.py check as the host user
 #   client-ip  Django sees the client's address, not the unix socket's, and
 #              not an X-Real-IP the client sent
 #   forwarded-proto
@@ -36,11 +53,12 @@
 #              import lands in Postgres and no SQLite file appears; with
 #              Postgres stopped it fails with one message naming the host;
 #              with no profile, it reads the server's SQLite (#308)
-#   root       manage.py check, run with docker compose exec and no -u, fails
-#              with one line naming the command and -u derbynet; a refused
-#              manage.py shell writes nothing; collectstatic, one of the
-#              build's commands, still runs as root; and manage.py check
-#              passes with -u derbynet (D103)
+#   root       with DERBYNET_UID=2345 (D106): manage.py check, run with
+#              docker compose exec and no -u, fails with one line naming the
+#              command and -u derbynet; a refused manage.py shell writes
+#              nothing; collectstatic, one of the build's commands, still runs
+#              as root; and manage.py check passes with -u derbynet, as uid
+#              2345 (D103)
 #   bad-env    values that would reach nginx's configuration malformed stop
 #              the container with a message
 #   allowed-hosts
@@ -286,29 +304,265 @@ check_upload() {
     echo "$reply" | grep -q '"code": "success"' || fail "the 30 MB upload did not succeed"
 }
 
+# The ids derbynet keeps when nothing gives it others (D106): the image's own,
+# as its /etc/passwd holds them before the entrypoint runs.
+image_ids() { docker run --rm --entrypoint sh "$IMAGE" -c 'echo "$(id -u derbynet) $(id -g derbynet)"'; }
+
+# ids <container>: "<uid> <gid>" a `docker exec -u derbynet` runs as, then
+# each gunicorn's, from /proc, since ps prints uid 4294967294 as -2.
+ids() {
+    echo "exec -u derbynet: $(docker exec -u derbynet "$PREFIX-$1" sh -c 'echo "$(id -u) $(id -g)"')"
+    echo "gunicorn: $(docker exec "$PREFIX-$1" sh -c \
+        'for pid in $(pgrep -x gunicorn); do echo $(awk "/^[UG]id:/ {print \$2}" /proc/$pid/status); done' | sort -u | xargs)"
+}
+
+# owned_by <container> <uid> <gid>: lists the data folder, and fails on a file
+# there with another owner, but tls/, which stays root's (#351 removes it).
+owned_by() {
+    docker exec "$PREFIX-$1" ls -lnA /var/lib/derbynet
+    docker exec "$PREFIX-$1" sh -c "! find /var/lib/derbynet -path /var/lib/derbynet/tls -prune -o \
+        \( ! -uid $2 -o ! -gid $3 \) -print | grep ." || fail "files under /var/lib/derbynet belong to another uid or gid than $2:$3"
+    [ "$(docker exec "$PREFIX-$1" stat -c '%u:%g %a' /var/lib/derbynet/tls)" = "0:0 700" ] \
+        || fail "tls/ is not root's, mode 0700"
+}
+
+# An event with the roster, and racer 1's photo uploaded: prints the racer
+# photo's URL path.  photo_racer <url> <work dir>
+photo_racer() {
+    local jar="$2/cookies" racer head
+    suite_copy "$2"
+    new_event "$1"
+    (cd "$2" && bash testing/reset-database.sh "$1" && bash testing/import-roster.sh "$1") \
+        >"$2/populate.log" 2>&1 || { tail "$2/populate.log" >&2; fail "no event"; }
+    login "$1" "$jar" RaceCoordinator
+    racer="$(curl -s -b "$jar" "$1/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
+    grep -q success <<<"$(curl -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
+        -F photo=@"$(first "$TESTING"/data/headshots/*.jpg)" "$1/action.php")" || fail "no racer photo"
+    head="$(curl -s -b "$jar" "$1/action.php?query=racer.list" | jq -r ".racers[] | select(.racerid == $racer) | .headshot")"
+    [ -n "$head" ] && [ "$head" != null ] || fail "racer $racer has no photo"
+    echo "$head"
+}
+
+# served <url> <path> <jar>: the photo, through nginx's www-data and the
+# gunicorn socket, answers 200 as an image.
+served() {
+    local got
+    got="$(curl -s -b "$3" -o /dev/null -w '%{http_code} %{content_type}' "$1/$2")"
+    echo "GET /$2: $got"
+    [[ "$got" == "200 image/"* ]] || fail "the photo answered $got"
+}
+
 check_bind_mount() {
-    local dir="$RUNNER_TEMP_DIR/bind"
-    say "a bind mount owned by uid 4321 is given to derbynet"
+    local dir="$RUNNER_TEMP_DIR/bind" default status out
+    default="$(image_ids)"
+    say "a bind mount owned by uid 4321, gid 4321, with no DERBYNET_UID: derbynet takes that owner (D106)"
     docker run --rm -v "$RUNNER_TEMP_DIR:/t" --entrypoint sh "$IMAGE" -c \
         'rm -rf /t/bind && mkdir -p /t/bind/events && touch /t/bind/events/old && chown -R 4321:4321 /t/bind && chmod 755 /t/bind'
     start b1 "$dir"
-    docker exec "$PREFIX-b1" ls -ln /var/lib/derbynet /var/lib/derbynet/events
-    docker exec "$PREFIX-b1" sh -c '! find /var/lib/derbynet -path /var/lib/derbynet/tls -prune -o -uid 4321 -print | grep .' \
-        || fail "files still belong to uid 4321"
+    out="$(ids b1)"
+    echo "$out"
+    [ "$out" = $'exec -u derbynet: 4321 4321\ngunicorn: 4321 4321' ] || fail "derbynet did not take uid 4321, gid 4321"
+    owned_by b1 4321 4321
     stop b1
-    say "one it may not chown (no CAP_CHOWN) stops with a message"
+
+    say "a bind mount owned by uid 4321 in root's group keeps the image's gid, ${default#* } (D109)"
+    docker run --rm -v "$RUNNER_TEMP_DIR:/t" --entrypoint sh "$IMAGE" -c \
+        'rm -rf /t/bind && mkdir -p /t/bind && chown 4321:0 /t/bind && chmod 755 /t/bind'
+    start b2 "$dir"
+    out="$(ids b2)"
+    echo "$out"
+    [ "$out" = "exec -u derbynet: 4321 ${default#* }"$'\n'"gunicorn: 4321 ${default#* }" ] \
+        || fail "derbynet did not take uid 4321 with the image's gid"
+    stop b2
+
+    say "the host user's folder, with DERBYNET_UID=\$(id -u) and DERBYNET_GID=\$(id -g): a photo the server writes is the host user's"
+    docker run --rm -v "$RUNNER_TEMP_DIR:/t" --entrypoint rm "$IMAGE" -rf /t/bind
+    mkdir "$dir"
+    start b3 "$dir" -e DERBYNET_UID="$(id -u)" -e DERBYNET_GID="$(id -g)" \
+        -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 127.0.0.1::80
+    local url="http://$(docker port "$PREFIX-b3" 80/tcp)" head photo
+    head="$(photo_racer "$url" "$RUNNER_TEMP_DIR/bind-work")"
+    served "$url" "$head" "$RUNNER_TEMP_DIR/bind-work/cookies"
+    photo="$(sed -n 1p <<<"$(find "$dir" -path "$dir/tls" -prune -o -name '*.jpg' -type f -print | sort)")"
+    [ -n "$photo" ] || fail "no photo on the bind mount"
+    say "ls -ln, on the host, of the photo the server wrote; id -u and id -g are $(id -u) $(id -g)"
+    (cd "$dir" && ls -ln "${photo#"$dir"/}")
+    [ "$(stat -c '%u %g' "$photo")" = "$(id -u) $(id -g)" ] || fail "the photo is not the host user's"
+    if find "$dir" -path "$dir/tls" -prune -o \( ! -uid "$(id -u)" -o ! -gid "$(id -g)" \) -print | grep .; then
+        fail "files on the bind mount are not the host user's"
+    fi
+    stop b3
+
+    say "one it may not chown (no CAP_CHOWN), with DERBYNET_UID=4322, stops with a message"
     docker run --rm -v "$RUNNER_TEMP_DIR:/t" --entrypoint sh "$IMAGE" -c \
         'rm -rf /t/bind && mkdir -p /t/bind && chown 4321:4321 /t/bind && chmod 755 /t/bind'
-    local status=0 out
-    out="$(timeout 120 docker run --name "$PREFIX-b2" --cap-drop CHOWN -v "$dir:/var/lib/derbynet" "$IMAGE" 2>&1)" || status=$?
+    status=0
+    out="$(timeout 120 docker run --name "$PREFIX-b4" --cap-drop CHOWN -e DERBYNET_UID=4322 \
+        -e DERBYNET_GID=4322 -v "$dir:/var/lib/derbynet" "$IMAGE" 2>&1)" || status=$?
     echo "$out" | tail -3
     echo "exit status $status"
     [ "$status" != 0 ] || fail "the container started on a folder derbynet can't write"
-    echo "$out" | grep -q 'not writable by the derbynet user' || fail "no message names the folder"
+    echo "$out" | grep -q "not writable by the derbynet user (uid 4322). On a bind mount, run 'sudo chown -R 4322:4322 <folder>'" \
+        || fail "no message names the folder and the chown"
     if grep -q 7$ <<<"$(docker run --rm -v "$dir:/d" --entrypoint stat "$IMAGE" -c %a /d)"; then
         fail "the folder was opened to everyone"
     fi
-    docker rm -f "$PREFIX-b2" >/dev/null
+    docker rm -f "$PREFIX-b4" >/dev/null
+}
+
+# DERBYNET_UID and DERBYNET_GID on a named volume (D106): a changed uid and
+# gid, ones other accounts and groups hold, and the ends of the range.
+check_uid_env() {
+    local out
+    say "DERBYNET_UID=2345 DERBYNET_GID=2346 on a named volume"
+    start ue1 "$PREFIX-uid-env-a" -e DERBYNET_UID=2345 -e DERBYNET_GID=2346 \
+        -e DERBYNET_ENABLE_TEST_ENDPOINTS=1 -p 127.0.0.1::80
+    out="$(ids ue1)"
+    echo "$out"
+    [ "$out" = $'exec -u derbynet: 2345 2346\ngunicorn: 2345 2346' ] || fail "derbynet does not run as 2345:2346"
+    local url="http://$(docker port "$PREFIX-ue1" 80/tcp)" head
+    say "www-data, nginx's user, is in derbynet's group at its new gid, and serves a photo"
+    docker exec "$PREFIX-ue1" sh -c 'getent group derbynet; id www-data'
+    [ "$(docker exec "$PREFIX-ue1" getent group derbynet)" = "derbynet:x:2346:www-data" ] \
+        || fail "www-data left derbynet's group"
+    head="$(photo_racer "$url" "$RUNNER_TEMP_DIR/uid-env")"
+    served "$url" "$head" "$RUNNER_TEMP_DIR/uid-env/cookies"
+    owned_by ue1 2345 2346
+    say "no file outside the volume belongs to derbynet's old uid or gid, which no account holds now"
+    out="$(docker exec "$PREFIX-ue1" find / -xdev \( -nouser -o -nogroup \) -print)"
+    echo "[${out}]"
+    [ -z "$out" ] || fail "files in the image belong to no account"
+    stop ue1
+
+    local uid gid name
+    for pair in 33:33 1:100 1000:1000 4294967294:4294967294; do
+        uid="${pair%:*}" gid="${pair#*:}" name="ue-${uid}"
+        say "DERBYNET_UID=$uid DERBYNET_GID=$gid: $(docker run --rm --entrypoint bash "$IMAGE" -c \
+            'u="$(getent passwd "$1" | cut -d: -f1)"; g="$(getent group "$2" | cut -d: -f1)"
+             echo "uid $1 is ${u:-no account}'"'"'s and gid $2 is ${g:-no group}'"'"'s in the image"' \
+            bash "$uid" "$gid")"
+        start "$name" "$PREFIX-uid-env-$uid" -e DERBYNET_UID="$uid" -e DERBYNET_GID="$gid"
+        out="$(ids "$name")"
+        echo "$out"
+        [ "$out" = "exec -u derbynet: $uid $gid"$'\n'"gunicorn: $uid $gid" ] || fail "derbynet does not run as $uid:$gid"
+        owned_by "$name" "$uid" "$gid"
+        if [ "$uid" = 1000 ]; then
+            # The base image's ubuntu account is gone (D111), so the usual
+            # first host user is derbynet's alone.
+            out="$(docker exec "$PREFIX-$name" getent passwd 1000 | cut -d: -f1 | xargs)"
+            echo "getent passwd 1000: $out"
+            [ "$out" = derbynet ] || fail "uid 1000 names $out, not derbynet alone"
+        fi
+        stop "$name"
+    done
+}
+
+# uid or gid 0, malformed ids, and one without the other each stop the
+# container with one line (D106).
+check_uid_root() {
+    local setting expected out status
+    while IFS='|' read -r setting expected; do
+        status=0
+        # shellcheck disable=SC2086 # each setting is one or two -e options
+        out="$(timeout 60 docker run --rm $setting "$IMAGE" 2>&1)" || status=$?
+        say "$setting: exit status $status"
+        echo "$out"
+        [ "$status" != 0 ] || fail "the container started with $setting"
+        [ "$out" = "derbynet: $expected" ] || fail "$setting did not stop with the one line: $expected"
+    done <<'EOF_CASES'
+-e DERBYNET_UID=0 -e DERBYNET_GID=1000|DERBYNET_UID=0 is root's id, and the image refuses to run the server as root. Set it to your own user's, as 'id -u' and 'id -g' print them.
+-e DERBYNET_UID=1000 -e DERBYNET_GID=0|DERBYNET_GID=0 is root's id, and the image refuses to run the server as root. Set it to your own user's, as 'id -u' and 'id -g' print them.
+-e DERBYNET_UID=00 -e DERBYNET_GID=00|DERBYNET_UID=00 is root's id, and the image refuses to run the server as root. Set it to your own user's, as 'id -u' and 'id -g' print them.
+-e DERBYNET_UID=0.5 -e DERBYNET_GID=1000|DERBYNET_UID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '0.5'
+-e DERBYNET_UID=1.5 -e DERBYNET_GID=1000|DERBYNET_UID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '1.5'
+-e DERBYNET_UID=-1 -e DERBYNET_GID=1000|DERBYNET_UID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '-1'
+-e DERBYNET_UID=1000 -e DERBYNET_GID=4294967295|DERBYNET_GID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '4294967295'
+-e DERBYNET_UID=4294967294.5 -e DERBYNET_GID=1000|DERBYNET_UID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '4294967294.5'
+-e DERBYNET_UID=1000|DERBYNET_GID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither.
+-e DERBYNET_GID=1000|DERBYNET_UID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither.
+EOF_CASES
+}
+
+# A volume whose files belong to the image's uid, as after an upgrade, goes
+# to a new DERBYNET_UID at the next start with one line (D106).  A restart,
+# and a new container, with the same uid log no line and change no file.
+check_uid_takeover() {
+    local default line lines before after out
+    default="$(image_ids)"
+    say "a volume made with the image's ids ($default)"
+    start ut1 "$PREFIX-uid-takeover"
+    docker exec -u derbynet "$PREFIX-ut1" sh -c 'mkdir -p /var/lib/derbynet/kept && echo x > /var/lib/derbynet/kept/file'
+    owned_by ut1 "${default% *}" "${default#* }"
+    stop ut1
+    say "the same volume with DERBYNET_UID=2345 DERBYNET_GID=2346"
+    start ut2 "$PREFIX-uid-takeover" -e DERBYNET_UID=2345 -e DERBYNET_GID=2346
+    line="derbynet: the files under /var/lib/derbynet belong to uid ${default% *} (gid ${default#* }); giving them to uid 2345 (gid 2346), once, which takes longer the more photos the folder holds"
+    lines="$(docker logs "$PREFIX-ut2" 2>&1 | grep -F 'giving them to' || true)"
+    echo "$lines"
+    [ "$lines" = "$line" ] || fail "the start did not log the one line: $line"
+    owned_by ut2 2345 2346
+    before="$(docker exec "$PREFIX-ut2" stat -c '%n %z' /var/lib/derbynet/secret_key /var/lib/derbynet/kept /var/lib/derbynet/kept/file)"
+
+    say "docker restart, with the same uid and derbynet's home left at /nonexistent, as by a start killed between its two usermods: no line, no file changed, and the home back"
+    docker exec "$PREFIX-ut2" usermod -d /nonexistent derbynet
+    docker restart "$PREFIX-ut2" >/dev/null
+    wait_ready "$PREFIX-ut2"
+    lines="$(docker logs "$PREFIX-ut2" 2>&1 | grep -cF 'giving them to' || true)"
+    echo "takeover lines in the log of both starts: $lines"
+    [ "$lines" = 1 ] || fail "the restart logged a takeover"
+    out="$(docker exec "$PREFIX-ut2" getent passwd derbynet)"
+    echo "$out"
+    [ "$out" = "derbynet:x:2345:2346::/var/lib/derbynet:/usr/sbin/nologin" ] \
+        || fail "derbynet's home stayed away from /var/lib/derbynet"
+    after="$(docker exec "$PREFIX-ut2" stat -c '%n %z' /var/lib/derbynet/secret_key /var/lib/derbynet/kept /var/lib/derbynet/kept/file)"
+    echo "$after"
+    [ "$before" = "$after" ] || fail "the restart changed a file's ctime"
+    stop ut2
+
+    say "a new container on the volume, with the same uid: no line, and no file changed"
+    start ut3 "$PREFIX-uid-takeover" -e DERBYNET_UID=2345 -e DERBYNET_GID=2346
+    lines="$(docker logs "$PREFIX-ut3" 2>&1 | grep -cF 'giving them to' || true)"
+    echo "takeover lines: $lines"
+    [ "$lines" = 0 ] || fail "the new container logged a takeover"
+    after="$(docker exec "$PREFIX-ut3" stat -c '%n %z' /var/lib/derbynet/secret_key /var/lib/derbynet/kept /var/lib/derbynet/kept/file)"
+    [ "$before" = "$after" ] || fail "the new container changed a file's ctime"
+    owned_by ut3 2345 2346
+}
+
+# guide_env_lines: the guide's command that writes DERBYNET_UID and
+# DERBYNET_GID into .env (docs/install-docker.md, With Docker Compose).
+guide_env_lines() {
+    awk '/^```sh$/ {on=1; block=""; next}
+         /^```$/ {if (on && block ~ /DERBYNET_UID/ && block ~ />> \.env/) printf "%s", block; on=0; next}
+         on {block = block $0 "\n"}' "$1"
+}
+
+# The Compose steps of docs/install-docker.md with the guide's .env lines: a
+# `docker compose exec -u derbynet` runs manage.py as the host user (D106).
+check_uid_exec() {
+    local project="$PREFIX-uidexec" work="$RUNNER_TEMP_DIR/uidexec" lines out status
+    mkdir -p "$work"
+    cp "$ROOT/server/docker/compose.yaml" "$work/"
+    lines="$(guide_env_lines "$ROOT/docs/install-docker.md")"
+    [ -n "$lines" ] || fail "docs/install-docker.md has no command writing DERBYNET_UID into .env"
+    say "the guide's .env lines, run in the folder beside compose.yaml"
+    echo "$lines"
+    (cd "$work" && bash -euo pipefail -c "$lines")
+    cat "$work/.env"
+    local compose=(docker compose -p "$project" -f "$work/compose.yaml")
+    export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
+    "${compose[@]}" up -d --wait
+    say "docker compose exec -u derbynet server sh -c 'id -u; id -g; python manage.py check'"
+    status=0
+    out="$("${compose[@]}" exec -T -u derbynet server sh -c 'id -u; id -g; python manage.py check' 2>&1)" || status=$?
+    echo "$out"
+    echo "exit status $status"
+    [ "$status" = 0 ] || fail "manage.py check failed as derbynet"
+    [[ "$out" == "$(id -u)"$'\n'"$(id -g)"$'\n'"System check identified no issues"* ]] \
+        || fail "manage.py check did not run as the host user, $(id -u):$(id -g)"
+    "${compose[@]}" exec -T server sh -c "! find /var/lib/derbynet -path /var/lib/derbynet/tls -prune -o \
+        \( ! -uid $(id -u) -o ! -gid $(id -g) \) -print | grep ." || fail "files on the volume are not the host user's"
+    "${compose[@]}" down --volumes
 }
 
 check_client_ip() {
@@ -570,7 +824,9 @@ check_root() {
     local project="$PREFIX-root"
     local compose=(docker compose -p "$project" -f "$ROOT/server/docker/compose.yaml")
     export DERBYNET_IMAGE="$IMAGE" DERBYNET_HTTP_PORT=127.0.0.1:0 DERBYNET_HTTPS_PORT=127.0.0.1:0
-    "${compose[@]}" up -d --wait
+    # A changed uid, so -u derbynet and the refusal's advice are checked at
+    # the uid the server runs as (D106).
+    DERBYNET_UID=2345 DERBYNET_GID=2346 "${compose[@]}" up -d --wait
     local out status
     say "manage.py check, run with docker compose exec and no -u"
     status=0
@@ -597,13 +853,13 @@ check_root() {
     echo "exit status $status"
     [ "$status" = 0 ] || fail "collectstatic did not run as root"
 
-    say "docker compose exec -u derbynet server python manage.py check"
+    say "docker compose exec -u derbynet server sh -c 'id -u; python manage.py check'"
     status=0
-    out="$("${compose[@]}" exec -T -u derbynet server python manage.py check 2>&1)" || status=$?
+    out="$("${compose[@]}" exec -T -u derbynet server sh -c 'id -u; python manage.py check' 2>&1)" || status=$?
     echo "$out"
     echo "exit status $status"
     [ "$status" = 0 ] || fail "manage.py check failed as derbynet"
-    [[ "$out" == "System check identified no issues"* ]] || fail "manage.py check did not run as derbynet"
+    [[ "$out" == $'2345\nSystem check identified no issues'* ]] || fail "manage.py check did not run as derbynet, uid 2345"
     "${compose[@]}" down --volumes
 }
 
@@ -929,7 +1185,8 @@ check_timer() {
 
 RUNNER_TEMP_DIR="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$PREFIX.XXXXXX")"
 trap 'cleanup; rm -rf "$RUNNER_TEMP_DIR"' EXIT
-[ $# -gt 0 ] || set -- tls secret user upload bind-mount client-ip forwarded-proto stop \
+[ $# -gt 0 ] || set -- tls secret user upload bind-mount uid-env uid-root uid-takeover \
+    uid-exec client-ip forwarded-proto stop \
     reload timeout engine postgres-password exec-database root bad-env allowed-hosts docs timer
 for check in "$@"; do
     case "$check" in
@@ -938,6 +1195,10 @@ for check in "$@"; do
         user) check_user ;;
         upload) check_upload ;;
         bind-mount) check_bind_mount ;;
+        uid-env) check_uid_env ;;
+        uid-root) check_uid_root ;;
+        uid-takeover) check_uid_takeover ;;
+        uid-exec) check_uid_exec ;;
         client-ip) check_client_ip ;;
         timeout) check_timeout ;;
         engine) check_engine ;;
