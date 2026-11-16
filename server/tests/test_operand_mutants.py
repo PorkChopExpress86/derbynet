@@ -395,23 +395,28 @@ def test_a_member_taken_away_leaves_the_same_kind_of_collection(tmp_path, collec
 def test_a_crowded_collection_lists_no_members_and_is_named(
     tmp_path, monkeypatch, capsys
 ):
-    """#370's review: a set of 400 names listed 400 mutants. Over
-    MAX_MEMBERS, the listing names the collection and lists none; at
-    MAX_MEMBERS it lists each."""
-    many = ", ".join(f'"n{i}"' for i in range(om.MAX_MEMBERS + 1))
-    enough = ", ".join(f'"n{i}"' for i in range(om.MAX_MEMBERS))
-    (tmp_path / "mod.py").write_text("")
+    """#370's review: a set of 400 names listed 400 mutants. Over 20
+    members, the listing names the collection and lists none; at 20 it
+    lists each. An unchanged crowded set, a deleted file and a script that
+    is not Python name nothing."""
+    many = ", ".join(f'"n{i}"' for i in range(21))
+    enough = ", ".join(f'"n{i}"' for i in range(20))
+    (tmp_path / "mod.py").write_text(f"OLD = {{{many}}}\n")
+    (tmp_path / "gone.py").write_text("x = 1\n")
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
     for args in (["init", "-q"], ["add", "."], ["commit", "-qm", "base"]):
         subprocess.run([*git, *args], cwd=tmp_path, check=True)
-    (tmp_path / "mod.py").write_text(f"MANY = {{{many}}}\nENOUGH = {{{enough}}}\n")
+    (tmp_path / "gone.py").unlink()
+    (tmp_path / "mod.py").write_text(
+        f"OLD = {{{many}}}\nMANY = x in ({many})\nENOUGH = {{{enough}}}\n"
+    )
+    (tmp_path / "page.js").write_text(f"S = {{{many}}}\n")
+    subprocess.run([*git, "add", "page.js"], cwd=tmp_path, check=True)
     monkeypatch.chdir(tmp_path)
     assert om.main(["--base", "HEAD"]) == 0
     out, err = capsys.readouterr()
-    assert [line.split("  ")[0] for line in out.splitlines()] == ["mod.py:2"] * (
-        om.MAX_MEMBERS
-    )
+    assert [line.split("  ")[0] for line in out.splitlines()] == ["mod.py:3"] * 20
     assert err == (
-        f"mod.py:1: {om.MAX_MEMBERS + 1} members, over {om.MAX_MEMBERS}: no member"
-        " rows; take away by hand the ones a rule reads\n"
+        "mod.py:2: 21 members, over 20: no member rows; take away by hand the"
+        " ones a rule reads\n"
     )

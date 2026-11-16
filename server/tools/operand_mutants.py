@@ -253,10 +253,10 @@ def offsets(text: str) -> list[int]:
 MAX_MEMBERS = 20
 
 
-def crowded(text: str, added: set[int]) -> list[tuple[int, int]]:
-    """(line, members) of each set literal, or tuple or list an `in` tests,
-    that touches a line in `added` and has more than MAX_MEMBERS members."""
-    tree = ast.parse(text)
+def collections(tree: ast.AST) -> list[ast.Set | ast.Tuple | ast.List]:
+    """Each set literal, `frozenset({...})`'s too, and each tuple or list an
+    `in` or `not in` tests: #356's review took `"range"` out of LOOKUPS and
+    `"values"` out of `("values_list", "values")`, and both survived."""
     found = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Set):
@@ -267,9 +267,15 @@ def crowded(text: str, added: set[int]) -> list[tuple[int, int]]:
                     right, (ast.Tuple, ast.List, ast.Set)
                 ):
                     found[id(right)] = right
+    return list(found.values())
+
+
+def crowded(text: str, added: set[int]) -> list[tuple[int, int]]:
+    """(line, members) of each of collections() that touches a line in
+    `added` and has more than MAX_MEMBERS members."""
     return sorted(
         (node.lineno, len(node.elts))
-        for node in found.values()
+        for node in collections(ast.parse(text))
         if len(node.elts) > MAX_MEMBERS
         and any(n in added for n in range(node.lineno, node.end_lineno + 1))
     )
@@ -299,19 +305,8 @@ def python_conditions(
     def touches(node: ast.expr) -> bool:
         return any(n in added for n in range(node.lineno, node.end_lineno + 1))
 
-    tests, ops, loops, members = [], [], [], {}
+    tests, ops, loops = [], [], []
     for node in ast.walk(tree):
-        # A set literal, `frozenset({...})`'s too, and the tuple or list an
-        # `in` tests: #356's review took `"range"` out of LOOKUPS and
-        # `"values"` out of `("values_list", "values")`, and both survived.
-        if isinstance(node, ast.Set):
-            members[id(node)] = node
-        elif isinstance(node, ast.Compare):
-            for op, right in zip(node.ops, node.comparators, strict=True):
-                if isinstance(op, (ast.In, ast.NotIn)) and isinstance(
-                    right, (ast.Tuple, ast.List, ast.Set)
-                ):
-                    members[id(right)] = right
         if isinstance(node, (ast.For, ast.AsyncFor)):
             loops.append(node)
         elif isinstance(node, (ast.If, ast.While, ast.IfExp)):
@@ -341,7 +336,7 @@ def python_conditions(
     # since `("values_list")` is a string, and `in` on it a substring test
     # that `"values"` passes (#370 review). A collection of more than
     # MAX_MEMBERS is a table, not a rule: crowded() names it instead.
-    for node in members.values():
+    for node in collections(tree):
         elts = node.elts
         if any(isinstance(e, ast.Starred) for e in elts) or len(elts) > MAX_MEMBERS:
             continue
