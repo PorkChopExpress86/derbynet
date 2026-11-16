@@ -681,8 +681,9 @@ check_caddy() {
     [[ "$ports" != *HostPort* ]] || fail "the server publishes a port"
 
     say "Caddy's root, from http://$http/derbynet-ca.crt and over https"
-    curl -fsS -m 30 -o "$work/root.crt" "http://$http/derbynet-ca.crt" \
-        || fail "http://$http/derbynet-ca.crt serves no root"
+    # 200 and no redirect: plain HTTP is never sent to HTTPS (D117).
+    code="$(curl -sS -m 30 -o "$work/root.crt" -w '%{http_code} %{redirect_url}' "http://$http/derbynet-ca.crt")"
+    [ "$code" = "200 " ] || fail "http://$http/derbynet-ca.crt answered $code, not the root"
     curl -fsSk -m 30 -o "$work/root-https.crt" "https://$https/derbynet-ca.crt" \
         || fail "https://$https/derbynet-ca.crt serves no root"
     openssl x509 -noout -subject -in "$work/root.crt"
