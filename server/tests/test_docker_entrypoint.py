@@ -87,7 +87,7 @@ def test_a_root_owned_folder_keeps_the_image_ids():
 
 
 def test_an_owner_in_roots_group_keeps_the_image_gid():
-    """Owner question, pending (#350): a folder of uid 4321 in gid 0 takes
+    """D109: a folder of uid 4321 in gid 0 takes
     the uid alone."""
     assert ids(("4321", "0")) == "4321 998"
 
@@ -146,23 +146,23 @@ def test_root_and_malformed_ids_stop_with_one_line(uid, gid, line):
     [
         (
             {"DERBYNET_UID": "1000"},
-            "derbynet: DERBYNET_UID is set and DERBYNET_GID is not. Set both, as "
-            "'id -u' and 'id -g' print them, or neither.\n",
+            "derbynet: DERBYNET_GID is unset; set both DERBYNET_UID and "
+            "DERBYNET_GID, or neither.\n",
         ),
         (
             {"DERBYNET_UID": "1000", "DERBYNET_GID": ""},
-            "derbynet: DERBYNET_UID is set and DERBYNET_GID is not. Set both, as "
-            "'id -u' and 'id -g' print them, or neither.\n",
+            "derbynet: DERBYNET_GID is unset; set both DERBYNET_UID and "
+            "DERBYNET_GID, or neither.\n",
         ),
         (
             {"DERBYNET_GID": "1000"},
-            "derbynet: DERBYNET_GID is set and DERBYNET_UID is not. Set both, as "
-            "'id -u' and 'id -g' print them, or neither.\n",
+            "derbynet: DERBYNET_UID is unset; set both DERBYNET_UID and "
+            "DERBYNET_GID, or neither.\n",
         ),
     ],
 )
 def test_one_without_the_other_stops_with_one_line(env, line):
-    """Owner question, pending (#350)."""
+    """D108: the line names the unset one."""
     assert refusal(env) == line
 
 
@@ -205,7 +205,7 @@ def test_a_folder_already_derbynets_logs_nothing(folder):
 
 
 def test_an_empty_folder_logs_nothing(tmp_path):
-    """A new volume, root's and empty (owner question, pending (#350))."""
+    """A new volume, root's and empty, logs nothing; with a file it logs (D110)."""
     assert takeover(tmp_path, "0", "0", "2345", "2346") == ""
     (tmp_path / ".hidden").write_text("x")
     assert takeover(tmp_path, "0", "0", "2345", "2346") == TAKEOVER.format(

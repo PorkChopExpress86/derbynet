@@ -67,22 +67,21 @@ TLS="$DERBYNET_CONFIG_DIR/tls"
 # folder's owner, or stops with one line.
 derbynet_ids() {
     local uid="${DERBYNET_UID:-}" gid="${DERBYNET_GID:-}" name value
-    # One without the other stops (owner question, pending (#350)): the
-    # guide always sets both, and a default gid would put the files in a
-    # group the host user is not in.
+    # One without the other stops (D108): the guide always sets both, and a
+    # default gid would put the files in a group the host user is not in.
     if [ -n "$uid" ] && [ -z "$gid" ]; then
-        die "DERBYNET_UID is set and DERBYNET_GID is not. Set both, as 'id -u' and 'id -g' print them, or neither."
+        die "DERBYNET_GID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither."
     fi
     if [ -z "$uid" ] && [ -n "$gid" ]; then
-        die "DERBYNET_GID is set and DERBYNET_UID is not. Set both, as 'id -u' and 'id -g' print them, or neither."
+        die "DERBYNET_UID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither."
     fi
     if [ -z "$uid" ]; then
         uid="$3" gid="$4"
         if [ "$1" != 0 ]; then
             uid="$1"
             # A user's folder in root's group, as 'sudo mkdir' and then
-            # 'sudo chown <user>' leave it, keeps the image's gid (owner
-            # question, pending (#350)).
+            # 'sudo chown <user>' leave it, keeps the image's gid (D109).
+            # The refusal of gid 0 is for DERBYNET_GID alone.
             [ "$2" = 0 ] || gid="$2"
         fi
         echo "$uid $gid"
@@ -103,7 +102,8 @@ derbynet_ids() {
 # takeover <owner uid> <owner gid> <uid> <gid> <folder>: logs one line for a
 # folder whose files go to another uid or gid, as after an upgrade or a
 # changed DERBYNET_UID.  Nothing for a folder already derbynet's, or for an
-# empty one, such as a new volume (owner question, pending (#350)).
+# empty one, such as a new volume (D110).  A folder with files logs it, a
+# root-owned one too.
 takeover() {
     [ "$1:$2" != "$3:$4" ] || return 0
     [ -n "$(ls -A "$5")" ] || return 0

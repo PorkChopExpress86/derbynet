@@ -86,14 +86,14 @@ FROM ${UBUNTU}
 # open gunicorn's socket, and stays in it when the entrypoint changes the
 # group's gid, since /etc/group lists it by name.  derbynet-ids holds the ids
 # derbynet keeps when no DERBYNET_UID and no folder owner give others (D106,
-# entrypoint.sh).  The base image's ubuntu account goes (owner question,
-# pending (#350)): it holds uid 1000, the first user on most Linux hosts, and
-# a derbynet sharing it would show as ubuntu in ps and ls.
+# entrypoint.sh).  The base image's ubuntu account goes (D111): it holds
+# uid 1000, the first user on most Linux hosts, and a derbynet sharing it
+# would show as ubuntu in ps and ls.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 nginx openssl tzdata \
       tini curl ca-certificates \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled/* \
- && userdel --remove ubuntu \
+ && userdel -r ubuntu \
  && useradd --system --user-group --home-dir /var/lib/derbynet --no-create-home \
       --shell /usr/sbin/nologin derbynet \
  && usermod -aG derbynet www-data \

@@ -25,8 +25,8 @@
 #              an exec -u derbynet and the volume's files take them, www-data
 #              still serves a photo, and ids other accounts and groups hold
 #              and the range's ends work (D106)
-#   uid-root   uid or gid 0, a malformed id, and one without the other stop
-#              the container with one line (D106)
+#   uid-root   uid or gid 0, a malformed id, and one without the other (D108)
+#              stop the container with one line (D106)
 #   uid-takeover
 #              a volume of the image's uid goes to a new DERBYNET_UID at the
 #              next start, with one log line; a restart, with derbynet's
@@ -365,7 +365,7 @@ check_bind_mount() {
     owned_by b1 4321 4321
     stop b1
 
-    say "a bind mount owned by uid 4321 in root's group keeps the image's gid, ${default#* } (owner question, pending (#350))"
+    say "a bind mount owned by uid 4321 in root's group keeps the image's gid, ${default#* } (D109)"
     docker run --rm -v "$RUNNER_TEMP_DIR:/t" --entrypoint sh "$IMAGE" -c \
         'rm -rf /t/bind && mkdir -p /t/bind && chown 4321:0 /t/bind && chmod 755 /t/bind'
     start b2 "$dir"
@@ -447,9 +447,8 @@ check_uid_env() {
         [ "$out" = "exec -u derbynet: $uid $gid"$'\n'"gunicorn: $uid $gid" ] || fail "derbynet does not run as $uid:$gid"
         owned_by "$name" "$uid" "$gid"
         if [ "$uid" = 1000 ]; then
-            # The base image's ubuntu account is gone (owner question,
-            # pending (#350)), so the usual first host user is derbynet's
-            # alone.
+            # The base image's ubuntu account is gone (D111), so the usual
+            # first host user is derbynet's alone.
             out="$(docker exec "$PREFIX-$name" getent passwd 1000 | cut -d: -f1 | xargs)"
             echo "getent passwd 1000: $out"
             [ "$out" = derbynet ] || fail "uid 1000 names $out, not derbynet alone"
@@ -479,8 +478,8 @@ check_uid_root() {
 -e DERBYNET_UID=-1 -e DERBYNET_GID=1000|DERBYNET_UID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '-1'
 -e DERBYNET_UID=1000 -e DERBYNET_GID=4294967295|DERBYNET_GID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '4294967295'
 -e DERBYNET_UID=4294967294.5 -e DERBYNET_GID=1000|DERBYNET_UID must be a whole number from 1 to 4294967294, as 'id -u' and 'id -g' print them, not '4294967294.5'
--e DERBYNET_UID=1000|DERBYNET_UID is set and DERBYNET_GID is not. Set both, as 'id -u' and 'id -g' print them, or neither.
--e DERBYNET_GID=1000|DERBYNET_GID is set and DERBYNET_UID is not. Set both, as 'id -u' and 'id -g' print them, or neither.
+-e DERBYNET_UID=1000|DERBYNET_GID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither.
+-e DERBYNET_GID=1000|DERBYNET_UID is unset; set both DERBYNET_UID and DERBYNET_GID, or neither.
 EOF_CASES
 }
 
