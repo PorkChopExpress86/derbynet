@@ -927,8 +927,10 @@ def test_a_newer_board_during_a_taps_request_wins(login, event):
     held, and the sheet's GET is held at its route. The sheet is closed,
     and a poll sent before the click then answers with the kiosk renamed
     Hall, and swaps the board at once, since no press is on. That swap
-    drops the held board, the older (#344 review): when the GET ends, with
-    no sheet open, the board swapped once after the click, to Hall."""
+    drops the held board, the older (#344 review): when the GET ends, the
+    board swapped once after the click, to Hall. The GET's body opens the
+    sheet again (`kioskSheet.show`); once it is closed, a later press holds
+    and applies a board as usual."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     gets = held_at_route(page, "**/kiosks/page/**")
@@ -942,9 +944,9 @@ def test_a_newer_board_during_a_taps_request_wins(login, event):
     polls.answer(1)
     gets[0].continue_()
     # The Hall board detached the Page button, and the log's listener on
-    # the document hears no end of the GET (asserted below); the closed
-    # sheet's form is swapped in in the task that ends it.
-    expect(sheet(page, "kiosks").locator("form")).to_be_attached()
+    # the document hears no end of the GET (asserted below); the sheet's
+    # form is swapped in in the task that ends it.
+    expect(sheet(page, "kiosks").locator("form")).to_be_visible()
     log = board_log(page)
     click = after(log, "click", after(log, "down"))
     # one read: a held board is applied in the GET's end, the task that
@@ -952,15 +954,21 @@ def test_a_newer_board_during_a_taps_request_wins(login, event):
     assert [r["name"] for r in swaps_since(log, click)] == ["Hall"], log
     assert [r for r in log if r["what"] == "done"] == [], log
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
-    # Nothing is left waiting: a later press that ends with nothing new
-    # held swaps nothing.
+    # Nothing is left waiting, the GET's end included: a later press across
+    # a poll's reply, the kiosk renamed Cove, swaps once on its move off, to
+    # Cove.
+    page.keyboard.press("Escape")
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    Kiosk.objects.filter(address="tv").update(name="Cove")
+    polls.wait_for(3)
     later = len(board_log(page))
     press(page, scene_button(page, scene(event, "Racing")))
+    polls.answer(2)
     move_off(page)
     page.mouse.up()
     log = board_log(page)
     # one read: the move off applies a held board at once, before it returns.
-    assert swaps_since(log, later) == [], log
+    assert [r["name"] for r in swaps_since(log, later)] == ["Cove"], log
     polls.end()
 
 
