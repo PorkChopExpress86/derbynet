@@ -56,7 +56,9 @@ targets, then:
   tool prints (D101);
 - before the commands, `tools/docstring_claims.py` on each changed test file,
   then with `--check` on the PR body draft over every one of them, since a
-  catch-all row fails (#341 retro), and `tools/operand_mutants.py` when a
+  catch-all row fails (#341 retro), with `--base BASE`, so that it asks only
+  for the claims of the tests the diff adds or changes and of those that
+  read a helper it adds or changes (D123; not under `--stdin`), and `tools/operand_mutants.py` when a
   changed hand-written source file can hold a condition (not a migration or
   vendored code), plan/'s Python tools and tests among them, with
   `tools/mutate.py --listed`, which runs every mutant it lists (#336 retro),
@@ -1672,6 +1674,34 @@ def frame_change(base, head):
     return 'it reorders the module-level code'
 
 
+def frame_names(node):
+    """The names a statement of the frame binds: the one a def, class or
+    simple assignment defines, else every name it may bind."""
+    name = defined_name(node)
+    return {name} if name else stored_names(node)
+
+
+def frame_seeds(base, head):
+    """For changed_tests(claims=True): the names the frame binds otherwise
+    at HEAD than at BASE. A new, changed or deleted import seeds each name
+    it binds whose binding differs, or that is bound twice, so a test
+    reading a name the import bound before is no reader; any other such
+    statement seeds the one name it defines (a fixture, a constant), or
+    every name it may bind."""
+    binds = bindings(base.module, 'BASE'), bindings(head.module, 'the file')
+    old = [ast.dump(n) for n in base.frame]
+    new = [ast.dump(n) for n in head.frame]
+    changed = [n for n, d in zip(head.frame, new) if d not in old]
+    changed += [n for n, d in zip(base.frame, old) if d not in new]
+    out = set()
+    for node in changed:
+        for name in frame_names(node):
+            was, now = (b.get(name) for b in binds)
+            if not is_import(node) or was is AMBIGUOUS or was != now:
+                out.add(name)
+    return out
+
+
 def put_back(base, head):
     """The two modules for D97's check of the frame: each test, helper and
     test class HEAD has put back as BASE had it, one HEAD adds left out, a
@@ -1695,13 +1725,25 @@ def put_back(base, head):
             ast.Module(body=head_body, type_ignores=[]))
 
 
-def changed_tests(base_text, head_text, module_text):
+def changed_tests(base_text, head_text, module_text, claims=False):
     """D101's verdict on a browser test file: [(node id less the path, why)],
     in HEAD's order, for each test the diff from `base_text` to `head_text`
     adds or changes, by AST, and each that reads, directly or through a
     helper of the file, a helper the diff adds, changes or deletes. A frame
     that differs is resolved only as a D97 move (`module_text` as for
-    import_only()). Raises WholeFile with the reason otherwise."""
+    import_only()). Raises WholeFile with the reason otherwise.
+
+    With `claims`, for `tools/docstring_claims.py --check --base` (D123,
+    #374): a changed frame is no reason to repeat the whole file, since an
+    import or a constant changes no claim of a test that never reads it.
+    Each name a new, changed or deleted frame statement binds otherwise, a
+    fixture's or an import's, is a seed instead, as a helper is, and so is
+    a test class that changes outside its test methods, and a frame
+    statement that reads a seed passes it on to the tests that read the
+    name it binds; a changed helper nothing in the file reads, or a diff
+    that changes no test, gives no reason either, and the list may be
+    empty.
+    What can't be parsed or resolved still raises."""
     if base_text is None:
         raise WholeFile('new on the branch, so each of its tests is new')
     try:
@@ -1722,12 +1764,14 @@ def changed_tests(base_text, head_text, module_text):
     docs = [(base.doc, head.doc)] + [(c.doc, head.classes[name].doc)
                                      for name, c in base.classes.items()
                                      if name in head.classes]
-    if any(a != b for a, b in docs) and reads_doc(trees[1]):
+    if not claims and any(a != b for a, b in docs) and reads_doc(trees[1]):
         raise WholeFile('a docstring changes, and the file reads `__doc__`')
 
-    moved = set()
+    moved, seeds = set(), set()
     why = frame_change(base, head)
-    if why:
+    if why and claims:
+        seeds = frame_seeds(base, head)
+    elif why:
         try:
             moved = {name for names in moves(*put_back(base, head), module_text).values()
                      for name in names}
@@ -1736,7 +1780,7 @@ def changed_tests(base_text, head_text, module_text):
 
     # What the diff adds, changes or deletes: a test or a helper by its name,
     # a new or deleted test class by its own.
-    seeds, ids = set(), {}
+    ids = {}
     for name, node in head.tests.items():
         old = base.tests.get(name)
         if old is None or ast.dump(old) != ast.dump(node):
@@ -1747,7 +1791,7 @@ def changed_tests(base_text, head_text, module_text):
         if old is None or ast.dump(old) != ast.dump(node):
             seeds.add(name)
             readers = [n for other, n in head.names().items() if other != name]
-            if not any(name in mentions(n) for n in readers + head.frame):
+            if not claims and not any(name in mentions(n) for n in readers + head.frame):
                 raise WholeFile(f'it adds or changes the helper {name}, which nothing '
                                 'in the file reads')
     seeds |= {name for name in [*base.tests, *base.helpers]
@@ -1759,6 +1803,10 @@ def changed_tests(base_text, head_text, module_text):
             ids[name] = 'new'
             continue
         if ast.dump(old.frame) != ast.dump(c.frame):
+            if claims:
+                seeds.add(name)
+                ids[name] = 'changed outside its test methods'
+                continue
             changed = next((what(n) for n in c.rest
                             if ast.dump(n) not in map(ast.dump, old.rest)),
                            'its bases, its decorators or what it deletes')
@@ -1779,6 +1827,11 @@ def changed_tests(base_text, head_text, module_text):
     # reads it, and the module's reach runs again.
     reached = set(seeds)
     readers = {**head.helpers, **head.tests}
+    if claims:
+        # A fixture or a constant that reads a seed passes it on to the
+        # tests that read it.
+        readers.update({name: node for node in head.frame
+                        for name in frame_names(node)})
     in_class = {}
     for _ in range(len(head.classes) + 1):
         for _ in range(len(readers) + 1):
@@ -1807,12 +1860,12 @@ def changed_tests(base_text, head_text, module_text):
         reached |= grown
     for node in head.frame + [c.frame for c in head.classes.values()]:
         hit = sorted(mentions(node) & reached)
-        if hit:
+        if hit and not claims:
             raise WholeFile(f'{what(node)} reads {hit[0]}, which the diff adds, '
                             'changes or deletes, or which reads one')
     for name, (owners, hit) in in_class.items():
         used = sorted(attributes(head.classes[name].frame, owners) & hit)
-        if used:
+        if used and not claims:
             raise WholeFile(f'the class {name} reads {used[0]} outside its test methods, '
                             'which the diff adds, changes or deletes, or which reads one')
 
@@ -1832,12 +1885,12 @@ def changed_tests(base_text, head_text, module_text):
         if node is head.tests.get(name):
             pick(name, node, name)
         elif name in head.classes and node is head.classes[name].node:
-            if ids.get(name) == 'new':
-                out.append((name, 'new'))
+            if name in ids:
+                out.append((name, ids[name]))
                 continue
             for method, test in head.classes[name].tests.items():
                 pick(f'{name}::{method}', test, name, method)
-    if not out:
+    if not out and not claims:
         raise WholeFile('by AST it adds or changes no test, and no helper a test '
                         'reads: a comment, a docstring or a deletion')
     return out
@@ -2006,16 +2059,17 @@ def report(plan, tree):
     # #312 restarted its hand-off run for a docstring's numbers no assert
     # read, and never listed its operand mutants.
     claimed = plan.changed_tests + plan.changed_helpers
+    base = f' --base {plan.base}' if plan.from_git else ''
     if claimed or plan.changed_source:
         say('Before the first hand-off run, from server/: settle what these list, '
             'since an edit restarts the runs below (#312 retro):')
         if claimed:
             say(f'  uv run python tools/docstring_claims.py {" ".join(claimed)}')
             # #341 checked two of its four changed test files, and a
-            # catch-all row for the rest failed review (#341 retro).
-            say('  uv run python tools/docstring_claims.py --check <the PR body draft> '
+            # catch-all row for the rest failed review (#341 retro); --base
+            # asks only for the claims the diff adds or changes (D123).
+            say(f'  uv run python tools/docstring_claims.py --check <the PR body draft>{base} '
                 + ' '.join(claimed))
-        base = f' --base {plan.base}' if plan.from_git else ''
         if plan.changed_source:
             say(f'  uv run python tools/operand_mutants.py{base}')
             # #336 picked its mutants by hand, mostly one way, and 21 of 98

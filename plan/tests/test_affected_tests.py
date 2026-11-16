@@ -794,6 +794,7 @@ class GitDiff(unittest.TestCase):
             git('add', '.')
             git('commit', '-q', '-m', 'base')
             editing.write_text('Award.objects.all()\n\n\nNAME = "b"\n')
+            (root / 'server/ui/tests/test_dashboard.py').write_text('"""2 rows."""\n')
             git('commit', '-q', '-am', 'rename')
 
             def affected():
@@ -808,6 +809,10 @@ class GitDiff(unittest.TestCase):
                           before_hand_off(out))
             self.assertIn('  uv run python tools/mutate.py --listed --base HEAD~1 -- ',
                           before_hand_off(out))
+            # D123: from git, --check asks only for the claims the diff adds
+            # or changes (#374); --stdin keeps every claim (BeforeTheHandOff).
+            self.assertIn('  uv run python tools/docstring_claims.py --check '
+                          '<the PR body draft> --base HEAD~1 ', before_hand_off(out))
             editing.write_text('Award.objects.all()\n\n\nNAME = Award.objects.get()\n')
             out = affected()
             self.assertIn('Postgres: needed', out)
@@ -2129,6 +2134,105 @@ def reach_shapes():
                 for end in ('test', 'method'):
                     for subclass in (False, True):
                         yield leaf, (*middle, end), subclass
+
+
+def claims(head, base=D101_BASE):
+    """changed_tests(claims=True) on test_sheet.py, for
+    tools/docstring_claims.py --check --base (D123, #374)."""
+    return TOOL.changed_tests(base, head, lambda name: None, claims=True)
+
+
+class ClaimsMode(unittest.TestCase):
+    """D123: the claims to list are those of the tests the diff adds or
+    changes and of those that read what it adds or changes; a changed
+    frame or class frame is a seed there, not the whole file (#374).
+    Each case below raises WholeFile without `claims`."""
+
+    def assert_whole_without_claims(self, head, base=D101_BASE):
+        with self.assertRaises(TOOL.WholeFile):
+            d101(head, base=base)
+
+    def test_a_new_import_reaches_only_its_readers(self):
+        head = edit('import pytest\n', 'import pytest\nimport time\n')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+        head = edit('    page.wait_for_timeout(10)\n', '    time.sleep(0)\n', head)
+        self.assertEqual(claims(head), [('test_waits', 'changed')])
+
+    def test_a_widened_import_reaches_no_reader_of_its_old_names(self):
+        head = edit('import expect\n', 'import Page, expect\n')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+
+    def test_a_changed_import_reaches_the_readers_of_the_name(self):
+        head = edit('from playwright.sync_api import expect',
+                    'from playwright.async_api import expect')
+        self.assertEqual(claims(head), [('test_races', 'reads expect'),
+                                        ('test_waits', 'reads expect')])
+
+    def test_an_import_of_a_name_bound_twice_reaches_its_readers(self):
+        base = edit('LANES = 4\n', 'LANES = 4\nexpect = expect\n')
+        head = edit('from playwright.sync_api import expect',
+                    'from playwright.sync_api import expect, Page', base)
+        self.assertEqual(claims(head, base), [('test_races', 'reads expect'),
+                                              ('test_waits', 'reads expect')])
+
+    def test_a_changed_constant_reaches_the_tests_that_read_it(self):
+        head = edit('LANES = 4', 'LANES = 5')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [('test_races', 'reads start'),
+                                        ('TestBoard::test_two', 'reads start')])
+
+    def test_a_changed_statement_seeds_each_name_it_binds(self):
+        base = edit('LANES = 4\n', 'LANES = 4\nfor STEP in [1]:\n    pass\n')
+        base = edit('    assert n\n', '    assert n + STEP\n', base)
+        head = edit('for STEP in [1]:', 'for STEP in [2]:', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual(claims(head, base), [('test_counts', 'reads STEP')])
+
+    def test_a_changed_fixture_reaches_the_tests_that_take_it(self):
+        head = edit('return page.locator("#board")', 'return page.locator("#sheet")')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [('test_races', 'reads board')])
+
+    def test_a_constant_that_reads_a_changed_helper_passes_it_on(self):
+        base = edit('\n\ndef test_races', '\n\nRUN = race\n\n\ndef test_races')
+        base = edit('    assert n\n', '    assert n and RUN\n', base)
+        head = edit('for lane in range(1, LANES + 1):', 'for lane in range(LANES):', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual([key for key, _ in claims(head, base)],
+                         ['test_races', 'test_counts', 'TestBoard::test_two'])
+
+    def test_a_class_changed_outside_its_tests_counts_whole(self):
+        head = edit('self.n = 1', 'self.n = 2')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [('TestBoard', 'changed outside its test methods')])
+
+    def test_a_new_helper_nothing_reads_reaches_no_test(self):
+        head = D101_BASE + '\n\ndef unused():\n    pass\n'
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+
+    def test_a_comment_alone_changes_no_test(self):
+        head = edit('    start(page)\n    expect', '    start(page)  # 4 lanes\n    expect')
+        self.assert_whole_without_claims(head)
+        self.assertEqual(claims(head), [])
+
+    def test_a_docstring_the_file_reads_changes_no_test(self):
+        base = edit('    assert n\n', '    assert __doc__\n')
+        head = edit('"""The sheet."""', '"""The sheet, 4 lanes."""', base)
+        self.assert_whole_without_claims(head, base)
+        self.assertEqual(claims(head, base), [])
+
+    def test_what_cannot_be_resolved_still_raises(self):
+        for head in (edit('    assert n\n', '    global LANES\n'),
+                     edit('LANES = 4\n', 'LANES = 4\nLANES = 5\n'.replace(
+                         'LANES = 5', 'def test_waits(): pass')),
+                     'def broken(:\n'):
+            with self.subTest(head=head[:40]), self.assertRaises(TOOL.WholeFile):
+                claims(head)
+        with self.assertRaises(TOOL.WholeFile):
+            claims(D101_BASE, base=None)
 
 
 class ReachShapes(unittest.TestCase):

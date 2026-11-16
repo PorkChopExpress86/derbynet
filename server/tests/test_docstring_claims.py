@@ -2,6 +2,8 @@
 file's prose, and `--check` refuses a PR body whose `<details>` blocks
 leave one out (#283 retro)."""
 
+import os
+import subprocess
 import textwrap
 
 import pytest
@@ -225,3 +227,183 @@ def test_a_probe_counts_only_cited_as_a_ticket_s_review_s_or_log_s(
     path.write_text(f'def test_x():\n    """{prose}."""\n')
     found = [c.text for c, _ in dc.claims(path) if c.text == "probe"]
     assert found == ["probe"] * cited
+
+
+# D123, #374: `--check --base` asks only for the claims of the scopes the
+# diff adds or changes, and of the tests that read what it changes.
+SCOPED = textwrap.dedent(
+    '''\
+    """Two lanes."""
+
+    import pytest
+
+    # 4 lanes.
+    LANES = 4
+
+
+    def race(page):
+        """Stops 4 lanes."""
+        return LANES
+
+
+    def test_unchanged(page):
+        """9 heats."""
+        assert page
+
+
+    def test_changed(page):
+        """3 heats."""
+        assert page
+
+
+    def test_calls_helper(page):
+        """5 cars."""
+        race(page)
+
+
+    class TestBoard:
+        def test_one(self):
+            """7 rows."""
+    '''
+)
+
+
+def edit(old, new, text=SCOPED):
+    assert text.count(old) == 1, old
+    return text.replace(old, new)
+
+
+def test_an_unchanged_test_s_claim_is_not_named_and_a_changed_one_s_is(
+    tmp_path, capsys, monkeypatch
+):
+    """The acceptance's case: `test_unchanged` keeps its 9 heats out of the
+    check, `test_changed` names its 3 heats (D123)."""
+    path = tmp_path / "test_scoped.py"
+    path.write_text(
+        edit("    assert page\n\n\ndef test_calls", "    assert 1\n\n\ndef test_calls")
+    )
+    monkeypatch.setattr(dc, "base_text", lambda f, rev: SCOPED)
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n</details>\n")
+    assert dc.main(["--check", str(body), "--base", "origin/master", str(path)]) == 1
+    out = capsys.readouterr().out
+    assert "test_changed: 3 is in no <details> block" in out
+    assert "test_unchanged" not in out
+    assert out.count("\n") == 1
+    # Without --base every claim counts, as before (#374's out of scope).
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert "test_unchanged: 9 is" in capsys.readouterr().out
+    body.write_text("<details>\n| test_changed | 3 heats |\n</details>\n")
+    assert dc.main(["--check", str(body), "--base", "origin/master", str(path)]) == 0
+
+
+def counted(head, base=SCOPED):
+    return dc.counted(base, head)
+
+
+def test_a_test_that_reads_a_changed_helper_counts():
+    assert counted(edit("return LANES", "return LANES + 1")) == (
+        {"race", "test_calls_helper"},
+        "",
+    )
+
+
+def test_a_comment_alone_counts_its_scope():
+    """AST sees no comment: the scope's text decides (#374)."""
+    head = edit(
+        "    assert page\n\n\ndef test_changed",
+        "    assert page  # 2\n\n\ndef test_changed",
+    )
+    assert counted(head) == ({"test_unchanged"}, "")
+
+
+def test_a_class_counts_for_its_method():
+    assert counted(edit('"""7 rows."""', '"""8 rows."""')) == ({"TestBoard"}, "")
+
+
+def test_nothing_changed_counts_nothing():
+    assert counted(SCOPED) == (set(), "")
+
+
+def test_a_module_comment_or_docstring_counts_the_module():
+    assert counted(edit("# 4 lanes.", "# 6 lanes.")) == ({"module"}, "")
+    assert counted(edit('"""Two lanes."""', '"""Three lanes."""')) == ({"module"}, "")
+
+
+def test_a_module_statement_counts_the_module_and_its_readers():
+    """Any module-level statement, an import too (the lead's choice on
+    #374, beyond D123's words); a constant reaches the tests that read it,
+    through a helper too, and no helper's claims."""
+    assert counted(edit("import pytest\n", "import pytest\nimport time\n")) == (
+        {"module"},
+        "",
+    )
+    assert counted(edit("LANES = 4", "LANES = 5")) == (
+        {"module", "test_calls_helper"},
+        "",
+    )
+
+
+def test_a_new_file_or_one_that_cannot_be_resolved_counts_every_claim(
+    tmp_path, capsys, monkeypatch
+):
+    assert counted(SCOPED, base=None) == (None, "new since the merge base")
+    head = edit(
+        "    assert page\n\n\ndef test_changed",
+        "    global LANES\n\n\ndef test_changed",
+    )
+    names, why = counted(head)
+    assert names is None and "`global`" in why
+    path = tmp_path / "test_scoped.py"
+    path.write_text(head)
+    monkeypatch.setattr(dc, "base_text", lambda f, rev: SCOPED)
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n</details>\n")
+    assert dc.main(["--check", str(body), "--base", "HEAD", str(path)]) == 1
+    out = capsys.readouterr().out
+    assert f"{path}: every claim counts (D123): " in out
+    assert "test_unchanged: 9 is" in out
+
+
+def test_base_needs_check(tmp_path):
+    path = tmp_path / "test_scoped.py"
+    path.write_text(SCOPED)
+    with pytest.raises(SystemExit):
+        dc.main(["--base", "HEAD", str(path)])
+
+
+def test_the_base_is_the_merge_base_s_text(tmp_path, monkeypatch):
+    """From the merge base with REV, not REV itself, as affected-tests
+    diffs; None for a file new since then."""
+    for name in [k for k in os.environ if k.startswith("GIT_")]:
+        monkeypatch.delenv(name)
+    for name, value in {
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }.items():
+        monkeypatch.setenv(name, value)
+
+    def git(*argv):
+        subprocess.run(["git", *argv], cwd=tmp_path, check=True, capture_output=True)
+
+    sub = tmp_path / "tests"
+    sub.mkdir()
+    path = sub / "test_a.py"
+    path.write_text("A = 1\n")
+    git("init", "-q", "-b", "master")
+    git("add", ".")
+    git("commit", "-q", "-m", "base")
+    git("checkout", "-q", "-b", "side")
+    path.write_text("A = 2\n")
+    git("commit", "-q", "-am", "side")
+    git("checkout", "-q", "master")
+    path.write_text("A = 3\n")
+    git("commit", "-q", "-am", "master moves on")
+    git("checkout", "-q", "side")
+    path.write_text("A = 4\n")
+    assert dc.base_text(path, "master") == "A = 1\n"
+    assert dc.base_text(sub / "test_new.py", "master") is None

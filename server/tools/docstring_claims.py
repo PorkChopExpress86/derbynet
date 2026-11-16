@@ -7,6 +7,7 @@ examples in the module docstring that no test asserted (#283 retro).
 
     uv run python tools/docstring_claims.py ui/tests/browser/test_x.py
     uv run python tools/docstring_claims.py --check BODY.md ui/tests/...
+    uv run python tools/docstring_claims.py --check BODY.md --base origin/master ...
 
 The first prints a Markdown table: where each claim is (the module, a
 `#` comment above a constant, or the function), the claim, and the lines
@@ -25,6 +26,24 @@ the line above it; any other row that names none lists for none. A module
 claim counts on any line, since its row may name the constant a comment
 sits above, or the test that reads it.
 
+`--check --base REV` asks only for the claims the diff from the merge base
+with REV, to the working tree, adds or changes (D123, #374): those of a
+scope (a top-level function or class) whose text differs, comments
+included, or that is new, and those of each test `changed_tests()` in
+`plan/bin/affected-tests` names, which adds the tests that read, directly
+or through a helper, a fixture or a constant, a helper, fixture, constant
+or import the diff adds, changes or deletes, as D101 counts them for its
+repeats. A test method's claims count as its class's, the scope this tool
+lists them under. Every module claim counts when the module's docstring or
+a module comment changes (D123), or any module-level statement other than
+a def or class does, an import included (the lead's choice on #374, beyond
+D123's words). Every claim of the file counts, as without `--base`, for a
+file new since the merge base, or one `changed_tests()` can't resolve
+(it can't be parsed, `global`, an assignment expression or a name bound
+twice at module level), and the output says why. #356 owed 37 rows and
+#360 owed 75 for tests they never changed (D123). The scoped check trusts
+that the PR that last changed a test listed its claims.
+
 A claim is a number with its unit (`58.3 px`, `2.85vw`, `1920x1080`, `22`),
 a number word that counts something (`two lines`, `four tall windows`), a
 double-quoted string, or a probe cited as a ticket's, a review's or a
@@ -39,8 +58,11 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.machinery
+import importlib.util
 import io
 import re
+import subprocess
 import sys
 import tokenize
 from dataclasses import dataclass
@@ -294,6 +316,75 @@ def listed_in(claim: Claim, file: Path, listed: list[tuple[set[str], str]]) -> b
     return any(scopes & names and pattern.search(line) for scopes, line in listed)
 
 
+AFFECTED_TESTS = Path(__file__).resolve().parents[2] / "plan" / "bin" / "affected-tests"
+
+
+def affected_tests():
+    """plan/bin/affected-tests as a module, for its `changed_tests()`."""
+    loader = importlib.machinery.SourceFileLoader("affected_tests", str(AFFECTED_TESTS))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def frame(source: str) -> list[str]:
+    """The module-level statements less the docstring and the top-level
+    defs and classes, which are scopes of their own, by AST."""
+    tree = ast.parse(source)
+    body = tree.body[1:] if ast.get_docstring(tree, clean=False) else tree.body
+    return [
+        ast.dump(n)
+        for n in body
+        if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    ]
+
+
+def texts(source: str) -> dict[str, list[list[str]]]:
+    """Each top-level scope's lines, decorators included, by its name."""
+    lines = source.splitlines()
+    out: dict[str, list[list[str]]] = {}
+    for s in scopes(source)[1:]:
+        out.setdefault(s.name, []).append(lines[s.start - 1 : s.end])
+    return out
+
+
+def counted(base: str | None, head: str, tool=None) -> tuple[set[str] | None, str]:
+    """The scopes whose claims `--check --base` asks for, from `base`, the
+    file's text at the merge base (None when it is new), to `head`: a set
+    of scope names, or None and why when every claim counts."""
+    if base is None:
+        return None, "new since the merge base"
+    tool = tool or affected_tests()
+    try:
+        picked = tool.changed_tests(base, head, lambda name: None, claims=True)
+    except tool.WholeFile as why:
+        return None, str(why)
+    old, new = texts(base), texts(head)
+    names = {name for name, text in new.items() if old.get(name) != text}
+    names |= {key.split("::")[0] for key, _ in picked}
+    prose = [[text for _, text in scopes(s)[0].prose] for s in (base, head)]
+    if prose[0] != prose[1] or frame(base) != frame(head):
+        names.add("module")
+    return names, ""
+
+
+def base_text(file: Path, rev: str) -> str | None:
+    """`file` as it was at the merge base of `rev` and HEAD, or None when
+    it is not there."""
+
+    def git(*argv: str) -> str:
+        return subprocess.run(
+            ["git", *argv], cwd=file.parent, check=True, capture_output=True, text=True
+        ).stdout
+
+    base = git("merge-base", rev, "HEAD").strip()
+    try:
+        return git("show", f"{base}:./{file.name}")
+    except subprocess.CalledProcessError:
+        return None
+
+
 def details(body: str) -> list[str]:
     return re.findall(r"<details>(.*?)</details>", body, re.S)
 
@@ -301,13 +392,29 @@ def details(body: str) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", metavar="BODY.md", type=Path)
+    parser.add_argument("--base", metavar="REV", help="with --check: see above")
     parser.add_argument("files", nargs="+", type=Path)
     args = parser.parse_args(argv)
+    if args.base and not args.check:
+        parser.error("--base goes with --check")
     found = [(f, c, hits) for f in args.files for c, hits in claims(f)]
     if args.check:
         names = {n for f, c, _ in found for n in scope_names(c, f)}
         listed = rows(details(args.check.read_text()), names)
-        missing = [(f, c) for f, c, _ in found if not listed_in(c, f, listed)]
+        scoped = {}
+        if args.base:
+            tool = affected_tests()
+            for f in dict.fromkeys(args.files):
+                names, why = counted(base_text(f, args.base), f.read_text(), tool)
+                scoped[f] = names
+                if names is None:
+                    print(f"{f}: every claim counts (D123): {why}")
+        missing = [
+            (f, c)
+            for f, c, _ in found
+            if (scoped.get(f) is None or c.scope in scoped[f])
+            and not listed_in(c, f, listed)
+        ]
         for f, c in missing:
             where = (
                 ""
