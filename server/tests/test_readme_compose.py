@@ -4,7 +4,7 @@ with no `build:` (D107).
 The README holds a complete example a race crew copies as written, and
 `server/docker/ci/checks.sh readme-compose` runs that text. compose.yaml is
 the file the guide tells the crew to save, and it keeps a `build:` so a copy
-of the repository can build the image when none is published. The two must
+of the repository can build the image when none is published. The files must
 not drift: a fix to one that misses the other would ship an example no check
 runs, or a file no check runs from the README. Both are compared from their
 first line that is not a comment, since their headers say where each lives.
