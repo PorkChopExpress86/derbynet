@@ -10,6 +10,7 @@ import importlib.machinery
 import importlib.util
 import io
 import itertools
+import json
 import os
 import subprocess
 import sys
@@ -304,7 +305,7 @@ class Testing(unittest.TestCase):
 class TestFile(unittest.TestCase):
     def test_a_browser_test_runs_itself_under_the_browser_marker(self):
         out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
-        self.assertIn('[test-file]', out)
+        self.assertIn('[test-file] the test file itself\n', out)
         self.assertIn('uv run pytest -n auto -m browser '
                       'ui/tests/browser/test_kiosk_ondeck_labels.py', commands(out))
         self.assertNotIn('uv run pytest -n auto ui/', commands(out))
@@ -330,6 +331,26 @@ class TestFile(unittest.TestCase):
         out = commands(run('server/ui/tests/test_mixed.py'))
         self.assertIn('uv run pytest -n auto ui/tests/test_mixed.py', out)
         self.assertIn('uv run pytest -n auto -m browser ui/tests/test_mixed.py', out)
+
+    def test_a_test_file_the_root_conftest_imports_leaves_the_full_run_to_ci(self):
+        tree = {**TREE, 'server/conftest.py': 'from ui.tests.test_mixed import x\n',
+                'server/ui/tests/test_reads_mixed.py': 'from ui.tests.test_mixed import x\n'}
+        out = run('server/ui/tests/test_mixed.py', tree=tree)
+        self.assertIn('  server/ui/tests/test_mixed.py: the root conftest imports it', out)
+        self.assertIn('CI runs the full suites on both databases (D85)', out)
+        self.assertNotIn('  uv run pytest -n auto\n', commands(out))
+        self.assertEqual(section(out, 'server/ui/tests/test_mixed.py').splitlines()[1:], [
+            '  [test-file] the test file itself, and the tests and conftest folders '
+            'that import it (#371 retro)',
+            '      ui/tests/test_mixed.py', '      ui/tests/test_reads_mixed.py'])
+
+    def test_a_test_file_only_a_conftest_imports_runs_that_folder(self):
+        tree = {**TREE, 'server/ui/tests/browser/conftest.py':
+                'from ui.tests.test_mixed import x\n'}
+        out = section(run('server/ui/tests/test_mixed.py', tree=tree),
+                      'server/ui/tests/test_mixed.py')
+        self.assertEqual(out.splitlines()[2:], ['      ui/tests/browser',
+                                                '      ui/tests/test_mixed.py'])
 
     def test_a_deleted_test_file_says_so(self):
         out = run('server/ui/tests/test_gone.py')
@@ -361,6 +382,14 @@ class TestHelper(unittest.TestCase):
 
 
 class TestData(unittest.TestCase):
+    def test_a_helper_that_names_it_is_no_target(self):
+        tree = {**TREE, 'server/ui/tests/sample.json': '{}',
+                'server/ui/tests/reader.py': 'NAME = "sample.json"\n',
+                'server/ui/tests/test_sample.py': 'NAME = "sample.json"\n'}
+        out = section(run('server/ui/tests/sample.json', tree=tree),
+                      'server/ui/tests/sample.json')
+        self.assertEqual(out.splitlines()[2:], ['      ui/tests/test_sample.py'])
+
     def test_a_fixture_maps_to_the_test_that_names_it(self):
         out = run('server/racing/engine/tests/data/tables.json')
         self.assertIn('[test-data]', out)
@@ -2724,6 +2753,33 @@ class HelperAdditions(unittest.TestCase):
                 self.assert_keeps(ADD_BASE + f'\n\ndef late(page, at={default}):\n    pass\n',
                                   'it adds the def late, a default of which runs on import')
 
+    def test_each_kind_of_default_narrows_or_keeps_them(self):
+        """Every kind of expression as a default, alone and nested: a
+        verdict or NotAddition, never another exception (#371 retro: review
+        M1's TypeError crashed the tool), and a default that narrows runs
+        with no name bound, so it calls nothing on import."""
+        forms = ['1', '-1', '1 + 2', '1 and 2', '1 < 2', '1 if 1 else 2', 'None',
+                 '(x := 1)', 'lambda: 1', '{1: 2}', '{[]: 1}', '{1}', '{[1]}', '[1, *()]',
+                 '(1,)', '[i for i in ()]', '{i for i in ()}', '{i: i for i in ()}',
+                 '(i for i in ())', 'now()', 'f"{1}"', 't"{1}"', 'a.b', 'a[1:2]', 'a',
+                 '(1, [2, {3: frozenset()}])']
+        made, kinds = [], set()
+        for form in forms:
+            with self.subTest(form=form):
+                head = ADD_BASE + f'\n\ndef late(page, at={form}):\n    pass\n'
+                kinds |= {type(n).__name__ for n in ast.walk(ast.parse(form, mode='eval'))}
+                try:
+                    TOOL.additions(ADD_BASE, head)
+                except TOOL.NotAddition:
+                    continue
+                made.append(form)
+                exec(f'def late(page, at={form}):\n    pass\n', {'__builtins__': {}})
+        # Await, Yield and YieldFrom can't stand in a module-level default.
+        every = {c.__name__ for c in ast.expr.__subclasses__()} - {
+            'Await', 'Yield', 'YieldFrom'}
+        self.assertEqual(sorted(every - kinds), [])
+        self.assertEqual(made, ['1', '-1', 'None', '{1: 2}', '{1}', '(1,)'])
+
     def test_a_name_pytest_or_python_reads_keeps_them(self):
         """A test name too: a file that star-imports the module collects it
         (#371 review, H2)."""
@@ -2868,6 +2924,149 @@ class HelperNamers(unittest.TestCase):
         self.assertEqual(self.namers(files)[0], ['ui/tests/browser/test_calls.py'])
 
 
+# Each import chain from a changed module to a test file: the leaf (a helper
+# or a test file), 0 to 3 files between of each kind, and one import style
+# for every link (#371 retro).
+CHAIN_KINDS = ('helper', 'test', 'conftest')
+CHAIN_STYLES = {
+    'from': 'from {mod} import {name}\n\n\ndef {me}():\n    {name}()\n',
+    'import': 'import {mod}\n\n\ndef {me}():\n    {mod}.{name}()\n',
+    'package': 'from {pkg} import {last}\n\n\ndef {me}():\n    {last}.{name}()\n',
+}
+
+# Imports each test file of a tree in a fresh set of shape modules, after
+# the conftests of its folder and the folders above it, as pytest does, and
+# prints the shape modules each import loaded.
+LOADED = '''import json, sys
+from pathlib import Path
+server = Path(sys.argv[1])
+sys.path.insert(0, str(server))
+out = {}
+for test in sorted(server.rglob('test_*.py')):
+    for name in [m for m in sys.modules if m.startswith('shape')]:
+        del sys.modules[name]
+    rel = test.relative_to(server)
+    folders = [rel.parents[i] for i in range(len(rel.parents) - 1, -1, -1)]
+    mods = ['.'.join((f / 'conftest').parts) for f in folders
+            if (server / f / 'conftest.py').is_file()]
+    for mod in mods + ['.'.join(rel.with_suffix('').parts)]:
+        __import__(mod)
+    out[str(rel)] = sorted(m for m in sys.modules if m.startswith('shape'))
+print(json.dumps(out))
+'''
+
+
+def import_chains():
+    """(leaf, chain, style) for each shape."""
+    for leaf in ('helper', 'test'):
+        for hops in range(4):
+            for chain in itertools.product(CHAIN_KINDS, repeat=hops):
+                for style in CHAIN_STYLES:
+                    yield leaf, chain, style
+
+
+def chain_tree():
+    """A tree that holds every shape in its own folder: {shape: (leaf
+    path, the module that calls the leaf's poke)}, and the files."""
+    files, shapes = {}, {}
+    for i, (leaf, chain, style) in enumerate(import_chains()):
+        tests = f'shape{i}/tests'
+        rel = f'{tests}/leaf.py' if leaf == 'helper' else f'{tests}/test_leaf.py'
+        files[rel] = 'def poke():\n    pass\n'
+        prev, name = rel, 'poke'
+        for j, kind in enumerate(chain + ('top',)):
+            me = f'step{j}'
+            path = {'helper': f'{tests}/h{j}.py', 'test': f'{tests}/test_m{j}.py',
+                    'conftest': f'{tests}/k{j}/conftest.py',
+                    'top': f'{tests}/test_top.py'}[kind]
+            mod = TOOL.module_name(prev)
+            pkg, last = mod.rsplit('.', 1)
+            files[path] = CHAIN_STYLES[style].format(
+                mod=mod, name=name, me=me, pkg=pkg, last=last)
+            if kind == 'conftest':
+                files[f'{tests}/k{j}/test_in.py'] = 'def test_in():\n    pass\n'
+            if j == 0:
+                shapes[(leaf, chain, style)] = (rel, TOOL.module_name(path))
+            prev, name = path, me
+    return shapes, {f'server/{rel}': text for rel, text in files.items()}
+
+
+class ImportChains(unittest.TestCase):
+    """A changed test-folder module maps to every test file whose import
+    loads it, against Python's own import system as the oracle: #371's
+    review found test files importing test files (H1) one diff at a time,
+    and the fallback and a changed test file stopped at the first test
+    file (#371 retro: test_database_check.py reaches core/tests/db.py
+    through test_invariants.py)."""
+
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.shapes, cls.files = chain_tree()
+        tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(tmp.cleanup)
+        cls.root = Path(tmp.name)
+        for rel, text in cls.files.items():
+            (cls.root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (cls.root / rel).write_text(text)
+        cls.loaded = json.loads(subprocess.run(
+            [sys.executable, '-I', '-c', LOADED, str(cls.root / 'server')],
+            capture_output=True, text=True, check=True).stdout)
+
+    def loads(self, mod):
+        return {t for t, mods in self.loaded.items() if mod in mods}
+
+    def covered(self, targets):
+        return {t for t in self.loaded
+                if any(t == d or t.startswith(d + '/') for d in targets)}
+
+    def test_a_changed_module_maps_to_every_test_that_loads_it(self):
+        leaves = sorted({rel for rel, _ in self.shapes.values()})
+        out = run(*(f'server/{rel}' for rel in leaves), root=self.root)
+        misses = []
+        for (leaf, chain, style), (rel, _) in sorted(self.shapes.items()):
+            block = section(out, f'server/{rel}')
+            targets = [ln.strip() for ln in block.splitlines() if ln.startswith(' ' * 6)]
+            expected = self.loads(TOOL.module_name(rel))
+            if self.covered(targets) != expected:
+                misses.append(f'{" <- ".join((leaf, *chain, "test_top"))} ({style}): missing '
+                              f'{sorted(expected - self.covered(targets))}, extra '
+                              f'{sorted(self.covered(targets) - expected)}')
+        self.assertEqual(misses, [])
+        self.assertNotIn('root conftest', out)
+        # Half the leaves are test files, and each conftest has a test beside
+        # it, which reaches a leaf only through that conftest.
+        self.assertEqual((len(self.shapes), len(leaves),
+                          sum(rel.endswith('/test_leaf.py') for rel in leaves)),
+                         (240, 240, 120))
+        beside = [t for t in self.loaded if t.endswith('/test_in.py')]
+        self.assertEqual(len(beside), sum(r.endswith('/conftest.py') for r in self.files))
+
+    def test_an_import_cycle_ends(self):
+        files = {'server/ui/tests/leaf.py': 'def poke():\n    pass\n',
+                 'server/ui/tests/test_a.py': 'from ui.tests import leaf, test_b\n',
+                 'server/ui/tests/test_b.py': 'from ui.tests import test_a\n'}
+        out = run('server/ui/tests/leaf.py', tree=files)
+        self.assertEqual(section(out, 'server/ui/tests/leaf.py').splitlines()[2:],
+                         ['      ui/tests/test_a.py', '      ui/tests/test_b.py'])
+
+    def test_an_added_def_maps_to_every_test_that_loads_its_caller(self):
+        """namers(), with step0 the one file that names poke."""
+        tree = TOOL.Tree(self.root)
+        misses = []
+        for (leaf, chain, style), (rel, caller) in sorted(self.shapes.items()):
+            if leaf != 'helper':
+                continue
+            tests, conftests, _ = TOOL.namers(tree, rel, ['poke'])
+            got = self.covered(tests + [str(Path(c).parent) for c in conftests])
+            if got != self.loads(caller):
+                misses.append(f'{" <- ".join((*chain, "test_top"))} ({style}): missing '
+                              f'{sorted(self.loads(caller) - got)}, extra '
+                              f'{sorted(got - self.loads(caller))}')
+        self.assertEqual(misses, [])
+
+
 def helper_diff(head, tree=None, commit=True):
     """The tool's output for a branch that turns helpers.py from ADD_BASE
     into `head` (None deletes it), over `tree` (ADD_TREE's importers by
@@ -2995,6 +3194,19 @@ class RealTree(unittest.TestCase):
         self.assertIn('[role-gates] a URL conf', section(out, 'server/ui/urls.py'))
         self.assertIn('OTHER_PAGES', section(out, 'server/ui/timer/views.py'))
         self.assertNotIn('[role-gates]', section(out, 'server/awards/editing.py'))
+
+    def test_a_test_file_passes_on_what_it_imports(self):
+        """#371 retro: the six kiosk files that import open_kiosk from
+        test_kiosk_pages.py ran nothing when it changed, and
+        test_database_check.py, which imports SERVICE_VIOLATIONS from
+        test_invariants.py, nothing when core/tests/db.py changed."""
+        pages, db = 'server/ui/tests/browser/test_kiosk_pages.py', 'server/core/tests/db.py'
+        out = run(pages, db, root=REPO)
+        for path, reader in ((pages, 'ui/tests/browser/test_kiosk_banner.py'),
+                             (pages, 'ui/tests/browser/test_kiosk_ondeck_labels.py'),
+                             (db, 'legacy_api/tests/test_database_check.py')):
+            with self.subTest(path=path, reader=reader):
+                self.assertIn(f'      {reader}\n', section(out, path) + '\n')
 
     def test_every_command_and_server_tool_maps(self):
         server = REPO / 'server'
