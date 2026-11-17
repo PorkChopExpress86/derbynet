@@ -1208,8 +1208,8 @@ def tapped(page, control):
 @pytest.mark.parametrize("control", ["scene", "reload"])
 def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control):
     """D125 (#369): Space goes down on a focused board button, a poll's
-    reply (the kiosk renamed Lobby) comes, the key repeats once, and Space
-    comes up. The button
+    reply (the kiosk renamed Lobby) comes, the key repeats twice, and Space
+    comes up; the board ignores the repeats (D131), not the press. The button
     still taps: Racing's POST goes out and Racing shows on, or Reload's POST
     goes out and the card shows Reloading. No swap comes between the keydown
     and the click; the POST's reply then brings the board out of band, and
@@ -1227,7 +1227,8 @@ def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control)
     focus_on(page, target)
     page.keyboard.down(" ")
     polls.answer(0)
-    page.keyboard.down(" ")  # an auto-repeat
+    page.keyboard.down(" ")  # two auto-repeats during the hold (D131)
+    page.keyboard.down(" ")
     with htmx_post(page, POST_PATHS[control]):
         page.keyboard.up(" ")
     tapped(page, control)
@@ -1239,6 +1240,7 @@ def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control)
     click = after(log, "click", keydown)
     assert after(log, "poll", keydown) < keyup < click, log
     assert log[keyup]["on"] != "BODY", log[keydown:]
+    assert len([r for r in log if r["what"] == "keydown" and r["repeat"]]) == 2, log
     assert swaps_since(log[:click], keydown) == [], log
     assert posts_since(log, keydown) == [POST_PATHS[control]], log
     # one read: htmx applies the reply's board and ends the request in one
@@ -1365,8 +1367,9 @@ def test_a_space_press_never_released_holds_the_board_one_poll_interval(login, e
     since a timer never fires early, and no later than one more poll
     interval of slack after the later of that and the reply. The focus then
     comes back to the swapped-in Racing (D127); one more repeat lands on it,
-    and Chromium clicks it on the keyup, so the press still taps Racing
-    (the PR's stand-in probe, `repeat-on-new.log`)."""
+    and the board ignores it (D131), so the keyup taps nothing: no scene is
+    posted and Racing stays off. Without D131, Chromium clicked the restored
+    Racing on the keyup (the PR's stand-in probe, `repeat-on-new.log`)."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     racing = scene_button(page, scene(event, "Racing"))
@@ -1393,12 +1396,50 @@ def test_a_space_press_never_released_holds_the_board_one_poll_interval(login, e
     assert any(r["what"] == "keydown" and r["repeat"] for r in log), log
     expect(racing).to_be_focused()
     page.keyboard.down(" ")
-    with htmx_post(page, "/kiosks/scene/"):
-        page.keyboard.up(" ")
-    expect(racing).to_have_attribute("aria-pressed", "true")
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
     log = board_log(page)
-    assert posts_since(log, keydown) == ["/kiosks/scene/"], log
+    # one read: a click would have sent its POST before keyboard.up()
+    # returned.
+    assert posts_since(log, keydown) == [], log
+    expect(racing).to_have_attribute("aria-pressed", "false")
     polls.end()
+
+
+def test_a_space_held_on_one_button_and_a_click_on_another_posts_once(login, event):
+    """D131: Space is held on Racing, and the mouse clicks Reload. Reload's
+    POST reply brings the board out of band, and the focus comes back to
+    the swapped-in Reload (D127). The Space auto-repeat that then lands on
+    it is ignored, so the keyup taps nothing: Reload's POST goes out once,
+    and no scene is posted. Without D131 the repeat armed the restored
+    Reload and the keyup clicked it, a second POST, where master's page,
+    with the focus on the body, sent one (the PR's probe, `aclickb/`)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    reload = page.locator(RELOAD_BUTTON)
+    htmx_settled(page)
+    page.evaluate(BOARD_LOG)
+    focus_on(page, racing)
+    page.keyboard.down(" ")
+    with htmx_post(page, "/kiosks/reload/"):
+        press(page, reload)
+        page.mouse.up()
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    wait_for_a_swap_after(page, after(log, "click", keydown))
+    expect(reload).to_be_focused()
+    page.keyboard.down(" ")
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = board_log(page)
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 1 and repeats[0]["on"] != "BODY", log
+    # one read: a click would have sent its POST before keyboard.up()
+    # returned.
+    assert posts_since(log, keydown) == ["/kiosks/reload/"], log
+    expect(racing).to_have_attribute("aria-pressed", "false")
 
 
 # A button outside the board, which counts its clicks: no page control off

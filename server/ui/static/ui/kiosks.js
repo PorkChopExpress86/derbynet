@@ -177,9 +177,17 @@ function holdBoardUnderPress(board, bound) {
 // button on each Enter keydown, auto-repeats included, so a repeat is
 // cancelled before it clicks; D127 puts the focus back on the button the
 // first tap's reply swapped in, where the repeats would land otherwise.
-function ignoreEnterRepeats(board) {
+// D131 (#369): Space's auto-repeats are cancelled the same way. Chromium
+// clicks a button on Space's keyup when a repeat landed on it (the PR's
+// stand-in probes), so Space held on one button while the mouse clicked
+// another, whose reply's swap gave the focus back to it (D127), clicked
+// that one twice. A cancelled repeat arms nothing, and the button the key
+// went down on still clicks on the keyup; a Space held past D125's bound
+// taps nothing on release.
+function ignoreKeyRepeats(board) {
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && e.repeat && board.contains(e.target.closest('button'))) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.repeat
+        && board.contains(e.target.closest('button'))) {
       e.preventDefault();
     }
   }, true);
@@ -250,7 +258,7 @@ document.addEventListener('alpine:init', () => {
       setInterval(() => this.tick(), 1000);
       const board = document.getElementById('kiosk-board');
       holdBoardUnderPress(board, () => this.pressBound);
-      ignoreEnterRepeats(board);
+      ignoreKeyRepeats(board);
       keepFocusAcrossSwaps(board);
     },
     tick() {
