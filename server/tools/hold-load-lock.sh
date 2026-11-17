@@ -80,7 +80,10 @@ stop_child() {
   if [ -n "$CHILD" ]; then kill -TERM -- "-$CHILD" 2>/dev/null || true; fi
 }
 trap stop_child EXIT
-trap 'exit 143' TERM INT HUP
+# A signal ignores further signals, as in pytest-under-load.sh, which says
+# why.  Its cleanup needs no ignore of its own: no command between `CHILD=$!`
+# and `CHILD=` can fail, so only a signal enters it with CHILD set.
+trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 # setsid gives COMMAND a process group of its own (its pid), which the trap
 # stops whole; `9>&-` keeps the lock with this script alone.  `<&0` keeps
