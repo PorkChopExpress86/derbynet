@@ -252,8 +252,8 @@ function swappedInCopy(root, gone) {
 // removes the button that opened the sheet. When the sheet closes, the
 // focus goes to its swapped-in copy, matched as D127 matches. PHP's naming
 // dialog gives the focus back to nothing (modal.js:63), and the reply's
-// rebuild (kiosk-dashboard.js:99) leaves it on the page's body (the PR's
-// probe); PHP has no page dialog, only a <select> per kiosk
+// rebuild (kiosk-dashboard.js:99) leaves it on the page's body (#383's
+// php-scratch probe); PHP has no page dialog, only a <select> per kiosk
 // (kiosk-dashboard.js:158).
 document.addEventListener('ui:opener-gone', (e) => {
   const copy = swappedInCopy(document, e.detail.opener);

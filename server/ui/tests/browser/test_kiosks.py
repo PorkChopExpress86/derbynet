@@ -2002,7 +2002,10 @@ def test_a_save_whose_reply_comes_after_close_focuses_once(login, event):
     so the focus goes back to the Name button itself. The reply then closes
     the sheet again, with no opener left to give the focus to, and swaps
     the board: D127 gives the focus to the swapped-in Name button, and the
-    page reports no script error (the harness's page errors)."""
+    page reports no script error (the harness's page errors). The wait for
+    the save's POST to go out is bounded at 10 s, as `HeldPolls.wait_for`
+    bounds a poll's: htmx sends it in the Enter keydown's task, so the slack
+    is 10 s less that task."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     target = card(page, "tv").locator('[data-action="name"]')
@@ -2020,14 +2023,16 @@ def test_a_save_whose_reply_comes_after_close_focuses_once(login, event):
     expect(field).to_be_focused()
     field.fill("Lobby")
     page.keyboard.press("Enter")
-    for _ in range(500):
-        if held:
-            break
-        page.wait_for_timeout(20)
-    assert len(held) == 1
+    page.wait_for_function(
+        "!!document.querySelector('[data-name-sheet] form.htmx-request')",
+        timeout=10_000,
+    )
     sheet(page, "kiosks").locator("[data-close]").click()
     expect(sheet(page, "kiosks")).to_be_hidden()
     expect(target).to_be_focused()
+    # The route's handler runs in Playwright's dispatch, which the calls
+    # above have given a turn since the request went out.
+    assert len(held) == 1
     old = target.element_handle()
     with htmx_post(page, "/kiosks/name/"):
         held[0].continue_()
