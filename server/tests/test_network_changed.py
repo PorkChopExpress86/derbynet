@@ -162,7 +162,7 @@ def harness(**change):
             message="AssertionError: assert 'x' in &quot;...&quot;",
             text="E       AssertionError: assert 'x' in OUT\n"
             f"E         {REQUEST_FAILED}"
-            "\n\ntests/test_x.py:9: AssertionError",
+            "\n\ntest_x.py:9: AssertionError",
         ),
         harness(tag="failure"),
         harness(message=TEARDOWN.replace("teardown", "setup")),
@@ -170,7 +170,7 @@ def harness(**change):
         harness(text=HARNESS_TRACEBACK.replace("\nui/tests/", "\nx/ui/tests/")),
         harness(text=""),
         harness(text=HARNESS_TRACEBACK.replace(": AssertionError", ": Error")),
-        harness(text=HARNESS_TRACEBACK + "\n\nui/tests/browser/test_x.py:5: Error"),
+        harness(text=HARNESS_TRACEBACK + "\n\ntest_x.py:5: Error"),
         # A source line the traceback quotes, not a raised one.
         harness(
             text=HARNESS_TRACEBACK.replace(
@@ -191,6 +191,16 @@ def harness(**change):
         harness(text=every_item(FIRST_ITEM, "'console: TypeError: x is null'")),
         harness(text=every_item(FIRST_ITEM, f"{SECOND_ITEM} (again)")),
         harness(text=every_item(FIRST_ITEM, SECOND_ITEM, count=3)),
+        harness(
+            text="E       AssertionError: 3 page errors, one per line:\n"
+            f"E         {FIRST_ITEM}\nE         {SECOND_ITEM}\n\n"
+            "ui/tests/browser/conftest.py:614: AssertionError"
+        ),
+        harness(text=every_item(FIRST_ITEM, count=0)),
+        # The traceback's source, not a raised line, as a diff's line.
+        harness(
+            text=HARNESS_TRACEBACK.replace("E         Left contains", "  Left contains")
+        ),
         failure(),
     ],
     ids=[
@@ -221,6 +231,9 @@ def harness(**change):
         "every-item-a-later-one-not",
         "every-item-a-later-one-longer",
         "every-item-fewer-than-counted",
+        "every-item-fewer-than-counted-at-the-end",
+        "every-item-none-counted",
+        "request-failed-not-raised",
         "empty",
     ],
 )
