@@ -139,6 +139,11 @@ def test_a_skip_after_the_condition(page):
 
 def test_a_mark(page):
     pytest.mark.skip("not a call of skip")
+
+
+def test_no_name_at_all(page):
+    if True:
+        pytest.skip("not the size")
 """
     assert size_skips(source) == [
         "4: desktop_only",

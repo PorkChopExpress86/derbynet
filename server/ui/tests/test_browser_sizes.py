@@ -99,6 +99,19 @@ def test_the_collection_hook_deselects_the_dropped_cases():
     assert reported == [[phone]]
 
 
+def test_a_collection_with_nothing_to_drop_reports_nothing():
+    """With no marked test, the hook leaves the items as they are and
+    reports no deselection (a call with none would read `dropped[0]`)."""
+    from ui.tests.browser import conftest
+
+    items = [case("phone"), case("desktop")]
+    for item in items:
+        item.fixturenames, item.add_marker = (), lambda mark: None
+    before = list(items)
+    conftest.pytest_collection_modifyitems(items)
+    assert items == before
+
+
 def test_a_collection_lists_no_case_at_a_size_the_test_does_not_name():
     """A real collection, in its own process: a marked test, parametrized or
     not, keeps only the size it names, an unmarked one keeps both, and
