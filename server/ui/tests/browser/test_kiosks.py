@@ -1538,14 +1538,20 @@ def test_a_held_enter_off_the_board_still_repeats(login, event):
 
 
 def test_a_held_tab_on_the_board_still_repeats(login, event):
-    """A near miss for D126: a held Tab on a board button moves the focus
-    on its first keydown and on its repeat, so 2 elements take the focus:
-    only Enter's repeats are ignored."""
+    """A near miss for D126 and D131: a held Tab on a board button moves
+    the focus on its first keydown and on its repeat, so 2 elements take
+    the focus and it ends on the scene button 2 after Racing: only Enter's
+    and Space's repeats are ignored."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    ids = page.locator("#kiosk-board button[data-scene]").evaluate_all(
+        "bs => bs.map((b) => b.dataset.scene)"
+    )
+    two_on = ids[ids.index(racing.get_attribute("data-scene")) + 2]
     htmx_settled(page)
     page.evaluate(BOARD_LOG)
-    focus_on(page, scene_button(page, scene(event, "Racing")))
+    focus_on(page, racing)
     start = len(board_log(page))
     page.keyboard.down("Tab")
     page.keyboard.down("Tab")
@@ -1557,6 +1563,7 @@ def test_a_held_tab_on_the_board_still_repeats(login, event):
     log = board_log(page)
     keydowns = [r["repeat"] for r in log[start:] if r["what"] == "keydown"]
     assert keydowns == [False, True], log
+    expect(page.locator(f'#kiosk-board button[data-scene="{two_on}"]')).to_be_focused()
 
 
 @pytest.mark.parametrize("control", ["scene", "reload"])
