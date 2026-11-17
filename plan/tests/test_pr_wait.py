@@ -157,10 +157,22 @@ class PushedHead(unittest.TestCase):
         gh.chmod(0o755)
         return gh
 
-    def run_pr_wait(self, gh, timeout_min):
+    def run_pr_wait(self, gh, timeout_min, **env):
         return subprocess.run(['bash', str(PR_WAIT), '7', '--timeout-min', timeout_min],
                               cwd=self.clone, capture_output=True, text=True, timeout=60,
-                              env={**self.env, 'GH': str(gh), 'PR_WAIT_RETRY_SLEEP': '0'})
+                              env={**self.env, 'GH': str(gh), 'PR_WAIT_RETRY_SLEEP': '0', **env})
+
+    def fake_clock(self, seconds=60):
+        """A `date` that moves `seconds` on each call, first in PATH."""
+        bin_dir = self.tmp / 'bin'
+        bin_dir.mkdir()
+        date = bin_dir / 'date'
+        date.write_text(f'#!{sys.executable}\nimport pathlib\n'
+                        f'f = pathlib.Path({str(self.tmp / "ticks")!r})\n'
+                        'n = int(f.read_text()) if f.exists() else 0\n'
+                        f'f.write_text(str(n + 1))\nprint(1000000 + {seconds} * n)\n')
+        date.chmod(0o755)
+        return {'PATH': f'{bin_dir}:{self.env["PATH"]}'}
 
     def test_the_old_head_is_waited_past_until_the_pr_shows_the_push(self):
         done = self.wait([self.old, self.old, self.old, self.new], origin=self.new)
@@ -186,6 +198,51 @@ class PushedHead(unittest.TestCase):
         self.assertIn(f'still shows {self.old}, older than origin/issue-7 {self.new}',
                       done.stderr)
 
+    def test_the_wait_for_the_push_says_so_when_it_starts(self):
+        self.git('update-ref', 'refs/remotes/origin/issue-7', self.new)
+        done = self.run_pr_wait(self.gh([self.old, self.old, self.new], {self.new: 'pass lint u'}),
+                                timeout_min='90')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(done.stderr.count('waiting for PR #7 to show'), 1, done.stderr)
+        self.assertIn(f'waiting for PR #7 to show origin/issue-7 {self.new}; it shows {self.old}',
+                      done.stderr)
+
+    def test_a_pr_at_the_pushed_head_prints_no_wait_line(self):
+        done = self.wait([self.new], origin=self.new)
+        self.assertNotIn('waiting for PR', done.stderr)
+
+    def test_the_wait_for_the_push_gives_up_after_five_minutes(self):
+        """A PR reset to an older commit than origin/<branch> shows that
+        commit for ever; the 90 minute default must not apply (#396)."""
+        self.git('update-ref', 'refs/remotes/origin/issue-7', self.new)
+        done = self.run_pr_wait(self.gh([self.old], {}), timeout_min='90',
+                                **self.fake_clock())
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn(f'timed out after 5 min; PR #7 still shows {self.old}, '
+                      f'older than origin/issue-7 {self.new}', done.stderr)
+        self.assertLess(int((self.tmp / 'ticks').read_text()), 12)
+
+    def test_the_push_bound_is_set_by_pr_wait_push_min(self):
+        self.git('update-ref', 'refs/remotes/origin/issue-7', self.new)
+        done = self.run_pr_wait(self.gh([self.old], {}), timeout_min='90',
+                                PR_WAIT_PUSH_MIN='2', **self.fake_clock())
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn('timed out after 2 min', done.stderr)
+
+    def test_the_wait_for_the_push_ends_the_moment_its_bound_is_reached(self):
+        """With no minute passing, a bound of 0 min is reached at once."""
+        self.git('update-ref', 'refs/remotes/origin/issue-7', self.new)
+        done = self.run_pr_wait(self.gh([self.old], {}), timeout_min='90',
+                                PR_WAIT_PUSH_MIN='0', **self.fake_clock(seconds=0))
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn('timed out after 0 min', done.stderr)
+
+    def test_the_push_bound_never_exceeds_the_timeout(self):
+        self.git('update-ref', 'refs/remotes/origin/issue-7', self.new)
+        done = self.run_pr_wait(self.gh([self.old], {}), timeout_min='1',
+                                PR_WAIT_PUSH_MIN='50', **self.fake_clock())
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn('timed out after 1 min', done.stderr)
 
     def test_a_pr_gh_cannot_read_fails_naming_it(self):
         gh = self.tmp / 'gh'

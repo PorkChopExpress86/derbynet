@@ -25,7 +25,9 @@
 # started in the same command as a push, read the old head, whose checks had
 # all passed; it exited 2 only because the head moved before its first
 # check read, and would otherwise have printed the old head's green checks
-# and exited 0 (#369 retro).  A stale origin/<branch>, older than the PR's
+# and exited 0 (#369 retro).  That wait prints one line when it starts and
+# gives up after PR_WAIT_PUSH_MIN minutes (default 5, at most the timeout), so
+# a PR reset to an older commit fails fast instead of looking hung (#396).  A stale origin/<branch>, older than the PR's
 # head or not in this clone, changes nothing.
 set -euo pipefail
 PR=${1:?usage: pr-wait <pr or branch> [--timeout-min N]}
@@ -59,9 +61,17 @@ behind_the_push() {
 head_branch=$(head_and_branch)
 read -r head branch <<<"$head_branch"
 deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
+# The wait for GitHub to show the push has a bound of its own: a PR reset to an
+# older commit than origin/<branch> would otherwise wait out all of TIMEOUT_MIN.
+push_min=$(( TIMEOUT_MIN < ${PR_WAIT_PUSH_MIN:-5} ? TIMEOUT_MIN : ${PR_WAIT_PUSH_MIN:-5} ))
+push_deadline=$(( $(date +%s) + push_min * 60 ))
+if behind_the_push "$head" "$branch"; then
+  echo "waiting for PR #$PR to show origin/$branch $(git rev-parse "origin/$branch");" \
+       "it shows $head" >&2
+fi
 while behind_the_push "$head" "$branch"; do
-  if [ "$(date +%s)" -ge "$deadline" ]; then
-    echo "timed out after $TIMEOUT_MIN min; PR #$PR still shows $head," \
+  if [ "$(date +%s)" -ge "$push_deadline" ]; then
+    echo "timed out after $push_min min; PR #$PR still shows $head," \
          "older than origin/$branch $(git rev-parse "origin/$branch")" >&2
     exit 3
   fi

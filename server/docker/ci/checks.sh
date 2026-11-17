@@ -140,7 +140,7 @@ start() {
 
 wait_ready() {
     for _ in $(seq 120); do
-        if docker exec "$1" curl -m 120 -fsS -o /dev/null http://127.0.0.1/index.php 2>/dev/null; then
+        if docker exec "$1" curl -m 10 -fsS -o /dev/null http://127.0.0.1/index.php 2>/dev/null; then
             return 0
         fi
         [ "$(docker inspect -f '{{.State.Running}}' "$1")" = true ] || break
@@ -949,7 +949,7 @@ check_reload() {
     sed -i "/{% block main %}/a <!-- $marker -->" "$template"
     say "after a template edit, with no rebuild"
     for _ in $(seq 30); do
-        page="$(curl -m 120 -s "$url/login/?all")"
+        page="$(curl -m 10 -s "$url/login/?all")"
         [[ "$page" == *"$marker"* ]] && break
         sleep 1
     done

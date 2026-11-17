@@ -573,6 +573,83 @@ def unbounded(text: str) -> list[str]:
     return found
 
 
+POLL_BOUND_MAX = 10
+LOOP_OPEN = re.compile(r"\s*(?:for|while|until)\s")
+LOOP_CLOSE = re.compile(r"\s*done\b")
+SLEEP = re.compile(r"(?:^|[;&|(]|\bdo)\s*sleep\s")
+CURL_SECONDS = re.compile(r"\s(?:-m\s*|--max-time[=\s])(\d+)")
+
+
+def slow_polls(text: str) -> list[str]:
+    """`line: what` for each curl in a polling loop (one with a `sleep`) that
+    waits more than POLL_BOUND_MAX seconds a try.  A hanging curl per try made
+    wait_ready's 120 tries of `-m 120` last up to 4 h (#396)."""
+    lines = logical_lines(text)
+    found = []
+    open_at: list[int] = []
+    for index, (_, line) in enumerate(lines):
+        if LOOP_OPEN.match(line):
+            open_at.append(index)
+        elif LOOP_CLOSE.match(line) and open_at:
+            start = open_at.pop()
+            body = lines[start : index + 1]
+            if not any(SLEEP.search(text) for _, text in body):
+                continue
+            for number, line in body:
+                for match in CURL.finditer(line):
+                    args = re.split(r"[|;)]", line[match.end() :], maxsplit=1)[0]
+                    seconds = CURL_SECONDS.search(" " + args)
+                    if seconds and int(seconds.group(1)) > POLL_BOUND_MAX:
+                        found.append(f"{number}: curl -m {seconds.group(1)} in a polling loop")
+    return sorted(set(found), key=lambda row: int(row.split(":")[0]))
+
+
+def test_a_curl_in_a_polling_loop_waits_ten_seconds_at_most_per_try():
+    assert slow_polls(CHECKS.read_text()) == [], (
+        f"give a curl in a loop that sleeps between tries `-m {POLL_BOUND_MAX}` "
+        "or less, and keep `-m 120` for a transfer that runs once"
+    )
+
+
+def test_a_slow_curl_in_a_polling_loop_is_found():
+    text = (
+        "    for _ in $(seq 120); do\n"
+        "        if docker exec x curl -m 120 -fsS http://127.0.0.1/; then\n"
+        "            return 0\n"
+        "        fi\n"
+        "        sleep 1\n"
+        "    done\n"
+        "    for _ in $(seq 30); do\n"
+        '        page="$(curl --max-time 11 -s "$url")"\n'
+        '        [[ "$page" == *x* ]] && break; sleep 1\n'
+        "    done\n"
+    )
+    assert slow_polls(text) == [
+        "2: curl -m 120 in a polling loop",
+        "8: curl -m 11 in a polling loop",
+    ]
+
+
+def test_a_short_curl_in_a_polling_loop_and_a_long_one_in_another_loop_pass():
+    text = (
+        "    done\n"
+        "    for _ in $(seq 120); do\n"
+        "        docker exec x curl -m 10 -fsS http://127.0.0.1/ && break\n"
+        "        curl -s http://x/ || true\n"
+        "        sleep 1\n"
+        "    done\n"
+        "    for page in a b; do\n"
+        '        curl -m 120 -s -o /dev/null "$url/$page"\n'
+        "        for _ in 1 2; do sleep 1; done\n"
+        "    done\n"
+        "    curl -m 120 -s http://x/\n"
+        "    while read -r path; do\n"
+        '        curl -m 120 -s "$url$path"\n'
+        "    done <<<\"$files\"\n"
+    )
+    assert slow_polls(text) == []
+
+
 def test_every_wait_in_checks_sh_is_bounded():
     assert unbounded(CHECKS.read_text()) == [], (
         "give curl `-m 120`, and `timeout 60` before openssl s_client, a Compose "
