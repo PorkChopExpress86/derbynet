@@ -117,13 +117,16 @@ done
 # that is no commit: #373's implementer edited network_changed.py during the
 # hook: the committed pytest-under-load.sh still passed `--` where the
 # edited tool took a file path, so the tool wrote a file named `--`, and the
-# run left rerun pytests behind.  The head, the tracked changes and the
-# untracked files are compared at exit, which names the edit but prevents
-# nothing.
+# run left rerun pytests behind.  The head, the status, the tracked changes
+# and the contents of the untracked files are compared at exit, which names
+# the edit but prevents nothing.  `diff HEAD` skips an untracked file and
+# `status` prints `?? path` before and after an edit of one, so the contents
+# of the untracked files are summed too (#390 review).
 tree_state() {
   git -C "$ROOT" rev-parse HEAD
   git -C "$ROOT" status --porcelain -uall
   git -C "$ROOT" diff HEAD | cksum
+  (cd "$ROOT" && git ls-files -o --exclude-standard -z | xargs -0 -r cksum || true)
 }
 START_TREE="$(tree_state)"
 check_tree() {

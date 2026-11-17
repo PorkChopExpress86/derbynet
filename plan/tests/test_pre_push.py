@@ -344,6 +344,17 @@ class TreeChanged(unittest.TestCase):
         self.assertIn('?? server/--', result.stderr)
         self.assertNotIn('the plan test failed', result.stderr)
 
+    def test_an_edit_of_a_file_untracked_at_the_start_fails_the_push(self):
+        """`git diff HEAD` skips untracked files and `status` prints
+        `?? path` before and after, so the hook compares their contents too
+        (#390 review)."""
+        result = push('docs/x.md', self.edit(
+            "(REPO / 'docs/new.md').write_text('again\\n')"), shell='echo first > docs/new.md')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(self.CHANGED, result.stderr)
+        self.assertIn('?? docs/new.md', result.stderr)
+        self.assertNotIn('the plan test failed', result.stderr)
+
     def test_a_failing_check_keeps_its_status_and_names_the_change(self):
         result = push('docs/x.md', self.edit(
             "(REPO / 'docs/x.md').write_text('edited\\n')", passes=False))
@@ -352,7 +363,7 @@ class TreeChanged(unittest.TestCase):
         self.assertIn(self.CHANGED, result.stderr)
 
     def test_a_tree_left_alone_passes_dirty_or_clean(self):
-        for shell in ('', 'echo dirty > docs/x.md'):
+        for shell in ('', 'echo dirty > docs/x.md', 'echo first > docs/new.md'):
             with self.subTest(shell=shell):
                 result = push('docs/x.md', PASSING, shell=shell)
                 self.assertEqual(result.returncode, 0, result.stderr)

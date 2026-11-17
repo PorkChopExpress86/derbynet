@@ -174,3 +174,6 @@ def test_quick_runs_the_pytest_half_alone_on_xdist(tmp_path, args):
         *args,
     ]
     assert "--quick" not in words
+    [notice] = result.stderr.splitlines()
+    assert "skips plan/tests and tests/test_pytest_under_load.py" in notice
+    assert "pre-push hook runs the whole script" in notice

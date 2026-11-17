@@ -52,6 +52,9 @@ quick=()
 if [ "${1:-}" = --quick ]; then
   shift
   quick=(-n auto --deselect tests/test_pytest_under_load.py)
+  echo "source-checks.sh --quick: skips plan/tests and" \
+       "tests/test_pytest_under_load.py; the pre-push hook runs the whole" \
+       "script, so a green --quick run is not a green push." >&2
 fi
 
 cd "$(dirname "$0")/.."
