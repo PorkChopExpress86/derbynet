@@ -40,9 +40,7 @@ def folders(event, tmp_path):
     return tmp_path
 
 
-def phone_only(page):
-    if page.size != "phone":
-        pytest.skip("this acceptance check is at 390x844")
+PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 
 
 def jpeg(path: Path, color=(30, 120, 200), size=(600, 800)) -> Path:
@@ -84,6 +82,7 @@ def render_size(page, url: str) -> tuple[int, int]:
 # ----- tap to assign, unassign with Undo -----------------------------------------
 
 
+@PHONE_ONLY
 def test_a_phone_assigns_and_unassigns_with_no_drag(login, event, folders):
     """Acceptance: tap a racer, then a photo; Unassign and Undo; tap a
     photo, then a racer found by search. No step drags."""
@@ -91,7 +90,6 @@ def test_a_phone_assigns_and_unassigns_with_no_drag(login, event, folders):
     jpeg(folders / "racers" / "blue.jpg")
     jpeg(folders / "racers" / "red.jpg", (200, 30, 30))
     page = login("RaceCrew")
-    phone_only(page)
     open_photos(page)
     expect(card(page, first)).to_have_attribute("data-photo-state", "none")
     expect(pool(page)).to_have_count(2)
@@ -143,13 +141,13 @@ def test_a_phone_assigns_and_unassigns_with_no_drag(login, event, folders):
 # ----- the check-in car photo, cropped and turned here ---------------------------
 
 
+@PHONE_ONLY
 def test_a_check_in_car_photo_shows_assigned_and_crops_and_turns(login, event, folders):
     """Acceptance: the car photo taken at check-in (#42) is the racer's in
     the Cars repository with no other step, and Turn and Crop change the
     render the server serves."""
     racer = add_racers(event, "Scouts", 1, 101, passed=False)[0]
     page = login("RaceCrew")
-    phone_only(page)
     open_checkin(page)
     checkin_card(page, racer).get_by_role(
         "button", name="Car photo of Scouts1 Racer"
@@ -271,11 +269,11 @@ def test_bulk_upload_retries_a_failed_file(
         assert max(uploaded.size) <= 1600
 
 
+@PHONE_ONLY
 def test_a_big_photo_is_downscaled_before_upload(login, event, folders, tmp_path):
     big = tmp_path / "big.jpg"
     Image.new("RGB", (4000, 3000), (10, 200, 10)).save(big, "JPEG")
     page = login("RaceCrew")
-    phone_only(page)
     open_photos(page)
     page.locator("[data-upload-input]").set_input_files(str(big))
     expect(page.locator('[data-upload-item][data-state="done"]')).to_have_count(1)
@@ -286,13 +284,13 @@ def test_a_big_photo_is_downscaled_before_upload(login, event, folders, tmp_path
 # ----- delete ----------------------------------------------------------------------
 
 
+@PHONE_ONLY
 def test_delete_removes_the_photo_from_the_pool_and_the_racer(login, event, folders):
     racer = add_racers(event, "Scouts", 1, 101)[0]
     jpeg(folders / "racers" / "a.jpg")
     jpeg(folders / "racers" / "b.jpg")
     Racer.objects.filter(pk=racer.pk).update(headshot="a.jpg")
     page = login("RaceCrew")
-    phone_only(page)
     open_photos(page)
     card(page, racer).get_by_role(
         "button", name="Crop the photo of Scouts1 Racer"
@@ -392,10 +390,10 @@ def test_a_missing_folder_hides_upload(login, event, folders):
 # ----- Take photo ------------------------------------------------------------------
 
 
+@PHONE_ONLY
 def test_take_photo_from_a_racer_card(login, event, folders):
     racer = add_racers(event, "Scouts", 1, 101)[0]
     page = login("RaceCrew")
-    phone_only(page)
     open_photos(page)
     card(page, racer).get_by_role(
         "button", name="Take a photo of Scouts1 Racer"

@@ -21,10 +21,7 @@ from ui.tests.browser.conftest import (
 )
 from ui.tests.race import car_times, race_setup, run_heat, scheduled
 
-
-def phone_only(page):
-    if page.size != "phone":
-        pytest.skip("this acceptance check is at 390x844")
+PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 
 
 def open_playlist(page, query=""):
@@ -104,6 +101,7 @@ class Timer:
         self.api.dispose()
 
 
+@PHONE_ONLY
 def test_the_owners_race_day(login, event, playwright, live_server, page_errors):
     """At 390x844: queue Scouts round 1, a Scouts top 4 final, Outlaws round
     1 and an Outlaws top 4 final on this page, start the playlist, finish
@@ -112,7 +110,6 @@ def test_the_owners_race_day(login, event, playwright, live_server, page_errors)
     rounds. No other operator step."""
     page_errors.allow(r"request failed: \S*/dashboard/live/\S* net::ERR_ABORTED$")
     page = login("RaceCoordinator")
-    phone_only(page)
     race_day(event)
     open_playlist(page)
 
@@ -204,9 +201,9 @@ def test_the_waiting_card_on_the_playlist_page(login, event):
 # ----- reordering on a phone, with no drag ----------------------------------------
 
 
+@PHONE_ONLY
 def test_a_phone_reorders_by_the_row_menu(login, event):
     page = login("RaceCoordinator")
-    phone_only(page)
     rounds = race_setup(event, groups=(("Scouts", 4), ("Outlaws", 4), ("Lions", 4)))
     for seq, name in enumerate(("Scouts", "Outlaws", "Lions"), 1):
         PlaylistEntryFactory(group=rounds[name].group, seq=seq)

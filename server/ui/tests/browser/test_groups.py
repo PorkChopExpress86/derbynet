@@ -23,10 +23,7 @@ from ui.tests.browser.conftest import (
 )
 from ui.tests.race import add_racers, race_setup, scheduled
 
-
-def phone_only(page):
-    if page.size != "phone":
-        pytest.skip("this acceptance check is at 390x844")
+PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 
 
 def dens(event, names=("Lions", "Tigers", "Parents")):
@@ -77,13 +74,13 @@ def order(event, model, **where) -> list[str]:
 # ----- D31: the rule change and its warning ----------------------------------------
 
 
+@PHONE_ONLY
 def test_a_rule_change_warns_what_it_deletes(login, event):
     """At 390x844: the warning names the rounds, schedules, group awards and
     playlist steps a change deletes, and the counts match the rows gone
     afterwards. The rule in force sends nothing."""
 
     page = page_of(login)
-    phone_only(page)
     rounds = race_setup(event, groups=(("Lions", 4), ("Tigers", 4)))
     scheduled(rounds["Lions"], race=False)
     Round.objects.create(event=event, group=rounds["Lions"].group, number=2)
@@ -217,6 +214,7 @@ def test_partition_add_rename_delete_and_ranges(login, event):
 # ----- D35: the speed-award partition lists ----------------------------------------
 
 
+@PHONE_ONLY
 def test_the_pack_and_subgroup_partition_lists(login, event):
     """At 390x844: unchecking Parents on the pack's list saves a list
     without it, and a subgroup's list with every box checked stores none."""
@@ -229,7 +227,6 @@ def test_the_pack_and_subgroup_partition_lists(login, event):
         groups.GroupRef("rankid", lions.subgroup_id),
     )
     page = page_of(login)
-    phone_only(page)
     open_groups(page)
 
     pack = page.locator('[data-partition-list="pack"]')
@@ -289,13 +286,13 @@ def test_a_partition_moved_into_a_group_joins_its_all_partitions_list(login, eve
 # ----- Move to..., reorder ------------------------------------------------------------
 
 
+@PHONE_ONLY
 def test_a_subgroup_moves_through_the_move_sheet_on_a_phone(login, event):
     dens(event)
     groups.form_groups_by_rule(event, "one-group")
     groups.form_groups_by_rule(event, "custom")
     groups.add_group(event, "Bears")
     page = page_of(login)
-    phone_only(page)
     open_groups(page)
     row_menu(page, "Lions")
     menu_item(page, "Move to…")
@@ -312,13 +309,12 @@ def test_a_subgroup_moves_through_the_move_sheet_on_a_phone(login, event):
     assert Subgroup.objects.get(event=event, name="Lions").group == bears
 
 
+@pytest.mark.sizes("desktop", reason="the phone screenshot is in the phone test")
 def test_the_move_sheet_on_a_desktop(login, event):
     dens(event)
     groups.form_groups_by_rule(event, "one-group")
     groups.form_groups_by_rule(event, "custom")
     page = page_of(login)
-    if page.size == "phone":
-        pytest.skip("the phone screenshot is in the phone test")
     open_groups(page)
     row_menu(page, "Lions")
     menu_item(page, "Move to…")

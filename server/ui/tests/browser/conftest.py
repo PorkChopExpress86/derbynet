@@ -2,7 +2,11 @@
 
 Each test that takes `page` runs twice, on a phone (390x844, touch) and on a
 desktop (1280x800), against pytest-django's live server, which serves the
-static files. Run them, after installing Chromium once:
+static files. A test that runs at one size is marked
+`@pytest.mark.sizes("desktop", reason=...)`, and collection deselects its
+other size before any page opens (#366); a `pytest.skip` on `page.size` in
+its body fails `ui/tests/test_browser_size_skips.py`. Run them, after
+installing Chromium once:
 
     uv run playwright install chromium
     uv run pytest -m browser ui
@@ -114,12 +118,42 @@ def check_harness(items, here):
             raise pytest.UsageError(HARNESS_LOST.format(item.nodeid))
 
 
-def pytest_collection_modifyitems(items):
+def split_by_size(items) -> tuple[list, list]:
+    """`(kept, dropped)`: a test marked `@pytest.mark.sizes(*names,
+    reason=...)` keeps its cases at those `SIZES` and drops the others, so a
+    one-size test never opens a page at the other size (#366). Raises
+    `pytest.UsageError` for a mark that names no size, a name not in `SIZES`,
+    no reason, or a test that takes no `size`."""
+    kept, dropped = [], []
+    for item in items:
+        mark = item.get_closest_marker("sizes")
+        if mark is None:
+            kept.append(item)
+            continue
+        if not mark.args or not set(mark.args) <= set(SIZES):
+            raise pytest.UsageError(
+                f"{item.nodeid}: sizes() takes names from {tuple(SIZES)}, "
+                f"not {mark.args}"
+            )
+        if not mark.kwargs.get("reason"):
+            raise pytest.UsageError(f"{item.nodeid}: sizes() needs a reason=")
+        callspec = getattr(item, "callspec", None)
+        if callspec is None or "size" not in callspec.params:
+            raise pytest.UsageError(f"{item.nodeid}: sizes() on a test with no page")
+        (kept if callspec.params["size"] in mark.args else dropped).append(item)
+    return kept, dropped
+
+
+def pytest_collection_modifyitems(config, items):
     here = Path(__file__).parent
     for item in items:
         if here in Path(item.fspath).parents:
             item.add_marker(pytest.mark.browser)
     check_harness(items, here)
+    kept, dropped = split_by_size(items)
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
 
 
 # A host name that reaches the live server over plain HTTP. `localhost` is a

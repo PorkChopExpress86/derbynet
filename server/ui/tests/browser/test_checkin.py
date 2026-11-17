@@ -57,9 +57,7 @@ def folders(event, tmp_path):
     return tmp_path
 
 
-def phone_only(page):
-    if page.size != "phone":
-        pytest.skip("this acceptance check is at 390x844")
+PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 
 
 def open_checkin(page):
@@ -250,6 +248,7 @@ def round_running(event):
     return wolves, late
 
 
+@PHONE_ONLY
 @pytest.mark.parametrize("answer", ["Yes", "No"])
 def test_a_pass_during_round_1_asks_to_add_the_car(
     login, browser, live_server, event, round_running, answer
@@ -259,7 +258,6 @@ def test_a_pass_during_round_1_asks_to_add_the_car(
     lists the racer as not added (D36)."""
     wolves, late = round_running
     page = login("RaceCrew")
-    phone_only(page)
     open_checkin(page)
     before = chart(wolves)
     page.get_by_label("Find a racer by name or car number").fill("150")
@@ -304,6 +302,7 @@ def test_a_pass_during_round_1_asks_to_add_the_car(
 # ----- D32: a request for a place in the final -----
 
 
+@PHONE_ONLY
 def test_a_racer_after_round_1_requests_a_place_in_the_final(
     login, browser, live_server, event
 ):
@@ -313,7 +312,6 @@ def test_a_racer_after_round_1_requests_a_place_in_the_final(
         run_heat(event)
     late = add_racers(event, "Scouts", 1, 150)[0]
     page = login("RaceCrew")
-    phone_only(page)
     open_checkin(page)
 
     late_card = card(page, late)
@@ -362,6 +360,7 @@ def test_the_racer_sheet_saves_both_award_settings(login, event):
     assert racer.exclude and racer.not_eligible_for_speed_awards
 
 
+@PHONE_ONLY
 def test_the_partition_field_lists_exactly_the_partitions(login, event):
     """A picker of the existing partitions with no typed entry, on the add
     and the edit sheet; picking another moves the racer (D34)."""
@@ -369,7 +368,6 @@ def test_the_partition_field_lists_exactly_the_partitions(login, event):
     add_racers(event, "Siblings", 1, 201)
     groups.find_or_create_partition(event.id, "Parents")
     page = login("RaceCoordinator")
-    phone_only(page)
     open_checkin(page)
     names = list(
         Partition.objects.filter(event=event)
@@ -417,6 +415,7 @@ def test_a_pass_on_one_station_shows_on_another_within_12_s(
     other.close()
 
 
+@PHONE_ONLY
 def test_a_pass_whose_card_a_poll_replaced_still_refreshes_the_list(login, event):
     """A poll's swap can replace the card while its switch's POST is out. The
     reply's checkin-refresh must still reach the list, or the card shows
@@ -424,7 +423,6 @@ def test_a_pass_whose_card_a_poll_replaced_still_refreshes_the_list(login, event
     in for the poll by swapping the card for a copy right after the click."""
     racer = add_racers(event, "Scouts", 1, 101, passed=False)[0]
     page = login("RaceCrew")
-    phone_only(page)
     open_checkin(page)
     expect(card(page, racer)).to_have_attribute("data-passed", "0")
     page.evaluate("derbynet.pollable = () => false")  # only the refresh may fetch
@@ -441,11 +439,11 @@ def test_a_pass_whose_card_a_poll_replaced_still_refreshes_the_list(login, event
     expect(card(page, racer)).to_have_attribute("data-passed", "1", timeout=3_000)
 
 
+@PHONE_ONLY
 def test_unpass_then_undo_leaves_the_racer_passed(login, event):
     """No confirm() dialog: the page fixture fails on any dialog."""
     racer = add_racers(event, "Scouts", 1, 101)[0]
     page = login("RaceCrew")
-    phone_only(page)
     open_checkin(page)
     switch = card(page, racer).get_by_role("switch", name="Passed, Scouts1 Racer")
     expect(switch).to_have_attribute("aria-checked", "true")
@@ -593,6 +591,7 @@ RED_CORNER = """() => {
 }"""
 
 
+@PHONE_ONLY
 def test_the_crop_sheet_turns_the_photo_left_and_right(login, event, folders):
     """Turn left turns the stored photo a quarter counterclockwise and Turn
     right a quarter clockwise (PHP's `photo.rotate` takes its angle
@@ -604,7 +603,6 @@ def test_the_crop_sheet_turns_the_photo_left_and_right(login, event, folders):
     photo.paste((220, 20, 20), (0, 0, 120, 120))
     photo.save(folders / "wide.jpg", "JPEG")
     page = open_checkin(login("RaceCrew"))
-    phone_only(page)
     card(page, racer).get_by_role("button", name="Car photo of Scouts1 Racer").click()
     take_photo(page, folders / "wide.jpg")
     crop_sheet = sheet(page).locator("[data-crop-sheet]")
@@ -804,6 +802,7 @@ def test_phone_landscape_layout(browser, live_server, event, page_errors):
     context.close()
 
 
+@PHONE_ONLY
 def test_a_long_name_keeps_the_phone_list_one_screen_wide(login, event):
     """A card is no wider than the list, whatever the name, so the page never
     scrolls sideways on a phone. The list's column took the width of its
@@ -815,7 +814,6 @@ def test_a_long_name_keeps_the_phone_list_one_screen_wide(login, event):
         first_name="Darrell & Darrell", last_name="Delaughter"
     )
     page = open_checkin(login("RaceCrew"))
-    phone_only(page)
     expect(card(page, racer)).to_contain_text("Darrell & Darrell Delaughter")
     no_sideways_scroll(page)
     width = page.evaluate(
@@ -880,6 +878,7 @@ def weigh_partitions(event):
         set_partition_weigh_in(partition, mode, "oz", "5")
 
 
+@PHONE_ONLY
 @pytest.mark.parametrize("partition", ["Scouts", "Outlaws"])
 def test_the_owners_station_flow_with_a_weigh_in(login, event, folders, partition):
     """D6 with D8 and D54, on a phone: the volunteer weighs the car, enters
@@ -887,7 +886,6 @@ def test_the_owners_station_flow_with_a_weigh_in(login, event, folders, partitio
     car photo, and passes the racer. Scouts weigh pass or fail, Outlaws
     record the weight."""
     page = login("RaceCrew")
-    phone_only(page)
     weigh_partitions(event)
     open_checkin(page)
 
