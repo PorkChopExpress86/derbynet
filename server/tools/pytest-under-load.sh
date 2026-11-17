@@ -131,7 +131,7 @@ fi
 # reading half the holder's lines (#354 review).
 HEAD_SHA="$(git -C "$SERVER_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
 
-WAITER=
+WAITING=
 PIDS=()
 RUN_PID=
 stop_loops() {
@@ -140,7 +140,13 @@ stop_loops() {
 }
 stop_all() {
   trap '' TERM INT HUP
-  if [ -n "$WAITER" ]; then kill "$WAITER" 2>/dev/null || true; fi
+  # `jobs -p` names the waiting flock from its fork until `wait` reaps it,
+  # and nothing after: a kept pid missed a signal before it was kept, and
+  # named a flock already gone after (#391 review).
+  if [ -n "$WAITING" ]; then
+    waiter=$(jobs -p)
+    if [ -n "$waiter" ]; then kill "$waiter" 2>/dev/null || true; fi
+  fi
   stop_loops
   if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
 }
@@ -159,13 +165,14 @@ if ! flock -n -x 9; then
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
   # In the background, so a signal's trap runs during the wait, and the
-  # cleanup stops the flock: bash runs a trap only once a foreground command
-  # ends.  The lock is on the file fd 9 opened, so it stays with this script
-  # once flock exits; a flock that ends without it fails the script here.
+  # cleanup stops the flock, the only job then: bash runs a trap only once a
+  # foreground command ends.  The lock is on the file fd 9 opened, so it
+  # stays with this script once flock exits; a flock that ends without it
+  # fails the script here.
+  WAITING=1
   flock -x 9 &
-  WAITER=$!
-  wait "$WAITER"
-  WAITER=
+  wait "$!"
+  WAITING=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
 fi
 refuse_used_folder
