@@ -495,10 +495,11 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
 # ----- a press that spans a board swap (D102, #344) --------------------------
 
 # The page's own record of a press, in the order the page saw it: each
-# pointerdown (at its event's timeStamp, which is no later than any listener
-# that handles it), each click and each htmx request sent, each board poll
-# answered and each other request ended, and each swap of the board's
-# children with the name the tv card shows after it.
+# pointerdown, keydown and keyup (at its event's timeStamp, which is no later
+# than any listener that handles it), each element that takes the focus, each
+# click and each htmx request sent, each board poll answered and each other
+# request ended, each swap of the board's children with the name the tv card
+# shows after it, and each script error the page reports at the window.
 BOARD_LOG = """() => {
   const log = window.boardLog = [];
   const board = document.getElementById('kiosk-board');
@@ -511,6 +512,15 @@ BOARD_LOG = """() => {
     .observe(board, {childList: true});
   document.addEventListener(
     'pointerdown', (e) => log.push({what: 'down', at: e.timeStamp}), true);
+  const on = (el) => el === document.body ? 'BODY' : el.outerHTML.slice(0, 60);
+  const key = (e) => log.push({
+    what: e.type, at: e.timeStamp, key: e.key, repeat: e.repeat, on: on(e.target)});
+  document.addEventListener('keydown', key, true);
+  document.addEventListener('keyup', key, true);
+  document.addEventListener(
+    'focusin', (e) => log.push({what: 'focus', at: now(), on: on(e.target)}), true);
+  window.addEventListener(
+    'error', (e) => log.push({what: 'error', message: e.message}));
   document.addEventListener('click', () => log.push({what: 'click', at: now()}), true);
   document.addEventListener('htmx:beforeSend', (e) => log.push({
     what: 'send', at: now(), verb: e.detail.requestConfig.verb,
@@ -577,14 +587,14 @@ class HeldPolls:
 
     def answer(self, index, status=200):
         """Let poll `index` through and wait until the page has handled its
-        reply: a new board (200), or no change (204)."""
+        reply: a new board (200), or no change (204); either, for `None`."""
         self.held[index].continue_()
         self.page.wait_for_function(
             "n => window.boardLog.filter((r) => r.what === 'poll').length >= n",
             arg=index + 1,
         )
         polls = [r for r in board_log(self.page) if r["what"] == "poll"]
-        assert polls[index]["status"] == status, polls
+        assert status is None or polls[index]["status"] == status, polls
 
     def end(self):
         self.ended = True
@@ -1161,6 +1171,550 @@ def test_a_press_never_released_holds_the_board_one_poll_interval(login, event):
     assert swap["name"] == "Lobby", log
     page.mouse.move(1, 1)
     page.mouse.up()
+    polls.end()
+
+
+RELOAD_BUTTON = '#kiosk-board [data-kiosk="tv"] button[data-action="reload"]'
+POST_PATHS = {"scene": "/kiosks/scene/", "reload": "/kiosks/reload/"}
+
+
+def key_target(page, event, control):
+    return {
+        "scene": scene_button(page, scene(event, "Racing")),
+        "reload": page.locator(RELOAD_BUTTON),
+    }[control]
+
+
+def focus_on(page, control):
+    bound(page, control)
+    dismiss_toasts(page)
+    control.focus()
+
+
+def posts_since(log, start) -> list[str]:
+    return [r["path"] for r in log[start:] if r.get("verb") == "post"]
+
+
+def tapped(page, control):
+    """What a tap on Racing or on Reload shows: Racing on, or the card
+    Reloading."""
+    shows, text = {
+        "scene": (page.locator("#kiosk-board [aria-pressed=true]"), "Racing"),
+        "reload": (card(page, "tv"), "Reloading"),
+    }[control]
+    expect(shows).to_contain_text(text)
+
+
+@pytest.mark.parametrize("control", ["scene", "reload"])
+def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control):
+    """D125 (#369): Space goes down on a focused board button, a poll's
+    reply (the kiosk renamed Lobby) comes, the key repeats twice, and Space
+    comes up; the board ignores the repeats (D131), not the press. The button
+    still taps: Racing's POST goes out and Racing shows on, or Reload's POST
+    goes out and the card shows Reloading. No swap comes between the keydown
+    and the click; the POST's reply then brings the board out of band, and
+    the focus comes back to the swapped-in button (D127). Before the fix the
+    poll's reply replaced the focused button, the focus fell to the page's
+    body, and Space's keyup went to the body and sent no click (#344's probe;
+    PHP's kiosk-dashboard.php loses the key on Reload the same way, the PR's
+    probe)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    target = key_target(page, event, control)
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, target)
+    page.keyboard.down(" ")
+    polls.answer(0)
+    page.keyboard.down(" ")  # two auto-repeats during the hold (D131)
+    page.keyboard.down(" ")
+    with htmx_post(page, POST_PATHS[control]):
+        page.keyboard.up(" ")
+    tapped(page, control)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    expect(target).to_be_focused()
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    keyup = after(log, "keyup", keydown)
+    click = after(log, "click", keydown)
+    assert after(log, "poll", keydown) < keyup < click, log
+    assert log[keyup]["on"] != "BODY", log[keydown:]
+    assert len([r for r in log if r["what"] == "keydown" and r["repeat"]]) == 2, log
+    assert swaps_since(log[:click], keydown) == [], log
+    assert posts_since(log, keydown) == [POST_PATHS[control]], log
+    # one read: htmx applies the reply's board and ends the request in one
+    # task, so a held board applied after it would be here too.
+    assert [r["name"] for r in swaps_since(log, click)] == ["Lobby"], log
+    polls.end()
+
+
+@pytest.mark.parametrize("key, step", [("Tab", 1), ("Shift+Tab", -1)])
+def test_a_space_press_whose_focus_moves_off_applies_the_held_board(
+    login, event, key, step
+):
+    """D125: Space is down on Racing when a poll's reply (Lobby) comes, and
+    the board waits. Tab or Shift+Tab then moves the focus off Racing to
+    the scene button after or before it, which ends the press: the board
+    swaps to Lobby, and the focus stays on the swapped-in copy of that
+    button, where the crew put it (D127). The keyup that follows taps
+    nothing, so no scene is posted and Racing stays off. Before the #369
+    review the swap ran inside the focusout, which removed the button the
+    focus was moving to, and D127 then gave the focus back to Racing."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    scenes = page.locator("#kiosk-board button[data-scene]")
+    ids = scenes.evaluate_all("bs => bs.map((b) => b.dataset.scene)")
+    neighbour = ids[ids.index(racing.get_attribute("data-scene")) + step]
+    moved_to = page.locator(f'#kiosk-board button[data-scene="{neighbour}"]')
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, racing)
+    page.keyboard.down(" ")
+    polls.answer(0)
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    assert swaps_since(log, keydown) == [], log
+    page.keyboard.press(key)
+    wait_for_a_swap_after(page, keydown)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    expect(moved_to).to_be_focused()
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = board_log(page)
+    assert [r["name"] for r in swaps_since(log, keydown)] == ["Lobby"], log
+    # one read: a click would have sent its POST before keyboard.up()
+    # returned.
+    assert posts_since(log, keydown) == [], log
+    expect(racing).to_have_attribute("aria-pressed", "false")
+    polls.end()
+
+
+@pytest.mark.parametrize(
+    "order, ends",
+    [
+        ("pointer then Space", "pointer moves off"),
+        ("Space then pointer", "pointer moves off"),
+        ("pointer then Space", "focus moves off"),
+    ],
+)
+def test_a_pointer_and_space_on_one_button_hold_until_both_end(
+    login, event, order, ends
+):
+    """D102 and D125 together (#369 review): the mouse and Space both go
+    down on Racing, in either order, and a poll's reply (Lobby) comes. The
+    mouse moving off Racing ends the pointer's part only, and Space still
+    holds the board; or Tab moves the focus off Racing, which ends Space's
+    part only, and the mouse still holds it. Nothing swaps. The other one
+    then taps Racing: Space's keyup with the focus still on it, or the
+    mouse's release over it. The scene's reply is the one swap after the
+    click."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, racing)
+    first, second = {
+        "pointer then Space": (
+            lambda: press(page, racing),
+            lambda: page.keyboard.down(" "),
+        ),
+        "Space then pointer": (
+            lambda: page.keyboard.down(" "),
+            lambda: press(page, racing),
+        ),
+    }[order]
+    first()
+    second()
+    expect(racing).to_be_focused()
+    polls.answer(0)
+    end, tap = {
+        "pointer moves off": (lambda: move_off(page), lambda: page.keyboard.up(" ")),
+        "focus moves off": (lambda: page.keyboard.press("Tab"), page.mouse.up),
+    }[ends]
+    end()
+    log = board_log(page)
+    down = after(log, "down")
+    start = min(down, after(log, "keydown"))
+    # one read: a pointerout's release swaps the board before the step
+    # returns, and a focusout's on a 0 ms timer queued before this one.
+    page.evaluate("() => new Promise((r) => setTimeout(r, 0))")
+    log = board_log(page)
+    assert swaps_since(log, start) == [], log
+    with htmx_post(page, "/kiosks/scene/"):
+        tap()
+    expect(racing).to_have_attribute("aria-pressed", "true")
+    log = board_log(page)
+    click = after(log, "click", start)
+    assert swaps_since(log[:click], start) == [], log
+    assert [r["name"] for r in swaps_since(log, click)] == ["Lobby"], log
+    page.keyboard.up(" ")
+    page.mouse.up()
+    polls.end()
+
+
+def test_a_space_press_never_released_holds_the_board_one_poll_interval(login, event):
+    """D125: Space held on Racing holds the board no longer than one poll
+    interval, `state.POLL_SECONDS`, from its first keydown, as D102's bound
+    does for a pointer, for a keyup that never comes. The key's auto-repeat
+    keydowns, sent every 250 ms here until the swap, do not extend it. The
+    swap comes no sooner than the first keydown's timeStamp plus the bound,
+    since a timer never fires early, and no later than one more poll
+    interval of slack after the later of that and the reply. The focus then
+    comes back to the swapped-in Racing (D127); one more repeat lands on it,
+    and the board ignores it (D131), so the keyup taps nothing: no scene is
+    posted and Racing stays off. Without D131, Chromium clicked the restored
+    Racing on the keyup (the PR's stand-in probe, `repeat-on-new.log`)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    polls = hold_the_polls(page, stretch=False)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, racing)
+    page.keyboard.down(" ")
+    polls.answer(0)
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    for _ in range(40):  # 10 s of repeats at most
+        if swaps_since(board_log(page), keydown):
+            break
+        page.keyboard.down(" ")
+        page.wait_for_timeout(250)
+    log = board_log(page)
+    bound_ms = state.POLL_SECONDS * 1000
+    swap = swaps_since(log, keydown)[0]
+    reply = log[after(log, "poll", keydown)]
+    assert swap["at"] >= log[keydown]["at"] + bound_ms, log
+    assert swap["at"] <= max(log[keydown]["at"] + bound_ms, reply["at"]) + bound_ms, log
+    assert swap["name"] == "Lobby", log
+    assert any(r["what"] == "keydown" and r["repeat"] for r in log), log
+    expect(racing).to_be_focused()
+    page.keyboard.down(" ")
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    log = board_log(page)
+    # one read: a click would have sent its POST before keyboard.up()
+    # returned.
+    assert posts_since(log, keydown) == [], log
+    expect(racing).to_have_attribute("aria-pressed", "false")
+    polls.end()
+
+
+def test_a_space_held_across_a_tab_taps_nothing(login, event):
+    """D131's accepted cost: Space goes down on Racing, Tab moves the focus
+    to the scene button after it, the key repeats once there, and comes up.
+    The board ignores the repeat, so nothing is tapped and no scene is
+    posted. Master's page, and Chromium on a plain page, tap the Tab target,
+    since the repeat arms its click (the PR's probe, `spacetab/run.log`). No
+    poll changes the board, so nothing swaps."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    htmx_settled(page)
+    page.evaluate(BOARD_LOG)
+    focus_on(page, racing)
+    page.keyboard.down(" ")
+    page.keyboard.press("Tab")
+    page.wait_for_function(
+        "id => document.activeElement.matches('#kiosk-board button[data-scene]')"
+        " && document.activeElement.dataset.scene !== id",
+        arg=racing.get_attribute("data-scene"),
+    )
+    page.keyboard.down(" ")
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 1 and repeats[0]["on"] != "BODY", log
+    # one read: a click would have sent its POST before keyboard.up()
+    # returned.
+    assert posts_since(log, keydown) == [], log
+    assert swaps_since(log, keydown) == [], log
+
+
+def test_a_space_held_on_one_button_and_a_click_on_another_posts_once(login, event):
+    """D131: Space is held on Racing, and the mouse clicks Reload. Reload's
+    POST reply brings the board out of band, and the focus comes back to
+    the swapped-in Reload (D127). The Space auto-repeat that then lands on
+    it is ignored, so the keyup taps nothing: Reload's POST goes out once,
+    and no scene is posted. Without D131 the repeat armed the restored
+    Reload and the keyup clicked it, a second POST, where master's page,
+    with the focus on the body, sent one (the PR's probe, `aclickb/`)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    reload = page.locator(RELOAD_BUTTON)
+    htmx_settled(page)
+    page.evaluate(BOARD_LOG)
+    focus_on(page, racing)
+    page.keyboard.down(" ")
+    with htmx_post(page, "/kiosks/reload/"):
+        press(page, reload)
+        page.mouse.up()
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    wait_for_a_swap_after(page, after(log, "click", keydown))
+    expect(reload).to_be_focused()
+    page.keyboard.down(" ")
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = board_log(page)
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 1 and repeats[0]["on"] != "BODY", log
+    # one read: a click would have sent its POST before keyboard.up()
+    # returned.
+    assert posts_since(log, keydown) == ["/kiosks/reload/"], log
+    expect(racing).to_have_attribute("aria-pressed", "false")
+
+
+# A button outside the board, which counts its clicks: no page control off
+# the board is a button at the phone's size.
+OUTSIDE_BUTTON = """() => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.id = 'outside';
+  b.textContent = 'Outside';
+  b.dataset.clicks = '0';
+  b.addEventListener('click', () => {
+    b.dataset.clicks = String(Number(b.dataset.clicks) + 1);
+  });
+  document.querySelector('main').prepend(b);
+}"""
+
+
+@pytest.mark.parametrize(
+    "where", ["shift on Racing", "space off the board", "space on Preview"]
+)
+def test_a_key_off_the_space_hold_holds_nothing(login, event, where):
+    """Near misses for D125's hold: Shift held on a focused board button,
+    Space held on a button off the board, and Space held on a card's
+    Preview link, which Space does not activate (the PR's probe,
+    `space-preview-*.log`). The poll's reply swaps the board while the key
+    is down."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(OUTSIDE_BUTTON)
+    target, key = {
+        "shift on Racing": (scene_button(page, scene(event, "Racing")), "Shift"),
+        "space off the board": (page.locator("#outside"), " "),
+        "space on Preview": (page.locator(PREVIEW_LINK), " "),
+    }[where]
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, target)
+    page.keyboard.down(key)
+    polls.answer(0)
+    log = board_log(page)
+    wait_for_a_swap_after(page, after(log, "keydown"))
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    page.keyboard.up(key)
+    polls.end()
+
+
+def test_a_held_enter_off_the_board_still_repeats(login, event):
+    """A near miss for D126: a held Enter on a button off the board clicks
+    on its first keydown and on each of its two repeats, 3 clicks, as
+    Chromium does."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(OUTSIDE_BUTTON)
+    outside = page.locator("#outside")
+    focus_on(page, outside)
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    expect(outside).to_have_attribute("data-clicks", "3")
+
+
+def test_a_held_tab_on_the_board_still_repeats(login, event):
+    """A near miss for D126 and D131: a held Tab on a board button moves
+    the focus on its first keydown and on its repeat, so 2 elements take
+    the focus and it ends on the scene button 2 after Racing: only Enter's
+    and Space's repeats are ignored."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    ids = page.locator("#kiosk-board button[data-scene]").evaluate_all(
+        "bs => bs.map((b) => b.dataset.scene)"
+    )
+    two_on = ids[ids.index(racing.get_attribute("data-scene")) + 2]
+    htmx_settled(page)
+    page.evaluate(BOARD_LOG)
+    focus_on(page, racing)
+    start = len(board_log(page))
+    page.keyboard.down("Tab")
+    page.keyboard.down("Tab")
+    page.keyboard.up("Tab")
+    page.wait_for_function(
+        "n => window.boardLog.slice(n).filter((r) => r.what === 'focus').length >= 2",
+        arg=start,
+    )
+    log = board_log(page)
+    keydowns = [r["repeat"] for r in log[start:] if r["what"] == "keydown"]
+    assert keydowns == [False, True], log
+    expect(page.locator(f'#kiosk-board button[data-scene="{two_on}"]')).to_be_focused()
+
+
+@pytest.mark.parametrize("control", ["scene", "reload"])
+def test_a_held_enter_is_one_tap(login, event, control):
+    """D126: Enter goes down on Racing or Reload and taps it; the POST's
+    reply brings the board out of band, and the focus comes back to the
+    swapped-in button (D127). Two auto-repeat keydowns then land on that
+    button, and neither taps it: one POST in all. A fresh Enter press after
+    the keyup taps again, a second POST: only the repeats are ignored."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    target = key_target(page, event, control)
+    htmx_settled(page)
+    page.evaluate(BOARD_LOG)
+    focus_on(page, target)
+    with htmx_post(page, POST_PATHS[control]):
+        page.keyboard.down("Enter")
+    log = board_log(page)
+    first = after(log, "keydown")
+    wait_for_a_swap_after(page, first)
+    expect(target).to_be_focused()
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = board_log(page)
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 2, log
+    assert all(r["on"] != "BODY" for r in repeats), log
+    # one read: a click would have sent its POST before keyboard.down()
+    # returned.
+    assert posts_since(log, first) == [POST_PATHS[control]], log
+    tapped(page, control)
+    with htmx_post(page, POST_PATHS[control]):
+        page.keyboard.press("Enter")
+    log = board_log(page)
+    assert posts_since(log, first) == [POST_PATHS[control]] * 2, log
+
+
+@pytest.mark.parametrize("control", ["scene", "identify", "page", "preview"])
+def test_the_focus_comes_back_after_a_board_swap(login, event, control):
+    """D127: the focus is on a board control, Racing, the card's Identify,
+    its Page or its Preview link, with no key held, when a poll's reply
+    (Lobby) swaps the board. The focus comes back to the swapped-in copy of
+    it: the same name, value, data-action and card. Identify shares its name
+    and value with Reload, and Page and Preview have neither; a second
+    kiosk, unnamed, whose card comes first on the board, has the same
+    controls as the tv's. Shift+Tab then moves the focus to the control
+    before it, and the next swap (Hall) gives the focus back to that one:
+    each control that takes the focus, a restored one too, is the one the
+    next swap gives it back to. The page reports no script error."""
+    kiosk(event, "hall")
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    target = {
+        "scene": scene_button(page, scene(event, "Racing")),
+        "identify": page.locator(IDENTIFY_BUTTON),
+        "page": page.locator(PAGE_BUTTON),
+        "preview": page.locator(PREVIEW_LINK),
+    }[control]
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, target)
+    old = target.element_handle()
+    polls.answer(0)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    assert not old.evaluate("e => e.isConnected")
+    expect(page.locator("[data-kiosk]").first).to_have_attribute("data-kiosk", "hall")
+    expect(target).to_be_focused()
+    page.keyboard.press("Shift+Tab")
+    page.wait_for_function("document.activeElement !== document.body")
+    before = page.evaluate_handle("document.activeElement")
+    markup = before.evaluate("e => e.outerHTML")
+    Kiosk.objects.filter(address="tv").update(name="Hall")
+    polls.wait_for(2)
+    polls.answer(1)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
+    assert not before.evaluate("e => e.isConnected")
+    page.wait_for_function(
+        "m => document.activeElement.isConnected"
+        " && document.activeElement.outerHTML === m",
+        arg=markup,
+    )
+    assert [r for r in board_log(page) if r["what"] == "error"] == []
+    polls.end()
+
+
+@pytest.mark.parametrize("where", ["off the board", "blurred", "gone"])
+def test_the_focus_stays_where_the_crew_put_it(login, event, where):
+    """Near misses for D127: the focus is on the Scene editor link, off the
+    board; or on Racing and then blurred to the page's body, as a tap on the
+    page's background does; or on the card's Identify, and the kiosk drops
+    off the board. A poll's reply swaps the board, a second poll answers
+    after it, and no element takes the focus and the page reports no script
+    error in all that time. The second
+    poll may have gone out before the first reply, with the old board's
+    signature, and then it swaps the board again."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    target = {
+        "off the board": page.locator('[data-action="scene-editor"]'),
+        "blurred": scene_button(page, scene(event, "Racing")),
+        "gone": page.locator(IDENTIFY_BUTTON),
+    }[where]
+    focused_after = {"off the board": target}.get(where, page.locator("body"))
+    tv = Kiosk.objects.filter(address="tv")
+    change = {"gone": tv.delete}.get(where, lambda: tv.update(name="Lobby"))
+    then = {"blurred": "document.activeElement.blur()"}.get(where, "0")
+    polls = hold_the_polls(page)
+    change()
+    polls.wait_for(1)
+    focus_on(page, target)
+    page.evaluate(then)
+    log = board_log(page)
+    start = len(log)
+    polls.answer(0)
+    polls.wait_for(2)
+    polls.answer(1, status=None)
+    log = board_log(page)
+    assert swaps_since(log, start), log
+    assert [r for r in log[start:] if r["what"] in ("focus", "error")] == [], log
+    expect(focused_after).to_be_focused()
+    polls.end()
+
+
+def test_the_focus_comes_back_without_scrolling_the_page(login, event):
+    """D127: ten unnamed kiosks' cards come before the tv's, so its Identify
+    is below the screen once the page is scrolled to the top. The focus is
+    on it there when a poll's reply (Lobby) swaps the board: the focus
+    comes back to the swapped-in Identify and the page does not scroll to
+    it (`preventScroll`), so the crew's view stays where it was."""
+    for n in range(10):
+        kiosk(event, f"spare{n}")
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    identify = page.locator(IDENTIFY_BUTTON)
+    polls = hold_the_polls(page)
+    Kiosk.objects.filter(address="tv").update(name="Lobby")
+    polls.wait_for(1)
+    focus_on(page, identify)
+    page.evaluate("scrollTo(0, 0)")
+    page.wait_for_function("scrollY === 0")
+    assert identify.evaluate("e => e.getBoundingClientRect().top > innerHeight")
+    polls.answer(0)
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    expect(identify).to_be_focused()
+    # one read: a focus() that scrolls does so before it returns, inside
+    # the swap's task, which has run once the focus is back.
+    assert page.evaluate("scrollY") == 0
     polls.end()
 
 
