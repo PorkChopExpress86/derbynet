@@ -187,5 +187,15 @@ class PushedHead(unittest.TestCase):
                       done.stderr)
 
 
+    def test_a_pr_gh_cannot_read_fails_naming_it(self):
+        gh = self.tmp / 'gh'
+        gh.write_text(f'#!{sys.executable}\nimport sys\nsys.exit(1)\n')
+        gh.chmod(0o755)
+        done = self.run_pr_wait(gh, timeout_min='1')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('gh could not read PR #7 after 5 tries', done.stderr)
+        self.assertNotIn('PR #7 head', done.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()

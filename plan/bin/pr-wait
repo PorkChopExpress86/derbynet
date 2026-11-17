@@ -55,7 +55,9 @@ behind_the_push() {
   [ "$1" != "$pushed" ] && git merge-base --is-ancestor "$1" "$pushed" 2>/dev/null
 }
 
-read -r head branch <<<"$(head_and_branch)"
+# Assigned first: set -e ignores a failure inside `read <<<"$(...)"`.
+head_branch=$(head_and_branch)
+read -r head branch <<<"$head_branch"
 deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
 while behind_the_push "$head" "$branch"; do
   if [ "$(date +%s)" -ge "$deadline" ]; then
