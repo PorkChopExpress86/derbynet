@@ -1967,3 +1967,30 @@ def test_a_key_held_as_a_sheet_closes_opens_nothing(login, event, key):
     ], log
     expect(sheet(page, "scenes")).to_be_hidden()
     expect(opener).to_be_focused()
+
+
+def test_a_save_that_removes_the_openers_card_focuses_nothing(login, event):
+    """A near miss for #383: in the scene editor, Hall is a kiosk name only
+    the first scene uses. Its card's Page button opens the picker from the
+    keyboard, and No page in this scene, chosen with Enter, takes Hall out
+    of every scene, so the save's reply drops its card. The sheet closes
+    with no copy of the opener to focus: the focus stays on the page's body,
+    and the page reports no script error (the harness's page errors)."""
+    SceneKiosk.objects.create(
+        event=event,
+        scene=scene(event, "Welcome"),
+        kiosk_name="Hall",
+        page="kiosks/welcome.kiosk",
+    )
+    page = login("RaceCoordinator")
+    page.goto("/kiosks/scenes/")
+    hall = page.locator('#scene-entries [data-entry="Hall"]')
+    focus_on(page, hall.locator('[data-action="page"]'))
+    page.keyboard.press("Enter")
+    form = ready(page, sheet(page, "scenes").locator("[data-page-sheet]"))
+    form.locator('[data-page-choice=""]').focus()
+    with htmx_post(page, "/kiosks/scenes/page/"):
+        page.keyboard.press("Enter")
+    expect(sheet(page, "scenes")).to_be_hidden()
+    expect(hall).to_have_count(0)
+    expect(page.locator("body")).to_be_focused()
