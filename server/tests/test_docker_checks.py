@@ -600,7 +600,9 @@ def slow_polls(text: str) -> list[str]:
                     args = re.split(r"[|;)]", line[match.end() :], maxsplit=1)[0]
                     seconds = CURL_SECONDS.search(" " + args)
                     if seconds and int(seconds.group(1)) > POLL_BOUND_MAX:
-                        found.append(f"{number}: curl -m {seconds.group(1)} in a polling loop")
+                        found.append(
+                            f"{number}: curl -m {seconds.group(1)} in a polling loop"
+                        )
     return sorted(set(found), key=lambda row: int(row.split(":")[0]))
 
 
@@ -645,7 +647,7 @@ def test_a_short_curl_in_a_polling_loop_and_a_long_one_in_another_loop_pass():
         "    curl -m 120 -s http://x/\n"
         "    while read -r path; do\n"
         '        curl -m 120 -s "$url$path"\n'
-        "    done <<<\"$files\"\n"
+        '    done <<<"$files"\n'
     )
     assert slow_polls(text) == []
 
