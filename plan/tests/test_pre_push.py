@@ -43,7 +43,7 @@ class Plan(unittest.TestCase):
 
 def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          remote: str = 'base', base_files: dict | None = None, delete: tuple = (),
-         local: str = 'head') -> subprocess.CompletedProcess:
+         local: str = 'head', git_dir: bool = False) -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -103,8 +103,10 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         if shell:
             # Not the script's last command, so bash forks the hook as its child.
             hook = ['bash', '-c', f'{shell}\nbash .githooks/pre-push origin url; exit $?']
+        # Git runs a hook with GIT_DIR set to the pushing checkout's.
+        hook_env = {**env, 'GIT_DIR': str(repo / '.git')} if git_dir else env
         result = subprocess.run(
-            hook, cwd=repo, env=env,
+            hook, cwd=repo, env=hook_env,
             input=f'refs/heads/b {head if local == "head" else "0" * 40} refs/heads/b '
                   f'{REMOTES.get(remote, base)}\n',
             capture_output=True, text=True)
@@ -368,6 +370,24 @@ class TreeChanged(unittest.TestCase):
                 result = push('docs/x.md', PASSING, shell=shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn(self.CHANGED, result.stderr)
+
+
+class GitDirUnset(unittest.TestCase):
+    """Git runs the hook with GIT_DIR set to the pushing checkout's git
+    directory. Under it, a plan test's `git init` in a scratch folder
+    reinitializes that repository instead: pushed from a worktree, it set
+    core.bare=true in the main clone's .git/config, and every checkout
+    failed "must be run in a work tree" for about 3 min, from this retro's
+    own first test_pr_wait.py (#351 and #369 retro). The checks find the
+    repository from the working tree."""
+
+    def test_the_checks_run_with_no_git_dir(self):
+        result = push('docs/x.md', TreeChanged.edit(
+            None, "log.write(f'GIT_DIR={os.environ.get(\"GIT_DIR\")}\\n')"), git_dir=True,
+            shell='echo "before the hook: GIT_DIR=$GIT_DIR" >>"$STUB_LOG"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.ran, r'before the hook: GIT_DIR=/\S+/\.git\n')
+        self.assertIn('GIT_DIR=None\n', result.ran)
 
 
 if __name__ == '__main__':
