@@ -824,19 +824,32 @@ def test_a_signal_while_the_lock_is_taken_or_removed_leaves_no_lock(
     assert "stopped:" not in err, "a signal is no edit by someone else"
 
 
+WAITS_FOR_THE_EDIT = """
+
+def test_waits_for_the_edit():
+    with open("started", "w") as started:
+        started.write(str(os.getpid()))
+    deadline = time.monotonic() + 60
+    while not os.path.exists("edited"):
+        assert time.monotonic() < deadline, "no edit"
+        time.sleep(0.02)
+"""
+
+
 @pytest.mark.parametrize("mode", ["single", "listed"])
 def test_an_edit_during_the_run_is_left_as_it_is_and_named(project, mode):
     """Someone appends a line while the mutant's test runs: the tool puts
-    nothing back over it, and names the file."""
+    nothing back over it, and names the file. The mutant's test ends on the
+    edit, not on a `--timeout`: under load a 3 s bound passed before pytest
+    reached the test, and the tool exited first (#367)."""
     module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
-    commit(project, module)
-    tool = wrapped(
-        project, "", mode, "test_mod.py::test_waits", tool=("--timeout", "3")
-    )
+    commit(project, module, WAITS_FOR_THE_EDIT)
+    tool = wrapped(project, "", mode, "test_mod.py::test_waits_for_the_edit")
     wait_for(project, "started", tool)
     mutant = (project / "mod.py").read_text()
     with open(project / "mod.py", "a") as f:
         f.write("# someone's edit\n")
+    (project / "edited").touch()
     out, err = tool.communicate(timeout=60)
     assert tool.returncode == 2, out + err
     assert "mod.py changed while mutate.py held it" in err
