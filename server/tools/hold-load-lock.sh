@@ -77,11 +77,12 @@ printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s\n' \
 
 CHILD=
 stop_child() {
-  trap '' TERM INT HUP
   if [ -n "$CHILD" ]; then kill -TERM -- "-$CHILD" 2>/dev/null || true; fi
 }
 trap stop_child EXIT
-# Further signals are ignored as in pytest-under-load.sh, which says why.
+# A signal ignores further signals, as in pytest-under-load.sh, which says
+# why.  Its cleanup needs no ignore of its own: no command between `CHILD=$!`
+# and `CHILD=` can fail, so only a signal enters it with CHILD set.
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 # setsid gives COMMAND a process group of its own (its pid), which the trap

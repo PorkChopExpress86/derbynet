@@ -489,6 +489,45 @@ def test_a_second_signal_during_the_cleanup_still_frees_all(tmp_path, signals):
         finish(tmp_path, first)
 
 
+# A `date` that fails once the test writes `fail-date` into PAUSE_DIR, so the
+# script's `ENDED=$(date +%s)` ends it under `set -e` with its loops still
+# listed, and its EXIT trap starts the cleanup with no signal before it.
+FAILING_DATE = """#! /bin/sh
+[ -e "$PAUSE_DIR/fail-date" ] && exit 1
+exec /usr/bin/date "$@"
+"""
+
+
+def test_a_signal_during_the_cleanup_after_an_error_still_frees_all(tmp_path):
+    """The cleanup ignores a signal itself, for an EXIT trap no signal
+    started, such as an error under `set -e` once pytest has ended: the
+    signal trap's own ignore covers only a cleanup a signal started (#372
+    review)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "date").write_text(FAILING_DATE)
+    (bin_dir / "date").chmod(0o755)
+    env = {**paused_kill(tmp_path), "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    lock = tmp_path / "load.lock"
+    first = start(tmp_path, "first", lock, extra_env=env, loops=4)
+    try:
+        wait_started(tmp_path, "first")
+        loops = [pid for pid, name in child_pids(first.pid) if name == "bash"]
+        assert len(loops) == 4
+        (tmp_path / "fail-date").write_text("")
+        (tmp_path / "first" / "go").write_text("")
+        wait_until((tmp_path / "cleanup").exists, "cleanup", 60)
+        os.kill(first.pid, signal.SIGTERM)
+        (tmp_path / "second").write_text("")
+        status = first.wait(timeout=30)
+        wait_until(lambda: not any(alive(pid) for pid in loops), "loops gone", 10)
+        # 1 is the failed `date`'s status: the TERM was ignored, not 143.
+        assert status == 1
+        assert free(lock)
+    finally:
+        finish(tmp_path, first)
+
+
 HOLD_LOCK = Path(__file__).resolve().parents[1] / "tools" / "hold-load-lock.sh"
 
 # A stand-in hand-off: it records the lock it was told it holds, then holds

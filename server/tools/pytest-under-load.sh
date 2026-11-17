@@ -156,9 +156,10 @@ stop_all() {
   if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
 }
 trap stop_all EXIT
-# A signal, and the cleanup, ignore any further TERM, INT or HUP: a second
-# one's `exit 143` would end the EXIT trap before the loops still listed
-# were killed, and they ran on after the script exited (#372).
+# A signal ignores any further TERM, INT or HUP, and so does the cleanup,
+# for an EXIT trap no signal started, such as an error under `set -e`: a
+# signal's `exit 143` inside the EXIT trap would end it before the loops
+# still listed were killed, and they ran on after the script exited (#372).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 cd "$SERVER_DIR"
