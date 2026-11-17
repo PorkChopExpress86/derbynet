@@ -838,10 +838,11 @@ def test_a_run_without_xdist_is_rerun_without_n(tmp_path):
 
 def failing(command):
     """A stand-in python3 that fails network_changed.py's `command` with
-    exit 2, as a wrong command line does, and runs the rest."""
+    exit 2, as a wrong command line does, after printing the `exit 0` line
+    a passing outcome ends with, and runs the rest."""
     real = shutil.which("python3")
     return (
-        f'#! /bin/sh\ncase "$3" in {command}) echo "usage" >&2; exit 2;; esac\n'
+        f'#! /bin/sh\ncase "$3" in {command}) echo "exit 0"; exit 2;; esac\n'
         f'exec {real} "$@"\n'
     )
 
