@@ -123,14 +123,18 @@ class PushedHead(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
         self.clone = self.tmp / 'clone'
         self.clone.mkdir()
+        # A pre-push hook runs this with GIT_DIR and the like set for the
+        # repository being pushed; the scratch clone and pr-wait take none.
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        self.env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
         self.git('init', '-q')
         self.old = self.commit('old')
         self.new = self.commit('new')
 
     def git(self, *args):
         return subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', *args],
-                              cwd=self.clone, check=True, capture_output=True,
-                              text=True).stdout.strip()
+                              cwd=self.clone, env=self.env, check=True,
+                              capture_output=True, text=True).stdout.strip()
 
     def commit(self, message):
         self.git('commit', '-q', '--allow-empty', '-m', message)
@@ -156,7 +160,7 @@ class PushedHead(unittest.TestCase):
     def run_pr_wait(self, gh, timeout_min):
         return subprocess.run(['bash', str(PR_WAIT), '7', '--timeout-min', timeout_min],
                               cwd=self.clone, capture_output=True, text=True, timeout=60,
-                              env={**os.environ, 'GH': str(gh), 'PR_WAIT_RETRY_SLEEP': '0'})
+                              env={**self.env, 'GH': str(gh), 'PR_WAIT_RETRY_SLEEP': '0'})
 
     def test_the_old_head_is_waited_past_until_the_pr_shows_the_push(self):
         done = self.wait([self.old, self.old, self.old, self.new], origin=self.new)

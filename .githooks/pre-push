@@ -28,6 +28,12 @@
 set -e -o pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
+# Git sets GIT_DIR for a hook. Under it, a test's `git init` in a scratch
+# folder reinitializes this repository: pushed from a worktree, it set
+# core.bare=true in the main clone's .git/config and stopped every checkout
+# (#351 and #369 retro). The hook and its checks run in the working tree,
+# where git finds the repository without it.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX
 ZERO=0000000000000000000000000000000000000000
 
 # A push in the same shell command as a pytest run, or as a read of a run's
