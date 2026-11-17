@@ -43,7 +43,7 @@ class Plan(unittest.TestCase):
 
 def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          remote: str = 'base', base_files: dict | None = None, delete: tuple = (),
-         local: str = 'head') -> subprocess.CompletedProcess:
+         local: str = 'head', git_dir: bool = False) -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -78,6 +78,10 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         env.update(PATH=f'{stubs}:{os.environ["PATH"]}', STUB_LOG=str(Path(tmp, 'ran')))
         (repo / 'plan' / 'tests').mkdir(parents=True)
         (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
+        # The stand-ins' log and the plan test's bytecode, which the hook
+        # would count as a change of the tree, as the clone's own
+        # .gitignore files keep its bytecode out.
+        (repo / '.gitignore').write_text('/ran\n__pycache__/\n')
         for name, body in (base_files or {}).items():
             (repo / name).parent.mkdir(parents=True, exist_ok=True)
             (repo / name).write_text(body)
@@ -99,8 +103,10 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         if shell:
             # Not the script's last command, so bash forks the hook as its child.
             hook = ['bash', '-c', f'{shell}\nbash .githooks/pre-push origin url; exit $?']
+        # Git runs a hook with GIT_DIR set to the pushing checkout's.
+        hook_env = {**env, 'GIT_DIR': str(repo / '.git')} if git_dir else env
         result = subprocess.run(
-            hook, cwd=repo, env=env,
+            hook, cwd=repo, env=hook_env,
             input=f'refs/heads/b {head if local == "head" else "0" * 40} refs/heads/b '
                   f'{REMOTES.get(remote, base)}\n',
             capture_output=True, text=True)
@@ -302,6 +308,86 @@ class ChainedPush(unittest.TestCase):
                 result = push('docs/x.md', PASSING, shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('pre-push: plan/tests', result.stderr)
+
+
+class TreeChanged(unittest.TestCase):
+    """#373's implementer edited network_changed.py while the hook's tests
+    ran it, and the run left rerun pytests behind and a file named `--` in
+    server/ (#373 retro). A plan test stands in for the edit."""
+
+    CHANGED = 'pre-push: the working tree changed while the checks ran'
+
+    def edit(self, line, passes=True):
+        test = PASSING if passes else FAILING
+        return test.replace(
+            "class Plan", "from pathlib import Path\n"
+            "REPO = Path(__file__).resolve().parents[2]\n\n\nclass Plan").replace(
+            "log.write('plan/tests\\n')", f"log.write('plan/tests\\n')\n            {line}")
+
+    def test_an_edit_of_a_tracked_file_fails_the_push(self):
+        for path in ('docs/x.md', 'server/tools/parity_gate.py'):
+            with self.subTest(path=path):
+                result = push(path, self.edit(
+                    f"(REPO / '{path}').write_text('edited\\n')"))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(self.CHANGED, result.stderr)
+                self.assertIn(f' M {path}', result.stderr)
+                self.assertNotIn('the plan test failed', result.stderr)
+
+    def test_a_second_edit_of_a_changed_file_fails_the_push(self):
+        result = push('docs/x.md', self.edit(
+            "(REPO / 'docs/x.md').write_text('again\\n')"), shell='echo dirty > docs/x.md')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(self.CHANGED, result.stderr)
+
+    def test_a_new_file_fails_the_push(self):
+        result = push('docs/x.md', self.edit("(REPO / 'server' / '--').write_text('x')"))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('?? server/--', result.stderr)
+        self.assertNotIn('the plan test failed', result.stderr)
+
+    def test_an_edit_of_a_file_untracked_at_the_start_fails_the_push(self):
+        """`git diff HEAD` skips untracked files and `status` prints
+        `?? path` before and after, so the hook compares their contents too
+        (#390 review)."""
+        result = push('docs/x.md', self.edit(
+            "(REPO / 'docs/new.md').write_text('again\\n')"), shell='echo first > docs/new.md')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(self.CHANGED, result.stderr)
+        self.assertIn('?? docs/new.md', result.stderr)
+        self.assertNotIn('the plan test failed', result.stderr)
+
+    def test_a_failing_check_keeps_its_status_and_names_the_change(self):
+        result = push('docs/x.md', self.edit(
+            "(REPO / 'docs/x.md').write_text('edited\\n')", passes=False))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('the plan test failed', result.stderr)
+        self.assertIn(self.CHANGED, result.stderr)
+
+    def test_a_tree_left_alone_passes_dirty_or_clean(self):
+        for shell in ('', 'echo dirty > docs/x.md', 'echo first > docs/new.md'):
+            with self.subTest(shell=shell):
+                result = push('docs/x.md', PASSING, shell=shell)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn(self.CHANGED, result.stderr)
+
+
+class GitDirUnset(unittest.TestCase):
+    """Git runs the hook with GIT_DIR set to the pushing checkout's git
+    directory. Under it, a plan test's `git init` in a scratch folder
+    reinitializes that repository instead: pushed from a worktree, it set
+    core.bare=true in the main clone's .git/config, and every checkout
+    failed "must be run in a work tree" for about 3 min, from this retro's
+    own first test_pr_wait.py (#351 and #369 retro). The checks find the
+    repository from the working tree."""
+
+    def test_the_checks_run_with_no_git_dir(self):
+        result = push('docs/x.md', TreeChanged.edit(
+            None, "log.write(f'GIT_DIR={os.environ.get(\"GIT_DIR\")}\\n')"), git_dir=True,
+            shell='echo "before the hook: GIT_DIR=$GIT_DIR" >>"$STUB_LOG"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.ran, r'before the hook: GIT_DIR=/\S+/\.git\n')
+        self.assertIn('GIT_DIR=None\n', result.ran)
 
 
 if __name__ == '__main__':

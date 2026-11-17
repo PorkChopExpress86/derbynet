@@ -140,7 +140,7 @@ start() {
 
 wait_ready() {
     for _ in $(seq 120); do
-        if docker exec "$1" curl -fsS -o /dev/null http://127.0.0.1/index.php 2>/dev/null; then
+        if docker exec "$1" curl -m 10 -fsS -o /dev/null http://127.0.0.1/index.php 2>/dev/null; then
             return 0
         fi
         [ "$(docker inspect -f '{{.State.Running}}' "$1")" = true ] || break
@@ -203,7 +203,7 @@ check_tls() {
 
     start tls1 "$PREFIX-tls-a"
     say "plain HTTP is served, with no redirect to HTTPS"
-    code="$(docker exec "$PREFIX-tls1" curl -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://localhost/action.php?query=role.list')"
+    code="$(docker exec "$PREFIX-tls1" curl -m 120 -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://localhost/action.php?query=role.list')"
     echo "$code"
     # With no event yet, Django answers 302 to setup.php over the same scheme.
     case "$code" in *https:*) fail "plain HTTP redirects to HTTPS: $code" ;; [23]??*) ;; *) fail "plain HTTP answered $code" ;; esac
@@ -282,13 +282,13 @@ check_upload() {
     padded_jpeg "$work/17m.jpg" $((17 * 1024 * 1024))
     local reply code
     say "photo.upload of a $(stat -c %s "$work/15m.jpg")-byte photo"
-    reply="$(curl -s -c "$jar" -b "$jar" -w '\nHTTP %{http_code}' -F action=photo.upload \
+    reply="$(curl -m 120 -s -c "$jar" -b "$jar" -w '\nHTTP %{http_code}' -F action=photo.upload \
         -F repo=head -F photo=@"$work/15m.jpg" "$url/action.php")"
     echo "$reply"
     echo "$reply" | grep -q 'HTTP 200' || fail "the 15 MiB upload did not answer 200"
     echo "$reply" | grep -q 'success' || fail "the 15 MiB upload did not succeed"
     say "photo.upload of a $(stat -c %s "$work/17m.jpg")-byte photo"
-    code="$(curl -s -o /dev/null -c "$jar" -b "$jar" -w '%{http_code}' -F action=photo.upload \
+    code="$(curl -m 120 -s -o /dev/null -c "$jar" -b "$jar" -w '%{http_code}' -F action=photo.upload \
         -F repo=head -F photo=@"$work/17m.jpg" "$url/action.php")"
     echo "HTTP $code"
     [ "$code" = 413 ] || fail "the 17 MiB upload answered $code, not 413"
@@ -300,7 +300,7 @@ check_upload() {
     rm -f "$jar"
     login "$url" "$jar" Photo
     padded_jpeg "$work/30mb.jpg" 30000000
-    reply="$(curl -s -c "$jar" -b "$jar" -w '\nHTTP %{http_code}' -F action=photo.upload \
+    reply="$(curl -m 120 -s -c "$jar" -b "$jar" -w '\nHTTP %{http_code}' -F action=photo.upload \
         -F repo=head -F MAX_FILE_SIZE=30000000 -F photo=@"$work/30mb.jpg" "$url/action.php")"
     echo "$reply" | tail -12
     echo "$reply" | grep -q 'HTTP 200' || fail "the 30 MB upload did not answer 200"
@@ -336,10 +336,10 @@ photo_racer() {
     (cd "$2" && bash testing/reset-database.sh "$1" && bash testing/import-roster.sh "$1") \
         >"$2/populate.log" 2>&1 || { tail "$2/populate.log" >&2; fail "no event"; }
     login "$1" "$jar" RaceCoordinator
-    racer="$(curl -s -b "$jar" "$1/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
-    grep -q success <<<"$(curl -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
+    racer="$(curl -m 120 -s -b "$jar" "$1/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
+    grep -q success <<<"$(curl -m 120 -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
         -F photo=@"$(first "$TESTING"/data/headshots/*.jpg)" "$1/action.php")" || fail "no racer photo"
-    head="$(curl -s -b "$jar" "$1/action.php?query=racer.list" | jq -r ".racers[] | select(.racerid == $racer) | .headshot")"
+    head="$(curl -m 120 -s -b "$jar" "$1/action.php?query=racer.list" | jq -r ".racers[] | select(.racerid == $racer) | .headshot")"
     [ -n "$head" ] && [ "$head" != null ] || fail "racer $racer has no photo"
     echo "$head"
 }
@@ -348,7 +348,7 @@ photo_racer() {
 # gunicorn socket, answers 200 as an image.
 served() {
     local got
-    got="$(curl -s -b "$3" -o /dev/null -w '%{http_code} %{content_type}' "$1/$2")"
+    got="$(curl -m 120 -s -b "$3" -o /dev/null -w '%{http_code} %{content_type}' "$1/$2")"
     echo "GET /$2: $got"
     [[ "$got" == "200 image/"* ]] || fail "the photo answered $got"
 }
@@ -944,12 +944,12 @@ check_reload() {
     # The page is read whole before it is searched: grep -q's early exit
     # would fail curl with SIGPIPE under pipefail.
     local page
-    page="$(curl -s "$url/login/?all")"
+    page="$(curl -m 120 -s "$url/login/?all")"
     [[ "$page" != *"$marker"* ]] || fail "the marker is there before the edit"
     sed -i "/{% block main %}/a <!-- $marker -->" "$template"
     say "after a template edit, with no rebuild"
     for _ in $(seq 30); do
-        page="$(curl -s "$url/login/?all")"
+        page="$(curl -m 10 -s "$url/login/?all")"
         [[ "$page" == *"$marker"* ]] && break
         sleep 1
     done
@@ -1196,14 +1196,14 @@ suite_copy() {
 
 # An event on a server with none, as exercise-one-database.sh makes one.
 new_event() {
-    grep -q success <<<"$(curl -sf -d 'action=setup.nodata&ez-new=checks' "$1/action.php")" \
+    grep -q success <<<"$(curl -m 120 -sf -d 'action=setup.nodata&ez-new=checks' "$1/action.php")" \
         || fail "setup.nodata did not make an event at $1"
 }
 
 login() { # login <url> <jar> <role>
     local password
     password="$(sed -n -e "s/^$3://p" "$TESTING/default.passwords")"
-    grep -q success <<<"$(curl -sf -c "$2" -b "$2" \
+    grep -q success <<<"$(curl -m 120 -sf -c "$2" -b "$2" \
         -d "action=role.login&name=$3&password=$password" "$1/action.php")" \
         || fail "$3 could not log in"
 }
@@ -1261,15 +1261,15 @@ check_backup() {
         >"$work/populate.log" 2>&1 || { tail "$work/populate.log"; fail "no event"; }
     local jar="$work/cookies" racer
     login "$url" "$jar" RaceCoordinator
-    racer="$(curl -s -b "$jar" "$url/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
-    grep -q success <<<"$(curl -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
+    racer="$(curl -m 120 -s -b "$jar" "$url/action.php?query=racer.list" | jq -r '.racers[0].racerid')"
+    grep -q success <<<"$(curl -m 120 -s -b "$jar" -F action=photo.upload -F repo=head -F racerid="$racer" \
         -F photo=@"$(first "$TESTING"/data/headshots/*.jpg)" "$url/action.php")" \
         || fail "no racer photo"
-    grep -q success <<<"$(curl -s -b "$jar" -F action=photo.upload -F repo=car -F racerid="$racer" \
+    grep -q success <<<"$(curl -m 120 -s -b "$jar" -F action=photo.upload -F repo=car -F racerid="$racer" \
         -F photo=@"$(first "$TESTING"/data/carphotos/Car-*.jpg)" "$url/action.php")" \
         || fail "no car photo"
     head -c 300000 /dev/urandom > "$work/replay.mkv"
-    grep -q success <<<"$(curl -s -b "$jar" -F action=video.upload \
+    grep -q success <<<"$(curl -m 120 -s -b "$jar" -F action=video.upload \
         -F video=@"$work/replay.mkv;filename=Heat-1.mkv" "$url/action.php")" || fail "no video"
     local before after
     before="$(backup_state "$url" "$jar" "$racer")"
@@ -1319,15 +1319,15 @@ check_backup() {
 # The event's name and racers, each photo as served, and the video file.
 backup_state() { # backup_state <url> <jar> <racerid>
     local head car
-    echo "racers $(curl -s -b "$2" "$1/action.php?query=racer.list" | jq '.racers | length')," \
-         "sha256 of their ids and names $(curl -s -b "$2" "$1/action.php?query=racer.list" \
+    echo "racers $(curl -m 120 -s -b "$2" "$1/action.php?query=racer.list" | jq '.racers | length')," \
+         "sha256 of their ids and names $(curl -m 120 -s -b "$2" "$1/action.php?query=racer.list" \
            | jq -c '[.racers[] | [.racerid, .firstname, .lastname, .carnumber]]' | sha256sum | cut -c1-16)"
-    head="$(curl -s -b "$2" "$1/action.php?query=racer.list" | jq -r ".racers[] | select(.racerid == $3) | .headshot")"
-    car="$(curl -s -b "$2" "$1/action.php?query=racer.list" | jq -r ".racers[] | select(.racerid == $3) | .car_photo")"
+    head="$(curl -m 120 -s -b "$2" "$1/action.php?query=racer.list" | jq -r ".racers[] | select(.racerid == $3) | .headshot")"
+    car="$(curl -m 120 -s -b "$2" "$1/action.php?query=racer.list" | jq -r ".racers[] | select(.racerid == $3) | .car_photo")"
     [ -n "$head" ] && [ "$head" != null ] || fail "racer $3 has no racer photo"
     [ -n "$car" ] && [ "$car" != null ] || fail "racer $3 has no car photo"
-    echo "racer photo $(curl -s -b "$2" "$1/$head" | sha256sum | cut -c1-16)"
-    echo "car photo $(curl -s -b "$2" "$1/$car" | sha256sum | cut -c1-16)"
+    echo "racer photo $(curl -m 120 -s -b "$2" "$1/$head" | sha256sum | cut -c1-16)"
+    echo "car photo $(curl -m 120 -s -b "$2" "$1/$car" | sha256sum | cut -c1-16)"
     echo "video $("${compose[@]}" exec -T server sh -c 'find /var/lib/derbynet -name Heat-1.mkv -exec sha256sum {} +' | cut -c1-16)"
     # Caddy's certificate authority (D120): a restore that made a new one
     # would have every phone install it again.
@@ -1341,7 +1341,7 @@ backup_state() { # backup_state <url> <jar> <racerid>
 # fetch <container> <path>: the status, the content type and the body, from
 # inside the container.
 fetch() {
-    docker exec "$PREFIX-$1" curl -sS -o /tmp/fetched -w '%{http_code} %{content_type} %{redirect_url}\n' \
+    docker exec "$PREFIX-$1" curl -m 120 -sS -o /tmp/fetched -w '%{http_code} %{content_type} %{redirect_url}\n' \
         "http://127.0.0.1$2"
 }
 
@@ -1363,10 +1363,10 @@ check_allowed_hosts() {
     [ "$(docker inspect -f '{{.State.Health.Status}}' "$name")" = healthy ] \
         || fail "the container is not healthy with DERBYNET_ALLOWED_HOSTS set"
     say "the named host answers, and another host is refused"
-    code="$(docker exec "$name" curl -s -o /dev/null -w '%{http_code}' -H 'Host: derby.example.org' http://127.0.0.1/index.php)"
+    code="$(docker exec "$name" curl -m 120 -s -o /dev/null -w '%{http_code}' -H 'Host: derby.example.org' http://127.0.0.1/index.php)"
     echo "derby.example.org: $code"
     case "$code" in 2??|3??) ;; *) fail "the named host answered $code" ;; esac
-    code="$(docker exec "$name" curl -s -o /dev/null -w '%{http_code}' -H 'Host: other.example.org' http://127.0.0.1/index.php)"
+    code="$(docker exec "$name" curl -m 120 -s -o /dev/null -w '%{http_code}' -H 'Host: other.example.org' http://127.0.0.1/index.php)"
     echo "other.example.org: $code"
     [ "$code" = 400 ] || fail "another host answered $code"
     stop hosts
@@ -1450,13 +1450,13 @@ check_timer() {
     local base got files path want bad=0 seen
     for base in / /derbynet/; do
         say "${base}timer.php as RaceCoordinator"
-        got="$(curl -s -o "$html" -b "$jar" -w '%{http_code} %{content_type}' "$url${base}timer.php")"
+        got="$(curl -m 120 -s -o "$html" -b "$jar" -w '%{http_code} %{content_type}' "$url${base}timer.php")"
         echo "$got"
         case "$got" in "200 text/html"*) ;; *) fail "${base}timer.php answered $got" ;; esac
         files="$(page_files "$html")"
         while read -r path; do
             case "$path" in *.js) ;; *) continue ;; esac
-            curl -s -o "$script" -b "$jar" "$url$base$path"
+            curl -m 120 -s -o "$script" -b "$jar" "$url$base$path"
             files+=$'\n'"$(script_files "$script")"
         done <<<"$files"
         files+=$'\n'"$(tr ' ' '\n' <<<"$TIMER_SCRIPT_FILES")"
@@ -1464,7 +1464,7 @@ check_timer() {
         seen=0
         while read -r path; do
             case "$path" in /*|*://*) fail "${base}timer.php loads $path, not a relative path" ;; esac
-            got="$(curl -s -o /dev/null -b "$jar" -w '%{http_code} %{content_type}' "$url$base$path")"
+            got="$(curl -m 120 -s -o /dev/null -b "$jar" -w '%{http_code} %{content_type}' "$url$base$path")"
             echo "$got $base$path"
             seen=$((seen + 1))
             case "$path:$got" in

@@ -10,6 +10,7 @@ import importlib.machinery
 import importlib.util
 import io
 import itertools
+import json
 import os
 import subprocess
 import sys
@@ -273,6 +274,16 @@ class PlanTools(unittest.TestCase):
         self.assertNotIn('unittest discover', commands(out))
         self.assertIn('  tools/source-checks.sh\n', commands(out))
 
+    def test_every_diff_lists_the_quick_source_checks_before_a_push(self):
+        """#373's hook found a made-up path read as a cite late in its run,
+        a push round later (#373 retro)."""
+        for path in ('plan/bin/pr-merge', 'server/awards/views.py', 'server/docs/x.md'):
+            with self.subTest(path=path):
+                out = run(path)
+                self.assertIn('Before each push, from server/', commands(out))
+                self.assertTrue(out.endswith(
+                    'about 15 min, #373 retro):\n  tools/source-checks.sh --quick\n'), out)
+
     def test_the_pre_push_hook_runs_plan_tests(self):
         self.assertIn('[plan-tools]', run('.githooks/pre-push'))
 
@@ -294,7 +305,7 @@ class Testing(unittest.TestCase):
 class TestFile(unittest.TestCase):
     def test_a_browser_test_runs_itself_under_the_browser_marker(self):
         out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
-        self.assertIn('[test-file]', out)
+        self.assertIn('[test-file] the test file itself\n', out)
         self.assertIn('uv run pytest -n auto -m browser '
                       'ui/tests/browser/test_kiosk_ondeck_labels.py', commands(out))
         self.assertNotIn('uv run pytest -n auto ui/', commands(out))
@@ -320,6 +331,26 @@ class TestFile(unittest.TestCase):
         out = commands(run('server/ui/tests/test_mixed.py'))
         self.assertIn('uv run pytest -n auto ui/tests/test_mixed.py', out)
         self.assertIn('uv run pytest -n auto -m browser ui/tests/test_mixed.py', out)
+
+    def test_a_test_file_the_root_conftest_imports_leaves_the_full_run_to_ci(self):
+        tree = {**TREE, 'server/conftest.py': 'from ui.tests.test_mixed import x\n',
+                'server/ui/tests/test_reads_mixed.py': 'from ui.tests.test_mixed import x\n'}
+        out = run('server/ui/tests/test_mixed.py', tree=tree)
+        self.assertIn('  server/ui/tests/test_mixed.py: the root conftest imports it', out)
+        self.assertIn('CI runs the full suites on both databases (D85)', out)
+        self.assertNotIn('  uv run pytest -n auto\n', commands(out))
+        self.assertEqual(section(out, 'server/ui/tests/test_mixed.py').splitlines()[1:], [
+            '  [test-file] the test file itself, and the tests and conftest folders '
+            'that import it (#371 retro)',
+            '      ui/tests/test_mixed.py', '      ui/tests/test_reads_mixed.py'])
+
+    def test_a_test_file_only_a_conftest_imports_runs_that_folder(self):
+        tree = {**TREE, 'server/ui/tests/browser/conftest.py':
+                'from ui.tests.test_mixed import x\n'}
+        out = section(run('server/ui/tests/test_mixed.py', tree=tree),
+                      'server/ui/tests/test_mixed.py')
+        self.assertEqual(out.splitlines()[2:], ['      ui/tests/browser',
+                                                '      ui/tests/test_mixed.py'])
 
     def test_a_deleted_test_file_says_so(self):
         out = run('server/ui/tests/test_gone.py')
@@ -351,6 +382,14 @@ class TestHelper(unittest.TestCase):
 
 
 class TestData(unittest.TestCase):
+    def test_a_helper_that_names_it_is_no_target(self):
+        tree = {**TREE, 'server/ui/tests/sample.json': '{}',
+                'server/ui/tests/reader.py': 'NAME = "sample.json"\n',
+                'server/ui/tests/test_sample.py': 'NAME = "sample.json"\n'}
+        out = section(run('server/ui/tests/sample.json', tree=tree),
+                      'server/ui/tests/sample.json')
+        self.assertEqual(out.splitlines()[2:], ['      ui/tests/test_sample.py'])
+
     def test_a_fixture_maps_to_the_test_that_names_it(self):
         out = run('server/racing/engine/tests/data/tables.json')
         self.assertIn('[test-data]', out)
@@ -2590,6 +2629,522 @@ class BindingSweep(unittest.TestCase):
                 self.assertEqual(made - set(TOOL.bindings(tree, label)), set())
 
 
+# #371's stand-in: a browser helper module at BASE, and #348's diff to it:
+# a changed module docstring, a new import and a new def.
+ADD_BASE = '''"""Shared helpers."""
+
+from playwright.sync_api import expect
+
+
+def ready(page, body):
+    expect(body).to_be_visible()
+    return body
+'''
+ADD_HEAD = ADD_BASE.replace('"""Shared helpers."""', '"""Shared helpers, and a clock."""') \
+    .replace('from playwright', 'from datetime import timedelta\n\nfrom playwright') \
+    + '\n\ndef pause_at(page, at):\n    page.clock.install(time=at - timedelta(minutes=1))\n'
+# The stand-in's importers of helpers.py: the browser conftest imports it and
+# names no added def, a test outside the folder imports the conftest.
+ADD_TREE = {
+    **TREE,
+    HELPERS: ADD_HEAD,
+    CONFTEST: 'from ui.tests.browser.helpers import ready  # noqa: F401\n',
+    'server/ui/tests/browser/test_calls.py': (
+        'from ui.tests.browser.helpers import pause_at\n\n\n'
+        'def test_a(page):\n    pause_at(page, 0)\n'),
+    'server/ui/tests/browser/test_reads.py': (
+        'from ui.tests.browser.helpers import ready\n\n\n'
+        'def test_b(page):\n    ready(page, page)\n'),
+    'server/ui/tests/test_through_conftest.py': (
+        'from ui.tests.browser.conftest import ready\n'),
+    # Names the def in its text, and imports no helper: not an importer.
+    'server/ui/tests/test_names_it.py': 'WHAT = "helpers.pause_at"\n',
+}
+# Names each form of top-level statement that narrows when added beside a
+# new def; every other form in BINDING_FORMS keeps every importer.
+NARROWS = {'def', 'async def', 'import', 'import as', 'from'}
+
+
+def narrows(base, head):
+    """additions()' verdict as a bool, for a near miss and its twin."""
+    try:
+        TOOL.additions(base, head)
+    except TOOL.NotAddition:
+        return False
+    return True
+
+
+class HelperAdditions(unittest.TestCase):
+    """#371's verdict on a helper module's diff, in process: only added
+    top-level defs, and imports beside them, narrow; anything else keeps
+    every importer."""
+
+    def assert_keeps(self, head, why, base=ADD_BASE):
+        with self.assertRaises(TOOL.NotAddition) as caught:
+            TOOL.additions(base, head)
+        self.assertEqual(str(caught.exception), why)
+
+    def test_348s_diff_adds_a_def_and_an_import(self):
+        """The docstring is no change, as D101 has it (lead, #371)."""
+        self.assertEqual(TOOL.additions(ADD_BASE, ADD_HEAD), (['pause_at'], ['timedelta']))
+
+    def test_a_def_added_between_two_kept_ones_narrows(self):
+        head = ADD_BASE.replace('\n\ndef ready', '\n\ndef early(page):\n    pass\n\n\ndef ready')
+        self.assertEqual(TOOL.additions(ADD_BASE, head), (['early'], []))
+
+    def test_a_changed_body_keeps_every_importer(self):
+        head = ADD_HEAD.replace('    return body\n', '    return body.first\n')
+        self.assert_keeps(head, 'it changes or deletes the def ready')
+
+    def test_a_deleted_def_keeps_every_importer(self):
+        self.assert_keeps(ADD_HEAD.replace('def ready(page, body):\n    expect(body).'
+                                           'to_be_visible()\n    return body\n', ''),
+                          'it changes or deletes the def ready')
+
+    def test_a_changed_import_keeps_every_importer(self):
+        self.assert_keeps(ADD_HEAD.replace('import expect', 'import expect, Page'),
+                          'it changes or deletes the import on line 3')
+
+    def test_a_docstring_change_in_a_module_that_reads_doc_keeps_them(self):
+        base = ADD_BASE + '\n\nUSAGE = __doc__\n'
+        head = ADD_HEAD + '\n\nUSAGE = __doc__\n'
+        self.assert_keeps(head, 'its docstring changes, and it reads `__doc__` (D101)',
+                          base)
+        self.assertTrue(narrows(base, head.replace('Shared helpers, and a clock.',
+                                                   'Shared helpers.')))
+
+    def test_a_def_that_shadows_a_name_the_module_read_keeps_them(self):
+        """#371's Risks: `open` was the builtin that ready read."""
+        base = ADD_BASE.replace('    return body\n', '    return open(body)\n')
+        head = base + '\n\ndef open(path):\n    return path\n'
+        self.assert_keeps(head, 'it adds open, which the module bound or read before', base)
+        self.assertTrue(narrows(base, base + '\n\ndef opened(path):\n    return path\n'))
+
+    def test_an_import_of_a_name_the_module_read_keeps_them(self):
+        base = ADD_BASE.replace('    return body\n', '    return Path(body)\n')
+        head = base.replace('from playwright', 'from pathlib import Path\nfrom playwright') \
+            + '\n\ndef more(page):\n    pass\n'
+        self.assert_keeps(head, 'it adds Path, which the module bound or read before', base)
+
+    def test_a_def_bound_again_keeps_them(self):
+        self.assert_keeps(ADD_BASE + '\n\ndef ready(page):\n    pass\n',
+                          'it adds ready, which the module bound or read before')
+        head = ADD_BASE + '\n\ndef twice(page):\n    pass\n\n\ndef twice(page):\n    pass\n'
+        self.assert_keeps(head, 'it binds twice more than once')
+
+    def test_a_decorated_def_keeps_them(self):
+        head = ADD_BASE + '\n\n@pytest.fixture\ndef clock(page):\n    return page\n'
+        self.assert_keeps(head, 'it adds the fixture clock, whose decorator runs on import')
+
+    def test_a_default_that_runs_code_keeps_them(self):
+        for head in (ADD_BASE + '\n\ndef late(page, at=now()):\n    pass\n',
+                     ADD_BASE + '\n\ndef late(page, *, at=now()):\n    pass\n'):
+            with self.subTest(head=head):
+                self.assert_keeps(head, 'it adds the def late, a default of which runs '
+                                  'on import')
+        self.assertTrue(narrows(ADD_BASE, ADD_BASE + '\n\ndef late(page, at=-1, *, '
+                                'b=(1, "a"), c=None, d):\n    pass\n'))
+
+    def test_a_default_literal_eval_refuses_with_a_type_error_keeps_them(self):
+        """#371 review, M1: `{[1]}` and `{[]: 1}` raise TypeError in
+        ast.literal_eval, not ValueError."""
+        for default in ('{[1]}', '{[]: 1}'):
+            with self.subTest(default=default):
+                self.assert_keeps(ADD_BASE + f'\n\ndef late(page, at={default}):\n    pass\n',
+                                  'it adds the def late, a default of which runs on import')
+
+    def test_each_kind_of_default_narrows_or_keeps_them(self):
+        """Every kind of expression as a default, alone and nested: a
+        verdict or NotAddition, never another exception (#371 retro: review
+        M1's TypeError crashed the tool), and a default that narrows runs
+        with no name bound, so it calls nothing on import."""
+        forms = ['1', '-1', '1 + 2', '1 and 2', '1 < 2', '1 if 1 else 2', 'None',
+                 '(x := 1)', 'lambda: 1', '{1: 2}', '{[]: 1}', '{1}', '{[1]}', '[1, *()]',
+                 '(1,)', '[i for i in ()]', '{i for i in ()}', '{i: i for i in ()}',
+                 '(i for i in ())', 'now()', 'f"{1}"', 't"{1}"', 'a.b', 'a[1:2]', 'a',
+                 '(1, [2, {3: frozenset()}])']
+        made, kinds = [], set()
+        for form in forms:
+            with self.subTest(form=form):
+                head = ADD_BASE + f'\n\ndef late(page, at={form}):\n    pass\n'
+                kinds |= {type(n).__name__ for n in ast.walk(ast.parse(form, mode='eval'))}
+                try:
+                    TOOL.additions(ADD_BASE, head)
+                except TOOL.NotAddition:
+                    continue
+                made.append(form)
+                exec(f'def late(page, at={form}):\n    pass\n', {'__builtins__': {}})
+        # Await, Yield and YieldFrom can't stand in a module-level default.
+        every = {c.__name__ for c in ast.expr.__subclasses__()} - {
+            'Await', 'Yield', 'YieldFrom'}
+        self.assertEqual(sorted(every - kinds), [])
+        self.assertEqual(made, ['1', '-1', 'None', '{1: 2}', '{1}', '(1,)'])
+
+    def test_a_name_pytest_or_python_reads_keeps_them(self):
+        """A test name too: a file that star-imports the module collects it
+        (#371 review, H2)."""
+        for name in ('__getattr__', 'pytest_configure', 'setup_module', 'test_smoke',
+                     'TestSmoke'):
+            with self.subTest(name=name):
+                self.assert_keeps(ADD_BASE + f'\n\ndef {name}(x):\n    pass\n',
+                                  f'it adds {name}, which pytest or Python reads by its name')
+
+    def test_a_changed_fixture_or_hook_is_named_as_one(self):
+        fixture = '\n\n@pytest.fixture\ndef clock(page):\n    return page\n'
+        self.assert_keeps(ADD_HEAD + fixture.replace('page\n', 'None\n'),
+                          'it changes or deletes the fixture clock', ADD_BASE + fixture)
+        hook = '\n\ndef pytest_configure(config):\n    return config\n'
+        self.assert_keeps(ADD_HEAD + hook.replace('config\n', 'None\n'),
+                          'it changes or deletes the hook pytest_configure', ADD_BASE + hook)
+
+    def test_a_module_with_no_docstring(self):
+        self.assertEqual(TOOL.additions('', 'def a(page):\n    pass\n'), (['a'], []))
+        base = 'import json\n'
+        self.assertEqual(TOOL.additions(base, base + '\n\ndef a(page):\n    pass\n'),
+                         (['a'], []))
+
+    def test_an_import_as_binds_its_alias(self):
+        head = ADD_HEAD.replace('from datetime import timedelta',
+                                'import datetime as dt\nimport os.path')
+        self.assertEqual(TOOL.additions(ADD_BASE, head), (['pause_at'], ['dt', 'os']))
+
+    def test_an_import_alone_adds_no_function(self):
+        head = ADD_BASE.replace('from playwright', 'import json\nfrom playwright')
+        self.assert_keeps(head, 'by AST it adds no function')
+        self.assert_keeps(ADD_BASE + '\n# A comment.\n', 'by AST it adds no function')
+
+    def test_what_cannot_be_read_keeps_them(self):
+        self.assert_keeps(ADD_HEAD, 'new on the branch', base=None)
+        with self.assertRaisesRegex(TOOL.NotAddition, r'^cannot be parsed \('):
+            TOOL.additions(ADD_BASE, ADD_HEAD + '\ndef broken(:\n')
+        self.assert_keeps(ADD_HEAD + '\nfrom . import x\n',
+                          'the module line 16: a relative import')
+        self.assert_keeps(ADD_HEAD + '\nfrom os import *\n', 'the module line 16: a star import')
+
+    def test_each_kind_of_added_statement(self):
+        """Each form of BindingSweep's sweep, added beside a new def: only a
+        plain def or an import narrows."""
+        for label, source in BINDING_FORMS.items():
+            with self.subTest(label):
+                head = ADD_BASE + '\n\n' + source + '\n\n\ndef fresh(page):\n    pass\n'
+                self.assertEqual(narrows(ADD_BASE, head), label in NARROWS)
+
+
+class HelperNamers(unittest.TestCase):
+    """namers() over a stand-in tree: the importers that name an added def,
+    and every importer of a helper or conftest that names one."""
+
+    def namers(self, files=None, names=('pause_at',)):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        for rel, text in (files or ADD_TREE).items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text)
+        return TOOL.namers(TOOL.Tree(root), 'ui/tests/browser/helpers.py', list(names))
+
+    def test_only_the_importers_that_name_it(self):
+        self.assertEqual(self.namers(), (['ui/tests/browser/test_calls.py'], [],
+                                         ['ui/tests/browser/test_calls.py']))
+
+    def test_a_conftest_that_names_it_keeps_its_folder_and_importers(self):
+        """#371's Risks: a fixture in the conftest calls the added def, so a
+        test reaches it without naming it."""
+        files = {**ADD_TREE, CONFTEST: (
+            'import pytest\n\nfrom ui.tests.browser.helpers import pause_at, ready  # noqa\n'
+            '\n\n@pytest.fixture\ndef paused(page):\n    pause_at(page, 0)\n')}
+        tests, conftests, naming = self.namers(files)
+        self.assertEqual(conftests, ['ui/tests/browser/conftest.py'])
+        self.assertEqual(tests, ['ui/tests/browser/test_calls.py',
+                                 'ui/tests/test_through_conftest.py'])
+        self.assertEqual(naming, ['ui/tests/browser/conftest.py',
+                                  'ui/tests/browser/test_calls.py'])
+
+    def test_a_helper_that_names_it_keeps_its_importers(self):
+        files = {**ADD_TREE,
+                 'server/ui/tests/browser/clock.py': (
+                     'from ui.tests.browser.helpers import pause_at\n\n\n'
+                     'def paused(page):\n    pause_at(page, 0)\n'),
+                 'server/ui/tests/browser/test_paused.py': (
+                     'from ui.tests.browser.clock import paused\n')}
+        tests, conftests, _ = self.namers(files)
+        self.assertEqual(tests, ['ui/tests/browser/test_calls.py',
+                                 'ui/tests/browser/test_paused.py'])
+        self.assertEqual(conftests, [])
+
+    def test_a_test_file_that_names_it_keeps_its_importers(self):
+        """#371 review, H1: test_kiosk_ondeck_labels.py imports open_kiosk
+        from test_kiosk_pages.py, and test_kiosk_banner.py fixtures from
+        test_kiosk_names.py; a helper open_kiosk calls reaches both."""
+        files = {**ADD_TREE,
+                 'server/ui/tests/browser/test_pages.py': (
+                     'from ui.tests.browser.helpers import pause_at\n\n\n'
+                     'def open_kiosk(page):\n    pause_at(page, 0)\n'),
+                 'server/ui/tests/browser/test_labels.py': (
+                     'from ui.tests.browser.test_pages import open_kiosk\n'),
+                 'server/ui/tests/browser/test_banner.py': (
+                     'from ui.tests.browser.test_labels import open_kiosk\n')}
+        tests, conftests, naming = self.namers(files)
+        self.assertEqual(tests, ['ui/tests/browser/test_banner.py',
+                                 'ui/tests/browser/test_calls.py',
+                                 'ui/tests/browser/test_labels.py',
+                                 'ui/tests/browser/test_pages.py'])
+        self.assertEqual(naming, ['ui/tests/browser/test_calls.py',
+                                  'ui/tests/browser/test_pages.py'])
+
+    def test_a_star_import_keeps_every_importer(self):
+        """Over two lines too (#371 review, H2)."""
+        for text in ('from ui.tests.browser.helpers import *  # noqa\n',
+                     'from ui.tests.browser.helpers import \\\n    *  # noqa\n',
+                     'def f():\n    pass\n\n\nfrom ui.tests.browser import helpers  # noqa\n'
+                     'from os import *  # noqa\n'):
+            with self.subTest(text=text):
+                files = {**ADD_TREE, 'server/ui/tests/browser/test_star.py': text}
+                with self.assertRaises(TOOL.NotAddition) as caught:
+                    self.namers(files)
+                self.assertEqual(str(caught.exception),
+                                 'ui/tests/browser/test_star.py has a star import')
+
+    def test_an_importer_that_cannot_be_parsed_keeps_every_importer(self):
+        files = {**ADD_TREE, 'server/ui/tests/browser/test_broken.py': (
+            'from ui.tests.browser.helpers import ready\ndef broken(:\n')}
+        with self.assertRaisesRegex(TOOL.NotAddition,
+                                    r'^ui/tests/browser/test_broken.py cannot be parsed'):
+            self.namers(files)
+
+    def test_no_importer_that_names_it_keeps_every_importer(self):
+        with self.assertRaises(TOOL.NotAddition) as caught:
+            self.namers(names=('nobody',))
+        self.assertEqual(str(caught.exception), 'nothing that imports it names nobody')
+
+    def test_a_name_is_a_whole_word(self):
+        files = {**ADD_TREE, 'server/ui/tests/browser/test_reads.py': (
+            'from ui.tests.browser.helpers import ready\n\n\n'
+            'def test_b(page):\n    pause_at_noon = ready(page, page)\n')}
+        self.assertEqual(self.namers(files)[0], ['ui/tests/browser/test_calls.py'])
+
+
+# Each import chain from a changed module to a test file: the leaf (a helper
+# or a test file), 0 to 3 files between of each kind, and one import style
+# for every link (#371 retro).
+CHAIN_KINDS = ('helper', 'test', 'conftest')
+CHAIN_STYLES = {
+    'from': 'from {mod} import {name}\n\n\ndef {me}():\n    {name}()\n',
+    'import': 'import {mod}\n\n\ndef {me}():\n    {mod}.{name}()\n',
+    'package': 'from {pkg} import {last}\n\n\ndef {me}():\n    {last}.{name}()\n',
+}
+
+# Imports each test file of a tree in a fresh set of shape modules, after
+# the conftests of its folder and the folders above it, as pytest does, and
+# prints the shape modules each import loaded.
+LOADED = '''import json, sys
+from pathlib import Path
+server = Path(sys.argv[1])
+sys.path.insert(0, str(server))
+out = {}
+for test in sorted(server.rglob('test_*.py')):
+    for name in [m for m in sys.modules if m.startswith('shape')]:
+        del sys.modules[name]
+    rel = test.relative_to(server)
+    folders = [rel.parents[i] for i in range(len(rel.parents) - 1, -1, -1)]
+    mods = ['.'.join((f / 'conftest').parts) for f in folders
+            if (server / f / 'conftest.py').is_file()]
+    for mod in mods + ['.'.join(rel.with_suffix('').parts)]:
+        __import__(mod)
+    out[str(rel)] = sorted(m for m in sys.modules if m.startswith('shape'))
+print(json.dumps(out))
+'''
+
+
+def import_chains():
+    """(leaf, chain, style) for each shape."""
+    for leaf in ('helper', 'test'):
+        for hops in range(4):
+            for chain in itertools.product(CHAIN_KINDS, repeat=hops):
+                for style in CHAIN_STYLES:
+                    yield leaf, chain, style
+
+
+def chain_tree():
+    """A tree that holds every shape in its own folder: {shape: (leaf
+    path, the module that calls the leaf's poke)}, and the files."""
+    files, shapes = {}, {}
+    for i, (leaf, chain, style) in enumerate(import_chains()):
+        tests = f'shape{i}/tests'
+        rel = f'{tests}/leaf.py' if leaf == 'helper' else f'{tests}/test_leaf.py'
+        files[rel] = 'def poke():\n    pass\n'
+        prev, name = rel, 'poke'
+        for j, kind in enumerate(chain + ('top',)):
+            me = f'step{j}'
+            path = {'helper': f'{tests}/h{j}.py', 'test': f'{tests}/test_m{j}.py',
+                    'conftest': f'{tests}/k{j}/conftest.py',
+                    'top': f'{tests}/test_top.py'}[kind]
+            mod = TOOL.module_name(prev)
+            pkg, last = mod.rsplit('.', 1)
+            files[path] = CHAIN_STYLES[style].format(
+                mod=mod, name=name, me=me, pkg=pkg, last=last)
+            if kind == 'conftest':
+                files[f'{tests}/k{j}/test_in.py'] = 'def test_in():\n    pass\n'
+            if j == 0:
+                shapes[(leaf, chain, style)] = (rel, TOOL.module_name(path))
+            prev, name = path, me
+    return shapes, {f'server/{rel}': text for rel, text in files.items()}
+
+
+class ImportChains(unittest.TestCase):
+    """A changed test-folder module maps to every test file whose import
+    loads it, against Python's own import system as the oracle: #371's
+    review found test files importing test files (H1) one diff at a time,
+    and the fallback and a changed test file stopped at the first test
+    file (#371 retro: test_database_check.py reaches core/tests/db.py
+    through test_invariants.py)."""
+
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.shapes, cls.files = chain_tree()
+        tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(tmp.cleanup)
+        cls.root = Path(tmp.name)
+        for rel, text in cls.files.items():
+            (cls.root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (cls.root / rel).write_text(text)
+        cls.loaded = json.loads(subprocess.run(
+            [sys.executable, '-I', '-c', LOADED, str(cls.root / 'server')],
+            capture_output=True, text=True, check=True).stdout)
+
+    def loads(self, mod):
+        return {t for t, mods in self.loaded.items() if mod in mods}
+
+    def covered(self, targets):
+        return {t for t in self.loaded
+                if any(t == d or t.startswith(d + '/') for d in targets)}
+
+    def test_a_changed_module_maps_to_every_test_that_loads_it(self):
+        leaves = sorted({rel for rel, _ in self.shapes.values()})
+        out = run(*(f'server/{rel}' for rel in leaves), root=self.root)
+        misses = []
+        for (leaf, chain, style), (rel, _) in sorted(self.shapes.items()):
+            block = section(out, f'server/{rel}')
+            targets = [ln.strip() for ln in block.splitlines() if ln.startswith(' ' * 6)]
+            expected = self.loads(TOOL.module_name(rel))
+            if self.covered(targets) != expected:
+                misses.append(f'{" <- ".join((leaf, *chain, "test_top"))} ({style}): missing '
+                              f'{sorted(expected - self.covered(targets))}, extra '
+                              f'{sorted(self.covered(targets) - expected)}')
+        self.assertEqual(misses, [])
+        self.assertNotIn('root conftest', out)
+        # Half the leaves are test files, and each conftest has a test beside
+        # it, which reaches a leaf only through that conftest.
+        self.assertEqual((len(self.shapes), len(leaves),
+                          sum(rel.endswith('/test_leaf.py') for rel in leaves)),
+                         (240, 240, 120))
+        beside = [t for t in self.loaded if t.endswith('/test_in.py')]
+        self.assertEqual(len(beside), sum(r.endswith('/conftest.py') for r in self.files))
+
+    def test_an_import_cycle_ends(self):
+        files = {'server/ui/tests/leaf.py': 'def poke():\n    pass\n',
+                 'server/ui/tests/test_a.py': 'from ui.tests import leaf, test_b\n',
+                 'server/ui/tests/test_b.py': 'from ui.tests import test_a\n'}
+        out = run('server/ui/tests/leaf.py', tree=files)
+        self.assertEqual(section(out, 'server/ui/tests/leaf.py').splitlines()[2:],
+                         ['      ui/tests/test_a.py', '      ui/tests/test_b.py'])
+
+    def test_an_added_def_maps_to_every_test_that_loads_its_caller(self):
+        """namers(), with step0 the one file that names poke."""
+        tree = TOOL.Tree(self.root)
+        misses = []
+        for (leaf, chain, style), (rel, caller) in sorted(self.shapes.items()):
+            if leaf != 'helper':
+                continue
+            tests, conftests, _ = TOOL.namers(tree, rel, ['poke'])
+            got = self.covered(tests + [str(Path(c).parent) for c in conftests])
+            if got != self.loads(caller):
+                misses.append(f'{" <- ".join((*chain, "test_top"))} ({style}): missing '
+                              f'{sorted(self.loads(caller) - got)}, extra '
+                              f'{sorted(got - self.loads(caller))}')
+        self.assertEqual(misses, [])
+
+
+def helper_diff(head, tree=None, commit=True):
+    """The tool's output for a branch that turns helpers.py from ADD_BASE
+    into `head` (None deletes it), over `tree` (ADD_TREE's importers by
+    default)."""
+    env = git_env()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+
+        def git(*argv):
+            subprocess.run(['git', *argv], cwd=root, env=env, check=True,
+                           capture_output=True)
+
+        for rel, text in {**(tree or ADD_TREE), HELPERS: ADD_BASE}.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text)
+        git('init', '-q', '-b', 'master')
+        git('add', '.')
+        git('commit', '-q', '-m', 'base')
+        if head is None:
+            (root / HELPERS).unlink()
+        else:
+            (root / HELPERS).write_text(head)
+        if commit:
+            git('commit', '-q', '-am', 'add')
+        return subprocess.run(
+            [sys.executable, '-I', str(AFFECTED), 'HEAD~1' if commit else 'HEAD'],
+            cwd=root, env=env, capture_output=True, text=True, check=True).stdout
+
+
+class HelperAdditionsThroughGit(unittest.TestCase):
+    """#371 end to end: #348's shape of diff maps to the test that names the
+    added def; a changed body maps to every importer."""
+
+    def test_an_addition_maps_to_the_tests_that_name_it(self):
+        block = section(helper_diff(ADD_HEAD), HELPERS)
+        self.assertEqual(block, (
+            f'{HELPERS}\n'
+            '  [test-helper] a test helper (#371): adds pause_at, which these files call: '
+            'ui/tests/browser/test_calls.py; and the tests and conftest folders that '
+            'import one of them; beside them it adds the import of timedelta\n'
+            '      ui/tests/browser/test_calls.py'))
+
+    def test_an_uncommitted_addition_with_no_import_narrows_too(self):
+        head = ADD_BASE + '\n\ndef pause_at(page, at):\n    page.clock.install(time=at)\n'
+        block = section(helper_diff(head, commit=False), HELPERS)
+        self.assertEqual(block, (
+            f'{HELPERS}\n'
+            '  [test-helper] a test helper (#371): adds pause_at, which these files call: '
+            'ui/tests/browser/test_calls.py; and the tests and conftest folders that '
+            'import one of them\n'
+            '      ui/tests/browser/test_calls.py'))
+
+    def test_a_changed_body_maps_to_every_importer(self):
+        """#371's acceptance: a diff that changes an existing def's body."""
+        head = ADD_HEAD.replace('    return body\n', '    return body.first\n')
+        block = section(helper_diff(head), HELPERS)
+        self.assertIn('its diff is no pure addition (#371): it changes or deletes the def '
+                      'ready', block)
+        self.assertIn('      ui/tests/browser\n', block + '\n')
+        self.assertIn('      ui/tests/test_through_conftest.py', block)
+
+    def test_a_root_conftest_that_names_it_runs_everything(self):
+        tree = {**ADD_TREE, 'server/conftest.py': (
+            'from ui.tests.browser.helpers import pause_at  # noqa: F401\n')}
+        out = helper_diff(ADD_HEAD, tree)
+        self.assertIn(f'  {HELPERS}: the root conftest names what it adds', out)
+
+    def test_a_deleted_helper_maps_to_every_importer(self):
+        block = section(helper_diff(None), HELPERS)
+        self.assertIn('no pure addition (#371): deleted', block)
+        self.assertIn('      ui/tests/browser\n', block + '\n')
+
+    def test_stdin_maps_to_every_importer(self):
+        block = section(run(HELPERS, tree=ADD_TREE), HELPERS)
+        self.assertIn('no pure addition (#371): --stdin has no BASE to compare with', block)
+        self.assertIn('      ui/tests/browser\n', block + '\n')
+
+
 class RealTree(unittest.TestCase):
     """Every page file of the real tree reaches a test by a rule, not the
     fallback: a new page, template or script name that no test file is named
@@ -2639,6 +3194,19 @@ class RealTree(unittest.TestCase):
         self.assertIn('[role-gates] a URL conf', section(out, 'server/ui/urls.py'))
         self.assertIn('OTHER_PAGES', section(out, 'server/ui/timer/views.py'))
         self.assertNotIn('[role-gates]', section(out, 'server/awards/editing.py'))
+
+    def test_a_test_file_passes_on_what_it_imports(self):
+        """#371 retro: the six kiosk files that import open_kiosk from
+        test_kiosk_pages.py ran nothing when it changed, and
+        test_database_check.py, which imports SERVICE_VIOLATIONS from
+        test_invariants.py, nothing when core/tests/db.py changed."""
+        pages, db = 'server/ui/tests/browser/test_kiosk_pages.py', 'server/core/tests/db.py'
+        out = run(pages, db, root=REPO)
+        for path, reader in ((pages, 'ui/tests/browser/test_kiosk_banner.py'),
+                             (pages, 'ui/tests/browser/test_kiosk_ondeck_labels.py'),
+                             (db, 'legacy_api/tests/test_database_check.py')):
+            with self.subTest(path=path, reader=reader):
+                self.assertIn(f'      {reader}\n', section(out, path) + '\n')
 
     def test_every_command_and_server_tool_maps(self):
         server = REPO / 'server'

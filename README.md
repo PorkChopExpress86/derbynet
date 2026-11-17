@@ -26,7 +26,7 @@ redirected. Add `--profile postgres` to every `docker compose` command to keep
 the race in Postgres instead of SQLite. The file pulls the image's `latest`
 tag, which only a full release sets (D89); until the first one, add a line
 naming a test release to `.env`, such as
-`DERBYNET_IMAGE=ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc2`. `server/docker/ci/checks.sh
+`DERBYNET_IMAGE=ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc3`. `server/docker/ci/checks.sh
 readme-compose` runs this file and these commands, with the image under test
 in `DERBYNET_IMAGE` and the project named for the run.
 

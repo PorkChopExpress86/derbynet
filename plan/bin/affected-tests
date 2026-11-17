@@ -69,6 +69,22 @@ targets, then:
   again (#312 retro);
 - the commands, from server/.
 
+A test file maps to itself and, like a test helper (a module in a tests
+folder that is no test file or conftest), to each test file and conftest
+folder that imports it, directly or through any other file of a tests
+folder, a test file too (#371 retro: test_kiosk_banner.py imports
+open_kiosk from test_kiosk_pages.py). When a helper's diff from BASE only
+adds top-level functions, by AST, it maps instead to the importers that
+name an added function as a whole word, and to every file that imports
+one of them, with a conftest's folder (#371). An added
+def has no decorator and only literal defaults; an added import beside it
+counts too; no added name is one the module bound or read at BASE, or one
+pytest or Python reads by its presence, a test's among them; the module
+docstring may change unless the module reads `__doc__` (D101). Anything
+else keeps every importer, and so do a star import among the importers, an
+importer that can't be parsed, no importer that names an added function, a
+new or deleted helper, and `--stdin`; the output says why.
+
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
 reaches every suite on both databases (#282's browser conftest hook ran in
 every collection), so CI's full run is the check, and the commands are the
@@ -214,7 +230,9 @@ class Tree:
         self.root = root
         self.server = root / SERVER
         self._tests = None
+        self._test_files = None
         self._imports = None
+        self._importing = None  # module name: the files that import it
         self._graph = None
         self._website = None
         self._users = {}
@@ -262,7 +280,10 @@ class Tree:
         return self._tests
 
     def test_files(self):
-        return [p for p in self.python_in_tests() if Path(p).name.startswith('test_')]
+        if self._test_files is None:
+            self._test_files = tuple(p for p in self.python_in_tests()
+                                     if Path(p).name.startswith('test_'))
+        return list(self._test_files)
 
     def imports(self):
         """Each test-folder module's imported names: `import a.b` gives a.b,
@@ -307,28 +328,36 @@ class Tree:
                 self._imports[rel] = names
         return self._imports
 
-    def importers(self, module):
-        """The test files that import `module`, directly or through a helper
-        module in a test folder, and the conftests that do."""
-        def hits(names, mods):
-            return any(n == m or n.startswith(m + '.') for n in names for m in mods)
+    def reach(self, module):
+        """The test-folder files that import `module`, directly or through
+        another test-folder file that does, a test file among them:
+        test_kiosk_banner.py imports open_kiosk from test_kiosk_pages.py, and
+        test_database_check.py SERVICE_VIOLATIONS from test_invariants.py,
+        which imports core/tests/db.py (#371 retro). A file imports a module
+        when it imports it or a name inside it: `a.b.c` imports a, a.b and
+        a.b.c."""
+        if self._importing is None:
+            self._importing = {}
+            for rel, names in self.imports().items():
+                for name in names:
+                    parts = name.split('.')
+                    for i in range(1, len(parts) + 1):
+                        self._importing.setdefault('.'.join(parts[:i]), set()).add(rel)
+        reached, todo, found = {module}, [module], set()
+        while todo:
+            users = self._importing.get(todo.pop(), set())
+            found |= users
+            new = {module_name(rel) for rel in users} - reached
+            reached |= new
+            todo.extend(new)
+        return sorted(found)
 
-        imports = self.imports()
-        reached = {module}
-        changed = True
-        while changed:
-            changed = False
-            for rel, names in imports.items():
-                mod = module_name(rel)
-                if not Path(rel).name.startswith('test_') and mod not in reached \
-                        and hits(names, reached):
-                    reached.add(mod)
-                    changed = True
-        tests = sorted(rel for rel, names in imports.items()
-                       if Path(rel).name.startswith('test_') and hits(names, reached))
-        conftests = sorted(rel for rel in imports if Path(rel).name == 'conftest.py'
-                           and module_name(rel) in reached)
-        return tests, conftests
+    def importers(self, module):
+        """The test files that import `module`, directly or through another
+        test-folder file, and the conftests that do."""
+        found = self.reach(module)
+        return ([rel for rel in found if Path(rel).name.startswith('test_')],
+                [rel for rel in found if Path(rel).name == 'conftest.py'])
 
     def mentions(self, words):
         """The test files whose text names one of `words`, as a whole word:
@@ -641,7 +670,16 @@ def cover_test_file(plan, tree, path):
     plan.changed_tests.append(rel)
     if is_browser_test(tree, rel):
         plan.changed_browser_tests.append(rel)
-    plan.add(path, 'test-file', 'the test file itself', [rel])
+    tests, conftests = tree.importers(module_name(rel))
+    if not tests + conftests:
+        plan.add(path, 'test-file', 'the test file itself', [rel])
+        return
+    dirs = [str(Path(c).parent) for c in conftests]
+    if '.' in dirs:
+        plan.everything.append(f'{path}: the root conftest imports it')
+    plan.add(path, 'test-file', 'the test file itself, and the tests and conftest '
+             'folders that import it (#371 retro)',
+             [rel] + tests + [d for d in dirs if d != '.'])
 
 
 def match_test_helper(path):
@@ -655,15 +693,32 @@ def cover_test_helper(plan, tree, path):
     if rel == 'core/tests/populated.py':
         plan.postgres.append(f'{path}: the populated event every event-scoped '
                              'model needs a row in')
-    tests, conftests = tree.importers(module_name(rel))
+    try:
+        if not plan.from_git:
+            raise NotAddition('--stdin has no BASE to compare with')
+        if not tree.exists(rel):
+            raise NotAddition('deleted')
+        functions, imports = additions(base_text(plan, rel), tree.text(rel))
+        tests, conftests, naming = namers(tree, rel, functions)
+    except NotAddition as why:
+        tests, conftests = tree.importers(module_name(rel))
+        note = ('a test helper: the tests and conftest folders that import it; its '
+                f'diff is no pure addition (#371): {why}')
+        root_why = 'the root conftest imports it'
+    else:
+        also = f'; beside them it adds the import of {", ".join(imports)}' \
+            if imports else ''
+        note = (f'a test helper (#371): adds {", ".join(functions)}, which these files '
+                f'call: {", ".join(naming)}; and the tests and conftest folders that '
+                f'import one of them{also}')
+        root_why = 'the root conftest names what it adds'
     dirs = [str(Path(c).parent) for c in conftests]
     if '.' in dirs:
-        plan.everything.append(f'{path}: the root conftest imports it')
+        plan.everything.append(f'{path}: {root_why}')
     targets = tests + [d for d in dirs if d != '.']
     if tree.exists(rel):  # match_test_helper took only .py files
         plan.changed_helpers.append(rel)
-    plan.add(path, 'test-helper', 'a test helper: the tests and conftest folders '
-             'that import it', targets)
+    plan.add(path, 'test-helper', note, targets)
 
 
 def match_test_data(path):
@@ -1980,6 +2035,141 @@ def changed_tests(base_text, head_text, module_text, claims=False):
     return out
 
 
+# --- #371: a test helper's diff that only adds ------------------------------
+#
+# A diff to a helper module that only adds top-level functions runs the
+# importers that name one, not every importer (#348's pause_clock_at ran all
+# of ui/tests/browser, 730 items, through the browser conftest's import).
+# A wrong verdict skips tests the change can reach, so every check fails
+# closed: anything else keeps every importer.
+
+class NotAddition(Exception):
+    """Why a changed test helper keeps every importer."""
+
+
+def literal(node):
+    """ast.literal_eval() takes `node`: a ValueError, or a TypeError for an
+    unhashable member such as `{[1]}` (#371 review, M1), says it does not."""
+    try:
+        ast.literal_eval(node)
+    except (ValueError, TypeError):
+        return False
+    return True
+
+
+def label(node):
+    if isinstance(node, FUNCTIONS) and not node.decorator_list \
+            and not PYTEST_READS.fullmatch(node.name):
+        return f'the def {node.name}'
+    return what(node)
+
+
+# What pytest collects as a test or a test class (python_functions' and
+# python_classes' defaults, which match a prefix).
+COLLECTED = re.compile(r'test\w*|Test\w*')
+
+
+def additions(base_text, head_text):
+    """#371's verdict on a test helper module: (functions, imports), the
+    names of the top-level defs the diff from `base_text` to `head_text`
+    adds and of the imports beside them, when it changes nothing else by
+    AST. Each def is undecorated, with literal defaults, since a decorator
+    or a default runs on import; its annotations wait until read on the
+    server's Python (>=3.14, PEP 649). Each added name is one the module
+    neither bound nor read at BASE, a builtin among them, so it shadows
+    nothing, and none is a name pytest or Python reads by its presence, a
+    test's or test class's among them (a star import collects it). The
+    module docstring is no change unless the module reads `__doc__`, as in
+    D101. Raises NotAddition with the reason otherwise."""
+    if base_text is None:
+        raise NotAddition('new on the branch')
+    try:
+        trees = ast.parse(base_text), ast.parse(head_text)
+    except SyntaxError as e:
+        raise NotAddition(f'cannot be parsed ({e.msg}, line {e.lineno})') from None
+    try:
+        base_binds = bindings(trees[0], 'BASE')
+        head_binds = bindings(trees[1], 'the module')
+    except NotImportOnly as e:
+        raise NotAddition(str(e)) from None
+    bodies = []
+    docs = []
+    for tree in trees:
+        body = list(tree.body)
+        docs.append(body.pop(0).value.value if body and is_docstring(body[0]) else None)
+        bodies.append(body)
+    if docs[0] != docs[1] and reads_doc(trees[1]):
+        raise NotAddition('its docstring changes, and it reads `__doc__` (D101)')
+    old = [ast.dump(n) for n in bodies[0]]
+    kept = 0
+    added = []
+    for node in bodies[1]:
+        if kept < len(old) and ast.dump(node) == old[kept]:
+            kept += 1
+        else:
+            added.append(node)
+    if kept < len(old):
+        raise NotAddition(f'it changes or deletes {label(bodies[0][kept])}')
+    read = mentions(trees[0]) | set(base_binds)
+    functions, imports = [], []
+    for node in added:
+        if isinstance(node, FUNCTIONS):
+            if node.decorator_list:
+                raise NotAddition(f'it adds {what(node)}, whose decorator runs on import')
+            if not all(literal(d) for d in node.args.defaults + node.args.kw_defaults
+                       if d is not None):
+                raise NotAddition(f'it adds the def {node.name}, a default of which '
+                                  'runs on import')
+            names, into = [node.name], functions
+        elif is_import(node):
+            names, into = [(a.asname or a.name).split('.')[0] for a in node.names], imports
+        else:
+            raise NotAddition(f'it adds {what(node)}')
+        for name in names:
+            if PYTEST_READS.fullmatch(name) or COLLECTED.fullmatch(name):
+                raise NotAddition(f'it adds {name}, which pytest or Python reads by '
+                                  'its name')
+            if name in read:
+                raise NotAddition(f'it adds {name}, which the module bound or read '
+                                  'before')
+            if head_binds.get(name) is AMBIGUOUS:
+                raise NotAddition(f'it binds {name} more than once')
+            into.append(name)
+    if not functions:
+        raise NotAddition('by AST it adds no function')
+    return functions, imports
+
+
+def namers(tree, rel, names):
+    """For a helper `rel` whose diff only adds `names`: (tests, conftests,
+    naming), where naming lists the files that import `rel` (through any
+    test-folder file, Tree.reach()) and name one of `names` as a whole
+    word, and tests and conftests are the test files and conftests among
+    them and among every file that imports one of them (#371 review, H1:
+    test_kiosk_ondeck_labels.py imports open_kiosk from
+    test_kiosk_pages.py). A star import among the importers, which takes in
+    a name without naming it, an importer that can't be parsed, or no
+    importer that names one, raises NotAddition."""
+    word = re.compile(r'\b(?:' + '|'.join(map(re.escape, names)) + r')\b')
+    naming = []
+    for other in tree.reach(module_name(rel)):
+        try:
+            parsed = ast.parse(tree.text(other))
+        except SyntaxError as e:
+            raise NotAddition(f'{other} cannot be parsed ({e.msg}, line {e.lineno})') \
+                from None
+        if any(isinstance(n, ast.ImportFrom) and any(a.name == '*' for a in n.names)
+               for n in ast.walk(parsed)):
+            raise NotAddition(f'{other} has a star import')
+        if word.search(tree.text(other)):
+            naming.append(other)
+    if not naming:
+        raise NotAddition(f'nothing that imports it names {", ".join(names)}')
+    found = set(naming).union(*(tree.reach(module_name(other)) for other in naming))
+    return (sorted(f for f in found if Path(f).name.startswith('test_')),
+            sorted(f for f in found if Path(f).name == 'conftest.py'), naming)
+
+
 # --- output ----------------------------------------------------------------
 
 def collapse(targets):
@@ -2187,6 +2377,13 @@ def report(plan, tree):
         say(f'  {line}')
     say('  tools/source-checks.sh')
     say('  uv run ruff check && uv run ruff format --check')
+    # The hook runs the whole script, plan/tests and all: #373's made-up path
+    # in a test string read as a cite, and the hook said so about 15 min into
+    # its run, a push round later (#373 retro).
+    say('')
+    say('Before each push, from server/ (about a minute: the pre-push hook '
+        'runs the whole script, about 15 min, #373 retro):')
+    say('  tools/source-checks.sh --quick')
     return '\n'.join(out) + '\n'
 
 

@@ -622,7 +622,13 @@ def page(browser, live_server, size, page_errors):
             no_sideways_scroll(page)
     finally:
         context.close()
-    assert page_errors.final() == []
+    errors = page_errors.final()
+    # Every item, one per line: pytest's diff names only the first, and
+    # tools/network_changed.py reruns a load run only when each item is a
+    # changed network (#373).
+    assert errors == [], f"{len(errors)} page errors, one per line:\n" + "\n".join(
+        map(repr, errors)
+    )
 
 
 def log_in(page, role: str):

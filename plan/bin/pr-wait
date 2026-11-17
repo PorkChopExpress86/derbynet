@@ -18,6 +18,17 @@
 # A branch names its PR, as `gh pr checks` takes it, so an implementer waits
 # on every workflow of its head: #58's own waiter watched image.yml alone and
 # reported CI green while server.yml's run 43497485339 was red (#58 retro).
+#
+# Run from a clone that just pushed the PR's branch, it waits for the PR to
+# show what the push sent: while the PR's head is an older commit of this
+# clone's origin/<branch>, GitHub has not caught up yet.  #384's pr-wait,
+# started in the same command as a push, read the old head, whose checks had
+# all passed; it exited 2 only because the head moved before its first
+# check read, and would otherwise have printed the old head's green checks
+# and exited 0 (#369 retro).  That wait prints one line when it starts and
+# gives up after PR_WAIT_PUSH_MIN minutes (default 5, at most the timeout), so
+# a PR reset to an older commit fails fast instead of looking hung (#396).  A stale origin/<branch>, older than the PR's
+# head or not in this clone, changes nothing.
 set -euo pipefail
 PR=${1:?usage: pr-wait <pr or branch> [--timeout-min N]}
 TIMEOUT_MIN=${3:-90}
@@ -25,19 +36,49 @@ GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 
 # A network error from gh is retried, so one dropped request does not end the wait.
-head_of() {
+# Prints the PR's head SHA and its branch.
+head_and_branch() {
   local n
   for n in 1 2 3 4 5; do
-    "$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid 2>/dev/null && return
+    "$GH" pr view "$PR" --repo "$REPO" --json headRefOid,headRefName \
+      --jq '"\(.headRefOid) \(.headRefName)"' 2>/dev/null && return
     sleep ${PR_WAIT_RETRY_SLEEP:-10}
   done
   echo "gh could not read PR #$PR after 5 tries" >&2
   return 1
 }
+head_of() { local h; h=$(head_and_branch) && echo "${h%% *}"; }
 
-head=$(head_of)
-echo "PR #$PR head $head" >&2
+# Succeeds while <head> is an older commit of this clone's origin/<branch>.
+behind_the_push() {
+  local pushed
+  [ -n "$2" ] || return 1
+  pushed=$(git rev-parse -q --verify "refs/remotes/origin/$2^{commit}" 2>/dev/null) || return 1
+  [ "$1" != "$pushed" ] && git merge-base --is-ancestor "$1" "$pushed" 2>/dev/null
+}
+
+# Assigned first: set -e ignores a failure inside `read <<<"$(...)"`.
+head_branch=$(head_and_branch)
+read -r head branch <<<"$head_branch"
 deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
+# The wait for GitHub to show the push has a bound of its own: a PR reset to an
+# older commit than origin/<branch> would otherwise wait out all of TIMEOUT_MIN.
+push_min=$(( TIMEOUT_MIN < ${PR_WAIT_PUSH_MIN:-5} ? TIMEOUT_MIN : ${PR_WAIT_PUSH_MIN:-5} ))
+push_deadline=$(( $(date +%s) + push_min * 60 ))
+if behind_the_push "$head" "$branch"; then
+  echo "waiting for PR #$PR to show origin/$branch $(git rev-parse "origin/$branch");" \
+       "it shows $head" >&2
+fi
+while behind_the_push "$head" "$branch"; do
+  if [ "$(date +%s)" -ge "$push_deadline" ]; then
+    echo "timed out after $push_min min; PR #$PR still shows $head," \
+         "older than origin/$branch $(git rev-parse "origin/$branch")" >&2
+    exit 3
+  fi
+  sleep ${PR_WAIT_RETRY_SLEEP:-10}
+  head=$(head_of)
+done
+echo "PR #$PR head $head" >&2
 while :; do
   now_head=$(head_of)
   if [ "$now_head" != "$head" ]; then
