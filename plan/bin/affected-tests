@@ -69,12 +69,14 @@ targets, then:
   again (#312 retro);
 - the commands, from server/.
 
-A test helper (a module in a tests folder that is no test file or conftest)
-maps to each test file and conftest folder that imports it, directly or
-through another helper or conftest. When its diff from BASE only adds
-top-level functions, by AST, it maps instead to the importers that name an
-added function as a whole word, and to every file that imports one of
-them, through a test file too, with a conftest's folder (#371). An added
+A test file maps to itself and, like a test helper (a module in a tests
+folder that is no test file or conftest), to each test file and conftest
+folder that imports it, directly or through any other file of a tests
+folder, a test file too (#371 retro: test_kiosk_banner.py imports
+open_kiosk from test_kiosk_pages.py). When a helper's diff from BASE only
+adds top-level functions, by AST, it maps instead to the importers that
+name an added function as a whole word, and to every file that imports
+one of them, with a conftest's folder (#371). An added
 def has no decorator and only literal defaults; an added import beside it
 counts too; no added name is one the module bound or read at BASE, or one
 pytest or Python reads by its presence, a test's among them; the module
@@ -228,7 +230,9 @@ class Tree:
         self.root = root
         self.server = root / SERVER
         self._tests = None
+        self._test_files = None
         self._imports = None
+        self._importing = None  # module name: the files that import it
         self._graph = None
         self._website = None
         self._users = {}
@@ -276,7 +280,10 @@ class Tree:
         return self._tests
 
     def test_files(self):
-        return [p for p in self.python_in_tests() if Path(p).name.startswith('test_')]
+        if self._test_files is None:
+            self._test_files = tuple(p for p in self.python_in_tests()
+                                     if Path(p).name.startswith('test_'))
+        return list(self._test_files)
 
     def imports(self):
         """Each test-folder module's imported names: `import a.b` gives a.b,
@@ -322,27 +329,32 @@ class Tree:
         return self._imports
 
     def reach(self, module):
-        """The test-folder files that import `module`, directly or through a
-        helper module or conftest in a test folder that does."""
-        def hits(names, mods):
-            return any(n == m or n.startswith(m + '.') for n in names for m in mods)
-
-        imports = self.imports()
-        reached = {module}
-        changed = True
-        while changed:
-            changed = False
-            for rel, names in imports.items():
-                mod = module_name(rel)
-                if not Path(rel).name.startswith('test_') and mod not in reached \
-                        and hits(names, reached):
-                    reached.add(mod)
-                    changed = True
-        return sorted(rel for rel, names in imports.items() if hits(names, reached))
+        """The test-folder files that import `module`, directly or through
+        another test-folder file that does, a test file among them:
+        test_kiosk_banner.py imports open_kiosk from test_kiosk_pages.py, and
+        test_database_check.py SERVICE_VIOLATIONS from test_invariants.py,
+        which imports core/tests/db.py (#371 retro). A file imports a module
+        when it imports it or a name inside it: `a.b.c` imports a, a.b and
+        a.b.c."""
+        if self._importing is None:
+            self._importing = {}
+            for rel, names in self.imports().items():
+                for name in names:
+                    parts = name.split('.')
+                    for i in range(1, len(parts) + 1):
+                        self._importing.setdefault('.'.join(parts[:i]), set()).add(rel)
+        reached, todo, found = {module}, [module], set()
+        while todo:
+            users = self._importing.get(todo.pop(), set())
+            found |= users
+            new = {module_name(rel) for rel in users} - reached
+            reached |= new
+            todo.extend(new)
+        return sorted(found)
 
     def importers(self, module):
-        """The test files that import `module`, directly or through a helper
-        module in a test folder, and the conftests that do."""
+        """The test files that import `module`, directly or through another
+        test-folder file, and the conftests that do."""
         found = self.reach(module)
         return ([rel for rel in found if Path(rel).name.startswith('test_')],
                 [rel for rel in found if Path(rel).name == 'conftest.py'])
@@ -658,7 +670,16 @@ def cover_test_file(plan, tree, path):
     plan.changed_tests.append(rel)
     if is_browser_test(tree, rel):
         plan.changed_browser_tests.append(rel)
-    plan.add(path, 'test-file', 'the test file itself', [rel])
+    tests, conftests = tree.importers(module_name(rel))
+    if not tests + conftests:
+        plan.add(path, 'test-file', 'the test file itself', [rel])
+        return
+    dirs = [str(Path(c).parent) for c in conftests]
+    if '.' in dirs:
+        plan.everything.append(f'{path}: the root conftest imports it')
+    plan.add(path, 'test-file', 'the test file itself, and the tests and conftest '
+             'folders that import it (#371 retro)',
+             [rel] + tests + [d for d in dirs if d != '.'])
 
 
 def match_test_helper(path):
@@ -2121,11 +2142,11 @@ def additions(base_text, head_text):
 
 def namers(tree, rel, names):
     """For a helper `rel` whose diff only adds `names`: (tests, conftests,
-    naming), where naming lists the files that import `rel` (through a
-    helper or conftest too) and name one of `names` as a whole word, and
-    tests and conftests are the test files and conftests among them and
-    among every file that imports one of them, through a test file too
-    (#371 review, H1: test_kiosk_ondeck_labels.py imports open_kiosk from
+    naming), where naming lists the files that import `rel` (through any
+    test-folder file, Tree.reach()) and name one of `names` as a whole
+    word, and tests and conftests are the test files and conftests among
+    them and among every file that imports one of them (#371 review, H1:
+    test_kiosk_ondeck_labels.py imports open_kiosk from
     test_kiosk_pages.py). A star import among the importers, which takes in
     a name without naming it, an importer that can't be parsed, or no
     importer that names one, raises NotAddition."""
@@ -2144,16 +2165,7 @@ def namers(tree, rel, names):
             naming.append(other)
     if not naming:
         raise NotAddition(f'nothing that imports it names {", ".join(names)}')
-    found = set(naming)
-    # Never reached while `found` still grows: reach() returns files of
-    # python_in_tests(), naming holds at least one of them, and each pass
-    # but the last adds one more, so the last pass, which finds nothing
-    # new, is at most pass len(python_in_tests()).
-    for _ in range(len(tree.python_in_tests())):
-        more = {f for other in found for f in tree.reach(module_name(other))} - found
-        if not more:
-            break
-        found |= more
+    found = set(naming).union(*(tree.reach(module_name(other)) for other in naming))
     return (sorted(f for f in found if Path(f).name.startswith('test_')),
             sorted(f for f in found if Path(f).name == 'conftest.py'), naming)
 
