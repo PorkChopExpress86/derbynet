@@ -354,3 +354,69 @@ def test_the_collection_hook_runs_the_harness_check():
     here = Path(conftest.__file__).parent
     with pytest.raises(pytest.UsageError, match=r"^test_b\.py::t lost "):
         conftest.pytest_collection_modifyitems([collected(here / "test_b.py", "page")])
+
+
+# A page with an iframe and a `target="_blank"` link to a popup.
+FRAME_AND_BLANK_LINK = """() => {
+  const frame = document.createElement('iframe');
+  frame.src = '/frame-target?first';
+  document.body.append(frame);
+  const link = document.createElement('a');
+  link.href = '/popup-target';
+  link.target = '_blank';
+  link.id = 'blank-link';
+  link.textContent = 'Open';
+  document.body.prepend(link);
+}"""
+
+
+def test_a_blank_link_followed_while_a_frame_navigates_is_tracked(page, event):
+    """A `target="_blank"` link sends the popup's navigation request before
+    Playwright has a page for the popup, and `request.frame` raises for that
+    request. While it was out, the opener's iframe navigated, and
+    `InFlight.navigated`, which read every request's frame, raised from the
+    `framenavigated` listener; the test's next call failed with it (#344's
+    Preview test, whose thumbnails swap; #378). The harness now keeps
+    tracking that request, and drains it once the popup's page loads."""
+    held = []
+    page.context.route("**/popup-target", lambda route: held.append(route))
+    page.route(
+        "**/frame-target?*",
+        lambda route: route.fulfill(body="<p>frame</p>", content_type="text/html"),
+    )
+    page.goto("/login/")
+    with page.expect_event(
+        "framenavigated", lambda f: f.url.endswith("/frame-target?first")
+    ):
+        page.evaluate(FRAME_AND_BLANK_LINK)
+    page.click("#blank-link")
+    for _ in range(500):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    assert len(held) == 1
+    # The popup has no page yet while its request is held.
+    assert page.context.pages == [page]
+    page.evaluate(
+        "() => { document.querySelector('iframe').src = '/frame-target?second'; }"
+    )
+    # Not `expect_event`: its waiter listens after the harness, whose raise
+    # kept the event from it, so without the fix the test timed out instead
+    # of failing with the error (#378's PR). Playwright sets a frame's url
+    # just before it emits `framenavigated`, and the next call raises what
+    # a listener raised.
+    for _ in range(500):
+        if any(f.url.endswith("/frame-target?second") for f in page.frames):
+            break
+        page.wait_for_timeout(20)
+    page.wait_for_timeout(20)
+    assert any(f.url.endswith("/frame-target?second") for f in page.frames)
+    assert [r.url for r in page.in_flight.requests if "popup-target" in r.url] == [
+        held[0].request.url
+    ]
+    with page.context.expect_page() as opened:
+        held[0].fulfill(body="<p>popup</p>", content_type="text/html")
+    popup = opened.value
+    expect(popup.locator("p")).to_have_text("popup")
+    assert page.in_flight.drain(page) == []
+    close_tab(page, popup)
