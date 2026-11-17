@@ -24,10 +24,10 @@ from pathlib import Path
 
 BROWSER = Path(__file__).resolve().parent / "browser"
 
-# (file name, `line: function`) of each skip left in place. test_kiosks.py
+# (file name, function) of each skip left in place. test_kiosks.py
 # keeps its `phone_only` while #369 rewrites that file; remove the entry
 # when its skip moves onto the mark, and add none.
-KNOWN = {("test_kiosks.py", "79: phone_only")}
+KNOWN = {("test_kiosks.py", "phone_only")}
 
 
 def size_reads(node: ast.AST) -> list[ast.AST]:
@@ -156,13 +156,20 @@ def test_no_name_at_all(page):
 
 
 def test_no_browser_test_skips_on_the_size_in_its_body():
-    found = {
+    skips = [
         (path.name, skip)
         for path in sorted(BROWSER.glob("*.py"))
         for skip in size_skips(path.read_text(encoding="utf-8"))
-    }
-    assert found - KNOWN == set(), (
+    ]
+    new = [(name, skip) for name, skip in skips if (name, function(skip)) not in KNOWN]
+    assert new == [], (
         "mark these @pytest.mark.sizes(..., reason=...), which deselects the "
-        f"other size at collection (#366): {sorted(found - KNOWN)}"
+        f"other size at collection (#366): {new}"
     )
-    assert KNOWN - found == set(), "no longer found; take it out of KNOWN"
+    gone = KNOWN - {(name, function(skip)) for name, skip in skips}
+    assert gone == set(), f"no longer found; take it out of KNOWN: {gone}"
+
+
+def function(skip: str) -> str:
+    """The function of a `line: function` that `size_skips` returns."""
+    return skip.split(": ", 1)[1]
