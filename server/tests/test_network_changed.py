@@ -110,6 +110,7 @@ SECOND_ITEM = f"'{SECOND} net::ERR_NETWORK_CHANGED'"
         failure(
             message=TEARDOWN, text=every_item(FIRST_ITEM, SECOND_ITEM), tag="error"
         ),
+        failure(message=TEARDOWN, text=HARNESS_TRACEBACK + "\n\n", tag="error"),
     ],
     ids=[
         "page-load",
@@ -119,6 +120,7 @@ SECOND_ITEM = f"'{SECOND} net::ERR_NETWORK_CHANGED'"
         "harness",
         "https",
         "harness-every-item",
+        "harness-trailing-blank-lines",
     ],
 )
 def test_a_changed_network_is_rerun(element):
@@ -165,6 +167,8 @@ def harness(**change):
         harness(tag="failure"),
         harness(message=TEARDOWN.replace("teardown", "setup")),
         harness(text=HARNESS_TRACEBACK.replace("ui/tests/browser/", "tests/")),
+        harness(text=HARNESS_TRACEBACK.replace("\nui/tests/", "\nx/ui/tests/")),
+        harness(text=""),
         harness(text=HARNESS_TRACEBACK.replace(": AssertionError", ": Error")),
         harness(text=HARNESS_TRACEBACK + "\n\nui/tests/browser/test_x.py:5: Error"),
         # A source line the traceback quotes, not a raised one.
@@ -204,6 +208,8 @@ def harness(**change):
         "harness-as-failure",
         "harness-at-setup",
         "harness-elsewhere",
+        "harness-under-another-folder",
+        "harness-no-traceback",
         "harness-other-error",
         "harness-not-last",
         "request-failed-source-line",
