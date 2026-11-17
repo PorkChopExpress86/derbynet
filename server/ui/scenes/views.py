@@ -11,7 +11,11 @@ changes nothing, and no GET writes anything.
 
 Each change is one service call under the `RaceState` lock, and answers with
 the scene's cards again, out of band. A new or deleted scene loads the page
-again, at the scene to show next.
+again, at the scene to show next. When the change's sheet closes, the focus
+goes to the swapped-in copy of the card's button that opened it, the same
+name, value, data-action and card (`data-entry`), as D127 matches on the
+kiosk board; and Enter or Space held down as a sheet opens or closes does
+nothing where the focus lands (#383, `kiosks.js` and `app.js`).
 """
 
 from urllib.parse import urlencode

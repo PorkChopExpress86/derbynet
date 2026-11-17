@@ -42,21 +42,62 @@ window.derbynet = {
   },
 };
 
+// #383: Enter or Space held down as a sheet opens or closes does nothing
+// where the focus lands. Chromium clicks a button or submits a form on each
+// of Enter's auto-repeat keydowns, and clicks a button on Space's keyup once
+// a repeat has landed on it (D131). A sheet moves the focus into itself as
+// it opens (sheet.html) and back to its opener as it closes, so a held
+// Enter's repeats submitted the field or pressed the Close button that took
+// the focus, or reopened the sheet from its opener
+// (test_a_held_enter_on_a_sheet_opener_opens_it_once,
+// test_a_key_held_as_a_sheet_closes_opens_nothing). PHP's kiosk dashboard
+// takes such a repeat: its naming dialog focuses the name field 210 ms after
+// it opens (modal.js:59), and a repeat there submits the name and closes it
+// (kiosk-dashboard.js:255, 262; the PR's probe). A key down when a sheet
+// opens or closes has its repeats cancelled until its keyup, and a fresh
+// press acts as before.
+const heldKeys = new Set();
+const carriedKeys = new Set();
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (!e.repeat) {
+    heldKeys.add(e.key);
+    carriedKeys.delete(e.key);
+  } else if (carriedKeys.has(e.key)) {
+    e.preventDefault();
+  }
+}, true);
+document.addEventListener('keyup', (e) => {
+  heldKeys.delete(e.key);
+  carriedKeys.delete(e.key);
+}, true);
+function carryHeldKeys() {
+  for (const key of heldKeys) carriedKeys.add(key);
+}
+
 document.addEventListener('alpine:init', () => {
   // One sheet at a time (#39: one level only). Focus returns to the control
-  // that opened it.
+  // that opened it. When a save's reply swapped the opener out, the page
+  // hears `ui:opener-gone` with the old opener, and may focus its
+  // swapped-in copy (#383, kiosks.js).
   Alpine.store('ui', {
     sheet: null,
     opener: null,
     open(name, ev) {
       this.opener = (ev && ev.currentTarget) || document.activeElement;
       this.sheet = name;
+      carryHeldKeys();
     },
     close() {
       const opener = this.opener;
       this.sheet = null;
       this.opener = null;
-      if (opener && opener.isConnected) setTimeout(() => opener.focus(), 0);
+      carryHeldKeys();
+      if (!opener) return;
+      setTimeout(() => {
+        if (opener.isConnected) opener.focus();
+        else document.dispatchEvent(new CustomEvent('ui:opener-gone', { detail: { opener } }));
+      }, 0);
     },
     modal() {
       return this.sheet !== null;

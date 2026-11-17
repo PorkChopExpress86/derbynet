@@ -1,4 +1,4 @@
-{# {% component "sheet" name="x" title="Title" %}body{% endcomponent %}. A bottom sheet on a phone and a centered dialog on a desktop, one level only (#39). It teleports into #sheets, so the page behind goes inert while it is open. Open it with $store.ui.open('x', $event). #}
+{# {% component "sheet" name="x" title="Title" %}body{% endcomponent %}. A bottom sheet on a phone and a centered dialog on a desktop, one level only (#39). It teleports into #sheets, so the page behind goes inert while it is open. Open it with $store.ui.open('x', $event). Enter or Space held as it opens or closes does nothing where the focus lands (#383, app.js). #}
 <template x-teleport="#sheets">
 <div x-cloak x-show="$store.ui.sheet === '{{ name }}'" class="fixed inset-0 z-40" data-sheet-root="{{ name }}">
   <div class="absolute inset-0 bg-black/50" aria-hidden="true" @click="$store.ui.close()"></div>

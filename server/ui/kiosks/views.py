@@ -19,6 +19,17 @@ button or a card's Preview link (D127, `keepFocusAcrossSwaps`); when a
 rename rebuilds PHP's controls, the focus that was on Reload falls to the
 page's body.
 
+When a save from a sheet swaps the board, the focus goes to the swapped-in
+copy of the button that opened the sheet, matched as D127 matches; and
+Enter or Space held down as a sheet opens or closes does nothing where the
+focus lands (#383, `ui:opener-gone` in `kiosks.js` and `carryHeldKeys` in
+`app.js`). PHP's naming dialog takes a held Enter's repeat: it focuses the
+name field 210 ms after it opens (modal.js:59), and the repeat submits the
+name and closes it (kiosk-dashboard.js:255, 262). After a save PHP gives
+the focus back to nothing (modal.js:63), so the rebuild leaves it on the
+page's body (kiosk-dashboard.js:99). PHP picks a kiosk's page with a
+`<select>` (kiosk-dashboard.js:158), not a dialog.
+
 The page needs PRESENT_AWARDS, its page gate, but every change needs
 CONTROL_RACE, as `kiosk.assign`, `kiosk.reload` and `scene.apply` do: a role
 without it sees the board with no controls (C37). No GET writes anything.
