@@ -1994,3 +1994,43 @@ def test_a_save_that_removes_the_openers_card_focuses_nothing(login, event):
     expect(sheet(page, "scenes")).to_be_hidden()
     expect(hall).to_have_count(0)
     expect(page.locator("body")).to_be_focused()
+
+
+def test_a_save_whose_reply_comes_after_close_focuses_once(login, event):
+    """A near miss for #383: the tv card's Name sheet saves Lobby with
+    Enter, and its POST is held at its route while Close closes the sheet,
+    so the focus goes back to the Name button itself. The reply then closes
+    the sheet again, with no opener left to give the focus to, and swaps
+    the board: D127 gives the focus to the swapped-in Name button, and the
+    page reports no script error (the harness's page errors)."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    target = card(page, "tv").locator('[data-action="name"]')
+    held = []
+    page.route(
+        "**/kiosks/name/",
+        lambda route: (
+            held.append(route) if route.request.method == "POST" else route.continue_()
+        ),
+    )
+    focus_on(page, target)
+    page.keyboard.press("Enter")
+    form = ready(page, sheet(page, "kiosks").locator("[data-name-sheet]"))
+    field = form.get_by_label("Name for this kiosk")
+    expect(field).to_be_focused()
+    field.fill("Lobby")
+    page.keyboard.press("Enter")
+    for _ in range(500):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    assert len(held) == 1
+    sheet(page, "kiosks").locator("[data-close]").click()
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    expect(target).to_be_focused()
+    old = target.element_handle()
+    with htmx_post(page, "/kiosks/name/"):
+        held[0].continue_()
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    assert not old.evaluate("e => e.isConnected")
+    expect(target).to_be_focused()
