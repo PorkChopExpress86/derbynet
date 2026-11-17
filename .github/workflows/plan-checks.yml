@@ -69,6 +69,22 @@ jobs:
         if: github.event_name != 'issues'
         run: uv run --no-project --python 3.14 python -I -m unittest discover -s plan/tests
 
+      # The source checks that read plan/ (D128): server.yml skips a PR that
+      # changes only plan/, so a decision row could break test_deviations.py
+      # on master unseen (#346 retro). server/tests/test_plan_source_checks.py
+      # holds this list to the source checks that read plan/. About 10 s of
+      # tests after uv syncs the server's locked dependencies.
+      - name: Run the source checks that read plan/
+        if: github.event_name != 'issues'
+        working-directory: server
+        run: >-
+          uv run --locked pytest -q -p no:cacheprovider
+          legacy_api/tests/test_registry.py
+          tests/test_deviations.py
+          tests/test_docker_checks.py
+          tests/test_listing_order.py
+          tests/test_pipefail_pipes.py
+
       - name: Decide whether to lint the issues
         id: scope
         # A pull request checks out its merge commit, whose first parent is the

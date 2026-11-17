@@ -123,12 +123,17 @@ class CiFailures(unittest.TestCase):
             f'  tools/pytest-under-load.sh --loops 12 -n auto --count 180 {race}\n'
             f'new    {EVENTS}\n')
 
-    def test_a_browser_test_repro_drops_its_parameter_and_selects_browser(self):
+    def test_a_browser_test_repro_repeats_only_its_parameter_and_selects_browser(self):
+        """pytest-repeat renames `[desktop-chromium]` to
+        `[desktop-chromium-N-180]`: #374's lead narrowed the bare function by
+        hand to `[...]` and collected 0 items. server/tests/test_ci_failures_repro.py
+        collects the printed form."""
         result = run([check('fail', 2)], {'2': line(EVENTS), '1': line(VOTE)}, MASTER,
                      files=['server/ui/views.py'])
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('  tools/pytest-under-load.sh --loops 12 -m browser -n auto --count 180 '
-                      'ui/tests/browser/test_events.py::test_reopen_and_archive_from_the_page\n',
+                      "'ui/tests/browser/test_events.py::test_reopen_and_archive_from_the_page"
+                      "[desktop-chromium-'{1..180}'-180]'\n",
                       result.stdout)
 
     def test_a_branch_names_the_pr(self):
