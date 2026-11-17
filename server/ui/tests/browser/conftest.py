@@ -144,7 +144,7 @@ def split_by_size(items) -> tuple[list, list]:
     return kept, dropped
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(items):
     here = Path(__file__).parent
     for item in items:
         if here in Path(item.fspath).parents:
@@ -152,7 +152,7 @@ def pytest_collection_modifyitems(config, items):
     check_harness(items, here)
     kept, dropped = split_by_size(items)
     if dropped:
-        config.hook.pytest_deselected(items=dropped)
+        dropped[0].config.hook.pytest_deselected(items=dropped)
         items[:] = kept
 
 

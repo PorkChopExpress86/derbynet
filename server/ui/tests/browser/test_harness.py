@@ -353,6 +353,4 @@ def test_the_collection_hook_runs_the_harness_check():
 
     here = Path(conftest.__file__).parent
     with pytest.raises(pytest.UsageError, match=r"^test_b\.py::t lost "):
-        conftest.pytest_collection_modifyitems(
-            None, [collected(here / "test_b.py", "page")]
-        )
+        conftest.pytest_collection_modifyitems([collected(here / "test_b.py", "page")])

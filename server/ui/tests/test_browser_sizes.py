@@ -86,14 +86,15 @@ def test_the_collection_hook_deselects_the_dropped_cases():
     from ui.tests.browser import conftest
 
     phone, desktop = case("phone", DESKTOP), case("desktop", DESKTOP)
-    for item in (phone, desktop):
-        item.fixturenames, item.add_marker = (), lambda mark: None
     reported = []
     config = SimpleNamespace(
         hook=SimpleNamespace(pytest_deselected=lambda items: reported.append(items))
     )
+    for item in (phone, desktop):
+        item.fixturenames, item.add_marker = (), lambda mark: None
+        item.config = config
     items = [phone, desktop]
-    conftest.pytest_collection_modifyitems(config, items)
+    conftest.pytest_collection_modifyitems(items)
     assert items == [desktop]
     assert reported == [[phone]]
 
