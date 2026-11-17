@@ -721,6 +721,162 @@ def test_a_sigkill_frees_the_lock_though_the_hand_off_s_command_lives_on(tmp_pat
         kill_all(group)
 
 
+def held_lock(tmp_path):
+    """The test's own lock, held by the test: (its path, the held fd)."""
+    lock = tmp_path / "load.lock"
+    lock.write_text("pid 1, since then\n")
+    held = os.open(lock, os.O_RDONLY)
+    fcntl.flock(held, fcntl.LOCK_EX)
+    return lock, held
+
+
+def start_waiting(tmp_path, script, lock, extra_env=None):
+    """`script` started on `lock`, which the test holds, once it waits in
+    flock: (the run, its flock's pid)."""
+    if script == SCRIPT:
+        run = start(tmp_path, "waiter", lock, extra_env=extra_env, go=True)
+    else:
+        run = hold(tmp_path, lock, name="waiter", extra_env=extra_env)
+    wait_until(lambda: "flock" in children(run.pid), "flock under it", 30)
+    waiter = [pid for pid, name in child_pids(run.pid) if name == "flock"]
+    assert len(waiter) == 1
+    return run, waiter[0]
+
+
+SCRIPTS = pytest.mark.parametrize("script", [SCRIPT, HOLD_LOCK], ids=lambda p: p.name)
+
+
+@SCRIPTS
+def test_a_sigterm_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script):
+    """#372's implementer stopped a queued run of each script with TERM,
+    and each left its `flock -x 9` waiting on the lock (#391)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock)
+    try:
+        os.kill(run.pid, signal.SIGTERM)
+        status = run.wait(timeout=30)
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        assert status == 143
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+@pytest.mark.parametrize(
+    "signals", [("TERM", "TERM"), ("TERM", "INT")], ids=["TERM-TERM", "TERM-INT"]
+)
+@SCRIPTS
+def test_a_second_signal_while_it_stops_its_wait_still_stops_its_flock(
+    tmp_path, script, signals
+):
+    """plan/AGENT-BRIEF.md: a second signal during the cleanup, held inside
+    it by PAUSED_KILL, here at the kill of the waiting flock (#391)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, paused_kill(tmp_path))
+    try:
+        second_signal_inside_the_cleanup(tmp_path, run.pid, signals)
+        status = run.wait(timeout=30)
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        assert status == 143
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_a_flock_that_ends_without_the_lock_ends_the_run(tmp_path, script):
+    """The wait's status is the flock's: a flock killed before it takes
+    the lock fails the script, which writes no holder lines and runs no
+    command (#391)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock)
+    try:
+        os.kill(waiter, signal.SIGTERM)
+        assert run.wait(timeout=30) == 143
+        assert lock.read_text() == "pid 1, since then\n"
+        assert not (tmp_path / "waiter" / "started").exists()
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+# A `kill` read through BASH_ENV that logs each call's arguments into
+# PAUSE_DIR/kills, then kills as the builtin does.
+LOGGED_KILL = """kill() {
+  echo "$*" >> "$PAUSE_DIR/kills"
+  builtin kill "$@"
+}
+"""
+
+
+@SCRIPTS
+def test_a_run_that_took_the_lock_never_signals_its_ended_flock(tmp_path, script):
+    """Its cleanup kills the waiting flock only while it waits: once that
+    flock has exited, its pid may be another process's (#391)."""
+    (tmp_path / "logged_kill.sh").write_text(LOGGED_KILL)
+    env = {"BASH_ENV": str(tmp_path / "logged_kill.sh"), "PAUSE_DIR": str(tmp_path)}
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, env)
+    try:
+        os.close(held)
+        held = None
+        (tmp_path / "waiter" / "go").write_text("")
+        assert run.wait(timeout=90) == 0
+        kills = tmp_path / "kills"
+        calls = kills.read_text().splitlines() if kills.exists() else []
+        assert not [call for call in calls if str(waiter) in call.split()], calls
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_a_waiter_in_the_environment_is_not_the_script_s_to_kill(tmp_path, script):
+    """A run that takes a free lock never sets the waiter's pid; one named
+    WAITER in its environment lives on past it (#391)."""
+    bystander = subprocess.Popen(["sleep", "60"])
+    try:
+        env = {"WAITER": str(bystander.pid)}
+        if script == SCRIPT:
+            run = start(tmp_path, "waiter", tmp_path / "load.lock", env, go=True)
+        else:
+            run = hold(tmp_path, tmp_path / "load.lock", "exit 0", "waiter", env)
+        assert run.wait(timeout=90) == 0
+        assert bystander.poll() is None
+    finally:
+        bystander.kill()
+        bystander.wait()
+
+
+@SCRIPTS
+def test_after_a_sigkill_while_it_waits_the_next_run_takes_the_lock(tmp_path, script):
+    """A SIGKILL skips the trap, so its flock lives on and waits; once the
+    lock frees, that flock takes it and exits, and the next run starts
+    (plan/AGENT-BRIEF.md: a SIGKILL followed by the next run)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock)
+    following = None
+    try:
+        os.kill(run.pid, signal.SIGKILL)
+        run.wait(timeout=10)
+        assert alive(waiter)
+        os.close(held)
+        held = None
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        following = start(tmp_path, "next", lock)
+        wait_started(tmp_path, "next")
+        assert "Waiting" not in (tmp_path / "next.out").read_text()
+    finally:
+        if held is not None:
+            os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run, *([following] if following else []))
+
+
 # A stand-in journalctl: it records its arguments and prints three veth
 # lines and one other.
 JOURNALCTL = """#! /bin/sh

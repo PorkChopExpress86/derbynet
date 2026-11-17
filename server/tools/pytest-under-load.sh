@@ -43,9 +43,11 @@
 # hand-off ran beside #317's 25-count run at a load average of 35 and failed,
 # then waited 74 min for a slot the lead handed out by message (#316 retro).
 # Only this script holds the lock (its loops and pytest get no copy of it),
-# so a SIGKILL frees it at once.  Its pytest gets DERBYNET_LOAD_LOCK_HELD,
-# and any other pytest run names the holder in its header and summary
-# (conftest.py).
+# so a SIGKILL frees it at once.  A SIGKILL while it waits leaves its flock
+# waiting, which takes the lock once it frees and exits at once; a SIGTERM,
+# SIGINT or SIGHUP stops that flock too (#391).  Its pytest gets
+# DERBYNET_LOAD_LOCK_HELD, and any other pytest run names the holder in its
+# header and summary (conftest.py).
 
 set -e -E -o pipefail
 
@@ -128,12 +130,42 @@ fi
 # The commit is read before the lock, so a slow git never leaves a waiter
 # reading half the holder's lines (#354 review).
 HEAD_SHA="$(git -C "$SERVER_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+
+WAITER=
+PIDS=()
+RUN_PID=
+stop_loops() {
+  for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done
+  PIDS=()
+}
+stop_all() {
+  trap '' TERM INT HUP
+  if [ -n "$WAITER" ]; then kill "$WAITER" 2>/dev/null || true; fi
+  stop_loops
+  if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
+}
+trap stop_all EXIT
+# A signal ignores any further TERM, INT or HUP, and so does the cleanup,
+# for an EXIT trap no signal started, such as an error under `set -e`: a
+# signal's `exit 143` inside the EXIT trap would end it before the loops
+# still listed were killed, and they ran on after the script exited (#372).
+# Both traps come before the wait for the lock: set after it, a TERM during
+# the wait killed the script and left its flock waiting (#391).
+trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
+
 if ! flock -n -x 9; then
   echo "Waiting for the load lock $LOCK, held by:"
   # Empty from the holder's truncation until its one write lands.
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
-  flock -x 9
+  # In the background, so a signal's trap runs during the wait, and the
+  # cleanup stops the flock: bash runs a trap only once a foreground command
+  # ends.  The lock is on the file fd 9 opened, so it stays with this script
+  # once flock exits; a flock that ends without it fails the script here.
+  flock -x 9 &
+  WAITER=$!
+  wait "$WAITER"
+  WAITER=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
 fi
 refuse_used_folder
@@ -143,24 +175,6 @@ printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s\n' \
 
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
-
-PIDS=()
-RUN_PID=
-stop_loops() {
-  for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done
-  PIDS=()
-}
-stop_all() {
-  trap '' TERM INT HUP
-  stop_loops
-  if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
-}
-trap stop_all EXIT
-# A signal ignores any further TERM, INT or HUP, and so does the cleanup,
-# for an EXIT trap no signal started, such as an error under `set -e`: a
-# signal's `exit 143` inside the EXIT trap would end it before the loops
-# still listed were killed, and they ran on after the script exited (#372).
-trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 cd "$SERVER_DIR"
 echo "Under load ($LOOPS loops): ${RUNNER[*]} $*"

@@ -65,25 +65,34 @@ if ! { mkdir -p "$(dirname "$LOCK")" && exec 9>>"$LOCK"; } 2>/dev/null; then
   exit 2
 fi
 HEAD_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
-if ! flock -n -x 9; then
-  echo "Waiting for the load lock $LOCK, held by:"
-  { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
-  since=$(date +%s)
-  flock -x 9
-  echo "Got the load lock after $(( $(date +%s) - since )) s"
-fi
-printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s\n' \
-  "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*" >"$LOCK"
 
+WAITER=
 CHILD=
 stop_child() {
+  if [ -n "$WAITER" ]; then kill "$WAITER" 2>/dev/null || true; fi
   if [ -n "$CHILD" ]; then kill -TERM -- "-$CHILD" 2>/dev/null || true; fi
 }
 trap stop_child EXIT
 # A signal ignores further signals, as in pytest-under-load.sh, which says
-# why.  Its cleanup needs no ignore of its own: no command between `CHILD=$!`
-# and `CHILD=` can fail, so only a signal enters it with CHILD set.
+# why.  Its cleanup needs no ignore of its own: a command that fails under
+# `set -e` leaves it nothing to stop, since a failed `wait "$WAITER"` means
+# that flock has ended, and no command between `CHILD=$!` and `CHILD=` can
+# fail.  The traps come before the wait for the lock, as there (#391).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
+
+if ! flock -n -x 9; then
+  echo "Waiting for the load lock $LOCK, held by:"
+  { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
+  since=$(date +%s)
+  # Waited on in the background, as in pytest-under-load.sh, which says why.
+  flock -x 9 &
+  WAITER=$!
+  wait "$WAITER"
+  WAITER=
+  echo "Got the load lock after $(( $(date +%s) - since )) s"
+fi
+printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s\n' \
+  "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*" >"$LOCK"
 
 # setsid gives COMMAND a process group of its own (its pid), which the trap
 # stops whole; `9>&-` keeps the lock with this script alone.  `<&0` keeps
