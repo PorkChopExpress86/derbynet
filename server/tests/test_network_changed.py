@@ -197,6 +197,12 @@ def harness(**change):
             "ui/tests/browser/conftest.py:614: AssertionError"
         ),
         harness(text=every_item(FIRST_ITEM, count=0)),
+        harness(
+            text=every_item(FIRST_ITEM, SECOND_ITEM).replace(
+                "one per line:", "one per line: (cut)"
+            )
+        ),
+        harness(text=HARNESS_TRACEBACK.replace("CHANGED'\n", "CHANGED' (cut)\n")),
         # The traceback's source, not a raised line, as a diff's line.
         harness(
             text=HARNESS_TRACEBACK.replace("E         Left contains", "  Left contains")
@@ -233,6 +239,8 @@ def harness(**change):
         "every-item-fewer-than-counted",
         "every-item-fewer-than-counted-at-the-end",
         "every-item-none-counted",
+        "every-item-header-with-text-after",
+        "one-item-with-text-after",
         "request-failed-not-raised",
         "empty",
     ],
