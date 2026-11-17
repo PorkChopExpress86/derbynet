@@ -840,7 +840,7 @@ def test_waits_for_the_edit():
 def test_an_edit_during_the_run_is_left_as_it_is_and_named(project, mode):
     """Someone appends a line while the mutant's test runs: the tool puts
     nothing back over it, and names the file. The mutant's test ends on the
-    edit, not on a `--timeout`: under load a 3 s bound passed before pytest
+    edit, not on a `--timeout`: under load the bound passed before pytest
     reached the test, and the tool exited first (#367)."""
     module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
     commit(project, module, WAITS_FOR_THE_EDIT)
