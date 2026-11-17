@@ -9,7 +9,7 @@
 # so a long run is never cut short or filtered.  It stops only the loops it
 # started.
 #
-# Usage: server/tools/pytest-under-load.sh [--postgres] [--loops N] [pytest argument ...]
+# Usage: server/tools/pytest-under-load.sh [--postgres] [--loops N] [--flake-ticket] [pytest argument ...]
 #
 #   server/tools/pytest-under-load.sh --postgres -m browser -n 4 --count 25 -k phone ui/tests/browser/test_photos.py
 #
@@ -20,8 +20,20 @@
 # server/, or DERBYNET_LOAD_RUN_DIR, which must be new or empty: pytest.log
 # and junit.xml.  At the end it prints pytest's summary lines, with -rfE's
 # list of failures and errors, and the log's path.  It exits with pytest's
-# status.  Run it with the Bash tool's run_in_background rather than under
+# status, unless a rerun after net::ERR_NETWORK_CHANGED passes the run
+# (below).  Run it with the Bash tool's run_in_background rather than under
 # `timeout`, which loses the run.
+#
+# When every failure and error is net::ERR_NETWORK_CHANGED, as a page load
+# or a failed request (tools/network_changed.py), it reruns the failed files
+# alone, with no loops and `-n 0`, before it frees the lock, keeping the
+# run's database, font and `-m`, `-k` and `-p` options, into rerun.log and
+# rerun-junit.xml beside the first run's (D122).  With veth lines in the
+# kernel log over the first run and a clean rerun, it exits 0: the run
+# counts as passed for D101's repeats only.  --flake-ticket keeps pytest's
+# status whatever the rerun does: a flake ticket's race keeps its 25 runs.
+# #308, #317, #341 and #348 each started that rerun by hand, sometimes after
+# the lock had gone to the next run.
 #
 # One load run at a time per machine: it takes an exclusive flock on
 # DERBYNET_LOAD_LOCK (default ~/.cache/derbynet/load-run.lock) before it
@@ -61,10 +73,12 @@ SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER=(uv run pytest)
 ALL_ARGS="$*"
 LOOPS=8
+FLAKE_TICKET=
 while [ $# -gt 0 ]; do
   case "$1" in
     --postgres) RUNNER=("$SERVER_DIR/tools/pytest-postgres.sh"); shift ;;
     --loops) LOOPS="$2"; shift 2 ;;
+    --flake-ticket) FLAKE_TICKET=--flake-ticket; shift ;;
     *) break ;;
   esac
 done
@@ -173,12 +187,13 @@ sed -n '/short test summary info/,$p' "$OUT/pytest.log"
 grep -q 'short test summary info' "$OUT/pytest.log" || tail -n 5 "$OUT/pytest.log"
 # Chromium's net::ERR_NETWORK_CHANGED marks the machine's network changing,
 # as another project's container joins or leaves a Docker bridge. The rule
-# for it (rerun the failed file alone at once, and report both) needs the
-# kernel log's veth lines over the run, which #348 read by hand three times
-# (#348 retro). This names them and the files to rerun; the status stays
-# pytest's.
+# for it (D122) needs the kernel log's veth lines over the run, which #348
+# read by hand three times (#348 retro), and a rerun of the failed files
+# alone, which tools/network_changed.py names when every failure is one.
+final=$status
 if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; then
   veth="no journalctl here"
+  veth_count=
   if command -v journalctl >/dev/null; then
     # A failed read is named, not counted: 0 veth lines would read as a
     # real failure under the rerun rule.  So is a journalctl that reads no
@@ -186,22 +201,43 @@ if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; t
     if [ -z "$(journalctl -k -n 1 -q 2>/dev/null)" ]; then
       veth="no count (journalctl reads no kernel log here)"
     elif journal=$(journalctl -k --since "@$STARTED" --until "@$ENDED" 2>&1); then
-      veth="$(grep -c veth <<<"$journal" || true) veth lines"
+      veth_count=$(grep -c veth <<<"$journal" || true)
+      veth="$veth_count veth lines"
     else
       veth="no count (journalctl failed: $(head -n 1 <<<"$journal"))"
     fi
   fi
-  files=$(sed -n '/short test summary info/,$p' "$OUT/pytest.log" |
-    sed -n 's/^\(FAILED\|ERROR\) \([^: ]*\.py\).*/\2/p' | sort -u | tr '\n' ' ')
   echo "net::ERR_NETWORK_CHANGED in the log; the kernel log has $veth from" \
        "@$STARTED to @$ENDED (journalctl -k --since @$STARTED --until @$ENDED | grep veth)."
-  # With no file named, the command would run every browser test.
-  if [ -n "$files" ]; then
-    echo "Rerun each failed file alone at once, and report both results:" \
-         "${DERBYNET_BROWSER_FONT:+DERBYNET_BROWSER_FONT=\"$DERBYNET_BROWSER_FONT\" }${RUNNER[*]} -m browser -n 0 ${files% }"
+  if rerun=$(python3 -I "$SERVER_DIR/tools/network_changed.py" rerun-args \
+               "$OUT/junit.xml" "$OUT/pytest.log" -- "$@"); then
+    mapfile -t RERUN <<<"$rerun"
+    echo "Rerunning the failed files alone, with no load, before the lock is freed:" \
+         "${DERBYNET_BROWSER_FONT:+DERBYNET_BROWSER_FONT=\"$DERBYNET_BROWSER_FONT\" }${RUNNER[*]} ${RERUN[*]}"
+    echo "Rerun log: $OUT/rerun.log"
+    DERBYNET_LOAD_LOCK_HELD="$LOCK" \
+      "${RUNNER[@]}" -rfE --junitxml="$OUT/rerun-junit.xml" "${RERUN[@]}" \
+      >"$OUT/rerun.log" 2>&1 9>&- &
+    RUN_PID=$!
+    rerun_status=0
+    wait "$RUN_PID" || rerun_status=$?
+    RUN_PID=
+    sed -n '/short test summary info/,$p' "$OUT/rerun.log"
+    grep -q 'short test summary info' "$OUT/rerun.log" || tail -n 5 "$OUT/rerun.log"
+    echo "rerun exited $rerun_status; log: $OUT/rerun.log; junit: $OUT/rerun-junit.xml"
+    final=0
+    python3 -I "$SERVER_DIR/tools/network_changed.py" outcome \
+      "$status" "$veth_count" "$rerun_status" $FLAKE_TICKET || final=$?
+    # Anything but a pass is pytest's own status.
+    [ "$final" = 0 ] || final=$status
   else
-    echo "No failed file is named in the summary: rerun the run's own command."
+    echo "$rerun"
   fi
 fi
-echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml"
-exit "$status"
+if [ "$final" = "$status" ]; then
+  echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml"
+else
+  echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml;" \
+       "the script exits $final (D122)"
+fi
+exit "$final"
