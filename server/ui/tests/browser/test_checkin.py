@@ -57,9 +57,6 @@ def folders(event, tmp_path):
     return tmp_path
 
 
-PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
-
-
 def open_checkin(page):
     page.goto("/checkin/")
     expect(page.locator("#checkin-list")).to_be_visible()
@@ -248,7 +245,7 @@ def round_running(event):
     return wolves, late
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 @pytest.mark.parametrize("answer", ["Yes", "No"])
 def test_a_pass_during_round_1_asks_to_add_the_car(
     login, browser, live_server, event, round_running, answer
@@ -302,7 +299,7 @@ def test_a_pass_during_round_1_asks_to_add_the_car(
 # ----- D32: a request for a place in the final -----
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_racer_after_round_1_requests_a_place_in_the_final(
     login, browser, live_server, event
 ):
@@ -360,7 +357,7 @@ def test_the_racer_sheet_saves_both_award_settings(login, event):
     assert racer.exclude and racer.not_eligible_for_speed_awards
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_the_partition_field_lists_exactly_the_partitions(login, event):
     """A picker of the existing partitions with no typed entry, on the add
     and the edit sheet; picking another moves the racer (D34)."""
@@ -415,7 +412,7 @@ def test_a_pass_on_one_station_shows_on_another_within_12_s(
     other.close()
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_pass_whose_card_a_poll_replaced_still_refreshes_the_list(login, event):
     """A poll's swap can replace the card while its switch's POST is out. The
     reply's checkin-refresh must still reach the list, or the card shows
@@ -439,7 +436,7 @@ def test_a_pass_whose_card_a_poll_replaced_still_refreshes_the_list(login, event
     expect(card(page, racer)).to_have_attribute("data-passed", "1", timeout=3_000)
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_unpass_then_undo_leaves_the_racer_passed(login, event):
     """No confirm() dialog: the page fixture fails on any dialog."""
     racer = add_racers(event, "Scouts", 1, 101)[0]
@@ -591,7 +588,7 @@ RED_CORNER = """() => {
 }"""
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_the_crop_sheet_turns_the_photo_left_and_right(login, event, folders):
     """Turn left turns the stored photo a quarter counterclockwise and Turn
     right a quarter clockwise (PHP's `photo.rotate` takes its angle
@@ -802,7 +799,7 @@ def test_phone_landscape_layout(browser, live_server, event, page_errors):
     context.close()
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_long_name_keeps_the_phone_list_one_screen_wide(login, event):
     """A card is no wider than the list, whatever the name, so the page never
     scrolls sideways on a phone. The list's column took the width of its
@@ -878,7 +875,7 @@ def weigh_partitions(event):
         set_partition_weigh_in(partition, mode, "oz", "5")
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 @pytest.mark.parametrize("partition", ["Scouts", "Outlaws"])
 def test_the_owners_station_flow_with_a_weigh_in(login, event, folders, partition):
     """D6 with D8 and D54, on a phone: the volunteer weighs the car, enters

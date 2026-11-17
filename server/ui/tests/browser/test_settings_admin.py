@@ -24,9 +24,6 @@ def _data_dir(settings, tmp_path):
     settings.DATA_DIR = tmp_path
 
 
-PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
-
-
 def saved(page):
     return htmx_post(page, "/settings/save/")
 
@@ -259,7 +256,7 @@ def test_a_fresh_install_reaches_the_dashboard_through_the_wizard(page, no_event
     assert Racer.objects.filter(event=event).count() > 0
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_make_fake_roster_on_a_phone(login, event):
     """Acceptance: 6 groups of 5, every racer checked in: exactly 30 (C57;
     racer.fake swings each group by up to 2, `action.racer.fake.inc:32-36`)."""
@@ -281,7 +278,7 @@ def test_make_fake_roster_on_a_phone(login, event):
     assert made.filter(passed_inspection=True).count() == 30
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_purge_racers_on_a_phone(login, event):
     """Acceptance: the count, a snapshot, then the delete."""
     add_racers(event, "Lions", 42, 101)

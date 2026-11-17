@@ -31,9 +31,6 @@ from ui.tests.browser.helpers import bound, ready
 DESIGN = 1
 
 
-PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
-
-
 def racer(event, name, partition, car, **flags) -> Racer:
     made = insert_new_racer(
         event,
@@ -130,7 +127,7 @@ def edit_award(page, award):
 # ----- acceptance: a judge on a phone -----
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_judge_on_a_phone_assigns_and_removes_an_award(login, event):
     """At 390x844, as the race crew: tap a racer, tap an award on the
     racer's sheet, then remove the award from its card, and Undo. No drag."""
@@ -198,7 +195,7 @@ def test_the_wrong_subgroup_is_refused_with_a_visible_reason(login, event):
 # ----- acceptance: D35, Parents -----
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_parents_win_a_pack_judged_award_until_the_editor_leaves_them_out(login, event):
     """At 390x844 (D35): with the pack's speed-award list leaving out
     Parents, the Parents racer can be given a pack-wide judged award whose
@@ -319,7 +316,7 @@ def test_the_no_kiosk_warning_shows_and_hides(login, event):
     expect(warning).to_have_count(0)
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_long_award_name_keeps_the_phone_list_one_screen_wide(login, event):
     """A card is no wider than the list, whatever the award's name, so the
     editor never scrolls sideways on a phone. With no phone columns the list's

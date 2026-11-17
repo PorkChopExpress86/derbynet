@@ -162,12 +162,9 @@ PAGES = (
 )
 
 
-PHONE_ONLY = pytest.mark.sizes(
+@pytest.mark.sizes(
     "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
 )
-
-
-@PHONE_ONLY
 @pytest.mark.parametrize("key", PAGES)
 def test_a_long_title_shows_whole_in_the_banner_on_a_phone(page, event, key):
     """The long title wraps to two lines at 0.36 of the banner inside the
@@ -182,7 +179,9 @@ def test_a_long_title_shows_whole_in_the_banner_on_a_phone(page, event, key):
     shoot(page, f"kiosk-banner-{name(key)}")
 
 
-@PHONE_ONLY
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_scale_mph_shows_its_own_title_whole_on_a_phone(page, event):
     """ "Scale Miles Per Hour", which the master branch cut to "Scale Miles
     Per H..." (#256)."""
@@ -192,7 +191,9 @@ def test_scale_mph_shows_its_own_title_whole_on_a_phone(page, event):
     whole_title(page)
 
 
-@PHONE_ONLY
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_a_one_line_title_keeps_the_banner_height_on_a_phone(page, event):
     """A short title leaves the banner at `--k-banner`, a minimum on a
     phone, as on a TV."""
@@ -205,7 +206,9 @@ def test_a_one_line_title_keeps_the_banner_height_on_a_phone(page, event):
     assert height(m) == pytest.approx(m["kBanner"], abs=0.5), m
 
 
-@PHONE_ONLY
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 @pytest.mark.parametrize(
     "key, group",
     (
@@ -285,7 +288,9 @@ LANE_FIT = """() => [...document.querySelectorAll('[data-now-racing] [data-lane]
   })"""
 
 
-@PHONE_ONLY
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_a_title_that_grows_with_the_same_lineup_keeps_the_lanes_fitted(
     page,
     event,
@@ -320,7 +325,9 @@ def test_a_title_that_grows_with_the_same_lineup_keeps_the_lanes_fitted(
     shoot(page, "kiosk-banner-grows-in-place")
 
 
-@PHONE_ONLY
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_the_phone_rules_hold_at_640_px(page, event):
     """640 px wide is the phone's widest (kiosk.css's `max-width: 640px`):
     the title wraps there at 0.36 of the banner. 641 px is in

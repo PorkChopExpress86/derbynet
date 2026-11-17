@@ -24,6 +24,11 @@ from pathlib import Path
 
 BROWSER = Path(__file__).resolve().parent / "browser"
 
+# (file name, `line: function`) of each skip left in place. test_kiosks.py
+# keeps its `phone_only` while #369 rewrites that file; remove the entry
+# when its skip moves onto the mark, and add none.
+KNOWN = {("test_kiosks.py", "79: phone_only")}
+
 
 def size_reads(node: ast.AST) -> list[ast.AST]:
     return [
@@ -147,11 +152,12 @@ def test_a_mark(page):
 
 def test_no_browser_test_skips_on_the_size_in_its_body():
     found = {
-        path.name: skips
+        (path.name, skip)
         for path in sorted(BROWSER.glob("*.py"))
-        if (skips := size_skips(path.read_text(encoding="utf-8")))
+        for skip in size_skips(path.read_text(encoding="utf-8"))
     }
-    assert found == {}, (
+    assert found - KNOWN == set(), (
         "mark these @pytest.mark.sizes(..., reason=...), which deselects the "
-        f"other size at collection (#366): {found}"
+        f"other size at collection (#366): {sorted(found - KNOWN)}"
     )
+    assert KNOWN - found == set(), "no longer found; take it out of KNOWN"

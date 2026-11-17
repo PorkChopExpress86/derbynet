@@ -69,16 +69,6 @@ def _polls_may_be_cut_short(page_errors):
     page_errors.allow(ABORTED)
 
 
-DESKTOP_ONLY = pytest.mark.sizes(
-    "desktop", reason="the browser timer needs desktop Chrome or Edge"
-)
-
-
-PHONE_ONLY = pytest.mark.sizes(
-    "phone", reason="this acceptance check runs once, at 390x844"
-)
-
-
 def timer_message(page, fields: str) -> str:
     """A timer message from the page's session, as `derby-timer.jar` posts."""
     reply = page.request.post(
@@ -100,7 +90,7 @@ def connect(page, lanes=4):
 # ----- the browser timer -----------------------------------------------------------
 
 
-@DESKTOP_ONLY
+@pytest.mark.sizes("desktop", reason="the browser timer needs desktop Chrome or Edge")
 def test_the_browser_timer_loads_every_file(login, page_errors):
     """Acceptance: `/timer.php` in headless Chrome with no 404 for any
     script, stylesheet, image or worker. It replaces the `timer.php` load of
@@ -139,7 +129,7 @@ def test_the_browser_timer_loads_every_file(login, page_errors):
     shoot(page, "browser-timer")
 
 
-@DESKTOP_ONLY
+@pytest.mark.sizes("desktop", reason="the browser timer needs desktop Chrome or Edge")
 def test_only_a_race_coordinator_gets_the_timer_settings_button(page, event):
     """D53: `timer.settings` needs CONTROL_RACE, so a Timer login sees no
     button; the race-day laptop logs in as RaceCoordinator."""
@@ -208,7 +198,7 @@ def test_the_fake_timer_page_at_both_sizes(login, event):
     shoot(page, "fake-timer")
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check runs once, at 390x844")
 def test_the_fake_timer_races_a_heat_in_auto_mode(login, event):
     """Acceptance: the fake timer in auto mode races a 4-lane heat against
     Django, and the race dashboard shows the result."""
@@ -248,7 +238,7 @@ def race_heat_1_by_hand(page, round_):
     assert heat_1.exclude(finish_time=None).count() == 4
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check runs once, at 390x844")
 def test_fake_timer_parity_lanes_start_and_stop(login, event):
     """Parity: lane count, Start and a Stop per lane."""
     page = login("RaceCoordinator")
@@ -265,7 +255,7 @@ def test_fake_timer_parity_lanes_start_and_stop(login, event):
     race_heat_1_by_hand(page, wolves)
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check runs once, at 390x844")
 def test_the_timer_role_races_a_heat_from_the_fake_timer(login, event):
     """Acceptance (D96): logged in as Timer through the login page, the fake
     timer opens, and the lane results it sends are accepted. Timer holds
@@ -438,7 +428,7 @@ def test_timer_test_parity_simulate_lanes_and_results(login, event):
     assert not RaceState.objects.get(event=event).timer_test
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check runs once, at 390x844")
 def test_identified_waits_for_hello(login, event, page_errors):
     """PHP's send_hello() sends IDENTIFIED from HELLO's success callback, so a
     HELLO that fails sends no IDENTIFIED."""
@@ -466,7 +456,7 @@ def test_identified_waits_for_hello(login, event, page_errors):
     page.goto("/timer/")
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check runs once, at 390x844")
 def test_the_log_tail_backs_off(login, event):
     """timer-test.js:345-354: 50 ms after data, then twice the wait up to 1 s;
     each read starts at the last size seen. The whole log stays on the

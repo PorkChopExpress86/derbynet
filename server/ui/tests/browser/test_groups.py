@@ -23,8 +23,6 @@ from ui.tests.browser.conftest import (
 )
 from ui.tests.race import add_racers, race_setup, scheduled
 
-PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
-
 
 def dens(event, names=("Lions", "Tigers", "Parents")):
     for i, name in enumerate(names, 1):
@@ -74,7 +72,7 @@ def order(event, model, **where) -> list[str]:
 # ----- D31: the rule change and its warning ----------------------------------------
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_rule_change_warns_what_it_deletes(login, event):
     """At 390x844: the warning names the rounds, schedules, group awards and
     playlist steps a change deletes, and the counts match the rows gone
@@ -214,7 +212,7 @@ def test_partition_add_rename_delete_and_ranges(login, event):
 # ----- D35: the speed-award partition lists ----------------------------------------
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_the_pack_and_subgroup_partition_lists(login, event):
     """At 390x844: unchecking Parents on the pack's list saves a list
     without it, and a subgroup's list with every box checked stores none."""
@@ -286,7 +284,7 @@ def test_a_partition_moved_into_a_group_joins_its_all_partitions_list(login, eve
 # ----- Move to..., reorder ------------------------------------------------------------
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_subgroup_moves_through_the_move_sheet_on_a_phone(login, event):
     dens(event)
     groups.form_groups_by_rule(event, "one-group")

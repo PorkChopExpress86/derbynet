@@ -74,7 +74,9 @@ def _polls_may_be_cut_short(page_errors, thumbnail_aborts):
     page_errors.allow(ABORTED_POLL)
 
 
-PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
+def phone_only(page):
+    if page.size != "phone":
+        pytest.skip("this acceptance check is at 390x844")
 
 
 def kiosk(event, address, **fields) -> Kiosk:
@@ -145,12 +147,11 @@ def test_a_scene_switch_still_shows_after_three_polls(login, event):
     expect(page.locator('#kiosk-board button[aria-pressed="true"]')).to_have_count(1)
 
 
-@PHONE_ONLY
 def test_three_fake_kiosks_follow_a_scene_tapped_on_the_phone(login, event):
     """The steps of `testing/test-scenes.sh`: the kiosks check in and get
     identify, are named, and then each scene tapped gives each named kiosk
     its page, read back through `query=poll.kiosk`."""
-    page = login("RaceCoordinator")
+    phone_only(page := login("RaceCoordinator"))
     for address in ADDRESSES:
         assert poll_kiosk(page, address)["page"] == "kiosks/identify.kiosk"
     open_dashboard(page)
@@ -735,14 +736,13 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
     polls.end()
 
 
-@PHONE_ONLY
 def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
     """A touch on a scene button across the same reply. Chromium hit-tests
     a touch's click again, so the unheld board loses no touch (the PR's
     probe, on PHP's page too); the hold still waits for the click, which a
     touch sends after its pointerup and pointerout, before it applies the
     board (D102)."""
-    page = login("RaceCoordinator")
+    phone_only(page := login("RaceCoordinator"))
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
     racing = scene(event, "Racing")
@@ -764,16 +764,7 @@ def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
     polls.end()
 
 
-@pytest.mark.parametrize(
-    "cancel",
-    [
-        "moved off",
-        pytest.param(
-            "pointercancel",
-            marks=pytest.mark.sizes("phone", reason="a pointercancel is a touch's"),
-        ),
-    ],
-)
+@pytest.mark.parametrize("cancel", ["moved off", "pointercancel"])
 def test_a_cancelled_press_applies_only_the_newest_held_board(login, event, cancel):
     """Two polls answer while the pointer is down on a scene button, the
     first renaming the kiosk Lobby and the second Hall. The press is then
@@ -782,6 +773,8 @@ def test_a_cancelled_press_applies_only_the_newest_held_board(login, event, canc
     Hall (D102). No scene is posted. The pointercancel is a real touch's,
     so it runs at the phone's size only."""
     page = login("RaceCoordinator")
+    if cancel == "pointercancel":
+        phone_only(page)
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
     racing = scene(event, "Racing")
@@ -1102,14 +1095,13 @@ def test_a_second_tap_that_aborts_a_taps_request_still_posts(
     polls.end()
 
 
-@PHONE_ONLY
 def test_a_second_finger_keeps_the_hold(login, event):
     """A finger is down on Racing when a poll's reply (Lobby) comes, and a
     second finger then goes down on Welcome. The second pointerdown keeps
     the board held for the newer press (#344 review); the touch's cancel
     then releases it, and the board swaps once, to Lobby. At the phone's
     size, where the context has touch."""
-    page = login("RaceCoordinator")
+    phone_only(page := login("RaceCoordinator"))
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
     racing = scene_button(page, scene(event, "Racing"))

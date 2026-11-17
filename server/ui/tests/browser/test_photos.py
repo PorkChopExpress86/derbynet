@@ -40,9 +40,6 @@ def folders(event, tmp_path):
     return tmp_path
 
 
-PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
-
-
 def jpeg(path: Path, color=(30, 120, 200), size=(600, 800)) -> Path:
     Image.new("RGB", size, color).save(path, "JPEG")
     return path
@@ -82,7 +79,7 @@ def render_size(page, url: str) -> tuple[int, int]:
 # ----- tap to assign, unassign with Undo -----------------------------------------
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_phone_assigns_and_unassigns_with_no_drag(login, event, folders):
     """Acceptance: tap a racer, then a photo; Unassign and Undo; tap a
     photo, then a racer found by search. No step drags."""
@@ -141,7 +138,7 @@ def test_a_phone_assigns_and_unassigns_with_no_drag(login, event, folders):
 # ----- the check-in car photo, cropped and turned here ---------------------------
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_check_in_car_photo_shows_assigned_and_crops_and_turns(login, event, folders):
     """Acceptance: the car photo taken at check-in (#42) is the racer's in
     the Cars repository with no other step, and Turn and Crop change the
@@ -269,7 +266,7 @@ def test_bulk_upload_retries_a_failed_file(
         assert max(uploaded.size) <= 1600
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_big_photo_is_downscaled_before_upload(login, event, folders, tmp_path):
     big = tmp_path / "big.jpg"
     Image.new("RGB", (4000, 3000), (10, 200, 10)).save(big, "JPEG")
@@ -284,7 +281,7 @@ def test_a_big_photo_is_downscaled_before_upload(login, event, folders, tmp_path
 # ----- delete ----------------------------------------------------------------------
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_delete_removes_the_photo_from_the_pool_and_the_racer(login, event, folders):
     racer = add_racers(event, "Scouts", 1, 101)[0]
     jpeg(folders / "racers" / "a.jpg")
@@ -390,7 +387,7 @@ def test_a_missing_folder_hides_upload(login, event, folders):
 # ----- Take photo ------------------------------------------------------------------
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_take_photo_from_a_racer_card(login, event, folders):
     racer = add_racers(event, "Scouts", 1, 101)[0]
     page = login("RaceCrew")

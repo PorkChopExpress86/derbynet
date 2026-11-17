@@ -25,9 +25,6 @@ from ui.tests.race import car_times, race_setup, run_heat, scheduled, standings_
 DATA = Path(__file__).resolve().parents[4] / "testing" / "data"
 
 
-PHONE_ONLY = pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
-
-
 # ----- results by racer --------------------------------------------------------
 
 
@@ -251,7 +248,7 @@ def import_now(page):
     htmx_settled(page)
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 @pytest.mark.parametrize(
     "name", sorted(n for n in import_golden.ROSTERS if n.endswith(".csv"))
 )
@@ -310,7 +307,7 @@ def test_the_xlsx_roster_imports_from_the_chosen_sheet(login, event):
     assert RaceSettings.objects.get(event=event).partition_label == "Patrol"
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_the_header_switch_and_the_combined_name_field(login, event, tmp_path):
     path = tmp_path / "names.csv"
     path.write_text("Ann Able,Lions,101\nBob Baker,Tigers,102\n")
@@ -333,7 +330,7 @@ def test_the_header_switch_and_the_combined_name_field(login, event, tmp_path):
     ]
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_the_car_name_from_and_award_eligibility_fields(login, event, tmp_path):
     """The roster fields beside the names, the partition and the car number,
     each picked from its header."""
@@ -359,7 +356,7 @@ def test_the_car_name_from_and_award_eligibility_fields(login, event, tmp_path):
     ) == [("Ann", "Zoom", "Pack 1", False), ("Bob", "Bolt", "Pack 2", True)]
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_the_award_subgroup_and_winning_car_fields(login, event, tmp_path):
     """An award for a subgroup takes its group from the subgroup, and the
     winning car number names the racer, as `award.import` reads them
@@ -427,7 +424,7 @@ def test_a_roster_with_one_bad_row_imports_nothing(login, event, tmp_path):
     shoot(page, "import-error")
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_d34_a_case_variant_joins_the_existing_partition(login, event, tmp_path):
     insert_new_racer(event, first_name="Old", last_name="Timer", partition_name="Lions")
     path = tmp_path / "roster.csv"
@@ -482,7 +479,7 @@ def test_awards_and_results_import(login, event):
     assert RaceState.objects.get(event=event)
 
 
-@PHONE_ONLY
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_double_tap_on_import_imports_once(login, event, tmp_path, page_errors):
     # The third tap is refused with a 422 toast, which the browser logs.
     page_errors.allow(r"status of 422|/import/roster/run/")

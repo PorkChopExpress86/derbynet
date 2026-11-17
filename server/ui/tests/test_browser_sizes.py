@@ -100,9 +100,9 @@ def test_the_collection_hook_deselects_the_dropped_cases():
 
 
 def test_a_collection_lists_no_case_at_a_size_the_test_does_not_name():
-    """A real collection, in its own process: a test marked on itself and a
-    case marked through `pytest.param(..., marks=...)` keep only the sizes
-    they name, and `--strict-markers` knows the mark."""
+    """A real collection, in its own process: a marked test, parametrized or
+    not, keeps only the size it names, an unmarked one keeps both, and
+    `--strict-markers` knows the mark."""
     env = {k: v for k, v in os.environ.items() if k != "PYTEST_ADDOPTS"}
     result = subprocess.run(
         [
@@ -119,9 +119,8 @@ def test_a_collection_lists_no_case_at_a_size_the_test_does_not_name():
             "-q",
             "-k",
             "test_the_camera_page or test_the_delay_counts_after_the_post_roll"
-            " or test_a_cancelled_press_applies_only_the_newest_held_board",
+            " or test_the_page_cuts_a_clip_as_the_service_does",
             "ui/tests/browser/test_replay.py",
-            "ui/tests/browser/test_kiosks.py",
         ],
         cwd=SERVER_DIR,
         env=env,
@@ -132,14 +131,18 @@ def test_a_collection_lists_no_case_at_a_size_the_test_does_not_name():
     assert result.returncode == 0, result.stdout + result.stderr
     ids = [line for line in result.stdout.splitlines() if "::" in line]
     replay = "ui/tests/browser/test_replay.py::"
-    press = "ui/tests/browser/test_kiosks.py::" + (
-        "test_a_cancelled_press_applies_only_the_newest_held_board"
-    )
     assert ids == [
         f"{replay}test_the_camera_page[phone-chromium]",
         f"{replay}test_the_camera_page[desktop-chromium]",
+        *(
+            f"{replay}test_the_page_cuts_a_clip_as_the_service_does"
+            f"[desktop-chromium-{clip}]"
+            for clip in (
+                "4000-2000-10000",
+                "4000-2000-5000",
+                "9000-3000-10000",
+                "500-0-300",
+            )
+        ),
         f"{replay}test_the_delay_counts_after_the_post_roll[desktop-chromium]",
-        f"{press}[phone-chromium-moved off]",
-        f"{press}[phone-chromium-pointercancel]",
-        f"{press}[desktop-chromium-moved off]",
     ], result.stdout
