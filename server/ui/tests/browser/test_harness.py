@@ -356,6 +356,56 @@ def test_the_collection_hook_runs_the_harness_check():
         conftest.pytest_collection_modifyitems([collected(here / "test_b.py", "page")])
 
 
+def wait_until(page, check, what):
+    """Wait until `check()` holds, reading Playwright's events every 20 ms,
+    for at most `InFlight.TIMEOUT_MS`."""
+    for _ in range(InFlight.TIMEOUT_MS // 20):
+        if check():
+            return
+        page.wait_for_timeout(20)
+    raise AssertionError(f"{what} not within {InFlight.TIMEOUT_MS} ms")
+
+
+class Sent:
+    """A stand-in request of `resource_type`, sent by `frame`."""
+
+    def __init__(self, frame, resource_type):
+        self.frame = frame
+        self.resource_type = resource_type
+
+
+class RefusedFrame:
+    """A request whose `frame` Playwright refuses, as it does a
+    `target="_blank"` popup's navigation request."""
+
+    def __init__(self, resource_type):
+        self.resource_type = resource_type
+
+    @property
+    def frame(self):
+        from playwright.sync_api import Error
+
+        raise Error("Frame for this navigation request is not available")
+
+
+def test_a_navigation_keeps_a_request_whose_frame_is_refused():
+    """`InFlight.navigated` drops a frame's own requests of the types in
+    `ORPHANED`, and keeps its document request, another frame's request and
+    a request whose frame Playwright refuses (#378). Only a navigation
+    request has its frame refused, and that is a document, which `ORPHANED`
+    never holds (`test_a_blank_link_followed_while_a_frame_navigates_is_tracked`),
+    so these requests are stand-ins."""
+    in_flight = InFlight(SimpleNamespace(on=lambda event, listener: None))
+    navigated, other = object(), object()
+    own = Sent(navigated, "fetch")
+    document = Sent(navigated, "document")
+    others = Sent(other, "fetch")
+    refused = RefusedFrame("fetch")
+    in_flight.requests = {own, document, others, refused}
+    in_flight.navigated(navigated)
+    assert in_flight.requests == {document, others, refused}
+
+
 # A page with an iframe and a `target="_blank"` link to a popup.
 FRAME_AND_BLANK_LINK = """() => {
   const frame = document.createElement('iframe');
@@ -377,46 +427,48 @@ def test_a_blank_link_followed_while_a_frame_navigates_is_tracked(page, event):
     `InFlight.navigated`, which read every request's frame, raised from the
     `framenavigated` listener; the test's next call failed with it (#344's
     Preview test, whose thumbnails swap; #378). The harness now keeps
-    tracking that request, and drains it once the popup's page loads."""
+    tracking that request, and drains it once the popup's page loads. It is
+    a document request, and the opener's own `request` listener never sees
+    it, since Playwright gives it no page; so a recorder there that reads
+    `request.frame`, as `test_kiosk_thumbnails.py`'s does, never meets it."""
     held = []
     page.context.route("**/popup-target", lambda route: held.append(route))
     page.route(
         "**/frame-target?*",
         lambda route: route.fulfill(body="<p>frame</p>", content_type="text/html"),
     )
+    on_the_opener = []
+    page.on("request", lambda r: on_the_opener.append(r.url))
     page.goto("/login/")
     with page.expect_event(
         "framenavigated", lambda f: f.url.endswith("/frame-target?first")
     ):
         page.evaluate(FRAME_AND_BLANK_LINK)
     page.click("#blank-link")
-    for _ in range(500):
-        if held:
-            break
-        page.wait_for_timeout(20)
+    wait_until(page, lambda: held, "the popup's request")
     assert len(held) == 1
+    request = held[0].request
+    assert request.resource_type == "document"
+    assert request.is_navigation_request()
     # The popup has no page yet while its request is held.
     assert page.context.pages == [page]
     page.evaluate(
         "() => { document.querySelector('iframe').src = '/frame-target?second'; }"
     )
-    # Not `expect_event`: its waiter listens after the harness, whose raise
-    # kept the event from it, so without the fix the test timed out instead
-    # of failing with the error (#378's PR). Playwright sets a frame's url
-    # just before it emits `framenavigated`, and the next call raises what
-    # a listener raised.
-    for _ in range(500):
-        if any(f.url.endswith("/frame-target?second") for f in page.frames):
-            break
-        page.wait_for_timeout(20)
-    page.wait_for_timeout(20)
-    assert any(f.url.endswith("/frame-target?second") for f in page.frames)
+    wait_until(
+        page,
+        lambda: any(f.url.endswith("/frame-target?second") for f in page.frames),
+        "the iframe's navigation",
+    )
     assert [r.url for r in page.in_flight.requests if "popup-target" in r.url] == [
-        held[0].request.url
+        request.url
     ]
+    # No tab is known to have sent it, and asking does not raise.
+    assert request not in page.in_flight.of(page)
     with page.context.expect_page() as opened:
         held[0].fulfill(body="<p>popup</p>", content_type="text/html")
     popup = opened.value
     expect(popup.locator("p")).to_have_text("popup")
     assert page.in_flight.drain(page) == []
+    assert not [url for url in on_the_opener if "popup-target" in url]
     close_tab(page, popup)

@@ -440,9 +440,11 @@ def _frame_of(request):
     service worker's request, and a `target="_blank"` link's navigation
     request, sent before Playwright has its popup's page
     (`test_a_blank_link_followed_while_a_frame_navigates_is_tracked`, #378)."""
+    from playwright.sync_api import Error
+
     try:
         return request.frame
-    except Exception:  # noqa: BLE001 - Playwright raises a bare Error
+    except Error:
         return None
 
 
