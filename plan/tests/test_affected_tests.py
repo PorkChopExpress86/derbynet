@@ -2704,13 +2704,43 @@ class HelperAdditions(unittest.TestCase):
                 self.assert_keeps(head, 'it adds the def late, a default of which runs '
                                   'on import')
         self.assertTrue(narrows(ADD_BASE, ADD_BASE + '\n\ndef late(page, at=-1, *, '
-                                'b=(1, "a"), c=None):\n    pass\n'))
+                                'b=(1, "a"), c=None, d):\n    pass\n'))
+
+    def test_a_default_literal_eval_refuses_with_a_type_error_keeps_them(self):
+        """#371 review, M1: `{[1]}` and `{[]: 1}` raise TypeError in
+        ast.literal_eval, not ValueError."""
+        for default in ('{[1]}', '{[]: 1}'):
+            with self.subTest(default=default):
+                self.assert_keeps(ADD_BASE + f'\n\ndef late(page, at={default}):\n    pass\n',
+                                  'it adds the def late, a default of which runs on import')
 
     def test_a_name_pytest_or_python_reads_keeps_them(self):
-        for name in ('__getattr__', 'pytest_configure', 'setup_module'):
+        """A test name too: a file that star-imports the module collects it
+        (#371 review, H2)."""
+        for name in ('__getattr__', 'pytest_configure', 'setup_module', 'test_smoke',
+                     'TestSmoke'):
             with self.subTest(name=name):
                 self.assert_keeps(ADD_BASE + f'\n\ndef {name}(x):\n    pass\n',
                                   f'it adds {name}, which pytest or Python reads by its name')
+
+    def test_a_changed_fixture_or_hook_is_named_as_one(self):
+        fixture = '\n\n@pytest.fixture\ndef clock(page):\n    return page\n'
+        self.assert_keeps(ADD_HEAD + fixture.replace('page\n', 'None\n'),
+                          'it changes or deletes the fixture clock', ADD_BASE + fixture)
+        hook = '\n\ndef pytest_configure(config):\n    return config\n'
+        self.assert_keeps(ADD_HEAD + hook.replace('config\n', 'None\n'),
+                          'it changes or deletes the hook pytest_configure', ADD_BASE + hook)
+
+    def test_a_module_with_no_docstring(self):
+        self.assertEqual(TOOL.additions('', 'def a(page):\n    pass\n'), (['a'], []))
+        base = 'import json\n'
+        self.assertEqual(TOOL.additions(base, base + '\n\ndef a(page):\n    pass\n'),
+                         (['a'], []))
+
+    def test_an_import_as_binds_its_alias(self):
+        head = ADD_HEAD.replace('from datetime import timedelta',
+                                'import datetime as dt\nimport os.path')
+        self.assertEqual(TOOL.additions(ADD_BASE, head), (['pause_at'], ['dt', 'os']))
 
     def test_an_import_alone_adds_no_function(self):
         head = ADD_BASE.replace('from playwright', 'import json\nfrom playwright')
@@ -2776,13 +2806,45 @@ class HelperNamers(unittest.TestCase):
                                  'ui/tests/browser/test_paused.py'])
         self.assertEqual(conftests, [])
 
+    def test_a_test_file_that_names_it_keeps_its_importers(self):
+        """#371 review, H1: test_kiosk_ondeck_labels.py imports open_kiosk
+        from test_kiosk_pages.py, and test_kiosk_banner.py fixtures from
+        test_kiosk_names.py; a helper open_kiosk calls reaches both."""
+        files = {**ADD_TREE,
+                 'server/ui/tests/browser/test_pages.py': (
+                     'from ui.tests.browser.helpers import pause_at\n\n\n'
+                     'def open_kiosk(page):\n    pause_at(page, 0)\n'),
+                 'server/ui/tests/browser/test_labels.py': (
+                     'from ui.tests.browser.test_pages import open_kiosk\n'),
+                 'server/ui/tests/browser/test_banner.py': (
+                     'from ui.tests.browser.test_labels import open_kiosk\n')}
+        tests, conftests, naming = self.namers(files)
+        self.assertEqual(tests, ['ui/tests/browser/test_banner.py',
+                                 'ui/tests/browser/test_calls.py',
+                                 'ui/tests/browser/test_labels.py',
+                                 'ui/tests/browser/test_pages.py'])
+        self.assertEqual(naming, ['ui/tests/browser/test_calls.py',
+                                  'ui/tests/browser/test_pages.py'])
+
     def test_a_star_import_keeps_every_importer(self):
-        files = {**ADD_TREE, 'server/ui/tests/browser/test_star.py': (
-            'from ui.tests.browser.helpers import *  # noqa\n')}
-        with self.assertRaises(TOOL.NotAddition) as caught:
+        """Over two lines too (#371 review, H2)."""
+        for text in ('from ui.tests.browser.helpers import *  # noqa\n',
+                     'from ui.tests.browser.helpers import \\\n    *  # noqa\n',
+                     'def f():\n    pass\n\n\nfrom ui.tests.browser import helpers  # noqa\n'
+                     'from os import *  # noqa\n'):
+            with self.subTest(text=text):
+                files = {**ADD_TREE, 'server/ui/tests/browser/test_star.py': text}
+                with self.assertRaises(TOOL.NotAddition) as caught:
+                    self.namers(files)
+                self.assertEqual(str(caught.exception),
+                                 'ui/tests/browser/test_star.py has a star import')
+
+    def test_an_importer_that_cannot_be_parsed_keeps_every_importer(self):
+        files = {**ADD_TREE, 'server/ui/tests/browser/test_broken.py': (
+            'from ui.tests.browser.helpers import ready\ndef broken(:\n')}
+        with self.assertRaisesRegex(TOOL.NotAddition,
+                                    r'^ui/tests/browser/test_broken.py cannot be parsed'):
             self.namers(files)
-        self.assertEqual(str(caught.exception),
-                         'ui/tests/browser/test_star.py has a star import')
 
     def test_no_importer_that_names_it_keeps_every_importer(self):
         with self.assertRaises(TOOL.NotAddition) as caught:
@@ -2833,16 +2895,20 @@ class HelperAdditionsThroughGit(unittest.TestCase):
         block = section(helper_diff(ADD_HEAD), HELPERS)
         self.assertEqual(block, (
             f'{HELPERS}\n'
-            '  [test-helper] a test helper whose diff only adds pause_at, and the import '
-            'of timedelta (#371): the importers that name an added function '
-            '(ui/tests/browser/test_calls.py), and the tests and conftest folders that '
-            'import a helper or conftest among them\n'
+            '  [test-helper] a test helper (#371): adds pause_at, which these files call: '
+            'ui/tests/browser/test_calls.py; and the tests and conftest folders that '
+            'import one of them; beside them it adds the import of timedelta\n'
             '      ui/tests/browser/test_calls.py'))
 
-    def test_an_uncommitted_addition_narrows_too(self):
-        block = section(helper_diff(ADD_HEAD, commit=False), HELPERS)
-        self.assertIn('only adds pause_at', block)
-        self.assertNotIn('      ui/tests/browser\n', block + '\n')
+    def test_an_uncommitted_addition_with_no_import_narrows_too(self):
+        head = ADD_BASE + '\n\ndef pause_at(page, at):\n    page.clock.install(time=at)\n'
+        block = section(helper_diff(head, commit=False), HELPERS)
+        self.assertEqual(block, (
+            f'{HELPERS}\n'
+            '  [test-helper] a test helper (#371): adds pause_at, which these files call: '
+            'ui/tests/browser/test_calls.py; and the tests and conftest folders that '
+            'import one of them\n'
+            '      ui/tests/browser/test_calls.py'))
 
     def test_a_changed_body_maps_to_every_importer(self):
         """#371's acceptance: a diff that changes an existing def's body."""
