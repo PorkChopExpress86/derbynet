@@ -10,11 +10,16 @@ import pytest
 
 from tools import network_changed as nc
 
-# The two forms #348's load run of test_kiosk_results_by_racer.py failed with.
+# The two forms #348's load runs failed with
+# (~/.cache/derbynet-drafts/348/load-noto-racer/junit.xml and
+# load3-dejavu-scale2/junit.xml): a raised Playwright error, whose junit
+# message starts with its class,
 PAGE_LOAD = (
     "playwright._impl._errors.Error: Page.goto: net::ERR_NETWORK_CHANGED at"
     " http://localhost:52751/kiosk.php?address=kiosk-test52"
 )
+# and the harness's teardown assert in ui/tests/browser/conftest.py, which
+# pytest writes as an <error> "failed on teardown with ...".
 REQUEST_FAILED = (
     "Left contains one more item: 'request failed:"
     " http://localhost:52751/kiosk.php?address=kiosk-test52"
@@ -24,6 +29,20 @@ TEARDOWN = (
     "failed on teardown with &quot;AssertionError: assert"
     " ['request fai...WORK_CHANGED']"
     " == []&#10;  &#10;  " + REQUEST_FAILED.replace("'", "&apos;") + "&quot;"
+)
+HARNESS_TRACEBACK = (
+    "        yield page\n"
+    "        try:\n"
+    "            no_sideways_scroll(page)\n"
+    "        finally:\n"
+    "            context.close()\n"
+    "&gt;       assert page_errors.final() == []\n"
+    "E       AssertionError: assert ['request fai...WORK_CHANGED'] == []\n"
+    "E         \n"
+    f"E         {REQUEST_FAILED}\n"
+    "E         Use -v to get more diff\n"
+    "\n"
+    "ui/tests/browser/conftest.py:614: AssertionError"
 )
 SUMMARY = (
     "=== short test summary info ===\n"
@@ -46,22 +65,25 @@ def failure(message="", text="", tag="failure"):
     return f'<{tag} message="{message}">{text}</{tag}>'
 
 
+HARNESS = failure(message=TEARDOWN, text=HARNESS_TRACEBACK, tag="error")
+
+
 @pytest.mark.parametrize(
     "element",
     [
         failure(message=PAGE_LOAD),
-        failure(text=f"    page.goto(url)\nE           {PAGE_LOAD}\n"),
-        failure(message=TEARDOWN, tag="error"),
-        failure(text=f"E         {REQUEST_FAILED}\n", tag="error"),
-        failure(message=f"first line&#10;{PAGE_LOAD}"),
+        failure(message=f"{PAGE_LOAD}&#10;Call log:&#10;  - navigating to"),
+        failure(message=PAGE_LOAD, tag="error"),
+        failure(message=f"failed on setup with &quot;{PAGE_LOAD}&quot;", tag="error"),
+        HARNESS,
         failure(message=PAGE_LOAD.replace("http://", "https://")),
     ],
     ids=[
-        "page-load-message",
-        "page-load-raised-line",
-        "teardown-message",
-        "request-failed-raised-line",
-        "page-load-second-message-line",
+        "page-load",
+        "page-load-call-log",
+        "page-load-error",
+        "page-load-at-setup",
+        "harness",
         "https",
     ],
 )
@@ -76,39 +98,75 @@ def test_a_changed_network_is_rerun(element):
     ]
 
 
+def harness(**change):
+    """HARNESS with one of its parts changed."""
+    parts = {"message": TEARDOWN, "text": HARNESS_TRACEBACK, "tag": "error"}
+    return failure(**{**parts, **change})
+
+
 @pytest.mark.parametrize(
     "element",
     [
         # This file's own asserts, `assert code == 1, out`, print the bare text.
         failure(message="AssertionError: net::ERR_NETWORK_CHANGED in the log;"),
         failure(text="E   AssertionError: net::ERR_NETWORK_CHANGED at app.css\n"),
-        # A source line the traceback quotes, not a raised one.
-        failure(
-            text=f"    allowed = [{REQUEST_FAILED.split(': ', 1)[1]}]\n"
-            "E   AssertionError: other\n"
-        ),
+        # A raised line or a later message line: an assert's diff can print
+        # the page-load text there (`assert out == expected`).
+        failure(text=f"E           {PAGE_LOAD}\n"),
+        failure(message=f"AssertionError: first line&#10;{PAGE_LOAD}"),
         failure(message=f"AssertionError: {PAGE_LOAD}"),
         failure(message=PAGE_LOAD.replace(" at http://", " at app.css")),
         failure(message=PAGE_LOAD.replace("Page.goto", "Page goto")),
         failure(message=PAGE_LOAD.replace("_errors.Error", "_errors.")),
-        failure(message="request failed: http://x/a.png net::ERR_NETWORK_CHANGED"),
-        failure(message="'request failed: http://x/a.png net::ERR_ABORTED'"),
-        failure(message="'request failed: x/a.png net::ERR_NETWORK_CHANGED'"),
-        failure(message="'request failed: http://x/a.png net::ERR_NETWORK_CHANGEDX'"),
+        failure(message=f"failed on call with &quot;{PAGE_LOAD}&quot;"),
+        failure(message=f"x failed on setup with &quot;{PAGE_LOAD}&quot;"),
+        # #373 review: a test body's `assert "..." in OUT`, where OUT holds the
+        # harness's line, is a <failure>, not the harness's teardown <error>.
+        failure(
+            message="AssertionError: assert 'x' in &quot;...&quot;",
+            text="E       AssertionError: assert 'x' in OUT\n"
+            f"E         {REQUEST_FAILED}"
+            "\n\ntests/test_x.py:9: AssertionError",
+        ),
+        harness(tag="failure"),
+        harness(message=TEARDOWN.replace("teardown", "setup")),
+        harness(text=HARNESS_TRACEBACK.replace("ui/tests/browser/", "tests/")),
+        harness(text=HARNESS_TRACEBACK.replace(": AssertionError", ": Error")),
+        harness(text=HARNESS_TRACEBACK + "\n\nui/tests/browser/test_x.py:5: Error"),
+        # A source line the traceback quotes, not a raised one.
+        harness(
+            text=HARNESS_TRACEBACK.replace(
+                f"E         {REQUEST_FAILED}", f"    allowed = [{REQUEST_FAILED}]"
+            )
+        ),
+        harness(text=HARNESS_TRACEBACK.replace("'request", "request")),
+        harness(text=HARNESS_TRACEBACK.replace("CHANGED'", "CHANGEDX'")),
+        harness(text=HARNESS_TRACEBACK.replace("CHANGED'", "ABORTED'")),
+        harness(text=HARNESS_TRACEBACK.replace("failed: http://", "failed: ")),
         failure(),
     ],
     ids=[
         "bare-text-message",
         "bare-text-raised-line",
-        "source-line",
+        "page-load-raised-line",
+        "page-load-second-message-line",
         "page-load-inside-another-error",
         "no-url",
         "no-playwright-call",
         "no-error-class",
+        "page-load-other-wrapper",
+        "page-load-wrapper-not-first",
+        "request-failed-in-a-test-body-assert",
+        "harness-as-failure",
+        "harness-at-setup",
+        "harness-elsewhere",
+        "harness-other-error",
+        "harness-not-last",
+        "request-failed-source-line",
         "request-failed-unquoted",
+        "request-failed-longer-error",
         "request-failed-other-error",
         "request-failed-no-scheme",
-        "request-failed-longer-error",
         "empty",
     ],
 )
@@ -117,8 +175,8 @@ def test_another_failure_is_not_rerun(element):
     assert args is None
     assert reason == (
         "1 of 1 failures and errors are not a changed network"
-        " (net::ERR_NETWORK_CHANGED as a page load or a failed request):"
-        " no rerun, and the status stays pytest's."
+        " (a Playwright net::ERR_NETWORK_CHANGED, or the browser harness's"
+        " teardown naming one): no rerun, and the status stays pytest's."
     )
 
 
@@ -126,7 +184,7 @@ def test_one_other_failure_among_changed_networks_is_not_rerun():
     found = junit(
         failure(message=PAGE_LOAD),
         failure(message="TimeoutError: Page.wait_for_function: Timeout"),
-        failure(message=TEARDOWN, tag="error"),
+        HARNESS,
     )
     args, reason = nc.rerun_args(found, SUMMARY, [])
     assert args is None
@@ -228,37 +286,69 @@ def test_the_outcome_names_the_first_run_the_veth_count_and_the_rerun():
     )
 
 
+@pytest.mark.parametrize(
+    "run_args",
+    [["-p", "no:xdist"], ["-pno:xdist"]],
+    ids=["two-words", "one-word"],
+)
+def test_a_run_without_xdist_reruns_without_n(run_args):
+    """`-n 0` beside `-p no:xdist` exits 4, "unrecognized arguments: -n"
+    (#373 review); server/README.md names both ways to run without xdist."""
+    args, _ = nc.rerun_args(junit(failure(message=PAGE_LOAD)), SUMMARY, run_args)
+    assert args == [
+        *run_args,
+        "ui/tests/browser/test_a.py",
+        "ui/tests/browser/test_b.py",
+    ]
+
+
 def test_the_command_line(tmp_path, capsys):
+    """rerun-args writes the arguments to a file of their own, and prints
+    only a reason; outcome prints its line, then `exit N` (#373 review)."""
     (tmp_path / "junit.xml").write_text(junit(failure(message=PAGE_LOAD)))
     (tmp_path / "pytest.log").write_text(SUMMARY)
     files = [str(tmp_path / "junit.xml"), str(tmp_path / "pytest.log")]
-    assert nc.main(["rerun-args", *files, "--", "-m", "browser", "x.py"]) == 0
-    assert capsys.readouterr().out == (
+    args_file = tmp_path / "rerun-args"
+    command = ["rerun-args", *files, str(args_file)]
+    assert nc.main([*command, "--", "-m", "browser", "x.py"]) == 0
+    assert capsys.readouterr().out == ""
+    assert args_file.read_text() == (
         "-m\nbrowser\n-n\n0\nui/tests/browser/test_a.py\nui/tests/browser/test_b.py\n"
     )
-    assert nc.main(["rerun-args", *files]) == 0
-    assert capsys.readouterr().out.startswith("-n\n0\n")
-    assert nc.main(["rerun-args", str(tmp_path / "none.xml"), files[1]]) == 1
-    assert capsys.readouterr().out == "no junit.xml to read: no rerun.\n"
-    assert nc.main(["outcome", "1", "3", "0"]) == 0
-    assert "counts as passed" in capsys.readouterr().out
-    assert nc.main(["outcome", "1", "3", "0", "--flake-ticket"]) == 1
-    assert "--flake-ticket keeps" in capsys.readouterr().out
-    assert nc.main(["outcome", "1", "", "0"]) == 1
-    assert "no veth count" in capsys.readouterr().out
-    assert nc.main(["outcome", "1", "3", "0", "--flake"]) == 2
-    assert "unknown option --flake" in capsys.readouterr().err
-    assert nc.main(["outcome", "1", "3"]) == 2
-    assert "network_changed.py rerun-args JUNIT LOG" in capsys.readouterr().err
-    assert nc.main(["outcome", "1", "3", "0", "--flake-ticket", "x"]) == 2
-    assert nc.main(["rerun-args", files[0]]) == 2
-    assert nc.main(["status", "1", "3", "0"]) == 2
-    capsys.readouterr()
     # The run's arguments may follow with no `--`.
-    assert nc.main(["rerun-args", *files, "-k", "phone"]) == 0
-    assert capsys.readouterr().out.startswith("-k\nphone\n-n\n0\n")
-    assert nc.main(["rerun-args", files[0], str(tmp_path / "none.log")]) == 1
+    assert nc.main([*command, "-k", "phone"]) == 0
+    assert args_file.read_text().startswith("-k\nphone\n-n\n0\n")
+    args_file.unlink()
+    none = str(tmp_path / "none")
+    assert nc.main(["rerun-args", none, files[1], str(args_file)]) == 1
+    assert capsys.readouterr().out == "no junit.xml to read: no rerun.\n"
+    assert nc.main(["rerun-args", files[0], none, str(args_file)]) == 1
     assert capsys.readouterr().out.startswith("No failed file is named")
+    assert not args_file.exists()
+
+    assert nc.main(["outcome", "1", "3", "0"]) == 0
+    out = capsys.readouterr().out
+    assert "counts as passed" in out and out.endswith("\nexit 0\n")
+    assert nc.main(["outcome", "1", "3", "0", "--flake-ticket"]) == 0
+    out = capsys.readouterr().out
+    assert "--flake-ticket keeps" in out and out.endswith("\nexit 1\n")
+    assert nc.main(["outcome", "2", "", "0"]) == 0
+    out = capsys.readouterr().out
+    assert "no veth count" in out and out.endswith("\nexit 2\n")
+
+    for wrong in (
+        ["outcome", "1", "3", "0", "--flake"],
+        ["outcome", "1", "3"],
+        ["outcome", "1", "3", "0", "--flake-ticket", "x"],
+        ["rerun-args", *files],
+        ["status", "1", "3", "0"],
+    ):
+        assert nc.main(wrong) == 2, wrong
+        assert capsys.readouterr().out == ""
+    nc.main(["outcome", "1", "3", "0", "--flake"])
+    assert "unknown option --flake" in capsys.readouterr().err
+    nc.main(["outcome", "1", "3"])
+    assert "network_changed.py rerun-args JUNIT LOG" in capsys.readouterr().err
 
 
 def test_the_script_runs_it(tmp_path):
@@ -271,4 +361,4 @@ def test_the_script_runs_it(tmp_path):
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
-    assert "counts as passed" in result.stdout
+    assert result.stdout.endswith("\nexit 0\n")

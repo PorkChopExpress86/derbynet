@@ -16,12 +16,16 @@ changing as another project's container joins or leaves a Docker bridge
 
 Usage, from the script:
 
-    network_changed.py rerun-args JUNIT LOG [-- RUN_ARG ...]
-        prints one rerun argument per line and exits 0, or prints the
-        reason there is no rerun and exits 1
+    network_changed.py rerun-args JUNIT LOG ARGS_FILE [-- RUN_ARG ...]
+        writes one rerun argument per line to ARGS_FILE and exits 0, or
+        prints the reason there is no rerun and exits 1
     network_changed.py outcome STATUS VETH RERUN_STATUS [--flake-ticket]
-        prints the outcome line and exits with the script's status; VETH
-        is a count, or empty when the kernel log was not read
+        prints the outcome line, then `exit N` with the script's status,
+        and exits 0; VETH is a count, or empty when the kernel log was
+        not read
+
+Any other exit, such as 2 for a wrong command line, is the tool's own
+error, and the script keeps pytest's status.
 """
 
 from __future__ import annotations
@@ -32,21 +36,33 @@ import xml.etree.ElementTree as ET
 
 MARKER = "net::ERR_NETWORK_CHANGED"
 
-# The two forms a browser test fails with when the network changes, as in
-# #348's load run of test_kiosk_results_by_racer.py (#348 retro):
-# Playwright's page load, a raised line of its own,
+# The two ways a browser test fails when the network changes, as #348's
+# load runs of test_kiosk_results_by_racer.py and test_harness.py failed
+# (#348 retro). Each is read from where pytest writes it alone, since the
+# bare text is not enough: tests/test_pytest_under_load.py's asserts print
+# the script's own lines naming it, an assert's diff can print any line,
+# and a flake there must keep its failure (#373 review).
+#
+# A raised Playwright error, whose junit message starts with its class, or
+# with pytest's `failed on setup with "` before it for a fixture's:
 #   playwright._impl._errors.Error: Page.goto: net::ERR_NETWORK_CHANGED at
 #   http://localhost:52751/kiosk.php?address=kiosk-test52
-# and the harness's failed request in its teardown assert
-# (`ui/tests/browser/conftest.py`, "request failed: {request.url} {request.failure}"),
-#   Left contains one more item: 'request failed:
-#   http://localhost:52751/kiosk.php?address=kiosk-test52 net::ERR_NETWORK_CHANGED'
-# The bare text is not enough: tests/test_pytest_under_load.py's asserts print
-# the script's own lines naming it, and a flake there must keep its failure.
-# PAGE_LOAD.match reads it from the start of a line only.
 PAGE_LOAD = re.compile(
     r"playwright\._impl\._errors\.\w+: \w+\.\w+: " + MARKER + r" at https?://"
 )
+# The harness's own teardown assert, `assert page_errors.final() == []` in
+# ui/tests/browser/conftest.py, which pytest writes as an <error> with the
+# message "failed on teardown with ...", a traceback that ends at that file,
+#   ui/tests/browser/conftest.py:614: AssertionError
+# and the first item it lists ("request failed: {request.url}
+# {request.failure}") in a raised line:
+#   E         Left contains one more item: 'request failed:
+#   http://localhost:52751/kiosk.php?address=kiosk-test52 net::ERR_NETWORK_CHANGED'
+TEARDOWN = "failed on teardown with "
+# How pytest wraps the message of an error in a fixture, such as a page
+# load in a login fixture, before the error's own class.
+SETUP_OR_TEARDOWN = re.compile(r'^failed on (?:setup|teardown) with "')
+HARNESS_END = re.compile(r"ui/tests/browser/conftest\.py:\d+: AssertionError")
 REQUEST_FAILED = re.compile(r"'request failed: https?://\S+ " + MARKER + "'")
 
 # A failed test or error in the -rfE summary, by the file pytest names.
@@ -57,24 +73,19 @@ SUMMARY_FILE = re.compile(r"^(?:FAILED|ERROR) ([^: ]*\.py)", re.M)
 CARRIED = ("-m", "-k", "-p")
 
 
-def network_line(line: str) -> bool:
-    """Whether a line of an error, its `E` taken off, is one of the forms
-    a changed network fails a browser test with."""
-    return bool(PAGE_LOAD.match(line) or REQUEST_FAILED.search(line))
-
-
-def carries_marker(element: ET.Element) -> bool:
-    """Whether a junit <failure> or <error> carries a changed network in a
-    line of its message or a raised line (`E   ...`) of its traceback. A
-    source line the traceback quotes is no failure of the network: a test
-    that defines the text would match."""
-    lines = [line.strip() for line in element.get("message", "").splitlines()]
-    lines += [
-        line[1:].strip()
-        for line in (element.text or "").splitlines()
-        if line.startswith("E ")
-    ]
-    return any(network_line(line) for line in lines)
+def changed_network(element: ET.Element) -> bool:
+    """Whether a junit <failure> or <error> is a raised Playwright error
+    naming a changed network, or the harness's teardown <error> naming one
+    as the first request that failed."""
+    message = element.get("message", "")
+    if PAGE_LOAD.match(SETUP_OR_TEARDOWN.sub("", message, count=1)):
+        return True
+    if element.tag != "error" or not message.startswith(TEARDOWN):
+        return False
+    lines = [line for line in (element.text or "").splitlines() if line.strip()]
+    if not lines or not HARNESS_END.fullmatch(lines[-1]):
+        return False
+    return any(line.startswith("E ") and REQUEST_FAILED.search(line) for line in lines)
 
 
 def carried_options(args: list[str]) -> list[str]:
@@ -92,6 +103,9 @@ def carried_options(args: list[str]) -> list[str]:
     return carried
 
 
+NO_FILE = "No failed file is named in the summary: rerun the run's own command."
+
+
 def rerun_args(
     junit: str | None, log: str, args: list[str]
 ) -> tuple[list[str] | None, str]:
@@ -106,23 +120,24 @@ def rerun_args(
         return None, f"junit.xml does not parse ({error}): no rerun."
     failures = [*root.iter("failure"), *root.iter("error")]
     if not failures:
-        return None, (
-            "No failed file is named in the summary: rerun the run's own command."
-        )
-    others = sum(1 for element in failures if not carries_marker(element))
+        return None, NO_FILE
+    others = sum(1 for element in failures if not changed_network(element))
     if others:
         return None, (
             f"{others} of {len(failures)} failures and errors are not a"
-            f" changed network ({MARKER} as a page load or a failed request):"
-            " no rerun, and the status stays pytest's."
+            f" changed network (a Playwright {MARKER}, or the browser harness's"
+            " teardown naming one): no rerun, and the status stays pytest's."
         )
     summary = log.split("short test summary info", 1)
     files = sorted(set(SUMMARY_FILE.findall(summary[1]))) if len(summary) > 1 else []
     if not files:
-        return None, (
-            "No failed file is named in the summary: rerun the run's own command."
-        )
-    return [*carried_options(args), "-n", "0", *files], ""
+        return None, NO_FILE
+    carried = carried_options(args)
+    # Beside `-p no:xdist`, `-n` is no option: pytest exits 4 (#373 review).
+    no_xdist = "-pno:xdist" in carried or any(
+        pair == ("-p", "no:xdist") for pair in zip(carried, carried[1:], strict=False)
+    )
+    return [*carried, *([] if no_xdist else ["-n", "0"]), *files], ""
 
 
 def outcome(
@@ -159,13 +174,14 @@ def read(path: str) -> str | None:
 
 
 def main(argv: list[str]) -> int:
-    if argv[:1] == ["rerun-args"] and len(argv) >= 3:
+    if argv[:1] == ["rerun-args"] and len(argv) >= 4:
         # A `--` before the run's arguments is no option of theirs to carry.
-        found, reason = rerun_args(read(argv[1]), read(argv[2]) or "", argv[3:])
+        found, reason = rerun_args(read(argv[1]), read(argv[2]) or "", argv[4:])
         if found is None:
             print(reason)
             return 1
-        print("\n".join(found))
+        with open(argv[3], "w", encoding="utf-8") as handle:
+            handle.write("".join(f"{arg}\n" for arg in found))
         return 0
     if argv[:1] == ["outcome"] and len(argv) in (4, 5):
         flake = argv[4:] == ["--flake-ticket"]
@@ -174,8 +190,8 @@ def main(argv: list[str]) -> int:
             return 2
         veth = int(argv[2]) if argv[2] else None
         status, line = outcome(int(argv[1]), veth, int(argv[3]), flake)
-        print(line)
-        return status
+        print(f"{line}\nexit {status}")
+        return 0
     print(__doc__.split("Usage, from the script:", 1)[1], file=sys.stderr)
     return 2
 

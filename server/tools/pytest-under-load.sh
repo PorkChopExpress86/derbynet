@@ -24,11 +24,12 @@
 # (below).  Run it with the Bash tool's run_in_background rather than under
 # `timeout`, which loses the run.
 #
-# When every failure and error is net::ERR_NETWORK_CHANGED, as a page load
-# or a failed request (tools/network_changed.py), it reruns the failed files
-# alone, with no loops and `-n 0`, before it frees the lock, keeping the
-# run's database, font and `-m`, `-k` and `-p` options, into rerun.log and
-# rerun-junit.xml beside the first run's (D122).  With veth lines in the
+# When every failure and error is net::ERR_NETWORK_CHANGED, as a raised
+# Playwright error or the browser harness's teardown assert naming it
+# (tools/network_changed.py), it reruns the failed files alone, with no
+# loops and `-n 0` (none beside `-p no:xdist`), before it frees the lock,
+# keeping the run's database, font and `-m`, `-k` and `-p` options, into
+# rerun.log and rerun-junit.xml beside the first run's (D122).  With veth lines in the
 # kernel log over the first run and a clean rerun, it exits 0: the run
 # counts as passed for D101's repeats only.  --flake-ticket keeps pytest's
 # status whatever the rerun does: a flake ticket's race keeps its 25 runs.
@@ -209,9 +210,13 @@ if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; t
   fi
   echo "net::ERR_NETWORK_CHANGED in the log; the kernel log has $veth from" \
        "@$STARTED to @$ENDED (journalctl -k --since @$STARTED --until @$ENDED | grep veth)."
-  if rerun=$(python3 -I "$SERVER_DIR/tools/network_changed.py" rerun-args \
-               "$OUT/junit.xml" "$OUT/pytest.log" -- "$@"); then
-    mapfile -t RERUN <<<"$rerun"
+  # The arguments go to a file of their own, so a reason is never run as
+  # one; any exit but 0 and 1 is the tool's own error (#373 review).
+  tool=0
+  reason=$(python3 -I "$SERVER_DIR/tools/network_changed.py" rerun-args \
+             "$OUT/junit.xml" "$OUT/pytest.log" "$OUT/rerun-args" -- "$@") || tool=$?
+  if [ "$tool" = 0 ]; then
+    mapfile -t RERUN <"$OUT/rerun-args"
     echo "Rerunning the failed files alone, with no load, before the lock is freed:" \
          "${DERBYNET_BROWSER_FONT:+DERBYNET_BROWSER_FONT=\"$DERBYNET_BROWSER_FONT\" }${RUNNER[*]} ${RERUN[*]}"
     echo "Rerun log: $OUT/rerun.log"
@@ -225,13 +230,20 @@ if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; t
     sed -n '/short test summary info/,$p' "$OUT/rerun.log"
     grep -q 'short test summary info' "$OUT/rerun.log" || tail -n 5 "$OUT/rerun.log"
     echo "rerun exited $rerun_status; log: $OUT/rerun.log; junit: $OUT/rerun-junit.xml"
-    final=0
-    python3 -I "$SERVER_DIR/tools/network_changed.py" outcome \
-      "$status" "$veth_count" "$rerun_status" $FLAKE_TICKET || final=$?
-    # Anything but a pass is pytest's own status.
-    [ "$final" = 0 ] || final=$status
+    tool=0
+    said=$(python3 -I "$SERVER_DIR/tools/network_changed.py" outcome \
+             "$status" "$veth_count" "$rerun_status" $FLAKE_TICKET) || tool=$?
+    if [ "$tool" = 0 ] && [[ "$said" =~ $'\n'exit\ ([0-9]+)$ ]]; then
+      echo "${said%$'\n'exit *}"
+      final=${BASH_REMATCH[1]}
+    else
+      echo "network_changed.py outcome failed (exit $tool): the status stays pytest's."
+    fi
+  elif [ "$tool" = 1 ]; then
+    echo "$reason"
   else
-    echo "$rerun"
+    echo "network_changed.py rerun-args failed (exit $tool): no rerun, and the" \
+         "status stays pytest's."
   fi
 fi
 if [ "$final" = "$status" ]; then

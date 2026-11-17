@@ -627,14 +627,20 @@ printf 'veth1 entered\\nveth2 left\\nveth3 entered\\neth0 up\\n'
 """
 
 
-def load_run_of(tmp_path, test_body, *args, journalctl=JOURNALCTL, options=""):
+def load_run_of(
+    tmp_path, test_body, *args, journalctl=JOURNALCTL, options="", python3=None
+):
     """pytest-under-load.sh, with `options` of its own, on a stub test file
-    holding `test_body`, with `journalctl` as a stand-in first on PATH: (its
-    exit code, its output, the journalctl arguments file)."""
+    holding `test_body`, with `journalctl`, and `python3` when given, as
+    stand-ins first on PATH: (its exit code, its output, the journalctl
+    arguments file)."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "journalctl").write_text(journalctl)
     (bin_dir / "journalctl").chmod(0o755)
+    if python3:
+        (bin_dir / "python3").write_text(python3)
+        (bin_dir / "python3").chmod(0o755)
     (tmp_path / "test_net.py").write_text(
         f"def test_loads():\n{test_body}\n\n\ndef test_passes():\n    pass\n"
     )
@@ -776,8 +782,8 @@ def test_another_failure_beside_a_network_change_starts_no_rerun(tmp_path):
     assert "the kernel log has 3 veth lines" in out
     assert (
         "1 of 2 failures and errors are not a changed network"
-        " (net::ERR_NETWORK_CHANGED as a page load or a failed request):"
-        " no rerun, and the status stays pytest's.\n"
+        " (a Playwright net::ERR_NETWORK_CHANGED, or the browser harness's"
+        " teardown naming one): no rerun, and the status stays pytest's.\n"
     ) in out
     assert not (tmp_path / "run" / "rerun.log").exists()
     assert "Rerunning" not in out
@@ -819,6 +825,52 @@ def test_a_clean_rerun_with_no_veth_count_keeps_pytest_s_status(
         f"The first run exited 1, with {seen} in its window; the rerun passed,"
         " but with no veth lines counted the status stays pytest's 1 (D122)."
     ) in out
+
+
+def test_a_run_without_xdist_is_rerun_without_n(tmp_path):
+    """`-n 0` beside `-p no:xdist` exits 4, "unrecognized arguments: -n"
+    (#373 review)."""
+    code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR), "-p", "no:xdist")
+    assert code == 0, out
+    assert " -n " not in out.split("Rerunning", 1)[1].splitlines()[0]
+    assert "2 passed" in (tmp_path / "run" / "rerun.log").read_text()
+
+
+def failing(command):
+    """A stand-in python3 that fails network_changed.py's `command` with
+    exit 2, as a wrong command line does, and runs the rest."""
+    real = shutil.which("python3")
+    return (
+        f'#! /bin/sh\ncase "$3" in {command}) echo "usage" >&2; exit 2;; esac\n'
+        f'exec {real} "$@"\n'
+    )
+
+
+def test_a_failed_outcome_is_named_and_keeps_pytest_s_status(tmp_path):
+    """A tool error is no pass and no silent fold into pytest's status
+    (#373 review)."""
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), python3=failing("outcome")
+    )
+    assert code == 1, out
+    assert re.search(r"^rerun exited 0; log: ", out, re.M), out
+    assert (
+        "network_changed.py outcome failed (exit 2): the status stays pytest's.\n"
+    ) in out
+    assert out.rstrip().splitlines()[-1].startswith("pytest exited 1; log: ")
+    assert "script exits" not in out
+
+
+def test_a_failed_rerun_args_is_named_and_starts_no_rerun(tmp_path):
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), python3=failing("rerun-args")
+    )
+    assert code == 1, out
+    assert (
+        "network_changed.py rerun-args failed (exit 2): no rerun, and the status"
+        " stays pytest's.\n"
+    ) in out
+    assert not (tmp_path / "run" / "rerun.log").exists()
 
 
 # A stub whose first run fails on a changed network and whose rerun holds
