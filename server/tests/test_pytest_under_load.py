@@ -738,9 +738,11 @@ def start_waiting(tmp_path, script, lock, extra_env=None):
     else:
         run = hold(tmp_path, lock, name="waiter", extra_env=extra_env)
     wait_until(lambda: "flock" in children(run.pid), "flock under it", 30)
-    waiter = [pid for pid, name in child_pids(run.pid) if name == "flock"]
-    assert len(waiter) == 1
-    return run, waiter[0]
+    # The run is the script asked for, and its only child is the flock.
+    assert script.name in Path(f"/proc/{run.pid}/cmdline").read_text()
+    [(waiter, name)] = child_pids(run.pid)
+    assert name == "flock"
+    return run, waiter
 
 
 SCRIPTS = pytest.mark.parametrize("script", [SCRIPT, HOLD_LOCK], ids=lambda p: p.name)
