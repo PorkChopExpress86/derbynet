@@ -506,3 +506,156 @@ def test_guide_env_lines_skip_other_blocks(tmp_path):
     assert guide_env_lines(tmp_path, text + step + after) == (
         "echo DERBYNET_UID=1 >> .env\n"
     )
+
+
+# A command in checks.sh that waits on a server or the network carries its
+# own bound: curl its `-m`, and `openssl s_client`, a Compose `run` and a
+# `docker run` of the image's own server a `timeout` before them.  #351's
+# check that Caddy stops at a malformed DERBYNET_ADDRESS ran `compose run`
+# unbounded; a mutant that left Caddy running held the check for about 5 h
+# 45 min, until f01f8fb3 put `timeout 60` before it (#351 retro).
+CURL = re.compile(r"(?<![\w/.-])curl\s")
+CURL_BOUND = re.compile(r"\s(?:-m\s*\d|--max-time[=\s]\d)")
+# Compose's run, through the `compose` array or `docker compose ...`; and a
+# `docker run` that is neither detached nor given another entrypoint, which
+# runs the image's server in the foreground.
+COMPOSE_RUN = re.compile(r'(?:"\$\{compose\[@\]\}"|docker compose\b[^|;&]*?)\s+run\s')
+DOCKER_RUN = re.compile(r"(?<![\w-])docker run\s")
+TIMED = re.compile(r"\btimeout\s+\d+\s")
+
+
+def logical_lines(text: str) -> list[tuple[int, str]]:
+    """Each command line with its `\\` continuations joined, by its first
+    line's number; comment lines are left out."""
+    found: list[tuple[int, str]] = []
+    joined, first = "", 0
+    for number, line in enumerate(text.splitlines(), 1):
+        if not joined:
+            if line.lstrip().startswith("#"):
+                continue
+            first = number
+        joined += line.removesuffix("\\") + " "
+        if not line.endswith("\\"):
+            found.append((first, joined))
+            joined = ""
+    return found
+
+
+def unbounded(text: str) -> list[str]:
+    """`line: what` for each command that waits with no bound of its own."""
+    found = []
+    for number, line in logical_lines(text):
+        # A trailing comment is prose.
+        line = re.sub(r"(?:^|\s)#\s.*$", "", line)
+        for match in CURL.finditer(line):
+            # An echo's words name curl; `$(curl ...)` inside it runs it.
+            if re.search(r"\becho\b", line[: match.start()].rsplit("$(", 1)[-1]):
+                continue
+            # A pipe or `;` ends curl's own arguments.
+            args = re.split(r"[|;)]", line[match.end() :], maxsplit=1)[0]
+            if not CURL_BOUND.search(" " + args):
+                found.append(f"{number}: curl with no -m")
+        for match in re.finditer(r"\bs_client\b", line):
+            if not TIMED.search(line[: match.start()]):
+                found.append(f"{number}: openssl s_client with no timeout")
+        for match in COMPOSE_RUN.finditer(line):
+            if not TIMED.search(line[: match.start()]):
+                found.append(f"{number}: compose run with no timeout")
+        for match in DOCKER_RUN.finditer(line):
+            args = line[match.end() :]
+            if (
+                re.match(r"(?:\S+\s+)*?(?:-d|--detach)\s", args)
+                or "--entrypoint" in args
+            ):
+                continue
+            if not TIMED.search(line[: match.start()]):
+                found.append(f"{number}: docker run of the server with no timeout")
+    return found
+
+
+def test_every_wait_in_checks_sh_is_bounded():
+    assert unbounded(CHECKS.read_text()) == [], (
+        "give curl `-m 120`, and `timeout 60` before openssl s_client, a Compose "
+        "run or a foreground docker run of the image: an unbounded one held "
+        "#351's caddy check for about 5 h 45 min"
+    )
+
+
+def test_an_unbounded_wait_is_found():
+    """The caddy check's line before f01f8fb3, and the shapes beside it."""
+    text = (
+        '    out="$(DERBYNET_ADDRESS=\'192.168.1.20;x\' "${compose[@]}" run --rm '
+        '--no-deps -T caddy 2>&1)" || status=$?\n'
+        '    code="$(curl -s -o /dev/null -w \'%{http_code}\' "$url/")"\n'
+        '    docker exec "$name" curl -fsS http://127.0.0.1/ | grep -q x\n'
+        '    grep -q success <<<"$(curl -s -b "$jar" \\\n'
+        '        -F action=photo.upload "$1/action.php")"\n'
+        "    openssl s_client -connect 127.0.0.1:443 </dev/null | openssl x509\n"
+        '    out="$(docker run --rm -e A=b "$IMAGE" 2>&1)"\n'
+        "    docker compose -p x run --rm server true\n"
+        "    curl -s url | timeout 5 cat -m 3\n"
+        '    echo "racers $(curl -s "$1/action.php" | jq .)"\n'
+        "    # A comment that ends in a backslash continues nothing: \\\n"
+        "    curl -s url\n"
+    )
+    assert unbounded(text) == [
+        "1: compose run with no timeout",
+        "2: curl with no -m",
+        "3: curl with no -m",
+        "4: curl with no -m",
+        "6: openssl s_client with no timeout",
+        "7: docker run of the server with no timeout",
+        "8: compose run with no timeout",
+        "9: curl with no -m",
+        "10: curl with no -m",
+        "12: curl with no -m",
+    ]
+
+
+def test_a_bounded_wait_passes():
+    text = (
+        '    out="$(DERBYNET_ADDRESS=\'x\' timeout 60 "${compose[@]}" '
+        'run --rm caddy)"\n'
+        "    curl -fsSk -m 30 -o a https://x/ \\\n"
+        "        || fail no\n"
+        "    curl -s --max-time 30 url | jq .\n"
+        "    timeout 30 openssl s_client -connect a:443 </dev/null\n"
+        '    docker run -d --name "$name" "$IMAGE" >/dev/null\n'
+        '    docker run --rm --entrypoint ls "$IMAGE" -A /\n'
+        '    out="$(timeout 120 docker run --name x "$IMAGE" 2>&1)"\n'
+        "    # curl -s http://x/ in a comment\n"
+        '    "${compose[@]}" exec -T server curl -s -m 5 http://127.0.0.1/\n'
+        '    echo "curl --cacert root.crt https://$https/: $code"\n'
+        "    origin_post() { # origin_post <url> [curl options]: the code\n"
+    )
+    assert unbounded(text) == []
+
+
+# The image tag in a guide's `DERBYNET_IMAGE=` example.
+EXAMPLE_IMAGE = re.compile(r"DERBYNET_IMAGE=ghcr\.io/\S+?:(v[\w.-]+)")
+
+
+def example_images() -> dict[str, list[str]]:
+    guides = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
+    return {
+        str(guide.relative_to(ROOT)): EXAMPLE_IMAGE.findall(guide.read_text())
+        for guide in guides
+    }
+
+
+def test_no_guide_example_names_the_image_from_before_caddy():
+    """checks.sh holds v0.1.0-rc2 as the last image before D107, which
+    serves HTTPS itself and does not fit compose.yaml's Caddy. README.md and
+    docs/install-docker.md still named it as the image to put in `.env` when
+    rc3 shipped for the owner's clean-machine test (#369 retro)."""
+    old = re.search(
+        r'^OLD_TLS_IMAGE="\$\{OLD_TLS_IMAGE:-\S+?:(v[\w.-]+)@', CHECKS.read_text(), re.M
+    )
+    assert old, "checks.sh names no OLD_TLS_IMAGE tag"
+    found = example_images()
+    assert found["README.md"] and found["docs/install-docker.md"], found
+    stale = {guide: tags for guide, tags in found.items() if old.group(1) in tags}
+    assert stale == {}, (
+        f"name a test release newer than {old.group(1)}, which predates the "
+        "Caddy compose.yaml (D107)"
+    )

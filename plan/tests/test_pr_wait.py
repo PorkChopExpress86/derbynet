@@ -94,5 +94,94 @@ class PrWait(unittest.TestCase):
         self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
 
 
+# Answers each `pr view` with the next head in HEADS, and the last for
+# ever after, and `pr checks` with the checks of the head it last answered.
+FAKE_GH_HEADS = '''#!{python}
+import pathlib, sys
+args = sys.argv[1:]
+calls = pathlib.Path({calls!r})
+heads = {heads!r}
+if args[:2] == ['pr', 'view']:
+    n = int(calls.read_text()) if calls.exists() else 0
+    calls.write_text(str(n + 1))
+    print(heads[min(n, len(heads) - 1)], {branch!r})
+elif args[:2] == ['pr', 'checks']:
+    n = int(calls.read_text())
+    head = heads[min(n - 1, len(heads) - 1)]
+    print({checks!r}[head])
+'''
+
+
+@unittest.skipUnless(shutil.which('git'), 'the clone that pushed is a git repository')
+class PushedHead(unittest.TestCase):
+    """A pr-wait started as a push ends waits for the PR to show the pushed
+    head.  #384's pr-wait read the old head 559330bc, whose checks had all
+    passed (#369 retro)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.clone = self.tmp / 'clone'
+        self.clone.mkdir()
+        self.git('init', '-q')
+        self.old = self.commit('old')
+        self.new = self.commit('new')
+
+    def git(self, *args):
+        return subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', *args],
+                              cwd=self.clone, check=True, capture_output=True,
+                              text=True).stdout.strip()
+
+    def commit(self, message):
+        self.git('commit', '-q', '--allow-empty', '-m', message)
+        return self.git('rev-parse', 'HEAD')
+
+    def wait(self, heads, origin):
+        """pr-wait 7 on branch issue-7, whose origin/issue-7 is `origin`, with
+        the old head's checks all passed and the new head's lint failed."""
+        if origin:
+            self.git('update-ref', 'refs/remotes/origin/issue-7', origin)
+        gh = self.gh(heads, {self.old: 'pass lint https://example/lint',
+                             self.new: 'fail lint https://example/lint'})
+        return self.run_pr_wait(gh, timeout_min='1')
+
+    def gh(self, heads, checks):
+        gh = self.tmp / 'gh'
+        gh.write_text(FAKE_GH_HEADS.format(python=sys.executable, heads=heads,
+                                           branch='issue-7', checks=checks,
+                                           calls=str(self.tmp / 'calls')))
+        gh.chmod(0o755)
+        return gh
+
+    def run_pr_wait(self, gh, timeout_min):
+        return subprocess.run(['bash', str(PR_WAIT), '7', '--timeout-min', timeout_min],
+                              cwd=self.clone, capture_output=True, text=True, timeout=60,
+                              env={**os.environ, 'GH': str(gh), 'PR_WAIT_RETRY_SLEEP': '0'})
+
+    def test_the_old_head_is_waited_past_until_the_pr_shows_the_push(self):
+        done = self.wait([self.old, self.old, self.old, self.new], origin=self.new)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f'PR #7 head {self.new}', done.stderr)
+        self.assertIn('fail lint', done.stdout)
+
+    def test_a_stale_origin_branch_is_not_waited_for(self):
+        """origin/issue-7 older than the PR's head: this clone did not push it."""
+        done = self.wait([self.new], origin=self.old)
+        self.assertIn(f'PR #7 head {self.new}', done.stderr)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+
+    def test_a_clone_without_the_branch_takes_the_prs_head(self):
+        done = self.wait([self.old], origin=None)
+        self.assertIn(f'PR #7 head {self.old}', done.stderr)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_pr_that_never_shows_the_push_times_out_naming_both(self):
+        self.git('update-ref', 'refs/remotes/origin/issue-7', self.new)
+        done = self.run_pr_wait(self.gh([self.old], {}), timeout_min='0')
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn(f'still shows {self.old}, older than origin/issue-7 {self.new}',
+                      done.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()
