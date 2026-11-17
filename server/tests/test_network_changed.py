@@ -83,7 +83,10 @@ def test_a_changed_network_is_rerun(element):
         failure(message="AssertionError: net::ERR_NETWORK_CHANGED in the log;"),
         failure(text="E   AssertionError: net::ERR_NETWORK_CHANGED at app.css\n"),
         # A source line the traceback quotes, not a raised one.
-        failure(text=f"        x = '{PAGE_LOAD}'\nE   AssertionError: other\n"),
+        failure(
+            text=f"    allowed = [{REQUEST_FAILED.split(': ', 1)[1]}]\n"
+            "E   AssertionError: other\n"
+        ),
         failure(message=f"AssertionError: {PAGE_LOAD}"),
         failure(message=PAGE_LOAD.replace(" at http://", " at app.css")),
         failure(message=PAGE_LOAD.replace("Page.goto", "Page goto")),
@@ -249,6 +252,7 @@ def test_the_command_line(tmp_path, capsys):
     assert "network_changed.py rerun-args JUNIT LOG" in capsys.readouterr().err
     assert nc.main(["outcome", "1", "3", "0", "--flake-ticket", "x"]) == 2
     assert nc.main(["rerun-args", files[0]]) == 2
+    assert nc.main(["status", "1", "3", "0"]) == 2
     capsys.readouterr()
     # The run's arguments may follow with no `--`.
     assert nc.main(["rerun-args", *files, "-k", "phone"]) == 0

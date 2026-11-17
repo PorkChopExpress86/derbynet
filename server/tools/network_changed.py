@@ -159,8 +159,8 @@ def read(path: str) -> str | None:
 
 def main(argv: list[str]) -> int:
     if argv[:1] == ["rerun-args"] and len(argv) >= 3:
-        args = argv[4:] if argv[3:4] == ["--"] else argv[3:]
-        found, reason = rerun_args(read(argv[1]), read(argv[2]) or "", args)
+        # A `--` before the run's arguments is no option of theirs to carry.
+        found, reason = rerun_args(read(argv[1]), read(argv[2]) or "", argv[3:])
         if found is None:
             print(reason)
             return 1
