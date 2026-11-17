@@ -3,7 +3,9 @@ load run count as a changed network, the rerun's arguments, and the
 script's status after the rerun (D122, #373). `test_pytest_under_load.py`
 runs the script on them."""
 
+import ast
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -67,6 +69,34 @@ def failure(message="", text="", tag="failure"):
 
 HARNESS = failure(message=TEARDOWN, text=HARNESS_TRACEBACK, tag="error")
 
+# The harness's teardown assert since #373 prints every item, one per
+# line, before pytest's own diff, which shows only the first: 2 of the 3
+# real runs whose only failure was a failed request (#348's
+# load3-dejavu-scale2, #316's load2) listed more items than they showed.
+SECOND = "request failed: http://localhost:52751/static/ui/kiosk.js"
+
+
+def every_item(*items, count=None):
+    """The teardown's traceback in the shape that prints every item."""
+    listed = "".join(f"E         {item}\n" for item in items)
+    return (
+        "&gt;       assert errors == [], (\n"
+        f"E       AssertionError: {len(items) if count is None else count}"
+        " page errors, one per line:\n"
+        f"{listed}"
+        "E       assert ['request fai...WORK_CHANGED'] == []\n"
+        "E         \n"
+        f"E         Left contains {len(items)} more items,"
+        f" first extra item: {items[0]}\n"
+        "E         Use -v to get more diff\n"
+        "\n"
+        "ui/tests/browser/conftest.py:614: AssertionError"
+    )
+
+
+FIRST_ITEM = REQUEST_FAILED.removeprefix("Left contains one more item: ")
+SECOND_ITEM = f"'{SECOND} net::ERR_NETWORK_CHANGED'"
+
 
 @pytest.mark.parametrize(
     "element",
@@ -77,6 +107,9 @@ HARNESS = failure(message=TEARDOWN, text=HARNESS_TRACEBACK, tag="error")
         failure(message=f"failed on setup with &quot;{PAGE_LOAD}&quot;", tag="error"),
         HARNESS,
         failure(message=PAGE_LOAD.replace("http://", "https://")),
+        failure(
+            message=TEARDOWN, text=every_item(FIRST_ITEM, SECOND_ITEM), tag="error"
+        ),
     ],
     ids=[
         "page-load",
@@ -85,6 +118,7 @@ HARNESS = failure(message=TEARDOWN, text=HARNESS_TRACEBACK, tag="error")
         "page-load-at-setup",
         "harness",
         "https",
+        "harness-every-item",
     ],
 )
 def test_a_changed_network_is_rerun(element):
@@ -143,6 +177,16 @@ def harness(**change):
         harness(text=HARNESS_TRACEBACK.replace("CHANGED'", "CHANGEDX'")),
         harness(text=HARNESS_TRACEBACK.replace("CHANGED'", "ABORTED'")),
         harness(text=HARNESS_TRACEBACK.replace("failed: http://", "failed: ")),
+        # pytest's diff alone names only the first of several items.
+        harness(
+            text=HARNESS_TRACEBACK.replace(
+                "Left contains one more item:",
+                "Left contains 8 more items, first extra item:",
+            )
+        ),
+        harness(text=every_item(FIRST_ITEM, "'console: TypeError: x is null'")),
+        harness(text=every_item(FIRST_ITEM, f"{SECOND_ITEM} (again)")),
+        harness(text=every_item(FIRST_ITEM, SECOND_ITEM, count=3)),
         failure(),
     ],
     ids=[
@@ -167,6 +211,10 @@ def harness(**change):
         "request-failed-longer-error",
         "request-failed-other-error",
         "request-failed-no-scheme",
+        "first-of-several-items",
+        "every-item-a-later-one-not",
+        "every-item-a-later-one-longer",
+        "every-item-fewer-than-counted",
         "empty",
     ],
 )
@@ -189,6 +237,96 @@ def test_one_other_failure_among_changed_networks_is_not_rerun():
     args, reason = nc.rerun_args(found, SUMMARY, [])
     assert args is None
     assert reason.startswith("1 of 3 failures and errors are not")
+
+
+CONFTEST = Path(__file__).parents[1] / "ui" / "tests" / "browser" / "conftest.py"
+
+
+def teardown_junit(tmp_path, items):
+    """The junit.xml pytest writes when the `page` fixture's teardown, run
+    from ui/tests/browser/conftest.py's own source after its `try`, finds
+    `items` in `page_errors`."""
+    tree = ast.parse(CONFTEST.read_text())
+    fixture = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "page"
+    )
+    last_try = max(
+        n for n, node in enumerate(fixture.body) if isinstance(node, ast.Try)
+    )
+    teardown = [ast.unparse(node) for node in fixture.body[last_try + 1 :]]
+    assert teardown, "no teardown after the page fixture's try"
+    browser = tmp_path / "ui" / "tests" / "browser"
+    browser.mkdir(parents=True)
+    (tmp_path / "pytest.ini").write_text("")
+    (browser / "conftest.py").write_text(
+        "import pytest\n\n\n"
+        "class PageErrors:\n"
+        "    def final(self):\n"
+        f"        return {items!r}\n\n\n"
+        "@pytest.fixture\n"
+        "def page():\n"
+        "    page_errors = PageErrors()\n"
+        "    yield None\n"
+        + "".join(f"    {line}\n" for node in teardown for line in node.splitlines())
+    )
+    (browser / "test_x.py").write_text("def test_x(page):\n    pass\n")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            "pytest.ini",
+            "-p",
+            "no:django",
+            "-p",
+            "no:xdist",
+            "-p",
+            "no:cacheprovider",
+            "--junitxml",
+            "junit.xml",
+            "-rfE",
+            "ui/tests/browser/test_x.py",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    return (tmp_path / "junit.xml").read_text(), result.stdout
+
+
+CHANGED = [
+    f"request failed: http://localhost:1/{name} net::ERR_NETWORK_CHANGED"
+    for name in ("kiosk.js", "app.css", "htmx.min.js")
+]
+
+
+def test_the_harness_teardown_names_every_item_so_all_changed_networks_rerun(
+    tmp_path,
+):
+    """pytest's diff names only the first of several items ("Left contains
+    8 more items, first extra item: ..."), so the harness's teardown names
+    every one (#373): the real teardown, run by pytest, reruns a run whose
+    every item is a changed network."""
+    found, log = teardown_junit(tmp_path, CHANGED)
+    for item in CHANGED:
+        assert repr(item) in found.replace("&apos;", "'")
+    args, reason = nc.rerun_args(found, log, [])
+    assert reason == ""
+    assert args == ["-n", "0", "ui/tests/browser/test_x.py"]
+
+
+def test_the_harness_teardown_with_a_later_item_not_a_changed_network_starts_no_rerun(
+    tmp_path,
+):
+    found, log = teardown_junit(tmp_path, [*CHANGED, "console: TypeError: x"])
+    args, reason = nc.rerun_args(found, log, [])
+    assert args is None
+    assert reason.startswith("1 of 1 failures and errors are not")
 
 
 def test_no_junit_no_parse_no_failure_and_no_summary_are_not_rerun():

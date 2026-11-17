@@ -54,8 +54,15 @@ PAGE_LOAD = re.compile(
 # ui/tests/browser/conftest.py, which pytest writes as an <error> with the
 # message "failed on teardown with ...", a traceback that ends at that file,
 #   ui/tests/browser/conftest.py:614: AssertionError
-# and the first item it lists ("request failed: {request.url}
-# {request.failure}") in a raised line:
+# and every item it lists ("request failed: {request.url}
+# {request.failure}") as a changed network. Since #373 the assert prints
+# every item, one per line, in raised lines:
+#   E       AssertionError: 2 page errors, one per line:
+#   E         'request failed: http://localhost:47905/a.js net::ERR_NETWORK_CHANGED'
+#   E         'request failed: http://localhost:47905/b.css net::ERR_NETWORK_CHANGED'
+# Before it, pytest's diff alone named one item in full only when it was
+# the only one; "Left contains 8 more items, first extra item: ..." names
+# the first of several, and starts no rerun.
 #   E         Left contains one more item: 'request failed:
 #   http://localhost:52751/kiosk.php?address=kiosk-test52 net::ERR_NETWORK_CHANGED'
 TEARDOWN = "failed on teardown with "
@@ -64,6 +71,8 @@ TEARDOWN = "failed on teardown with "
 SETUP_OR_TEARDOWN = re.compile(r'^failed on (?:setup|teardown) with "')
 HARNESS_END = re.compile(r"ui/tests/browser/conftest\.py:\d+: AssertionError")
 REQUEST_FAILED = re.compile(r"'request failed: https?://\S+ " + MARKER + "'")
+EVERY_ITEM = re.compile(r"AssertionError: (\d+) page errors, one per line:")
+ONE_ITEM = re.compile("Left contains one more item: " + REQUEST_FAILED.pattern)
 
 # A failed test or error in the -rfE summary, by the file pytest names.
 SUMMARY_FILE = re.compile(r"^(?:FAILED|ERROR) ([^: ]*\.py)", re.M)
@@ -75,8 +84,8 @@ CARRIED = ("-m", "-k", "-p")
 
 def changed_network(element: ET.Element) -> bool:
     """Whether a junit <failure> or <error> is a raised Playwright error
-    naming a changed network, or the harness's teardown <error> naming one
-    as the first request that failed."""
+    naming a changed network, or the harness's teardown <error> naming a
+    changed network as every request that failed."""
     message = element.get("message", "")
     if PAGE_LOAD.match(SETUP_OR_TEARDOWN.sub("", message, count=1)):
         return True
@@ -85,7 +94,14 @@ def changed_network(element: ET.Element) -> bool:
     lines = [line for line in (element.text or "").splitlines() if line.strip()]
     if not lines or not HARNESS_END.fullmatch(lines[-1]):
         return False
-    return any(line.startswith("E ") and REQUEST_FAILED.search(line) for line in lines)
+    raised = [line[2:].strip() for line in lines if line.startswith("E ")]
+    for n, line in enumerate(raised):
+        if header := EVERY_ITEM.fullmatch(line):
+            items = raised[n + 1 : n + 1 + int(header[1])]
+            return len(items) == int(header[1]) > 0 and all(
+                REQUEST_FAILED.fullmatch(item) for item in items
+            )
+    return any(ONE_ITEM.fullmatch(line) for line in raised)
 
 
 def carried_options(args: list[str]) -> list[str]:
