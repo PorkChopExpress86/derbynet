@@ -1406,6 +1406,40 @@ def test_a_space_press_never_released_holds_the_board_one_poll_interval(login, e
     polls.end()
 
 
+def test_a_space_held_across_a_tab_taps_nothing(login, event):
+    """D131's accepted cost: Space goes down on Racing, Tab moves the focus
+    to the scene button after it, the key repeats once there, and comes up.
+    The board ignores the repeat, so nothing is tapped and no scene is
+    posted. Master's page, and Chromium on a plain page, tap the Tab target,
+    since the repeat arms its click (the PR's probe, `spacetab/run.log`). No
+    poll changes the board, so nothing swaps."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    racing = scene_button(page, scene(event, "Racing"))
+    htmx_settled(page)
+    page.evaluate(BOARD_LOG)
+    focus_on(page, racing)
+    page.keyboard.down(" ")
+    page.keyboard.press("Tab")
+    page.wait_for_function(
+        "id => document.activeElement.matches('#kiosk-board button[data-scene]')"
+        " && document.activeElement.dataset.scene !== id",
+        arg=racing.get_attribute("data-scene"),
+    )
+    page.keyboard.down(" ")
+    page.keyboard.up(" ")
+    page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = board_log(page)
+    keydown = after(log, "keydown")
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 1 and repeats[0]["on"] != "BODY", log
+    # one read: a click would have sent its POST before keyboard.up()
+    # returned.
+    assert posts_since(log, keydown) == [], log
+    assert swaps_since(log, keydown) == [], log
+
+
 def test_a_space_held_on_one_button_and_a_click_on_another_posts_once(login, event):
     """D131: Space is held on Racing, and the mouse clicks Reload. Reload's
     POST reply brings the board out of band, and the focus comes back to
