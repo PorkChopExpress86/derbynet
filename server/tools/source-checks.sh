@@ -56,6 +56,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
   tests/test_deviations.py \
   tests/test_parity_gate_ci.py \
   tests/test_pytest_under_load.py \
+  tests/test_network_changed.py \
   tests/test_no_xdist_fixtures.py \
   tests/test_playwright_in_process.py \
   tests/test_transactional_tests.py \

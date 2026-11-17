@@ -627,18 +627,27 @@ printf 'veth1 entered\\nveth2 left\\nveth3 entered\\neth0 up\\n'
 """
 
 
-def load_run_of(tmp_path, test_body, *args, journalctl=JOURNALCTL):
-    """pytest-under-load.sh on a stub test file holding `test_body`, with
-    `journalctl` as a stand-in first on PATH: (its exit code, its output,
-    the journalctl arguments file)."""
+def load_run_of(
+    tmp_path, test_body, *args, journalctl=JOURNALCTL, options="", python3=None
+):
+    """pytest-under-load.sh, with `options` of its own, on a stub test file
+    holding `test_body`, with `journalctl`, and `python3` when given, as
+    stand-ins first on PATH: (its exit code, its output, the journalctl
+    arguments file)."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "journalctl").write_text(journalctl)
     (bin_dir / "journalctl").chmod(0o755)
+    if python3:
+        (bin_dir / "python3").write_text(python3)
+        (bin_dir / "python3").chmod(0o755)
     (tmp_path / "test_net.py").write_text(
         f"def test_loads():\n{test_body}\n\n\ndef test_passes():\n    pass\n"
     )
-    command = f"'{SCRIPT}' --loops 0 -p no:cacheprovider {' '.join(args)} '{tmp_path}'"
+    command = (
+        f"'{SCRIPT}' --loops 0 {options} -p no:cacheprovider {' '.join(args)}"
+        f" '{tmp_path}'"
+    )
     result = subprocess.run(
         ["bash", "-c", command + " >out"],
         capture_output=True,
@@ -660,20 +669,19 @@ def load_run_of(tmp_path, test_body, *args, journalctl=JOURNALCTL):
     )
 
 
-def test_a_network_change_names_the_veth_lines_and_the_rerun(tmp_path):
+def test_a_network_change_names_the_veth_lines_and_reruns_each_file(tmp_path):
     """#348 read the kernel log by hand for three load runs that failed only
     on net::ERR_NETWORK_CHANGED (#348 retro). A failure and a setup error
-    each name their file; the run lasts past a second, so its window does
-    too. The status stays pytest's."""
+    each name their file, and the rerun names both; the run lasts past a
+    second, so its window does too. Both fail again in the rerun, so the
+    status stays pytest's (D122)."""
     (tmp_path / "test_net_setup.py").write_text(
         "import pytest\n\n\n@pytest.fixture\ndef page():\n"
-        "    raise RuntimeError('net::ERR_NETWORK_CHANGED at index.php')\n\n\n"
-        "def test_opens(page):\n    pass\n"
+        + PAGE_LOAD_ERROR.rstrip()
+        + "\n\n\ndef test_opens(page):\n    pass\n"
     )
     code, out, args = load_run_of(
-        tmp_path,
-        "    import time\n\n    time.sleep(1.1)\n"
-        "    raise AssertionError('net::ERR_NETWORK_CHANGED at app.css')",
+        tmp_path, "    import time\n\n    time.sleep(1.1)\n" + PAGE_LOAD_ERROR
     )
     assert code == 1, out
     found = re.search(
@@ -697,10 +705,275 @@ def test_a_network_change_names_the_veth_lines_and_the_rerun(tmp_path):
         for name in ("test_net.py", "test_net_setup.py")
     ]
     assert (
-        "Rerun each failed file alone at once, and report both results: "
-        'DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -m browser -n 0 '
+        "Rerunning the failed files alone, with no load, before the lock is freed: "
+        'DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -p no:cacheprovider -n 0 '
         f"{failed[0]} {failed[1]}\n"
     ) in out
+    assert re.search(r"^rerun exited 1; log: .*/rerun\.log;", out, re.M), out
+    assert re.search(r"^ERROR \S*test_net_setup\.py::test_opens", out, re.M)
+    assert (
+        "The first run exited 1, with 3 veth lines in its window; the rerun"
+        " failed too (exit 1).\n"
+    ) in out
+    assert out.rstrip().splitlines()[-1].startswith("pytest exited 1; log: ")
+
+
+# A stub's raise of Playwright's page-load error, as #348's load run failed:
+#   playwright._impl._errors.Error: Page.goto: net::ERR_NETWORK_CHANGED at http://...
+PAGE_LOAD_ERROR = """\
+    class Error(Exception):
+        pass
+
+    Error.__module__ = "playwright._impl._errors"
+    Error.__qualname__ = "Error"
+    raise Error(
+        "Page.goto: net::ERR_NETWORK_CHANGED at http://localhost:1/kiosk.php"
+    )
+"""
+
+
+def once(raises):
+    """A stub test body that runs `raises`, a body of its own, on its first
+    run only, leaving a file beside it, and passes on the rerun."""
+    return (
+        "    from pathlib import Path\n\n"
+        "    first = not Path(__file__).with_name('failed-once').exists()\n"
+        "    Path(__file__).with_name('failed-once').write_text('')\n"
+        "    if first:\n" + "".join(f"    {line}\n" for line in raises.splitlines())
+    )
+
+
+def test_a_network_change_alone_reruns_and_a_clean_rerun_passes_the_run(tmp_path):
+    """D122: every failure is a changed network, the kernel log has veth
+    lines over the run, and the rerun passes, so the script exits 0. The
+    first run's log, junit file and status stay as they were (#373)."""
+    code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR))
+    assert code == 0, out
+    run_dir = tmp_path / "run"
+    assert "1 failed, 1 passed" in (run_dir / "pytest.log").read_text()
+    assert 'failures="1"' in (run_dir / "junit.xml").read_text()
+    assert "2 passed" in (run_dir / "rerun.log").read_text()
+    assert 'failures="0"' in (run_dir / "rerun-junit.xml").read_text()
+    assert re.search(r"^rerun exited 0; log: \S*/rerun\.log;", out, re.M), out
+    assert (
+        "The first run exited 1, with 3 veth lines in its window; the rerun"
+        " passed: the run counts as passed for D101's repeats only (D122)"
+    ) in out
+    assert out.rstrip().splitlines()[-1].startswith("pytest exited 1; log: ")
+    assert out.rstrip().endswith("the script exits 0 (D122)")
+
+
+def test_a_flake_ticket_s_run_keeps_pytest_s_status_after_a_clean_rerun(tmp_path):
+    """--flake-ticket: a flake ticket's race keeps its 25 runs (D122)."""
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), options="--flake-ticket"
+    )
+    assert code == 1, out
+    assert "2 passed" in (tmp_path / "run" / "rerun.log").read_text()
+    assert "the rerun passed, and --flake-ticket keeps pytest's status 1" in out
+    assert out.rstrip().splitlines()[-1].startswith("pytest exited 1; log: ")
+    assert "script exits" not in out
+
+
+def test_another_failure_beside_a_network_change_starts_no_rerun(tmp_path):
+    (tmp_path / "test_other.py").write_text("def test_other():\n    assert False\n")
+    code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR))
+    assert code == 1, out
+    assert "the kernel log has 3 veth lines" in out
+    assert (
+        "1 of 2 failures and errors are not a changed network"
+        " (a Playwright net::ERR_NETWORK_CHANGED, or the browser harness's"
+        " teardown naming one): no rerun, and the status stays pytest's.\n"
+    ) in out
+    assert not (tmp_path / "run" / "rerun.log").exists()
+    assert "Rerunning" not in out
+
+
+def test_the_bare_error_text_in_a_failure_starts_no_rerun(tmp_path):
+    """This file's own asserts print the script's lines, which name the
+    error (`assert code == 1, out`): a flake there, with veth churn, must
+    keep its failure (#373, lead)."""
+    code, out, _ = load_run_of(
+        tmp_path,
+        once(
+            "    raise AssertionError('net::ERR_NETWORK_CHANGED in the log; the kernel"
+            " log has 3 veth lines')"
+        ),
+    )
+    assert code == 1, out
+    assert "1 of 1 failures and errors are not a changed network" in out
+    assert not (tmp_path / "run" / "rerun.log").exists()
+
+
+@pytest.mark.parametrize(
+    "journalctl, seen",
+    [
+        ("#! /bin/sh\necho 'eth0 up'\n", "0 veth lines"),
+        ("#! /bin/sh\nexit 0\n", "no veth count"),
+    ],
+    ids=["no-veth", "unread"],
+)
+def test_a_clean_rerun_with_no_veth_count_keeps_pytest_s_status(
+    tmp_path, journalctl, seen
+):
+    """A veth count of 0, or one not read, keeps pytest's status; the rerun
+    still runs and is reported (#373)."""
+    code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR), journalctl=journalctl)
+    assert code == 1, out
+    assert re.search(r"^rerun exited 0; log: ", out, re.M), out
+    assert (
+        f"The first run exited 1, with {seen} in its window; the rerun passed,"
+        " but with no veth lines counted the status stays pytest's 1 (D122)."
+    ) in out
+
+
+def test_a_run_without_xdist_is_rerun_without_n(tmp_path):
+    """`-n 0` beside `-p no:xdist` exits 4, "unrecognized arguments: -n"
+    (#373 review)."""
+    code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR), "-p", "no:xdist")
+    assert code == 0, out
+    assert " -n " not in out.split("Rerunning", 1)[1].splitlines()[0]
+    assert "2 passed" in (tmp_path / "run" / "rerun.log").read_text()
+
+
+def failing(command):
+    """A stand-in python3 that fails network_changed.py's `command` with
+    exit 2, as a wrong command line does, after printing the lines a
+    passing outcome prints, a line and then `exit 0`, and runs the rest."""
+    real = shutil.which("python3")
+    return (
+        f'#! /bin/sh\ncase "$3" in {command})'
+        ' printf "the run counts as passed\\nexit 0\\n"; exit 2;; esac\n'
+        f'exec {real} "$@"\n'
+    )
+
+
+def test_a_failed_outcome_is_named_and_keeps_pytest_s_status(tmp_path):
+    """A tool error is no pass and no silent fold into pytest's status
+    (#373 review)."""
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), python3=failing("outcome")
+    )
+    assert code == 1, out
+    assert re.search(r"^rerun exited 0; log: ", out, re.M), out
+    assert (
+        "network_changed.py outcome failed (exit 2): the status stays pytest's.\n"
+    ) in out
+    assert out.rstrip().splitlines()[-1].startswith("pytest exited 1; log: ")
+    assert "script exits" not in out
+
+
+def test_a_failed_rerun_args_is_named_and_starts_no_rerun(tmp_path):
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), python3=failing("rerun-args")
+    )
+    assert code == 1, out
+    assert (
+        "network_changed.py rerun-args failed (exit 2): no rerun, and the status"
+        " stays pytest's.\n"
+    ) in out
+    assert not (tmp_path / "run" / "rerun.log").exists()
+
+
+# A stub whose first run fails on a changed network and whose rerun holds
+# until the test writes `go` beside it, for at most 60 s.
+HELD_RERUN = (
+    "import os\nimport time\nfrom pathlib import Path\n\n\n"
+    "def test_loads():\n"
+    "    here = Path(__file__).parent\n"
+    "    if (here / 'failed-once').exists():\n"
+    "        (here / 'rerunning').write_text(str(os.getpid()))\n"
+    "        for _ in range(600):\n"
+    "            if (here / 'go').exists():\n"
+    "                return\n"
+    "            time.sleep(0.1)\n"
+    "        raise AssertionError('no go within 60 s')\n"
+    "    (here / 'failed-once').write_text('')\n" + PAGE_LOAD_ERROR
+)
+
+
+def start_held_rerun(tmp_path):
+    """The script, with two loops, on HELD_RERUN in `tmp_path/held`, in a
+    session of its own, with the stand-in journalctl: (the run, the lock)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "journalctl").write_text(JOURNALCTL)
+    (bin_dir / "journalctl").chmod(0o755)
+    folder = tmp_path / "held"
+    folder.mkdir()
+    (folder / "test_held.py").write_text(HELD_RERUN)
+    lock = tmp_path / "load.lock"
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "held-run"),
+        "DERBYNET_LOAD_LOCK": str(lock),
+    }
+    env.pop("DERBYNET_LOAD_LOCK_HELD", None)
+    with open(tmp_path / "held.out", "w") as out:
+        run = subprocess.Popen(
+            [str(SCRIPT), "--loops", "2", "-p", "no:cacheprovider", str(folder)],
+            stdout=out,
+            stderr=subprocess.STDOUT,
+            cwd=tmp_path,
+            env=env,
+            start_new_session=True,
+        )
+    wait_until((folder / "rerunning").exists, "the rerun", 90)
+    return run, lock
+
+
+def test_the_rerun_holds_the_lock_with_no_loops_and_no_xdist(tmp_path):
+    """The rerun runs before the lock is freed, so the next load run waits
+    for it, with the busy loops stopped (D122)."""
+    run, lock = start_held_rerun(tmp_path)
+    try:
+        assert not free(lock)
+        assert "bash" not in children(run.pid)
+        rerun = int((tmp_path / "held" / "rerunning").read_text())
+        argv = Path(f"/proc/{rerun}/cmdline").read_bytes().split(b"\0")
+        assert b"-n" in argv and argv[argv.index(b"-n") + 1] == b"0", argv
+        (tmp_path / "held" / "go").write_text("")
+        assert run.wait(timeout=60) == 0, (tmp_path / "held.out").read_text()
+    finally:
+        finish(tmp_path, run)
+
+
+@pytest.mark.parametrize(
+    "signals",
+    [("TERM",), ("TERM", "TERM"), ("TERM", "INT")],
+    ids=["TERM", "TERM-TERM", "TERM-INT"],
+)
+def test_a_signal_during_the_rerun_stops_it_and_frees_the_lock(tmp_path, signals):
+    """plan/AGENT-BRIEF.md: a tool that cleans up in a trap is tested with a
+    second signal during the cleanup."""
+    run, lock = start_held_rerun(tmp_path)
+    try:
+        rerun = int((tmp_path / "held" / "rerunning").read_text())
+        for name in signals:
+            os.kill(run.pid, getattr(signal, f"SIG{name}"))
+        assert run.wait(timeout=30) == 143
+        assert free(lock)
+        wait_until(lambda: not alive(rerun), "the rerun's pytest gone", 10)
+    finally:
+        finish(tmp_path, run)
+
+
+def test_a_sigkill_during_the_rerun_frees_the_lock_for_the_next_run(tmp_path):
+    """The rerun's pytest gets no copy of the lock (plan/AGENT-BRIEF.md: a
+    SIGKILL followed by the next run)."""
+    run, lock = start_held_rerun(tmp_path)
+    second = None
+    try:
+        rerun = int((tmp_path / "held" / "rerunning").read_text())
+        os.kill(run.pid, signal.SIGKILL)
+        run.wait(timeout=10)
+        assert alive(rerun)
+        second = start(tmp_path, "second", lock, go=True, loops=0)
+        assert second.wait(timeout=90) == 0
+        assert "Waiting" not in (tmp_path / "second.out").read_text()
+    finally:
+        finish(tmp_path, run, *([second] if second else []))
 
 
 def test_another_failure_names_neither(tmp_path):
