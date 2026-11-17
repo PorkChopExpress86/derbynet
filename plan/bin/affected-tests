@@ -69,6 +69,19 @@ targets, then:
   again (#312 retro);
 - the commands, from server/.
 
+A test helper (a module in a tests folder that is no test file or conftest)
+maps to each test file and conftest folder that imports it, directly or
+through another helper or conftest. When its diff from BASE only adds
+top-level functions, by AST, it maps instead to the importers that name an
+added function as a whole word, and to every importer of a helper or
+conftest among them, with a conftest's folder (#371). An added def has no
+decorator and only literal defaults; an added import beside it counts too;
+no added name is one the module bound or read at BASE, or one pytest or
+Python reads by its presence; the module docstring may change unless the
+module reads `__doc__` (D101). Anything else keeps every importer, and so
+do a star import among the importers, no importer that names an added
+function, a new or deleted helper, and `--stdin`; the output says why.
+
 A shared conftest, pyproject.toml, uv.lock, the settings or a CI workflow
 reaches every suite on both databases (#282's browser conftest hook ran in
 every collection), so CI's full run is the check, and the commands are the
@@ -307,9 +320,10 @@ class Tree:
                 self._imports[rel] = names
         return self._imports
 
-    def importers(self, module):
-        """The test files that import `module`, directly or through a helper
-        module in a test folder, and the conftests that do."""
+    def reach(self, module):
+        """The test-folder files that import `module`, directly or through a
+        helper module or conftest in a test folder that does: each test file
+        that does, and each other module reached, `module` among them."""
         def hits(names, mods):
             return any(n == m or n.startswith(m + '.') for n in names for m in mods)
 
@@ -324,11 +338,16 @@ class Tree:
                         and hits(names, reached):
                     reached.add(mod)
                     changed = True
-        tests = sorted(rel for rel, names in imports.items()
-                       if Path(rel).name.startswith('test_') and hits(names, reached))
-        conftests = sorted(rel for rel in imports if Path(rel).name == 'conftest.py'
-                           and module_name(rel) in reached)
-        return tests, conftests
+        return sorted(rel for rel, names in imports.items()
+                      if (hits(names, reached) if Path(rel).name.startswith('test_')
+                          else module_name(rel) in reached))
+
+    def importers(self, module):
+        """The test files that import `module`, directly or through a helper
+        module in a test folder, and the conftests that do."""
+        found = self.reach(module)
+        return ([rel for rel in found if Path(rel).name.startswith('test_')],
+                [rel for rel in found if Path(rel).name == 'conftest.py'])
 
     def mentions(self, words):
         """The test files whose text names one of `words`, as a whole word:
@@ -655,15 +674,33 @@ def cover_test_helper(plan, tree, path):
     if rel == 'core/tests/populated.py':
         plan.postgres.append(f'{path}: the populated event every event-scoped '
                              'model needs a row in')
-    tests, conftests = tree.importers(module_name(rel))
+    try:
+        if not plan.from_git:
+            raise NotAddition('--stdin has no BASE to compare with')
+        if not tree.exists(rel):
+            raise NotAddition('deleted')
+        functions, imports = additions(base_text(plan, rel), tree.text(rel))
+        tests, conftests, naming = namers(tree, rel, functions)
+    except NotAddition as why:
+        tests, conftests = tree.importers(module_name(rel))
+        note = ('a test helper: the tests and conftest folders that import it; its '
+                f'diff is no pure addition (#371): {why}')
+        root_why = 'the root conftest imports it'
+    else:
+        also = f', and the import of {", ".join(imports)}' if imports else ''
+        note = (f'a test helper whose diff only adds {", ".join(functions)}{also} '
+                f'(#371): the importers that name an added function '
+                f'({", ".join(naming)}), '
+                'and the tests and conftest folders that import a helper or '
+                'conftest among them')
+        root_why = 'the root conftest names what it adds'
     dirs = [str(Path(c).parent) for c in conftests]
     if '.' in dirs:
-        plan.everything.append(f'{path}: the root conftest imports it')
+        plan.everything.append(f'{path}: {root_why}')
     targets = tests + [d for d in dirs if d != '.']
     if tree.exists(rel):  # match_test_helper took only .py files
         plan.changed_helpers.append(rel)
-    plan.add(path, 'test-helper', 'a test helper: the tests and conftest folders '
-             'that import it', targets)
+    plan.add(path, 'test-helper', note, targets)
 
 
 def match_test_data(path):
@@ -1978,6 +2015,135 @@ def changed_tests(base_text, head_text, module_text, claims=False):
         raise WholeFile('by AST it adds or changes no test, and no helper a test '
                         'reads: a comment, a docstring or a deletion')
     return out
+
+
+# --- #371: a test helper's diff that only adds ------------------------------
+#
+# A diff to a helper module that only adds top-level functions runs the
+# importers that name one, not every importer (#348's pause_clock_at ran all
+# of ui/tests/browser, 730 items, through the browser conftest's import).
+# A wrong verdict skips tests the change can reach, so every check fails
+# closed: anything else keeps every importer.
+
+class NotAddition(Exception):
+    """Why a changed test helper keeps every importer."""
+
+
+def literal(node):
+    try:
+        ast.literal_eval(node)
+    except ValueError:
+        return False
+    return True
+
+
+def label(node):
+    if isinstance(node, FUNCTIONS) and not node.decorator_list \
+            and not PYTEST_READS.fullmatch(node.name):
+        return f'the def {node.name}'
+    return what(node)
+
+
+def additions(base_text, head_text):
+    """#371's verdict on a test helper module: (functions, imports), the
+    names of the top-level defs the diff from `base_text` to `head_text`
+    adds and of the imports beside them, when it changes nothing else by
+    AST. Each def is undecorated, with literal defaults, since a decorator
+    or a default runs on import; its annotations wait until read on the
+    server's Python (>=3.14, PEP 649). Each added name is one the module
+    neither bound nor read at BASE, a builtin among them, so it shadows
+    nothing, and none is a name pytest or Python reads by its presence. The
+    module docstring is no change unless the module reads `__doc__`, as in
+    D101. Raises NotAddition with the reason otherwise."""
+    if base_text is None:
+        raise NotAddition('new on the branch')
+    try:
+        trees = ast.parse(base_text), ast.parse(head_text)
+    except SyntaxError as e:
+        raise NotAddition(f'cannot be parsed ({e.msg}, line {e.lineno})') from None
+    try:
+        base_binds = bindings(trees[0], 'BASE')
+        head_binds = bindings(trees[1], 'the module')
+    except NotImportOnly as e:
+        raise NotAddition(str(e)) from None
+    bodies = []
+    docs = []
+    for tree in trees:
+        body = list(tree.body)
+        docs.append(body.pop(0).value.value if body and is_docstring(body[0]) else None)
+        bodies.append(body)
+    if docs[0] != docs[1] and reads_doc(trees[1]):
+        raise NotAddition('its docstring changes, and it reads `__doc__` (D101)')
+    old = [ast.dump(n) for n in bodies[0]]
+    kept = 0
+    added = []
+    for node in bodies[1]:
+        if kept < len(old) and ast.dump(node) == old[kept]:
+            kept += 1
+        else:
+            added.append(node)
+    if kept < len(old):
+        raise NotAddition(f'it changes or deletes {label(bodies[0][kept])}')
+    read = mentions(trees[0]) | set(base_binds)
+    functions, imports = [], []
+    for node in added:
+        if isinstance(node, FUNCTIONS):
+            if node.decorator_list:
+                raise NotAddition(f'it adds {what(node)}, whose decorator runs on import')
+            if not all(literal(d) for d in node.args.defaults + node.args.kw_defaults
+                       if d is not None):
+                raise NotAddition(f'it adds the def {node.name}, a default of which '
+                                  'runs on import')
+            names, into = [node.name], functions
+        elif is_import(node):
+            names, into = [(a.asname or a.name).split('.')[0] for a in node.names], imports
+        else:
+            raise NotAddition(f'it adds {what(node)}')
+        for name in names:
+            if PYTEST_READS.fullmatch(name):
+                raise NotAddition(f'it adds {name}, which pytest or Python reads by '
+                                  'its name')
+            if name in read:
+                raise NotAddition(f'it adds {name}, which the module bound or read '
+                                  'before')
+            if head_binds.get(name) is AMBIGUOUS:
+                raise NotAddition(f'it binds {name} more than once')
+            into.append(name)
+    if not functions:
+        raise NotAddition('by AST it adds no function')
+    return functions, imports
+
+
+def namers(tree, rel, names):
+    """For a helper `rel` whose diff only adds `names`: (tests, conftests,
+    naming), where naming lists the files that import `rel` (through a
+    helper or conftest too) and name one of `names` as a whole word, tests
+    the test files among them, and conftests the conftests among them; a
+    helper or conftest among them adds every test and conftest that imports
+    it, as if it changed. A star import among the importers, which takes in
+    a name without naming it, or no importer that names one, raises
+    NotAddition."""
+    word = re.compile(r'\b(?:' + '|'.join(map(re.escape, names)) + r')\b')
+    tests, conftests, naming = set(), set(), []
+    for other in tree.reach(module_name(rel)):
+        if other == rel:
+            continue
+        if re.search(r'^\s*from\s+\S+\s+import\s+\*', tree.text(other), re.M):
+            raise NotAddition(f'{other} has a star import')
+        if not word.search(tree.text(other)):
+            continue
+        naming.append(other)
+        if Path(other).name.startswith('test_'):
+            tests.add(other)
+            continue
+        if Path(other).name == 'conftest.py':
+            conftests.add(other)
+        more, folders = tree.importers(module_name(other))
+        tests.update(more)
+        conftests.update(folders)
+    if not naming:
+        raise NotAddition(f'nothing that imports it names {", ".join(names)}')
+    return sorted(tests), sorted(conftests), naming
 
 
 # --- output ----------------------------------------------------------------
