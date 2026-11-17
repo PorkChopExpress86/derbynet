@@ -388,24 +388,6 @@ class RefusedFrame:
         raise Error("Frame for this navigation request is not available")
 
 
-def test_a_navigation_keeps_a_request_whose_frame_is_refused():
-    """`InFlight.navigated` drops a frame's own requests of the types in
-    `ORPHANED`, and keeps its document request, another frame's request and
-    a request whose frame Playwright refuses (#378). Only a navigation
-    request has its frame refused, and that is a document, which `ORPHANED`
-    never holds (`test_a_blank_link_followed_while_a_frame_navigates_is_tracked`),
-    so these requests are stand-ins."""
-    in_flight = InFlight(SimpleNamespace(on=lambda event, listener: None))
-    navigated, other = object(), object()
-    own = Sent(navigated, "fetch")
-    document = Sent(navigated, "document")
-    others = Sent(other, "fetch")
-    refused = RefusedFrame("fetch")
-    in_flight.requests = {own, document, others, refused}
-    in_flight.navigated(navigated)
-    assert in_flight.requests == {document, others, refused}
-
-
 # A page with an iframe and a `target="_blank"` link to a popup.
 FRAME_AND_BLANK_LINK = """() => {
   const frame = document.createElement('iframe');
@@ -418,6 +400,47 @@ FRAME_AND_BLANK_LINK = """() => {
   link.textContent = 'Open';
   document.body.prepend(link);
 }"""
+MOVE_THE_IFRAME = (
+    "() => { document.querySelector('iframe').src = '/frame-target?second'; }"
+)
+
+
+def test_a_navigation_keeps_a_request_whose_frame_is_refused(page, event):
+    """When a frame navigates, the harness drops that frame's own requests
+    of the types in `InFlight.ORPHANED`, and keeps its document request,
+    another frame's request and a request whose frame Playwright refuses
+    (#378). Only a navigation request has its frame refused, and that is a
+    document, which `ORPHANED` never holds
+    (`test_a_blank_link_followed_while_a_frame_navigates_is_tracked`), so
+    these requests are stand-ins, put in the page's set while its iframe
+    navigates."""
+    page.route(
+        "**/frame-target?*",
+        lambda route: route.fulfill(body="<p>frame</p>", content_type="text/html"),
+    )
+    page.goto("/login/")
+    with page.expect_event(
+        "framenavigated", lambda f: f.url.endswith("/frame-target?first")
+    ):
+        page.evaluate(FRAME_AND_BLANK_LINK)
+    iframe = next(f for f in page.frames if f.url.endswith("/frame-target?first"))
+    own = Sent(iframe, "fetch")
+    document = Sent(iframe, "document")
+    others = Sent(page.main_frame, "fetch")
+    refused = RefusedFrame("fetch")
+    stand_ins = {own, document, others, refused}
+    page.in_flight.requests |= stand_ins
+    try:
+        with page.expect_event(
+            "framenavigated", lambda f: f.url.endswith("/frame-target?second")
+        ):
+            page.evaluate(MOVE_THE_IFRAME)
+        left = page.in_flight.requests & stand_ins
+    finally:
+        # The drain after the test names what is left, and a stand-in has
+        # no method or url.
+        page.in_flight.requests -= stand_ins
+    assert left == {document, others, refused}
 
 
 def test_a_blank_link_followed_while_a_frame_navigates_is_tracked(page, event):
@@ -452,9 +475,7 @@ def test_a_blank_link_followed_while_a_frame_navigates_is_tracked(page, event):
     assert request.is_navigation_request()
     # The popup has no page yet while its request is held.
     assert page.context.pages == [page]
-    page.evaluate(
-        "() => { document.querySelector('iframe').src = '/frame-target?second'; }"
-    )
+    page.evaluate(MOVE_THE_IFRAME)
     wait_until(
         page,
         lambda: any(f.url.endswith("/frame-target?second") for f in page.frames),
