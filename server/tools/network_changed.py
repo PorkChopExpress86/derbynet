@@ -43,8 +43,9 @@ MARKER = "net::ERR_NETWORK_CHANGED"
 #   http://localhost:52751/kiosk.php?address=kiosk-test52 net::ERR_NETWORK_CHANGED'
 # The bare text is not enough: tests/test_pytest_under_load.py's asserts print
 # the script's own lines naming it, and a flake there must keep its failure.
+# PAGE_LOAD.match reads it from the start of a line only.
 PAGE_LOAD = re.compile(
-    r"^playwright\._impl\._errors\.\w+: \w+\.\w+: " + MARKER + r" at https?://"
+    r"playwright\._impl\._errors\.\w+: \w+\.\w+: " + MARKER + r" at https?://"
 )
 REQUEST_FAILED = re.compile(r"'request failed: https?://\S+ " + MARKER + "'")
 
