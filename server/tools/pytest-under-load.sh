@@ -150,7 +150,11 @@ stop_loops() {
   for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done
   PIDS=()
 }
+# The cleanup ignores a second TERM, INT or HUP: its `exit 143` would end
+# the EXIT trap before the loops still listed were killed, and they ran on
+# after the script exited (#372).
 stop_all() {
+  trap '' TERM INT HUP
   stop_loops
   if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
 }

@@ -405,20 +405,53 @@ def test_an_unwritable_lock_is_refused_by_name(tmp_path):
     assert "Permission denied" not in result.stderr
 
 
+# A `kill` for the scripts' cleanup traps, read through BASH_ENV: its first
+# call writes `cleanup` into PAUSE_DIR and waits there, for at most 30 s,
+# until the test writes `second`, then kills as the builtin does.  The
+# test's second signal so lands inside the cleanup, before its first kill,
+# on every run: sent back to back, it landed there only now and then under
+# load, and the stopped cleanup left loops running (#372).
+PAUSED_KILL = """kill() {
+  if [ -n "${PAUSE_DIR:-}" ] && [ ! -e "$PAUSE_DIR/cleanup" ]; then
+    : > "$PAUSE_DIR/cleanup"
+    for _ in $(seq 300); do [ -e "$PAUSE_DIR/second" ] && break; sleep 0.1; done
+  fi
+  builtin kill "$@"
+}
+"""
+
+
+def paused_kill(tmp_path):
+    """The environment that gives a script PAUSED_KILL, pausing in
+    `tmp_path`."""
+    (tmp_path / "paused_kill.sh").write_text(PAUSED_KILL)
+    return {"BASH_ENV": str(tmp_path / "paused_kill.sh"), "PAUSE_DIR": str(tmp_path)}
+
+
+def second_signal_inside_the_cleanup(tmp_path, pid, signals):
+    """Send `pid` the first of `signals`, wait for its cleanup to reach its
+    first kill, then send the second while the cleanup waits there."""
+    first, second = (getattr(signal, f"SIG{name}") for name in signals)
+    os.kill(pid, first)
+    wait_until((tmp_path / "cleanup").exists, "cleanup", 30)
+    os.kill(pid, second)
+    (tmp_path / "second").write_text("")
+
+
 @pytest.mark.parametrize(
     "signals", [("TERM", "TERM"), ("TERM", "INT")], ids=["TERM-TERM", "TERM-INT"]
 )
 def test_a_second_signal_during_the_cleanup_still_frees_all(tmp_path, signals):
     """plan/AGENT-BRIEF.md: a tool that cleans up in a trap is tested with a
-    second signal during the cleanup (#354 review)."""
+    second signal during the cleanup (#354 review), here held inside it by
+    PAUSED_KILL (#372)."""
     lock = tmp_path / "load.lock"
-    first = start(tmp_path, "first", lock, loops=4)
+    first = start(tmp_path, "first", lock, extra_env=paused_kill(tmp_path), loops=4)
     try:
         wait_until((tmp_path / "first" / "started").exists, "first run")
         loops = [pid for pid, name in child_pids(first.pid) if name == "bash"]
         assert len(loops) == 4
-        for name in signals:
-            os.kill(first.pid, getattr(signal, f"SIG{name}"))
+        second_signal_inside_the_cleanup(tmp_path, first.pid, signals)
         first.wait(timeout=30)
         wait_until(lambda: not any(alive(pid) for pid in loops), "loops gone", 10)
         assert free(lock)
@@ -436,14 +469,14 @@ HAND_OFF = (
 )
 
 
-def hold(tmp_path, lock, command=HAND_OFF, name="handoff"):
+def hold(tmp_path, lock, command=HAND_OFF, name="handoff", env=None):
     """tools/hold-load-lock.sh running `command` through bash in
     `tmp_path/name`, in a session of its own, with its output in
-    `tmp_path/name.out`."""
+    `tmp_path/name.out`, and `env` added to its environment."""
     folder = tmp_path / name
     folder.mkdir()
     out = open(tmp_path / f"{name}.out", "w")
-    env = {**os.environ, "DERBYNET_LOAD_LOCK": str(lock)}
+    env = {**os.environ, "DERBYNET_LOAD_LOCK": str(lock), **(env or {})}
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
         [str(HOLD_LOCK), "bash", "-c", command],
@@ -1027,16 +1060,16 @@ def test_a_second_signal_during_the_hand_off_s_cleanup_still_frees_all(
     tmp_path, signals
 ):
     """plan/AGENT-BRIEF.md: a tool that cleans up in a trap is tested with a
-    second signal during the cleanup."""
+    second signal during the cleanup, here held inside it by PAUSED_KILL
+    (#372)."""
     lock = tmp_path / "load.lock"
-    handoff = hold(tmp_path, lock, f"({HAND_OFF}) & wait")
+    handoff = hold(tmp_path, lock, f"({HAND_OFF}) & wait", env=paused_kill(tmp_path))
     wait_until((tmp_path / "handoff" / "started").exists, "the hand-off's command")
     command = [pid for pid, _ in child_pids(handoff.pid)]
     group = command + [pid for pid, _ in child_pids(command[0])]
     assert len(group) == 2
     try:
-        for name in signals:
-            os.kill(handoff.pid, getattr(signal, f"SIG{name}"))
+        second_signal_inside_the_cleanup(tmp_path, handoff.pid, signals)
         handoff.wait(timeout=30)
         assert free(lock)
         wait_until(lambda: not any(alive(p) for p in group), "its command gone", 10)

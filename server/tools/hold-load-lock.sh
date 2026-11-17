@@ -76,7 +76,10 @@ printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s\n' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*" >"$LOCK"
 
 CHILD=
+# The cleanup ignores a second TERM, INT or HUP, as pytest-under-load.sh's
+# does: its `exit 143` would end the EXIT trap before the kill (#372).
 stop_child() {
+  trap '' TERM INT HUP
   if [ -n "$CHILD" ]; then kill -TERM -- "-$CHILD" 2>/dev/null || true; fi
 }
 trap stop_child EXIT
