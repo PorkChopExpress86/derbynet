@@ -2145,12 +2145,12 @@ def namers(tree, rel, names):
     if not naming:
         raise NotAddition(f'nothing that imports it names {", ".join(names)}')
     found = set(naming)
-    frontier = list(naming)
-    while frontier:
-        for other in tree.reach(module_name(frontier.pop())):
-            if other not in found:
-                found.add(other)
-                frontier.append(other)
+    # Each pass adds a file or stops, so the bound is only a cap.
+    for _ in range(len(tree.python_in_tests())):
+        more = {f for other in found for f in tree.reach(module_name(other))} - found
+        if not more:
+            break
+        found |= more
     return (sorted(f for f in found if Path(f).name.startswith('test_')),
             sorted(f for f in found if Path(f).name == 'conftest.py'), naming)
 
