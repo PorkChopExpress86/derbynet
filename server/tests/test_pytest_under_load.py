@@ -746,14 +746,16 @@ def start_waiting(tmp_path, script, lock, extra_env=None):
 SCRIPTS = pytest.mark.parametrize("script", [SCRIPT, HOLD_LOCK], ids=lambda p: p.name)
 
 
+@pytest.mark.parametrize("sig", ["TERM", "INT", "HUP"])
 @SCRIPTS
-def test_a_sigterm_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script):
+def test_a_signal_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script, sig):
     """#372's implementer stopped a queued run of each script with TERM,
-    and each left its `flock -x 9` waiting on the lock (#391)."""
+    and each left its `flock -x 9` waiting on the lock (#391); INT and HUP
+    reach the same trap."""
     lock, held = held_lock(tmp_path)
     run, waiter = start_waiting(tmp_path, script, lock)
     try:
-        os.kill(run.pid, signal.SIGTERM)
+        os.kill(run.pid, getattr(signal, f"SIG{sig}"))
         status = run.wait(timeout=30)
         wait_until(lambda: not alive(waiter), "its flock gone", 10)
         assert status == 143
