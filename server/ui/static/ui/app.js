@@ -53,26 +53,19 @@ window.derbynet = {
 // test_a_key_held_as_a_sheet_closes_opens_nothing). PHP's kiosk dashboard
 // takes such a repeat: its naming dialog focuses the name field 210 ms after
 // it opens (modal.js:59), and a repeat there submits the name and closes it
-// (kiosk-dashboard.js:255, 262; the PR's probe). A key down when a sheet
-// opens or closes has its repeats cancelled until its keyup, and a fresh
-// press acts as before.
-const heldKeys = new Set();
+// (kiosk-dashboard.js:255, 262; the PR's probe). Enter or Space down when a
+// sheet opens or closes has its repeats cancelled until its keyup, and a fresh
+// press acts as before. An auto-repeat comes only while its key is down,
+// so carrying both keys at each open and close holds no key that is up:
+// its next keydown is a fresh press.
 const carriedKeys = new Set();
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-  if (!e.repeat) {
-    heldKeys.add(e.key);
-    carriedKeys.delete(e.key);
-  } else if (carriedKeys.has(e.key)) {
-    e.preventDefault();
-  }
-}, true);
-document.addEventListener('keyup', (e) => {
-  heldKeys.delete(e.key);
-  carriedKeys.delete(e.key);
+  if (!e.repeat) carriedKeys.delete(e.key);
+  else if (carriedKeys.has(e.key)) e.preventDefault();
 }, true);
 function carryHeldKeys() {
-  for (const key of heldKeys) carriedKeys.add(key);
+  carriedKeys.add('Enter');
+  carriedKeys.add(' ');
 }
 
 document.addEventListener('alpine:init', () => {
