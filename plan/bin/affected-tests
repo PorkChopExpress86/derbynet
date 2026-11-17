@@ -2145,7 +2145,10 @@ def namers(tree, rel, names):
     if not naming:
         raise NotAddition(f'nothing that imports it names {", ".join(names)}')
     found = set(naming)
-    # Each pass adds a file or stops, so the bound is only a cap.
+    # Never reached while `found` still grows: reach() returns files of
+    # python_in_tests(), naming holds at least one of them, and each pass
+    # but the last adds one more, so the last pass, which finds nothing
+    # new, is at most pass len(python_in_tests()).
     for _ in range(len(tree.python_in_tests())):
         more = {f for other in found for f in tree.reach(module_name(other))} - found
         if not more:
