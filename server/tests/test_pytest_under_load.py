@@ -784,9 +784,9 @@ def kill_calls(tmp_path):
     return kills.read_text().splitlines() if kills.exists() else []
 
 
-def naming(calls, pid):
-    """The calls that name `pid` as an argument."""
-    return [call for call in calls if str(pid) in call.split()]
+def kill_args(tmp_path):
+    """Every argument of the kills LOGGED_KILL logged, in one list."""
+    return " ".join(kill_calls(tmp_path)).split()
 
 
 def paused_copy(tmp_path, script, after, name):
@@ -841,7 +841,7 @@ def test_a_signal_as_its_wait_ends_signals_no_ended_flock(tmp_path, script):
         held = None
         signal_at_the_pause(tmp_path, run, "waited")
         assert run.wait(timeout=30) == 143
-        assert not naming(kill_calls(tmp_path), waiter)
+        assert str(waiter) not in kill_args(tmp_path)
     finally:
         if held is not None:
             os.close(held)
@@ -902,7 +902,7 @@ def test_a_flock_that_ends_without_the_lock_ends_the_run(tmp_path, script):
         assert run.wait(timeout=30) == 143
         assert lock.read_text() == "pid 1, since then\n"
         assert not (tmp_path / "waiter" / "started").exists()
-        assert not naming(kill_calls(tmp_path), waiter)
+        assert str(waiter) not in kill_args(tmp_path)
     finally:
         os.close(held)
         kill_all([waiter])
@@ -920,36 +920,51 @@ def test_a_run_that_took_the_lock_never_signals_its_ended_flock(tmp_path, script
         held = None
         (tmp_path / "waiter" / "go").write_text("")
         assert run.wait(timeout=90) == 0
-        assert not naming(kill_calls(tmp_path), waiter)
+        assert str(waiter) not in kill_args(tmp_path)
     finally:
         if held is not None:
             os.close(held)
         finish(tmp_path, run)
 
 
+@pytest.mark.parametrize("waits", [False, True], ids=["free", "after-a-wait"])
 @SCRIPTS
-def test_a_signal_after_it_took_the_lock_kills_each_child_once(tmp_path, script):
+def test_a_signal_after_it_took_the_lock_kills_each_child_once(tmp_path, script, waits):
     """Its cleanup stops the wait's flock only during the wait, though
-    WAITING comes set from its environment: once it holds the lock, the
-    cleanup kills each child it started once, from its own list (#391)."""
+    WAITING comes set from its environment, on a free lock or after a wait:
+    once it holds the lock, the cleanup kills each child it started once,
+    from its own list (#391)."""
     env = {**logged_kill(tmp_path), "WAITING": "1"}
     lock = tmp_path / "load.lock"
+    held = None
+    if waits:
+        lock, held = held_lock(tmp_path)
     if script == SCRIPT:
         run = start(tmp_path, "first", lock, env)
-        wait_started(tmp_path, "first")
-        # Its loop and its pytest.
-        expected = sorted(str(pid) for pid, _ in child_pids(run.pid))
-        assert len(expected) == 2
     else:
         run = hold(tmp_path, lock, extra_env=env)
-        wait_until((tmp_path / "handoff" / "started").exists, "the hand-off's command")
-        [(command, _)] = child_pids(run.pid)
-        expected = [f"-TERM -- -{command}"]
     try:
+        if waits:
+            wait_until(lambda: "flock" in children(run.pid), "flock under it", 30)
+            os.close(held)
+            held = None
+        if script == SCRIPT:
+            wait_started(tmp_path, "first")
+            # Its loop and its pytest.
+            expected = sorted(str(pid) for pid, _ in child_pids(run.pid))
+            assert len(expected) == 2
+        else:
+            wait_until(
+                (tmp_path / "handoff" / "started").exists, "the hand-off's command"
+            )
+            [(command, _)] = child_pids(run.pid)
+            expected = [f"-TERM -- -{command}"]
         os.kill(run.pid, signal.SIGTERM)
         assert run.wait(timeout=30) == 143
         assert sorted(kill_calls(tmp_path)) == expected
     finally:
+        if held is not None:
+            os.close(held)
         finish(tmp_path, run)
 
 
