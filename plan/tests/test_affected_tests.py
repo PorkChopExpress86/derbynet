@@ -273,6 +273,16 @@ class PlanTools(unittest.TestCase):
         self.assertNotIn('unittest discover', commands(out))
         self.assertIn('  tools/source-checks.sh\n', commands(out))
 
+    def test_every_diff_lists_the_quick_source_checks_before_a_push(self):
+        """#373's hook found a made-up path read as a cite late in its run,
+        a push round later (#373 retro)."""
+        for path in ('plan/bin/pr-merge', 'server/awards/views.py', 'server/docs/x.md'):
+            with self.subTest(path=path):
+                out = run(path)
+                self.assertIn('Before each push, from server/', commands(out))
+                self.assertTrue(out.endswith(
+                    'about 15 min, #373 retro):\n  tools/source-checks.sh --quick\n'), out)
+
     def test_the_pre_push_hook_runs_plan_tests(self):
         self.assertIn('[plan-tools]', run('.githooks/pre-push'))
 

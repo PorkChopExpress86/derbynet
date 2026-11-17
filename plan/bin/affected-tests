@@ -2187,6 +2187,13 @@ def report(plan, tree):
         say(f'  {line}')
     say('  tools/source-checks.sh')
     say('  uv run ruff check && uv run ruff format --check')
+    # The hook runs the whole script, plan/tests and all: #373's made-up path
+    # in a test string read as a cite, and the hook said so about 15 min into
+    # its run, a push round later (#373 retro).
+    say('')
+    say('Before each push, from server/ (about a minute: the pre-push hook '
+        'runs the whole script, about 15 min, #373 retro):')
+    say('  tools/source-checks.sh --quick')
     return '\n'.join(out) + '\n'
 
 
