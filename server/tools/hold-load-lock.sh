@@ -76,14 +76,13 @@ printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s\n' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*" >"$LOCK"
 
 CHILD=
-# The cleanup ignores a second TERM, INT or HUP, as pytest-under-load.sh's
-# does: its `exit 143` would end the EXIT trap before the kill (#372).
 stop_child() {
   trap '' TERM INT HUP
   if [ -n "$CHILD" ]; then kill -TERM -- "-$CHILD" 2>/dev/null || true; fi
 }
 trap stop_child EXIT
-trap 'exit 143' TERM INT HUP
+# Further signals are ignored as in pytest-under-load.sh, which says why.
+trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 # setsid gives COMMAND a process group of its own (its pid), which the trap
 # stops whole; `9>&-` keeps the lock with this script alone.  `<&0` keeps
