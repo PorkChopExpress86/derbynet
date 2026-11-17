@@ -383,8 +383,10 @@ class GitDirUnset(unittest.TestCase):
 
     def test_the_checks_run_with_no_git_dir(self):
         result = push('docs/x.md', TreeChanged.edit(
-            None, "log.write(f'GIT_DIR={os.environ.get(\"GIT_DIR\")}\\n')"), git_dir=True)
+            None, "log.write(f'GIT_DIR={os.environ.get(\"GIT_DIR\")}\\n')"), git_dir=True,
+            shell='echo "before the hook: GIT_DIR=$GIT_DIR" >>"$STUB_LOG"')
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.ran, r'before the hook: GIT_DIR=/\S+/\.git\n')
         self.assertIn('GIT_DIR=None\n', result.ran)
 
 
