@@ -130,3 +130,50 @@ def test_both_halves_run_whatever_the_first_says(
     )
     assert ran.read_text() == "python3\nuv\n", result.stderr
     assert result.returncode == status, result.stderr
+
+
+@pytest.mark.parametrize("args", [[], ["-x"]])
+def test_quick_runs_the_pytest_half_alone_on_xdist(tmp_path, args):
+    """--quick leaves out plan/tests and the under-load script's tests, and
+    spreads the rest over xdist: #373's hook found a made-up path read as a
+    cite late in its run, a push round later (#373 retro)."""
+    script = tmp_path / "server" / "tools" / "source-checks.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy(SCRIPT, script)
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    for name in ("python3", "uv"):
+        stub = stubs / name
+        stub.write_text(f'#! /bin/sh\necho {name} "$@" >> "$RAN"\n')
+        stub.chmod(0o755)
+    ran = tmp_path / "ran"
+    result = subprocess.run(
+        [str(script), "--quick", *args],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        stdin=subprocess.DEVNULL,
+        env={**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "RAN": str(ran)},
+    )
+    assert result.returncode == 0, result.stderr
+    [line] = ran.read_text().splitlines()
+    words = line.split()
+    assert words[:8] == [
+        "uv",
+        "run",
+        "--locked",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "-n",
+    ]
+    assert words[8:11] == ["auto", "--deselect", "tests/test_pytest_under_load.py"]
+    assert words[-1 - len(args) :] == [
+        "legacy_api/tests/test_testing_scripts.py",
+        *args,
+    ]
+    assert "--quick" not in words
+    [notice] = result.stderr.splitlines()
+    assert "skips plan/tests and tests/test_pytest_under_load.py" in notice
+    assert "pre-push hook runs the whole script" in notice

@@ -24,7 +24,13 @@
 # one full-suite round at a time (#48 retro); run this after each batch of
 # edits.
 #
-# Usage: server/tools/source-checks.sh [pytest argument ...]
+# Usage: server/tools/source-checks.sh [--quick] [pytest argument ...]
+#
+# --quick leaves out plan/tests and tests/test_pytest_under_load.py, the two
+# slowest parts, and runs the rest on xdist: run it before each push.  #373's
+# push ran the whole script in the hook, which found a made-up path in a
+# test string that read as a cite (test_php_cite_lines.py) after about 15
+# min, and the fix needed a second push (#373 retro).
 
 set -e -o pipefail
 
@@ -42,14 +48,25 @@ while [ "${pid:-0}" -gt 1 ]; do
   pid=$(ps -o ppid= -p "$pid" | tr -d ' ') || pid=1
 done
 
+quick=()
+if [ "${1:-}" = --quick ]; then
+  shift
+  quick=(-n auto --deselect tests/test_pytest_under_load.py)
+  echo "source-checks.sh --quick: skips plan/tests and" \
+       "tests/test_pytest_under_load.py; the pre-push hook runs the whole" \
+       "script, so a green --quick run is not a green push." >&2
+fi
+
 cd "$(dirname "$0")/.."
 # plan/bin reads the parity gate and the workflows; #222 broke a plan test.
 # Both halves run whatever the first one says, and the script exits with the
 # last failure's status: #312 stopped at a failing plan test and needed a
 # second scratch merge to learn the pytest half passed (#312 retro).
 status=0
-python3 -I -m unittest discover -s ../plan/tests </dev/null || status=$?
-env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider \
+if [ "${#quick[@]}" -eq 0 ]; then
+  python3 -I -m unittest discover -s ../plan/tests </dev/null || status=$?
+fi
+env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" \
   tests/test_php_claims.py \
   tests/test_php_cite_lines.py \
   tests/test_clamp_claims.py \
