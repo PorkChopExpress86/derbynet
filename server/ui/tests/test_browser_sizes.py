@@ -10,14 +10,18 @@ from types import SimpleNamespace
 import pytest
 
 SERVER_DIR = Path(__file__).resolve().parents[2]
+BROWSER = Path(__file__).resolve().parent / "browser"
 
 
-def case(size, *marks, name="t"):
-    """A collected test at `size` (None: one that takes no `size`)."""
+def case(size, *marks, name="t", folder=BROWSER):
+    """A test in `folder` collected at `size` (None: one that takes no
+    `size`)."""
     own = [m.mark for m in marks]
     return SimpleNamespace(
         nodeid=f"test_a.py::{name}[{size}]",
-        fspath=SERVER_DIR / "test_a.py",
+        fspath=folder / "test_a.py",
+        fixturenames=("_async_unsafe",),
+        add_marker=lambda mark: own.append(mark.mark),
         callspec=SimpleNamespace(params={} if size is None else {"size": size}),
         get_closest_marker=lambda n: next((m for m in own if m.name == n), None),
     )
@@ -91,7 +95,6 @@ def test_the_collection_hook_deselects_the_dropped_cases():
         hook=SimpleNamespace(pytest_deselected=lambda items: reported.append(items))
     )
     for item in (phone, desktop):
-        item.fixturenames, item.add_marker = (), lambda mark: None
         item.config = config
     items = [phone, desktop]
     conftest.pytest_collection_modifyitems(items)
@@ -105,11 +108,27 @@ def test_a_collection_with_nothing_to_drop_reports_nothing():
     from ui.tests.browser import conftest
 
     items = [case("phone"), case("desktop")]
-    for item in items:
-        item.fixturenames, item.add_marker = (), lambda mark: None
     before = list(items)
     conftest.pytest_collection_modifyitems(items)
     assert items == before
+
+
+def test_the_hook_leaves_a_mark_outside_the_browser_tests_alone():
+    """A `sizes` mark on a test outside browser/ is not the browser
+    harness's: the hook neither drops that test nor stops the collection on
+    it, as it marks only its own tests `browser`, and keeps the order."""
+    from ui.tests.browser import conftest
+
+    outside = case(None, pytest.mark.sizes("tablet"), folder=SERVER_DIR)
+    phone, desktop = case("phone", DESKTOP), case("desktop", DESKTOP)
+    phone.config = SimpleNamespace(
+        hook=SimpleNamespace(pytest_deselected=lambda items: None)
+    )
+    items = [phone, outside, desktop]
+    conftest.pytest_collection_modifyitems(items)
+    assert items == [outside, desktop]
+    assert outside.get_closest_marker("browser") is None
+    assert desktop.get_closest_marker("browser") is not None
 
 
 def test_a_collection_lists_no_case_at_a_size_the_test_does_not_name():

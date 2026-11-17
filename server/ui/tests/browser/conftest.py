@@ -146,14 +146,15 @@ def split_by_size(items) -> tuple[list, list]:
 
 def pytest_collection_modifyitems(items):
     here = Path(__file__).parent
-    for item in items:
-        if here in Path(item.fspath).parents:
-            item.add_marker(pytest.mark.browser)
+    browser = [item for item in items if here in Path(item.fspath).parents]
+    for item in browser:
+        item.add_marker(pytest.mark.browser)
     check_harness(items, here)
-    kept, dropped = split_by_size(items)
+    dropped = split_by_size(browser)[1]
     if dropped:
         dropped[0].config.hook.pytest_deselected(items=dropped)
-        items[:] = kept
+        gone = {id(item) for item in dropped}
+        items[:] = [item for item in items if id(item) not in gone]
 
 
 # A host name that reaches the live server over plain HTTP. `localhost` is a
