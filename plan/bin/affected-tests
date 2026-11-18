@@ -55,9 +55,10 @@ targets, then:
   repeats of the whole file, on the database it failed on, whatever the
   tool prints (D101). A text-measuring file named
   `ui/tests/browser/test_kiosk*.py` repeats under load in the default font
-  only, and its DejaVu Sans run goes once, with no load and no --count, under
-  `tools/hold-load-lock.sh`, a flake ticket's whole-file 25 included (D133,
-  amending D101's repeats; D85's second font under load stays for other files);
+  only, and its one DejaVu Sans run is the hand-off's, with no load and no
+  --count, under `tools/hold-load-lock.sh`, a flake ticket's whole-file 25
+  included (D133, amending D101's repeats; D85's second font under load stays
+  for other files);
 - before the commands, `tools/docstring_claims.py` on each changed test file,
   then with `--check` on the PR body draft over every one of them, since a
   catch-all row fails (#341 retro), with `--base BASE`, so that it asks only
@@ -2278,13 +2279,12 @@ def load_repeats(rel, base, head, module_text, postgres=False):
     if text_hit(head, MEASURES):
         if KIOSK_BROWSER_FILE.fullmatch(rel):
             # D133: CI runs DejaVu once, and 25 counts of test_kiosks.py took
-            # 1 h 53 min under load, so the second font runs once, alone.
+            # 1 h 53 min under load.  The hand-off's DejaVu line in report()
+            # is the one run, so no command prints here.
             say('      D133: a kiosk file repeats under load in the default font '
-                'only; DejaVu Sans runs it once, with no load and no --count, '
-                'holding the load lock:')
-            once = 'tools/pytest-postgres.sh' if postgres else 'uv run pytest'
-            say('      DERBYNET_BROWSER_FONT="DejaVu Sans" tools/hold-load-lock.sh '
-                f'{once} -n auto -m browser {targets}')
+                'only. Its one DejaVu Sans run is the DERBYNET_BROWSER_FONT line '
+                'under "Run from server/" below, with no load and no --count, '
+                'under tools/hold-load-lock.sh.')
         else:
             say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
     return out
