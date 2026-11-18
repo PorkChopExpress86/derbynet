@@ -114,11 +114,11 @@ def inputs(sha, loops_per_cpu, workers):
 
 def plan(text, per_shard=5, flake_ticket=False, trial_count=None, workers=None,
          script_text=None):
-    commands, shards, skipped, notes = [], [], [], []
+    commands, shards, skipped = [], [], []
     if flake_ticket and script_text is not None and FLAKE_CASE not in script_text:
-        flake_ticket = False
-        notes.append("This head's pytest-under-load.sh has no --flake-ticket (D122): "
-                     'left out.')
+        raise ValueError("this head's pytest-under-load.sh has no --flake-ticket (D122), "
+                         "so the run is no flake ticket's evidence: merge master into "
+                         'the branch first')
     for raw in text.splitlines():
         line = raw.strip()
         parsed = parse_line(line)
@@ -153,7 +153,7 @@ def plan(text, per_shard=5, flake_ticket=False, trial_count=None, workers=None,
     if len(shards) > MAX_SHARDS:
         raise ValueError(f'{len(shards)} shards, more than the {MAX_SHARDS} jobs a '
                          'GitHub matrix takes: raise per_shard')
-    return {'commands': commands, 'shards': shards, 'skipped': skipped, 'notes': notes}
+    return {'commands': commands, 'shards': shards, 'skipped': skipped}
 
 
 def font_error(font, family):
@@ -216,8 +216,6 @@ def summary(the_plan, shards_dir, sha):
         out.append('')
     for skip in the_plan['skipped']:
         out += [f'Skipped `{skip["line"]}`: {skip["why"]}.', '']
-    for note in the_plan['notes']:
-        out += [note, '']
     out.append('Result: ' + ('failed' if failed else 'passed') + '. CI load is extra '
                'evidence until the owner amends D85; it does not replace local load runs.')
     return '\n'.join(out) + '\n', failed
@@ -261,8 +259,6 @@ def main(argv):
             script = args.script.read_text() if args.script else None
             the_plan = plan(sys.stdin.read(), args.per_shard, args.flake_ticket, args.count,
                             args.workers, script)
-            for note in the_plan['notes']:
-                print(note, file=sys.stderr)
             print(json.dumps(the_plan))
         elif args.action == 'font':
             print(f'fc-match sans-serif: {args.family}; the command\'s font: '

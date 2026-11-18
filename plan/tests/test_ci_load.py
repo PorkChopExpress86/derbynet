@@ -129,7 +129,7 @@ class Plan(unittest.TestCase):
 
     def test_no_load_command_plans_no_shard(self):
         plan = TOOL.plan('Repeats under load: no browser test file changed.\n')
-        self.assertEqual(plan, {'commands': [], 'shards': [], 'skipped': [], 'notes': []})
+        self.assertEqual(plan, {'commands': [], 'shards': [], 'skipped': []})
 
     def test_workers_replace_the_n_of_each_command(self):
         plan = TOOL.plan(MASTER_KIOSKS + NODE_IDS, workers=8)
@@ -137,18 +137,16 @@ class Plan(unittest.TestCase):
                          {('-m', 'browser', '-n', '8', '--count'),
                           ('--postgres', '-m', 'browser', '-n', '8')})
 
-    def test_a_script_from_before_d122_drops_the_flake_flag_and_says_so(self):
+    def test_a_script_from_before_d122_fails_a_flake_ticket_plan(self):
         old = 'case "$1" in\n    --loops) LOOPS=$2; shift 2 ;;\n'
         new = old + '    --flake-ticket) FLAKE_TICKET=--flake-ticket; shift ;;\n'
-        for script, kept in ((old, False), (new, True), (None, True)):
-            with self.subTest(kept=kept):
-                plan = TOOL.plan(NODE_IDS, flake_ticket=True, script_text=script)
-                self.assertEqual('--flake-ticket' in plan['shards'][0]['args'], kept)
-                self.assertEqual(plan['notes'], [] if kept else [
-                    "This head's pytest-under-load.sh has no --flake-ticket (D122): "
-                    'left out.'])
+        with self.assertRaisesRegex(ValueError, r'no --flake-ticket \(D122\).*merge master'):
+            TOOL.plan(NODE_IDS, flake_ticket=True, script_text=old)
+        for script in (new, None):
+            plan = TOOL.plan(NODE_IDS, flake_ticket=True, script_text=script)
+            self.assertTrue(all(s['args'][0] == '--flake-ticket' for s in plan['shards']))
         plan = TOOL.plan(NODE_IDS, script_text=old)
-        self.assertEqual(plan['notes'], [])
+        self.assertNotIn('--flake-ticket', plan['shards'][0]['args'])
 
     def test_more_than_256_shards_are_refused(self):
         line = '  tools/pytest-under-load.sh -m browser --count {} x.py\n'
@@ -333,14 +331,6 @@ class Summary(unittest.TestCase):
         text, _failed = TOOL.summary(plan, self.dir, 'f' * 40)
         self.assertIn('Skipped `DERBYNET_BROWSER_FONT="DejaVu Sans" tools/hold-load-lock.sh', text)
 
-    def test_a_note_of_the_plan_is_in_the_summary(self):
-        plan = TOOL.plan(NODE_IDS, flake_ticket=True, script_text='')
-        for s in plan['shards']:
-            self.shard(s['name'], 0, junit(10))
-        text, _failed = TOOL.summary(plan, self.dir, 'f' * 40)
-        self.assertIn("This head's pytest-under-load.sh has no --flake-ticket (D122): left out.",
-                      text)
-
 
 def run_tool(*argv, stdin=''):
     return subprocess.run([sys.executable, '-I', str(CI_LOAD), *argv],
@@ -393,12 +383,15 @@ class CommandLine(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             script = Path(tmp) / 'pytest-under-load.sh'
             script.write_text('case "$1" in\n')
-            done = run_tool('plan', '--flake-ticket', '--workers', '2', '--script', str(script),
-                            stdin=NODE_IDS)
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(json.loads(done.stdout)['shards'][0]['args'][:5],
-                         ['--postgres', '-m', 'browser', '-n', '2'])
-        self.assertIn('has no --flake-ticket (D122): left out.', done.stderr)
+            done = run_tool('plan', '--workers', '2', '--script', str(script), stdin=NODE_IDS)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual(json.loads(done.stdout)['shards'][0]['args'][:5],
+                             ['--postgres', '-m', 'browser', '-n', '2'])
+            done = run_tool('plan', '--flake-ticket', '--script', str(script), stdin=NODE_IDS)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('::error::this head\'s pytest-under-load.sh has no --flake-ticket (D122)',
+                      done.stdout)
+        self.assertIn('merge master into the branch first', done.stdout)
 
     def test_summary_exits_0_when_every_shard_passed(self):
         with tempfile.TemporaryDirectory() as tmp:
