@@ -151,7 +151,8 @@ jobs:
           if [ -n "$COUNT" ]; then opts+=(--count "$COUNT"); fi
           if [ -n "$WORKERS" ]; then opts+=(--workers "$WORKERS"); fi
           "${py[@]}" ../tools/plan/bin/ci-load plan "${opts[@]}" \
-            <"$RUNNER_TEMP/affected.txt" >"$RUNNER_TEMP/plan.json"
+            <"$RUNNER_TEMP/affected.txt" >"$RUNNER_TEMP/plan.json" \
+            || { cat "$RUNNER_TEMP/plan.json"; exit 1; }
           "${py[@]}" -m json.tool "$RUNNER_TEMP/plan.json"
           echo "shards=$("${py[@]}" -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["shards"]))' <"$RUNNER_TEMP/plan.json")" >>"$GITHUB_OUTPUT"
           cp "$RUNNER_TEMP/affected.txt" "$RUNNER_TEMP/plan.json" "$GITHUB_WORKSPACE/"
