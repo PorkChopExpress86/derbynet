@@ -177,3 +177,82 @@ def test_quick_runs_the_pytest_half_alone_on_xdist(tmp_path, args):
     [notice] = result.stderr.splitlines()
     assert "skips plan/tests and tests/test_pytest_under_load.py" in notice
     assert "pre-push hook runs the whole script" in notice
+
+
+def _repo_with_script(tmp_path):
+    """A scratch work tree holding a copy of the script, its stubs and the
+    git environment to call it with."""
+    # Under a hook's GIT_DIR, `git init` here would set core.bare in the
+    # pushing clone (memory note git-dir-in-hooks), so every GIT_ var goes.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    repo = tmp_path / "repo"
+    script = repo / "server" / "tools" / "source-checks.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy(SCRIPT, script)
+    subprocess.run(["git", "init", "-q", str(repo)], env=env, check=True)
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    for name in ("python3", "uv"):
+        stub = stubs / name
+        stub.write_text(f'#! /bin/sh\necho {name} >> "$RAN"\n')
+        stub.chmod(0o755)
+    env.update(PATH=f"{stubs}:{os.environ['PATH']}", RAN=str(tmp_path / "ran"))
+    return repo, script, env
+
+
+def _run(script, env, *args):
+    return subprocess.run(
+        [str(script), *args],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        stdin=subprocess.DEVNULL,
+        env=env,
+    )
+
+
+def test_quick_refuses_an_untracked_file(tmp_path, monkeypatch):
+    """The checks that read `git ls-files` skip an untracked file: #414's
+    --quick passed with a new script untracked, and the hook's run refused
+    three of its pipes 19 min later (#414 retro)."""
+    # As under the pre-push hook, which runs these tests too.
+    hook_git_dir = tmp_path / "pushing.git"
+    monkeypatch.setenv("GIT_DIR", str(hook_git_dir))
+    repo, script, env = _repo_with_script(tmp_path)
+    subprocess.run(["git", "add", "server"], cwd=repo, env=env, check=True)
+    new = repo / "testing" / "new tool"
+    new.parent.mkdir(parents=True)
+    new.write_text("#! /bin/bash\n")
+    result = _run(script, env, "--quick")
+    assert result.returncode == 2, result.stderr
+    assert "these files are untracked" in result.stderr
+    assert "\n  testing/new tool\n" in result.stderr
+    assert not (tmp_path / "ran").exists(), "no check ran"
+
+    subprocess.run(["git", "add", "testing"], cwd=repo, env=env, check=True)
+    result = _run(script, env, "--quick")
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "ran").read_text() == "uv\n"
+    assert not hook_git_dir.exists()
+
+
+def test_quick_runs_beside_an_ignored_file(tmp_path):
+    repo, script, env = _repo_with_script(tmp_path)
+    (repo / ".gitignore").write_text("scratch/\n")
+    (repo / "scratch").mkdir()
+    (repo / "scratch" / "probe.log").write_text("x\n")
+    subprocess.run(["git", "add", "."], cwd=repo, env=env, check=True)
+    result = _run(script, env, "--quick")
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "ran").read_text() == "uv\n"
+
+
+def test_the_whole_script_runs_beside_an_untracked_file(tmp_path):
+    """The pre-push hook runs the whole script on a commit already made; an
+    untracked scratch file there is no part of the push."""
+    repo, script, env = _repo_with_script(tmp_path)
+    (repo / "notes.txt").write_text("x\n")
+    result = _run(script, env)
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "ran").read_text() == "python3\nuv\n"
