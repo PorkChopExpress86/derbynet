@@ -2,7 +2,7 @@
 {% load static ui %}
 {% block head %}<script src="{% static 'ui/kiosks.js' %}"></script>{% endblock %}
 {% block main %}
-{# The scene editor (#46). Thumbnails, never live previews, so opening it changes nothing on the kiosks. Each change answers with the scene's cards out of band (scenes/views.py `changed`); when its sheet closes, the focus goes to the swapped-in copy of the card's button that opened it, the same name, value, data-action and card (data-entry), as D127 matches on the kiosk board (#383, `ui:opener-gone` in kiosks.js). #}
+{# The scene editor (#46). Thumbnails, never live previews, so opening it changes nothing on the kiosks. Each change answers with the scene's cards out of band (scenes/views.py `changed`); when its sheet closes, the focus goes to the swapped-in copy of the card's button that opened it, the same name, value, data-action and card (data-entry), as D127 matches on the kiosk board (D132, #383, `ui:opener-gone` in kiosks.js). #}
 <div class="flex flex-col gap-4" data-scene-editor>
   <section aria-labelledby="sc-pick-h" class="rounded-2xl border border-line bg-surface p-4" data-section="scenes">
     <div class="flex flex-wrap items-center justify-between gap-2">

@@ -234,7 +234,7 @@ function keepFocusAcrossSwaps(board) {
 
 // "The same control" (D127): the same name, value, data-action and card, a
 // kiosk's on the board (data-kiosk) or a kiosk name's in the scene editor
-// (data-entry, #383).
+// (data-entry, D132).
 function controlKey(el) {
   const card = el.closest('[data-kiosk], [data-entry]');
   return JSON.stringify([el.tagName, el.getAttribute('name'), el.getAttribute('value'),
@@ -247,7 +247,7 @@ function swappedInCopy(root, gone) {
   return [...root.querySelectorAll(BOARD_FOCUS_CONTROLS)].find((el) => controlKey(el) === key);
 }
 
-// #383: a save from a sheet answers with the board, or the scene's cards,
+// D132 (#383): a save from a sheet answers with the board, or the scene's cards,
 // out of band (kiosks/views.py and scenes/views.py `changed`), which
 // removes the button that opened the sheet. When the sheet closes, the
 // focus goes to its swapped-in copy, matched as D127 matches. PHP's naming

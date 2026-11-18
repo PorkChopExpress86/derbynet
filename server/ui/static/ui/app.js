@@ -42,7 +42,7 @@ window.derbynet = {
   },
 };
 
-// #383: Enter or Space held down as a sheet opens or closes does nothing
+// D132 (#383): Enter or Space held down as a sheet opens or closes does nothing
 // where the focus lands. Chromium clicks a button or submits a form on each
 // of Enter's auto-repeat keydowns, and clicks a button on Space's keyup once
 // a repeat has landed on it (D131). A sheet moves the focus into itself as
@@ -72,7 +72,7 @@ document.addEventListener('alpine:init', () => {
   // One sheet at a time (#39: one level only). Focus returns to the control
   // that opened it. When a save's reply swapped the opener out, the page
   // hears `ui:opener-gone` with the old opener, and may focus its
-  // swapped-in copy (#383, kiosks.js).
+  // swapped-in copy (D132, #383, kiosks.js).
   Alpine.store('ui', {
     sheet: null,
     opener: null,

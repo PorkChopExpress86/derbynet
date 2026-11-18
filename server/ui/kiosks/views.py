@@ -22,7 +22,7 @@ page's body.
 When a save from a sheet swaps the board, the focus goes to the swapped-in
 copy of the button that opened the sheet, matched as D127 matches; and
 Enter or Space held down as a sheet opens or closes does nothing where the
-focus lands (#383, `ui:opener-gone` in `kiosks.js` and `carryHeldKeys` in
+focus lands (D132, #383, `ui:opener-gone` in `kiosks.js` and `carryHeldKeys` in
 `app.js`). PHP's naming dialog takes a held Enter's repeat: it focuses the
 name field 210 ms after it opens (modal.js:59), and the repeat submits the
 name and closes it (kiosk-dashboard.js:255, 262). After a save PHP gives
