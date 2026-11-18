@@ -92,6 +92,25 @@ jobs:
   # every page at 390x844 and 1280x800 against Django's live server, once on
   # SQLite and once on Postgres, and the screenshots are uploaded whatever the
   # outcome.  The container image is pinned by digest.
+  # docs/developer-guide.md's commands, as written (#414), by
+  # server/docker/ci/guide-commands.sh from server/docs/guide-commands.tsv.
+  # The shell-suite block starts a development server on port 8000 and runs
+  # testing/reset-database.sh against it.
+  guide:
+    name: guide commands
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: The developer guide's setup and shell-suite commands, run as written
+        working-directory: ${{ github.workspace }}
+        run: server/docker/ci/guide-commands.sh dev-setup dev-shell-suite
+
   ui:
     name: ui (${{ matrix.database }})
     runs-on: ubuntu-latest

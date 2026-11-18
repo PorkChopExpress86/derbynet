@@ -39,6 +39,9 @@ on:
       - testing/import-roster.sh
       - testing/common.sh
       - server/tests/test_pi_images.py
+      - docs/pi-setup.md
+      - server/docs/guide-commands.tsv
+      - server/tools/guide_commands.py
       - .github/workflows/pi-images.yml
   pull_request:
     paths:
@@ -60,6 +63,9 @@ on:
       - testing/import-roster.sh
       - testing/common.sh
       - server/tests/test_pi_images.py
+      - docs/pi-setup.md
+      - server/docs/guide-commands.tsv
+      - server/tools/guide_commands.py
       - .github/workflows/pi-images.yml
   workflow_dispatch:
 
@@ -230,6 +236,23 @@ jobs:
         run: |
           ls -la /dev/snd || true
           extras/docker/ci/checks.sh photostand-compose
+
+      # docs/pi-setup.md's timer commands, as written (#414), with
+      # server/docker/ci/guide-commands.sh: its timer image from a registry
+      # of the job's own, the settings in the environment, a simulated timer.
+      - uses: astral-sh/setup-uv@v10.3.2
+        if: success() || failure()
+        with:
+          python-version: '3.14'
+
+      - name: docs/pi-setup.md's timer commands, run as written
+        if: success() || failure()
+        env:
+          IMAGE: derbynet_server:ci
+          TIMER_IMAGE: derbynet_timer:ci
+        run: >-
+          server/docker/ci/guide-commands.sh pi-timer-folder pi-timer-env
+          pi-timer pi-timer-update
 
       - uses: actions/upload-artifact@v7
         if: always()
