@@ -77,6 +77,34 @@ holds what the probe showed. Ticket and decision
 ids (`#273`, `D10`, `ADR-10`, `C25`), file:line cites (`ondeck.css:49-51`)
 and numbers inside backticks are left out: their own checks cover them
 (tests/test_php_cite_lines.py).
+
+`--check` also names each sentence of the body, outside fenced code,
+quotes and code spans, that credits a ruling to the lead ("which the lead
+confirmed", "the lead's choice", "accepted by the lead") and cites nothing
+(a decision `D10`, a question `Q17`, an `ADR-10`, a ticket `#378`): a
+reviewer sees no message from the lead, so the sentence cites the decision
+the ruling rests on, or the ticket's own words (AGENT-BRIEF, #272). A
+`#N` after "for" clears nothing: #404's body said the zeros-plus-places
+rule was one "the lead confirmed for #65", where #65's own Q17 line stated
+it (#65 retro). What the lead does next ("which the lead posts after
+merge", "the lead decides on them") or still has to rule ("is the lead's
+call") credits no ruling, nor does "as the lead reported" ("per the lead"
+does). A sentence that states a policy about the lead's rulings is still
+named, as #275's was: the check cannot tell it from a ruling, so cite the
+rule's own source.
+
+With `--base`, `--check` also names each test the merge base defines in a
+file given and no file given defines at the head (a test function, a test
+class, or a test method, in a class nested to any depth or under an `if`),
+until a line of the body names it: a test that replaces another lists each
+of the old test's asserts beside the test that now makes it (AGENT-BRIEF
+Evidence, #240). Any line outside fenced code counts. #404's first body
+listed nothing for the `test_adjuster.py` test it deleted (#65 retro). A
+test moved to another file given, under its own name, counts as kept. A
+test file the diff deletes is read from the merge base too, whether or not
+it is on the command line, and a path given that is not there is read
+that way too. A parametrized test is one test: dropped cases are not
+named.
 """
 
 from __future__ import annotations
@@ -87,6 +115,7 @@ import functools
 import importlib.machinery
 import importlib.util
 import io
+import itertools
 import re
 import subprocess
 import sys
@@ -119,6 +148,29 @@ PROBE = re.compile(
     re.IGNORECASE,
 )
 BACKTICKS = re.compile(r"`[^`\n]*`")
+# A ruling credited to the lead, as a past verb or a noun near "the lead"
+# (`lead_cites()`). A present or future verb ("the lead decides", "the lead
+# posts") is what the lead does next, and credits no ruling.
+RULING = (
+    r"(?:confirmed|ruled|ruling|chose|choice|decided|decision|answer|approved"
+    r"|accepted|agreed|OK'?d|okayed|call\b|picked|said|wanted|asked for|judged)"
+)
+LEAD = re.compile(
+    rf"\bthe lead(?:'s|’s)?\s+(?:\w+\s+){{0,2}}?{RULING}"
+    rf"|\b{RULING}\s+(?:\w+\s+){{0,2}}?by the lead\b"
+    r"|\bper the lead\b",
+    re.IGNORECASE,
+)
+# A question still open: "is the lead's call".
+PROSPECTIVE = re.compile(
+    r"\b(?:is|are|stays|remains) the lead(?:'s|’s) call\b", re.IGNORECASE
+)
+# A citation that clears a sentence: a decision (`D10`), a question (`Q17`),
+# an ADR, or a ticket (`#378`). "for #65" names what the ruling was about,
+# not where it is recorded: #404's "which the lead confirmed for #65" was
+# the sentence this check was built for, so `for #N` clears nothing.
+CITES = re.compile(r"\b(?:D|Q)\d+\b|\bADR-\d+\b|(?<!\bfor )#\d+")
+SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`(*#\[])")
 QUOTED = re.compile(r"\"([^\"]{1,120})\"|“([^”\n]{1,80})”")
 # Spans whose numbers are ids or cites, not claims.
 SKIP = re.compile(
@@ -398,20 +450,43 @@ def counted(base: str | None, head: str) -> tuple[set[str] | None, str]:
     return names, ""
 
 
+def git(cwd: Path, *argv: str) -> str:
+    return subprocess.run(
+        ["git", *argv], cwd=cwd, check=True, capture_output=True, text=True
+    ).stdout
+
+
+def alive(path: Path) -> Path:
+    """`path`'s nearest folder that still exists: a deleted file's own may
+    be gone too."""
+    return next(p for p in path.resolve().parents if p.is_dir())
+
+
 def base_text(file: Path, rev: str) -> str | None:
     """`file` as it was at the merge base of `rev` and HEAD, or None when
-    it is not there."""
-
-    def git(*argv: str) -> str:
-        return subprocess.run(
-            ["git", *argv], cwd=file.parent, check=True, capture_output=True, text=True
-        ).stdout
-
-    base = git("merge-base", rev, "HEAD").strip()
+    it is not there. `file` may be gone from the head."""
+    cwd = alive(file)
+    base = git(cwd, "merge-base", rev, "HEAD").strip()
+    top = Path(git(cwd, "rev-parse", "--show-toplevel").strip())
     try:
-        return git("show", f"{base}:./{file.name}")
+        return git(cwd, "show", f"{base}:{file.resolve().relative_to(top)}")
     except subprocess.CalledProcessError:
         return None
+
+
+def deleted_tests(near: Path, rev: str) -> list[Path]:
+    """The test files the working tree has deleted since the merge base of
+    `rev` and HEAD, as paths beside `near`'s repository. A move shows as a
+    delete and an add."""
+    cwd = alive(near)
+    base = git(cwd, "merge-base", rev, "HEAD").strip()
+    top = Path(git(cwd, "rev-parse", "--show-toplevel").strip())
+    out = git(top, "diff", "--name-only", "--diff-filter=D", "--no-renames", base)
+    return [
+        top / name
+        for name in out.splitlines()
+        if re.fullmatch(r"(?:test_.*|.*_test)\.py", Path(name).name)
+    ]
 
 
 class FenceError(Exception):
@@ -453,13 +528,20 @@ def details(body: str) -> list[str]:
     output lists no claim (#367 retro), and a `<details>` a fence quotes
     opens no block. Raises FenceError where it can't tell where a fence
     ends: a line left of it, or no close."""
+    kept = [line for _, line in unfenced(body)]
+    return re.findall(r"<details>(.*?)</details>", "\n".join(kept), re.S)
+
+
+def unfenced(body: str) -> list[tuple[int, str]]:
+    """Each line of the body outside fenced code, with its number. Raises
+    FenceError as `details()` says."""
     kept, fence, start = [], None, 0
     for n, line in enumerate(body.splitlines(), 1):
         mark = FENCE.match(line)
         if fence is None and mark and opens(mark):
             fence, start = mark, n
         elif fence is None:
-            kept.append(line)
+            kept.append((n, line))
         elif not stays_in(line, fence):
             raise FenceError(
                 n,
@@ -482,7 +564,71 @@ def details(body: str) -> list[str]:
             "this fence never closes at its own indent, so the rest of the"
             " body, every <details> block in it, reads as code",
         )
-    return re.findall(r"<details>(.*?)</details>", "\n".join(kept), re.S)
+    return kept
+
+
+def lead_cites(body: str) -> list[tuple[int, str]]:
+    """Each sentence outside fenced code that credits a ruling to the lead
+    and cites no decision, question or ticket, with its line, as the module
+    docstring says. Quotes and code spans are read as blank for the words
+    that credit a ruling, so a body may quote a docstring that did, and
+    read as written for the citation, so `D10` in backticks clears."""
+    found = []
+    for n, line in unfenced(body):
+        read = blank(blank(blank(line, QUOTED), BACKTICKS), PROSPECTIVE)
+        ends = [0, *(m.start() for m in SENTENCE.finditer(read)), len(read)]
+        for start, end in itertools.pairwise(ends):
+            if LEAD.search(read[start:end]) and not CITES.search(line[start:end]):
+                found.append((n, line[start:end].strip()))
+    return found
+
+
+def test_names(source: str) -> set[str]:
+    """The tests a file defines: `test_x`, `TestX`, and `TestX::test_y`,
+    through nested classes (`TestX::TestY::test_z`) and the bodies of an
+    `if`. A parametrized test is one name."""
+
+    def walk(body: list[ast.stmt], prefix: str) -> set[str]:
+        names = set()
+        for node in body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name.startswith("test"):
+                    names.add(prefix + node.name)
+            elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+                names.add(prefix + node.name)
+                names |= walk(node.body, f"{prefix}{node.name}::")
+            elif isinstance(node, ast.If):
+                names |= walk(node.body, prefix) | walk(node.orelse, prefix)
+        return names
+
+    return walk(ast.parse(source).body, "")
+
+
+def head_text(file: Path) -> str:
+    """`file` as it is, or empty when it is gone."""
+    return file.read_text() if file.exists() else ""
+
+
+def gone(files: list[Path], rev: str) -> list[tuple[Path, str]]:
+    """Each test the merge base defines in one of `files` (deleted ones
+    too) that none of them defines at the head, by its last name (a method
+    moved to another class counts as kept). A class that is gone is named
+    once, not per method."""
+    kept = {name.split("::")[-1] for f in files for name in test_names(head_text(f))}
+    found = []
+    for f in dict.fromkeys(files):
+        base = base_text(f, rev)
+        if base is None:
+            continue
+        lost = test_names(base) - test_names(head_text(f))
+        for name in sorted(lost):
+            parents = {
+                "::".join(name.split("::")[:i]) for i in range(1, name.count("::") + 1)
+            }
+            if name.split("::")[-1] in kept or parents & lost:
+                continue
+            found.append((f, name))
+    return found
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -493,7 +639,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.base and not args.check:
         parser.error("--base goes with --check")
-    found = [(f, c, hits) for f in args.files for c, hits in claims(f)]
+    present = [f for f in args.files if f.exists()]
+    absent = [f for f in args.files if not f.exists()]
+    if absent and not args.base:
+        parser.error(f"{absent[0]}: no such file (--base reads a deleted one)")
+    for f in absent:
+        if base_text(f, args.base) is None:
+            parser.error(f"{f}: no such file, and not at the merge base either")
+    found = [(f, c, hits) for f in present for c, hits in claims(f)]
     if args.check:
         names = {n for f, c, _ in found for n in scope_names(c, f)}
         try:
@@ -502,9 +655,30 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{args.check}:{e.line}: {e}")
             return 1
         listed = rows(blocks, names)
+        failed = False
+        for n, sentence in lead_cites(args.check.read_text()):
+            failed = True
+            print(
+                f"{args.check}:{n}: credits a ruling to the lead with no decision:"
+                f" {sentence!r}. Cite the decision (D10) it rests on, or the"
+                " ticket's own words: a reviewer sees no message from the lead"
+                " (AGENT-BRIEF, #272)"
+            )
+        if args.base:
+            text = "\n".join(line for _, line in unfenced(args.check.read_text()))
+            removed = deleted_tests(args.files[0], args.base)
+            for f, name in gone([*args.files, *removed], args.base):
+                if not word(name.split("::")[-1]).search(text):
+                    failed = True
+                    print(
+                        f"{f}: {name} is gone since the merge base, and no"
+                        " line of the body names it: list each of its asserts"
+                        " beside the test that now makes it (AGENT-BRIEF"
+                        " Evidence, #240)"
+                    )
         scoped = {}
         if args.base:
-            for f in dict.fromkeys(args.files):
+            for f in dict.fromkeys(present):
                 names, why = counted(base_text(f, args.base), f.read_text())
                 scoped[f] = names
                 if names is None:
@@ -523,7 +697,7 @@ def main(argv: list[str] | None = None) -> int:
                 " (by its function name, not a nickname)"
             )
             print(f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block{where}")
-        return 1 if missing else 0
+        return 1 if missing or failed else 0
     print("| where | claim | code lines with its literal |")
     print("|---|---|---|")
     for f, c, hits in found:

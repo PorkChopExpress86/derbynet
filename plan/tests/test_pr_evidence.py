@@ -4,6 +4,7 @@ Run: python3 -I -m unittest discover -s plan/tests
 """
 import importlib.machinery
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -167,6 +168,189 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
         done = self.run_tool('--body', 'x.md')
         self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
         self.assertNotEqual(done.returncode, 0)
+
+
+HEAD = '19fea1fb0000000000000000000000000000beef'
+RUN = 'https://github.com/PorkChopExpress86/derbynet/actions/runs/'
+# The fields pr-evidence reads, as the runs API answers for a ci-load run.
+CI_LOAD_RUN = {'path': '.github/workflows/ci-load.yml', 'event': 'workflow_dispatch',
+               'head_branch': 'master', 'run_attempt': 1,
+               'display_title': f'CI load at {HEAD}', 'status': 'completed',
+               'conclusion': 'success'}
+PR_HEAD = '0123456789abcdef0123456789abcdef01234567'
+
+
+class CiLoad(IssueStandIn, unittest.TestCase):
+    """A `- CI load: <run URL>` item, read through a `gh` that also answers
+    the runs API from runs.json and PR 421's head (#415)."""
+
+    def setUp(self):
+        super().setUp()
+        (self.tmp / 'runs.json').write_text('{}')
+        gh = self.tmp / 'gh'
+        gh.write_text(f'#!{sys.executable}\n'
+                      'import json, sys\n'
+                      'if sys.argv[1] == "api":\n'
+                      f'    runs = json.load(open({str(self.tmp / "runs.json")!r}))\n'
+                      '    run = runs.get(sys.argv[2].rsplit("/", 1)[1])\n'
+                      '    if run is None:\n'
+                      '        sys.exit("HTTP 404: Not Found")\n'
+                      '    print(json.dumps(run))\n'
+                      '    sys.exit(0)\n'
+                      'if sys.argv[1:3] == ["pr", "view"]:\n'
+                      '    if sys.argv[3] != "421":\n'
+                      '        sys.exit("no pull requests found")\n'
+                      f'    print(json.dumps({{"headRefOid": {PR_HEAD!r}}}))\n'
+                      '    sys.exit(0)\n'
+                      'assert sys.argv[1:4] == ["issue", "view", "61"], sys.argv\n'
+                      f'print(open({str(self.tmp / "issue.md")!r}).read(), end="")\n')
+
+    def runs(self, **by_id):
+        (self.tmp / 'runs.json').write_text(json.dumps(by_id))
+
+    def check_at(self, items, head=HEAD, pr=None, flake_ticket=False):
+        (self.tmp / 'body.md').write_text(evidence(KEYS) + items)
+        argv = ['--check', str(self.tmp / 'body.md')] + (['--head', head] if head else [])
+        return self.run_tool(*argv, *(['--pr', pr] if pr else []),
+                             *(['--flake-ticket'] if flake_ticket else []))
+
+    def test_a_passed_run_at_the_head_is_accepted_as_ci_load(self):
+        self.runs(**{'101': CI_LOAD_RUN})
+        done = self.check_at(f'- CI load: {RUN}101\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn(f'CI load at {HEAD}, passed: {RUN}101 (extra evidence until the '
+                      'owner amends D85', done.stdout)
+
+    def test_each_wrong_field_is_refused_with_its_reason(self):
+        cases = {'path': ('.github/workflows/server.yml', 'not a run of'),
+                 'event': ('push', 'started by push'),
+                 'head_branch': ('issue-415-ci-load-runs',
+                                 "ran the workflow of issue-415-ci-load-runs, not master's"),
+                 'run_attempt': (2, 'attempt 2, not the first'),
+                 'display_title': ('CI load at ' + '0' * 40, "is not at the PR's head"),
+                 'conclusion': ('failure', 'completed, failure: not passed'),
+                 'status': ('in_progress', 'in_progress, success: not passed')}
+        for field, (value, why) in cases.items():
+            with self.subTest(field=field):
+                self.runs(**{'102': {**CI_LOAD_RUN, field: value}})
+                done = self.check_at(f'- CI load: {RUN}102\n')
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('not load evidence, ', done.stdout)
+                self.assertIn(why, done.stdout)
+
+    def test_no_head_no_url_or_another_repo_is_refused(self):
+        self.runs(**{'103': CI_LOAD_RUN})
+        for items, head, why in (
+                (f'- CI load: {RUN}103\n', None, 'no --head or --pr to check it at'),
+                ('- CI load: the run below\n', HEAD, 'no run URL'),
+                ('- CI load: https://github.com/jeffpiazza/derbynet/actions/runs/103\n',
+                 HEAD, 'a run of jeffpiazza/derbynet')):
+            with self.subTest(why=why):
+                done = self.check_at(items, head)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(why, done.stdout)
+
+    def test_a_trial_at_the_head_is_refused(self):
+        """The workflow names a run with any non-default input a trial."""
+        trial = f'CI load trial at {HEAD} (files x.py, base origin/master, flake ticket false)'
+        self.runs(**{'107': {**CI_LOAD_RUN, 'display_title': trial}})
+        done = self.check_at(f'- CI load: {RUN}107\n')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"not load evidence, {trial!r} is not at the PR's head {HEAD}",
+                      done.stdout)
+
+    def test_a_flake_ticket_run_at_the_head_is_accepted_for_any_ticket(self):
+        """D101 and D122 ask a flake ticket for its whole-file repeats with
+        --flake-ticket; the workflow names that run `(flake ticket)`, and a
+        ticket not said to be a flake ticket takes it too."""
+        title = f'CI load at {HEAD} (flake ticket)'
+        self.runs(**{'109': {**CI_LOAD_RUN, 'display_title': title}})
+        for flake_ticket in (False, True):
+            with self.subTest(flake_ticket=flake_ticket):
+                done = self.check_at(f'- CI load: {RUN}109\n', flake_ticket=flake_ticket)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn(f'{title}, passed: {RUN}109 (extra evidence until the owner '
+                              'amends D85', done.stdout)
+
+    def test_a_plain_run_is_refused_for_a_flake_ticket_with_the_reason(self):
+        self.runs(**{'110': CI_LOAD_RUN})
+        done = self.check_at(f'- CI load: {RUN}110\n', flake_ticket=True)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"not load evidence, 'CI load at {HEAD}' ran without flake_ticket, and "
+                      'this ticket is a flake ticket: D101 asks its whole-file 25 with '
+                      f'--flake-ticket (D122): {RUN}110', done.stdout)
+
+    def test_a_flake_ticket_run_must_still_be_at_the_head_and_no_trial(self):
+        """The `(flake ticket)` name opens no other door: the head, the
+        trial name and every other field are checked as for a plain run, and
+        the verdict is the same whether or not the ticket is a flake ticket."""
+        trial = f'CI load trial at {HEAD} (files x.py; base origin/master; flake ticket true)'
+        flake = f'CI load at {HEAD} (flake ticket)'
+        for fields, why in (
+                ({'display_title': f'CI load at {"0" * 40} (flake ticket)'}, "is not at the PR's head"),
+                ({'display_title': trial}, "is not at the PR's head"),
+                ({'display_title': flake + ' '}, "is not at the PR's head"),
+                ({'display_title': flake, 'run_attempt': 2}, 'attempt 2, not the first'),
+                ({'display_title': flake, 'conclusion': 'failure'}, 'completed, failure: not passed'),
+                ({'display_title': flake, 'status': 'in_progress'}, 'in_progress, success: not passed')):
+            for flake_ticket in (False, True):
+                with self.subTest(fields=fields, flake_ticket=flake_ticket):
+                    verdict = TOOL.ci_load_verdict({**CI_LOAD_RUN, **fields}, HEAD, flake_ticket)
+                    self.assertIn(why, verdict)
+
+    def test_the_verdict_names_the_run_each_kind_of_ticket_takes(self):
+        flake = f'CI load at {HEAD} (flake ticket)'
+        for title, flake_ticket, verdict in (
+                (f'CI load at {HEAD}', False, None),
+                (flake, False, None),
+                (flake, True, None),
+                (f'CI load at {HEAD}', True, 'ran without flake_ticket')):
+            with self.subTest(title=title, flake_ticket=flake_ticket):
+                got = TOOL.ci_load_verdict({**CI_LOAD_RUN, 'display_title': title}, HEAD,
+                                           flake_ticket)
+                self.assertTrue(got is None if verdict is None else verdict in got, got)
+
+    def test_pr_gives_the_head_and_a_head_that_is_not_the_prs_is_refused(self):
+        self.runs(**{'108': {**CI_LOAD_RUN, 'display_title': f'CI load at {PR_HEAD}'}})
+        for head in (None, PR_HEAD):
+            with self.subTest(head=head):
+                done = self.check_at(f'- CI load: {RUN}108\n', head=head, pr='421')
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn(f'CI load at {PR_HEAD}, passed: {RUN}108', done.stdout)
+        done = self.check_at(f'- CI load: {RUN}108\n', head=HEAD, pr='421')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f'--head {HEAD} is not the head of PR #421, {PR_HEAD}', done.stderr)
+
+    def test_a_pr_gh_cannot_read_exits_with_its_message(self):
+        done = self.check_at('', head=None, pr='999')
+        self.assertEqual(done.returncode, 1)
+        self.assertIn('gh could not read PR #999:\nno pull requests found', done.stderr)
+
+    def test_head_or_pr_without_check_prints_the_usage(self):
+        for option, value in (('--head', [HEAD]), ('--pr', ['421']), ('--flake-ticket', [])):
+            with self.subTest(option=option):
+                done = self.run_tool(option, *value)
+                self.assertEqual(done.returncode, 1, done.stdout)
+                self.assertIn('--head, --pr and --flake-ticket go with --check', done.stderr)
+                self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
+
+    def test_other_run_links_and_still_open_items_are_not_read(self):
+        """This PR's own body cites a failing run for its failing-shard box."""
+        done = self.check_at(f'- A failing shard: {RUN}104 failed, as it should\n'
+                             f'\n## Still open\n\n- CI load: {RUN}105 waits on D85\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn('CI load', done.stdout)
+
+    def test_a_misspelt_head_option_prints_the_usage(self):
+        (self.tmp / 'body.md').write_text(evidence(KEYS))
+        done = self.run_tool('--check', str(self.tmp / 'body.md'), '--hed', HEAD)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
+
+    def test_a_run_gh_cannot_read_exits_with_its_message(self):
+        done = self.check_at(f'- CI load: {RUN}106\n')
+        self.assertEqual(done.returncode, 1)
+        self.assertIn(f'gh could not read {RUN}106:\nHTTP 404', done.stderr)
 
 
 class Placeholders(unittest.TestCase):

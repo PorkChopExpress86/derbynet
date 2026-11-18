@@ -2,7 +2,7 @@
 """Lists each open line of an issue that asks for evidence in the PR, and
 with `--check BODY.md` names each one the PR body gives no evidence for.
 
-Usage: plan/bin/pr-evidence <issue> [--check BODY.md]
+Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N] [--flake-ticket]]
 
 A line asks for evidence in the PR when it says so: "Evidence is ... in the
 PR", "The PR lists", "Record the size in the PR", "Attach" (but not
@@ -32,10 +32,32 @@ name anywhere under server/ or testing/ excuses a placeholder written to look
 like it, and a name PHP, Java or JavaScript defines is refused until it is put
 in inline code.
 
-Exits 1 on a key the body gives no evidence for, on a placeholder, or when
-the issue cannot be read.
+A list item `- CI load: <run URL>` cites a run of
+.github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
+run from GitHub and accepts it only when it ran master's workflow
+(workflow_dispatch, head_branch master: `--ref <branch>` runs that branch's
+copy), on its first attempt (a "Re-run failed jobs" turns a failed run green),
+at the PR's head with no trial input, and passed. The run's name is exactly
+`CI load at <SHA>`, or `CI load at <SHA> (flake ticket)` for a run with
+`-f flake_ticket=true`; the workflow names a run with a `base`, `files`,
+`count`, `loops_per_cpu` or `workers` input `CI load trial ...`. A flake
+ticket's whole-file 25 with `--flake-ticket` is the evidence D101 and D122
+ask of it, so with `--flake-ticket` the run must carry the `(flake ticket)`
+name, and a plain run is refused. The ticket's body and title do not say
+reliably that it is a flake ticket (#373 and #407 both name the flag), so
+the caller says it (plan/implement-all-tickets.md, step 3.2). The head is
+`--head SHA`, or PR N's head as GitHub reads it with `--pr N`; given both,
+they must match. It is labelled CI load: extra evidence until the owner
+amends D85, never a local load run. Other links to runs in the body are not
+read.
+
+Exits 1 on a key the body gives no evidence for, on a CI load item not
+accepted or given with no head, on a `--head` that is not PR N's head, on a
+placeholder, or when the issue, the PR or a run cannot be read.
 """
 
+import argparse
+import json
 import os
 import re
 import subprocess
@@ -66,6 +88,9 @@ JOINED = re.compile(
     r"(?![A-Za-z0-9_/-]|\.\w)"
 )
 INLINE_CODE = re.compile(r"`[^`\n]*`")
+CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
+RUN_URL = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/actions/runs/(\d+)")
+CI_LOAD_WORKFLOW = ".github/workflows/ci-load.yml"
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Where a code name is assigned. plan/ is left out: it holds this tool, its
 # test and the README rows and notes that quote the drafts' placeholders.
@@ -177,6 +202,77 @@ def placeholders(body: str, defined=defined_names) -> list[str]:
     return [f"line {n}: {token}" for n, _at, token in sorted(found) if token not in code_names]
 
 
+def ci_load_items(body: str) -> list[str]:
+    """The evidence text of each `CI load:` item outside `## Still open`."""
+    found, section, chunk = [], None, []
+    for line in [*body.splitlines(), "## "]:
+        if line.startswith("## "):
+            if section != "Still open":
+                texts = (" ".join(text.split()) for _mark, text in items("\n".join(chunk)))
+                found += [m[1] for m in map(CI_LOAD_ITEM.match, texts) if m]
+            section, chunk = line[3:].strip(), []
+        else:
+            chunk.append(line)
+    return found
+
+
+def ci_load_verdict(run: dict, head: str, flake_ticket: bool = False) -> str | None:
+    """None when a run, as GitHub's runs API answers, is a passed first
+    attempt of master's CI load workflow at head with no trial input, else
+    why not. For a flake ticket the run must be the `(flake ticket)` one."""
+    if run.get("path") != CI_LOAD_WORKFLOW:
+        return f"not a run of {CI_LOAD_WORKFLOW} but of {run.get('path')}"
+    if run.get("event") != "workflow_dispatch":
+        return f"started by {run.get('event')}, not workflow_dispatch"
+    if run.get("head_branch") != "master":
+        return f"ran the workflow of {run.get('head_branch')}, not master's"
+    if run.get("run_attempt") != 1:
+        return f"attempt {run.get('run_attempt')}, not the first"
+    title = run.get("display_title")
+    if title not in (f"CI load at {head}", f"CI load at {head} (flake ticket)"):
+        return f"{title!r} is not at the PR's head {head}"
+    if flake_ticket and title != f"CI load at {head} (flake ticket)":
+        return (f"{title!r} ran without flake_ticket, and this ticket is a flake ticket: "
+                "D101 asks its whole-file 25 with --flake-ticket (D122)")
+    if (run.get("status"), run.get("conclusion")) != ("completed", "success"):
+        return f"{run.get('status')}, {run.get('conclusion')}: not passed"
+    return None
+
+
+def check_ci_load(body: str, head: str | None, flake_ticket: bool = False) -> list[str]:
+    """A line for each `CI load:` item: accepted, or why not (the line then
+    starts "not load evidence")."""
+    lines = []
+    for text in ci_load_items(body):
+        url = RUN_URL.search(text)
+        if not url:
+            lines.append(f"not load evidence, no run URL: CI load: {text}")
+            continue
+        if not head:
+            lines.append(f"not load evidence, no --head or --pr to check it at: {url[0]}")
+            continue
+        repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+        if url[1].casefold() != repo.casefold():
+            lines.append(f"not load evidence, a run of {url[1]}, not {repo}: {url[0]}")
+            continue
+        run = gh_json(["api", f"repos/{repo}/actions/runs/{url[2]}"], url[0])
+        why = ci_load_verdict(run, head, flake_ticket)
+        if why:
+            lines.append(f"not load evidence, {why}: {url[0]}")
+        else:
+            lines.append(f"{run['display_title']}, passed: {url[0]} (extra evidence until "
+                         "the owner amends D85; it replaces no local load run)")
+    return lines
+
+
+def gh_json(args: list[str], what: str) -> dict:
+    gh = os.environ.get("GH", "gh")
+    done = subprocess.run([gh, *args], capture_output=True, text=True)
+    if done.returncode:
+        sys.exit(f"pr-evidence: gh could not read {what}:\n{done.stderr.strip()}")
+    return json.loads(done.stdout)
+
+
 def issue_body(number: str) -> str:
     gh = os.environ.get("GH", "gh")
     repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
@@ -190,29 +286,57 @@ def issue_body(number: str) -> str:
     return done.stdout.replace("\r", "")
 
 
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.exit(f"pr-evidence: {message}\n\n{__doc__}")
+
+
+def pr_head(number: str) -> str:
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+    return gh_json(["pr", "view", number, "--repo", repo, "--json", "headRefOid"],
+                   f"PR #{number}")["headRefOid"]
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) not in (1, 3) or (len(argv) == 3 and argv[1] != "--check"):
-        sys.exit(__doc__)
-    asked = keys(issue_body(argv[0]))
-    if len(argv) == 1:
+    parser = Parser(prog="plan/bin/pr-evidence", allow_abbrev=False, add_help=False)
+    parser.add_argument("issue")
+    parser.add_argument("--check", metavar="BODY.md")
+    parser.add_argument("--head", metavar="SHA")
+    parser.add_argument("--pr", metavar="N")
+    parser.add_argument("--flake-ticket", action="store_true")
+    args = parser.parse_args(argv)
+    if (args.head or args.pr or args.flake_ticket) and not args.check:
+        parser.error("--head, --pr and --flake-ticket go with --check")
+    head = args.head
+    if args.pr:
+        real = pr_head(args.pr)
+        if head and head != real:
+            sys.exit(f"pr-evidence: --head {head} is not the head of PR #{args.pr}, {real}")
+        head = real
+    asked = keys(issue_body(args.issue))
+    if not args.check:
         for key in asked:
             print(f"- {key.rstrip('.!?')}: ")
-        print(f"{len(asked)} open lines of #{argv[0]} ask for evidence in the PR")
+        print(f"{len(asked)} open lines of #{args.issue} ask for evidence in the PR")
         return 0
-    with open(argv[2], encoding="utf-8") as f:
+    with open(args.check, encoding="utf-8") as f:
         body = f.read()
     outside, still_open = body_items(body)
     missing = [key for key in asked if not has_evidence(key, outside, still_open)]
     for key in missing:
         print(f"no evidence in the body: {key}")
     print(
-        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{argv[0]} that ask "
+        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{args.issue} that ask "
         "for evidence in the PR have it in the body"
     )
     unfilled = placeholders(body)
     for found in unfilled:
         print(f"unfilled placeholder, {found}")
-    return 1 if missing or unfilled else 0
+    loads = check_ci_load(body, head, args.flake_ticket)
+    for line in loads:
+        print(line)
+    refused = [line for line in loads if line.startswith("not load evidence")]
+    return 1 if missing or unfilled or refused else 0
 
 
 if __name__ == "__main__":

@@ -1,0 +1,289 @@
+name: ci-load
+
+# Runs a head's repeats under load (D85, D97, D101) on GitHub's runners, each
+# `--count N` split into shards that run at once, where the laptop's load
+# lock runs one after another (#415).  Start it from server/README.md's
+# command.  Its result is extra evidence: it replaces no local load run
+# until the owner amends D85.
+#
+# The planner and the summary come from this workflow's own commit (tools/),
+# the tests from the input SHA (head/), so a head older than this file, such
+# as one before a flake's fix, runs too.
+
+# pr-evidence reads the tested SHA from the run's name. It accepts two names:
+# `CI load at <SHA>`, and `CI load at <SHA> (flake ticket)` for a run with
+# flake_ticket, the evidence D101 and D122 ask of a flake ticket. A run with
+# base, files, count, loops_per_cpu or workers changed from its default is a
+# trial, since it did not run what affected-tests prints for the head
+# (plan/tests/test_ci_load.py evaluates this name for each input).
+run-name: >-
+  ${{ (inputs.base != 'origin/master' || inputs.files || inputs.count
+      || inputs.loops_per_cpu || inputs.workers)
+  && format('CI load trial at {0} (files {1}; base {2}; flake ticket {3}; count {4}; loops per CPU {5}; workers {6})',
+            inputs.sha, inputs.files, inputs.base, inputs.flake_ticket, inputs.count,
+            inputs.loops_per_cpu, inputs.workers)
+  || (inputs.flake_ticket && format('CI load at {0} (flake ticket)', inputs.sha))
+  || format('CI load at {0}', inputs.sha) }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: The full SHA of the head to run
+        required: true
+        type: string
+      base:
+        description: The BASE plan/bin/affected-tests compares the head with
+        default: origin/master
+        type: string
+      files:
+        description: >-
+          Repo-relative test files to run through affected-tests --stdin
+          instead of the diff (a master head, a head before a fix)
+        default: ''
+        type: string
+      flake_ticket:
+        description: >-
+          Pass --flake-ticket to each shard (D122), for a flake ticket: the
+          run is named `CI load at <SHA> (flake ticket)`
+        default: false
+        type: boolean
+      per_shard:
+        description: The most repeats one runner takes
+        default: '5'
+        type: string
+      count:
+        description: >-
+          A count in place of each command's, for a trial of this workflow;
+          pr-evidence accepts no trial
+        default: ''
+        type: string
+      loops_per_cpu:
+        description: >-
+          Busy loops per logical CPU in place of 2, for a trial; pr-evidence
+          accepts no trial
+        default: ''
+        type: string
+      workers:
+        description: >-
+          The pytest -n in place of each command's, for a trial; pr-evidence
+          accepts no trial
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+# A second run of the same inputs waits for the first rather than sharing
+# the runners with it. GitHub keeps one waiting run a group, so a third
+# cancels the second; runs that differ in any input are in groups of their
+# own, so a sweep of trials at one SHA loses none.
+concurrency:
+  group: >-
+    ci-load-${{ inputs.sha }}-${{ inputs.base }}-${{ inputs.files }}-${{ inputs.flake_ticket
+    }}-${{ inputs.per_shard }}-${{ inputs.count }}-${{ inputs.loops_per_cpu }}-${{
+    inputs.workers }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+      sha: ${{ steps.inputs.outputs.sha }}
+      loops_per_cpu: ${{ steps.inputs.outputs.loops_per_cpu }}
+      workers: ${{ steps.inputs.outputs.workers }}
+    env:
+      SHA: ${{ inputs.sha }}
+      BASE: ${{ inputs.base }}
+      FILES: ${{ inputs.files }}
+      FLAKE_TICKET: ${{ inputs.flake_ticket }}
+      PER_SHARD: ${{ inputs.per_shard }}
+      COUNT: ${{ inputs.count }}
+      LOOPS_PER_CPU: ${{ inputs.loops_per_cpu }}
+      WORKERS: ${{ inputs.workers }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools
+          persist-credentials: false
+
+      # The tools parse the head's server/ code, which is Python 3.14
+      # (`except A, B:`): on the runner's older python3, affected-tests
+      # counts a test file it cannot parse as changed whole (#415 review).
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Check the inputs
+        id: inputs
+        run: |
+          uv run --no-project --python 3.14 python -I tools/plan/bin/ci-load inputs \
+            "$SHA" "$LOOPS_PER_CPU" "$WORKERS" >inputs.txt || { cat inputs.txt; exit 1; }
+          tee -a "$GITHUB_OUTPUT" <inputs.txt
+
+      - uses: actions/checkout@v7
+        with:
+          path: head
+          ref: ${{ steps.inputs.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Plan the shards
+        id: plan
+        working-directory: head
+        run: |
+          py=(uv run --no-project --python 3.14 python -I)
+          # A head from before affected-tests (2026-11-11) is read by this
+          # commit's copy.
+          affected=("${py[@]}" plan/bin/affected-tests)
+          if [ ! -e plan/bin/affected-tests ]; then
+            affected=("${py[@]}" ../tools/plan/bin/affected-tests --root "$PWD")
+          fi
+          echo "${affected[*]}"
+          if [ -n "$FILES" ]; then
+            read -r -a files <<<"$FILES"
+            printf '%s\n' "${files[@]}" | "${affected[@]}" --stdin >"$RUNNER_TEMP/affected.txt"
+          else
+            "${affected[@]}" "${BASE:-origin/master}" >"$RUNNER_TEMP/affected.txt"
+          fi
+          cat "$RUNNER_TEMP/affected.txt"
+          opts=(--per-shard "${PER_SHARD:-5}" --script server/tools/pytest-under-load.sh)
+          if [ "$FLAKE_TICKET" = true ]; then opts+=(--flake-ticket); fi
+          if [ -n "$COUNT" ]; then opts+=(--count "$COUNT"); fi
+          if [ -n "$WORKERS" ]; then opts+=(--workers "$WORKERS"); fi
+          "${py[@]}" ../tools/plan/bin/ci-load plan "${opts[@]}" \
+            <"$RUNNER_TEMP/affected.txt" >"$RUNNER_TEMP/plan.json" \
+            || { cat "$RUNNER_TEMP/plan.json"; exit 1; }
+          "${py[@]}" -m json.tool "$RUNNER_TEMP/plan.json"
+          echo "shards=$("${py[@]}" -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["shards"]))' <"$RUNNER_TEMP/plan.json")" >>"$GITHUB_OUTPUT"
+          cp "$RUNNER_TEMP/affected.txt" "$RUNNER_TEMP/plan.json" "$GITHUB_WORKSPACE/"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plan
+          retention-days: 7
+          path: |
+            affected.txt
+            plan.json
+
+  shard:
+    needs: plan
+    if: needs.plan.outputs.shards != '[]'
+    name: ${{ matrix.name }} (count ${{ matrix.count }}${{ matrix.font && format(', {0}', matrix.font) || '' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.shards) }}
+    defaults:
+      run:
+        working-directory: head/server
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools
+          sparse-checkout: |
+            .github
+            plan/bin
+          persist-credentials: false
+
+      - uses: actions/checkout@v7
+        with:
+          path: head
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # fonts-noto-core makes fontconfig's sans-serif Noto Sans, as on the
+      # laptop, so a command that names no font draws what it draws there.
+      - name: Install Chromium and Noto Sans
+        run: |
+          sudo sh "$GITHUB_WORKSPACE/tools/.github/ubuntu-mirror.sh"
+          sudo apt-get install -y fonts-noto-core
+          uv run playwright install --with-deps chromium
+
+      - name: Check the font
+        env:
+          FONT: ${{ matrix.font }}
+        run: >-
+          python3 -I "$GITHUB_WORKSPACE/tools/plan/bin/ci-load" font
+          "$FONT" "$(fc-match -f '%{family}' sans-serif)"
+
+      - name: Build the browser timer
+        run: uv run python manage.py build_timer
+
+      # Two loops per logical CPU: at one, as the laptop's 8 loops on 8
+      # threads, #224's flake at its pre-fix head 832e0ee6 passed 25 counts
+      # (run 44319672052), where the laptop failed it 2-3 times in 50; at
+      # two, it failed 8 times in 50 (run 44321206965, #415's sweep).
+      # The script refuses a pipe, so its output goes to a file.
+      - name: Run under load
+        env:
+          ARGS: ${{ toJSON(matrix.args) }}
+          FONT: ${{ matrix.font }}
+          LOOPS_PER_CPU: ${{ needs.plan.outputs.loops_per_cpu }}
+        run: |
+          lscpu
+          echo "nproc: $(nproc)"
+          mapfile -t args < <(python3 -I -c 'import json, os; print("\n".join(json.loads(os.environ["ARGS"])))')
+          if [ -n "$FONT" ]; then export DERBYNET_BROWSER_FONT="$FONT"; fi
+          out="$RUNNER_TEMP/out"
+          mkdir -p "$out"
+          python3 -I "$GITHUB_WORKSPACE/tools/plan/bin/ci-load" sample "$out/loadavg.log" &
+          sampler=$!
+          status=0
+          DERBYNET_LOAD_RUN_DIR="$RUNNER_TEMP/load" DERBYNET_LOAD_LOCK="$RUNNER_TEMP/load.lock" \
+            tools/pytest-under-load.sh --loops "$(( $(nproc) * LOOPS_PER_CPU ))" "${args[@]}" \
+            >"$out/script.log" 2>&1 || status=$?
+          kill "$sampler"
+          wait "$sampler" || true
+          cat "$out/script.log"
+          echo "load average every 10 s (1, 5 and 15 min):"
+          cat "$out/loadavg.log"
+          echo "$status" >"$out/status"
+          cp "$RUNNER_TEMP"/load/*.log "$RUNNER_TEMP"/load/*.xml "$out/" 2>/dev/null || true
+          exit "$status"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ runner.temp }}/out
+          retention-days: 7
+          if-no-files-found: warn
+
+  summary:
+    needs: [plan, shard]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools
+          sparse-checkout: plan/bin
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Sum the shards
+        env:
+          SHA: ${{ needs.plan.outputs.sha }}
+        run: |
+          status=0
+          python3 -I tools/plan/bin/ci-load summary artifacts/plan/plan.json artifacts "$SHA" \
+            >summary.md || status=$?
+          cat summary.md
+          cat summary.md >>"$GITHUB_STEP_SUMMARY"
+          exit "$status"
