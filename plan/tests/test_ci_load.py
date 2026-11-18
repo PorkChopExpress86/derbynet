@@ -98,6 +98,14 @@ class Plan(unittest.TestCase):
                           '--count', '1', 'ui/tests/browser/test_a.py::test_one',
                           'ui/tests/browser/test_a.py::test_two'])
 
+    def test_a_trial_count_replaces_each_commands_count(self):
+        plan = TOOL.plan(MASTER_KIOSKS + '  tools/pytest-under-load.sh -m browser x.py\n',
+                         per_shard=1, trial_count=2)
+        self.assertEqual([c['count'] for c in plan['commands']], [2, 2, 2])
+        self.assertEqual([s['count'] for s in plan['shards']], [1] * 6)
+        self.assertEqual(plan['shards'][0]['args'][4:6], ['--count', '1'])
+        self.assertEqual(plan['shards'][4]['args'], ['-m', 'browser', 'x.py', '--count', '1'])
+
     def test_a_prose_mention_or_a_quoted_command_is_no_load_command(self):
         text = ('Run tools/pytest-under-load.sh in the background\n'
                 '  echo tools/pytest-under-load.sh --count 25 x.py\n'

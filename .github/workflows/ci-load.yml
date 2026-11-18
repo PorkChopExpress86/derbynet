@@ -10,8 +10,12 @@ name: ci-load
 # the tests from the input SHA (head/), so a head older than this file, such
 # as one before a flake's fix, runs too.
 
-# pr-evidence reads the tested SHA from the run's name.
-run-name: CI load at ${{ inputs.sha || github.sha }}
+# pr-evidence reads the tested SHA from the run's name, and accepts no
+# trial: a run with a count of its own or a push's.
+run-name: >-
+  ${{ github.event_name == 'push' && format('CI load trial, push of {0}', github.sha)
+  || inputs.count && format('CI load trial at {0} (count {1})', inputs.sha, inputs.count)
+  || format('CI load at {0}', inputs.sha) }}
 
 on:
   workflow_dispatch:
@@ -38,6 +42,12 @@ on:
         description: The most repeats one runner takes
         default: '5'
         type: string
+      count:
+        description: >-
+          A count in place of each command's, for a trial of this workflow;
+          pr-evidence accepts no trial
+        default: ''
+        type: string
   # Temporary, for the proof runs on scratch branches before this file is on
   # master: removed before #415's PR leaves draft.
   push:
@@ -60,6 +70,7 @@ jobs:
       FILES: ${{ inputs.files }}
       FLAKE_TICKET: ${{ inputs.flake_ticket }}
       PER_SHARD: ${{ inputs.per_shard }}
+      COUNT: ${{ inputs.count }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -87,17 +98,24 @@ jobs:
         id: plan
         working-directory: head
         run: |
+          # A head from before affected-tests (2026-11-11) is read by this
+          # commit's copy.
+          affected=(python3 -I plan/bin/affected-tests)
+          if [ ! -e plan/bin/affected-tests ]; then
+            affected=(python3 -I ../tools/plan/bin/affected-tests --root "$PWD")
+          fi
+          echo "${affected[*]}"
           if [ -n "$FILES" ]; then
             read -r -a files <<<"$FILES"
-            printf '%s\n' "${files[@]}" | python3 -I plan/bin/affected-tests --stdin \
-              >"$RUNNER_TEMP/affected.txt"
+            printf '%s\n' "${files[@]}" | "${affected[@]}" --stdin >"$RUNNER_TEMP/affected.txt"
           else
-            python3 -I plan/bin/affected-tests "${BASE:-origin/master}" >"$RUNNER_TEMP/affected.txt"
+            "${affected[@]}" "${BASE:-origin/master}" >"$RUNNER_TEMP/affected.txt"
           fi
           cat "$RUNNER_TEMP/affected.txt"
-          flake=()
-          if [ "$FLAKE_TICKET" = true ]; then flake=(--flake-ticket); fi
-          python3 -I ../tools/plan/bin/ci-load plan --per-shard "${PER_SHARD:-5}" "${flake[@]}" \
+          opts=(--per-shard "${PER_SHARD:-5}")
+          if [ "$FLAKE_TICKET" = true ]; then opts+=(--flake-ticket); fi
+          if [ -n "$COUNT" ]; then opts+=(--count "$COUNT"); fi
+          python3 -I ../tools/plan/bin/ci-load plan "${opts[@]}" \
             <"$RUNNER_TEMP/affected.txt" >"$RUNNER_TEMP/plan.json"
           python3 -I -m json.tool "$RUNNER_TEMP/plan.json"
           echo "shards=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["shards"]))' <"$RUNNER_TEMP/plan.json")" >>"$GITHUB_OUTPUT"

@@ -3,7 +3,7 @@
 head's repeats under load, split across GitHub's runners so they run at once
 rather than one after another under the laptop's load lock.
 
-Usage: plan/bin/ci-load plan [--per-shard N] [--flake-ticket] < AFFECTED_TESTS_OUTPUT
+Usage: plan/bin/ci-load plan [--per-shard N] [--flake-ticket] [--count N] < AFFECTED_TESTS_OUTPUT
        plan/bin/ci-load summary PLAN.json SHARDS_DIR SHA
 
 `plan` reads what `plan/bin/affected-tests` printed for the head and writes
@@ -16,6 +16,8 @@ its font. Any other line that runs `tools/pytest-under-load.sh` or
 `tools/hold-load-lock.sh`, such as D133's DejaVu Sans run once with no load,
 is no load command: the plan lists it as skipped, with the reason.
 `--flake-ticket` adds the script's `--flake-ticket` (D122) to each shard.
+`--count N` replaces each command's count, for a trial run of the workflow:
+its run is named a trial, which pr-evidence does not accept.
 
 `summary` reads each shard's folder under SHARDS_DIR (`shard-<command>-<n>`,
 holding `status`, the script's exit code, and `junit.xml`) and prints the
@@ -79,7 +81,7 @@ def count_of(args):
     return None
 
 
-def plan(text, per_shard=5, flake_ticket=False):
+def plan(text, per_shard=5, flake_ticket=False, trial_count=None):
     commands, shards, skipped = [], [], []
     for raw in text.splitlines():
         line = raw.strip()
@@ -95,6 +97,9 @@ def plan(text, per_shard=5, flake_ticket=False):
         if flake_ticket and '--flake-ticket' not in args:
             args = ['--flake-ticket', *args]
         total = count_of(args)
+        if trial_count is not None:
+            args = with_count(args, trial_count) or [*args, '--count', str(trial_count)]
+            total = trial_count
         index = len(commands)
         commands.append({'index': index, 'line': line, 'font': font,
                          'count': total or 1})
@@ -160,19 +165,22 @@ def summary(the_plan, shards_dir, sha):
 def main(argv):
     if argv[:1] == ['plan']:
         args = argv[1:]
-        per_shard, flake = 5, False
+        per_shard, flake, count = 5, False, None
         while args:
             if args[0] == '--per-shard' and len(args) > 1:
                 per_shard = int(args[1])
+                args = args[2:]
+            elif args[0] == '--count' and len(args) > 1:
+                count = int(args[1])
                 args = args[2:]
             elif args[0] == '--flake-ticket':
                 flake = True
                 args = args[1:]
             else:
                 sys.exit(__doc__)
-        if per_shard < 1:
-            sys.exit('ci-load: --per-shard must be at least 1')
-        print(json.dumps(plan(sys.stdin.read(), per_shard, flake)))
+        if per_shard < 1 or (count is not None and count < 1):
+            sys.exit('ci-load: --per-shard and --count must be at least 1')
+        print(json.dumps(plan(sys.stdin.read(), per_shard, flake, count)))
         return 0
     if argv[:1] == ['summary'] and len(argv) == 4:
         the_plan = json.loads(Path(argv[1]).read_text())
