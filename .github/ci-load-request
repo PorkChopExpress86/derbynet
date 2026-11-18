@@ -1,0 +1,6 @@
+SHA=cfc4f8825d89d27ed9fc6a27a398fac4af7a6397
+FILES=server/ui/tests/browser/test_kiosk_slideshow.py
+COUNT=1
+PER_SHARD=1
+FLAKE_TICKET=false
+BASE=origin/master
