@@ -249,6 +249,14 @@ SOURCE = re.compile(
     r"\b[0-9.]+ ?(?:ms|s|seconds?|min|minutes?)\b|#\d+\b|\bD\d+\b"
     r"|\w\.(?:java|py|php|inc|js|sh|yml)\b"
 )
+# The waits whose source sits here, since a comment in the script would
+# change a golden capture input (server/tools/golden_inputs.py) and need a
+# recapture: script and line -> source.
+SOURCED_HERE = {
+    ("test-playlist.sh", "sleep 11"): "the scene switches 10 s after the round"
+    " ends (playlist.inc:157, PLAYLIST_SCENE_DELAY in"
+    " server/racing/services/playlist.py), and 1 s more",
+}
 BOUND_DEFAULT = re.compile(r"^\s*(\w+)=\$\{\1:-[0-9.]+\}", re.MULTILINE)
 
 
@@ -297,7 +305,12 @@ def test_every_wait_in_a_script_ci_runs_names_its_source(script):
     """A bound's comment says where its number comes from (AGENT-BRIEF's
     Evidence rules); #399's review sent back the waits the next test
     holds."""
-    assert unsourced_waits(script.read_text(encoding="utf-8")) == []
+    found = unsourced_waits(script.read_text(encoding="utf-8"))
+    assert [
+        line
+        for line in found
+        if (script.name, line.partition(": ")[2]) not in SOURCED_HERE
+    ] == []
 
 
 def test_a_wait_with_no_source_is_found():
@@ -336,6 +349,13 @@ def test_a_wait_with_no_source_is_found():
         "10: curl --max-time 10 -s $URL",
         "22: sleep 0.5",
     ]
+
+
+def test_each_wait_sourced_here_is_still_in_its_script_with_no_source():
+    for (name, line), source in SOURCED_HERE.items():
+        assert SOURCE.search(source)
+        found = unsourced_waits((TESTING / name).read_text(encoding="utf-8"))
+        assert line in [f.partition(": ")[2] for f in found], (name, line)
 
 
 def test_where_a_waits_source_may_sit():

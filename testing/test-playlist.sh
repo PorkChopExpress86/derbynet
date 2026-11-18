@@ -69,8 +69,6 @@ run_heat $ROUND 2   102:1.00 101:2.00 - -    x
 # After the first round, we should have Den2 scheduled and teed up, but not
 # racing.  After a brief pause, we should see the scene switched to Awards
 echo "Waiting for scene change to take effect..."
-# The scene switches 10 s after the round ends (playlist.inc:157,
-# PLAYLIST_SCENE_DELAY in server/racing/services/playlist.py), and 1 s more.
 sleep 11
 curl_getj "action.php?query=poll.kiosk&address=$KIOSK1" | expect_one award-presentations.kiosk
 
