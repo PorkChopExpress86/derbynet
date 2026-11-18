@@ -49,9 +49,14 @@ line_scan() {
 # one holds it, leaving ENTRY empty; otherwise adds an entry holding TEXT
 # and sets ENTRY.
 line_join() {
-  LINE="$(realpath -m -- "$LOCK").line"
-  mkdir -p "$LINE"
-  exec 7>>"$LINE/mutex"
+  # The script has opened LOCK on fd 9, so it exists and realpath needs no
+  # -m.
+  LINE="$(realpath -- "$LOCK").line"
+  if ! { mkdir -p "$LINE" && exec 7>>"$LINE/mutex"; } 2>/dev/null; then
+    echo "${0##*/}: it cannot make the line $LINE beside the load lock;" \
+         "name a file in a writable folder in DERBYNET_LOAD_LOCK." >&2
+    exit 2
+  fi
   flock -x 7
   line_scan
   local count=${#LINE_ENTRIES[@]} last=0

@@ -1426,6 +1426,100 @@ def test_a_signal_as_it_leaves_the_line_leaves_no_entry(tmp_path, script):
         finish(tmp_path, run)
 
 
+@SCRIPTS
+def test_tickets_count_on_in_decimal_past_9(tmp_path, script):
+    """Two live entries, tickets 7 and 8, each held by an flock the test
+    owns: the next two waiters join as 9 and 10, read in base 10 (08 and 09
+    are no octal numbers), and 10 waits behind 9, its name padded to sort
+    after it. Once the test lets 7 and 8 go, 9 takes the lock first."""
+    lock, held = held_lock(tmp_path)
+    line = Path(f"{os.path.realpath(lock)}.line")
+    line.mkdir()
+    seeds = []
+    runs = []
+    try:
+        for ticket in (7, 8):
+            entry = line / f"{ticket:010d}.{os.getpid()}"
+            entry.write_text(f"seed {ticket}\n")
+            seeds.append(os.open(entry, os.O_RDONLY))
+            fcntl.flock(seeds[-1], fcntl.LOCK_EX)
+        runs.append(join_at(tmp_path, script, "ninth", lock, 3))
+        runs.append(join_at(tmp_path, script, "tenth", lock, 4))
+        assert entries(lock) == [
+            f"0000000007.{os.getpid()}",
+            f"0000000008.{os.getpid()}",
+            f"0000000009.{runs[0].pid}",
+            f"0000000010.{runs[1].pid}",
+        ]
+        assert "  seed 7\n  seed 8\n" in (tmp_path / "tenth.out").read_text()
+        for fd in seeds:
+            os.close(fd)
+        seeds = []
+        os.close(held)
+        held = None
+        assert [run.wait(timeout=90) for run in runs] == [0, 0]
+        assert order(tmp_path) == ["ninth", "tenth"]
+        assert entries(lock) == []
+    finally:
+        for fd in seeds:
+            os.close(fd)
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, *runs)
+
+
+def lock_with_no_room_for_a_line(tmp_path, closed):
+    """A writable lock where no line can be made: `closed` is "folder", its
+    folder taking no new file, or "line", its line's folder there already
+    and taking no new file. (the folder to open again, the lock)."""
+    folder = tmp_path / "locks"
+    folder.mkdir()
+    lock = folder / "load.lock"
+    lock.write_text("")
+    line = Path(f"{os.path.realpath(lock)}.line")
+    shut = {"folder": folder, "line": line}[closed]
+    shut.mkdir(exist_ok=True)
+    shut.chmod(0o555)
+    return shut, lock
+
+
+NO_ROOM = pytest.mark.parametrize("closed", ["folder", "line"])
+
+
+@NO_ROOM
+def test_a_lock_that_takes_no_line_is_refused_by_name(tmp_path, closed):
+    shut, lock = lock_with_no_room_for_a_line(tmp_path, closed)
+    try:
+        result = run(
+            f"'{SCRIPT}' --loops 0 tests/test_pytest_under_load.py >/dev/null",
+            out=str(tmp_path / "run"),
+            lock=str(lock),
+        )
+    finally:
+        shut.chmod(0o755)
+    assert result.returncode == 2
+    assert (
+        f"pytest-under-load.sh: it cannot make the line {os.path.realpath(lock)}.line"
+        in result.stderr
+    )
+    assert "Permission denied" not in result.stderr
+
+
+@NO_ROOM
+def test_a_hand_off_on_a_lock_that_takes_no_line_is_refused_by_name(tmp_path, closed):
+    shut, lock = lock_with_no_room_for_a_line(tmp_path, closed)
+    try:
+        code, err = hold_with(tmp_path, ["true"], {"DERBYNET_LOAD_LOCK": str(lock)})
+    finally:
+        shut.chmod(0o755)
+    assert code == 2
+    assert (
+        f"hold-load-lock.sh: it cannot make the line {os.path.realpath(lock)}.line"
+        in err
+    )
+    assert "Permission denied" not in err
+
+
 def test_a_run_from_before_the_line_never_runs_beside_a_holder(tmp_path):
     """A run from a branch cut before the line takes the load lock with a
     bare `flock -x` and no entry, so it may go ahead of the first waiter,
