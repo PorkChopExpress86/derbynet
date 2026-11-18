@@ -12,12 +12,44 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
+
+# The argv prefix start() and hold() start a script through: it puts TERM,
+# INT and HUP, the signals the scripts trap, back to their default, with the
+# two Python ignores (PIPE, XFSZ), then execs the command in the same pid.  A
+# non-interactive bash gives a command it starts with `&` SIGINT ignored, as
+# pytest-under-load.sh and hold-load-lock.sh start theirs, so a pytest under
+# either ignored SIGINT, and so did the scripts it started; bash cannot trap
+# a signal ignored when it starts, so an INT never reached their traps (#407,
+# test_a_command_the_scripts_start_ignores_sigint,
+# test_a_signal_reaches_the_trap_though_pytest_ignores_it).
+RESET_NAMES = ("SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ")
+RESET_SIGNALS_ARGV = (
+    sys.executable,
+    "-c",
+    "import os, signal, sys\n"
+    f"for name in {RESET_NAMES!r}:\n"
+    "    signal.signal(getattr(signal, name), signal.SIG_DFL)\n"
+    "os.execvp(sys.argv[1], sys.argv[1:])\n",
+)
+
+
+def ignored_in(status):
+    """The names of the signals ignored in `status`'s SigIgn mask, the
+    text of a /proc/PID/status."""
+    mask = int(re.search(r"^SigIgn:\s*([0-9a-f]+)$", status, re.M).group(1), 16)
+    return {s.name for s in signal.Signals if mask >> (s.value - 1) & 1}
+
+
+def ignored(pid):
+    """The names of the signals `pid` ignores."""
+    return ignored_in(Path(f"/proc/{pid}/status").read_text())
 
 
 def run(
@@ -91,7 +123,8 @@ def test_the_summary_names_an_error_as_well_as_a_failure(tmp_path):
 
 # A stub test that holds its run open until the test writes `go` beside it,
 # for at most 60 s, so the first run is still running when the second
-# starts, on any load.
+# starts, on any load.  It writes `started` by a rename, since wait_started
+# returns once the file exists and its callers read it at once (#407).
 HOLD = """\
 import os
 import time
@@ -102,7 +135,8 @@ HERE = Path(__file__).parent
 
 def test_holds():
     held = os.environ.get("DERBYNET_LOAD_LOCK_HELD")
-    (HERE / "started").write_text(f"{os.getpid()} {held}")
+    (HERE / "started.tmp").write_text(f"{os.getpid()} {held}")
+    os.replace(HERE / "started.tmp", HERE / "started")
     for _ in range(600):
         if (HERE / "go").exists():
             break
@@ -135,6 +169,7 @@ def start(
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
         [
+            *RESET_SIGNALS_ARGV,
             *under,
             str(script),
             "--loops",
@@ -532,10 +567,11 @@ def test_a_signal_during_the_cleanup_after_an_error_still_frees_all(tmp_path):
 
 HOLD_LOCK = Path(__file__).resolve().parents[1] / "tools" / "hold-load-lock.sh"
 
-# A stand-in hand-off: it records the lock it was told it holds, then holds
-# its run open until the test writes `go` beside it, for at most 60 s.
+# A stand-in hand-off: it records the lock it was told it holds, by a
+# rename as HOLD does, then holds its run open until the test writes `go`
+# beside it, for at most 60 s.
 HAND_OFF = (
-    'echo "$DERBYNET_LOAD_LOCK_HELD" > started; '
+    'echo "$DERBYNET_LOAD_LOCK_HELD" > started.tmp; mv started.tmp started; '
     "for _ in $(seq 600); do [ -e go ] && exit 0; sleep 0.1; done; exit 1"
 )
 
@@ -553,7 +589,7 @@ def hold(
     env = {**os.environ, "DERBYNET_LOAD_LOCK": str(lock), **(extra_env or {})}
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
-        [str(script), "bash", "-c", command],
+        [*RESET_SIGNALS_ARGV, str(script), "bash", "-c", command],
         stdout=out,
         stderr=subprocess.STDOUT,
         cwd=folder,
@@ -735,15 +771,37 @@ def held_lock(tmp_path):
     return lock, held
 
 
-def start_waiting(tmp_path, script, lock, extra_env=None, copy=None):
+def start_waiting(tmp_path, script, lock, extra_env=None, copy=None, under=()):
     """`script`, or `copy`, a copy of it, started on `lock`, which the test
-    holds, once it waits in flock: (the run, its flock's pid)."""
+    holds, once it waits in flock: (the run, its flock's pid); `under` is
+    start()'s, for pytest-under-load.sh only.  A run that ends first, such
+    as one refused under `timeout`, fails at once with the script's output:
+    #59's runs under a `timeout 300` read "no flock under it within 30 s"
+    (#407)."""
     path = copy or script
     if script == SCRIPT:
-        run = start(tmp_path, "waiter", lock, extra_env=extra_env, go=True, script=path)
+        run = start(
+            tmp_path, "waiter", lock, extra_env, go=True, under=under, script=path
+        )
     else:
+        assert not under, "hold() starts hold-load-lock.sh under nothing"
         run = hold(tmp_path, lock, name="waiter", extra_env=extra_env, script=path)
-    wait_until(lambda: "flock" in children(run.pid), "flock under it", 30)
+    out = tmp_path / "waiter.out"
+    # Its flock once it has printed "Waiting": before that, the flock under
+    # it may be the `flock -n` that found the lock held.
+    wait_until(
+        lambda: (
+            run.poll() is not None
+            or ("Waiting for" in out.read_text() and "flock" in children(run.pid))
+        ),
+        "flock under it",
+        30,
+    )
+    if run.returncode is not None:
+        raise AssertionError(
+            f"the run exited {run.returncode} before its flock; the script"
+            f" printed:\n{out.read_text()}"
+        )
     # The run is the script asked for.
     assert str(path) in Path(f"/proc/{run.pid}/cmdline").read_text()
     return run, {name: pid for pid, name in child_pids(run.pid)}["flock"]
@@ -865,6 +923,128 @@ def test_a_signal_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script, 
         os.close(held)
         kill_all([waiter])
         finish(tmp_path, run)
+
+
+@pytest.mark.parametrize("sig", ["TERM", "INT", "HUP"])
+@SCRIPTS
+def test_a_signal_reaches_the_trap_though_pytest_ignores_it(tmp_path, script, sig):
+    """A pytest that a non-interactive shell started with `&`, as
+    pytest-under-load.sh and hold-load-lock.sh start theirs, ignores SIGINT;
+    the scripts it started ignored it too, and an INT left each waiting
+    until the test's 30 s wait ran out (#407). A TERM or HUP that pytest
+    ignores is reset the same way."""
+    number = getattr(signal, f"SIG{sig}")
+    before = signal.signal(number, signal.SIG_IGN)
+    try:
+        assert f"SIG{sig}" in ignored(os.getpid())
+        lock, held = held_lock(tmp_path)
+        run, waiter = start_waiting(tmp_path, script, lock)
+    finally:
+        signal.signal(number, before)
+    try:
+        # RESET_SIGNALS_ARGV left it none of its five ignored, Python's own
+        # PIPE and XFSZ included; spelled out rather than read from
+        # RESET_NAMES, so a name dropped there fails here.
+        five = {"SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ"}
+        assert not ignored(run.pid) & five, ignored(run.pid)
+        os.kill(run.pid, number)
+        assert run.wait(timeout=30) == 143
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+def test_a_command_the_scripts_start_ignores_sigint(tmp_path):
+    """From a pytest with SIGINT at its default, a non-interactive bash
+    starts a command in the foreground with SIGINT at its default and one
+    with `&` with it ignored, and so pytest-under-load.sh's pytest and
+    hold-load-lock.sh's command ignore it: the fact RESET_SIGNALS_ARGV's
+    comment states (#407)."""
+    status = "cat /proc/self/status"
+    env = {**os.environ, "DERBYNET_LOAD_LOCK": str(tmp_path / "own.lock")}
+    env.pop("DERBYNET_LOAD_LOCK_HELD", None)
+    before = signal.signal(signal.SIGINT, signal.SIG_DFL)
+    try:
+        foreground, job, held = (
+            subprocess.run(
+                argv, capture_output=True, text=True, timeout=60, env=env, check=True
+            ).stdout
+            for argv in (
+                ["bash", "-c", status],
+                ["bash", "-c", f"{status} & wait"],
+                [str(HOLD_LOCK), "bash", "-c", status],
+            )
+        )
+        code, out, _ = load_run_of(
+            tmp_path,
+            "    from pathlib import Path\n"
+            "    status = Path('/proc/self/status').read_text()\n"
+            "    Path(__file__).with_name('status').write_text(status)",
+        )
+    finally:
+        signal.signal(signal.SIGINT, before)
+    assert code == 0, out
+    assert "SIGINT" not in ignored_in(foreground)
+    assert "SIGINT" in ignored_in(job)
+    # The load run's pytest and the hand-off's command ignore SIGINT, and
+    # not SIGTERM, which start_held_rerun's callers send first.
+    for text in (held, (tmp_path / "status").read_text()):
+        assert "SIGINT" in ignored_in(text)
+        assert "SIGTERM" not in ignored_in(text)
+
+
+# A stand-in flock(1) whose `flock -n` holds for 2 s before it runs the real
+# one, so a flock under the run is the one that found the lock held.
+SLOW_FLOCK_N = """#! /bin/sh
+[ "$1" = -n ] && sleep 2
+exec {flock} "$@"
+"""
+
+
+@SCRIPTS
+def test_the_flock_it_returns_is_the_one_that_waits(tmp_path, script):
+    """Before the run prints "Waiting", the flock under it may be the
+    `flock -n` that found the lock held, here held 2 s by SLOW_FLOCK_N;
+    start_waiting returns the `flock -x 9` that waits (#407)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "flock").write_text(SLOW_FLOCK_N.format(flock=shutil.which("flock")))
+    (bin_dir / "flock").chmod(0o755)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, extra_env=env)
+    try:
+        argv = Path(f"/proc/{waiter}/cmdline").read_bytes().split(b"\0")
+        assert b"-n" not in argv and b"-x" in argv, argv
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+def test_start_waiting_starts_hold_load_lock_sh_under_nothing(tmp_path):
+    """start_waiting's `under` is for pytest-under-load.sh only: hold()
+    takes none, and it refuses one before it starts a run."""
+    with pytest.raises(AssertionError, match="under nothing"):
+        start_waiting(tmp_path, HOLD_LOCK, tmp_path / "load.lock", under=("nice",))
+    assert not (tmp_path / "waiter.out").exists()
+
+
+def test_a_run_refused_before_its_flock_is_named_at_once(tmp_path):
+    """Under `timeout` the script refuses before its flock, and the wait for
+    that flock says so at once: #59's runs under a `timeout 300` waited 30 s
+    each and read "no flock under it within 30 s" (#407)."""
+    lock, held = held_lock(tmp_path)
+    began = time.monotonic()
+    try:
+        with pytest.raises(AssertionError, match="it runs under timeout") as error:
+            start_waiting(tmp_path, SCRIPT, lock, under=("timeout", "300"))
+        assert "exited 2 before its flock" in str(error.value)
+        assert time.monotonic() - began < 30
+    finally:
+        os.close(held)
 
 
 @pytest.mark.parametrize(
@@ -1250,13 +1430,16 @@ def test_a_failed_rerun_args_is_named_and_starts_no_rerun(tmp_path):
 
 
 # A stub whose first run fails on a changed network and whose rerun holds
-# until the test writes `go` beside it, for at most 60 s.
+# until the test writes `go` beside it, for at most 60 s.  It writes
+# `rerunning` by a rename, as HOLD writes `started`: start_held_rerun returns
+# once the file exists and its callers read it at once (#407).
 HELD_RERUN = (
     "import os\nimport time\nfrom pathlib import Path\n\n\n"
     "def test_loads():\n"
     "    here = Path(__file__).parent\n"
     "    if (here / 'failed-once').exists():\n"
-    "        (here / 'rerunning').write_text(str(os.getpid()))\n"
+    "        (here / 'rerunning.tmp').write_text(str(os.getpid()))\n"
+    "        os.replace(here / 'rerunning.tmp', here / 'rerunning')\n"
     "        for _ in range(600):\n"
     "            if (here / 'go').exists():\n"
     "                return\n"
@@ -1285,6 +1468,9 @@ def start_held_rerun(tmp_path):
     }
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     with open(tmp_path / "held.out", "w") as out:
+        # No RESET_SIGNALS_ARGV: its callers send TERM, which a load run and a
+        # hand-off leave at its default, and INT only after a TERM, when the
+        # script's trap has set every signal it traps to ignored.
         run = subprocess.Popen(
             [str(SCRIPT), "--loops", "2", "-p", "no:cacheprovider", str(folder)],
             stdout=out,

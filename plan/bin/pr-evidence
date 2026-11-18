@@ -16,8 +16,24 @@ an earlier PR gave its evidence.
 
 #61's body draft left out the reviewer's checklist its timer-guide box asked
 for, though the checklist was drafted, until the lead found it (#61 retro).
-Exits 1 on a key the body gives no evidence for, or when the issue cannot be
-read.
+
+`--check` also refuses an unfilled placeholder outside inline code: a
+capitalised token joined by -, such as LOOP-OUTPUT, that ends in a word of
+SUFFIXES. #399's draft held LOOP-OUTPUT where its text said "all 25 pass",
+and this check passed it (#399 retro). A token joined by _ of that shape is
+one too unless a file under server/ or testing/ assigns it (`NAME = ...`,
+`NAME=...`, an enum member), since code names such as VIEW_RACE_RESULTS share
+the shape: #406's draft held HANDOFF_RUNS, as #399's had, and review found it
+(#406 retro). A mention in prose, a README, a comment, a string or plan/ does
+not excuse a token, since #406's review found LOG_TABLE, EXP_TABLE and
+NO_MORE_RESULTS passing on a vendored script and a timer profile, and a plan
+README row once passed HANDOFF_RUNS. The limit left: an assignment of the same
+name anywhere under server/ or testing/ excuses a placeholder written to look
+like it, and a name PHP, Java or JavaScript defines is refused until it is put
+in inline code.
+
+Exits 1 on a key the body gives no evidence for, on a placeholder, or when
+the issue cannot be read.
 """
 
 import os
@@ -34,6 +50,26 @@ ELSEWHERE = re.compile(r"\b(?:to|on|in) this issue\b", re.IGNORECASE)
 ITEM = re.compile(r"^\s*[-*] (?:\[( |x|X)\] )?(.*)$")
 SENTENCES = re.compile(r".*?[.!?](?=\s|$)")
 NO_EVIDENCE = re.compile(r"^(?:not done|todo)\b", re.IGNORECASE)
+# A draft's stand-in for output still to come, such as PROBE-PENDING or
+# LOOP-OUTPUT in #399's drafts. A shell or Python name has no -. A path
+# (path/X-OUTPUT, X-OUTPUT.txt) or a shell default (${X-OUTPUT}) passes.
+SUFFIXES = ("PENDING", "RESULT", "RESULTS", "OUTPUT", "RUNS", "TABLE", "TODO", "TBD")
+PLACEHOLDER = re.compile(
+    rf"(?<![A-Za-z0-9$/.-])(?<!\$\{{)[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-(?:{'|'.join(SUFFIXES)})"
+    r"(?![A-Za-z0-9/-]|\.\w)"
+)
+# The same shape joined by _, as #399's and #406's drafts wrote
+# HANDOFF_RUNS. It counts only when no file under CODE_DIRS assigns it
+# (defined_names).
+JOINED = re.compile(
+    rf"(?<![A-Za-z0-9$/._-])(?<!\$\{{)[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_(?:{'|'.join(SUFFIXES)})"
+    r"(?![A-Za-z0-9_/-]|\.\w)"
+)
+INLINE_CODE = re.compile(r"`[^`\n]*`")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Where a code name is assigned. plan/ is left out: it holds this tool, its
+# test and the README rows and notes that quote the drafts' placeholders.
+CODE_DIRS = ("server", "testing")
 
 
 def fold(text: str) -> str:
@@ -109,6 +145,38 @@ def has_evidence(key: str, outside: list[str], still_open: list[str]) -> bool:
     return any(item.startswith(k.rstrip(".!?")) for item in still_open)
 
 
+def defined_names(tokens: set[str]) -> set[str]:
+    """The tokens a file under CODE_DIRS of this checkout assigns: a line
+    that starts `NAME = x`, `NAME=x` or `export NAME=x`, with no second `=`
+    after it. Git runs without the GIT_* variables a hook sets."""
+    if not tokens:
+        return set()
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    names = "|".join(sorted(tokens))
+    pattern = f"^[[:blank:]]*((export|readonly)[[:blank:]]+)?({names})[[:blank:]]*=([^=]|$)"
+    done = subprocess.run(
+        ["git", "-C", ROOT, "grep", "-ohE", pattern, "--", *CODE_DIRS],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    if done.returncode not in (0, 1):
+        sys.exit(f"pr-evidence: git grep could not read the tree:\n{done.stderr.strip()}")
+    return {line.split("=")[0].split()[-1] for line in done.stdout.splitlines()}
+
+
+def placeholders(body: str, defined=defined_names) -> list[str]:
+    """Each unfilled placeholder, as `line N: TOKEN`: a token joined by -,
+    or one joined by _ that `defined` does not find assigned in the tree."""
+    found = []
+    for n, line in enumerate(body.splitlines(), 1):
+        bare = INLINE_CODE.sub("", line)
+        found += [(n, m.start(), m[0]) for m in PLACEHOLDER.finditer(bare)]
+        found += [(n, m.start(), m[0]) for m in JOINED.finditer(bare)]
+    code_names = defined({token for _n, _at, token in found if "_" in token})
+    return [f"line {n}: {token}" for n, _at, token in sorted(found) if token not in code_names]
+
+
 def issue_body(number: str) -> str:
     gh = os.environ.get("GH", "gh")
     repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
@@ -132,7 +200,8 @@ def main(argv: list[str]) -> int:
         print(f"{len(asked)} open lines of #{argv[0]} ask for evidence in the PR")
         return 0
     with open(argv[2], encoding="utf-8") as f:
-        outside, still_open = body_items(f.read())
+        body = f.read()
+    outside, still_open = body_items(body)
     missing = [key for key in asked if not has_evidence(key, outside, still_open)]
     for key in missing:
         print(f"no evidence in the body: {key}")
@@ -140,7 +209,10 @@ def main(argv: list[str]) -> int:
         f"{len(asked) - len(missing)} of {len(asked)} open lines of #{argv[0]} that ask "
         "for evidence in the PR have it in the body"
     )
-    return 1 if missing else 0
+    unfilled = placeholders(body)
+    for found in unfilled:
+        print(f"unfilled placeholder, {found}")
+    return 1 if missing or unfilled else 0
 
 
 if __name__ == "__main__":
