@@ -243,15 +243,17 @@ def uncited_php(n, text):
                         'file:line cite in its sentence; cite the line (`fake-timer.php:99-100`)')
 
 
-POSTGRES_JOB = re.compile(r'\b\w+ \(postgres\)', re.I)
-UNDER_LOAD = re.compile(r'^\s*[-*] \[ \] .*\bunder load\b', re.I)
-DATABASE = re.compile(r'\b(?:postgres|postgresql|sqlite)\b', re.I)
+POSTGRES_JOB = re.compile(r'\b[\w.-]+ \((?:\w+, )?postgres(?:, [^()]+)?\)', re.I)
+UNDER_LOAD = re.compile(r'^\s*[-*] \[ \] .*\bunder[ -]load\b', re.I)
+DATABASE = re.compile(r'\b(?:postgres|postgresql|sqlite|(?:both|each|every|either) '
+                      r'(?:databases?|engines))\b', re.I)
 
 
 def load_database(n, text):
     """Each open box of an open ticket that asks for a run under load and
     names no database, when the body names a CI Postgres job such as
-    `pytest (postgres)`, code spans included. #412 failed in `pytest
+    `pytest (postgres)`, `pytest (postgres, test endpoints)` or `shell
+    (postgres, group 2)`, code spans included. #412 failed in `pytest
     (postgres)`, its box said only "25 counts under load", and its first load
     run queued on SQLite (#412 retro)."""
     job = POSTGRES_JOB.search(text)
