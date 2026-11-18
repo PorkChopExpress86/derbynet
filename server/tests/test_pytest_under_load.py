@@ -20,14 +20,14 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
 
-# The prefix each test starts a script through: it puts TERM, INT and HUP,
+# The prefix start() and hold() start a script through: it puts TERM, INT and HUP,
 # the signals the scripts trap, back to their default, with the two Python
 # ignores (PIPE, XFSZ), then execs the command in the same pid.  A
 # non-interactive bash gives a command it starts with `&` SIGINT ignored, as
 # pytest-under-load.sh and hold-load-lock.sh start theirs, so a pytest under
 # either ignored SIGINT, and so did the scripts it started; bash cannot trap
 # a signal ignored when it starts, so an INT never reached their traps (#407,
-# test_an_int_reaches_the_trap_though_pytest_ignores_it).
+# test_a_signal_reaches_the_trap_though_pytest_ignores_it).
 DEFAULT_NAMES = ("SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ")
 DEFAULT_SIGNALS = (
     sys.executable,
@@ -915,25 +915,28 @@ def test_a_signal_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script, 
         finish(tmp_path, run)
 
 
+@pytest.mark.parametrize("sig", ["TERM", "INT", "HUP"])
 @SCRIPTS
-def test_an_int_reaches_the_trap_though_pytest_ignores_it(tmp_path, script):
+def test_a_signal_reaches_the_trap_though_pytest_ignores_it(tmp_path, script, sig):
     """A pytest that a non-interactive shell started with `&`, as
     pytest-under-load.sh and hold-load-lock.sh start theirs, ignores SIGINT;
     the scripts it started ignored it too, and an INT left each waiting
-    until the test's 30 s wait ran out (#407)."""
-    before = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    until the test's 30 s wait ran out (#407). A TERM or HUP that pytest
+    ignores, as under nohup for HUP, is reset the same way."""
+    number = getattr(signal, f"SIG{sig}")
+    before = signal.signal(number, signal.SIG_IGN)
     try:
-        assert "SIGINT" in ignored(os.getpid())
+        assert f"SIG{sig}" in ignored(os.getpid())
         lock, held = held_lock(tmp_path)
         run, waiter = start_waiting(tmp_path, script, lock)
     finally:
-        signal.signal(signal.SIGINT, before)
+        signal.signal(number, before)
     try:
         # DEFAULT_SIGNALS left it none of its five ignored, Python's own PIPE
         # and XFSZ included.
         five = {"SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ"}
         assert not ignored(run.pid) & five, ignored(run.pid)
-        os.kill(run.pid, signal.SIGINT)
+        os.kill(run.pid, number)
         assert run.wait(timeout=30) == 143
         wait_until(lambda: not alive(waiter), "its flock gone", 10)
     finally:
@@ -1405,15 +1408,7 @@ def start_held_rerun(tmp_path):
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     with open(tmp_path / "held.out", "w") as out:
         run = subprocess.Popen(
-            [
-                *DEFAULT_SIGNALS,
-                str(SCRIPT),
-                "--loops",
-                "2",
-                "-p",
-                "no:cacheprovider",
-                str(folder),
-            ],
+            [str(SCRIPT), "--loops", "2", "-p", "no:cacheprovider", str(folder)],
             stdout=out,
             stderr=subprocess.STDOUT,
             cwd=tmp_path,
