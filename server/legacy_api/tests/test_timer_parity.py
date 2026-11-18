@@ -5,10 +5,13 @@ byte with Django's ids written as PHP's.
 The scenario's transcripts share one race, so they run in order in one test.
 `capture/scenarios/13-heat-state.sh`'s Q17 transcripts are replayed the same
 way, against the Q17 deviation it writes with `WRITE_DEVIATIONS=1` (#65).
+`test_classid_through_a_timer_test` replays no capture: it pins Django's
+current-heat through a timer test, where PHP's classid differs (C4, #406).
 """
 
 import json
 import os
+from typing import NamedTuple
 from urllib.parse import parse_qsl, quote, urlencode
 
 import pytest
@@ -309,34 +312,40 @@ CURRENT_HEAT_POLLS = (
 )
 
 
-def current_heats(s: TimerScenario, step: str) -> list[tuple]:
-    """`current-heat`'s classid, round, roundid and heat in each poll that
-    carries it."""
+class CurrentHeat(NamedTuple):
+    classid: int | None
+    round: int | None
+    roundid: int | None
+    heat: int | None
+
+
+def current_heats(s: TimerScenario, step: str) -> list[tuple[str, str, CurrentHeat]]:
+    """`current-heat` in each poll that carries it."""
     rows = []
     for query in CURRENT_HEAT_POLLS:
         heat = json.loads(s.client.get(f"/action.php?query={query}").content)[
             "current-heat"
         ]
         rows.append(
-            (step, query, heat["classid"], heat["round"], heat["roundid"], heat["heat"])
+            (
+                step,
+                query,
+                CurrentHeat(
+                    classid=heat["classid"],
+                    round=heat["round"],
+                    roundid=heat["roundid"],
+                    heat=heat["heat"],
+                ),
+            )
         )
     return rows
 
 
-def timer_test_case(s: TimerScenario):
-    """Six Wolves checked in on 4 lanes, round 1 scheduled, and an
-    identified timer."""
-    s.reset()
-    for i in range(1, 7):
-        s.import_racer(f"firstname=F{i}&lastname=L{i}&carnumber=10{i}&partition=Wolves")
-    s.post_ok("action=racer.bulk&who=all&what=checkin")
-    s.post_ok("action=settings.write&unused-lane-mask=0&n-lanes=4")
-    s.learn_rows()
-    s.post_ok("action=schedule.generate&roundid=1")
-    s._timer_client = Client(headers={"User-Agent": TIMER_UA})
-    s.post_as(s._timer_client, "action=role.login&name=Timer&password=")
-    s.post_as(s._timer_client, "action=timer-message&message=HELLO")
-    s.post_as(s._timer_client, "action=timer-message&message=IDENTIFIED&lane_count=4")
+def identified_timer_case(s: TimerScenario):
+    """`heat_state_case`, and a timer that has sent HELLO and IDENTIFIED."""
+    heat_state_case(s)
+    s.timer("message=HELLO")
+    s.timer("message=IDENTIFIED&lane_count=4")
 
 
 def test_classid_through_a_timer_test(event):
@@ -345,11 +354,14 @@ def test_classid_through_a_timer_test(event):
     (`website/inc/autoadvance.inc:138`) and keeps it after the test ends.
     Every poll that carries current-heat sends the classid from before the
     test: the round's class after a heat.select (A), and null with no heat
-    ever selected (B). The test heat moves the heat on, so the advance ran."""
+    ever selected (B). The test heat moves the heat on, so the advance ran.
+    After the test, A's round is 1 where PHP's is null, since PHP's
+    get_running_round() looks the round up by that "" classid and finds no
+    row (`website/inc/data.inc:236-243`)."""
     s = TimerScenario()
     got = []
 
-    timer_test_case(s)
+    identified_timer_case(s)
     s.post_ok("action=heat.select&roundid=1&now_racing=1")
     got += current_heats(s, "A1 heat selected")
     s.post_ok("action=timer.test&tt-mask=0")
@@ -363,7 +375,7 @@ def test_classid_through_a_timer_test(event):
     wolves = Group.objects.get(event=active_event(), name="Wolves").pk
     round1 = Round.objects.get(event=active_event()).pk
 
-    timer_test_case(s)
+    identified_timer_case(s)
     got += current_heats(s, "B1 no heat selected")
     s.post_ok("action=timer.test&tt-mask=12")
     got += current_heats(s, "B2 test started")
@@ -373,18 +385,28 @@ def test_classid_through_a_timer_test(event):
     got += current_heats(s, "B4 test ended")
 
     steps = [
-        ("A1 heat selected", wolves, 1, round1, 1),
-        ("A2 test started", wolves, 1, -100, 2),
-        ("A3 after a test heat", wolves, 1, -100, 3),
-        ("A4 test ended", wolves, 1, round1, 1),
-        ("A5 next heat", wolves, 1, round1, 2),
-        ("B1 no heat selected", None, None, -1, None),
-        ("B2 test started", None, 1, -100, 1),
-        ("B3 after a test heat", None, 1, -100, 2),
-        ("B4 test ended", None, None, -1, None),
+        (
+            "A1 heat selected",
+            CurrentHeat(classid=wolves, round=1, roundid=round1, heat=1),
+        ),
+        ("A2 test started", CurrentHeat(classid=wolves, round=1, roundid=-100, heat=2)),
+        (
+            "A3 after a test heat",
+            CurrentHeat(classid=wolves, round=1, roundid=-100, heat=3),
+        ),
+        ("A4 test ended", CurrentHeat(classid=wolves, round=1, roundid=round1, heat=1)),
+        ("A5 next heat", CurrentHeat(classid=wolves, round=1, roundid=round1, heat=2)),
+        (
+            "B1 no heat selected",
+            CurrentHeat(classid=None, round=None, roundid=-1, heat=None),
+        ),
+        ("B2 test started", CurrentHeat(classid=None, round=1, roundid=-100, heat=1)),
+        (
+            "B3 after a test heat",
+            CurrentHeat(classid=None, round=1, roundid=-100, heat=2),
+        ),
+        ("B4 test ended", CurrentHeat(classid=None, round=None, roundid=-1, heat=None)),
     ]
     assert got == [
-        (step, query, classid, rnd, roundid, heat)
-        for step, classid, rnd, roundid, heat in steps
-        for query in CURRENT_HEAT_POLLS
+        (step, query, heat) for step, heat in steps for query in CURRENT_HEAT_POLLS
     ]
