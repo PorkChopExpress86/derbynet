@@ -1,0 +1,6 @@
+SHA=19fea1fbdf406c14576f03874b80cbc486e1632f
+FILES=server/ui/tests/browser/test_kiosks.py
+COUNT=
+PER_SHARD=5
+FLAKE_TICKET=false
+BASE=origin/master
