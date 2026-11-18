@@ -26,6 +26,23 @@ the line above it; any other row that names none lists for none. A module
 claim counts on any line, since its row may name the constant a comment
 sits above, or the test that reads it.
 
+A line of fenced code lists nothing and names no scope: #367's `<details>`
+of pasted junit and traceback named the test and held `timed out after
+3 s`, which passed a "3 s" no assert read (#367 retro). A fence opens on a
+run of backticks with no backtick after it, or of tildes, behind any
+indent, `>` marks and list markers. It closes on its own mark, at least as
+long, with nothing after it, behind the opener's indent and `>` marks.
+The tool reads one line at a time and can't see the list item or quote
+that holds a fence, so where CommonMark might read a fence otherwise it
+stops with an error naming the line: a fence left open, a line left of
+its fence's indent (a blank one in a quote), or a fence mark off that
+indent. In the swept cases, it keeps no line a CommonMark fence holds,
+and drops more where it can't tell the container
+(`test_the_fence_rule_drops_what_commonmark_fences`). It does not read
+HTML blocks: in CommonMark a fence mark inside one, such as straight under
+a `<details>` line, opens no fence, so a fence after the blank line that
+ends the block reads to the tool as a close (PR #402's body).
+
 `--check --base REV` asks only for the claims the diff from the merge base
 with REV, to the working tree, adds or changes (D123, #374): those of a
 scope (a top-level function or class) whose text differs, comments
@@ -282,6 +299,10 @@ def scope_names(claim: Claim, file: Path) -> list[str]:
 # whose first cell is `same` (or a ditto mark) continues the one above.
 NEW_ITEM = re.compile(r"\s*(?:\||[-*+]\s|\d+[.)]\s|#)")
 SAME = re.compile(r"\s*\|\s*(?:same\b|〃|\")", re.IGNORECASE)
+# A fence mark behind its indent, blockquote marks and list markers, then
+# its info string.
+FENCE = re.compile(r"((?:[ \t>]|[-*+][ \t]|\d{1,9}[.)][ \t])*)(`{3,}|~{3,})(.*)")
+MARKER = re.compile(r"[-*+]|\d{1,9}[.)]")
 
 
 def word(text: str) -> re.Pattern:
@@ -393,8 +414,75 @@ def base_text(file: Path, rev: str) -> str | None:
         return None
 
 
+class FenceError(Exception):
+    def __init__(self, line: int, message: str):
+        super().__init__(message)
+        self.line = line
+
+
+def opens(mark: re.Match) -> bool:
+    """A backtick fence's info string holds no backtick, or the line is an
+    inline code span (```code``` is a span)."""
+    return mark[2][0] == "~" or "`" not in mark[3]
+
+
+def closes(mark: re.Match, fence: re.Match) -> bool:
+    """The fence's own mark, at least as long, with nothing after it."""
+    return (
+        mark[2][0] == fence[2][0]
+        and len(mark[2]) >= len(fence[2])
+        and not mark[3].strip()
+    )
+
+
+def inset(prefix: str) -> str:
+    """A fence's indent and `>` marks, with list markers read as spaces."""
+    return MARKER.sub(lambda m: " " * len(m[0]), prefix.expandtabs(4))
+
+
+def stays_in(line: str, fence: re.Match) -> bool:
+    """A line behind the fence's indent and `>` marks, or holding only
+    them (a blank line, outside a quote): a line left of them, or a blank
+    line in a quote, may end the list item or quote that holds the fence."""
+    text, room = line.expandtabs(4), inset(fence[1])
+    return text.startswith(room) or text.rstrip() == room.rstrip()
+
+
 def details(body: str) -> list[str]:
-    return re.findall(r"<details>(.*?)</details>", body, re.S)
+    """The text of each `<details>` block, less its fenced code: pasted
+    output lists no claim (#367 retro), and a `<details>` a fence quotes
+    opens no block. Raises FenceError where it can't tell where a fence
+    ends: a line left of it, or no close."""
+    kept, fence, start = [], None, 0
+    for n, line in enumerate(body.splitlines(), 1):
+        mark = FENCE.match(line)
+        if fence is None and mark and opens(mark):
+            fence, start = mark, n
+        elif fence is None:
+            kept.append(line)
+        elif not stays_in(line, fence):
+            raise FenceError(
+                n,
+                f"this line sits left of the fence opened on line {start}, so"
+                " the tool can't tell where that fence ends: indent it as the"
+                " fence is, or close the fence above it",
+            )
+        elif mark and closes(mark, fence) and inset(mark[1]) == inset(fence[1]):
+            fence = None
+        elif mark and closes(mark, fence) and not MARKER.search(mark[1]):
+            raise FenceError(
+                n,
+                "this fence mark sits off the indent of the fence opened on"
+                f" line {start}, so the tool can't tell whether it closes it:"
+                " put it at that fence's indent",
+            )
+    if fence is not None:
+        raise FenceError(
+            start,
+            "this fence never closes at its own indent, so the rest of the"
+            " body, every <details> block in it, reads as code",
+        )
+    return re.findall(r"<details>(.*?)</details>", "\n".join(kept), re.S)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -408,7 +496,12 @@ def main(argv: list[str] | None = None) -> int:
     found = [(f, c, hits) for f in args.files for c, hits in claims(f)]
     if args.check:
         names = {n for f, c, _ in found for n in scope_names(c, f)}
-        listed = rows(details(args.check.read_text()), names)
+        try:
+            blocks = details(args.check.read_text())
+        except FenceError as e:
+            print(f"{args.check}:{e.line}: {e}")
+            return 1
+        listed = rows(blocks, names)
         scoped = {}
         if args.base:
             for f in dict.fromkeys(args.files):

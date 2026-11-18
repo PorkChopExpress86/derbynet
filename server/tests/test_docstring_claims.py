@@ -131,6 +131,261 @@ def test_a_row_naming_another_test_by_nickname_lists_nothing(tmp_path):
     assert dc.main(["--check", str(body), str(path)]) == 0
 
 
+PASTED = """\
+<details><summary>one failure from the log</summary>
+
+{fence}
+_____ test_waits[single] _____
+E   AssertionError: ("ERROR  mod.py: (timed out after 3 s)
+{fence}
+{after}
+</details>
+"""
+
+
+@pytest.mark.parametrize("fence", ["```", "~~~", "````"])
+def test_pasted_output_in_a_details_block_lists_no_claim(tmp_path, fence):
+    """#367's pasted traceback named the test and held `timed out after
+    3 s`, and passed a "3 s" no assert read (#367 retro). A wrapped line
+    after the fence takes no scope from inside it."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(PASTED.format(fence=fence, after=""))
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    body.write_text(PASTED.format(fence=fence, after="  3 s, wrapped"))
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    body.write_text(PASTED.format(fence=fence, after="- `test_waits`: 3 s"))
+    assert dc.main(["--check", str(body), str(path)]) == 0
+
+
+def test_a_row_before_a_fence_keeps_its_scope_after_it(tmp_path):
+    """The fenced lines drop out whole, so a wrapped line after the fence
+    lists for the row above it."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        "<details>\n- `test_waits`: the log shows\n```\nwaiting\n```\n"
+        "  3 s, the bound\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 0
+
+
+@pytest.mark.parametrize(
+    "fence, inner", [("````", "```"), ("```", "~~~"), ("```", "```python")]
+)
+def test_a_fence_closes_only_on_its_own_mark(tmp_path, fence, inner):
+    """A shorter mark, the other mark, or a mark with an info string
+    inside a fence leaves it open. The inner mark comes twice, so a fence
+    it closed opens again and the block still ends."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        f"<details>\n{fence}\n{inner}\n- `test_waits`: 3 s\n{inner}\n{fence}\n"
+        "</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+
+
+def test_a_fence_that_quotes_a_details_tag_opens_no_block(tmp_path):
+    """#340's body quoted `<details>` in a diff fence ahead of its real
+    blocks, so the text between read as a block."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        "```diff\n- a claim on a <details> line\n```\n"
+        "- `test_waits`: 3 s\n<details>\n| `test_lanes` | 2 |\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+
+
+def test_an_unclosed_fence_is_named_by_its_line(tmp_path, capsys):
+    """A fence left open drops the rest of the body, its `</details>`
+    too, so the error names the fence rather than the claim it hid
+    (#367 retro)."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n```\nfoo\n- `test_waits`: 3 s\n</details>\n")
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert capsys.readouterr().out == (
+        f"{body}:2: this fence never closes at its own indent, so the rest of"
+        " the body, every <details> block in it, reads as code\n"
+    )
+
+
+def test_a_line_left_of_its_fence_is_named(tmp_path, capsys):
+    """A line left of a list item's fence may end the item, and the fence
+    with it, so the error names that line (#402 review)."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        "<details>\n- `test_waits`: the log\n  ```\nlog\n  ```\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert capsys.readouterr().out == (
+        f"{body}:4: this line sits left of the fence opened on line 3, so the"
+        " tool can't tell where that fence ends: indent it as the fence is, or"
+        " close the fence above it\n"
+    )
+
+
+def test_a_fence_mark_off_its_fence_indent_is_named(tmp_path, capsys):
+    """Whether CommonMark closes a fence on a mark at another indent than
+    its opener's depends on the container, which the tool can't see, so it
+    names such a mark (#402 review)."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n```\nlog\n  ```\n- `test_waits`: 3 s\n</details>\n")
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert capsys.readouterr().out == (
+        f"{body}:4: this fence mark sits off the indent of the fence opened on"
+        " line 2, so the tool can't tell whether it closes it: put it at that"
+        " fence's indent\n"
+    )
+
+
+# Each case's id, its lines, the words of `inner` and `after` that
+# markdown-it-py's CommonMark parser fences in those lines alone (the probe
+# and its output are in PR #402's body), the words details() keeps, and the
+# line its error names, where it stops.
+FENCE_SWEEP = [
+    ("backtick-0", "```\ninner\n```\nafter", "inner", "after", None),
+    ("backtick-0-py", "```py\ninner\n```\nafter", "inner", "after", None),
+    ("backtick-0-tick", "```a`b\ninner\n```\nafter", "after", "", 5),
+    ("tilde-0", "~~~\ninner\n~~~\nafter", "inner", "after", None),
+    ("tilde-0-py", "~~~py\ninner\n~~~\nafter", "inner", "after", None),
+    ("tilde-0-tick", "~~~a`b\ninner\n~~~\nafter", "inner", "after", None),
+    ("backtick-1", " ```\n inner\n ```\nafter", "inner", "after", None),
+    ("backtick-1-py", " ```py\n inner\n ```\nafter", "inner", "after", None),
+    ("backtick-1-tick", " ```a`b\n inner\n ```\nafter", "after", "", 6),
+    ("tilde-1", " ~~~\n inner\n ~~~\nafter", "inner", "after", None),
+    ("tilde-1-py", " ~~~py\n inner\n ~~~\nafter", "inner", "after", None),
+    ("tilde-1-tick", " ~~~a`b\n inner\n ~~~\nafter", "inner", "after", None),
+    ("backtick-2", "  ```\n  inner\n  ```\nafter", "inner", "after", None),
+    ("backtick-2-py", "  ```py\n  inner\n  ```\nafter", "inner", "after", None),
+    ("backtick-2-tick", "  ```a`b\n  inner\n  ```\nafter", "after", "", 6),
+    ("tilde-2", "  ~~~\n  inner\n  ~~~\nafter", "inner", "after", None),
+    ("tilde-2-py", "  ~~~py\n  inner\n  ~~~\nafter", "inner", "after", None),
+    ("tilde-2-tick", "  ~~~a`b\n  inner\n  ~~~\nafter", "inner", "after", None),
+    ("backtick-3", "   ```\n   inner\n   ```\nafter", "inner", "after", None),
+    ("backtick-3-py", "   ```py\n   inner\n   ```\nafter", "inner", "after", None),
+    ("backtick-3-tick", "   ```a`b\n   inner\n   ```\nafter", "after", "", 6),
+    ("tilde-3", "   ~~~\n   inner\n   ~~~\nafter", "inner", "after", None),
+    ("tilde-3-py", "   ~~~py\n   inner\n   ~~~\nafter", "inner", "after", None),
+    ("tilde-3-tick", "   ~~~a`b\n   inner\n   ~~~\nafter", "inner", "after", None),
+    ("backtick-4", "    ```\n    inner\n    ```\nafter", "", "after", None),
+    ("backtick-4-py", "    ```py\n    inner\n    ```\nafter", "", "after", None),
+    ("backtick-4-tick", "    ```a`b\n    inner\n    ```\nafter", "", "", 6),
+    ("tilde-4", "    ~~~\n    inner\n    ~~~\nafter", "", "after", None),
+    ("tilde-4-py", "    ~~~py\n    inner\n    ~~~\nafter", "", "after", None),
+    ("tilde-4-tick", "    ~~~a`b\n    inner\n    ~~~\nafter", "", "after", None),
+    ("tab-indent", "\t```\n\tinner\n\t```\nafter", "", "after", None),
+    ("inline-span", "```code``` is a span\ninner\nafter", "", "after inner", None),
+    ("close-shorter", "````\ninner\n```\nafter", "after inner", "", 3),
+    ("close-same", "````\ninner\n````\nafter", "inner", "after", None),
+    ("close-longer", "````\ninner\n`````\nafter", "inner", "after", None),
+    ("close-other-mark", "````\ninner\n~~~~\nafter", "after inner", "", 3),
+    ("close-with-info", "````\ninner\n```` x\nafter", "after inner", "", 3),
+    ("close-trailing-spaces", "````\ninner\n````  \nafter", "inner", "after", None),
+    ("close-trailing-tab", "````\ninner\n````\t\nafter", "inner", "after", None),
+    ("close-1", "````\ninner\n ````\nafter", "inner", "", 5),
+    ("close-3", "````\ninner\n   ````\nafter", "inner", "", 5),
+    ("close-4", "````\ninner\n    ````\nafter", "after inner", "", 5),
+    ("unclosed", "```\ninner\nafter", "after inner", "", 3),
+    ("list-item-2", "- row\n  ```\n  inner\n  ```\nafter", "inner", "after", None),
+    (
+        "list-item-4",
+        "- row\n    ```\n    inner\n    ```\nafter",
+        "inner",
+        "after",
+        None,
+    ),
+    (
+        "list-item-6",
+        "- row\n      ```\n      inner\n      ```\nafter",
+        "",
+        "after",
+        None,
+    ),
+    (
+        "ordered-item-6",
+        "1. row\n      ```\n      inner\n      ```\nafter",
+        "inner",
+        "after",
+        None,
+    ),
+    (
+        "fence-on-the-marker-line",
+        "- ```\n  inner\n  ```\nafter",
+        "inner",
+        "after",
+        None,
+    ),
+    ("star-marker-line", "* ```\n  inner\n  ```\nafter", "inner", "after", None),
+    ("plus-marker-line", "+ ```\n  inner\n  ```\nafter", "inner", "after", None),
+    ("paren-marker-line", "1) ```\n   inner\n   ```\nafter", "inner", "after", None),
+    ("blockquote", "> ```\n> inner\n> ```\nafter", "inner", "after", None),
+    ("blockquote-ends-it", "> ```\n> inner\n\nafter", "inner", "", 5),
+    (
+        "fence-on-an-ordered-marker-line",
+        "1. ```\n   inner\n   ```\nafter",
+        "inner",
+        "after",
+        None,
+    ),
+    ("close-tab-indent", "````\ninner\n\t````\nafter", "after inner", "", 5),
+    ("open3-close4", "   ```\ninner\n    ```\nafter", "after inner", "", 4),
+    ("open2-close5", "  ```\ninner\n     ```\nafter", "after inner", "", 4),
+    ("close-quoted", "```\ninner\n> ```\nafter", "after inner", "", 5),
+    ("close-on-marker", "```\ninner\n- ```\nafter", "after inner", "", 3),
+    ("close-on-ordered", "```\ninner\n1. ```\nafter", "after inner", "", 3),
+    ("quoted-open-bare-close", "> ```\n> inner\n```\nafter", "after inner", "", 5),
+    ("item4-close7", "- row\n    ```\n    inner\n       ```\nafter", "inner", "", 6),
+    ("item4-close1", "- row\n    ```\n    inner\n ```\nafter", "after inner", "", 6),
+    ("item2-close0", "- row\n  ```\n  inner\n```\nafter", "after inner", "", 6),
+    ("item4-close2", "- row\n    ```\n    inner\n  ```\nafter", "inner", "", 6),
+    ("quote-close-deeper", "> ```\n> inner\n>     ```\nafter", "inner", "", 5),
+    ("nested-quote-close", "> ```\n> inner\n> > ```\nafter", "inner", "", 5),
+    ("item-open-quote-close", "- ```\n  inner\n  > ```\nafter", "inner", "", 5),
+    ("item-line-left-of-fence", "- row\n  ```\ninner\n  ```\nafter", "after", "", 5),
+    ("quote-blank-line", "> ```\n> inner\n\n> ```\nafter", "inner", "", 5),
+    ("quote-bare-mark-line", "> ```\n>\n> inner\n> ```\nafter", "inner", "after", None),
+    (
+        "item-blank-line",
+        "- row\n  ```\n  inner\n\n  ```\nafter",
+        "inner",
+        "after",
+        None,
+    ),
+]
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"], ids=["LF", "CRLF"])
+@pytest.mark.parametrize(
+    "lines, fenced, kept, error",
+    [pytest.param(*row[1:], id=row[0]) for row in FENCE_SWEEP],
+)
+def test_the_fence_rule_drops_what_commonmark_fences(lines, fenced, kept, error, eol):
+    """details() keeps no word CommonMark fences in these cases: where it
+    can't tell the container it drops more, or stops with an error. Each
+    case's outcome is pinned, so a change shows in the table (#402
+    review)."""
+    body = eol.join(["<details>", "", *lines.split("\n"), "", "</details>", ""])
+    try:
+        text, line = "\n".join(dc.details(body)), None
+    except dc.FenceError as e:
+        text, line = "", e.line
+    left = {w for w in ("inner", "after") if w in text}
+    assert (left, line) == (set(kept.split()), error)
+    assert not set(fenced.split()) & left
+
+
 def test_a_class_claim_counts_on_a_row_naming_its_method(tmp_path):
     """#333's rows name the test method, under its class's claims."""
     path = tmp_path / "test_sample.py"
