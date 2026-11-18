@@ -1,0 +1,5 @@
+SHA=58bfd46c7a787a891a0870a86e6687e42887624e
+FILES=server/ui/tests/browser/test_kiosk_slideshow.py server/racing/services/heats.py
+COUNT=1
+FLAKE_TICKET=false
+BASE=origin/master
