@@ -77,12 +77,12 @@ def test_a_changed_guide_command_fails_by_guide_line_and_command():
     )
 
 
-def shell_commands() -> list[tuple[str, int, str]]:
+def shell_commands(folder: Path = DOCS) -> list[tuple[str, int, str]]:
     """(guide, line, command) of each command in the guides' blocks of a
     language bash reads."""
     return [
         (path.name, line, command)
-        for path in sorted(DOCS.glob("*.md"))
+        for path in sorted(folder.glob("*.md"))
         for language, first, code in fenced_blocks(path.read_text())
         if language in gc.LANGUAGES - {"powershell", "pwsh"}
         for line, command in gc.split(language, code, first)
@@ -95,6 +95,12 @@ def test_every_command_of_a_shell_block_parses_as_whole_commands():
     commands = shell_commands()
     assert commands
     assert [c for c in commands if not gc.complete(c[2])] == []
+
+
+@pytest.mark.parametrize("language", ["powershell", "pwsh"])
+def test_the_bash_check_leaves_out_a_powershell_block(tmp_path, language):
+    (tmp_path / "g.md").write_text(fence(language, "if ($x) {") + fence("sh", "ls"))
+    assert shell_commands(tmp_path) == [("g.md", 5, "ls")]
 
 
 def test_the_function_in_photo_stand_md_is_one_command():
@@ -753,9 +759,13 @@ def test_the_guard_refuses_no_daemon(tmp_path):
     assert calls(tmp_path) == ["info"]
 
 
-def test_names_that_only_contain_a_guide_name_pass_and_the_cleanup_runs(tmp_path):
+def test_names_that_only_contain_a_guide_name_pass_and_the_cleanup_runs(
+    tmp_path, monkeypatch
+):
     """A failing stage after the guard passed still removes what the guides'
-    commands name, and the script's own folder."""
+    commands name, and the script's own folder: a GUIDE_WORK of the test
+    run's own environment does not reach it."""
+    monkeypatch.setenv("GUIDE_WORK", str(tmp_path / "kept"))
     env = stub_env(
         tmp_path,
         containers="my-derbynet",
@@ -771,6 +781,7 @@ def test_names_that_only_contain_a_guide_name_pass_and_the_cleanup_runs(tmp_path
     assert "ps -aq --filter name=^guide-" in logged
     assert f"rmi {GHCR_LATEST}" in logged
     assert list((tmp_path / "tmp").iterdir()) == []
+    assert not (tmp_path / "kept").exists()
 
 
 def test_a_stop_signal_mid_stage_exits_143_after_the_cleanup(tmp_path):
