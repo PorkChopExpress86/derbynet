@@ -25,6 +25,7 @@ from ui.tests.browser.conftest import (
     close_tab,
     shoot,
 )
+from ui.tests.browser.tab_closing import after_the_stop, at_the_server
 from ui.tests.race import race_setup, scheduled
 
 # Each frame records the messages posted to it, so a test can read what the
@@ -550,6 +551,44 @@ def test_closing_the_camera_tab_waits_for_its_post(login, event):
     assert held
     held[0].continue_()
     close_tab(page, camera)
+
+
+# The camera posts an ICE candidate through its own `post_action`, and posts
+# it again on each reply, as its message handlers post on no timer.
+POST_ON_EACH_REPLY = """() => {
+  const post = (left) => post_action({action: 'message.send', message: {
+      recipient: 'viewer-409', type: 'ice-candidate', from: 'camera-replay'}})
+    .catch(() => {})
+    .then(() => left && post(left - 1));
+  post(2);
+}"""
+
+
+def is_a_post_to_action_php(environ):
+    return environ["REQUEST_METHOD"] == "POST" and environ["PATH_INFO"] == "/action.php"
+
+
+def test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop(login, event):
+    """The camera's WebRTC callbacks post `message.send` on no timer, an ICE
+    candidate or a renegotiation offer, so a POST can leave in the task
+    after `close_tab` stops the tab's timers, and another on its reply. Its
+    `request` event then reached Python inside `tab.close()`, with the POST
+    out, and the harness failed the test (#409). Here the camera posts in
+    that task, and again on each reply. When `close_tab` returns, the
+    server has no POST in hand, and none arrives after."""
+    page = login("RaceCoordinator")
+    desktop_only(page)
+    camera = page.context.new_page()
+    camera.goto("/replay/camera/")
+    expect(camera.locator("[data-stream-size]")).to_have_text(re.compile(r" × "))
+    sent = []
+    camera.on("request", lambda r: sent.append(r.post_data or ""))
+    after_the_stop(camera, POST_ON_EACH_REPLY)
+    with at_the_server(is_a_post_to_action_php) as server:
+        close_tab(page, camera)
+        assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+    assert [body for body in sent if "viewer-409" in body]
 
 
 def test_a_message_sent_before_the_websocket_opens_is_sent_once_it_does(login, event):

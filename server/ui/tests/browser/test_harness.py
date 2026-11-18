@@ -17,6 +17,7 @@ from ui.tests.browser.conftest import (
     close_tab,
     font_config,
 )
+from ui.tests.browser.tab_closing import at_the_server
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -115,6 +116,36 @@ def test_close_tab_waits_for_the_request_out(page, event):
         tab.wait_for_timeout(20)
     held[0].fulfill(status=204)
     close_tab(page, tab)
+    assert page.in_flight.closed_with == []
+
+
+def test_close_tab_closes_a_tab_that_keeps_sending(page, event):
+    """A reply's handler can send again on no timer, so a tab that does so
+    always has a request out, and waiting until it has none never ends.
+    `close_tab` has Chromium block every request the tab sends once it has
+    stopped the timers, waits for the server's reply to the ones sent
+    before, and names none of them (#409). When it returns, the server has
+    no request of the tab in hand, and none arrives after."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    with at_the_server(lambda environ: environ["QUERY_STRING"] == "again") as server:
+        with tab.expect_event(
+            "requestfinished", lambda r: r.url.endswith("/login/?again")
+        ):
+            tab.evaluate(
+                "() => { const go = () => fetch('/login/?again').finally(go); go(); }"
+            )
+        close_tab(page, tab)
+        assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+
+
+def test_close_tab_closes_a_tab_that_never_loaded(page, event):
+    """A tab still on `about:blank` has no server to send to, so `close_tab`
+    sends it no barrier, which would never end."""
+    page.goto("/login/")
+    close_tab(page, page.context.new_page())
     assert page.in_flight.closed_with == []
 
 
