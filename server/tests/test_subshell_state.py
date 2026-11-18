@@ -9,18 +9,21 @@ the subshell, so `cleanup` took no Compose project down and a
 
 A function records state when, outside a quoted string and outside a
 subshell of its own, it appends to a variable it has not declared `local`,
-sets a trap, assigns a global that code outside it reads before setting, or
-calls a function that does. A function that prints its result for `$(...)`
+sets a trap, assigns a global that some code, itself included, reads
+before setting it, or calls a function that does. A function that prints its result for `$(...)`
 takes its state from its caller instead, or the caller runs it bare and
 reads the global it sets, as checks.sh's compose_up now does.
 
 The rule reads the script's text, not a bash parse: a function read across
 files is found only through a `source` or `.` line naming a .sh file by its
-basename, and a call is a name in command position.
+basename, a call is a name in command position, and a read is a `$NAME`
+or `${NAME`, not a bare name inside `$(( ))`.
 """
 
 import re
 from pathlib import Path
+
+import pytest
 
 from tests.test_pipefail_pipes import ROOT, logical_lines, shell_files
 
@@ -74,12 +77,12 @@ def locals_of(body: str) -> set[str]:
     return names
 
 
-def records(body: str, read_elsewhere: set[str]) -> list[str]:
+def records(body: str, read_first: set[str]) -> list[str]:
     """What the body changes in its caller's shell, in order: each append to
     a global (`NAME+=`, `NAME[i]=`), each trap it sets, and each global it
-    assigns that code elsewhere reads (`read_elsewhere`). A global set and
-    read only inside functions that each set it first, such as common.sh's
-    OK, is scratch, and a subshell loses nothing by it."""
+    assigns that some code reads before setting it (`read_first`). A global
+    set and then read only inside functions that each set it first, such as
+    common.sh's OK, is scratch, and a subshell loses nothing by it."""
     local = locals_of(body)
     out = []
     for line in _code(unquoted(body)):
@@ -87,7 +90,7 @@ def records(body: str, read_elsewhere: set[str]) -> list[str]:
         for m in ASSIGNMENT.finditer(line):
             name = m.group(1)
             append = line[m.end() - 2] in "+]"
-            if name not in local and (append or name in read_elsewhere):
+            if name not in local and (append or name in read_first):
                 out.append(f"{name}{'+=' if append else '='}")
         if TRAP.search(line):
             out.append("trap")
@@ -142,11 +145,11 @@ def readers(chunk: str) -> set[str]:
     initialisation (`NAME=""`, `NAME=()`) counts as no assignment."""
     assigned, read = set(), set()
     for line in _code(unquoted(chunk)):
-        read |= {n for n in READ.findall(line) if n not in assigned}
-        code = _drop_substitutions(line)
-        for m in ASSIGNMENT.finditer(code):
-            if re.match(r"[^\s;]*", code[m.end() :]).group() not in EMPTY:
-                assigned.add(m.group(1))
+        for command in re.split(r"[;&|]+", _drop_substitutions(line)):
+            read |= {n for n in READ.findall(command) if n not in assigned}
+            for m in ASSIGNMENT.finditer(command.strip()):
+                if re.match(r"\S*", command.strip()[m.end() :]).group() not in EMPTY:
+                    assigned.add(m.group(1))
     return read
 
 
@@ -165,9 +168,7 @@ def _drop_substitutions(line: str) -> str:
     i = 0
     while i < len(line):
         c = line[i]
-        if c == "(" and (
-            depth or (i and line[i - 1] == "$") or _subshell_paren(line, i)
-        ):
+        if c == "(" and (depth or line[i - 1 : i] == "$" or _subshell_paren(line, i)):
             depth += 1
         elif c == ")" and depth:
             depth -= 1
@@ -194,10 +195,6 @@ def substitutions(line: str) -> list[str]:
     found, stack = [], []
     i = 0
     while i < len(line):
-        if line.startswith("$((", i):
-            stack.append(None)
-            i += 3
-            continue
         if line.startswith("$(", i):
             stack.append(i + 2)
             i += 2
@@ -234,12 +231,10 @@ def calls(text: str, name: str) -> bool:
 def recorders(text: str, defs: dict[str, tuple[int, str]]) -> dict[str, list[str]]:
     """Each function that records state, directly or through a function it
     calls in its own shell, with what it records."""
-    reads = {name: readers(body) for name, (_, body) in defs.items()}
-    outside = readers(top_level(text, defs))
-    found = {}
-    for name, (_, body) in defs.items():
-        elsewhere = outside.union(*(r for other, r in reads.items() if other != name))
-        found[name] = records(body, elsewhere)
+    read_first = readers(top_level(text, defs)).union(
+        *(readers(body) for _, body in defs.values())
+    )
+    found = {name: records(body, read_first) for name, (_, body) in defs.items()}
     found = {name: r for name, r in found.items() if r}
     changed = True
     while changed:
@@ -265,8 +260,6 @@ def offenders_in(
     record = recorders(text, defs)
     out = []
     for n, line in logical_lines(text):
-        if DEFINITION.match(line):
-            continue
         places = substitutions(line) + pipeline_members(line)
         for name, what in record.items():
             if any(calls(place, name) for place in places):
@@ -278,7 +271,7 @@ def sourced_definitions(path: Path, text: str, by_name: dict[str, Path]) -> dict
     defs = {}
     for name in SOURCE.findall(text):
         lib = by_name.get(name)
-        if lib is not None and lib != path:
+        if lib is not None:
             defs.update(functions(lib.read_text(encoding="utf-8", errors="replace")))
     defs.update(functions(text))
     return defs
@@ -453,3 +446,97 @@ def test_a_function_from_a_sourced_library_is_read(tmp_path):
     text = 'source "$(dirname "$0")/common.sh"\nid="$(remember x)"\n'
     defs = sourced_definitions(script, text, {"common.sh": lib})
     assert offenders_in(text, defs) == [(2, "remember", ["SEEN+="])]
+
+
+def test_the_sweep_reads_each_shell_file_and_its_library(tmp_path, monkeypatch):
+    import tests.test_subshell_state as module
+
+    (tmp_path / "lib.sh").write_text('remember() { SEEN+=("$1"); }\n')
+    (tmp_path / "a.sh").write_text('. "$(dirname "$0")/lib.sh"\nid="$(remember x)"\n')
+    (tmp_path / "b.sh").write_text("source missing.sh\nid=$(other)\n")
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "shell_files", lambda: sorted(tmp_path.glob("*.sh")))
+    assert module.offenders() == ["a.sh:2: remember sets SEEN+="]
+
+
+@pytest.mark.parametrize(
+    ("text", "blanked"),
+    [
+        ("awk '{on=1}' f", "awk '      ' f"),
+        ('"x=$V y"', '"  $V  "'),
+        ('"$(curl -d "a=1")"', '"$(curl -d "   ")"'),
+        ("'$V'", "'  '"),
+        ('"a\\"b=1"', '"      "'),
+        ("x\\'y=1", "x\\'y=1"),
+        ("'a\\' b=1", "'  ' b=1"),
+        ("'a\nb'", "' \n '"),
+        ('$(echo ")") c=1', '$(echo " ") c=1'),
+    ],
+)
+def test_unquoted_blanks_what_quotes_hold(text, blanked):
+    assert unquoted(text) == blanked
+
+
+@pytest.mark.parametrize(
+    ("line", "left"),
+    [
+        ("a=$(f x) b", "a=$ b"),
+        ("x=(1 2); y=1", "x=(1 2); y=1"),
+        ("( X=1 ); Y=2", "; Y=2"),
+        ("true && ( A=1 )", "true && "),
+        ("a || ( A=1 )", "a || "),
+        ("a | ( A=1 )", "a | "),
+        ("then ( A=1 )", "then "),
+        ("do ( A=1 )", "do "),
+        ("else ( A=1 )", "else "),
+        ("( ( A=1 ) B=2 ) C=3", " C=3"),
+        ("f() { :; }", "f() { :; }"),
+        ("$(a (b) c)d", "$d"),
+    ],
+)
+def test_drop_substitutions_takes_out_each_subshell(line, left):
+    assert _drop_substitutions(line) == left
+
+
+@pytest.mark.parametrize(
+    ("line", "found"),
+    [
+        ('a "$(f x)" b', ["f x"]),
+        ('$(f "$(g)")', ["g", 'f "$(g)"']),
+        ("$(f (x) y)", ["f (x) y"]),
+        ("a `g y`", ["g y"]),
+        ("echo (x)", []),
+    ],
+)
+def test_substitutions_finds_each_command_substitution(line, found):
+    assert substitutions(line) == found
+
+
+@pytest.mark.parametrize(
+    ("chunk", "read"),
+    [
+        ('echo "$A"; A=1', {"A"}),
+        ('B=1; echo "$B"', set()),
+        ('C=""\necho "$C"', {"C"}),
+        ("D=()\necho ${D[@]}", {"D"}),
+        ("E=''\necho $E", {"E"}),
+        ("F=\necho $F", {"F"}),
+        ("G=$(x)\necho $G", set()),
+        ("echo '$H'", set()),
+    ],
+)
+def test_readers_are_the_names_read_before_set(chunk, read):
+    assert readers(chunk) == read
+
+
+def test_a_local_is_no_record_though_read_elsewhere():
+    text = 'f() {\n    local v\n    v=1\n    printf %s "$v"\n}\nx="$(f)"\necho "$v"\n'
+    assert offenders_in(text, functions(text)) == []
+    unlocal = text.replace("    local v\n", "")
+    assert offenders_in(unlocal, functions(unlocal)) == [(5, "f", ["v="])]
+
+
+def test_a_global_only_its_own_function_reads_first_is_a_record():
+    """A log it adds to: its next call reads the value the subshell lost."""
+    text = 'note() {\n    NOTES="$NOTES $1"\n}\nn=$(note a)\n'
+    assert offenders_in(text, functions(text)) == [(4, "note", ["NOTES="])]
