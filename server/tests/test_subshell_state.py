@@ -543,3 +543,8 @@ def test_a_global_only_its_own_function_reads_first_is_a_record():
     """A log it adds to: its next call reads the value the subshell lost."""
     text = 'note() {\n    NOTES="$NOTES $1"\n}\nn=$(note a)\n'
     assert offenders_in(text, functions(text)) == [(4, "note", ["NOTES="])]
+
+
+def test_pipeline_members_are_every_command_the_last_one_too():
+    assert pipeline_members("a | b c && d; e | f") == ["a ", " b c ", " e ", " f"]
+    assert pipeline_members("a || b") == []
