@@ -104,12 +104,15 @@ class RejectedWorkflows(unittest.TestCase):
         self.assertEqual(done.stdout, REJECTED_LINE + '\n', done.stderr)
 
     def test_a_run_with_no_job_that_did_not_fail_is_not_named(self):
-        """A cancelled run, and one still queued, have no job yet either."""
+        """Cancelled, still queued, or passed, with the job count of the
+        rejected run: none."""
+        results = []
         for status, conclusion in (('completed', 'cancelled'), ('queued', None),
                                    ('completed', 'success')):
-            with self.subTest(status=status, conclusion=conclusion):
-                done = self.rejected([run(status, conclusion)])
-                self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
+            done = self.rejected([run(status, conclusion)])
+            results.append((status, conclusion, done.returncode, done.stdout))
+        self.assertEqual(results, [('completed', 'cancelled', 0, ''), ('queued', None, 0, ''),
+                                   ('completed', 'success', 0, '')])
 
     def test_no_run_names_nothing(self):
         done = self.rejected([])
