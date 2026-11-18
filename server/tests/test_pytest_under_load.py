@@ -22,15 +22,10 @@ SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
 
 # The argv prefix start() and hold() start a script through: it puts TERM,
 # INT and HUP, the signals the scripts trap, back to their default, with the
-# two Python ignores (PIPE, XFSZ), then execs the command in the same pid.  A
-# non-interactive bash gives a command it starts with `&` SIGINT ignored, as
-# pytest-under-load.sh and hold-load-lock.sh start theirs, so a pytest under
-# either ignored SIGINT, and so did the scripts it started; bash cannot trap
-# a signal ignored when it starts, so an INT never reached their traps (#407,
-# test_a_command_the_scripts_start_ignores_sigint,
-# test_a_signal_reaches_the_trap_though_pytest_ignores_it).  conftest.py now
-# puts INT and QUIT back in every server/ pytest (tests/test_signals_at_default.py);
-# the prefix stays for the TERM, INT or HUP a test here ignores itself.
+# two Python ignores (PIPE, XFSZ), then execs the command in the same pid.
+# conftest.py puts INT and QUIT back for pytest itself (#407,
+# tests/test_signals_at_default.py); the prefix stays for the TERM, INT or
+# HUP a test here ignores itself.
 RESET_NAMES = ("SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ")
 RESET_SIGNALS_ARGV = (
     sys.executable,

@@ -10,7 +10,6 @@ conftest.py resets both, so a test's commands get them as from a terminal.
 """
 
 import os
-import re
 import signal
 import subprocess
 import sys
@@ -18,17 +17,16 @@ from pathlib import Path
 
 import pytest
 
+from tests.test_pytest_under_load import ignored_in
+
 SERVER = Path(__file__).resolve().parents[1]
 PROBE = "DERBYNET_SIGNAL_PROBE"
 
 
-def ignored_in(status):
-    mask = int(re.search(r"^SigIgn:\s*([0-9a-f]+)$", status, re.M).group(1), 16)
-    return {s.name for s in signal.Signals if mask >> (s.value - 1) & 1}
-
-
 @pytest.mark.skipif(not os.environ.get(PROBE), reason="run by the test below")
 def test_probe_writes_what_a_command_it_starts_ignores():
+    assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+    assert signal.getsignal(signal.SIGQUIT) is signal.SIG_DFL
     status = subprocess.run(
         ["cat", "/proc/self/status"], capture_output=True, text=True, check=True
     ).stdout
@@ -53,8 +51,7 @@ def test_a_command_a_background_pytest_starts_gets_int_and_quit(tmp_path, worker
     # The job's own mask, then pytest as a job of the same shell.
     script = f"cat /proc/self/status >'{tmp_path}/job' & wait; {pytest_argv} & wait $!"
     env = {**os.environ, PROBE: str(out)}
-    # The nested pytest took 10 to 17 s here at a load average near 25; 240 s
-    # leaves CI's smaller runners over ten times that.
+    # A bound for a hung nested run, not a measure of one.
     run = subprocess.run(
         ["bash", "-c", script],
         cwd=SERVER / "tests",
