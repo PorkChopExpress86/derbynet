@@ -2,7 +2,10 @@
 
 Run: python3 -I -m unittest discover -s plan/tests
 """
+import importlib.machinery
+import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -14,6 +17,38 @@ from pathlib import Path
 import k_patterns  # noqa: F401  a -k that matches no test is refused
 
 PR_EVIDENCE = Path(__file__).resolve().parent.parent / 'bin' / 'pr-evidence'
+LINT_ISSUES = Path(__file__).resolve().parent.parent / 'lint-issues.py'
+
+
+def load_tool():
+    """plan/bin/pr-evidence as a module, so the checks that take text run in
+    process (the pre-push hook runs these tests)."""
+    loader = importlib.machinery.SourceFileLoader('pr_evidence_tool', str(PR_EVIDENCE))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+TOOL = load_tool()
+
+# #399's body draft as the implementer wrote it (2026-11-18 04:16, before
+# the lead's edit), cut to the lines the checks read.
+DRAFT_399 = textwrap.dedent('''\
+    Closes #399.
+
+    ## Evidence
+
+    - The script passes 25 runs in a row after the fix: all 25 pass at 8726c4ef, the head that holds this body. The loop's output:
+
+      ```
+      LOOP-OUTPUT
+      ```
+
+    ## Still open
+
+    - Why the jar was quiet for about 150 s at its start in run 44181424925.
+    ''')
 
 # #61's boxes as the PR found them, one asking for nothing in the PR, one
 # ticked by an earlier PR, and a Scope line.
@@ -129,6 +164,70 @@ class PrEvidence(unittest.TestCase):
         done = self.run_tool('--body', 'x.md')
         self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
         self.assertNotEqual(done.returncode, 0)
+
+
+class ClosesWhileOpen(unittest.TestCase):
+    def test_399s_draft_closes_its_issue_above_its_still_open(self):
+        self.assertEqual(TOOL.closes_while_open(DRAFT_399), ['399'])
+
+    def test_part_of_or_an_empty_still_open_passes(self):
+        part_of = DRAFT_399.replace('Closes #399.', 'Part of #399.')
+        self.assertEqual(TOOL.closes_while_open(part_of), [])
+        # #380's body: "None." under the heading lists no item.
+        none = DRAFT_399.split('## Still open')[0] + '## Still open\n\nNone. Q36 is D127.\n'
+        self.assertEqual(TOOL.closes_while_open(none), [])
+        later = DRAFT_399.replace('## Still open', '## Left for later')
+        self.assertEqual(TOOL.closes_while_open(later), [])
+
+    def test_the_section_ends_at_the_next_heading(self):
+        body = ('Fixes #12 and resolves: #7\n\n## Still open\n\n## Evidence\n\n'
+                '- a: b\n\n## Still open\n\n- c\n')
+        self.assertEqual(TOOL.closes_while_open(body), ['7', '12'])
+        self.assertEqual(TOOL.closes_while_open(body.rsplit('## Still open', 1)[0]), [])
+
+    def test_closing_reads_as_lint_issues_reads_it(self):
+        text = LINT_ISSUES.read_text()
+        found = re.search(r"^CLOSING = re\.compile\((r'.*'), re\.I\)$", text, re.M)
+        self.assertIsNotNone(found)
+        self.assertEqual(TOOL.CLOSING.pattern, eval(found[1]))
+        self.assertEqual(TOOL.CLOSING.flags & re.I, re.I)
+
+
+class Placeholders(unittest.TestCase):
+    def test_399s_loop_output_is_found(self):
+        self.assertEqual(TOOL.placeholders(DRAFT_399), ['line 8: LOOP-OUTPUT'])
+
+    def test_each_placeholder_shape_from_the_drafts_is_found(self):
+        # From the #369, #383, #391 and #399 drafts.
+        for token in ('PROBE-PENDING', 'HANDOFF_RUNS', 'LOAD_RUN_PENDING', 'PUSH-RESULT',
+                      'MUTANT_TABLE', 'CASES-OUTPUT', 'LISTED_RESULT', 'X-RESULTS',
+                      'HANDOFF-TODO', 'NOTES_TBD'):
+            with self.subTest(token=token):
+                self.assertEqual(TOOL.placeholders(f'| R13 | none | ({token}). |'),
+                                 [f'line 1: {token}'])
+
+    def test_code_names_and_inline_code_pass(self):
+        # From merged bodies: #355's OUTPUT_CURL, #185's MAX_RUNS_PER_LANE,
+        # #377's VIEW_RACE_RESULTS_PERMISSION, #333's HEAD_SHA.
+        body = ('OUTPUT_CURL and MAX_RUNS_PER_LANE, VIEW_RACE_RESULTS_PERMISSION, HEAD_SHA,\n'
+                '`X_RESULT` in code, $LOOP_OUTPUT, ${HANDOFF_RUNS}, path/LOOP-OUTPUT,\n'
+                'LOOP-OUTPUTS, TABLE, OUTPUT, LOOP-OUTPUT.txt, X_PENDING()\n')
+        self.assertEqual(TOOL.placeholders(body), [])
+
+
+class CheckRefuses(PrEvidence):
+    def test_399s_draft_is_refused_for_both(self):
+        done = self.check(evidence(KEYS) + '\n' + DRAFT_399)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [
+            'the body closes #399 and its "## Still open" section lists an item: write '
+            '"Part of #399", or move a limit that leaves no box open to "## Left for later"',
+            'unfilled placeholder, line 17: LOOP-OUTPUT'])
+
+    def test_the_draft_as_the_lead_fixed_it_passes(self):
+        fixed = DRAFT_399.replace('Closes', 'Part of').replace('LOOP-OUTPUT', '25 of 25 ok')
+        done = self.check(evidence(KEYS) + '\n' + fixed)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
 
 if __name__ == '__main__':

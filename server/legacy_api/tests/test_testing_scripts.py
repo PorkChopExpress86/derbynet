@@ -220,3 +220,143 @@ def test_a_request_line_the_gate_cannot_parse_is_found(tmp_path):
     assert unparsed_requests(script) == [
         "x.sh:1: curl_text checkin/racer/x/voting-code/"
     ]
+
+
+# The scripts CI runs against Django, as `bash testing/<name>` in a workflow.
+WORKFLOWS = TESTING.parent / ".github" / "workflows"
+CI_RUN = re.compile(r"^[^#\n]*\bbash testing/([A-Za-z0-9._-]+)", re.MULTILINE)
+
+
+def ci_scripts() -> list[Path]:
+    names = {
+        found[1]
+        for workflow in sorted(WORKFLOWS.glob("*.yml"))
+        for found in CI_RUN.finditer(workflow.read_text(encoding="utf-8"))
+    }
+    return [path for path in SCRIPTS if path.name in names]
+
+
+# A wait or a bound: a literal sleep, timeout or curl --max-time, or a
+# variable named for a bound.
+WAIT = re.compile(
+    r"\bsleep\s+[0-9.]+|\btimeout\s+(?:-\S+\s+)*[0-9.]+|--max-time\s+[0-9.]+"
+    r"|^\s*(?:export\s+)?\w*(?:SECONDS|AFTER|TIMEOUT|DELAY)=",
+    re.IGNORECASE,
+)
+# A source: a measurement with its unit ("the 5 s a heat takes", "250 ms"),
+# a ticket, an owner decision, or a file ("playlist.inc:157").
+SOURCE = re.compile(
+    r"\b[0-9.]+ ?(?:ms|s|seconds?|min|minutes?)\b|#\d+\b|\bD\d+\b"
+    r"|\w\.(?:java|py|php|inc|js|sh|yml)\b"
+)
+BOUND_DEFAULT = re.compile(r"^\s*(\w+)=\$\{\1:-[0-9.]+\}", re.MULTILINE)
+
+
+def unsourced_waits(text: str) -> list[str]:
+    """Each wait or bound whose comment names no source: the comment on its
+    line, the comment block right above it, or a comment in the three lines
+    above it."""
+    lines = text.splitlines()
+    found = []
+    for n, line in enumerate(lines):
+        if line.lstrip().startswith("#"):
+            continue
+        code, _, trailing = line.partition(" #")
+        if not WAIT.search(code):
+            continue
+        notes = [trailing]
+        above = n - 1
+        while above >= 0 and lines[above].lstrip().startswith("#"):
+            notes.append(lines[above])
+            above -= 1
+        notes += [
+            prev for prev in lines[max(0, n - 3) : n] if prev.lstrip().startswith("#")
+        ]
+        if not any(SOURCE.search(note) for note in notes):
+            found.append(f"{n + 1}: {line.strip()}")
+    return found
+
+
+def uncased_bounds(script: Path) -> list[str]:
+    """Each bound the script lets its caller set (`NAME=${NAME:-30}`) that
+    no case of its `<script>-cases.sh` sets."""
+    bounds = BOUND_DEFAULT.findall(script.read_text(encoding="utf-8"))
+    cases = script.with_name(f"{script.stem}-cases.sh")
+    text = cases.read_text(encoding="utf-8") if cases.is_file() else ""
+    return [name for name in bounds if not re.search(rf"\b{name}=", text)]
+
+
+def test_the_scan_covers_the_scripts_ci_runs():
+    assert {"race-with-derby-timer.sh", "test-playlist.sh"} <= {
+        path.name for path in ci_scripts()
+    }
+
+
+@pytest.mark.parametrize("script", ci_scripts(), ids=lambda path: path.name)
+def test_every_wait_in_a_script_ci_runs_names_its_source(script):
+    """A bound's comment says where its number comes from (AGENT-BRIEF's
+    Evidence rules). #399's review (round 1, finding 6) found DUMP_AFTER=30
+    with "after this long", and a `sleep 1` and a `sleep 2` with no comment,
+    in the script that gates CI's derby-timer.jar race."""
+    assert unsourced_waits(script.read_text(encoding="utf-8")) == []
+
+
+def test_a_wait_with_no_source_is_found():
+    # The waits #399's review sent back, as 8726c4ef had them, and ones
+    # that pass beside them.
+    text = (
+        "# HEAT_SECONDS bounds each heat: six times the 5 s a heat takes.\n"
+        "HEAT_SECONDS=${HEAT_SECONDS:-30}\n"
+        "# A thread dump after this long, if the timer is not identified yet;\n"
+        "# the wait goes on.\n"
+        "DUMP_AFTER=${DUMP_AFTER:-30}\n"
+        "        kill -QUIT $JAR_PID\n"
+        "        sleep 1\n"
+        '    thread_dump "$1"\n'
+        "    sleep 2\n"
+        "curl --max-time 10 -s $URL\n"
+        "    sleep 0.25  # replay.php polls every 250 ms\n"
+        "# The scene switches 10 s after the round (playlist.inc:157).\n"
+        'echo "Waiting..."\n'
+        "sleep 11\n"
+        "curl --max-time $POLL_SECONDS -s $URL\n"
+        "# See #399.\n"
+        "timeout -k 5 300 java -jar x.jar\n"
+    )
+
+    assert unsourced_waits(text) == [
+        "5: DUMP_AFTER=${DUMP_AFTER:-30}",
+        "7: sleep 1",
+        "9: sleep 2",
+        "10: curl --max-time 10 -s $URL",
+    ]
+
+
+@pytest.mark.parametrize("script", ci_scripts(), ids=lambda path: path.name)
+def test_every_bound_a_caller_can_set_has_a_case(script):
+    """Each `NAME=${NAME:-N}` bound is set by a case of the script's
+    `-cases.sh` beside it, which runs the script with that bound and checks
+    how the run ends. #399's first two heads replaced one bound with two and
+    no case checked them until after the first push: the dump guard and the
+    missing-log path each failed when the cases first ran (#399 retro), and
+    review found that no bound was left for the whole round."""
+    assert uncased_bounds(script) == []
+
+
+def test_a_bound_with_no_case_is_found(tmp_path):
+    script = tmp_path / "race.sh"
+    script.write_text(
+        "IDENTIFY_SECONDS=${IDENTIFY_SECONDS:-300}\n"
+        "  RACE_SECONDS=${RACE_SECONDS:-180}\n"
+        "POLL_SECONDS=10\n"
+        "OTHER=${HEAT_SECONDS:-30}\n"
+    )
+
+    assert uncased_bounds(script) == ["IDENTIFY_SECONDS", "RACE_SECONDS"]
+
+    (tmp_path / "race-cases.sh").write_text(
+        "identify-1s|IDENTIFY_SECONDS=1|did not complete\n"
+        "race-60s|XRACE_SECONDS=60|did not complete\n"
+    )
+
+    assert uncased_bounds(script) == ["RACE_SECONDS"]
