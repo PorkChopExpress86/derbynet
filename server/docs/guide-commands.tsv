@@ -1,0 +1,116 @@
+# The commands the guides in docs/ tell the user to run (#414), and what runs
+# each one.  tools/guide_commands.py reads this table, tests/test_guide_commands.py
+# fails a command with no row and a row with no command, and
+# tools/source-checks.sh runs that test.
+#
+# Columns, separated by one tab:
+#   guide      the file in docs/
+#   heading    the nearest heading above the command
+#   turn       1, or 2 for the second command with this text under this heading
+#   command    one line of the block (a construct over several lines is one
+#              command: a newline is written \n, a backslash \\)
+#   entry      one of
+#              stage NAME        a stage of server/docker/ci/guide-commands.sh,
+#                                which takes the command from the guide and runs
+#                                it as written; a workflow step runs the stage
+#              workflow FILE     a live `run:` step of .github/workflows/FILE
+#                                holds the command as one of its lines
+#              reason TEXT       why no check can run it
+database.md	Postgres	1	docker compose --profile postgres up -d	stage postgres
+database.md	A whole event with its photos	1	docker cp /path/to/pack42 derbynet:/tmp/pack42	reason `/path/to/pack42` is the reader's own folder of an older DerbyNet's database; stage import-plain copies a folder it makes from transfer/tests/fixtures/legacy the same way, then runs the next command as written
+database.md	A whole event with its photos	1	docker exec -u derbynet derbynet python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"	stage import-plain
+database.md	A whole event with its photos	1	docker compose cp /path/to/pack42 server:/tmp/pack42	reason `/path/to/pack42` is the reader's own folder of an older DerbyNet's database; stage import-compose copies a folder it makes from transfer/tests/fixtures/legacy the same way, then runs the next command as written
+database.md	A whole event with its photos	1	docker compose exec -u derbynet server python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"	stage import-compose
+developer-guide.md	Set up	1	uv sync	stage dev-setup
+developer-guide.md	Set up	1	uv run python manage.py migrate	stage dev-setup
+developer-guide.md	Set up	1	uv run python manage.py runserver	reason starts the development server in the foreground and never returns; the shell-suite block below runs it with `&` (stage dev-shell-suite)
+developer-guide.md	Run the tests	1	uv run pytest -n auto	reason runs the whole suite; in its place server.yml's pytest job runs `uv run pytest -v -rs -n auto`, and its legacy-api job `uv run pytest -v -rs -n auto legacy_api`
+developer-guide.md	Run the tests	1	uv run ruff check	workflow server.yml
+developer-guide.md	Run the tests	1	uv run ruff format --check	workflow server.yml
+developer-guide.md	Run the tests	1	uv run python manage.py makemigrations --check --dry-run	workflow server.yml
+developer-guide.md	The browser tests	1	uv run playwright install chromium	stage dev-browser
+developer-guide.md	The browser tests	1	uv run pytest -m browser ui	reason runs the whole browser suite; in its place server.yml's ui job runs `uv run pytest -v -rs -n auto -m browser ui`
+developer-guide.md	Run the shell suite against Django	1	cd server	stage dev-shell-suite
+developer-guide.md	Run the shell suite against Django	1	export DERBYNET_ENABLE_TEST_ENDPOINTS=1	stage dev-shell-suite
+developer-guide.md	Run the shell suite against Django	1	uv run python manage.py migrate	stage dev-shell-suite
+developer-guide.md	Run the shell suite against Django	1	uv run python manage.py create_test_event	stage dev-shell-suite
+developer-guide.md	Run the shell suite against Django	1	uv run python manage.py runserver 127.0.0.1:8000 &	stage dev-shell-suite
+developer-guide.md	Run the shell suite against Django	1	../testing/reset-database.sh http://127.0.0.1:8000	stage dev-shell-suite
+install-docker.md	Start DerbyNet	1	echo "DERBYNET_UID=$(id -u)" >> .env	stage compose-env
+install-docker.md	Start DerbyNet	1	echo "DERBYNET_GID=$(id -g)" >> .env	stage compose-env
+install-docker.md	Start DerbyNet	1	echo "DERBYNET_ADDRESS=$(hostname -I | cut -d' ' -f1)" >> .env	stage compose-env
+install-docker.md	Start DerbyNet	1	echo "TZ=America/Chicago" >> .env	stage compose-env
+install-docker.md	Start DerbyNet	1	echo "DERBYNET_ADDRESS=$(ipconfig getifaddr en0)" >> .env	reason the Mac's block: `ipconfig getifaddr en0` exists only on a Mac
+install-docker.md	Start DerbyNet	2	echo "TZ=America/Chicago" >> .env	reason the Mac's block, and a repeat of the Linux block's TZ line, which stage compose-env runs
+install-docker.md	Start DerbyNet	1	docker compose up -d	stage compose-start
+install-docker.md	Plain HTTP with one command	1	docker run -d --name derbynet --restart unless-stopped -p 80:80 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) ghcr.io/porkchopexpress86/derbynet_server	stage plain-http
+install-docker.md	Set the time zone	1	docker rm -f derbynet	stage time-zone
+install-docker.md	Set the time zone	1	docker run -d --name derbynet --restart unless-stopped -p 80:80 -v derbynet:/var/lib/derbynet -e TZ=America/Denver -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) ghcr.io/porkchopexpress86/derbynet_server	stage time-zone
+install-docker.md	Use Postgres instead of SQLite	1	docker compose --profile postgres up -d	stage postgres
+install-docker.md	Nginx Proxy Manager	1	docker run -d --name derbynet --restart unless-stopped -p 8000:80 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) -e DERBYNET_TRUSTED_PROXIES=172.17.0.1 -e DERBYNET_CSRF_TRUSTED_ORIGINS=https://derby.example.org -e DERBYNET_ALLOWED_HOSTS=derby.example.org ghcr.io/porkchopexpress86/derbynet_server	stage proxies
+install-docker.md	Traefik	1	docker run -d --name derbynet --restart unless-stopped --network traefik -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) -e DERBYNET_TRUSTED_PROXIES=172.18.0.0/16 -e DERBYNET_CSRF_TRUSTED_ORIGINS=https://derby.example.org -e DERBYNET_ALLOWED_HOSTS=derby.example.org -l traefik.enable=true -l 'traefik.http.routers.derbynet.rule=Host(`derby.example.org`)' -l traefik.http.routers.derbynet.entrypoints=websecure -l traefik.http.routers.derbynet.tls.certresolver=le -l traefik.http.services.derbynet.loadbalancer.server.port=80 ghcr.io/porkchopexpress86/derbynet_server	stage proxies
+install-docker.md	nginx	1	docker run -d --name derbynet --restart unless-stopped -p 127.0.0.1:8000:80 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) -e DERBYNET_URL_PREFIX=/my-derbynet -e DERBYNET_TRUSTED_PROXIES=172.17.0.1 -e DERBYNET_CSRF_TRUSTED_ORIGINS=https://derby.example.org -e DERBYNET_ALLOWED_HOSTS=derby.example.org ghcr.io/porkchopexpress86/derbynet_server	stage proxies
+install-docker.md	Back up and restore	1	umask 077	stage backup-compose
+install-docker.md	Back up and restore	1	docker compose stop	stage backup-compose
+install-docker.md	Back up and restore	1	docker run --rm -v derbynet_data:/data:ro --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -czf - . > derbynet-data.tgz	stage backup-compose
+install-docker.md	Back up and restore	1	docker run --rm -v derbynet_caddy:/data:ro --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -czf - . > derbynet-caddy.tgz	stage backup-compose
+install-docker.md	Back up and restore	1	docker compose start	stage backup-compose
+install-docker.md	Back up and restore	1	docker compose down --volumes	stage restore
+install-docker.md	Back up and restore	1	docker compose create	stage restore
+install-docker.md	Back up and restore	1	docker run --rm -i -v derbynet_data:/data --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf - < derbynet-data.tgz	stage restore
+install-docker.md	Back up and restore	1	docker run --rm -i -v derbynet_caddy:/data --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf - < derbynet-caddy.tgz	stage restore
+install-docker.md	Back up and restore	1	docker compose up -d	stage restore
+install-docker.md	Back up and restore	2	umask 077	stage backup-plain
+install-docker.md	Back up and restore	1	docker stop derbynet	stage backup-plain
+install-docker.md	Back up and restore	1	docker run --rm -v derbynet:/data:ro --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -czf - . > derbynet-data.tgz	stage backup-plain
+install-docker.md	Back up and restore	1	docker start derbynet	stage backup-plain
+install-docker.md	Back up and restore	1	docker run --rm -v derbynet_data:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-data.tgz	reason PowerShell 7.4 on Windows: no check runs PowerShell, and a Linux runner's `${PWD}` is not Windows'
+install-docker.md	Back up and restore	1	docker run --rm -v derbynet_caddy:/data -v "${PWD}:/backup:ro" --entrypoint tar ghcr.io/porkchopexpress86/derbynet_server -C /data -xzf /backup/derbynet-caddy.tgz	reason PowerShell 7.4 on Windows: no check runs PowerShell, and a Linux runner's `${PWD}` is not Windows'
+install-docker.md	Upgrade	1	docker pull ghcr.io/porkchopexpress86/derbynet_server	reason ghcr.io holds no `latest` of the server image until the first full release (D89), so the pull fails or fetches another image than the one under test
+install-docker.md	Upgrade	1	docker rm -f derbynet	stage upgrade
+install-docker.md	Upgrade	1	docker run -d --name derbynet --restart unless-stopped -p 80:80 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) ghcr.io/porkchopexpress86/derbynet_server	stage upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker stop derbynet	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker compose create	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker run --rm -v derbynet:/from:ro -v derbynet_data:/to --entrypoint cp ghcr.io/porkchopexpress86/derbynet_server -a /from/. /to/	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker rm derbynet	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker compose up -d	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker compose pull	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	2	docker compose up -d	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker compose exec server rm -r /var/lib/derbynet/tls	stage https-upgrade
+install-docker.md	HTTPS after an upgrade from an older image	1	docker compose restart caddy	stage https-upgrade
+live-streaming.md	Take events from derby-timer.jar	1	java -jar derby-timer.jar -obs-uri ws://192.168.0.12:4444 -obs-password secret -obs-finish OBS_KEY_NUM2	reason needs OBS Studio with its WebSocket server at the address named, and a timer
+photo-stand.md	Set up a new photo stand	1	git clone https://github.com/PorkChopExpress86/derbynet.git	reason installs the older, non-container photo stand on a Raspberry Pi or Debian computer: git clone into the home folder of the stand
+photo-stand.md	Set up a new photo stand	1	cd derbynet/extras	reason the older photo stand's install, on a stand computer
+photo-stand.md	Set up a new photo stand	1	sudo mkdir -p /usr/share/derbynet	reason root on the stand computer: the older photo stand's install into /usr/share
+photo-stand.md	Set up a new photo stand	1	sudo cp -r autostart conf scripts sounds tools /usr/share/derbynet/	reason root on the stand computer: the older photo stand's install into /usr/share
+photo-stand.md	Set up a new photo stand	1	sudo cp derbynet.conf /etc/derbynet.conf	reason root on the stand computer: the older photo stand's install into /etc
+photo-stand.md	Set up a new photo stand	1	mkdir -p ~/.config/autostart	reason needs the stand computer's desktop session, which reads ~/.config/autostart
+photo-stand.md	Set up a new photo stand	1	cp /usr/share/derbynet/autostart/photostand.desktop ~/.config/autostart/	reason needs the stand computer's desktop session, which reads ~/.config/autostart
+photo-stand.md	Point it at the server	1	unset prepare_camera_before_shot	reason text for /etc/derbynet.conf, which photostand.sh sources on the stand computer; no check reads this block
+photo-stand.md	Point it at the server	1	prepare_camera_before_shot() {\n  chdkptp -c -e"rec" -e"luar set_zoom(40)"\n}	reason text for /etc/derbynet.conf, which photostand.sh sources on the stand computer; no check reads this block
+pi-setup.md	Install Docker on the Pi	1	curl -fsSL https://get.docker.com | sudo sh	reason root on a Raspberry Pi: the install script is not run by any check (#59's probe ran it once, by hand, in a Debian arm64 container)
+pi-setup.md	Install Docker on the Pi	1	sudo usermod -aG docker $USER	reason root on a Raspberry Pi: no check adds a user to the docker group
+pi-setup.md	Set up the timer	1	mkdir -p ~/derbynet-timer && cd ~/derbynet-timer	stage pi-timer-folder
+pi-setup.md	Set up the timer	1	curl -fsSLO https://raw.githubusercontent.com/PorkChopExpress86/derbynet/master/extras/docker/compose.timer.yaml	stage pi-timer-folder
+pi-setup.md	Set up the timer	1	ls -l /dev/serial/by-id/	reason needs the timer's USB serial cable plugged into the Pi
+pi-setup.md	Set up the timer	1	DERBYNET_SERVER='http://192.168.1.20'	stage pi-timer-env
+pi-setup.md	Set up the timer	1	DERBYNET_TIMER_DEVICE='/dev/ttyUSB0'	stage pi-timer-env
+pi-setup.md	Set up the timer	1	docker compose -f compose.timer.yaml up -d	stage pi-timer
+pi-setup.md	Set up the timer	1	docker compose -f compose.timer.yaml logs -f	reason follows the log until Ctrl-C; stage pi-timer reads the same log with `docker compose logs`
+pi-setup.md	Set up the photo stand	1	mkdir -p ~/derbynet-photostand && cd ~/derbynet-photostand	stage pi-photostand-folder
+pi-setup.md	Set up the photo stand	1	curl -fsSLO https://raw.githubusercontent.com/PorkChopExpress86/derbynet/master/extras/docker/compose.photostand.yaml	stage pi-photostand-folder
+pi-setup.md	Set up the photo stand	1	ls /dev/input/by-id/	reason needs the barcode scanner plugged into the Pi
+pi-setup.md	Set up the photo stand	1	DERBYNET_SERVER='http://192.168.1.20'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	PHOTO_CAPTURE='gphoto2'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	PHOTO_REPO='head'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	PHOTO_CHECKIN='1'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	BARCODE_SCANNER_DEVS='usb-Your_Scanner_Name-event-kbd'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml up -d	stage pi-photostand
+pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml logs -f	reason follows the log until Ctrl-C; stage pi-photostand reads the same log with `docker compose -f compose.photostand.yaml logs`
+pi-setup.md	Cameras	1	systemctl --user stop gvfs-daemon	reason needs the Pi desktop's user session, whose gvfs-daemon holds the camera
+pi-setup.md	Cameras	1	systemctl --user mask gvfs-daemon	reason needs the Pi desktop's user session, whose gvfs-daemon holds the camera
+pi-setup.md	Update	1	docker compose -f compose.timer.yaml pull	stage pi-timer-update
+pi-setup.md	Update	1	docker compose -f compose.timer.yaml up -d	stage pi-timer-update
+timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x http://localhost/	reason needs derby-timer.jar and a timer on a serial port; the jar is built by the timer image (extras/docker/timer.Dockerfile), whose checks run it with -simulate-timer
+timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -n /dev/ttyUSB0 -d FastTrackPSeries http://localhost/	reason needs derby-timer.jar and a timer on /dev/ttyUSB0
+timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -simulate-timer -lanes 4 http://localhost/	reason needs derby-timer.jar, built by the timer image (extras/docker/timer.Dockerfile); in its place pi-images.yml's checks (arm64) job runs `extras/docker/ci/checks.sh timer`, the image's jar with `-t -r -simulate-timer -lanes 4 -pace 1` against a server

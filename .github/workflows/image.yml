@@ -416,6 +416,40 @@ jobs:
           OLD_IMAGE: derbynet_server:previous
         run: server/docker/ci/checks.sh upgrade
 
+  # The commands docs/install-docker.md and docs/database.md tell the user to
+  # run, as the guides write them (#414): server/docker/ci/guide-commands.sh
+  # takes them from the guides through server/docs/guide-commands.tsv, which
+  # also lists each command no check can run, with the reason.  The runner is
+  # a fresh machine, which the script needs: the guides' names (derbynet,
+  # derbynet_data, port 80) carry no prefix.
+  guide:
+    name: guide commands (amd64)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - name: Load the amd64 image the build job made
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 \
+            "oci-archive:$RUNNER_TEMP/image.tar" "docker-daemon:$IMAGE"
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: The install and database guides' commands, run as written
+        run: >-
+          server/docker/ci/guide-commands.sh compose-env compose-start
+          postgres backup-compose restore plain-http time-zone backup-plain
+          upgrade https-upgrade proxies import-plain import-compose
+
   phone:
     name: phone check (Chromium 390x844 over HTTPS)
     needs: build

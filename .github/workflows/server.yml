@@ -25,6 +25,9 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
+      # The developer guide's shell suite (guide-commands.sh dev-shell-suite).
+      - testing/reset-database.sh
+      - testing/common.sh
       - .github/workflows/server.yml
   pull_request:
     paths:
@@ -41,6 +44,9 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
+      # The developer guide's shell suite (guide-commands.sh dev-shell-suite).
+      - testing/reset-database.sh
+      - testing/common.sh
       - .github/workflows/server.yml
   workflow_dispatch:
 
@@ -84,6 +90,26 @@ jobs:
 
       - name: Check the browser timer template matches templates/timer.html
         run: uv run python manage.py build_timer --check
+
+  # docs/developer-guide.md's commands, as written (#414), by
+  # server/docker/ci/guide-commands.sh from server/docs/guide-commands.tsv.
+  # The browser install downloads Playwright's Chromium; the shell-suite
+  # block starts a development server on port 8000 and runs
+  # testing/reset-database.sh against it.
+  guide:
+    name: guide commands
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: The developer guide's setup, browser and shell-suite commands, run as written
+        working-directory: .
+        run: server/docker/ci/guide-commands.sh dev-setup dev-browser dev-shell-suite
 
   # The manager UI (#40). The CSS build runs in a bare Python container with
   # no network and no Node, from the checkout and the pinned Tailwind CLI, and
