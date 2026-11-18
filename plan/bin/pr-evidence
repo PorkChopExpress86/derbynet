@@ -2,7 +2,7 @@
 """Lists each open line of an issue that asks for evidence in the PR, and
 with `--check BODY.md` names each one the PR body gives no evidence for.
 
-Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N]]
+Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N] [--flake-ticket]]
 
 A line asks for evidence in the PR when it says so: "Evidence is ... in the
 PR", "The PR lists", "Record the size in the PR", "Attach" (but not
@@ -37,12 +37,19 @@ A list item `- CI load: <run URL>` cites a run of
 run from GitHub and accepts it only when it ran master's workflow
 (workflow_dispatch, head_branch master: `--ref <branch>` runs that branch's
 copy), on its first attempt (a "Re-run failed jobs" turns a failed run green),
-at the PR's head with no trial input (its name is exactly `CI load at <SHA>`;
-the workflow names any other input's run `CI load trial ...`), and passed.
-The head is `--head SHA`, or PR N's head as GitHub reads it with `--pr N`;
-given both, they must match. It is labelled CI load: extra evidence until the
-owner amends D85, never a local load run. Other links to runs in the body are
-not read.
+at the PR's head with no trial input, and passed. The run's name is exactly
+`CI load at <SHA>`, or `CI load at <SHA> (flake ticket)` for a run with
+`-f flake_ticket=true`; the workflow names a run with a `base`, `files`,
+`count`, `loops_per_cpu` or `workers` input `CI load trial ...`. A flake
+ticket's whole-file 25 with `--flake-ticket` is the evidence D101 and D122
+ask of it, so with `--flake-ticket` the run must carry the `(flake ticket)`
+name, and a plain run is refused. The ticket's body and title do not say
+reliably that it is a flake ticket (#373 and #407 both name the flag), so
+the caller says it (plan/implement-all-tickets.md, step 3.2). The head is
+`--head SHA`, or PR N's head as GitHub reads it with `--pr N`; given both,
+they must match. It is labelled CI load: extra evidence until the owner
+amends D85, never a local load run. Other links to runs in the body are not
+read.
 
 Exits 1 on a key the body gives no evidence for, on a CI load item not
 accepted or given with no head, on a `--head` that is not PR N's head, on a
@@ -209,10 +216,10 @@ def ci_load_items(body: str) -> list[str]:
     return found
 
 
-def ci_load_verdict(run: dict, head: str) -> str | None:
+def ci_load_verdict(run: dict, head: str, flake_ticket: bool = False) -> str | None:
     """None when a run, as GitHub's runs API answers, is a passed first
     attempt of master's CI load workflow at head with no trial input, else
-    why not."""
+    why not. For a flake ticket the run must be the `(flake ticket)` one."""
     if run.get("path") != CI_LOAD_WORKFLOW:
         return f"not a run of {CI_LOAD_WORKFLOW} but of {run.get('path')}"
     if run.get("event") != "workflow_dispatch":
@@ -221,14 +228,18 @@ def ci_load_verdict(run: dict, head: str) -> str | None:
         return f"ran the workflow of {run.get('head_branch')}, not master's"
     if run.get("run_attempt") != 1:
         return f"attempt {run.get('run_attempt')}, not the first"
-    if run.get("display_title") != f"CI load at {head}":
-        return f"{run.get('display_title')!r} is not at the PR's head {head}"
+    title = run.get("display_title")
+    if title not in (f"CI load at {head}", f"CI load at {head} (flake ticket)"):
+        return f"{title!r} is not at the PR's head {head}"
+    if flake_ticket and title != f"CI load at {head} (flake ticket)":
+        return (f"{title!r} ran without flake_ticket, and this ticket is a flake ticket: "
+                "D101 asks its whole-file 25 with --flake-ticket (D122)")
     if (run.get("status"), run.get("conclusion")) != ("completed", "success"):
         return f"{run.get('status')}, {run.get('conclusion')}: not passed"
     return None
 
 
-def check_ci_load(body: str, head: str | None) -> list[str]:
+def check_ci_load(body: str, head: str | None, flake_ticket: bool = False) -> list[str]:
     """A line for each `CI load:` item: accepted, or why not (the line then
     starts "not load evidence")."""
     lines = []
@@ -245,11 +256,11 @@ def check_ci_load(body: str, head: str | None) -> list[str]:
             lines.append(f"not load evidence, a run of {url[1]}, not {repo}: {url[0]}")
             continue
         run = gh_json(["api", f"repos/{repo}/actions/runs/{url[2]}"], url[0])
-        why = ci_load_verdict(run, head)
+        why = ci_load_verdict(run, head, flake_ticket)
         if why:
             lines.append(f"not load evidence, {why}: {url[0]}")
         else:
-            lines.append(f"CI load at {head}, passed: {url[0]} (extra evidence until "
+            lines.append(f"{run['display_title']}, passed: {url[0]} (extra evidence until "
                          "the owner amends D85; it replaces no local load run)")
     return lines
 
@@ -292,9 +303,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--check", metavar="BODY.md")
     parser.add_argument("--head", metavar="SHA")
     parser.add_argument("--pr", metavar="N")
+    parser.add_argument("--flake-ticket", action="store_true")
     args = parser.parse_args(argv)
-    if (args.head or args.pr) and not args.check:
-        parser.error("--head and --pr go with --check")
+    if (args.head or args.pr or args.flake_ticket) and not args.check:
+        parser.error("--head, --pr and --flake-ticket go with --check")
     head = args.head
     if args.pr:
         real = pr_head(args.pr)
@@ -320,7 +332,7 @@ def main(argv: list[str]) -> int:
     unfilled = placeholders(body)
     for found in unfilled:
         print(f"unfilled placeholder, {found}")
-    loads = check_ci_load(body, head)
+    loads = check_ci_load(body, head, args.flake_ticket)
     for line in loads:
         print(line)
     refused = [line for line in loads if line.startswith("not load evidence")]

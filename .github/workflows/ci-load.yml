@@ -10,16 +10,19 @@ name: ci-load
 # the tests from the input SHA (head/), so a head older than this file, such
 # as one before a flake's fix, runs too.
 
-# pr-evidence reads the tested SHA from the run's name, and accepts no
-# trial: a run with any input but sha and per_shard changed from its
-# default, since it did not run what affected-tests prints for the head
-# (plan/tests/test_ci_load.py checks the list).
+# pr-evidence reads the tested SHA from the run's name. It accepts two names:
+# `CI load at <SHA>`, and `CI load at <SHA> (flake ticket)` for a run with
+# flake_ticket, the evidence D101 and D122 ask of a flake ticket. A run with
+# base, files, count, loops_per_cpu or workers changed from its default is a
+# trial, since it did not run what affected-tests prints for the head
+# (plan/tests/test_ci_load.py evaluates this name for each input).
 run-name: >-
-  ${{ (inputs.base != 'origin/master' || inputs.files || inputs.flake_ticket || inputs.count
+  ${{ (inputs.base != 'origin/master' || inputs.files || inputs.count
       || inputs.loops_per_cpu || inputs.workers)
   && format('CI load trial at {0} (files {1}; base {2}; flake ticket {3}; count {4}; loops per CPU {5}; workers {6})',
             inputs.sha, inputs.files, inputs.base, inputs.flake_ticket, inputs.count,
             inputs.loops_per_cpu, inputs.workers)
+  || (inputs.flake_ticket && format('CI load at {0} (flake ticket)', inputs.sha))
   || format('CI load at {0}', inputs.sha) }}
 
 on:
@@ -41,8 +44,8 @@ on:
         type: string
       flake_ticket:
         description: >-
-          Pass --flake-ticket to each shard (D122), for a trial; pr-evidence
-          accepts no trial
+          Pass --flake-ticket to each shard (D122), for a flake ticket: the
+          run is named `CI load at <SHA> (flake ticket)`
         default: false
         type: boolean
       per_shard:

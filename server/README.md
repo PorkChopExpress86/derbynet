@@ -431,11 +431,10 @@ Each test that takes `page` runs on a phone (390x844, touch) and a desktop (1280
 gh workflow run ci-load.yml --repo PorkChopExpress86/derbynet -f sha="$(git rev-parse HEAD)"
 ```
 
-The run is named `CI load at <SHA>`. Every other input makes it a trial, named `CI load trial at <SHA> (...)`, which `plan/bin/pr-evidence` does not accept, since it did not run what `affected-tests` prints for the head:
+The run is named `CI load at <SHA>`. For a flake ticket, whose whole-file 25 with `--flake-ticket` is the evidence D101 and D122 ask, add `-f flake_ticket=true`: the run is named `CI load at <SHA> (flake ticket)`, and it passes `--flake-ticket` to each shard, left out at a head whose script predates it. `plan/bin/pr-evidence N --check BODY.md --pr <PR>` accepts either name, and with `--flake-ticket` it accepts only the second. Every input but `sha`, `flake_ticket` and `per_shard` makes the run a trial, named `CI load trial at <SHA> (...)`, which `pr-evidence` does not accept, since it did not run what `affected-tests` prints for the head:
 
 - `-f files="server/ui/tests/browser/test_kiosks.py"` feeds those files to `affected-tests --stdin` instead of the diff, for a master head or a head before a fix.
 - `-f base=REV` names another BASE than `origin/master`.
-- `-f flake_ticket=true` passes `--flake-ticket` (D122), left out at a head whose script predates it.
 - `-f count=N`, `-f loops_per_cpu=N` and `-f workers=N` (pytest's `-n`) replace the count, the busy loops per CPU and the workers.
 
 `-f per_shard=N` sets the shard size and keeps the name, since the shards' counts still sum to each command's.
@@ -446,7 +445,7 @@ Each shard runs the head's `tools/pytest-under-load.sh` with its own lock file a
 
 A command that names no font draws Noto Sans, the laptop's `system-ui` font: the shard installs `fonts-noto-core` and fails unless `fc-match sans-serif` gives Noto Sans. A line that is no `tools/pytest-under-load.sh` command, such as D133's DejaVu Sans run once under `tools/hold-load-lock.sh`, is listed as skipped in the summary.
 
-The summary job adds up the shards, names the head, each command and its count, and fails when any shard's script exited non-zero or left no exit code. A PR body cites a passed run at its head as `- CI load: <run URL>`, which `plan/bin/pr-evidence N --check BODY.md --pr <PR>` checks against GitHub: master's workflow, its first attempt, the PR's head, no trial. CI load is extra evidence until the owner amends D85: it replaces no local load run.
+The summary job adds up the shards, names the head, each command and its count, and fails when any shard's script exited non-zero or left no exit code. A PR body cites a passed run at its head as `- CI load: <run URL>`, which `plan/bin/pr-evidence N --check BODY.md --pr <PR>` checks against GitHub: master's workflow, its first attempt, the PR's head, no trial, and for a flake ticket (`--flake-ticket`) the `(flake ticket)` run. CI load is extra evidence until the owner amends D85: it replaces no local load run.
 
 ### The race dashboard (#41)
 

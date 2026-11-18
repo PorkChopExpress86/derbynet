@@ -12,6 +12,7 @@ import sys
 import tempfile
 import textwrap
 import time
+import types
 import unittest
 from pathlib import Path
 
@@ -211,20 +212,58 @@ class Sample(unittest.TestCase):
 
 
 class Workflow(unittest.TestCase):
-    def test_every_input_but_sha_and_per_shard_makes_the_run_a_trial(self):
-        """pr-evidence accepts only a run named `CI load at <SHA>`: an input
-        that changes what runs must change the name."""
+    SHA = 'a' * 40
+    DEFAULTS = {'sha': SHA, 'base': 'origin/master', 'files': '', 'flake_ticket': False,
+                'per_shard': '5', 'count': '', 'loops_per_cpu': '', 'workers': ''}
+    CHANGED = {'base': 'HEAD~1', 'files': 'x.py', 'flake_ticket': True, 'per_shard': '1',
+               'count': '1', 'loops_per_cpu': '1', 'workers': '1'}
+
+    @staticmethod
+    def names():
         text = WORKFLOW.read_text()
         dispatch = text[text.index('  workflow_dispatch:'):text.index('\npermissions:')]
-        names = re.findall(r'^      (\w+):$', dispatch, re.M)
-        self.assertEqual(names, ['sha', 'base', 'files', 'flake_ticket', 'per_shard', 'count',
-                                 'loops_per_cpu', 'workers'])
-        run_name = text[text.index('run-name:'):text.index('\non:')]
-        condition = run_name[:run_name.index("&& format('CI load trial at")]
-        for name in names:
-            with self.subTest(name=name):
-                self.assertEqual(f'inputs.{name}' in condition,
-                                 name not in ('sha', 'per_shard'))
+        return re.findall(r'^      (\w+):$', dispatch, re.M)
+
+    @staticmethod
+    def run_name(**changed):
+        """The run's name as GitHub's expression gives it for the inputs,
+        by Python's own `and`, `or` and `!=`, which pick the same operand
+        for the strings and booleans the inputs hold."""
+        text = WORKFLOW.read_text()
+        expression = ' '.join(text[text.index('run-name: >-') + len('run-name: >-'):
+                                   text.index('\non:')].split())
+        expression = expression.removeprefix('${{').removesuffix('}}')
+        expression = expression.replace('&&', ' and ').replace('||', ' or ')
+
+        def fmt(template, *values):
+            return template.format(*(str(v).lower() if isinstance(v, bool) else v
+                                     for v in values))
+        values = types.SimpleNamespace(**{**Workflow.DEFAULTS, **changed})
+        return eval(expression, {'__builtins__': {}}, {'format': fmt, 'inputs': values})
+
+    def test_the_inputs_are_the_ones_the_name_is_checked_for(self):
+        self.assertEqual(self.names(), list(self.DEFAULTS))
+        self.assertEqual(self.CHANGED.keys(), self.DEFAULTS.keys() - {'sha'})
+
+    def test_the_default_run_is_named_plain_and_at_the_sha(self):
+        self.assertEqual(self.run_name(), f'CI load at {self.SHA}')
+
+    def test_the_shard_size_keeps_the_plain_name(self):
+        """The shards' counts still sum to each command's."""
+        self.assertEqual(self.run_name(per_shard='1'), f'CI load at {self.SHA}')
+
+    def test_a_flake_ticket_run_is_named_for_it_and_is_no_trial(self):
+        """A whole-file repeat with --flake-ticket is the evidence D101 asks of
+        a flake ticket, so pr-evidence accepts this name."""
+        self.assertEqual(self.run_name(flake_ticket=True), f'CI load at {self.SHA} (flake ticket)')
+
+    def test_each_input_that_changes_what_runs_makes_a_trial_even_for_a_flake_ticket(self):
+        for name in ('base', 'files', 'count', 'loops_per_cpu', 'workers'):
+            for flake_ticket in (False, True):
+                with self.subTest(name=name, flake_ticket=flake_ticket):
+                    title = self.run_name(**{name: self.CHANGED[name]}, flake_ticket=flake_ticket)
+                    self.assertTrue(title.startswith(f'CI load trial at {self.SHA} ('), title)
+                    self.assertIn(f'flake ticket {str(flake_ticket).lower()};', title)
 
 
 class Summary(unittest.TestCase):
