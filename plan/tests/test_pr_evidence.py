@@ -5,7 +5,6 @@ Run: python3 -I -m unittest discover -s plan/tests
 import importlib.machinery
 import importlib.util
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +16,6 @@ from pathlib import Path
 import k_patterns  # noqa: F401  a -k that matches no test is refused
 
 PR_EVIDENCE = Path(__file__).resolve().parent.parent / 'bin' / 'pr-evidence'
-LINT_ISSUES = Path(__file__).resolve().parent.parent / 'lint-issues.py'
 
 
 def load_tool():
@@ -166,33 +164,6 @@ class PrEvidence(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0)
 
 
-class ClosesWhileOpen(unittest.TestCase):
-    def test_399s_draft_closes_its_issue_above_its_still_open(self):
-        self.assertEqual(TOOL.closes_while_open(DRAFT_399), ['399'])
-
-    def test_part_of_or_an_empty_still_open_passes(self):
-        part_of = DRAFT_399.replace('Closes #399.', 'Part of #399.')
-        self.assertEqual(TOOL.closes_while_open(part_of), [])
-        # #380's body: "None." under the heading lists no item.
-        none = DRAFT_399.split('## Still open')[0] + '## Still open\n\nNone. Q36 is D127.\n'
-        self.assertEqual(TOOL.closes_while_open(none), [])
-        later = DRAFT_399.replace('## Still open', '## Left for later')
-        self.assertEqual(TOOL.closes_while_open(later), [])
-
-    def test_the_section_ends_at_the_next_heading(self):
-        body = ('Fixes #12 and resolves: #7\n\n## Still open\n\n## Evidence\n\n'
-                '- a: b\n\n## Still open\n\n- c\n')
-        self.assertEqual(TOOL.closes_while_open(body), ['7', '12'])
-        self.assertEqual(TOOL.closes_while_open(body.rsplit('## Still open', 1)[0]), [])
-
-    def test_closing_reads_as_lint_issues_reads_it(self):
-        text = LINT_ISSUES.read_text()
-        found = re.search(r"^CLOSING = re\.compile\((r'.*'), re\.I\)$", text, re.M)
-        self.assertIsNotNone(found)
-        self.assertEqual(TOOL.CLOSING.pattern, eval(found[1]))
-        self.assertEqual(TOOL.CLOSING.flags & re.I, re.I)
-
-
 class Placeholders(unittest.TestCase):
     def test_399s_loop_output_is_found(self):
         self.assertEqual(TOOL.placeholders(DRAFT_399), ['line 8: LOOP-OUTPUT'])
@@ -216,28 +187,17 @@ class Placeholders(unittest.TestCase):
 
 
 class CheckRefuses(PrEvidence):
-    def test_399s_draft_is_refused_for_both(self):
+    def test_399s_draft_is_refused_for_its_placeholder(self):
         done = self.check(evidence(KEYS) + '\n' + DRAFT_399)
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertEqual(done.stdout.splitlines()[1:], [
-            'the body closes #399 and its "## Still open" section lists an item: write '
-            '"Part of #399", or move a limit that leaves no box open to "## Left for later"',
-            'unfilled placeholder, line 17: LOOP-OUTPUT'])
+        self.assertEqual(done.stdout.splitlines()[1:],
+                         ['unfilled placeholder, line 17: LOOP-OUTPUT'])
 
-    def test_each_check_alone_is_refused(self):
-        closing = DRAFT_399.replace('LOOP-OUTPUT', '25 of 25 ok')
-        unfilled = DRAFT_399.replace('Closes', 'Part of')
-        for body, line in ((closing, 'the body closes #399'),
-                           (unfilled, 'unfilled placeholder, line 17: LOOP-OUTPUT')):
-            with self.subTest(line=line):
-                done = self.check(evidence(KEYS) + '\n' + body)
-                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-                self.assertEqual(len(done.stdout.splitlines()), 2, done.stdout)
-                self.assertTrue(done.stdout.splitlines()[1].startswith(line), done.stdout)
-
-    def test_the_draft_as_the_lead_fixed_it_passes(self):
-        fixed = DRAFT_399.replace('Closes', 'Part of').replace('LOOP-OUTPUT', '25 of 25 ok')
-        done = self.check(evidence(KEYS) + '\n' + fixed)
+    def test_the_draft_with_its_output_filled_in_passes(self):
+        # Its "Closes #399." above its "## Still open" passes: the lead
+        # dropped that check (AGENT-BRIEF puts undecided divergences there).
+        filled = DRAFT_399.replace('LOOP-OUTPUT', '25 of 25 ok')
+        done = self.check(evidence(KEYS) + '\n' + filled)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
 

@@ -17,18 +17,12 @@ an earlier PR gave its evidence.
 #61's body draft left out the reviewer's checklist its timer-guide box asked
 for, though the checklist was drafted, until the lead found it (#61 retro).
 
-`--check` also refuses a body that closes an issue (`Closes #N`, as
-plan/lint-issues.py reads it) while its own `## Still open` section lists
-an item: the ticket stays open for what that section names, so the body says
-`Part of #N`, and a limit that leaves no box open goes under
-`## Left for later`. And it refuses an unfilled placeholder, a capitalised
-token such as LOOP-OUTPUT or HANDOFF_RUNS that ends in PENDING, RESULT,
-OUTPUT, RUNS or TABLE, outside inline code. #399's draft said `Closes #399.`
-above a `## Still open` naming the cause it never found, and held
-LOOP-OUTPUT where its text said "all 25 pass"; this check passed it, and
-the lead fixed the first by hand (#399 retro).
+`--check` also refuses an unfilled placeholder, a capitalised token such as
+LOOP-OUTPUT or HANDOFF_RUNS that ends in PENDING, RESULT, OUTPUT, RUNS or
+TABLE, outside inline code. #399's draft held LOOP-OUTPUT where its text
+said "all 25 pass", and this check passed it (#399 retro).
 
-Exits 1 on a key the body gives no evidence for, on either of those, or when
+Exits 1 on a key the body gives no evidence for, on a placeholder, or when
 the issue cannot be read.
 """
 
@@ -46,8 +40,6 @@ ELSEWHERE = re.compile(r"\b(?:to|on|in) this issue\b", re.IGNORECASE)
 ITEM = re.compile(r"^\s*[-*] (?:\[( |x|X)\] )?(.*)$")
 SENTENCES = re.compile(r".*?[.!?](?=\s|$)")
 NO_EVIDENCE = re.compile(r"^(?:not done|todo)\b", re.IGNORECASE)
-# plan/lint-issues.py's CLOSING; test_pr_evidence.py checks they match.
-CLOSING = re.compile(r'\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b', re.I)
 # A draft's stand-in for output still to come: PROBE-PENDING, HANDOFF_RUNS,
 # LOOP-OUTPUT in #399's drafts. Code names such as OUTPUT_CURL or
 # MAX_RUNS_PER_LANE end in another word.
@@ -131,26 +123,6 @@ def has_evidence(key: str, outside: list[str], still_open: list[str]) -> bool:
     return any(item.startswith(k.rstrip(".!?")) for item in still_open)
 
 
-def still_open_text(body: str) -> str:
-    """The text under the body's `## Still open` heading, as pr-merge reads
-    an issue's: up to the next `## ` heading."""
-    found, on = [], False
-    for line in body.splitlines():
-        if line.startswith("## "):
-            on = line.rstrip() == "## Still open"
-        elif on:
-            found.append(line)
-    return "\n".join(found).strip()
-
-
-def closes_while_open(body: str) -> list[str]:
-    """Each issue the body closes while its `## Still open` lists an item
-    (#380's "None." lists none)."""
-    if not items(still_open_text(body)):
-        return []
-    return sorted(set(CLOSING.findall(body)), key=int)
-
-
 def placeholders(body: str) -> list[str]:
     """Each unfilled placeholder, as `line N: TOKEN`."""
     return [
@@ -192,14 +164,10 @@ def main(argv: list[str]) -> int:
         f"{len(asked) - len(missing)} of {len(asked)} open lines of #{argv[0]} that ask "
         "for evidence in the PR have it in the body"
     )
-    closing = closes_while_open(body)
-    for n in closing:
-        print(f'the body closes #{n} and its "## Still open" section lists an item: write '
-              f'"Part of #{n}", or move a limit that leaves no box open to "## Left for later"')
     unfilled = placeholders(body)
     for found in unfilled:
         print(f"unfilled placeholder, {found}")
-    return 1 if missing or closing or unfilled else 0
+    return 1 if missing or unfilled else 0
 
 
 if __name__ == "__main__":
