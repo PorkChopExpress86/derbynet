@@ -212,15 +212,48 @@ def test_an_unclosed_fence_is_named_by_its_line(tmp_path, capsys):
     body.write_text("<details>\n```\nfoo\n- `test_waits`: 3 s\n</details>\n")
     assert dc.main(["--check", str(body), str(path)]) == 1
     assert capsys.readouterr().out == (
-        f"{body}:2: this fence never closes, so the rest of the body, every"
-        " <details> block in it, reads as code\n"
+        f"{body}:2: this fence never closes at its own indent, so the rest of"
+        " the body, every <details> block in it, reads as code\n"
+    )
+
+
+def test_a_line_left_of_its_fence_is_named(tmp_path, capsys):
+    """A line left of a list item's fence may end the item, and the fence
+    with it, so the error names that line (#402 review)."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        "<details>\n- `test_waits`: the log\n  ```\nlog\n  ```\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert capsys.readouterr().out == (
+        f"{body}:4: this line sits left of the fence opened on line 3, so the"
+        " tool can't tell where that fence ends: indent it as the fence is, or"
+        " close the fence above it\n"
+    )
+
+
+def test_a_fence_mark_off_its_fence_indent_is_named(tmp_path, capsys):
+    """Whether CommonMark closes a fence on a mark at another indent than
+    its opener's depends on the container, which the tool can't see, so it
+    names such a mark (#402 review)."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n```\nlog\n  ```\n- `test_waits`: 3 s\n</details>\n")
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert capsys.readouterr().out == (
+        f"{body}:4: this fence mark sits off the indent of the fence opened on"
+        " line 2, so the tool can't tell whether it closes it: put it at that"
+        " fence's indent\n"
     )
 
 
 # Each case's id, its lines, the words of `inner` and `after` that
 # markdown-it-py's CommonMark parser fences in those lines alone (the probe
 # and its output are in PR #402's body), the words details() keeps, and the
-# line of the fence it finds left open.
+# line its error names, where it stops.
 FENCE_SWEEP = [
     ("backtick-0", "```\ninner\n```\nafter", "inner", "after", None),
     ("backtick-0-py", "```py\ninner\n```\nafter", "inner", "after", None),
@@ -230,25 +263,25 @@ FENCE_SWEEP = [
     ("tilde-0-tick", "~~~a`b\ninner\n~~~\nafter", "inner", "after", None),
     ("backtick-1", " ```\n inner\n ```\nafter", "inner", "after", None),
     ("backtick-1-py", " ```py\n inner\n ```\nafter", "inner", "after", None),
-    ("backtick-1-tick", " ```a`b\n inner\n ```\nafter", "after", "", 5),
+    ("backtick-1-tick", " ```a`b\n inner\n ```\nafter", "after", "", 6),
     ("tilde-1", " ~~~\n inner\n ~~~\nafter", "inner", "after", None),
     ("tilde-1-py", " ~~~py\n inner\n ~~~\nafter", "inner", "after", None),
     ("tilde-1-tick", " ~~~a`b\n inner\n ~~~\nafter", "inner", "after", None),
     ("backtick-2", "  ```\n  inner\n  ```\nafter", "inner", "after", None),
     ("backtick-2-py", "  ```py\n  inner\n  ```\nafter", "inner", "after", None),
-    ("backtick-2-tick", "  ```a`b\n  inner\n  ```\nafter", "after", "", 5),
+    ("backtick-2-tick", "  ```a`b\n  inner\n  ```\nafter", "after", "", 6),
     ("tilde-2", "  ~~~\n  inner\n  ~~~\nafter", "inner", "after", None),
     ("tilde-2-py", "  ~~~py\n  inner\n  ~~~\nafter", "inner", "after", None),
     ("tilde-2-tick", "  ~~~a`b\n  inner\n  ~~~\nafter", "inner", "after", None),
     ("backtick-3", "   ```\n   inner\n   ```\nafter", "inner", "after", None),
     ("backtick-3-py", "   ```py\n   inner\n   ```\nafter", "inner", "after", None),
-    ("backtick-3-tick", "   ```a`b\n   inner\n   ```\nafter", "after", "", 5),
+    ("backtick-3-tick", "   ```a`b\n   inner\n   ```\nafter", "after", "", 6),
     ("tilde-3", "   ~~~\n   inner\n   ~~~\nafter", "inner", "after", None),
     ("tilde-3-py", "   ~~~py\n   inner\n   ~~~\nafter", "inner", "after", None),
     ("tilde-3-tick", "   ~~~a`b\n   inner\n   ~~~\nafter", "inner", "after", None),
     ("backtick-4", "    ```\n    inner\n    ```\nafter", "", "after", None),
     ("backtick-4-py", "    ```py\n    inner\n    ```\nafter", "", "after", None),
-    ("backtick-4-tick", "    ```a`b\n    inner\n    ```\nafter", "", "", 5),
+    ("backtick-4-tick", "    ```a`b\n    inner\n    ```\nafter", "", "", 6),
     ("tilde-4", "    ~~~\n    inner\n    ~~~\nafter", "", "after", None),
     ("tilde-4-py", "    ~~~py\n    inner\n    ~~~\nafter", "", "after", None),
     ("tilde-4-tick", "    ~~~a`b\n    inner\n    ~~~\nafter", "", "after", None),
@@ -261,33 +294,27 @@ FENCE_SWEEP = [
     ("close-with-info", "````\ninner\n```` x\nafter", "after inner", "", 3),
     ("close-trailing-spaces", "````\ninner\n````  \nafter", "inner", "after", None),
     ("close-trailing-tab", "````\ninner\n````\t\nafter", "inner", "after", None),
-    ("close-indent-1", "````\ninner\n ````\nafter", "inner", "after", None),
-    ("close-indent-3", "````\ninner\n   ````\nafter", "inner", "after", None),
-    ("close-indent-4", "````\ninner\n    ````\nafter", "after inner", "", 3),
+    ("close-1", "````\ninner\n ````\nafter", "inner", "", 5),
+    ("close-3", "````\ninner\n   ````\nafter", "inner", "", 5),
+    ("close-4", "````\ninner\n    ````\nafter", "after inner", "", 5),
     ("unclosed", "```\ninner\nafter", "after inner", "", 3),
+    ("list-item-2", "- row\n  ```\n  inner\n  ```\nafter", "inner", "after", None),
     (
-        "list-item-indent-2",
-        "- row\n  ```\n  inner\n  ```\nafter",
-        "inner",
-        "after",
-        None,
-    ),
-    (
-        "list-item-indent-4",
+        "list-item-4",
         "- row\n    ```\n    inner\n    ```\nafter",
         "inner",
         "after",
         None,
     ),
     (
-        "list-item-indent-6",
+        "list-item-6",
         "- row\n      ```\n      inner\n      ```\nafter",
         "",
         "after",
         None,
     ),
     (
-        "ordered-item-indent-6",
+        "ordered-item-6",
         "1. row\n      ```\n      inner\n      ```\nafter",
         "inner",
         "after",
@@ -301,31 +328,57 @@ FENCE_SWEEP = [
         None,
     ),
     ("blockquote", "> ```\n> inner\n> ```\nafter", "inner", "after", None),
-    ("blockquote-ends-it", "> ```\n> inner\n\nafter", "inner", "", 3),
-    ("ordered-marker-line", "1. ```\n   inner\n   ```\nafter", "inner", "after", None),
-    ("close-tab-indent", "````\ninner\n\t````\nafter", "after inner", "", 3),
+    ("blockquote-ends-it", "> ```\n> inner\n\nafter", "inner", "", 5),
+    (
+        "fence-on-an-ordered-marker-line",
+        "1. ```\n   inner\n   ```\nafter",
+        "inner",
+        "after",
+        None,
+    ),
+    ("close-tab-indent", "````\ninner\n\t````\nafter", "after inner", "", 5),
+    ("open3-close4", "   ```\ninner\n    ```\nafter", "after inner", "", 4),
+    ("open2-close5", "  ```\ninner\n     ```\nafter", "after inner", "", 4),
+    ("close-quoted", "```\ninner\n> ```\nafter", "after inner", "", 5),
+    ("close-on-marker", "```\ninner\n- ```\nafter", "after inner", "", 3),
+    ("close-on-ordered", "```\ninner\n1. ```\nafter", "after inner", "", 3),
+    ("quoted-open-bare-close", "> ```\n> inner\n```\nafter", "after inner", "", 5),
+    ("item4-close7", "- row\n    ```\n    inner\n       ```\nafter", "inner", "", 6),
+    ("item4-close1", "- row\n    ```\n    inner\n ```\nafter", "after inner", "", 6),
+    ("item2-close0", "- row\n  ```\n  inner\n```\nafter", "after inner", "", 6),
+    ("item4-close2", "- row\n    ```\n    inner\n  ```\nafter", "inner", "", 6),
+    ("quote-close-deeper", "> ```\n> inner\n>     ```\nafter", "inner", "", 5),
+    ("nested-quote-close", "> ```\n> inner\n> > ```\nafter", "inner", "", 5),
+    ("item-open-quote-close", "- ```\n  inner\n  > ```\nafter", "inner", "", 5),
+    ("item-line-left-of-fence", "- row\n  ```\ninner\n  ```\nafter", "after", "", 5),
+    ("quote-blank-line", "> ```\n> inner\n\n> ```\nafter", "inner", "", 5),
+    ("quote-bare-mark-line", "> ```\n>\n> inner\n> ```\nafter", "inner", "after", None),
+    (
+        "item-blank-line",
+        "- row\n  ```\n  inner\n\n  ```\nafter",
+        "inner",
+        "after",
+        None,
+    ),
 ]
 
 
 @pytest.mark.parametrize("eol", ["\n", "\r\n"], ids=["LF", "CRLF"])
 @pytest.mark.parametrize(
-    "lines, fenced, kept, unclosed",
+    "lines, fenced, kept, error",
     [pytest.param(*row[1:], id=row[0]) for row in FENCE_SWEEP],
 )
-def test_the_fence_rule_drops_what_commonmark_fences(
-    lines, fenced, kept, unclosed, eol
-):
-    """details() keeps no word CommonMark fences: where it can't tell a
-    list item's indent it drops more, and a fence it finds left open is an
-    error. Each case's outcome is pinned, so a change shows in the table
-    (#402 review)."""
+def test_the_fence_rule_drops_what_commonmark_fences(lines, fenced, kept, error, eol):
+    """details() keeps no word CommonMark fences: where it can't tell the
+    container it drops more, or stops with an error. Each case's outcome
+    is pinned, so a change shows in the table (#402 review)."""
     body = eol.join(["<details>", "", *lines.split("\n"), "", "</details>", ""])
     try:
         text, line = "\n".join(dc.details(body)), None
-    except dc.UnclosedFence as e:
+    except dc.FenceError as e:
         text, line = "", e.line
     left = {w for w in ("inner", "after") if w in text}
-    assert (left, line) == (set(kept.split()), unclosed)
+    assert (left, line) == (set(kept.split()), error)
     assert not set(fenced.split()) & left
 
 
