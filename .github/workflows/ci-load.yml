@@ -52,7 +52,7 @@ on:
         type: string
       loops_per_cpu:
         description: >-
-          Busy loops per logical CPU in place of 1, for a trial; pr-evidence
+          Busy loops per logical CPU in place of 2, for a trial; pr-evidence
           accepts no trial
         default: ''
         type: string
@@ -138,11 +138,11 @@ jobs:
           python3 -I -m json.tool "$RUNNER_TEMP/plan.json"
           echo "shards=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["shards"]))' <"$RUNNER_TEMP/plan.json")" >>"$GITHUB_OUTPUT"
           echo "sha=$SHA" >>"$GITHUB_OUTPUT"
-          if ! [[ "${LOOPS_PER_CPU:-1}" =~ ^[1-9][0-9]?$ && "${WORKERS:-1}" =~ ^[1-9][0-9]?$ ]]; then
+          if ! [[ "${LOOPS_PER_CPU:-2}" =~ ^[1-9][0-9]?$ && "${WORKERS:-1}" =~ ^[1-9][0-9]?$ ]]; then
             echo "::error::loops_per_cpu and workers must be whole numbers from 1 to 99"
             exit 1
           fi
-          echo "loops_per_cpu=${LOOPS_PER_CPU:-1}" >>"$GITHUB_OUTPUT"
+          echo "loops_per_cpu=${LOOPS_PER_CPU:-2}" >>"$GITHUB_OUTPUT"
           echo "workers=$WORKERS" >>"$GITHUB_OUTPUT"
           cp "$RUNNER_TEMP/affected.txt" "$RUNNER_TEMP/plan.json" "$GITHUB_WORKSPACE/"
 
@@ -206,7 +206,10 @@ jobs:
       - name: Build the browser timer
         run: uv run python manage.py build_timer
 
-      # One loop per logical CPU, as the laptop's 8 loops on 8 threads.
+      # Two loops per logical CPU: at one, as the laptop's 8 loops on 8
+      # threads, #224's flake at its pre-fix head 832e0ee6 passed 25 counts
+      # (run 44319672052), where the laptop failed it 2-3 times in 50; at
+      # two, it failed 8 times in 50 (run 44321206965, #415's sweep).
       # The script refuses a pipe, so its output goes to a file.
       - name: Run under load
         env:
