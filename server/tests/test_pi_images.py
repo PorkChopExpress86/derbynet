@@ -33,8 +33,8 @@ WORKFLOW = ROOT / ".github" / "workflows" / "pi-images.yml"
 BY_ID = "/dev/input/by-id"
 
 LP64_EVENT = struct.Struct("<qqHHi")
-EV_SYN, EV_KEY, EV_MSC = 0, 1, 4
-SHIFT, ENTER = 42, 28
+EV_SYN, EV_KEY, EV_REL, EV_MSC = 0, 1, 2, 4
+SHIFT, RIGHT_SHIFT, ENTER = 42, 54, 28
 
 
 def load_reader():
@@ -125,6 +125,17 @@ def test_a_held_key_repeats():
     assert list(reader.barcodes(io.BytesIO(data))) == ["11"]
 
 
+def test_the_right_shift_key_shifts_too():
+    data = event(EV_KEY, RIGHT_SHIFT, 1) + press(25) + event(EV_KEY, RIGHT_SHIFT, 0)
+    assert list(reader.barcodes(io.BytesIO(data + press(ENTER)))) == ["P"]
+
+
+def test_an_event_that_is_no_key_types_nothing():
+    """A relative move whose code and value read as key 1 going down."""
+    data = event(EV_REL, 2, 1) + press(3) + press(ENTER)
+    assert list(reader.barcodes(io.BytesIO(data))) == ["2"]
+
+
 def test_a_key_after_shift_goes_up_is_lower_case():
     data = shifted(25) + press(25) + press(ENTER)
     assert list(reader.barcodes(io.BytesIO(data))) == ["Pp"]
@@ -197,3 +208,41 @@ def test_pi_images_yml_runs_each_check():
     ]
     assert calls and all(calls)
     assert {name for call in calls for name in call} == named
+
+
+def read_once(capsys, wanted, by_id):
+    reader.read_once(wanted, str(by_id))
+    return capsys.readouterr()
+
+
+def test_read_once_with_no_device_prints_nothing(tmp_path, capsys):
+    out = read_once(capsys, [], tmp_path)
+    assert (out.out, out.err) == ("", "")
+
+
+def test_read_once_with_no_folder_prints_nothing(tmp_path, capsys):
+    out = read_once(capsys, [], tmp_path / "missing")
+    assert (out.out, out.err) == ("", "")
+
+
+def test_read_once_reads_the_first_device_without_a_grab(tmp_path, capsys):
+    (tmp_path / "usb-a-kbd").write_bytes(PWD101)
+    out = read_once(capsys, [], tmp_path)
+    assert (out.out, out.err) == ("PWD101\n", "")
+
+
+def test_read_once_grabs_a_named_device(tmp_path, capsys):
+    """A plain file refuses the grab, and the refusal names the device: a
+    named device is the one the reader tries to grab."""
+    (tmp_path / "usb-a-kbd").write_bytes(b"")
+    (tmp_path / "usb-b-kbd").write_bytes(PWD101)
+    out = read_once(capsys, ["usb-b-kbd"], tmp_path)
+    assert out.out == "PWD101\n"
+    assert out.err.startswith(f"read-barcodes: no grab of {tmp_path}/usb-b-kbd: ")
+
+
+def test_read_once_reports_a_device_it_cannot_open(tmp_path, capsys):
+    (tmp_path / "usb-a-kbd").mkdir()
+    out = read_once(capsys, [], tmp_path)
+    assert out.out == ""
+    assert out.err.startswith(f"read-barcodes: {tmp_path}/usb-a-kbd: ")

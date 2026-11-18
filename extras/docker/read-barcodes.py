@@ -87,42 +87,47 @@ def barcodes(stream):
             line += (SHIFTED if shift else KEYS).get(code, "")
 
 
-def find_scanner(wanted, listing):
+def find_scanner(wanted, listing, by_id=BY_ID):
     """The device find_barcode_scanner picks, and whether to grab it: the
     first of `wanted` (BARCODE_SCANNER_DEVS's names) in `listing`, grabbed,
     else the first of `listing`, sorted as `ls` sorts it, not grabbed; None
     for an empty listing."""
     for name in wanted:
         if name in listing:
-            return os.path.join(BY_ID, name), True
+            return os.path.join(by_id, name), True
     for name in sorted(listing):
-        return os.path.join(BY_ID, name), False
+        return os.path.join(by_id, name), False
     return None
+
+
+def read_once(wanted, by_id=BY_ID):
+    """Prints each barcode from the device find_scanner picks under `by_id`,
+    until the device ends or goes away; nothing when there is none."""
+    try:
+        listing = os.listdir(by_id)
+    except OSError:
+        listing = []
+    found = find_scanner(wanted, listing, by_id)
+    if found is None:
+        return
+    device, grab = found
+    try:
+        with open(device, "rb", buffering=0) as stream:
+            if grab:
+                try:
+                    fcntl.ioctl(stream, EVIOCGRAB, 1)
+                except OSError as error:
+                    print(f"read-barcodes: no grab of {device}: {error}", file=sys.stderr)
+            for barcode in barcodes(stream):
+                print(barcode, flush=True)
+    except OSError as error:
+        print(f"read-barcodes: {device}: {error}", file=sys.stderr)
 
 
 def main():
     wanted = os.environ.get("BARCODE_SCANNER_DEVS", "").split()
     while True:
-        try:
-            listing = os.listdir(BY_ID)
-        except OSError:
-            listing = []
-        found = find_scanner(wanted, listing)
-        if found is None:
-            time.sleep(RETRY_SECONDS)
-            continue
-        device, grab = found
-        try:
-            with open(device, "rb", buffering=0) as stream:
-                if grab:
-                    try:
-                        fcntl.ioctl(stream, EVIOCGRAB, 1)
-                    except OSError as error:
-                        print(f"read-barcodes: no grab of {device}: {error}", file=sys.stderr)
-                for barcode in barcodes(stream):
-                    print(barcode, flush=True)
-        except OSError as error:
-            print(f"read-barcodes: {device}: {error}", file=sys.stderr)
+        read_once(wanted)
         time.sleep(RETRY_SECONDS)
 
 
