@@ -9,7 +9,8 @@ No test here signals a pid it read from the script's output unless
 the script that named `$PPID` on its session line named systemd --user,
 and the unguarded `os.killpg` this file once ran on it ended the owner's
 desktop session twice on 2026-11-17. Every held command ends by itself
-once the test writes `go` beside it, so cleanup sends no signal."""
+once the test writes `go` beside it, so cleanup signals no pid the script
+named: it kills only the test's own Popen children."""
 
 import fcntl
 import os
