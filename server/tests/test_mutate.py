@@ -490,6 +490,8 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
     run = listed(project, "test_mod.py::test_the_bound")
     assert run.returncode == 2
     assert "no mutant listed" in run.stderr
+    # The refusal names the next step (#367 retro).
+    assert "Mutate each step the changed tests take by hand" in run.stderr
     assert run.stdout == (
         "SKIPPED   notes.md: 2 listed, in no source file\n"
         "SKIPPED   test_mod.py: 2 listed, in a test file"
