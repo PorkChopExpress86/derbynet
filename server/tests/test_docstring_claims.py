@@ -690,3 +690,138 @@ def test_a_decorated_test_or_a_test_case_that_reads_a_change_counts():
         {"race", "test_calls_helper", "test_decorated", "Reach"},
         "",
     )
+
+
+# #404's first body, line 31, as the implementer wrote it (#65 retro), and
+# the lines of its last body that say what the lead does after merge.
+ROUND_0_LEAD = (
+    "`racing/tests/test_did_not_finish.py::test_places_with_zero_times_are_"
+    "recorded_as_php_records_them` asserted the old behaviour. It moved to"
+    " `racing/tests/test_all_zero_lanes.py::test_zero_times_with_places_on_the_"
+    "used_lanes_stop_racing` with the new expectation, which the lead confirmed"
+    " for #65."
+)
+AFTER_MERGE = (
+    "Both Scope lines are drafted for the lead to post on #62 after merge, and"
+    " no new docs file is added.\n"
+    "- The #20 quirk-table comment, which the lead posts after merge.\n"
+    "- The release-note lines on #62, which the lead posts after merge.\n"
+)
+
+
+def test_a_ruling_credited_to_the_lead_is_named(tmp_path, capsys):
+    """#404's round-0 sentence is refused by its line; what the lead does
+    next, a ruling that names its decision, a quote and pasted output pass."""
+    path = tmp_path / "test_x.py"
+    path.write_text("def test_x():\n    assert True\n")
+    body = tmp_path / "body.md"
+    body.write_text(f"Intro.\n{ROUND_0_LEAD}\n{AFTER_MERGE}")
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith(f"{body}:2: credits a ruling to the lead")
+    assert "'It moved to `racing/tests/test_all_zero_lanes.py::" in out
+    assert out.count("\n") == 1
+    fine = (
+        ROUND_0_LEAD.replace("for #65", "for #65 under D42"),
+        "#272's docstring said \"the lead's choice B\" until review.",
+        "```\nwhich the lead confirmed\n```",
+        "Per the `lead` column, it is filled.",
+    )
+    exits = []
+    for text in fine:
+        body.write_text(f"{text}\n{AFTER_MERGE}")
+        exits.append(dc.main(["--check", str(body), str(path)]))
+    assert exits == [0, 0, 0, 0]
+    cited = (
+        "This is the lead's choice C (#346).",
+        "The lead approved this reading.",
+        "It stays, per the lead.",
+        "Cost (accepted by the lead).",
+    )
+    assert [dc.lead_cites(text) for text in cited] == [[(1, text)] for text in cited]
+    assert len(cited) == 4
+
+
+GONE_BASE = textwrap.dedent(
+    """\
+    import os
+
+
+    def helper():
+        return os.sep
+
+
+    class Helper:
+        pass
+
+
+    def test_old():
+        assert 1
+
+
+    def test_moved():
+        assert 2
+
+
+    class TestBoard:
+        size = 4
+
+        def setup_method(self):
+            pass
+
+        def test_row(self):
+            assert 3
+
+        def test_kept(self):
+            assert 4
+
+
+    class TestGone:
+        def test_a(self):
+            assert 5
+    """
+)
+GONE_HEAD = textwrap.dedent(
+    """\
+    class TestBoard:
+        def test_kept(self):
+            assert 4
+    """
+)
+
+
+def test_a_test_gone_since_the_merge_base_is_named(tmp_path, capsys, monkeypatch):
+    """#404's deleted `test_adjuster.py` test: each test the head no longer
+    defines is named until the body names it; a test moved to another file
+    given counts as kept, and a class that is gone is named once."""
+    path = tmp_path / "test_gone.py"
+    path.write_text(GONE_HEAD)
+    other = tmp_path / "test_other.py"
+    other.write_text("def test_moved():\n    assert 2\n")
+    monkeypatch.setattr(
+        dc, "base_text", lambda f, rev: GONE_BASE if f == path else None
+    )
+    body = tmp_path / "body.md"
+    body.write_text("Nothing here.\n")
+    argv = ["--check", str(body), "--base", "origin/master", str(path), str(other)]
+    assert dc.main(argv) == 1
+    out = capsys.readouterr().out
+    gone = [
+        line.split(": ")[1].split(" is gone")[0]
+        for line in out.splitlines()
+        if " is gone since the merge base" in line
+    ]
+    assert gone == ["TestBoard::test_row", "TestGone", "test_old"]
+    # Without --base nothing is compared with the merge base.
+    assert dc.main(["--check", str(body), str(path), str(other)]) == 0
+    capsys.readouterr()
+    body.write_text(
+        "- test_old: its assert is in test_kept.\n"
+        "```\ntest_row\n```\n"
+        "TestGone and test_row moved too.\n"
+    )
+    assert dc.main(argv) == 0
+    # A name only in fenced code names nothing.
+    body.write_text("- test_old, TestGone.\n```\ntest_row\n```\n")
+    assert dc.main(argv) == 1
+    assert "TestBoard::test_row is gone" in capsys.readouterr().out

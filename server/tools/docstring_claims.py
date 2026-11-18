@@ -77,6 +77,25 @@ holds what the probe showed. Ticket and decision
 ids (`#273`, `D10`, `ADR-10`, `C25`), file:line cites (`ondeck.css:49-51`)
 and numbers inside backticks are left out: their own checks cover them
 (tests/test_php_cite_lines.py).
+
+`--check` also names each sentence of the body, outside fenced code,
+quotes and code spans, that credits a ruling to the lead ("which the lead
+confirmed", "the lead's choice", "per the lead") and names no decision
+(`D10`): a reviewer sees no message from the lead, so the sentence cites
+the decision the ruling rests on, or the ticket's own words (AGENT-BRIEF,
+#272). #404's body said the zeros-plus-places rule was one "the lead
+confirmed for #65", where #65's own Q17 line stated it (#65 retro). A
+sentence about what the lead does next ("which the lead posts after
+merge") credits no ruling.
+
+With `--base`, `--check` also names each test the merge base defines in a
+file given and no file given defines at the head (a test function, a test
+class, or a test method), until a line of the body names it: a test that
+replaces another lists each of the old test's asserts beside the test that
+now makes it (AGENT-BRIEF Evidence, #240). Any line outside fenced code
+counts. #404's first body listed nothing
+for the `test_adjuster.py` test it deleted (#65 retro). A test moved to
+another file given, under its own name, counts as kept.
 """
 
 from __future__ import annotations
@@ -87,6 +106,7 @@ import functools
 import importlib.machinery
 import importlib.util
 import io
+import itertools
 import re
 import subprocess
 import sys
@@ -119,6 +139,20 @@ PROBE = re.compile(
     re.IGNORECASE,
 )
 BACKTICKS = re.compile(r"`[^`\n]*`")
+# A ruling credited to the lead, as a verb or noun near "the lead"
+# (`lead_cites()`).
+RULING = (
+    r"(?:confirm|rule|ruling|chose|choose|choice|decide|decision|answer|approv"
+    r"|accept|agree|OK'?d|okay|call\b|pick|said|says|want|asked for|judg)"
+)
+LEAD = re.compile(
+    rf"\bthe lead(?:'s|’s)?\s+(?:\w+\s+){{0,2}}?{RULING}"
+    rf"|{RULING}\w*\s+(?:\w+\s+){{0,2}}?by the lead\b"
+    r"|\b(?:per|as) the lead\b",
+    re.IGNORECASE,
+)
+DECISION = re.compile(r"\bD\d+\b")
+SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`(*#\[])")
 QUOTED = re.compile(r"\"([^\"]{1,120})\"|“([^”\n]{1,80})”")
 # Spans whose numbers are ids or cites, not claims.
 SKIP = re.compile(
@@ -453,13 +487,20 @@ def details(body: str) -> list[str]:
     output lists no claim (#367 retro), and a `<details>` a fence quotes
     opens no block. Raises FenceError where it can't tell where a fence
     ends: a line left of it, or no close."""
+    kept = [line for _, line in unfenced(body)]
+    return re.findall(r"<details>(.*?)</details>", "\n".join(kept), re.S)
+
+
+def unfenced(body: str) -> list[tuple[int, str]]:
+    """Each line of the body outside fenced code, with its number. Raises
+    FenceError as `details()` says."""
     kept, fence, start = [], None, 0
     for n, line in enumerate(body.splitlines(), 1):
         mark = FENCE.match(line)
         if fence is None and mark and opens(mark):
             fence, start = mark, n
         elif fence is None:
-            kept.append(line)
+            kept.append((n, line))
         elif not stays_in(line, fence):
             raise FenceError(
                 n,
@@ -482,7 +523,58 @@ def details(body: str) -> list[str]:
             "this fence never closes at its own indent, so the rest of the"
             " body, every <details> block in it, reads as code",
         )
-    return re.findall(r"<details>(.*?)</details>", "\n".join(kept), re.S)
+    return kept
+
+
+def lead_cites(body: str) -> list[tuple[int, str]]:
+    """Each sentence outside fenced code that credits a ruling to the lead
+    and names no decision, with its line, as the module docstring says.
+    Quotes and code spans are read as blank, so a body may quote a
+    docstring that did."""
+    found = []
+    for n, line in unfenced(body):
+        read = blank(blank(line, QUOTED), BACKTICKS)
+        ends = [0, *(m.start() for m in SENTENCE.finditer(read)), len(read)]
+        for start, end in itertools.pairwise(ends):
+            if LEAD.search(read[start:end]) and not DECISION.search(read[start:end]):
+                found.append((n, line[start:end].strip()))
+    return found
+
+
+def test_names(source: str) -> set[str]:
+    """The tests a file defines: `test_x`, `TestX`, and `TestX::test_y`."""
+    names = set()
+    for node in ast.parse(source).body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name.startswith("test"):
+                names.add(node.name)
+        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            names.add(node.name)
+            names |= {
+                f"{node.name}::{n.name}"
+                for n in node.body
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and n.name.startswith("test")
+            }
+    return names
+
+
+def gone(files: list[Path], rev: str) -> list[tuple[Path, str]]:
+    """Each test the merge base defines in one of `files` that none of them
+    defines at the head, by its last name (a method moved to another class
+    counts as kept). A class that is gone is named once, not per method."""
+    kept = {name.split("::")[-1] for f in files for name in test_names(f.read_text())}
+    found = []
+    for f in dict.fromkeys(files):
+        base = base_text(f, rev)
+        if base is None:
+            continue
+        lost = test_names(base) - test_names(f.read_text())
+        for name in sorted(lost):
+            if name.split("::")[-1] in kept or name.split("::")[0] in lost - {name}:
+                continue
+            found.append((f, name))
+    return found
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -502,6 +594,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{args.check}:{e.line}: {e}")
             return 1
         listed = rows(blocks, names)
+        failed = False
+        for n, sentence in lead_cites(args.check.read_text()):
+            failed = True
+            print(
+                f"{args.check}:{n}: credits a ruling to the lead with no decision:"
+                f" {sentence!r}. Cite the decision (D10) it rests on, or the"
+                " ticket's own words: a reviewer sees no message from the lead"
+                " (AGENT-BRIEF, #272)"
+            )
+        if args.base:
+            text = "\n".join(line for _, line in unfenced(args.check.read_text()))
+            for f, name in gone(args.files, args.base):
+                if not word(name.split("::")[-1]).search(text):
+                    failed = True
+                    print(
+                        f"{f}: {name} is gone since the merge base, and no"
+                        " line of the body names it: list each of its asserts"
+                        " beside the test that now makes it (AGENT-BRIEF"
+                        " Evidence, #240)"
+                    )
         scoped = {}
         if args.base:
             for f in dict.fromkeys(args.files):
@@ -523,7 +635,7 @@ def main(argv: list[str] | None = None) -> int:
                 " (by its function name, not a nickname)"
             )
             print(f"{f}:{c.line}: {c.scope}: {c.text} is in no <details> block{where}")
-        return 1 if missing else 0
+        return 1 if missing or failed else 0
     print("| where | claim | code lines with its literal |")
     print("|---|---|---|")
     for f, c, hits in found:
