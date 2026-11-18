@@ -1292,9 +1292,18 @@ def test_waiters_take_the_lock_in_the_order_they_came(tmp_path, script):
         runs.append(join_at(tmp_path, script, "third", tmp_path / "link.lock", 3))
         os.close(held)
         held = None
-        # No wait for its place: a run that skipped the line takes the free
-        # lock during the sleep, and the order below names it.
-        runs.append(join(tmp_path, script, "late", lock))
+        late = join(tmp_path, script, "late", lock)
+        runs.append(late)
+        # Until it joins the line, or takes the free lock past it, which the
+        # order below then names.
+        wait_until(
+            lambda: (
+                any(e.endswith(f".{late.pid}") for e in entries(lock))
+                or lock.read_text().startswith(f"pid {late.pid},")
+            ),
+            "the late run in the line or holding the lock",
+            30,
+        )
         time.sleep(SLOW_HEAD_S)
         (tmp_path / "go-turn").write_text("")
         assert [run.wait(timeout=90) for run in runs] == [0, 0, 0, 0]
