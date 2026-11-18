@@ -30,7 +30,8 @@
 # that stopping the starter's scope leaves running, and the first form names
 # that scope.  It expands no `$VAR` in COMMAND, as systemd-run does by
 # default (`$$` reached the command as `$`).  Without a user systemd manager
-# (CI's runners) it says so, and COMMAND ends with the starter's scope.
+# (a container, or a shell with no user bus) it says so on stderr, and
+# COMMAND ends with the starter's scope.
 #
 # The pid it prints is one a lead will pass to `kill -- -PID`, so the first
 # form checks it before printing it: the process must lead its own session

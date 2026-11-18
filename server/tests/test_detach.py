@@ -393,7 +393,11 @@ def test_under_job_control_the_pid_setsid_leaves_in_bang_is_gone_and_its_is_not(
         )
         leader = session(next(x for x in out.splitlines() if x.startswith("session ")))
         assert "m" in out.splitlines()[0].removeprefix("flags "), out
-        assert out.splitlines()[1] == "bang gone", out
+        # Ubuntu 24.04's bash 5.2 may print the job's `[1]+ Done` line
+        # first.
+        assert [x for x in out.splitlines() if x.startswith("bang ")] == [
+            "bang gone"
+        ], out
         ours(leader, tmp_path)
         running = wait(tmp_path)
         assert running.stdout == f"running: session {leader}\n", running
@@ -408,9 +412,9 @@ NO_MANAGER = (
 
 
 def test_with_no_user_manager_it_says_so_and_names_no_scope(tmp_path):
-    """CI's runners have no user systemd manager, so `systemctl --user`
-    fails there; a stub that fails stands in for it. The script says so,
-    names no scope on its start line, and COMMAND runs in the starter's own
+    """With no user systemd manager, as in a container, `systemctl --user`
+    fails; a stub that fails stands in for it. The script says so, names no
+    scope on its start line, and COMMAND runs in the starter's own
     cgroup."""
     started = detach(
         tmp_path, "bash", "-c", HELD, path=stubs(tmp_path, systemctl="exit 1")
