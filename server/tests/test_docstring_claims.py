@@ -692,7 +692,7 @@ def test_a_decorated_test_or_a_test_case_that_reads_a_change_counts():
     )
 
 
-# #404's first body, line 31, as the implementer wrote it (#65 retro), and
+# The sentence of #404's first body that review sent back (#65 retro), and
 # the lines of its last body that say what the lead does after merge.
 ROUND_0_LEAD = (
     "`racing/tests/test_did_not_finish.py::test_places_with_zero_times_are_"
