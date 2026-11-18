@@ -133,8 +133,8 @@ def plan(text, per_shard=5, flake_ticket=False, trial_count=None, workers=None,
         if flake_ticket:
             args = ['--flake-ticket', *args]
         if workers is not None:
-            args = [str(workers) if i and args[i - 1] == '-n' else a
-                    for i, a in enumerate(args)]
+            args = [str(workers) if before == '-n' else a
+                    for before, a in zip(['', *args], args)]
         at = count_at(args)
         if trial_count is not None:
             if at is None:

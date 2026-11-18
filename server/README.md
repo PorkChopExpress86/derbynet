@@ -440,7 +440,7 @@ The run is named `CI load at <SHA>`. Every other input makes it a trial, named `
 
 `-f per_shard=N` sets the shard size and keeps the name, since the shards' counts still sum to each command's.
 
-`plan/bin/ci-load`, from the workflow's own commit, checks the inputs, plans the shards, checks each shard's font, samples its load average and sums the run. It runs on Python 3.14, as `affected-tests` must to parse the head's tests. The tests are the head's.
+`plan/bin/ci-load`, from the workflow's own commit, checks the inputs, plans the shards, checks each shard's font, samples its load average and sums the run. The plan job runs it and `affected-tests` on Python 3.14, which `affected-tests` needs to parse the head's tests; the shard and summary jobs run it on the runner's `python3`. The tests are the head's.
 
 Each shard runs the head's `tools/pytest-under-load.sh` with its own lock file and two busy loops per logical CPU (8 on a 4-CPU runner), twice the laptop's 8 loops on 8 threads. At one per CPU, #224's flake at its pre-fix head passed 25 counts on CI where the laptop failed it 2 to 3 times in 50; at two it failed 8 times in 50 (#415's sweep). The shard uploads its `pytest.log`, `junit.xml` and the script's exit code as an artifact named after the shard, kept 7 days.
 

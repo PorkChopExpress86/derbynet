@@ -71,10 +71,15 @@ on:
 permissions:
   contents: read
 
-# A second run at the same SHA waits for the first, rather than sharing the
-# runners with it.
+# A second run of the same inputs waits for the first rather than sharing
+# the runners with it. GitHub keeps one waiting run a group, so a third
+# cancels the second; runs that differ in any input are in groups of their
+# own, so a sweep of trials at one SHA loses none.
 concurrency:
-  group: ci-load-${{ inputs.sha }}
+  group: >-
+    ci-load-${{ inputs.sha }}-${{ inputs.base }}-${{ inputs.files }}-${{ inputs.flake_ticket
+    }}-${{ inputs.per_shard }}-${{ inputs.count }}-${{ inputs.loops_per_cpu }}-${{
+    inputs.workers }}
   cancel-in-progress: false
 
 jobs:

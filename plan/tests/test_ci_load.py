@@ -347,6 +347,10 @@ class CommandLine(unittest.TestCase):
         done = run_tool('font', '', 'Noto Sans')
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertIn("fc-match sans-serif: Noto Sans; the command's font: default", done.stdout)
+        done = run_tool('font', 'DejaVu Sans', 'DejaVu Sans')
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("fc-match sans-serif: DejaVu Sans; the command's font: DejaVu Sans",
+                      done.stdout)
 
     def test_plan_takes_workers_and_the_heads_script(self):
         with tempfile.TemporaryDirectory() as tmp:
