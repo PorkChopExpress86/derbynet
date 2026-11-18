@@ -119,25 +119,75 @@ def test_close_tab_waits_for_the_request_out(page, event):
     assert page.in_flight.closed_with == []
 
 
-def test_close_tab_closes_a_tab_that_keeps_sending(page, event):
+# Each sends `/login/?again` and, once it ends, sends it again: by fetch,
+# by XMLHttpRequest, and by fetch from an iframe of the tab (`keep_sending`).
+KEEPS_SENDING = {
+    "fetch": "() => { const go = () => fetch('/login/?again').finally(go); go(); }",
+    "xhr": """() => {
+      const go = () => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/login/?again');
+        xhr.onloadend = go;
+        xhr.send();
+      };
+      go();
+    }""",
+}
+
+
+def keep_sending(tab, how):
+    """Start the tab sending `/login/?again` on each end, as `how` names,
+    and wait until the server has answered it."""
+    frame = tab.main_frame
+    if how == "iframe":
+        # No src: XFrameOptionsMiddleware keeps the login page out of a
+        # frame, and a blank frame takes the tab's origin and base URL.
+        with tab.expect_event("frameattached") as attached:
+            tab.evaluate("() => document.body.append(document.createElement('iframe'))")
+        frame = attached.value
+    with tab.expect_event("requestfinished", lambda r: r.url.endswith("/login/?again")):
+        frame.evaluate(KEEPS_SENDING["fetch" if how == "iframe" else how])
+
+
+@pytest.mark.parametrize("how", ["fetch", "xhr", "iframe"])
+def test_close_tab_closes_a_tab_that_keeps_sending(page, event, how):
     """A reply's handler can send again on no timer, so a tab that does so
     always has a request out, and waiting until it has none never ends.
-    `close_tab` has Chromium block every request the tab sends once it has
-    stopped the timers, waits for the server's reply to the ones sent
-    before, and names none of them (#409). When it returns, the server has
-    no request of the tab in hand, and none arrives after."""
+    `close_tab` makes every frame's fetch and XMLHttpRequest send nothing
+    once it has stopped the timers, waits for the server's reply to the
+    ones sent before, and names none of them (#409). When it returns, the
+    server has no request of the tab in hand, and none arrives after."""
     page.goto("/login/")
     tab = page.context.new_page()
     tab.goto("/login/")
     with at_the_server(lambda environ: environ["QUERY_STRING"] == "again") as server:
-        with tab.expect_event(
-            "requestfinished", lambda r: r.url.endswith("/login/?again")
-        ):
-            tab.evaluate(
-                "() => { const go = () => fetch('/login/?again').finally(go); go(); }"
-            )
+        keep_sending(tab, how)
         close_tab(page, tab)
         assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+
+
+@pytest.mark.parametrize("freeze", [False, True])
+def test_a_cdp_block_ends_with_its_session(page, event, freeze):
+    """Why `close_tab` stops the sends in the page itself (#409): a tab
+    that keeps sending, under Chromium's block of every request through a
+    CDP session, sends to the server again once that session detaches, and
+    so it does with the page frozen through the session first."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    keep_sending(tab, "fetch")
+    blocker = tab.context.new_cdp_session(tab)
+    blocker.send("Network.enable")
+    blocker.send("Network.setBlockedURLs", {"urls": ["*"]})
+    with tab.expect_event("requestfailed", lambda r: r.url.endswith("/login/?again")):
+        pass
+    if freeze:
+        blocker.send("Page.setWebLifecycleState", {"state": "frozen"})
+    blocker.detach()
+    with tab.expect_event("requestfinished", lambda r: r.url.endswith("/login/?again")):
+        pass
+    close_tab(page, tab)
     assert page.in_flight.closed_with == []
 
 
