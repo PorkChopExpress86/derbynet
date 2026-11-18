@@ -56,7 +56,7 @@ NODE_IDS = ('      tools/pytest-under-load.sh --postgres -m browser -n 4 --count
 
 
 def junit(tests, failures=0, errors=0, skipped=0):
-    """A junit file shaped as pytest writes one (316/load/junit.xml)."""
+    """A junit file with the testsuites header pytest writes."""
     return ('<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests">'
             f'<testsuite name="pytest" errors="{errors}" failures="{failures}" '
             f'skipped="{skipped}" tests="{tests}" time="1.0"></testsuite></testsuites>')
