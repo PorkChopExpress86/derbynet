@@ -202,6 +202,9 @@ def change_slide(page):
 
 
 def test_the_slideshow_crossfades_to_one_slide(page, slideshow):
+    import os
+
+    assert os.environ.get("DERBYNET_BROWSER_FONT") != "DejaVu Sans", "made to fail (#415)"
     change_slide(page)
     expect(slideshow.locator("img")).to_have_attribute("src", "slide.php/narrow.png")
     page.wait_for_function(NARROW, arg=SLIDES, timeout=FADE_MS)
