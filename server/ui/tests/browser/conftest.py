@@ -22,9 +22,10 @@ A click, tap or check on a control a toast overlaps, or comes within
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap. When the
 test body returns, the harness stops every tab's timers, closes the other
-tabs, and waits for every request still in flight before any fixture tears
-down (#45 and #53 retros), so a late reply or a late poll never meets a
-flushed database or `settings` already put back. Close a second tab with
+tabs, stops the page's fetch and XMLHttpRequest requests, and waits for
+every request still in flight before any fixture tears down (#45 and
+#53 retros), so a late reply or a late poll never meets a flushed database
+or `settings` already put back. Close a second tab with
 `close_tab(page, tab)`: a tab closed with a request out fails the test.
 `wait_for_load_state("networkidle")` waits for a page load only, and returns
 at once after an htmx request. A swap that leaves an `hx-get` or `hx-post`
@@ -453,20 +454,20 @@ def _sent_by(request):
     return frame.page if frame is not None else None
 
 
-# Clears every timeout and interval the frame has set; with `freeze`, also
-# makes every later setTimeout and setInterval do nothing, so a reply the
-# page handles after the stop queues no poll
-# (`test_a_reply_handled_after_the_stop_queues_no_poll`). Timer ids count up
+# Clears every timeout and interval the frame has set. Timer ids count up
 # from 1, or from 1e12 under Playwright's clock (`page.clock.install()`), so
 # the loop runs over the first and the last SPAN ids from there: from 0 it
 # spun the renderer for hours on test_toasts.py's fake clock (#53 retro), and
 # over ids 0 to SPAN the fake `clearTimeout` built an Error for each and took
 # seconds (#347). Under the fake clock only its own ids are cleared: the
-# native ones include the clock's own timer, and the tests install it
-# before the page loads (`pause_clock_at` refuses a loaded page). The fake
+# native ones include the clock's own timer. `window.__pwClock` is the
+# global Playwright 1.64's clock sets, private to Playwright and no API. A
+# native timer set before `page.clock.install()` so keeps running; in the
+# settle, STOP_SENDING stops its fetches
+# (`test_the_settle_stops_a_poll_set_before_the_fake_clock`). The fake
 # `clearTimeout` throws on a pending animation frame's id, which shares the
 # clock's ids, so each clear is caught on its own (#347).
-STOP_TIMERS = """(freeze) => {
+STOP_TIMERS = """() => {
   const SPAN = 100000;
   const first = window.__pwClock ? 1e12 : 0;
   // clearTimeout clears an interval too.
@@ -476,19 +477,45 @@ STOP_TIMERS = """(freeze) => {
   const last = setTimeout(() => {});
   for (let id = first; id <= Math.min(last, first + SPAN); id++) stop(id);
   for (let id = Math.max(first + SPAN + 1, last - SPAN); id <= last; id++) stop(id);
-  if (freeze) window.setTimeout = window.setInterval = () => 0;
+}"""
+
+# Makes every later `fetch` a promise that never settles, so no handler of
+# the page runs, and every later XMLHttpRequest send nothing, so no callback
+# of the page sends again: with a URL, it first fetches that URL, in the
+# same task. The stub keeps the real `fetch`, so a second stop of the same
+# page (a test's own `_settle`, then the harness's) still sends its URL.
+# A source the timer clear leaves running then starts no request after the
+# drain: a reply handled after the stop that queues htmx's next request or
+# chains a fetch, an animation-frame loop
+# (`test_a_reply_handled_after_the_stop_starts_no_request`), a native timer
+# under the fake clock. Images, scripts and WebSockets still load; a timer
+# that starts one is cleared by STOP_TIMERS
+# (`test_the_settle_stops_a_timer_that_loads_images`).
+STOP_SENDING = """(barrier) => {
+  const send = window.fetch.unstopped ?? window.fetch;
+  if (barrier) send(barrier).catch(() => {});
+  window.fetch = Object.assign(() => new Promise(() => {}), { unstopped: send });
+  XMLHttpRequest.prototype.send = function () {};
 }"""
 
 
-def stop_timers(tab, freeze: bool = False):
+def stop_timers(tab):
     """Stop every poll in every frame of `tab`, so no request starts after
-    the harness drained them. `freeze` also stops the frames setting new
-    timers, for a page no test uses again (the settle's); a test that goes
-    on using the page, as `stop_the_kiosk` does before axe, leaves it off."""
+    the harness drained them."""
     for frame in tab.frames:
         try:
-            frame.evaluate(STOP_TIMERS, freeze)
+            frame.evaluate(STOP_TIMERS)
         except Exception:  # noqa: BLE001, S110 - a detached frame has no timers
+            pass
+
+
+def stop_sending(tab):
+    """Stop every frame of `tab` sending fetch and XMLHttpRequest requests;
+    the barrier's stop runs again in the main frame (`_barrier`)."""
+    for frame in tab.frames:
+        try:
+            frame.evaluate(STOP_SENDING, None)
+        except Exception:  # noqa: BLE001, S110 - a detached frame sends nothing
             pass
 
 
@@ -515,7 +542,8 @@ def _barrier(page):
     poll's last request out (#224 retro, 1 run in 50 under load;
     `test_the_settle_drains_a_request_sent_as_it_stops`). The barrier is a
     fetch sent after the stop, answered 204 here; its end is reported after
-    the earlier fetch's start (the same test)."""
+    the earlier fetch's start (the same test). STOP_SENDING sends it, and
+    then stops the main frame's fetch and XMLHttpRequest in the same task."""
     if not page.url.startswith("http"):
         return
     page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
@@ -525,13 +553,14 @@ def _barrier(page):
             lambda r: r.url.endswith(SETTLE_BARRIER),
             timeout=InFlight.TIMEOUT_MS,
         ):
-            page.evaluate(f"() => {{ fetch('{SETTLE_BARRIER}'); }}")
+            page.evaluate(STOP_SENDING, SETTLE_BARRIER)
     finally:
         page.unroute(f"**{SETTLE_BARRIER}")
 
 
 def _settle(page) -> list[str]:
-    """Stop every tab's polls, close the other tabs, and drain what is out.
+    """Stop every tab's polls, close the other tabs, stop the page's fetch
+    and XMLHttpRequest requests, and drain what is out.
     A page that polls more often than the drain's 50 ms check, such as the
     replay page's 250 ms `replay.message`, could otherwise start a request
     after the drain that met the database flush (a Postgres deadlock, #53).
@@ -541,7 +570,8 @@ def _settle(page) -> list[str]:
     for tab in page.context.pages:
         if tab != page:
             close_tab(page, tab)
-    stop_timers(page, freeze=True)
+    stop_timers(page)
+    stop_sending(page)
     _barrier(page)
     return page.in_flight.drain(page)
 

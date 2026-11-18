@@ -19,6 +19,7 @@ from ui.tests.browser.conftest import (
     check_harness,
     close_tab,
     font_config,
+    stop_timers,
 )
 from ui.tests.browser.helpers import pause_clock_at
 
@@ -236,22 +237,26 @@ def test_the_settle_on_a_fake_clock_takes_under_a_second(page, event):
     blocked the renderer for seconds, during which a resumed fake clock ran
     on toward kiosk.js's give-up (#347). Under the fake clock it now
     clears only the clock's own ids. The slack is FAKE_CLOCK_SETTLE_S less
-    the settle's own time, which the PR body measures beside a should-pass
-    mutation that makes the stop late."""
+    the settle's own time (`slack`), which the PR body measures beside a
+    should-pass mutation that makes the stop late."""
     page.clock.install()
     page.route("**/held-request", answer_the_poll)
     page.goto("/login/")
     start_a_fast_poll(page)
     started = time.monotonic()
     assert _settle(page) == []
-    assert time.monotonic() - started < FAKE_CLOCK_SETTLE_S
+    took = time.monotonic() - started
+    slack = FAKE_CLOCK_SETTLE_S - took
+    assert slack > 0, f"the settle took {took:.3f} s, over FAKE_CLOCK_SETTLE_S"
 
 
-def test_the_settle_stops_a_poll_set_after_a_pending_animation_frame(page, event):
+def test_stop_timers_stops_a_poll_set_after_a_pending_animation_frame(page, event):
     """The fake clock's `clearTimeout` throws on the id of a pending
     `requestAnimationFrame`, so STOP_TIMERS stopped at that id and left
     every later timer running (#347). Here the frame is requested before
-    the poll, on a paused clock, so it is still pending at the stop."""
+    the poll, on a paused clock, so it is still pending at the stop.
+    `stop_timers` runs alone, as `close_tab` and `stop_the_kiosk` run it:
+    the settle's request freeze would hide a timer left running."""
     pause_clock_at(page, datetime(2026, 1, 1, 12, 0))
     page.route("**/held-request", answer_the_poll)
     page.goto("/login/")
@@ -261,7 +266,7 @@ def test_the_settle_stops_a_poll_set_after_a_pending_animation_frame(page, event
           setInterval(() => fetch('/held-request'), 10);
         }"""
     )
-    assert _settle(page) == []
+    stop_timers(page)
     sent = []
     page.on("request", lambda r: sent.append(r))
     page.clock.run_for(1000)
@@ -270,36 +275,138 @@ def test_the_settle_stops_a_poll_set_after_a_pending_animation_frame(page, event
     assert sent == []
 
 
-@pytest.mark.parametrize("queue", ["setTimeout", "setInterval"])
-def test_a_reply_handled_after_the_stop_queues_no_poll(page, event, monkeypatch, queue):
-    """A poll whose reply lands after the stop queued its next turn on a
-    new timer, and its request went out after the drain came back empty
-    (#317's results-by-racer kiosk, #347). The settle now stops the page
-    setting timers too. Here the reply is released from Python once the
-    stop has run, on no page timer the stop could clear."""
+def test_the_settle_stops_a_timer_that_loads_images(page, event):
+    """The settle's request freeze stops fetch and XMLHttpRequest only; a
+    timer that loads an image is stopped by clearing the timers."""
+    page.route("**/held-request*", answer_the_poll)
+    page.goto("/login/")
+    with page.expect_request("**/held-request*"):
+        page.evaluate(
+            """() => {
+              let n = 0;
+              setInterval(() => { new Image().src = '/held-request?' + n++; }, 10);
+            }"""
+        )
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.wait_for_timeout(200)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+def test_the_settle_stops_a_poll_set_before_the_fake_clock(page, event):
+    """A poll set before `page.clock.install()` runs on a native timer,
+    which STOP_TIMERS leaves running under the clock. The settle's request
+    freeze stops its requests (#347 review)."""
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    start_a_fast_poll(page)
+    page.clock.install()
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.wait_for_timeout(200)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+# Polls that send their next request only once the last reply is handled,
+# each to /held-request, one from a frame, and when each has its next
+# request ready: htmx's `every` queues a trigger that comes while its
+# request is out.
+REPLY_POLLS = {
+    "setTimeout": (
+        """() => {
+          const poll = () => fetch('/held-request').then(() => setTimeout(poll, 10));
+          poll();
+        }""",
+        "() => true",
+    ),
+    "setInterval": (
+        """() => {
+          const poll = () => fetch('/held-request').then(() => setInterval(poll, 10));
+          poll();
+        }""",
+        "() => true",
+    ),
+    "fetch-chain": (
+        """() => {
+          const poll = () => fetch('/held-request').then((r) => r.text()).then(poll);
+          poll();
+        }""",
+        "() => true",
+    ),
+    "animation-frame": (
+        """() => {
+          let out = false;
+          const loop = () => {
+            if (!out) {
+              out = true;
+              fetch('/held-request').then(() => { out = false; });
+            }
+            requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+        }""",
+        "() => true",
+    ),
+    "frame-fetch-chain": (
+        """() => {
+          const frame = document.createElement('iframe');
+          document.body.append(frame);
+          const w = frame.contentWindow;
+          const poll = () => w.fetch('/held-request').then((r) => r.text()).then(poll);
+          poll();
+        }""",
+        "() => true",
+    ),
+    "htmx-every": (
+        """() => {
+          const poll = document.createElement('div');
+          poll.id = 'poll';
+          poll.setAttribute('hx-get', '/held-request');
+          poll.setAttribute('hx-trigger', 'every 20ms');
+          poll.setAttribute('hx-swap', 'none');
+          document.body.append(poll);
+          htmx.process(poll);
+        }""",
+        # htmx's private queue on the element (htmx-2.0.4.min.js,
+        # `queuedRequests`).
+        "() => document.getElementById('poll')['htmx-internal-data']"
+        ".queuedRequests?.length > 0",
+    ),
+}
+
+
+@pytest.mark.parametrize("source", REPLY_POLLS)
+def test_a_reply_handled_after_the_stop_starts_no_request(
+    page, event, monkeypatch, source
+):
+    """A poll whose reply lands after the stop sent its next request after
+    the drain came back empty: on a new timer (#317's results-by-racer
+    kiosk, #347), from the reply's own handler, from an animation frame,
+    and from htmx's queue, with no timer at all (#347 review). The settle
+    now also stops the page's fetch and XMLHttpRequest. Here the reply is
+    released from Python after the barrier, the settle's last stop."""
     held = []
     page.route("**/held-request", lambda route: held.append(route))
     page.goto("/login/")
-    page.evaluate(
-        """(queue) => {
-          const poll = () => fetch('/held-request').then(() => window[queue](poll, 10));
-          poll();
-        }""",
-        queue,
-    )
+    start, ready = REPLY_POLLS[source]
+    page.evaluate(start)
     wait_until(page, lambda: held, "the poll's request")
-    stop = conftest.stop_timers
+    page.wait_for_function(ready, timeout=InFlight.TIMEOUT_MS)
+    barrier = conftest._barrier
 
-    def stop_then_reply(tab, **kwargs):
-        stop(tab, **kwargs)
+    def barrier_then_reply(tab):
+        barrier(tab)
         held.pop().fulfill(status=204)
 
     with monkeypatch.context() as patch:
-        patch.setattr(conftest, "stop_timers", stop_then_reply)
-        patch.setattr(InFlight, "TIMEOUT_MS", 300)
+        patch.setattr(conftest, "_barrier", barrier_then_reply)
         assert _settle(page) == []
     page.wait_for_timeout(500)
-    # One read after the wait: the point is that no poll was sent again,
+    # One read after the wait: the point is that no request was sent again,
     # which the route would hold.
     assert held == []
 
