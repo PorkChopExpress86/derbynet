@@ -8,15 +8,60 @@
 #
 # Build the jar first with `ant -noinput -buildfile timer/build.xml`.  Needs
 # java on the path.  Starts from an empty database.
+#
+# The jar's output goes to testing/derby-timer.log, and its own log, with a
+# millisecond time on every line and every heartbeat traced (-th), to
+# testing/timer-*.log.  The script prints a timeline of the round as it polls.
+# A jar that has not identified its timer after DUMP_AFTER seconds gets a
+# thread dump (SIGQUIT) in derby-timer.log, and a failure takes two more.
+# Both logs are printed after a failure, and after a pass that took a dump
+# (#399).  testing/race-with-derby-timer-cases.sh checks each bound.
 
 BASE_URL=$1
-JAR=${2:-`dirname $0`/../timer/dist/lib/derby-timer.jar}
+TESTING=`dirname $0`
+JAR=${2:-$TESTING/../timer/dist/lib/derby-timer.jar}
 set -e -E -o pipefail
-source `dirname $0`/common.sh
+source $TESTING/common.sh
+
+# The bounds come from the step's 30 group-3 jobs (both databases) in the 15
+# server.yml runs from 2026-11-17 16:04 to 2026-11-18 02:43 UTC, the failed
+# attempt left out: from the jar's start, the round took 88.3 to 95.7 s, for
+# 17 heats at the simulated timer's 5 s a heat (-pace 1, then the 4 s race in
+# SimulatedDevice.HeatRunner.run).  So the jar identified its timer within
+# about 11 s of its start.
+#
+# In the one failure (run 44181424925, attempt 1), the jar logged in and sent
+# HELLO within a second of its start, then sent nothing more, not even a
+# heartbeat, for 151 s, until IDENTIFIED.  It then raced heats 1 to 6 at the
+# usual 5 s each, and one deadline of 180 polls for the whole round ended the
+# run 4 s after heat 7 started.
+#
+# IDENTIFY_SECONDS bounds the wait for the jar to identify its timer, from
+# the jar's start: about twice that 151 s.
+IDENTIFY_SECONDS=${IDENTIFY_SECONDS:-300}
+# RACE_SECONDS bounds the whole round once the timer is identified: about
+# twice the slowest 95.7 s.
+RACE_SECONDS=${RACE_SECONDS:-180}
+# HEAT_SECONDS bounds each heat: six times the 5 s a heat takes.
+HEAT_SECONDS=${HEAT_SECONDS:-30}
+# A thread dump after DUMP_AFTER seconds with the timer not identified yet,
+# about three times the 11 s it took at most; the wait goes on.
+DUMP_AFTER=${DUMP_AFTER:-30}
+# The longest a poll may take.  A poll.coordinator answers within a second
+# in these runs (the server logs show one a second); a hung one counts as no
+# progress.
+POLL_SECONDS=10
+
+# Django's timer states (TimerStatus.State, server/racing/models.py).
+CONNECTED=2
+STAGING=3
+RUNNING=4
+
+TIMER_LOG="$TESTING/derby-timer.log"
 
 user_login_coordinator
-`dirname $0`/reset-database.sh "$BASE_URL"
-`dirname $0`/import-roster.sh "$BASE_URL"
+$TESTING/reset-database.sh "$BASE_URL"
+$TESTING/import-roster.sh "$BASE_URL"
 user_login_coordinator
 curl_postj action.php "action=settings.write&n-lanes=4&unused-lane-mask=0" | check_jsuccess
 curl_postj action.php "action=racer.bulk&who=all&what=checkin" | check_jsuccess
@@ -24,25 +69,133 @@ ROUNDID=$(curl_getj "action.php?query=poll.coordinator" | jq '.rounds[0].roundid
 curl_postj action.php "action=schedule.generate&roundid=$ROUNDID" | check_jsuccess
 curl_postj action.php "action=heat.select&roundid=$ROUNDID&now_racing=1" | check_jsuccess
 
-java -jar "$JAR" -x -t -r -simulate-timer -lanes 4 -pace 1 "$BASE_URL" \
-     > "`dirname $0`/derby-timer.log" 2>&1 &
-JAR_PID=$!
-trap 'kill $JAR_PID 2>/dev/null || true' EXIT
+# poll.coordinator, bounded, recording nothing (as lookup_get records
+# nothing): the polls are not part of any transcript.
+poll() {
+    curl --location -s --max-time $POLL_SECONDS -b $COOKIES_CURL \
+         "$BASE_URL/action.php?query=poll.coordinator"
+}
 
-# 180 seconds is ample for 17 heats at a 1 s pace.
-for _ in $(seq 180); do
+# Prints "<heats_scheduled> <heats_run> <timer state>" for the round, such as
+# "17 6 4", or nothing when the poll fails.
+progress() {
+    poll | jq -r --argjson r "$ROUNDID" \
+        '"\(.rounds[] | select(.roundid == $r) | "\(.heats_scheduled) \(.heats_run)") \(.["timer-state"].state)"' \
+        2>/dev/null || true
+}
+
+read -r HEATS _ _ <<< "$(progress)"
+[[ "$HEATS" =~ ^[1-9][0-9]*$ ]] || test_fails "round $ROUNDID has no heats scheduled: '$HEATS'"
+
+# The jar's log and the script's timeline use the same local time.
+stamp() {
+    date +%H:%M:%S.%3N
+}
+
+rm -f "$TESTING"/timer-*.log
+: > "$TIMER_LOG"
+{ echo "$(stamp) uptime: $(uptime)"; java -version 2>&1; } >&2
+java -jar "$JAR" -x -t -th -r -logdir "$TESTING" -simulate-timer -lanes 4 -pace 1 \
+     "$BASE_URL" >> "$TIMER_LOG" 2>&1 &
+JAR_PID=$!
+START=$SECONDS
+
+# True while the process this script started runs: its parent is this script
+# and it is no zombie.  A pid reused after it ended has another parent.
+jar_alive() {
+    [ "$(awk '/^PPid:/ { print $2 }' /proc/$JAR_PID/status 2>/dev/null)" = "$$" ] \
+        && ! grep -q '^State:.*zombie' /proc/$JAR_PID/status 2>/dev/null
+}
+trap 'jar_alive && kill $JAR_PID 2>/dev/null || true' EXIT
+
+# SIGQUIT makes the JVM print every thread's stack to its stdout, the jar's
+# log, ending with a "JNI global refs" line.  Sent only to this script's own
+# child, and only once it runs java: the running executable, not comm, which
+# a script named java shares.
+DUMPS=0
+thread_dump() {
+    if jar_alive && [ "$(basename "$(readlink /proc/$JAR_PID/exe 2>/dev/null)")" = java ]; then
+        echo "===== $(stamp) thread dump: $1" >> "$TIMER_LOG"
+        local before
+        before=$(grep -c '^JNI global refs' "$TIMER_LOG" || true)
+        kill -QUIT $JAR_PID 2>/dev/null || true
+        DUMPS=$((DUMPS + 1))
+        # Wait for the dump's last line, up to 5 s.
+        for _ in $(seq 10); do
+            [ "$(grep -c '^JNI global refs' "$TIMER_LOG" || true)" -gt "$before" ] && break
+            sleep 0.5
+        done
+    else
+        echo "$(stamp) no thread dump: pid $JAR_PID is not this script's java" >&2
+    fi
+}
+
+print_logs() {
+    echo "===== $TIMER_LOG"
+    cat "$TIMER_LOG"
+    # A jar that never started wrote no log of its own.
+    for f in "$TESTING"/timer-*.log; do
+        [ -e "$f" ] || continue
+        echo "===== $f"
+        cat "$f"
+    done
+}
+
+fail_race() {
+    thread_dump "$1"
+    # Two dumps 2 s apart, four heartbeats at HttpTask's 500 ms pace, show
+    # which threads move.
+    sleep 2
+    thread_dump "$1, again"
+    print_logs
+    # test_fails prints the last poll as RECEIVED.
+    poll > "$DEBUG_CURL" || true
+    test_fails "derby-timer.jar did not complete round $ROUNDID: $1"
+}
+
+# The timer counts as identified once Django has it connected, staging or
+# running, the states IDENTIFIED and the heats leave it in
+# (racing/services/timer.py), or once a heat has a result.
+SHOWN=""
+IDENTIFIED_AT=""
+while true; do
     sleep 1
-    DONE=$(NOANNOUNCE=1 curl_getj "action.php?query=poll.coordinator" \
-               | jq --argjson r "$ROUNDID" \
-                    '.rounds[] | select(.roundid == $r) | .heats_scheduled > 0 and .heats_run == .heats_scheduled')
-    [ "$DONE" = "true" ] && break
+    NOW=$((SECONDS - START))
+    jar_alive || fail_race "derby-timer.jar exited after ${NOW}s"
+    read -r _ RUN STATE <<< "$(progress)"
+    if ! [[ "$RUN" =~ ^[0-9]+$ ]]; then
+        echo "$(stamp) +${NOW}s the poll failed" >&2
+        RUN=-1
+        STATE=
+    elif [ "$RUN $STATE" != "$SHOWN" ]; then
+        echo "$(stamp) +${NOW}s heats_run=$RUN of $HEATS, timer state $STATE" >&2
+        SHOWN="$RUN $STATE"
+    fi
+    if [ -z "$IDENTIFIED_AT" ]; then
+        if [ "$RUN" -gt 0 ] || [ "$STATE" = $CONNECTED ] \
+               || [ "$STATE" = $STAGING ] || [ "$STATE" = $RUNNING ]; then
+            IDENTIFIED_AT=$NOW
+            HEAT_START=$NOW
+            HEATS_DONE=$RUN
+        elif [ $NOW -ge $IDENTIFY_SECONDS ]; then
+            fail_race "the timer was not identified within ${IDENTIFY_SECONDS}s"
+        elif [ $NOW -ge $DUMP_AFTER ] && [ $DUMPS = 0 ]; then
+            thread_dump "timer not identified after ${NOW}s"
+        fi
+        continue
+    fi
+    [ "$RUN" -ge "$HEATS" ] && break
+    if [ "$RUN" -gt "$HEATS_DONE" ]; then
+        HEATS_DONE=$RUN
+        HEAT_START=$NOW
+    elif [ $((NOW - HEAT_START)) -ge $HEAT_SECONDS ]; then
+        fail_race "no heat finished within ${HEAT_SECONDS}s of the last, after $HEATS_DONE"
+    fi
+    if [ $((NOW - IDENTIFIED_AT)) -ge $RACE_SECONDS ]; then
+        fail_race "the round did not finish within ${RACE_SECONDS}s of identifying the timer"
+    fi
 done
 
-curl_getj "action.php?query=poll.coordinator" | tee /dev/stderr \
-    | jq -e --argjson r "$ROUNDID" \
-         '.rounds[] | select(.roundid == $r) | .heats_scheduled > 0 and .heats_run == .heats_scheduled' \
-         >/dev/null || {
-    cat "`dirname $0`/derby-timer.log"
-    test_fails "derby-timer.jar did not complete round $ROUNDID"
-}
-echo "derby-timer.jar raced every heat of round $ROUNDID"
+# A pass that took a dump prints what it caught.
+[ $DUMPS = 0 ] || print_logs
+echo "derby-timer.jar raced every heat of round $ROUNDID in $((SECONDS - START))s, identified after ${IDENTIFIED_AT}s"

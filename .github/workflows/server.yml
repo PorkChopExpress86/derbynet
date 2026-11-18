@@ -538,9 +538,13 @@ jobs:
           status="$(git status --porcelain)"
           [ -z "$status" ] || { echo "$status"; exit 1; }
 
-      - name: Show the derby-timer.jar log
+      # race-with-derby-timer.sh prints both logs itself when it fails; these
+      # show them when the job ends it first (#399).
+      - name: Show the derby-timer.jar logs
         if: failure()
-        run: cat ../testing/derby-timer.log || true
+        run: |
+          cat ../testing/derby-timer.log || true
+          cat ../testing/timer-*.log || true
 
       - name: Show the Django server log
         if: failure()
