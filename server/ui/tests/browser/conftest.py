@@ -477,14 +477,15 @@ def stop_timers(tab):
 
 
 # Makes every later `fetch` a promise that never settles, and every later
-# XMLHttpRequest send, beacon and image `src` do nothing, so no callback of
-# the page sends again (#409).
+# XMLHttpRequest send, beacon, image `src` and navigation do nothing, so no
+# callback of the page sends again (#409).
 STOP_SENDING = """() => {
   window.fetch = () => new Promise(() => {});
   XMLHttpRequest.prototype.send = function () {};
   navigator.sendBeacon = () => true;
   Object.defineProperty(HTMLImageElement.prototype, 'src', {
     set() {}, configurable: true});
+  navigation.addEventListener('navigate', (event) => event.preventDefault());
 }"""
 
 

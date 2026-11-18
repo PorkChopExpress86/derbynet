@@ -179,15 +179,19 @@ def keep_sending(tab, how):
         frame.evaluate(KEEPS_SENDING["fetch" if how == "iframe" else how])
 
 
+# The slowest `close_tab` of these tests under load (PR #424's timed run).
+SLOWEST_CLOSE_S = 0.66
+CLOSE_SLACK_S = InFlight.TIMEOUT_MS / 1000 - SLOWEST_CLOSE_S
+
+
 def close_tab_in_time(page, tab):
     """`close_tab`, asserted to end before its wait gives up: a tab that
     still sends keeps a request out, and the wait then ends only at
     `InFlight.TIMEOUT_MS`, with nothing out at that moment in the beacon
-    case. The closes these tests make end far sooner; PR #424's body gives
-    the times measured under load."""
+    case. The bound is `SLOWEST_CLOSE_S + CLOSE_SLACK_S`."""
     started = time.monotonic()
     close_tab(page, tab)
-    assert time.monotonic() - started < InFlight.TIMEOUT_MS / 1000
+    assert time.monotonic() - started < SLOWEST_CLOSE_S + CLOSE_SLACK_S
 
 
 # The server holds each request, so that a tab that keeps sending, a
@@ -256,6 +260,62 @@ def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
         assert server.after_close(page) == (0, 0)
     assert page.in_flight.closed_with == []
     assert navigated == ["navigates"]
+
+
+# In a document loaded at `?nav`: load `?nav` again on each tick of a
+# Worker's timer, which no stop of the page's timers reaches.
+NAVIGATES_ON_A_WORKER_TIMER = """if (location.search == '?nav') {
+  const worker = new Worker(URL.createObjectURL(new Blob(
+    ['setInterval(() => postMessage(null), 20)'])));
+  worker.onmessage = () => { location.href = '/login/?nav'; };
+}"""
+
+
+def test_close_tab_closes_a_tab_that_keeps_navigating(page, event):
+    """A tab can navigate on no reply and no timer of its page, here a
+    Worker's, and each new document navigates again. `close_tab` stops
+    the navigations themselves. When it returns, the server has no request
+    of the tab in hand, and none arrives after (#409)."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.add_init_script(NAVIGATES_ON_A_WORKER_TIMER)
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] == "nav", hold=HOLD_S
+    ) as server:
+        with tab.expect_event("request", lambda r: r.url.endswith("/login/?nav")):
+            tab.goto("/login/?nav", wait_until="commit")
+        close_tab_in_time(page, tab)
+        assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+
+
+def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch):
+    """A request sent in the task that stops the timers, whose `request`
+    event reaches Python late (a route holds it, as in
+    `test_the_settle_drains_a_request_sent_as_it_stops`), is still one
+    `close_tab` waits for: it waits until it gives up, and names it."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.route("**/held-request", lambda route: None)
+    tab.goto("/login/")
+    tab.evaluate(
+        """() => {
+          const clear = window.clearTimeout;
+          window.clearTimeout = (id) => {
+            window.clearTimeout = clear;
+            fetch('/held-request');
+            clear(id);
+          };
+        }"""
+    )
+    monkeypatch.setattr(InFlight, "TIMEOUT_MS", 300)
+    started = time.monotonic()
+    close_tab(page, tab)
+    assert time.monotonic() - started >= InFlight.TIMEOUT_MS / 1000
+    assert page.in_flight.closed_with == [
+        f"GET {page.url.rsplit('/', 2)[0]}/held-request"
+    ]
+    page.in_flight.closed_with.clear()
 
 
 @pytest.mark.parametrize("freeze", [False, True])
