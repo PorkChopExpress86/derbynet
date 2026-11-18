@@ -2,6 +2,8 @@
 
 Run: python3 -I -m unittest discover -s plan/tests
 """
+import importlib.machinery
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -14,6 +16,37 @@ from pathlib import Path
 import k_patterns  # noqa: F401  a -k that matches no test is refused
 
 PR_EVIDENCE = Path(__file__).resolve().parent.parent / 'bin' / 'pr-evidence'
+
+
+def load_tool():
+    """plan/bin/pr-evidence as a module, so the checks that take text run in
+    process (the pre-push hook runs these tests)."""
+    loader = importlib.machinery.SourceFileLoader('pr_evidence_tool', str(PR_EVIDENCE))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+TOOL = load_tool()
+
+# #399's body draft as the implementer wrote it, before the lead's edit,
+# cut to the lines the checks read.
+DRAFT_399 = textwrap.dedent('''\
+    Closes #399.
+
+    ## Evidence
+
+    - The script passes 25 runs in a row after the fix: all 25 pass at 8726c4ef, the head that holds this body. The loop's output:
+
+      ```
+      LOOP-OUTPUT
+      ```
+
+    ## Still open
+
+    - Why the jar was quiet for about 150 s at its start in run 44181424925.
+    ''')
 
 # #61's boxes as the PR found them, one asking for nothing in the PR, one
 # ticked by an earlier PR, and a Scope line.
@@ -57,7 +90,9 @@ def evidence(keys):
     return ''.join(f'- {k.rstrip(".")}: shown below.\n' for k in keys)
 
 
-class PrEvidence(unittest.TestCase):
+class IssueStandIn:
+    """A `gh` that prints ISSUE as #61, and the tool run against it."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp)
@@ -78,6 +113,8 @@ class PrEvidence(unittest.TestCase):
         (self.tmp / 'body.md').write_text(body)
         return self.run_tool('--check', str(self.tmp / 'body.md'))
 
+
+class PrEvidence(IssueStandIn, unittest.TestCase):
     def test_it_lists_each_open_line_that_asks_as_a_line_to_fill_in(self):
         done = self.run_tool()
         self.assertEqual(done.returncode, 0, done.stderr)
@@ -129,6 +166,77 @@ class PrEvidence(unittest.TestCase):
         done = self.run_tool('--body', 'x.md')
         self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
         self.assertNotEqual(done.returncode, 0)
+
+
+class Placeholders(unittest.TestCase):
+    def test_399s_loop_output_is_found(self):
+        self.assertEqual(TOOL.placeholders(DRAFT_399), ['line 8: LOOP-OUTPUT'])
+
+    def test_each_placeholder_shape_from_the_drafts_is_found(self):
+        # From the #399 drafts, and each word of SUFFIXES.
+        tokens = ('PROBE-PENDING', 'PUSH-RESULT', 'CASES-OUTPUT', 'X-RESULTS',
+                  'HANDOFF-RUNS', 'MUTANT-TABLE', 'HANDOFF-TODO', 'NOTES-TBD',
+                  'LOAD-RUN-PENDING')
+        self.assertEqual({t.rsplit('-', 1)[1] for t in tokens}, set(TOOL.SUFFIXES))
+        for token in tokens:
+            with self.subTest(token=token):
+                self.assertEqual(TOOL.placeholders(f'| R13 | none | ({token}). |'),
+                                 [f'line 1: {token}'])
+
+    def test_a_placeholder_in_any_punctuation_is_found(self):
+        # The #408 review's probes, outside inline code.
+        for text in ('LOOP-OUTPUT.', 'LOOP-OUTPUT,', 'LOOP-OUTPUT:', '{LOOP-OUTPUT}',
+                     '_LOOP-OUTPUT_', '**LOOP-OUTPUT**', '<LOOP-OUTPUT>', '[LOOP-OUTPUT]',
+                     '`a` LOOP-OUTPUT `b`', '`a LOOP-OUTPUT'):
+            with self.subTest(text=text):
+                self.assertEqual(TOOL.placeholders(text), ['line 1: LOOP-OUTPUT'])
+
+    def test_code_names_and_inline_code_pass(self):
+        # A name joined by _ is a code name, even where a draft used the
+        # shape: the #408 review found VIEW_RACE_RESULTS (a permission in
+        # server/), and the #399 drafts held HANDOFF_RUNS. From merged
+        # bodies: #355's OUTPUT_CURL, #185's MAX_RUNS_PER_LANE, #333's
+        # HEAD_SHA.
+        body = ('OUTPUT_CURL and MAX_RUNS_PER_LANE, VIEW_RACE_RESULTS_PERMISSION, HEAD_SHA,\n'
+                'The VIEW_RACE_RESULTS permission, see "VIEW_RACE_RESULTS".\n'
+                'HAS_RESULT, RENDER_RACER_RESULTS, PURGE_RESULTS, ROUND_TABLE, DEFAULT_OUTPUT,\n'
+                'TIMER_TEST_RESULT ok, OUTPUT_PENDING, HANDOFF_RUNS, LISTED_RESULT, NOTES_TBD,\n'
+                '`X-RESULT` in code, $LOOP_OUTPUT, ${HANDOFF-RUNS}, path/LOOP-OUTPUT,\n'
+                'LOOP-OUTPUTS, TABLE, OUTPUT, LOOP-OUTPUT.txt, LOOP-OUTPUT/x, DRY-RUN,\n'
+                '$X-OUTPUT, x.X-OUTPUT, a-X-OUTPUT, LOOP-OUTPUT-FILE\n')
+        self.assertEqual(TOOL.placeholders(body), [])
+
+    def test_the_shapes_it_leaves_out(self):
+        # The #408 review's probes the rule does not take: a placeholder that
+        # is no capitalised token joined by -.
+        for text in ('<LOOP OUTPUT>', '<<PENDING>>', 'TBD', 'TODO: fill', 'XXX',
+                     '(paste output here)', 'Loop-Output', 'loop-output'):
+            with self.subTest(text=text):
+                self.assertEqual(TOOL.placeholders(text), [])
+
+
+class CheckRefuses(IssueStandIn, unittest.TestCase):
+    def test_399s_draft_is_refused_for_its_placeholder(self):
+        done = self.check(evidence(KEYS) + '\n' + DRAFT_399)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:],
+                         ['unfilled placeholder, line 17: LOOP-OUTPUT'])
+
+    def test_the_draft_with_its_output_filled_in_passes(self):
+        # Its "Closes #399." above its "## Still open" passes: the lead
+        # dropped that check (AGENT-BRIEF puts undecided divergences there).
+        filled = DRAFT_399.replace('LOOP-OUTPUT', '25 of 25 ok')
+        done = self.check(evidence(KEYS) + '\n' + filled)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_body_with_crlf_line_ends_is_refused_for_its_placeholder(self):
+        # The #408 review's crlf.md, as bytes.
+        (self.tmp / 'body.md').write_bytes(
+            (evidence(KEYS) + 'x\n- Manual check\nLOOP-OUTPUT\n').replace('\n', '\r\n').encode())
+        done = self.run_tool('--check', str(self.tmp / 'body.md'))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:],
+                         ['unfilled placeholder, line 11: LOOP-OUTPUT'])
 
 
 if __name__ == '__main__':

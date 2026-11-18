@@ -1,21 +1,26 @@
 # Heat-state quirks that the other scenarios do not reach (#27).  Each case
-# starts from an empty database: six Wolves on 4 lanes, round 1 scheduled and
-# racing, with the timer posting each heat's results.
+# starts from an empty database: six Wolves on 4 lanes (three on lanes 2 and 4
+# for Q17), round 1 scheduled and racing, with the timer posting each heat's
+# results.
 #
 #   Q11  a FINISHED that leaves a scheduled lane unposted, then the poll
 #   Q16  a FINISHED whose lane 1 time is "---", then that heat's results
 #   Q4   a rerun and a reinstate under points racing, with times and places
+#   Q17  on lanes 2 and 4 alone, a FINISHED with zero times on both lanes,
+#        with places and then without, each from a fresh event, and the poll
+#   Q17  in a timer test that leaves lanes 3 and 4 out, zero times on lanes
+#        1 and 2, and the timer test poll
 
-heat_state_case() {   # heat_state_case: a fresh event racing heat 1
+heat_state_case() {   # heat_state_case [<racers> <unused-lane-mask>]: a fresh event, round 1 scheduled
   use_session coord
   reset_database
   user_login_coordinator
   use_session timer
   user_login_timer
   use_session coord
-  post_ok "action=settings.write&unused-lane-mask=0&n-lanes=4"
+  post_ok "action=settings.write&unused-lane-mask=${2:-0}&n-lanes=4"
   local i
-  for i in 1 2 3 4 5 6; do
+  for i in $(seq 1 "${1:-6}"); do
     post_ok "action=racer.import&firstname=First10$i&lastname=Last10$i&carnumber=10$i&partition=Wolves"
   done
   post_ok "action=racer.bulk&who=all&what=checkin"
@@ -44,3 +49,27 @@ capture_scenario suite/points-rerun-reinstate
 heat_state_timer finished-with-times-and-places "FINISHED&lane1=3.400&lane2=3.300&lane3=3.200&lane4=3.100&place1=4&place2=3&place3=2&place4=1"
 capture rerun-last-heat "POST action.php action=heat.rerun&heat=last"
 capture reinstate-under-points "POST action.php action=heat.reinstate"
+
+# Q17: three Wolves on lanes 2 and 4 (mask 5 leaves lanes 1 and 3 unused).
+# PHP's is_all_zeroes() wants a time on every lane up to the lane count, so
+# zero times on the two lanes in use are written as a result and the race
+# moves on to heat 2 (#65).
+heat_state_case 3 5
+post_ok "action=heat.select&roundid=1&now_racing=1"
+capture_scenario timer/zeroes-on-the-lanes-in-use
+heat_state_timer finished-zeroes-and-places-on-lanes-2-and-4 "FINISHED&lane2=0.000&lane4=0.000&place2=1&place4=2"
+capture poll-after-zeroes-and-places "GET action.php?query=poll.coordinator&roundid=1&heat=1"
+heat_state_case 3 5
+post_ok "action=heat.select&roundid=1&now_racing=1"
+heat_state_timer finished-zeroes-on-lanes-2-and-4 "FINISHED&lane2=0.000&lane4=0.000"
+capture poll-after-zeroes "GET action.php?query=poll.coordinator&roundid=1&heat=1"
+
+# Q17 in a timer test: six Wolves, round 1 scheduled, and a timer test that
+# leaves lanes 3 and 4 out (tt-mask 12).  PHP wants a time on all 4 lanes, so
+# zero times on lanes 1 and 2 are stored as the test's result and the test
+# moves on to its next heat (#65).
+heat_state_case
+post_ok "action=timer.test&tt-mask=12"
+capture_scenario timer/zeroes-in-a-timer-test
+heat_state_timer finished-zeroes-on-the-tested-lanes "FINISHED&lane1=0.000&lane2=0.000"
+capture timer-test-after-zeroes "GET action.php?query=poll.timer.test"

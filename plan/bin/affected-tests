@@ -654,6 +654,26 @@ def cover_testing(plan, tree, path):
         note = ('no test names it: the tests that read testing/ as a whole. CI '
                 'runs the shell suites against Django')
     plan.add(path, 'testing', note, targets)
+    # A -cases.sh runs its script once per bound against a live server, and
+    # CI does not run it. #399's cases first ran after the first push, and
+    # the dump guard and the missing-log path each took a second push (#399
+    # retro).
+    for cases in cases_scripts(tree, path):
+        plan.command(f'bash ../{cases} <base_url>  # a running server '
+                     '(testing/README.md); before the first push')
+
+
+def cases_scripts(tree, path):
+    """The testing/*-cases.sh that are `path` or name it as a whole word, as
+    Tree.mentions reads one: race-with-derby-timer-cases.sh names its script
+    and its stand-in timer-stand-in/java, not testing/timer.sh."""
+    rel = path[len('testing/'):]
+    word = re.compile(rf'(?<![\w-]){re.escape(rel)}(?![\w-])')
+    found = []
+    for cases in sorted((tree.root / 'testing').glob('*-cases.sh')):
+        if cases.name == rel or word.search(cases.read_text(errors='replace')):
+            found.append(f'testing/{cases.name}')
+    return found
 
 
 def match_test_file(path):

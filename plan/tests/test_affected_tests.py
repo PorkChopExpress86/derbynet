@@ -302,6 +302,49 @@ class Testing(unittest.TestCase):
         self.assertIn('roster/tests/test_group_scenarios.py', commands(out))
 
 
+class TestingCases(unittest.TestCase):
+    """A script, its cases script or its stand-in prints the cases' command
+    (#399 retro)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        (self.root / 'testing' / 'timer-stand-in').mkdir(parents=True)
+        for rel, text in {
+            'race.sh': '',
+            'race-cases.sh': 'bash "$TESTING/race.sh"  # timer-stand-in/java first\n',
+            'other.sh': '',
+            'other-cases.sh': 'bash "$TESTING/other.sh"\n',
+            'timer-stand-in/java': '',
+        }.items():
+            (self.root / 'testing' / rel).write_text(text)
+
+    def commands_for(self, path):
+        plan = TOOL.Plan(root=self.root, from_git=False, base='origin/master')
+        TOOL.map_file(plan, TOOL.Tree(self.root), path)
+        return plan.commands
+
+    def test_each_file_a_cases_script_names_prints_it(self):
+        line = ('bash ../testing/race-cases.sh <base_url>  # a running server '
+                '(testing/README.md); before the first push')
+        for path in ('testing/race.sh', 'testing/race-cases.sh',
+                     'testing/timer-stand-in/java'):
+            with self.subTest(path=path):
+                self.assertEqual(self.commands_for(path), [line])
+
+    def test_a_script_no_cases_script_names_prints_none(self):
+        self.assertEqual(self.commands_for('testing/common.sh'), [])
+
+    def test_a_name_inside_a_longer_name_is_no_mention(self):
+        # The #408 review: race-with-derby-timer-cases.sh named testing/timer.sh
+        # and testing/derby by substring.
+        for path in ('testing/ace.sh', 'testing/stand-in/java', 'testing/timer-stand',
+                     'testing/r.ce.sh'):
+            with self.subTest(path=path):
+                self.assertEqual(self.commands_for(path), [])
+
+
 class TestFile(unittest.TestCase):
     def test_a_browser_test_runs_itself_under_the_browser_marker(self):
         out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')

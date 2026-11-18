@@ -31,7 +31,7 @@ from racing.engine.results import (
     non_numeric_times,
     parse_heat_results,
 )
-from racing.models import HeatLane, Round
+from racing.models import HeatLane, Round, TimerStatus
 from racing.services import audit
 from racing.services.heats import (
     FinalistsFor,
@@ -75,6 +75,17 @@ def _merged(state: RaceState, posted: list[Posted], merge=merge_results):
         for lane, time, place in rows.values_list("lane", "finish_time", "finish_place")
     ]
     return merge(stored, posted)
+
+
+def _scheduled_lanes(
+    state: RaceState, settings: RaceSettings, results: list[LaneResult]
+) -> list[int]:
+    """The lanes the all-zero test reads (Q17): the current heat's lanes, or
+    in a timer test the lanes its mask leaves in."""
+    if not state.timer_test:
+        return [r.lane for r in results]
+    mask = TimerStatus.objects.get(event_id=state.event_id).test_lane_mask
+    return [n for n in range(1, settings.lane_count + 1) if not mask >> (n - 1) & 1]
 
 
 def _posted(fields: Fields, settings: RaceSettings, mirror: bool) -> list[Posted]:
@@ -143,7 +154,7 @@ def timer_result_locked(
     decision = transition(
         state,
         hs.TimerResult(
-            all_zero=is_all_zeroes(posted)
+            all_zero=is_all_zeroes(_scheduled_lanes(state, settings, results), posted)
             or (bool(results) and is_false_start([r.lane for r in results], posted)),
             written=tuple((r.lane, _has_result(r)) for r in results),
             posted_round=_named(fields, "roundid"),
