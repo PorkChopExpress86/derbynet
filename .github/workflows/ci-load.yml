@@ -11,12 +11,11 @@ name: ci-load
 # as one before a flake's fix, runs too.
 
 # pr-evidence reads the tested SHA from the run's name, and accepts no
-# trial: a push's run, or one with any input but sha and per_shard changed
-# from its default, since it did not run what affected-tests prints for the
-# head (plan/tests/test_ci_load.py checks the list).
+# trial: a run with any input but sha and per_shard changed from its
+# default, since it did not run what affected-tests prints for the head
+# (plan/tests/test_ci_load.py checks the list).
 run-name: >-
-  ${{ github.event_name == 'push' && format('CI load trial, push of {0}', github.sha)
-  || (inputs.base != 'origin/master' || inputs.files || inputs.flake_ticket || inputs.count
+  ${{ (inputs.base != 'origin/master' || inputs.files || inputs.flake_ticket || inputs.count
       || inputs.loops_per_cpu || inputs.workers)
   && format('CI load trial at {0} (files {1}; base {2}; flake ticket {3}; count {4}; loops per CPU {5}; workers {6})',
             inputs.sha, inputs.files, inputs.base, inputs.flake_ticket, inputs.count,
@@ -68,11 +67,6 @@ on:
           accepts no trial
         default: ''
         type: string
-  # Temporary, for the proof runs on scratch branches before this file is on
-  # master: removed before #415's PR leaves draft.
-  push:
-    branches: ['scratch-415-*']
-    paths: ['.github/ci-load-request']
 
 permissions:
   contents: read
@@ -80,7 +74,7 @@ permissions:
 # A second run at the same SHA waits for the first, rather than sharing the
 # runners with it.
 concurrency:
-  group: ci-load-${{ inputs.sha || github.sha }}
+  group: ci-load-${{ inputs.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -106,11 +100,6 @@ jobs:
         with:
           path: tools
           persist-credentials: false
-
-      # Temporary, with the push trigger: a request file names the inputs.
-      - name: Read the request
-        if: github.event_name == 'push'
-        run: cat tools/.github/ci-load-request >> "$GITHUB_ENV"
 
       # The tools parse the head's server/ code, which is Python 3.14
       # (`except A, B:`): on the runner's older python3, affected-tests

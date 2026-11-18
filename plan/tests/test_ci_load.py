@@ -215,12 +215,12 @@ class Workflow(unittest.TestCase):
         """pr-evidence accepts only a run named `CI load at <SHA>`: an input
         that changes what runs must change the name."""
         text = WORKFLOW.read_text()
-        dispatch = text[text.index('  workflow_dispatch:'):text.index('\n  push:')]
+        dispatch = text[text.index('  workflow_dispatch:'):text.index('\npermissions:')]
         names = re.findall(r'^      (\w+):$', dispatch, re.M)
         self.assertEqual(names, ['sha', 'base', 'files', 'flake_ticket', 'per_shard', 'count',
                                  'loops_per_cpu', 'workers'])
         run_name = text[text.index('run-name:'):text.index('\non:')]
-        condition = run_name[run_name.index("|| ("):run_name.index("&& format('CI load trial at")]
+        condition = run_name[:run_name.index("&& format('CI load trial at")]
         for name in names:
             with self.subTest(name=name):
                 self.assertEqual(f'inputs.{name}' in condition,
