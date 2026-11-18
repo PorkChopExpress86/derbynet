@@ -345,6 +345,7 @@ def test_where_a_waits_source_may_sit():
     assert unsourced_waits(long_block) == []
     assert unsourced_waits("source common.sh\nsleep 1\n") == ["2: sleep 1"]
     assert unsourced_waits("# Was: sleep 3\n") == []
+    assert unsourced_waits("# 5 s\nx\nsleep 1\n") == []
     # The block ends at the first line, not at the last one, read as -1.
     assert unsourced_waits("# no source\nsleep 1\nx\ny\nz\n# 5 s\n") == ["2: sleep 1"]
 
