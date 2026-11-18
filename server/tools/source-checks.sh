@@ -14,7 +14,8 @@
 # the role page lists of testing/test-permissions.sh against the page gates
 # (#319 retro), a fake clock paused at its install time and a browser test
 # that takes no fixture (#317 retro), a shell function that records state
-# called in a subshell (#59 retro),
+# called in a subshell (#59 retro), a guide's command with no row in
+# docs/guide-commands.tsv (#414),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -80,6 +81,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   tests/test_transactional_tests.py \
   tests/test_docker_checks.py \
   tests/test_pi_images.py \
+  tests/test_guide_commands.py \
   tests/test_workflow_contexts.py \
   tests/test_readme_compose.py \
   tests/test_pipefail_pipes.py \
