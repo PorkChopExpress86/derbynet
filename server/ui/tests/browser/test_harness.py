@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,7 +18,7 @@ from ui.tests.browser.conftest import (
     close_tab,
     font_config,
 )
-from ui.tests.browser.tab_closing import at_the_server
+from ui.tests.browser.tab_closing import after_the_stop, at_the_server
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -120,7 +121,8 @@ def test_close_tab_waits_for_the_request_out(page, event):
 
 
 # Each sends `/login/?again` and, once it ends, sends it again: by fetch,
-# by XMLHttpRequest, and by fetch from an iframe of the tab (`keep_sending`).
+# by XMLHttpRequest, by fetch from an iframe of the tab (`keep_sending`), by
+# an image, and by fetch from a new iframe each time.
 KEEPS_SENDING = {
     "fetch": "() => { const go = () => fetch('/login/?again').finally(go); go(); }",
     "xhr": """() => {
@@ -129,6 +131,34 @@ KEEPS_SENDING = {
         xhr.open('GET', '/login/?again');
         xhr.onloadend = go;
         xhr.send();
+      };
+      go();
+    }""",
+    "image": """() => {
+      const go = () => {
+        const img = new Image();
+        img.onload = img.onerror = go;
+        img.src = '/login/?again';
+      };
+      go();
+    }""",
+    # sendBeacon has no reply to wait on: the tab sends one now and then,
+    # on a MessageChannel loop no stop of timers ends.
+    "beacon": """() => {
+      let n = 0;
+      const tick = () => {
+        if (n++ % 200 == 0) navigator.sendBeacon('/login/?again');
+        const channel = new MessageChannel();
+        channel.port1.onmessage = tick;
+        channel.port2.postMessage(null);
+      };
+      tick();
+    }""",
+    "new-frame": """() => {
+      const go = () => {
+        const frame = document.createElement('iframe');
+        document.body.append(frame);
+        frame.contentWindow.fetch('/login/?again').finally(go);
       };
       go();
     }""",
@@ -149,22 +179,83 @@ def keep_sending(tab, how):
         frame.evaluate(KEEPS_SENDING["fetch" if how == "iframe" else how])
 
 
-@pytest.mark.parametrize("how", ["fetch", "xhr", "iframe"])
+def close_tab_in_time(page, tab):
+    """`close_tab`, asserted to end before its wait gives up: a tab that
+    still sends keeps a request out, and the wait then ends only at
+    `InFlight.TIMEOUT_MS`, with nothing out at that moment in the beacon
+    case. The closes these tests make end far sooner; PR #424's body gives
+    the times measured under load."""
+    started = time.monotonic()
+    close_tab(page, tab)
+    assert time.monotonic() - started < InFlight.TIMEOUT_MS / 1000
+
+
+# The server holds each request, so that a tab that keeps sending, a
+# beacon's included, always has one out, and the reply to the one out at
+# the stop lands after `close_tab` has stopped the tab.
+HOLD_S = 0.1
+
+
+@pytest.mark.parametrize(
+    "how", ["fetch", "xhr", "iframe", "image", "beacon", "new-frame"]
+)
 def test_close_tab_closes_a_tab_that_keeps_sending(page, event, how):
     """A reply's handler can send again on no timer, so a tab that does so
     always has a request out, and waiting until it has none never ends.
-    `close_tab` makes every frame's fetch and XMLHttpRequest send nothing
-    once it has stopped the timers, waits for the server's reply to the
-    ones sent before, and names none of them (#409). When it returns, the
-    server has no request of the tab in hand, and none arrives after."""
+    `close_tab` makes every send of the tab's frames, of frames made after
+    too, do nothing once it has stopped the timers, waits for the server's
+    reply to the ones sent before, and names none of them (#409). When it
+    returns, the server has no request of the tab in hand, and none arrives
+    after."""
     page.goto("/login/")
     tab = page.context.new_page()
     tab.goto("/login/")
-    with at_the_server(lambda environ: environ["QUERY_STRING"] == "again") as server:
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
+    ) as server:
         keep_sending(tab, how)
-        close_tab(page, tab)
+        close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
     assert page.in_flight.closed_with == []
+
+
+# In a document loaded at `?nav`: fetch `?again` on each reply, until the
+# first reply after the stop, which reloads the page or loads `?nav` again.
+NAVIGATES_AFTER_THE_STOP = """if (location.search == '?nav') {
+  addEventListener('DOMContentLoaded', () => {
+    const go = () => fetch('/login/?again').finally(() => {
+      if (!window.stopped) return go();
+      console.log('navigates');
+      if ('%s' == 'reload') location.reload(); else location.href = '/login/?nav';
+    });
+    go();
+  });
+}"""
+
+
+@pytest.mark.parametrize("how", ["href", "reload"])
+def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
+    """A reply's handler can reload the page or set `location.href`, as
+    kiosk.js does on a `poll.kiosk` reply (kiosk.js:103, kiosk.js:116), and
+    the new document sends afresh. Here the reply to the fetch out at the
+    stop navigates, and each new document keeps sending. When `close_tab`
+    returns, the server has no request of the tab in hand, and none arrives
+    after (#409)."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.add_init_script(NAVIGATES_AFTER_THE_STOP % how)
+    navigated = []
+    tab.on("console", lambda message: navigated.append(message.text))
+    with tab.expect_event("requestfinished", lambda r: r.url.endswith("/login/?again")):
+        tab.goto("/login/?nav")
+    after_the_stop(tab, "() => { window.stopped = true; }")
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] in ("again", "nav"), hold=HOLD_S
+    ) as server:
+        close_tab_in_time(page, tab)
+        assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+    assert navigated == ["navigates"]
 
 
 @pytest.mark.parametrize("freeze", [False, True])
@@ -192,8 +283,8 @@ def test_a_cdp_block_ends_with_its_session(page, event, freeze):
 
 
 def test_close_tab_closes_a_tab_that_never_loaded(page, event):
-    """A tab still on `about:blank` has no server to send to, so `close_tab`
-    sends it no barrier, which would never end."""
+    """`close_tab` closes a tab still on `about:blank`, as the settle does
+    every other tab of the context."""
     page.goto("/login/")
     close_tab(page, page.context.new_page())
     assert page.in_flight.closed_with == []

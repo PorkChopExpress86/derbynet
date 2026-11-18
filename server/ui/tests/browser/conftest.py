@@ -476,13 +476,15 @@ def stop_timers(tab):
             pass
 
 
-# Makes every later `fetch` a promise that never settles and every later
-# XMLHttpRequest send nothing, so no callback of the page sends again: with
-# a URL, it first fetches that URL, in the same task.
-STOP_SENDING = """(barrier) => {
-  if (barrier) fetch(barrier).catch(() => {});
+# Makes every later `fetch` a promise that never settles, and every later
+# XMLHttpRequest send, beacon and image `src` do nothing, so no callback of
+# the page sends again (#409).
+STOP_SENDING = """() => {
   window.fetch = () => new Promise(() => {});
   XMLHttpRequest.prototype.send = function () {};
+  navigator.sendBeacon = () => true;
+  Object.defineProperty(HTMLImageElement.prototype, 'src', {
+    set() {}, configurable: true});
 }"""
 
 
@@ -493,53 +495,28 @@ def close_tab(page, tab):
 
     Stopping the timers leaves the callbacks that send on no timer: the
     camera's `onicecandidate` and `onnegotiationneeded` post a message
-    (camera-signaling.js), and a reply's handler can send again. So every
-    frame's `fetch` and XMLHttpRequest then send nothing, in the page
-    itself: a tab under a CDP block sent again once the block's session
-    detached, frozen through that session or not
-    (`test_a_cdp_block_ends_with_its_session`). The main frame's last real
-    fetch is the barrier (`blocked_barrier`): once Playwright reports its
-    end, it has reported every request sent before, and the wait is for the
-    server's replies to those (#409:
+    (camera-signaling.js), and a reply's handler can send again, load an
+    image or navigate (kiosk.js, kiosk-awards.js). So `STOP_SENDING` then
+    runs in every frame of the tab, and in each document or frame the tab
+    makes after, in the page itself: a tab under a CDP block sent again
+    once the block's session detached, frozen through that session or not
+    (`test_a_cdp_block_ends_with_its_session`). The wait is for the
+    server's replies to the requests sent before (#409:
     `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
-    `test_close_tab_closes_a_tab_that_keeps_sending`)."""
+    `test_close_tab_closes_a_tab_that_keeps_sending`,
+    `test_close_tab_closes_a_tab_whose_reply_navigates`)."""
     stop_timers(tab)
+    tab.add_init_script(f"({STOP_SENDING})()")
     for frame in tab.frames:
-        if frame == tab.main_frame:
-            continue
         try:
-            frame.evaluate(STOP_SENDING, None)
-        except Exception:  # noqa: BLE001, S110 - a detached frame sends nothing
+            frame.evaluate(STOP_SENDING)
+        except Exception:  # noqa: BLE001, S110 - a new document gets the init script
             pass
-    if tab.url.startswith("http"):
-        blocked_barrier(tab, STOP_SENDING)
     waited = 0
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
         tab.wait_for_timeout(50)
         waited += 50
     tab.close()
-
-
-def blocked_barrier(tab, script: str):
-    """Run `script`, a JavaScript function that takes a URL and fetches it
-    first, with `SETTLE_BARRIER`, and wait until Playwright reports that
-    fetch's end. Chromium blocks every request of `tab` meanwhile, so the
-    barrier never reaches the server and needs no route. The block ends
-    with its CDP session, before this returns
-    (`test_a_cdp_block_ends_with_its_session`). A request sent before the
-    barrier is reported before it (#224 retro, `_barrier`)."""
-    blocker = tab.context.new_cdp_session(tab)
-    try:
-        blocker.send("Network.enable")
-        blocker.send("Network.setBlockedURLs", {"urls": ["*"]})
-        with tab.expect_event(
-            "requestfailed",
-            lambda r: r.url.endswith(SETTLE_BARRIER),
-            timeout=InFlight.TIMEOUT_MS,
-        ):
-            tab.evaluate(script, SETTLE_BARRIER)
-    finally:
-        blocker.detach()
 
 
 # A fetch the settle sends after it stops the timers.
