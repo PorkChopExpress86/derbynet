@@ -282,8 +282,10 @@ def test_close_tab_closes_a_tab_that_keeps_navigating(page, event):
     with at_the_server(
         lambda environ: environ["QUERY_STRING"] == "nav", hold=HOLD_S
     ) as server:
+        tab.goto("/login/?nav", wait_until="commit")
+        # The Worker's first navigation.
         with tab.expect_event("request", lambda r: r.url.endswith("/login/?nav")):
-            tab.goto("/login/?nav", wait_until="commit")
+            pass
         close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
     assert page.in_flight.closed_with == []
