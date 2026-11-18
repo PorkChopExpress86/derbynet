@@ -41,7 +41,7 @@ Hand the implementer's PR body draft path to both reviewers in Code review, sinc
 ## 3. PR
 
 1. Have the implementer merge origin/master into the branch before its fix-round hand-off run (Code review's step 4), so that one run covers the merge too, and push. Have it finish the PR body draft with /mattpocock-skills:pr, with the low findings under "Left for later" and `Closes #N` (or the reason the ticket stays open under `## Still open`), and return the path. The body fills in each `- <key>: ` line `plan/bin/pr-evidence N` prints with its evidence, or lists the key under `## Still open`.
-2. Run `plan/bin/pr-evidence N --check <path>`, and send each line it names back to the implementer, since a key with no evidence after it, or with "Not done", is no evidence: #61's body draft left out the reviewer's checklist its timer box asked for (#61 retro). Then run `gh pr edit <pr> --repo PorkChopExpress86/derbynet --body-file <path>` on the draft PR.
+2. Run `plan/bin/pr-evidence N --check <path> --pr <pr>` (`--pr` gives the PR's head, at which a `- CI load:` run must be; add `--flake-ticket` for a flake ticket, whose `- CI load:` run must be the one dispatched with `-f flake_ticket=true`, named `CI load at <SHA> (flake ticket)`), and send each line it names back to the implementer, since a key with no evidence after it, or with "Not done", is no evidence: #61's body draft left out the reviewer's checklist its timer box asked for (#61 retro). Then run `gh pr edit <pr> --repo PorkChopExpress86/derbynet --body-file <path>` on the draft PR.
 
 ## 4. Merge
 
