@@ -88,6 +88,18 @@ def pytest_terminal_summary(terminalreporter, config):
 
 
 def pytest_configure():
+    """SIGINT and SIGQUIT go back to a terminal run's handling when pytest
+    started ignoring them, as a `&` job of a non-interactive bash does under
+    pytest-under-load.sh and hold-load-lock.sh: the commands a test starts
+    inherit an ignore, and bash cannot trap one (#311, #407;
+    tests/test_signals_at_default.py)."""
+    import signal
+
+    if signal.getsignal(signal.SIGINT) is signal.SIG_IGN:
+        signal.signal(signal.SIGINT, signal.default_int_handler)
+    if signal.getsignal(signal.SIGQUIT) is signal.SIG_IGN:
+        signal.signal(signal.SIGQUIT, signal.SIG_DFL)
+
     from django.conf import settings
 
     settings.LEGACY_SESSION_WRITES_RAISE = True
