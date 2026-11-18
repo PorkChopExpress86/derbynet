@@ -48,9 +48,9 @@ def functions(text: str) -> dict[str, tuple[int, str]]:
         m = DEFINITION.match(line)
         if not m:
             continue
-        rest = m.group(2) or ""
-        if rest.rstrip().endswith("}") and rest.strip() != "{":
-            found[m.group(1)] = (i + 1, rest.strip()[1:-1])
+        rest = (m.group(2) or "").strip()
+        if rest.endswith("}"):
+            found[m.group(1)] = (i + 1, rest[1:-1])
             continue
         indent = len(line) - len(line.lstrip())
         body = []
@@ -308,7 +308,7 @@ def test_no_function_that_records_state_runs_in_a_subshell():
 
 
 # #59's round-1 extras/docker/ci/checks.sh at ff00bbc6 (on the PR's branch
-# only; the PR merged squashed): lines 58, 63-71, 148-157, 234, 246, 357
+# only; the PR merged squashed): lines 58, 63-71, 148-156, 234, 246, 357
 # and 372 as they were, each function closed after the lines taken from it.
 ROUND_1 = """\
 COMPOSE_DOWN=()
@@ -388,6 +388,37 @@ echo "$VALUE"
         (15, "arm", ["trap"]),
         (16, "indirect", ["add()"]),
         (17, "indirect", ["add()"]),
+    ]
+
+
+def test_each_body_is_read_to_its_own_closing_brace():
+    """A brace on the next line, an inner `}` deeper in, and a heredoc's
+    lines at column 0 each leave the body going on to its recording line."""
+    text = """\
+brace_below()
+{
+    BELOW+=(x)
+}
+nested() {
+    if true; then
+        {
+            echo a
+        }
+    fi
+    NESTED+=(x)
+}
+heredoc() {
+    cat <<EOF
+text
+EOF
+    DOC+=(x)
+}
+a="$(brace_below)" b="$(nested)" c="$(heredoc)"
+"""
+    assert offenders_in(text, functions(text)) == [
+        (19, "brace_below", ["BELOW+="]),
+        (19, "nested", ["NESTED+="]),
+        (19, "heredoc", ["DOC+="]),
     ]
 
 

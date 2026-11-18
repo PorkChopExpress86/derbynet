@@ -28,12 +28,11 @@ api() {
   return 1
 }
 
-# A rejected file's run ends as `failure` (run 44236545824) or, by GitHub's
-# docs, as `startup_failure`.
+# A rejected file's run ended as `failure` (run 44236545824); a
+# `startup_failure`, another conclusion the runs API gives, counts too.
 failed=$(api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
   --jq '.workflow_runs[]
-        | select(.status == "completed"
-                 and (.conclusion == "failure" or .conclusion == "startup_failure"))
+        | select(.conclusion == "failure" or .conclusion == "startup_failure")
         | "\(.id) \(.path) \(.html_url)"')
 while read -r id path url; do
   [ -n "$id" ] || continue
