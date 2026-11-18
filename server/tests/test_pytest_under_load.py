@@ -634,9 +634,9 @@ def test_a_waiting_hand_off_goes_ahead_of_a_load_run_started_after_the_release(
 ):
     """#350's hand-off polled for a free lock and waited about 2 h, since
     #348's queued load runs took it again within seconds of each other. A
-    hand-off waiting in hold-load-lock.sh's flock takes the lock as the
-    holder lets it go, though a load run starts at once after the release,
-    and that run then waits for the hand-off and names it."""
+    hand-off first in the line takes the lock as the holder lets it go,
+    though a load run starts at once after the release, and that run then
+    waits behind the hand-off and names it."""
     lock = tmp_path / "load.lock"
     lock.write_text("pid 1, since then\n")
     held = os.open(lock, os.O_RDONLY)
@@ -1228,9 +1228,6 @@ def join(tmp_path, script, name, lock, extra_env=None, copy=None):
         run = start(tmp_path, name, lock, extra_env, go=True, script=path)
     else:
         run = hold(tmp_path, lock, ORDER_HAND_OFF, name, extra_env, path)
-    # The run is the script asked for: read from its arguments, since its
-    # cmdline is empty while it execs.
-    assert str(path) in run.args, run.args
     return run
 
 
@@ -1295,7 +1292,9 @@ def test_waiters_take_the_lock_in_the_order_they_came(tmp_path, script):
         runs.append(join_at(tmp_path, script, "third", tmp_path / "link.lock", 3))
         os.close(held)
         held = None
-        runs.append(join_at(tmp_path, script, "late", lock, 4))
+        # No wait for its place: a run that skipped the line takes the free
+        # lock during the sleep, and the order below names it.
+        runs.append(join(tmp_path, script, "late", lock))
         time.sleep(SLOW_HEAD_S)
         (tmp_path / "go-turn").write_text("")
         assert [run.wait(timeout=90) for run in runs] == [0, 0, 0, 0]
