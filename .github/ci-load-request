@@ -1,0 +1,8 @@
+SHA=832e0ee6fc237328cc5eda4b738007b21483befa
+FILES=server/ui/tests/browser/test_harness.py
+COUNT=
+PER_SHARD=5
+FLAKE_TICKET=true
+BASE=origin/master
+LOOPS_PER_CPU=2
+WORKERS=
