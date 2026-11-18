@@ -20,30 +20,36 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
 
-# The prefix start() and hold() start a script through: it puts TERM, INT and HUP,
-# the signals the scripts trap, back to their default, with the two Python
-# ignores (PIPE, XFSZ), then execs the command in the same pid.  A
+# The argv prefix start() and hold() start a script through: it puts TERM,
+# INT and HUP, the signals the scripts trap, back to their default, with the
+# two Python ignores (PIPE, XFSZ), then execs the command in the same pid.  A
 # non-interactive bash gives a command it starts with `&` SIGINT ignored, as
 # pytest-under-load.sh and hold-load-lock.sh start theirs, so a pytest under
 # either ignored SIGINT, and so did the scripts it started; bash cannot trap
 # a signal ignored when it starts, so an INT never reached their traps (#407,
+# test_a_command_the_scripts_start_ignores_sigint,
 # test_a_signal_reaches_the_trap_though_pytest_ignores_it).
-DEFAULT_NAMES = ("SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ")
-DEFAULT_SIGNALS = (
+RESET_NAMES = ("SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ")
+RESET_SIGNALS_ARGV = (
     sys.executable,
     "-c",
     "import os, signal, sys\n"
-    f"for name in {DEFAULT_NAMES!r}:\n"
+    f"for name in {RESET_NAMES!r}:\n"
     "    signal.signal(getattr(signal, name), signal.SIG_DFL)\n"
     "os.execvp(sys.argv[1], sys.argv[1:])\n",
 )
 
 
-def ignored(pid):
-    """The names of the signals `pid` ignores, from its SigIgn mask."""
-    status = Path(f"/proc/{pid}/status").read_text()
+def ignored_in(status):
+    """The names of the signals ignored in `status`'s SigIgn mask, the
+    text of a /proc/PID/status."""
     mask = int(re.search(r"^SigIgn:\s*([0-9a-f]+)$", status, re.M).group(1), 16)
     return {s.name for s in signal.Signals if mask >> (s.value - 1) & 1}
+
+
+def ignored(pid):
+    """The names of the signals `pid` ignores."""
+    return ignored_in(Path(f"/proc/{pid}/status").read_text())
 
 
 def run(
@@ -117,9 +123,8 @@ def test_the_summary_names_an_error_as_well_as_a_failure(tmp_path):
 
 # A stub test that holds its run open until the test writes `go` beside it,
 # for at most 60 s, so the first run is still running when the second
-# starts, on any load.  It writes `started` whole, by a rename: a test
-# that saw the file exist read it empty under load, before the write
-# (#407's push hook, test_a_sigkill_frees_the_lock_though_its_loops_and_pytest_live_on).
+# starts, on any load.  It writes `started` by a rename, since wait_started
+# returns once the file exists and its callers read it at once (#407).
 HOLD = """\
 import os
 import time
@@ -164,7 +169,7 @@ def start(
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
         [
-            *DEFAULT_SIGNALS,
+            *RESET_SIGNALS_ARGV,
             *under,
             str(script),
             "--loops",
@@ -562,7 +567,7 @@ def test_a_signal_during_the_cleanup_after_an_error_still_frees_all(tmp_path):
 
 HOLD_LOCK = Path(__file__).resolve().parents[1] / "tools" / "hold-load-lock.sh"
 
-# A stand-in hand-off: it records the lock it was told it holds, whole by a
+# A stand-in hand-off: it records the lock it was told it holds, by a
 # rename as HOLD does, then holds its run open until the test writes `go`
 # beside it, for at most 60 s.
 HAND_OFF = (
@@ -584,7 +589,7 @@ def hold(
     env = {**os.environ, "DERBYNET_LOAD_LOCK": str(lock), **(extra_env or {})}
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
-        [*DEFAULT_SIGNALS, str(script), "bash", "-c", command],
+        [*RESET_SIGNALS_ARGV, str(script), "bash", "-c", command],
         stdout=out,
         stderr=subprocess.STDOUT,
         cwd=folder,
@@ -769,16 +774,17 @@ def held_lock(tmp_path):
 def start_waiting(tmp_path, script, lock, extra_env=None, copy=None, under=()):
     """`script`, or `copy`, a copy of it, started on `lock`, which the test
     holds, once it waits in flock: (the run, its flock's pid); `under` is
-    start()'s, for pytest-under-load.sh.  A run that
-    ends first, such as one refused under `timeout`, fails at once with the
-    script's output: #59's runs under a `timeout 300` read "no flock under it
-    within 30 s" (#407)."""
+    start()'s, for pytest-under-load.sh only.  A run that ends first, such
+    as one refused under `timeout`, fails at once with the script's output:
+    #59's runs under a `timeout 300` read "no flock under it within 30 s"
+    (#407)."""
     path = copy or script
     if script == SCRIPT:
         run = start(
             tmp_path, "waiter", lock, extra_env, go=True, under=under, script=path
         )
     else:
+        assert not under, "hold() starts hold-load-lock.sh under nothing"
         run = hold(tmp_path, lock, name="waiter", extra_env=extra_env, script=path)
     out = tmp_path / "waiter.out"
     # Its flock once it has printed "Waiting": before that, the flock under
@@ -926,7 +932,7 @@ def test_a_signal_reaches_the_trap_though_pytest_ignores_it(tmp_path, script, si
     pytest-under-load.sh and hold-load-lock.sh start theirs, ignores SIGINT;
     the scripts it started ignored it too, and an INT left each waiting
     until the test's 30 s wait ran out (#407). A TERM or HUP that pytest
-    ignores, as under nohup for HUP, is reset the same way."""
+    ignores is reset the same way."""
     number = getattr(signal, f"SIG{sig}")
     before = signal.signal(number, signal.SIG_IGN)
     try:
@@ -936,8 +942,9 @@ def test_a_signal_reaches_the_trap_though_pytest_ignores_it(tmp_path, script, si
     finally:
         signal.signal(number, before)
     try:
-        # DEFAULT_SIGNALS left it none of its five ignored, Python's own PIPE
-        # and XFSZ included.
+        # RESET_SIGNALS_ARGV left it none of its five ignored, Python's own
+        # PIPE and XFSZ included; spelled out rather than read from
+        # RESET_NAMES, so a name dropped there fails here.
         five = {"SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ"}
         assert not ignored(run.pid) & five, ignored(run.pid)
         os.kill(run.pid, number)
@@ -947,6 +954,45 @@ def test_a_signal_reaches_the_trap_though_pytest_ignores_it(tmp_path, script, si
         os.close(held)
         kill_all([waiter])
         finish(tmp_path, run)
+
+
+def test_a_command_the_scripts_start_ignores_sigint(tmp_path):
+    """From a pytest with SIGINT at its default, a non-interactive bash
+    starts a command in the foreground with SIGINT at its default and one
+    with `&` with it ignored, and so pytest-under-load.sh's pytest and
+    hold-load-lock.sh's command ignore it: the fact RESET_SIGNALS_ARGV's
+    comment states (#407)."""
+    status = "cat /proc/self/status"
+    env = {**os.environ, "DERBYNET_LOAD_LOCK": str(tmp_path / "own.lock")}
+    env.pop("DERBYNET_LOAD_LOCK_HELD", None)
+    before = signal.signal(signal.SIGINT, signal.SIG_DFL)
+    try:
+        foreground, job, held = (
+            subprocess.run(
+                argv, capture_output=True, text=True, timeout=60, env=env, check=True
+            ).stdout
+            for argv in (
+                ["bash", "-c", status],
+                ["bash", "-c", f"{status} & wait"],
+                [str(HOLD_LOCK), "bash", "-c", status],
+            )
+        )
+        code, out, _ = load_run_of(
+            tmp_path,
+            "    from pathlib import Path\n"
+            "    status = Path('/proc/self/status').read_text()\n"
+            "    Path(__file__).with_name('status').write_text(status)",
+        )
+    finally:
+        signal.signal(signal.SIGINT, before)
+    assert code == 0, out
+    assert "SIGINT" not in ignored_in(foreground)
+    assert "SIGINT" in ignored_in(job)
+    # The load run's pytest and the hand-off's command ignore SIGINT, and
+    # not SIGTERM, which start_held_rerun's callers send first.
+    for text in (held, (tmp_path / "status").read_text()):
+        assert "SIGINT" in ignored_in(text)
+        assert "SIGTERM" not in ignored_in(text)
 
 
 # A stand-in flock(1) whose `flock -n` holds for 2 s before it runs the real
@@ -1376,13 +1422,16 @@ def test_a_failed_rerun_args_is_named_and_starts_no_rerun(tmp_path):
 
 
 # A stub whose first run fails on a changed network and whose rerun holds
-# until the test writes `go` beside it, for at most 60 s.
+# until the test writes `go` beside it, for at most 60 s.  It writes
+# `rerunning` by a rename, as HOLD writes `started`: start_held_rerun returns
+# once the file exists and its callers read it at once (#407).
 HELD_RERUN = (
     "import os\nimport time\nfrom pathlib import Path\n\n\n"
     "def test_loads():\n"
     "    here = Path(__file__).parent\n"
     "    if (here / 'failed-once').exists():\n"
-    "        (here / 'rerunning').write_text(str(os.getpid()))\n"
+    "        (here / 'rerunning.tmp').write_text(str(os.getpid()))\n"
+    "        os.replace(here / 'rerunning.tmp', here / 'rerunning')\n"
     "        for _ in range(600):\n"
     "            if (here / 'go').exists():\n"
     "                return\n"
@@ -1411,6 +1460,9 @@ def start_held_rerun(tmp_path):
     }
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     with open(tmp_path / "held.out", "w") as out:
+        # No RESET_SIGNALS_ARGV: its callers send TERM, which a load run and a
+        # hand-off leave at its default, and INT only after a TERM, when the
+        # script's trap has set every signal it traps to ignored.
         run = subprocess.Popen(
             [str(SCRIPT), "--loops", "2", "-p", "no:cacheprovider", str(folder)],
             stdout=out,
