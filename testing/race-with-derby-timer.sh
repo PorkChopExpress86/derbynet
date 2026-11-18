@@ -168,6 +168,20 @@ while true; do
     sleep 1
     NOW=$((SECONDS - START))
     jar_alive || fail_race "derby-timer.jar exited after ${NOW}s"
+    # The bounds on identifying go by the polls before this one, so each
+    # fires at its time whatever this poll shows: a timer first seen
+    # identified at or past a bound fails, or gets its dump.  Checked after
+    # the poll, a jar already staging at the first poll passed
+    # IDENTIFY_SECONDS=1 and took no dump at DUMP_AFTER=0 (#399).
+    if [ -z "$IDENTIFIED_AT" ]; then
+        if [ $NOW -ge $IDENTIFY_SECONDS ]; then
+            fail_race "the timer was not identified within ${IDENTIFY_SECONDS}s"
+        elif [ $NOW -ge $DUMP_AFTER ] && [ $DUMPS = 0 ]; then
+            thread_dump "timer not identified after ${NOW}s"
+            # The dump waits up to 5 s for its last line.
+            NOW=$((SECONDS - START))
+        fi
+    fi
     read -r _ RUN STATE <<< "$(progress)"
     if ! [[ "$RUN" =~ ^[0-9]+$ ]]; then
         echo "$(stamp) +${NOW}s the poll failed" >&2
@@ -183,10 +197,6 @@ while true; do
             IDENTIFIED_AT=$NOW
             HEAT_START=$NOW
             HEATS_DONE=$RUN
-        elif [ $NOW -ge $IDENTIFY_SECONDS ]; then
-            fail_race "the timer was not identified within ${IDENTIFY_SECONDS}s"
-        elif [ $NOW -ge $DUMP_AFTER ] && [ $DUMPS = 0 ]; then
-            thread_dump "timer not identified after ${NOW}s"
         fi
         continue
     fi
