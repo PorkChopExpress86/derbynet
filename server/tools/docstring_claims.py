@@ -24,7 +24,10 @@ test or class, or `module` or the file's name, as a row of the table does.
 A `same` row or a wrapped line that names no scope lists for the scope of
 the line above it; any other row that names none lists for none. A module
 claim counts on any line, since its row may name the constant a comment
-sits above, or the test that reads it.
+sits above, or the test that reads it. A line of fenced code lists nothing,
+and the line after the fence names its own scope: #367's `<details>` of
+pasted junit and traceback named the test and held `timed out after 3 s`,
+which passed a "3 s" no assert read (#367 retro).
 
 `--check --base REV` asks only for the claims the diff from the merge base
 with REV, to the working tree, adds or changes (D123, #374): those of a
@@ -282,6 +285,8 @@ def scope_names(claim: Claim, file: Path) -> list[str]:
 # whose first cell is `same` (or a ditto mark) continues the one above.
 NEW_ITEM = re.compile(r"\s*(?:\||[-*+]\s|\d+[.)]\s|#)")
 SAME = re.compile(r"\s*\|\s*(?:same\b|〃|\")", re.IGNORECASE)
+FENCE = re.compile(r"\s*(`{3,}|~{3,})")
+FENCED = "```"  # what details() leaves of a fenced block
 
 
 def word(text: str) -> re.Pattern:
@@ -299,6 +304,9 @@ def rows(blocks: list[str], names: set[str]) -> list[tuple[set[str], str]]:
     for block in blocks:
         current: set[str] = set()
         for line in block.splitlines():
+            if line == FENCED:
+                current = set()
+                continue
             if named := {n for n, pattern in found.items() if pattern.search(line)}:
                 current = named
             elif NEW_ITEM.match(line) and not SAME.match(line):
@@ -394,7 +402,26 @@ def base_text(file: Path, rev: str) -> str | None:
 
 
 def details(body: str) -> list[str]:
-    return re.findall(r"<details>(.*?)</details>", body, re.S)
+    """The text of each `<details>` block, each fenced code block in it cut
+    to one `FENCED` line: pasted output lists no claim (#367 retro), and a
+    `<details>` a fence quotes opens no block."""
+    kept, fence = [], ""
+    for line in body.splitlines():
+        mark = FENCE.match(line)
+        if fence:
+            if (
+                mark
+                and mark[1][0] == fence[0]
+                and len(mark[1]) >= len(fence)
+                and not line[mark.end() :].strip()
+            ):
+                fence = ""
+        elif mark:
+            fence = mark[1]
+            kept.append(FENCED)
+        else:
+            kept.append(line)
+    return re.findall(r"<details>(.*?)</details>", "\n".join(kept), re.S)
 
 
 def main(argv: list[str] | None = None) -> int:

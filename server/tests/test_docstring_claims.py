@@ -131,6 +131,47 @@ def test_a_row_naming_another_test_by_nickname_lists_nothing(tmp_path):
     assert dc.main(["--check", str(body), str(path)]) == 0
 
 
+PASTED = """\
+<details><summary>one failure from the log</summary>
+
+{fence}
+_____ test_waits[single] _____
+E   AssertionError: ("ERROR  mod.py: (timed out after 3 s)
+{fence}
+{after}
+</details>
+"""
+
+
+@pytest.mark.parametrize("fence", ["```", "~~~", "````"])
+def test_pasted_output_in_a_details_block_lists_no_claim(tmp_path, fence):
+    """#367's pasted traceback named the test and held `timed out after
+    3 s`, and passed a "3 s" no assert read (#367 retro). A wrapped line
+    after the fence takes no scope from inside it."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(PASTED.format(fence=fence, after=""))
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    body.write_text(PASTED.format(fence=fence, after="  3 s, wrapped"))
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    body.write_text(PASTED.format(fence=fence, after="- `test_waits`: 3 s"))
+    assert dc.main(["--check", str(body), str(path)]) == 0
+
+
+def test_a_fence_that_quotes_a_details_tag_opens_no_block(tmp_path):
+    """retro-320's body quoted `<details>` in a diff fence ahead of its real
+    blocks, so the text between read as a block."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        "```diff\n- a claim on a <details> line\n```\n"
+        "- `test_waits`: 3 s\n<details>\n| `test_lanes` | 2 |\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 1
+
+
 def test_a_class_claim_counts_on_a_row_naming_its_method(tmp_path):
     """#333's rows name the test method, under its class's claims."""
     path = tmp_path / "test_sample.py"
