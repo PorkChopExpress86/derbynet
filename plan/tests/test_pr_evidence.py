@@ -111,9 +111,9 @@ class IssueStandIn:
         return subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '61', *argv],
                               capture_output=True, text=True, env=self.env)
 
-    def check(self, body):
+    def check(self, body, *argv):
         (self.tmp / 'body.md').write_text(body)
-        return self.run_tool('--check', str(self.tmp / 'body.md'))
+        return self.run_tool('--check', str(self.tmp / 'body.md'), *argv)
 
 
 class PrEvidence(IssueStandIn, unittest.TestCase):
@@ -331,7 +331,7 @@ class CiLoad(IssueStandIn, unittest.TestCase):
             with self.subTest(option=option):
                 done = self.run_tool(option, *value)
                 self.assertEqual(done.returncode, 1, done.stdout)
-                self.assertIn('--head, --pr and --flake-ticket go with --check', done.stderr)
+                self.assertIn('--head, --pr, --flake-ticket and --closes go with --check', done.stderr)
                 self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
 
     def test_other_run_links_and_still_open_items_are_not_read(self):
@@ -538,7 +538,7 @@ class DefinedNames(unittest.TestCase):
 
 class CheckRefuses(IssueStandIn, unittest.TestCase):
     def test_399s_draft_is_refused_for_its_placeholder(self):
-        done = self.check(evidence(KEYS) + '\n' + DRAFT_399)
+        done = self.check(evidence(KEYS) + '\n' + DRAFT_399, '--closes', '399')
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:],
                          ['unfilled placeholder, line 17: LOOP-OUTPUT'])
@@ -555,7 +555,7 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
         # Its "Closes #399." above its "## Still open" passes: the lead
         # dropped that check (AGENT-BRIEF puts undecided divergences there).
         filled = DRAFT_399.replace('LOOP-OUTPUT', '25 of 25 ok')
-        done = self.check(evidence(KEYS) + '\n' + filled)
+        done = self.check(evidence(KEYS) + '\n' + filled, '--closes', '399')
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_a_body_with_crlf_line_ends_is_refused_for_its_placeholder(self):
@@ -566,6 +566,110 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:],
                          ['unfilled placeholder, line 11: LOOP-OUTPUT'])
+
+
+# The line of #421's body draft that pr-merge refused at merge time, since
+# GitHub read it as closing #399 (#415 retro), and the line as it merged.
+LINE_421 = ('- `test_pr_evidence.py::CheckRefuses` "Closes #399." and "## Still open": '
+            'DRAFT_399 holds both lines, and the class\'s tests check that draft.')
+MERGED_421 = LINE_421.replace('"Closes #399."', '"`Closes #399.`"').replace(
+    '"## Still open"', '"`## Still open`"')
+NO_ISSUE = "no issue given: no ticket's evidence lines were checked"
+CLOSES_421 = ('closes another issue, line {n}: Closes #399: GitHub closes it on merge; '
+              'put a quote in backticks, or write "Part of #N"')
+
+
+class ClosingKeywords(IssueStandIn, unittest.TestCase):
+    """A closing keyword for an issue other than the PR's own, outside code."""
+
+    def body(self, *lines):
+        """The #61 stand-in's evidence, `Closes #61.` and `lines`, and the
+        number of the first of `lines`."""
+        head = 'Closes #61.\n\n' + evidence(KEYS) + '\n'
+        return head + ''.join(f'{line}\n' for line in lines), head.count('\n') + 1
+
+    def test_421s_quoted_fixture_line_is_refused(self):
+        body, n = self.body(LINE_421)
+        done = self.check(body)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [CLOSES_421.format(n=n)])
+
+    def test_421s_line_as_it_merged_passes(self):
+        body, _n = self.body(MERGED_421)
+        done = self.check(body)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [])
+
+    def test_the_prs_own_issue_and_each_closes_option_pass(self):
+        body, _n = self.body('Fixes #64 C5 (Q3), as #404 did.', 'Resolves: #65')
+        done = self.check(body, '--closes', '64', '--closes', '65')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        done = self.check(body, '--closes', '64')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual([line.split(':')[0] for line in done.stdout.splitlines()[1:]],
+                         [f'closes another issue, line {_n + 1}'])
+
+    def test_each_form_github_reads_is_found(self):
+        for words in ('close #59', 'closes #59', 'closed #59', 'fix #59', 'fixes #59',
+                      'fixed #59', 'resolve #59', 'resolves #59', 'resolved #59',
+                      'CLOSES #59', 'Closes: #59', 'Closes\t#59', 'Closes owner/repo#59',
+                      'Closes https://github.com/PorkChopExpress86/derbynet/issues/59',
+                      '(closes #59)', 'see "Fixes #59."', 'closes#59', 'closes-#59',
+                      'closes #59a', 'closes #59-b', 'closes - #59', '-fixes #59'):
+            with self.subTest(words=words):
+                found = TOOL.foreign_closes(f'Text {words} here.\n', {'61'})
+                self.assertEqual(len(found), 1, found)
+                self.assertTrue(found[0].startswith('line 1: '), found)
+                self.assertTrue(found[0].endswith('59'), found)
+
+    def test_the_shapes_that_close_nothing_pass(self):
+        for words in ('disclosed #59', 'prefixes #59', 'closes the #59 thread', 'closes #61',
+                      'closes #61a', 'see #59', 'Closes `#59`', '`Closes #59`', 'Part of #59'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'Text {words} here.\n', {'61'}), [])
+
+    def test_a_longer_number_is_another_issue(self):
+        self.assertEqual(TOOL.foreign_closes('Closes #610.\nCloses #6.\n', {'61'}),
+                         ['line 1: Closes #610', 'line 2: Closes #6'])
+
+    def test_a_closed_fence_is_quoted_and_an_open_one_is_read(self):
+        closed = 'Before.\n```\nCloses #59\n```\nAfter.\n'
+        self.assertEqual(TOOL.foreign_closes(closed, {'61'}), [])
+        indented = '- a log:\n\n  ```\n  Fixes #59\n  ```\n'
+        self.assertEqual(TOOL.foreign_closes(indented, {'61'}), [])
+        unclosed = 'Closes #58.\n```\nFixes #59\nCloses #57\n'
+        self.assertEqual(TOOL.foreign_closes(unclosed, {'61'}),
+                         ['line 1: Closes #58', 'line 3: Fixes #59', 'line 4: Closes #57'])
+        reopened = '```\nCloses #59\n```\nFixes #58\n```\nCloses #57\n'
+        self.assertEqual(TOOL.foreign_closes(reopened, {'61'}),
+                         ['line 4: Fixes #58', 'line 6: Closes #57'])
+
+    def test_a_prs_number_is_refused_too(self):
+        """The limit left: #377's "The fake gh's closed #325" names a PR,
+        which GitHub does not close."""
+        line = "- The fake gh's closed #325 makes the claim, and the run gives 0 findings."
+        self.assertEqual(TOOL.foreign_closes(line, {'346'}), ['line 1: closed #325'])
+
+    def test_a_body_with_no_issue_refuses_any_close(self):
+        (self.tmp / 'body.md').write_text('## Summary\n\nA retro.\n\n' + LINE_421 + '\n')
+        done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '--check',
+                               str(self.tmp / 'body.md')],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines(), [NO_ISSUE, CLOSES_421.format(n=5)])
+        (self.tmp / 'body.md').write_text('## Summary\n\nA retro.\n\n' + MERGED_421 + '\n')
+        done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '--check',
+                               str(self.tmp / 'body.md'), '--closes', '61'],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, NO_ISSUE + '\n', ''))
+
+    def test_no_issue_and_no_check_or_closes_without_check_prints_the_usage(self):
+        for argv in ([], ['61', '--closes', '64']):
+            with self.subTest(argv=argv):
+                done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), *argv],
+                                      capture_output=True, text=True, env=self.env)
+                self.assertEqual(done.returncode, 1)
+                self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
 
 
 if __name__ == '__main__':

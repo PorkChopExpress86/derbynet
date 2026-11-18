@@ -2,7 +2,8 @@
 """Lists each open line of an issue that asks for evidence in the PR, and
 with `--check BODY.md` names each one the PR body gives no evidence for.
 
-Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N] [--flake-ticket]]
+Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N] [--flake-ticket] [--closes N]...]
+       plan/bin/pr-evidence --check BODY.md [--closes N]...    (a body with no ticket, such as a retro's)
 
 A line asks for evidence in the PR when it says so: "Evidence is ... in the
 PR", "The PR lists", "Record the size in the PR", "Attach" (but not
@@ -32,6 +33,19 @@ name anywhere under server/ or testing/ excuses a placeholder written to look
 like it, and a name PHP, Java or JavaScript defines is refused until it is put
 in inline code.
 
+`--check` also refuses a closing keyword outside code that names an issue
+other than <issue> and each `--closes N` (#404 closed #65 and #64): GitHub's
+close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved,
+with any colons, blanks or - between, before #N, owner/repo#N or an issue
+URL. GitHub
+closes that issue on merge. #421's body quoted a test fixture's
+"Closes #399." in prose, and pr-merge refused it at merge time only because
+#399 had a `## Still open` section; #411's retro body was the first (#415
+retro). Quoted text goes in inline code or a closed code fence, which GitHub
+does not read; the lines of a fence that never closes are checked, as
+pr-merge reads cited decisions. The limit left: a keyword before a PR's
+number is refused too, though GitHub closes only issues.
+
 A list item `- CI load: <run URL>` cites a run of
 .github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
 run from GitHub and accepts it only when it ran master's workflow
@@ -53,7 +67,8 @@ read.
 
 Exits 1 on a key the body gives no evidence for, on a CI load item not
 accepted or given with no head, on a `--head` that is not PR N's head, on a
-placeholder, or when the issue, the PR or a run cannot be read.
+placeholder, on a closing keyword for another issue, or when the issue, the
+PR or a run cannot be read.
 """
 
 import argparse
@@ -88,6 +103,18 @@ JOINED = re.compile(
     r"(?![A-Za-z0-9_/-]|\.\w)"
 )
 INLINE_CODE = re.compile(r"`[^`\n]*`")
+# GitHub's closing keywords before an issue reference (#N, owner/repo#N, or
+# an issue URL). Checked against every PR body on the fork: the issues it
+# finds are GitHub's closingIssuesReferences but for one PR number (#377's
+# "closed #325").
+# What lies between the keyword and the reference is read wide (any run of
+# colons, blanks and -, none at all, a letter after the number), since a
+# miss closes an issue and a false refusal costs a pair of backticks.
+CLOSING = re.compile(
+    r"(?<!\w)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[:\s-]*"
+    r"(?:[\w.-]+/[\w.-]+#(\d+)|#(\d+)|https://github\.com/[\w.-]+/[\w.-]+/issues/(\d+))",
+    re.IGNORECASE,
+)
 CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
 RUN_URL = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/actions/runs/(\d+)")
 CI_LOAD_WORKFLOW = ".github/workflows/ci-load.yml"
@@ -202,6 +229,34 @@ def placeholders(body: str, defined=defined_names) -> list[str]:
     return [f"line {n}: {token}" for n, _at, token in sorted(found) if token not in code_names]
 
 
+def unquoted_lines(body: str) -> list[tuple[int, str]]:
+    """Each line GitHub reads as prose, as (its number, the line with inline
+    code taken out): a closed code fence is left out, and the lines of a
+    fence that never closes are kept, as pr-merge reads cited decisions."""
+    kept, fence = [], None
+    for n, line in enumerate(body.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fence = None if fence is not None else []
+        elif fence is not None:
+            fence.append((n, line))
+        else:
+            kept.append((n, INLINE_CODE.sub("", line)))
+    kept += [(n, INLINE_CODE.sub("", line)) for n, line in fence or []]
+    return sorted(kept)
+
+
+def foreign_closes(body: str, closes: set[str]) -> list[str]:
+    """Each closing keyword outside code for an issue not in `closes`, as
+    `line N: <the words>`."""
+    found = []
+    for n, line in unquoted_lines(body):
+        for m in CLOSING.finditer(line):
+            number = next(g for g in m.groups() if g)
+            if number not in closes:
+                found.append(f"line {n}: {m[0]}")
+    return found
+
+
 def ci_load_items(body: str) -> list[str]:
     """The evidence text of each `CI load:` item outside `## Still open`."""
     found, section, chunk = [], None, []
@@ -299,21 +354,24 @@ def pr_head(number: str) -> str:
 
 def main(argv: list[str]) -> int:
     parser = Parser(prog="plan/bin/pr-evidence", allow_abbrev=False, add_help=False)
-    parser.add_argument("issue")
+    parser.add_argument("issue", nargs="?")
     parser.add_argument("--check", metavar="BODY.md")
     parser.add_argument("--head", metavar="SHA")
     parser.add_argument("--pr", metavar="N")
     parser.add_argument("--flake-ticket", action="store_true")
+    parser.add_argument("--closes", metavar="N", action="append", default=[])
     args = parser.parse_args(argv)
-    if (args.head or args.pr or args.flake_ticket) and not args.check:
-        parser.error("--head, --pr and --flake-ticket go with --check")
+    if (args.head or args.pr or args.flake_ticket or args.closes) and not args.check:
+        parser.error("--head, --pr, --flake-ticket and --closes go with --check")
+    if not (args.issue or args.check):
+        parser.error("give an issue, or --check BODY.md")
     head = args.head
     if args.pr:
         real = pr_head(args.pr)
         if head and head != real:
             sys.exit(f"pr-evidence: --head {head} is not the head of PR #{args.pr}, {real}")
         head = real
-    asked = keys(issue_body(args.issue))
+    asked = keys(issue_body(args.issue)) if args.issue else []
     if not args.check:
         for key in asked:
             print(f"- {key.rstrip('.!?')}: ")
@@ -325,18 +383,25 @@ def main(argv: list[str]) -> int:
     missing = [key for key in asked if not has_evidence(key, outside, still_open)]
     for key in missing:
         print(f"no evidence in the body: {key}")
-    print(
-        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{args.issue} that ask "
-        "for evidence in the PR have it in the body"
-    )
+    if args.issue:
+        print(
+            f"{len(asked) - len(missing)} of {len(asked)} open lines of #{args.issue} that ask "
+            "for evidence in the PR have it in the body"
+        )
+    else:
+        print("no issue given: no ticket's evidence lines were checked")
     unfilled = placeholders(body)
     for found in unfilled:
         print(f"unfilled placeholder, {found}")
+    closes = foreign_closes(body, {args.issue, *args.closes} - {None})
+    for found in closes:
+        print(f"closes another issue, {found}: GitHub closes it on merge; put a quote in "
+              "backticks, or write \"Part of #N\"")
     loads = check_ci_load(body, head, args.flake_ticket)
     for line in loads:
         print(line)
     refused = [line for line in loads if line.startswith("not load evidence")]
-    return 1 if missing or unfilled or refused else 0
+    return 1 if missing or unfilled or closes or refused else 0
 
 
 if __name__ == "__main__":
