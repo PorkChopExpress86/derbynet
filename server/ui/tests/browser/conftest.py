@@ -421,7 +421,7 @@ class InFlight:
         self.requests -= {
             r
             for r in self.requests
-            if r.frame == frame and r.resource_type in self.ORPHANED
+            if _frame_of(r) == frame and r.resource_type in self.ORPHANED
         }
 
     def drain(self, page) -> list[str]:
@@ -435,11 +435,22 @@ class InFlight:
         return sorted(f"{r.method} {r.url}" for r in self.requests)
 
 
-def _sent_by(request):
+def _frame_of(request):
+    """The frame that sent `request`, or None where Playwright refuses it: a
+    service worker's request, and a `target="_blank"` link's navigation
+    request, sent before Playwright has its popup's page
+    (`test_a_blank_link_followed_while_a_frame_navigates_is_tracked`, #378)."""
+    from playwright.sync_api import Error
+
     try:
-        return request.frame.page
-    except Exception:  # noqa: BLE001 - a service worker's request has no frame
+        return request.frame
+    except Error:
         return None
+
+
+def _sent_by(request):
+    frame = _frame_of(request)
+    return frame.page if frame is not None else None
 
 
 # Clears every timeout and interval the frame has set. Timer ids count up

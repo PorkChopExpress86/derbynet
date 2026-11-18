@@ -53,7 +53,12 @@ targets, then:
   differ, or what can't be parsed or resolved (a relative or star import, a
   module outside the tree) is no import-only move. A flake ticket keeps 25
   repeats of the whole file, on the database it failed on, whatever the
-  tool prints (D101);
+  tool prints (D101). A text-measuring file named
+  `ui/tests/browser/test_kiosk*.py` repeats under load in the default font
+  only, and its one DejaVu Sans run is the hand-off's, with no load and no
+  --count, under `tools/hold-load-lock.sh`, a flake ticket's whole-file 25
+  included (D133, amending D101's repeats; D85's second font under load stays
+  for other files);
 - before the commands, `tools/docstring_claims.py` on each changed test file,
   then with `--check` on the PR body draft over every one of them, since a
   catch-all row fails (#341 retro), with `--base BASE`, so that it asks only
@@ -172,6 +177,8 @@ MEASURES = re.compile(
     r'bounding_box\(|getBoundingClientRect|getClientRects|scrollWidth|'
     r'scrollHeight|clientWidth|clientHeight|offsetWidth|offsetHeight|'
     r'fontSize|font-size|font_size')
+# D133: the browser test files whose font repeats are one font under load.
+KIOSK_BROWSER_FILE = re.compile(r'ui/tests/browser/test_kiosk[^/]*\.py')
 DB_CODE = re.compile(
     r'django\.db|\.objects\b|transaction\.|select_for_update|\.raw\(|'
     r'cursor\(|RawSQL|connection\.|Subquery|'
@@ -2270,7 +2277,16 @@ def load_repeats(rel, base, head, module_text, postgres=False):
     run = f'tools/pytest-under-load.sh {pg}-m browser -n 4 --count {count} {targets}'
     say(f'      {run}')
     if text_hit(head, MEASURES):
-        say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
+        if KIOSK_BROWSER_FILE.fullmatch(rel):
+            # D133: CI runs DejaVu once, and 25 counts of test_kiosks.py took
+            # 1 h 53 min under load.  The hand-off's DejaVu line in report()
+            # is the one run, so no command prints here.
+            say('      D133: a kiosk file repeats under load in the default font '
+                'only. Its one DejaVu Sans run is the DERBYNET_BROWSER_FONT line '
+                'under "Run from server/" below, with no load and no --count, '
+                'under tools/hold-load-lock.sh.')
+        else:
+            say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
     return out
 
 
@@ -2338,7 +2354,8 @@ def report(plan, tree):
             'each adds or changes, by node id, and those that read a helper it adds '
             'or changes (D101); none for an import-only move (D97). A flake ticket '
             'keeps 25 of the whole file, on the database it failed on, whatever this '
-            'prints (owner, 2026-11-11):')
+            'prints (owner, 2026-11-11). A kiosk file takes the default font under '
+            'load and DejaVu Sans once under hold-load-lock.sh (D133):')
         if not plan.from_git:
             say('  (--stdin has no BASE to compare with, so no file counts as an '
                 'import-only move, D97: each keeps its count, of the whole file, D101)')
