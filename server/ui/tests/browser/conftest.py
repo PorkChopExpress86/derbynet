@@ -476,7 +476,11 @@ def close_tab(page, tab):
     Chromium then blocks every request the tab sends, and a fetch it blocks
     after that is the barrier: once Playwright reports its end, it has
     reported every request sent before. Only those reach the server; the
-    blocked ones end at once, so the wait is for the server's replies (#409:
+    blocked ones end at once, so the wait is for the server's replies. With
+    none left out, the tab then leaves its page for `about:blank`, so none
+    of the page's callbacks runs while the tab closes and the block goes
+    with it; a navigation would drop a request still out from the harness's
+    record, so a tab with one closes as it is and fails the test (#409:
     `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
     `test_close_tab_closes_a_tab_that_keeps_sending`)."""
     stop_timers(tab)
@@ -494,6 +498,8 @@ def close_tab(page, tab):
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
         tab.wait_for_timeout(50)
         waited += 50
+    if not page.in_flight.of(tab):
+        tab.goto("about:blank")
     tab.close()
 
 
