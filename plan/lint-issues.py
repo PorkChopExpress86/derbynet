@@ -12,6 +12,8 @@ Reads every issue labeled django-migration, then checks each body for:
 - in an open kind:ticket or kind:spec, a sentence that says what a PHP file
   does ("`fake-timer.php` links ...") with no `file:line` cite in it
   (plan/php_cites.py, #346)
+- in an open kind:ticket that names a CI Postgres job (`pytest (postgres)`),
+  an open box asking for a run under load that names no database (#412)
 - cited repository paths that exist in this checkout, and for a --file
   draft on origin/master too (LINT_BASE)
 - #N references that name an existing issue
@@ -241,6 +243,28 @@ def uncited_php(n, text):
                         'file:line cite in its sentence; cite the line (`fake-timer.php:99-100`)')
 
 
+POSTGRES_JOB = re.compile(r'\b\w+ \(postgres\)', re.I)
+UNDER_LOAD = re.compile(r'^\s*[-*] \[ \] .*\bunder load\b', re.I)
+DATABASE = re.compile(r'\b(?:postgres|postgresql|sqlite)\b', re.I)
+
+
+def load_database(n, text):
+    """Each open box of an open ticket that asks for a run under load and
+    names no database, when the body names a CI Postgres job such as
+    `pytest (postgres)`, code spans included. #412 failed in `pytest
+    (postgres)`, its box said only "25 counts under load", and its first load
+    run queued on SQLite (#412 retro)."""
+    job = POSTGRES_JOB.search(text)
+    if not job:
+        return
+    for ln, line in enumerate(text.splitlines(), 1):
+        if UNDER_LOAD.match(line) and not DATABASE.search(line):
+            findings.append(
+                f'#{n}:{ln}: the body names CI\'s "{job.group(0)}" job while this box asks '
+                'for a run under load and names no database; write "on Postgres" (or the '
+                'database it should run on), since a flake repeats on the database it failed on')
+
+
 def kind(issue):
     names = {l['name'] for l in issue['labels']}
     return 'spec' if 'kind:spec' in names else 'ticket' if 'kind:ticket' in names else 'epic'
@@ -259,6 +283,7 @@ for n, issue in sorted(issues.items()):
         uncited_php(n, text)
         if k == 'ticket':
             unverified_cause(n, text)
+            load_database(n, text)
     in_fence = False
     for ln, line in enumerate(text.splitlines(), 1):
         if line.startswith('```'):
