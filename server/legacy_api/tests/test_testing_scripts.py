@@ -505,6 +505,7 @@ def test_a_wait_with_no_source_is_found():
         ("local timeout=30", True),
         ("readonly POLL_SECONDS=10", True),
         ("X_MS=300", True),
+        ("HEAT_DELAY=5", True),
         ('NAME_SECONDS="${NAME_SECONDS:-30}"', True),
         ("export NAME_SECONDS=${NAME_SECONDS:-30}", True),
         (": ${NAME_SECONDS:=30}", True),
@@ -557,13 +558,16 @@ def test_where_a_waits_source_may_sit():
     assert unsourced_waits("# 5 s\nx\nsleep 1\n") == []
     assert unsourced_waits("sleep 1  # 5 s\n") == []
     assert unsourced_waits("sleep 1  # D85\n") == []
-    # A wait on a bound the script sets takes the bound's source; a variable
-    # set any other way needs its own.
+    # A wait on a bound the script sets takes the bound's source, though
+    # the source is too far above the wait; a variable set any other way
+    # needs its own.
+    far = "x\ny\nz\n"
     assert (
-        unsourced_waits("# 10 s\nPOLL_SECONDS=10\ncurl --max-time $POLL_SECONDS u\n")
+        unsourced_waits(f"# 10 s\nPOLL_SECONDS=10\n{far}curl -m $POLL_SECONDS u\n")
         == []
     )
-    assert unsourced_waits("# 5 s\nHEAT_DELAY=5\nsleep ${HEAT_DELAY}\n") == []
+    assert unsourced_waits(f"# 5 s\nHEAT_DELAY=5\n{far}sleep ${{HEAT_DELAY}}\n") == []
+    assert unsourced_waits(f"# 5 s\n: ${{X_DELAY:=5}}\n{far}sleep $X_DELAY\n") == []
     assert unsourced_waits("DELAY=$1\nsleep $DELAY\n") == [(2, "sleep $DELAY")]
     assert unsourced_waits("HEAT_SECONDS=$((6 * 5))\nsleep $HEAT_SECONDS\n") == [
         (2, "sleep $HEAT_SECONDS")
