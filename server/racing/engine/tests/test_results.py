@@ -56,8 +56,37 @@ def test_reverse_lanes_mirrors_results_and_the_lane_mask():
         ("lane1=0.000&lane2=-0&lane3=0.000&lane4=0.000", False),
     ],
 )
-def test_all_zeroes_needs_a_zero_time_on_every_lane(body, all_zero):
-    assert is_all_zeroes(parse(body)) is all_zero
+def test_all_zeroes_needs_a_zero_time_on_every_scheduled_lane(body, all_zero):
+    assert is_all_zeroes([1, 2, 3, 4], parse(body)) is all_zero
+
+
+@pytest.mark.parametrize(
+    ("body", "all_zero"),
+    [
+        ("lane2=0.000&lane4=0.000", True),
+        ("lane2=0.000", False),
+        ("place2=1&place4=2", False),
+        ("lane2=0.000&lane4=0.000&place2=1&place4=2", True),
+        ("lane1=3.100&lane2=0.000&lane3=3.300&lane4=0.000", True),
+        ("lane2=0.000&lane4=3.400", False),
+    ],
+)
+def test_all_zeroes_reads_only_the_lanes_the_heat_schedules(body, all_zero):
+    """Q17, fixed (#65): with lanes 2 and 4 scheduled, lanes 1 and 3 need no
+    time, and a time there changes nothing."""
+    assert is_all_zeroes([2, 4], parse(body)) is all_zero
+
+
+def test_a_scheduled_lane_past_the_lane_count_is_left_out():
+    """A scheduled lane past the lanes parsed from the post is left out."""
+    assert is_all_zeroes([2, 5], parse("lane2=0.000")) is True
+
+
+def test_no_scheduled_lane_is_never_all_zero():
+    assert (
+        is_all_zeroes([], parse("lane1=0.000&lane2=0.000&lane3=0.000&lane4=0.000"))
+        is False
+    )
 
 
 def stored(*lanes):

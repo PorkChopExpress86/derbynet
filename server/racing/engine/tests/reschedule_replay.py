@@ -32,6 +32,7 @@ QUIRK_FIXTURES = [
     "http/reschedule/dry-run-while-racing.http",
     "http/reschedule/master-schedule.http",
     "http/reschedule/last-added-heat.http",
+    "http/reschedule/first-heat-bye.http",
 ]
 
 # Classes are made in the order their first racer is imported: Lions & Tigers
@@ -331,7 +332,9 @@ def replay_quirks(new_server: NewServer) -> Iterator[tuple[tuple[str, str], Repl
     """Yield `((fixture, exchange), Reply)` for each reschedule
     of `capture/scenarios/11-reschedule-quirks.sh`. Every case starts from an
     empty database, so racer ids count from 1 in import order."""
-    dry_run_fixture, master_fixture, last_heat_fixture = QUIRK_FIXTURES
+    dry_run_fixture, master_fixture, last_heat_fixture, first_heat_fixture = (
+        QUIRK_FIXTURES
+    )
 
     s = new_server(dict.fromkeys(range(1, 12), 1))
     s.passed |= set(s.round_of)
@@ -364,4 +367,13 @@ def replay_quirks(new_server: NewServer) -> Iterator[tuple[tuple[str, str], Repl
     yield (
         (last_heat_fixture, "002 dry-run-runs-out-of-added-heats"),
         s.reschedule(1, 5, dry_run=True),
+    )
+
+    s = new_server(dict.fromkeys(range(1, 6), 1), mask=12)
+    s.passed |= set(s.round_of)
+    s.generate(1)
+    s.passed.discard(1)
+    yield (
+        (first_heat_fixture, "001 dry-run-with-a-bye-in-the-first-heat"),
+        s.reschedule(1, dry_run=True),
     )

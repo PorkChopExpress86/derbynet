@@ -3,15 +3,23 @@
 byte with Django's ids written as PHP's.
 
 The scenario's transcripts share one race, so they run in order in one test.
+`capture/scenarios/13-heat-state.sh`'s Q17 transcript is replayed the same
+way, against the Q17 deviation it writes with `WRITE_DEVIATIONS=1` (#65).
 """
 
+import os
 from urllib.parse import parse_qsl, quote, urlencode
 
 import pytest
 from django.test import Client
 
 from legacy_api.tests.php_http import as_php_body, translate
-from legacy_api.tests.test_race_control_parity import Scenario
+from legacy_api.tests.test_race_control_parity import (
+    Scenario,
+    assert_listed,
+    listed_claim,
+    write_deviations,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -187,3 +195,75 @@ def run_timer_scenario() -> TimerScenario:
 def test_timer_transcripts_match_php(event):
     s = run_timer_scenario()
     assert s.mismatches() == []
+
+
+# ----- capture/scenarios/13-heat-state.sh, its Q17 case -----------------------
+
+ZEROES = "http/timer/zeroes-on-the-lanes-in-use.http"
+
+
+def run_zeroes_on_the_lanes_in_use(client=None) -> TimerScenario:
+    """Three Wolves on lanes 2 and 4 (mask 5), each FINISHED from a fresh
+    event, as `heat_state_case 3 5` makes them."""
+    s = TimerScenario()
+    s.scenario(ZEROES)
+    for finished, poll in (
+        ("finished-zeroes-and-places-on-lanes-2-and-4", "poll-after-zeroes-and-places"),
+        ("finished-zeroes-on-lanes-2-and-4", "poll-after-zeroes"),
+    ):
+        s.reset()
+        s.post_ok("action=settings.write&unused-lane-mask=5&n-lanes=4")
+        for i in range(1, 4):
+            s.import_racer(
+                f"firstname=First10{i}&lastname=Last10{i}&carnumber=10{i}"
+                "&partition=Wolves"
+            )
+        s.post_ok("action=racer.bulk&who=all&what=checkin")
+        s.learn_rows()
+        s.post_ok("action=schedule.generate&roundid=1")
+        s._timer_client = None  # a new Timer login, as user_login_timer
+        s.post_ok("action=heat.select&roundid=1&now_racing=1")
+        s.timer_msg(finished)
+        s.coord(poll)
+    return s
+
+
+SCENARIOS = {"zeroes-on-the-lanes-in-use": run_zeroes_on_the_lanes_in_use}
+
+# quirk: (reason, scenario, {fixture: [exchange names]}, expected file name)
+DEVIATIONS = {
+    "Q17": (
+        "PHP's is_all_zeroes() wants a time on every lane up to the lane count,"
+        " so zero times on lanes 2 and 4, the only lanes in use, are written as"
+        " heat 1's result and heat 2 is staged. Django reads only the lanes the"
+        " heat schedules, so it stops racing on heat 1 and writes nothing,"
+        " places or not (#65).",
+        "zeroes-on-the-lanes-in-use",
+        {
+            ZEROES: [
+                "001 finished-zeroes-and-places-on-lanes-2-and-4",
+                "002 poll-after-zeroes-and-places",
+                "003 finished-zeroes-on-lanes-2-and-4",
+                "004 poll-after-zeroes",
+            ]
+        },
+        None,
+    ),
+}
+DEVIATION_CLAIM = listed_claim(DEVIATIONS)
+
+
+def test_zeroes_on_the_lanes_in_use_give_the_q17_deviation(event):
+    s = run_zeroes_on_the_lanes_in_use()
+    assert s.mismatches() == []
+
+
+def test_every_listed_deviation_is_a_reply_these_scenarios_make():
+    assert_listed(DEVIATIONS, SCENARIOS)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the Q17 entry"
+)
+def test_write_timer_deviations(event):
+    write_deviations(DEVIATIONS, SCENARIOS)

@@ -60,7 +60,17 @@ def message_retrieve(ctx: LegacyContext) -> None:
     ctx.success()
 
 
-@action("replay.message", permission=Perm.CONTROL_RACE, divergences=REPLAY_LOGIN)
+@action(
+    "replay.message",
+    permission=Perm.CONTROL_RACE,
+    divergences=REPLAY_LOGIN
+    + (
+        "Q17: after a timer FINISHED with zero times on every lane the heat"
+        " schedules, the queue holds REPLAY and CANCEL, as after an all-zero"
+        " result; PHP writes the heat and queues the next heat's START too"
+        " (#65).",
+    ),
+)
 def replay_message(ctx: LegacyContext) -> None:
     """`status` is the replay client's state, `finished-replay` unused."""
     commands = replay.poll(ctx.event.id, _text(ctx, "status") or "", timezone.now())

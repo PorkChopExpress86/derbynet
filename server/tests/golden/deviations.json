@@ -239,6 +239,15 @@
       "expected": "deviations/R3/two-lanes.http"
     },
     {
+      "quirk": "Q3",
+      "fixture": "http/reschedule/first-heat-bye.http",
+      "exchanges": [
+        "001 dry-run-with-a-bye-in-the-first-heat"
+      ],
+      "reason": "PHP's squeeze takes heat index 0 for no heat (!$relos[$lane]), so a bye in the round's first heat never takes a displaced racer; Django uses it and squeezes out one more heat (#65). The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
+      "expected": "deviations/Q3/first-heat-bye.http"
+    },
+    {
       "quirk": "Q4",
       "fixture": "http/suite/basic-racing.http",
       "exchanges": [
@@ -1783,6 +1792,18 @@
       ],
       "reason": "PHP stores a time of --- as text, shows it as 0 and places it first. Django gives the car a did-not-finish time, 9.999 s, so it places last (D42).",
       "expected": "deviations/Q16/partial-and-non-numeric-results.http"
+    },
+    {
+      "quirk": "Q17",
+      "fixture": "http/timer/zeroes-on-the-lanes-in-use.http",
+      "exchanges": [
+        "001 finished-zeroes-and-places-on-lanes-2-and-4",
+        "002 poll-after-zeroes-and-places",
+        "003 finished-zeroes-on-lanes-2-and-4",
+        "004 poll-after-zeroes"
+      ],
+      "reason": "PHP's is_all_zeroes() wants a time on every lane up to the lane count, so zero times on lanes 2 and 4, the only lanes in use, are written as heat 1's result and heat 2 is staged. Django reads only the lanes the heat schedules, so it stops racing on heat 1 and writes nothing, places or not (#65).",
+      "expected": "deviations/Q17/zeroes-on-the-lanes-in-use.http"
     },
     {
       "quirk": "Q18",
