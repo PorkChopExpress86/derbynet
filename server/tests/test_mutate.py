@@ -824,21 +824,40 @@ def test_a_signal_while_the_lock_is_taken_or_removed_leaves_no_lock(
     assert "stopped:" not in err, "a signal is no edit by someone else"
 
 
+EDIT_WAIT = 60
+WAITS_FOR_THE_EDIT = f"""
+
+def test_waits_for_the_edit():
+    with open("started", "w") as started:
+        started.write(str(os.getpid()))
+    deadline = time.monotonic() + {EDIT_WAIT}
+    while not os.path.exists("edited"):
+        assert time.monotonic() < deadline, "no edit"
+        time.sleep(0.02)
+    open("ended", "w").close()
+"""
+
+
 @pytest.mark.parametrize("mode", ["single", "listed"])
 def test_an_edit_during_the_run_is_left_as_it_is_and_named(project, mode):
     """Someone appends a line while the mutant's test runs: the tool puts
-    nothing back over it, and names the file."""
+    nothing back over it, and names the file. The mutant's test ends on the
+    edit, not on a `--timeout`: under load the bound passed before pytest
+    reached the test, and the tool exited first (#367). The mutant's test
+    waits `EDIT_WAIT` for the edit; the run's bound is `2 * EDIT_WAIT`, which
+    leaves `EDIT_WAIT` for pytest's start and the tool's exit, so an edit it
+    never sees ends on its own deadline, and `ended` is missing."""
     module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
-    commit(project, module)
-    tool = wrapped(
-        project, "", mode, "test_mod.py::test_waits", tool=("--timeout", "3")
-    )
+    commit(project, module, WAITS_FOR_THE_EDIT)
+    tool = wrapped(project, "", mode, "test_mod.py::test_waits_for_the_edit")
     wait_for(project, "started", tool)
     mutant = (project / "mod.py").read_text()
     with open(project / "mod.py", "a") as f:
         f.write("# someone's edit\n")
-    out, err = tool.communicate(timeout=60)
+    (project / "edited").touch()
+    out, err = tool.communicate(timeout=2 * EDIT_WAIT)
     assert tool.returncode == 2, out + err
+    assert (project / "ended").exists(), "the mutant's test never saw the edit"
     assert "mod.py changed while mutate.py held it" in err
     assert (project / "mod.py").read_text() == mutant + "# someone's edit\n"
     assert no_lock(project)
