@@ -1,6 +1,6 @@
 # The DerbyNet server image
 
-`derbynet_server` runs the Django server for a race (#58). Docker is the only way DerbyNet is installed (D3, ADR-14), so a laptop at the race and a hosted server run this same image. It is built for `linux/amd64` and `linux/arm64`; the arm64 image is for Apple Silicon Macs and arm64 servers, not for running the server on a Raspberry Pi (D21; #59 covers the Pi's timer and photo stand images).
+`derbynet_server` runs the Django server for a race (#58). Docker is the only way DerbyNet is installed (D3, ADR-14), so a laptop at the race and a hosted server run this same image. It is built for `linux/amd64` and `linux/arm64`; the arm64 image is for Apple Silicon Macs and arm64 servers, not for running the server on a Raspberry Pi (D21). The Pi's timer and photo stand images are in `extras/docker/` (#59, `docs/pi-setup.md`).
 
 Inside the container, nginx answers on port 80, plain HTTP only, and passes requests to gunicorn, which runs Django as the unprivileged `derbynet` user. HTTPS comes from a proxy in front of the image: `compose.yaml` runs Caddy for it (D107). On Linux, `derbynet` takes the host user's uid and gid (D106), so the volume's files belong to that user. Everything the server keeps is on one volume, `/var/lib/derbynet`: the SQLite database, photos, videos and the secret key. Caddy keeps its certificate authority and certificates on a second volume.
 
