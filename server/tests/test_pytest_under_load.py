@@ -874,8 +874,13 @@ LINE = Path(__file__).resolve().parents[1] / "tools" / "load-lock-line.sh"
 
 
 def paused_copy(tmp_path, script, after, name):
+    """injected_copy() that runs `pause_at NAME` after the line."""
+    return injected_copy(tmp_path, script, after, f"  pause_at {name}\n")
+
+
+def injected_copy(tmp_path, script, after, text):
     """A copy of `script` in `tmp_path/tools`, beside a copy of LINE, the
-    file it sources, that runs `pause_at NAME` right after the one line of
+    file it sources, with `text` (whole lines) right after the one line of
     the two that matches `after` (a regex the whole line matches)."""
     folder = tmp_path / "tools"
     folder.mkdir(exist_ok=True)
@@ -887,7 +892,7 @@ def paused_copy(tmp_path, script, after, name):
         ]
         found += [source.name] * len(at)
         for i in reversed(at):
-            lines.insert(i + 1, f"  pause_at {name}\n")
+            lines.insert(i + 1, text)
         (folder / source.name).write_text("".join(lines))
     assert len(found) == 1, found
     copy = folder / script.name
@@ -1115,7 +1120,11 @@ def test_a_flock_that_ends_without_the_lock_ends_the_run(tmp_path, script):
     run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path))
     try:
         os.kill(waiter, signal.SIGTERM)
-        assert run.wait(timeout=30) == 143
+        assert run.wait(timeout=30) == 2
+        assert (
+            "it could not join the line or take the load lock"
+            in (tmp_path / "waiter.out").read_text()
+        )
         assert lock.read_text() == "pid 1, since then\n"
         assert not (tmp_path / "waiter" / "started").exists()
         assert str(waiter) not in kill_args(tmp_path)
@@ -1466,6 +1475,162 @@ def test_tickets_count_on_in_decimal_past_9(tmp_path, script):
         if held is not None:
             os.close(held)
         finish(tmp_path, *runs)
+
+
+# What a line folder holds besides the scripts' own entries, as (name, kind,
+# whether the test holds an flock on it): a name that breaks the arithmetic
+# on tickets, one with a suffix as an editor's backup has, a ticket of the
+# wrong length, and a folder named as an entry, which a bare removal fails
+# on.
+STRAYS = [
+    pytest.param("1abc.2", "file", True, id="not-a-ticket-held"),
+    pytest.param("1abc.2", "file", False, id="not-a-ticket-free"),
+    pytest.param("0000000003.4~", "file", True, id="backup-suffix-held"),
+    pytest.param("0000000003.4~", "file", False, id="backup-suffix-free"),
+    pytest.param("0.0", "file", True, id="short-ticket-held"),
+    pytest.param("0000000005.7", "folder", False, id="folder-free"),
+]
+
+
+@pytest.mark.parametrize(("name", "kind", "held_by_test"), STRAYS)
+@SCRIPTS
+def test_a_stray_in_the_line_folder_is_ignored(
+    tmp_path, script, name, kind, held_by_test
+):
+    """On the first head of this ticket an entry name the scripts did not
+    make, one a test-owned flock held, broke the arithmetic that numbers the
+    next ticket, bash dropped the whole join, and the run went on with no
+    lock while another run held it (#417 round 3's N1). A stray, held or
+    not, is no entry: the run takes place 1 and waits on the load lock the
+    test holds, then runs once it lets go, and leaves the stray where it
+    was."""
+    lock, held = held_lock(tmp_path)
+    line = Path(f"{os.path.realpath(lock)}.line")
+    line.mkdir()
+    stray = line / name
+    if kind == "folder":
+        stray.mkdir()
+    else:
+        stray.write_text("stray\n")
+    stray_fd = os.open(stray, os.O_RDONLY)
+    if held_by_test:
+        fcntl.flock(stray_fd, fcntl.LOCK_EX)
+    run = waiter = None
+    try:
+        run, waiter = start_waiting(tmp_path, script, lock)
+        out = tmp_path / "waiter.out"
+        assert "Place 1 in line: it takes the load lock next." in out.read_text()
+        assert not (tmp_path / "waiter" / "started").exists()
+        os.close(held)
+        held = None
+        (tmp_path / "waiter" / "go").write_text("")
+        assert run.wait(timeout=60) == 0
+        assert (tmp_path / "waiter" / "started").exists()
+        assert stray.exists()
+    finally:
+        os.close(stray_fd)
+        if held is not None:
+            os.close(held)
+        kill_all([waiter] if waiter else [])
+        finish(tmp_path, *([run] if run else []))
+
+
+# What a script says when a step before the lock fails.
+JOIN_FAILED = "it could not join the line or take the load lock"
+
+# A flock that fails its CALL-th call of `flock -x FD`, read through
+# BASH_ENV, and passes every other.
+FAIL_FLOCK = """flock() {
+  if [ "$*" = "-x $FAIL_FD" ]; then
+    FAILS_SEEN=$((${FAILS_SEEN:-0} + 1))
+    if [ "$FAILS_SEEN" = "$FAIL_CALL" ]; then return 1; fi
+  fi
+  command flock "$@"
+}
+"""
+
+FAILING_STEPS = [
+    pytest.param("7", 1, id="the-mutex-of-the-join"),
+    pytest.param("8", 1, id="the-entry"),
+    pytest.param("7", 2, id="the-mutex-of-its-turn"),
+    pytest.param("9", 1, id="the-load-lock"),
+]
+
+
+@pytest.mark.parametrize(("fd", "call"), FAILING_STEPS)
+@SCRIPTS
+def test_a_step_that_fails_before_the_lock_ends_the_run_with_2_and_no_command(
+    tmp_path, script, fd, call
+):
+    """The test holds the lock, so a run that went on past the failure
+    would run its command beside the holder. Each step from joining the
+    line to the wait on the lock, made to fail, ends the run with 2 and a
+    message, runs no command, and leaves no entry."""
+    (tmp_path / "fail_flock.sh").write_text(FAIL_FLOCK)
+    env = {
+        "BASH_ENV": str(tmp_path / "fail_flock.sh"),
+        "FAIL_FD": fd,
+        "FAIL_CALL": str(call),
+    }
+    lock, held = held_lock(tmp_path)
+    run = join(tmp_path, script, "waiter", lock, env)
+    try:
+        assert run.wait(timeout=30) == 2
+        said = (tmp_path / "waiter.out").read_text()
+        assert f"{script.name}: {JOIN_FAILED}" in said
+        assert not (tmp_path / "order").exists()
+        assert entries(lock) == []
+        assert lock.read_text() == "pid 1, since then\n"
+    finally:
+        os.close(held)
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_a_join_that_ends_with_no_verdict_ends_the_run_with_2_and_no_command(
+    tmp_path, script
+):
+    """Bash drops a whole command, a join here, on an arithmetic error and
+    goes on with the next, with no failed status for `set -e` or an ERR
+    trap to see; the join's own division by zero stands for any such
+    error. The run reads the join's verdict, and a join that gave none ends
+    it with 2 and a message, not as the run that holds the lock."""
+    copy = injected_copy(tmp_path, script, r"  line_scan", "  last=$((1 / 0))\n")
+    lock, held = held_lock(tmp_path)
+    run = join(tmp_path, script, "waiter", lock, copy=copy)
+    try:
+        assert run.wait(timeout=30) == 2
+        said = (tmp_path / "waiter.out").read_text()
+        assert f"{script.name}: {JOIN_FAILED}" in said
+        assert not (tmp_path / "order").exists()
+        assert entries(lock) == []
+        assert lock.read_text() == "pid 1, since then\n"
+    finally:
+        os.close(held)
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_a_script_beside_no_line_file_ends_the_run_with_2_and_no_command(
+    tmp_path, script
+):
+    """A copy of the script with no load-lock-line.sh beside it, as a
+    checkout missing the file, would find no functions to join the line
+    with; it ends with 2 and names the file, and runs no command."""
+    folder = tmp_path / "tools"
+    folder.mkdir()
+    copy = folder / script.name
+    shutil.copy(script, copy)
+    lock, held = held_lock(tmp_path)
+    run = join(tmp_path, script, "waiter", lock, copy=copy)
+    try:
+        assert run.wait(timeout=30) == 2
+        said = (tmp_path / "waiter.out").read_text()
+        assert f"{script.name}: it cannot read {folder}/load-lock-line.sh" in said
+        assert not (tmp_path / "order").exists()
+    finally:
+        os.close(held)
+        finish(tmp_path, run)
 
 
 def lock_with_no_room_for_a_line(tmp_path, closed):

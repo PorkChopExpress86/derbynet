@@ -14,7 +14,8 @@
 # seconds of each other, so its gate waited for a 5-minute free window
 # (#348, #350 retro).  This script waits in the same line as the load runs
 # instead, and takes the lock in the order it came, ahead of any run that
-# starts waiting after it (tools/load-lock-line.sh, #417).
+# starts waiting after it (tools/load-lock-line.sh, #417).  Whatever fails on
+# the way to the lock, it exits 2 with a message and runs no COMMAND.
 #
 # It takes the lock as pytest-under-load.sh does (DERBYNET_LOAD_LOCK, or
 # ~/.cache/derbynet/load-run.lock), prints its place in the line as that
@@ -62,7 +63,12 @@ if ! { mkdir -p "$(dirname "$LOCK")" && exec 9>>"$LOCK"; } 2>/dev/null; then
   exit 2
 fi
 HEAD_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
-. "$(dirname "${BASH_SOURCE[0]}")/load-lock-line.sh"
+LINE_FILE="$(dirname "${BASH_SOURCE[0]}")/load-lock-line.sh"
+. "$LINE_FILE" || {
+  echo "hold-load-lock.sh: it cannot read $LINE_FILE, which keeps the line" \
+       "the load lock is served in; it runs no command." >&2
+  exit 2
+}
 
 WAITING=
 CHILD=
@@ -85,9 +91,10 @@ trap stop_child EXIT
 # lock, as there (#391).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
+trap 'line_fail "$BASH_COMMAND"' ERR
 line_join "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*")"
-if [ -n "$ENTRY" ]; then
+if [ "$LINE_STATE" = queued ]; then
   echo "Waiting for the load lock $LOCK, held by:"
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
@@ -98,7 +105,10 @@ if [ -n "$ENTRY" ]; then
   wait "$!"
   WAITING=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
+elif [ "$LINE_STATE" != took ]; then
+  line_fail "the join gave no place and no lock"
 fi
+trap - ERR
 printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s\n' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*" >"$LOCK"
 # Out of the line, now that it holds the lock.

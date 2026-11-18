@@ -22,18 +22,42 @@
 # changes.  The flock on the load lock stays the mutual exclusion: a run
 # from a branch cut before the line takes it with no entry, so it may go
 # ahead of the line, but never runs beside a holder.
+#
+# A run that does not hold the lock never runs its command, whatever fails
+# on the way (#417 round 4).  An entry's name is TICKET.PID with a ticket of
+# ten digits; any other name in the line folder is not an entry, and the
+# scan leaves it alone.  A failed command ends the run through line_fail,
+# which each script sets as its ERR trap from before line_join to the end of
+# the wait.  Bash also drops a whole command on an arithmetic error and goes
+# on with the next, with no failed status for that trap to see, so
+# line_join says what happened in LINE_STATE, and a script that finds it
+# neither `took` nor `queued` calls line_fail itself.
 
 ENTRY=
 LINE=
+LINE_STATE=
+ENTRY_NAME='^[0-9]{10}\.[0-9]+$'
 LINE_ENTRIES=()
 LINE_SHOWN=
+
+# Ends the run with 2 and a message: its command has not run, and a run that
+# holds no lock must not.  $1 says what failed.
+line_fail() {
+  echo "${0##*/}: it could not join the line or take the load lock ($1);" \
+       "it runs no command." >&2
+  exit 2
+}
 
 # Under the mutex: removes each entry whose owner has died, and lists the
 # others, in the order they came, in LINE_ENTRIES.
 line_scan() {
   local entry
   LINE_ENTRIES=()
-  for entry in "$LINE"/[0-9]*.[0-9]*; do
+  for entry in "$LINE"/*; do
+    # The mutex, an editor's backup and the like are no entries, and an
+    # entry's owner made a file.
+    [[ ${entry##*/} =~ $ENTRY_NAME ]] || continue
+    [ -f "$entry" ] || continue
     # `6<` opens the entry without creating it, as `flock FILE` would.  An
     # entry its owner removed since the glob fails to open, which is no
     # error here.
@@ -46,9 +70,10 @@ line_scan() {
 }
 
 # Takes the load lock on fd 9 at once when no one waits in the line and no
-# one holds it, leaving ENTRY empty; otherwise adds an entry holding TEXT
-# and sets ENTRY.
+# one holds it, leaving ENTRY empty and LINE_STATE `took`; otherwise adds an
+# entry holding TEXT, sets ENTRY, and ends with LINE_STATE `queued`.
 line_join() {
+  LINE_STATE=
   # The script has opened LOCK on fd 9, so it exists and realpath needs no
   # -m.
   LINE="$(realpath -- "$LOCK").line"
@@ -62,6 +87,7 @@ line_join() {
   local count=${#LINE_ENTRIES[@]} last=0
   if [ "$count" = 0 ] && flock -n -x 9; then
     exec 7>&-
+    LINE_STATE=took
     return
   fi
   if [ "$count" != 0 ]; then
@@ -74,6 +100,7 @@ line_join() {
   flock -x 8
   printf '%s\n' "$1" >&8
   exec 7>&-
+  LINE_STATE=queued
 }
 
 # Prints this run's place and the runs ahead of it whenever they change,

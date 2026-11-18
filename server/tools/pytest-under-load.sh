@@ -45,7 +45,9 @@
 # then waited 74 min for a slot the lead handed out by message (#316 retro).
 # Runs wait in a line and take the lock in the order they came, each
 # printing its place and the runs ahead of it, again whenever that changes
-# (tools/load-lock-line.sh, #417).
+# (tools/load-lock-line.sh, #417).  Whatever fails on the way to the lock,
+# the run ends with 2 and a message and starts nothing; a file in the line
+# folder that it did not make is ignored.
 # Only this script holds the lock (its loops and pytest get no copy of it),
 # so a SIGKILL frees it at once.  A SIGKILL while it waits leaves its flock
 # waiting, which takes the lock once it frees and exits at once, and its
@@ -135,7 +137,12 @@ fi
 # The commit is read before the lock, so a slow git never leaves a waiter
 # reading half the holder's lines (#354 review).
 HEAD_SHA="$(git -C "$SERVER_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
-. "$SERVER_DIR/tools/load-lock-line.sh"
+LINE_FILE="$SERVER_DIR/tools/load-lock-line.sh"
+. "$LINE_FILE" || {
+  echo "pytest-under-load.sh: it cannot read $LINE_FILE, which keeps the" \
+       "line the load lock is served in; it runs no command." >&2
+  exit 2
+}
 
 WAITING=
 PIDS=()
@@ -166,9 +173,10 @@ trap stop_all EXIT
 # the wait killed the script and left its flock waiting (#391).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
+trap 'line_fail "$BASH_COMMAND"' ERR
 line_join "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS")"
-if [ -n "$ENTRY" ]; then
+if [ "$LINE_STATE" = queued ]; then
   echo "Waiting for the load lock $LOCK, held by:"
   # Empty from the holder's truncation until its one write lands.
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
@@ -185,7 +193,10 @@ if [ -n "$ENTRY" ]; then
   wait "$!"
   WAITING=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
+elif [ "$LINE_STATE" != took ]; then
+  line_fail "the join gave no place and no lock"
 fi
+trap - ERR
 refuse_used_folder
 # One write of the whole text.
 printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s\n' \
