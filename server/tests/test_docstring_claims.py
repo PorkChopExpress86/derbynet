@@ -159,6 +159,19 @@ def test_pasted_output_in_a_details_block_lists_no_claim(tmp_path, fence):
     assert dc.main(["--check", str(body), str(path)]) == 0
 
 
+def test_a_row_before_a_fence_keeps_its_scope_after_it(tmp_path):
+    """The fenced lines drop out whole, so a wrapped line after the fence
+    lists for the row above it."""
+    path = tmp_path / "test_sample.py"
+    path.write_text('def test_waits():\n    """A 3 s bound."""\n')
+    body = tmp_path / "body.md"
+    body.write_text(
+        "<details>\n- `test_waits`: the log shows\n```\nwaiting\n```\n"
+        "  3 s, the bound\n</details>\n"
+    )
+    assert dc.main(["--check", str(body), str(path)]) == 0
+
+
 @pytest.mark.parametrize(
     "fence, inner", [("````", "```"), ("```", "~~~"), ("```", "```python")]
 )
