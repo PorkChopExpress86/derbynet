@@ -4,6 +4,7 @@ Run: python3 -I -m unittest discover -s plan/tests
 """
 import importlib.machinery
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -166,6 +167,88 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
         done = self.run_tool('--body', 'x.md')
         self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
         self.assertNotEqual(done.returncode, 0)
+
+
+HEAD = '19fea1fb0000000000000000000000000000beef'
+RUN = 'https://github.com/PorkChopExpress86/derbynet/actions/runs/'
+# The fields pr-evidence reads, as the runs API answers for a ci-load run.
+CI_LOAD_RUN = {'path': '.github/workflows/ci-load.yml', 'event': 'workflow_dispatch',
+               'display_title': f'CI load at {HEAD}', 'status': 'completed',
+               'conclusion': 'success'}
+
+
+class CiLoad(IssueStandIn, unittest.TestCase):
+    """A `- CI load: <run URL>` item, read through a `gh` that also answers
+    the runs API from runs.json (#415)."""
+
+    def setUp(self):
+        super().setUp()
+        (self.tmp / 'runs.json').write_text('{}')
+        gh = self.tmp / 'gh'
+        gh.write_text(f'#!{sys.executable}\n'
+                      'import json, sys\n'
+                      'if sys.argv[1] == "api":\n'
+                      f'    runs = json.load(open({str(self.tmp / "runs.json")!r}))\n'
+                      '    run = runs.get(sys.argv[2].rsplit("/", 1)[1])\n'
+                      '    if run is None:\n'
+                      '        sys.exit("HTTP 404: Not Found")\n'
+                      '    print(json.dumps(run))\n'
+                      '    sys.exit(0)\n'
+                      'assert sys.argv[1:4] == ["issue", "view", "61"], sys.argv\n'
+                      f'print(open({str(self.tmp / "issue.md")!r}).read(), end="")\n')
+
+    def runs(self, **by_id):
+        (self.tmp / 'runs.json').write_text(json.dumps(by_id))
+
+    def check_at(self, items, head=HEAD):
+        (self.tmp / 'body.md').write_text(evidence(KEYS) + items)
+        argv = ['--check', str(self.tmp / 'body.md')] + (['--head', head] if head else [])
+        return self.run_tool(*argv)
+
+    def test_a_passed_run_at_the_head_is_accepted_as_ci_load(self):
+        self.runs(**{'101': CI_LOAD_RUN})
+        done = self.check_at(f'- CI load: {RUN}101\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn(f'CI load at {HEAD}, passed: {RUN}101 (extra evidence until the '
+                      'owner amends D85', done.stdout)
+
+    def test_each_wrong_field_is_refused_with_its_reason(self):
+        cases = {'path': ('.github/workflows/server.yml', 'not a run of'),
+                 'event': ('push', 'started by push'),
+                 'display_title': ('CI load at ' + '0' * 40, "is not at the PR's head"),
+                 'conclusion': ('failure', 'completed, failure: not passed'),
+                 'status': ('in_progress', 'in_progress, success: not passed')}
+        for field, (value, why) in cases.items():
+            with self.subTest(field=field):
+                self.runs(**{'102': {**CI_LOAD_RUN, field: value}})
+                done = self.check_at(f'- CI load: {RUN}102\n')
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('not load evidence, ', done.stdout)
+                self.assertIn(why, done.stdout)
+
+    def test_no_head_no_url_or_another_repo_is_refused(self):
+        self.runs(**{'103': CI_LOAD_RUN})
+        for items, head, why in (
+                (f'- CI load: {RUN}103\n', None, 'no --head to check it at'),
+                ('- CI load: the run below\n', HEAD, 'no run URL'),
+                ('- CI load: https://github.com/jeffpiazza/derbynet/actions/runs/103\n',
+                 HEAD, 'a run of jeffpiazza/derbynet')):
+            with self.subTest(why=why):
+                done = self.check_at(items, head)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(why, done.stdout)
+
+    def test_other_run_links_and_still_open_items_are_not_read(self):
+        """This PR's own body cites a failing run for its failing-shard box."""
+        done = self.check_at(f'- A failing shard: {RUN}104 failed, as it should\n'
+                             f'\n## Still open\n\n- CI load: {RUN}105 waits on D85\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn('CI load', done.stdout)
+
+    def test_a_run_gh_cannot_read_exits_with_its_message(self):
+        done = self.check_at(f'- CI load: {RUN}106\n')
+        self.assertEqual(done.returncode, 1)
+        self.assertIn('HTTP 404', done.stderr)
 
 
 class Placeholders(unittest.TestCase):

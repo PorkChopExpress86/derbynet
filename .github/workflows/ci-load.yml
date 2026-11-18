@@ -1,0 +1,219 @@
+name: ci-load
+
+# Runs a head's repeats under load (D85, D97, D101) on GitHub's runners, each
+# `--count N` split into shards that run at once, where the laptop's load
+# lock runs one after another (#415).  Start it from server/README.md's
+# command.  Its result is extra evidence: it replaces no local load run
+# until the owner amends D85.
+#
+# The planner and the summary come from this workflow's own commit (tools/),
+# the tests from the input SHA (head/), so a head older than this file, such
+# as one before a flake's fix, runs too.
+
+# pr-evidence reads the tested SHA from the run's name.
+run-name: CI load at ${{ inputs.sha || github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: The full SHA of the head to run
+        required: true
+        type: string
+      base:
+        description: The BASE plan/bin/affected-tests compares the head with
+        default: origin/master
+        type: string
+      files:
+        description: >-
+          Repo-relative test files to run through affected-tests --stdin
+          instead of the diff (a master head, a head before a fix)
+        default: ''
+        type: string
+      flake_ticket:
+        description: Pass --flake-ticket to each shard (D122)
+        default: false
+        type: boolean
+      per_shard:
+        description: The most repeats one runner takes
+        default: '5'
+        type: string
+  # Temporary, for the proof runs on scratch branches before this file is on
+  # master: removed before #415's PR leaves draft.
+  push:
+    branches: ['scratch-415-*']
+    paths: ['.github/ci-load-request']
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+      sha: ${{ steps.plan.outputs.sha }}
+    env:
+      SHA: ${{ inputs.sha }}
+      BASE: ${{ inputs.base }}
+      FILES: ${{ inputs.files }}
+      FLAKE_TICKET: ${{ inputs.flake_ticket }}
+      PER_SHARD: ${{ inputs.per_shard }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools
+
+      # Temporary, with the push trigger: a request file names the inputs.
+      - name: Read the request
+        if: github.event_name == 'push'
+        run: cat tools/.github/ci-load-request >> "$GITHUB_ENV"
+
+      - name: Check the SHA
+        run: |
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::sha must be a full 40-character SHA, not '$SHA'"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          path: head
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+
+      - name: Plan the shards
+        id: plan
+        working-directory: head
+        run: |
+          if [ -n "$FILES" ]; then
+            read -r -a files <<<"$FILES"
+            printf '%s\n' "${files[@]}" | python3 -I plan/bin/affected-tests --stdin \
+              >"$RUNNER_TEMP/affected.txt"
+          else
+            python3 -I plan/bin/affected-tests "${BASE:-origin/master}" >"$RUNNER_TEMP/affected.txt"
+          fi
+          cat "$RUNNER_TEMP/affected.txt"
+          flake=()
+          if [ "$FLAKE_TICKET" = true ]; then flake=(--flake-ticket); fi
+          python3 -I ../tools/plan/bin/ci-load plan --per-shard "${PER_SHARD:-5}" "${flake[@]}" \
+            <"$RUNNER_TEMP/affected.txt" >"$RUNNER_TEMP/plan.json"
+          python3 -I -m json.tool "$RUNNER_TEMP/plan.json"
+          echo "shards=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["shards"]))' <"$RUNNER_TEMP/plan.json")" >>"$GITHUB_OUTPUT"
+          echo "sha=$SHA" >>"$GITHUB_OUTPUT"
+          cp "$RUNNER_TEMP/affected.txt" "$RUNNER_TEMP/plan.json" "$GITHUB_WORKSPACE/"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plan
+          path: |
+            affected.txt
+            plan.json
+
+  shard:
+    needs: plan
+    if: needs.plan.outputs.shards != '[]'
+    name: ${{ matrix.name }} (count ${{ matrix.count }}${{ matrix.font && format(', {0}', matrix.font) || '' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.shards) }}
+    defaults:
+      run:
+        working-directory: head/server
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools
+          sparse-checkout: .github
+
+      - uses: actions/checkout@v7
+        with:
+          path: head
+          ref: ${{ needs.plan.outputs.sha }}
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # fonts-noto-core makes fontconfig's sans-serif Noto Sans, as on the
+      # laptop, so a command that names no font draws what it draws there.
+      - name: Install Chromium and Noto Sans
+        run: |
+          sudo sh "$GITHUB_WORKSPACE/tools/.github/ubuntu-mirror.sh"
+          sudo apt-get install -y fonts-noto-core
+          uv run playwright install --with-deps chromium
+
+      - name: Check the font
+        env:
+          FONT: ${{ matrix.font }}
+        run: |
+          family=$(fc-match -f '%{family}' sans-serif)
+          echo "fc-match sans-serif: $family; the command's font: ${FONT:-default}"
+          if [ -z "$FONT" ] && [ "$family" != "Noto Sans" ]; then
+            echo "::error::the default font is $family, not Noto Sans as on the laptop"
+            exit 1
+          fi
+
+      - name: Build the browser timer
+        run: uv run python manage.py build_timer
+
+      # One loop per logical CPU, as the laptop's 8 loops on 8 threads.
+      # The script refuses a pipe, so its output goes to a file.
+      - name: Run under load
+        env:
+          ARGS: ${{ toJSON(matrix.args) }}
+          FONT: ${{ matrix.font }}
+        run: |
+          lscpu
+          echo "nproc: $(nproc)"
+          mapfile -t args < <(python3 -I -c 'import json, os; print("\n".join(json.loads(os.environ["ARGS"])))')
+          if [ -n "$FONT" ]; then export DERBYNET_BROWSER_FONT="$FONT"; fi
+          out="$RUNNER_TEMP/out"
+          mkdir -p "$out"
+          status=0
+          DERBYNET_LOAD_RUN_DIR="$RUNNER_TEMP/load" DERBYNET_LOAD_LOCK="$RUNNER_TEMP/load.lock" \
+            tools/pytest-under-load.sh --loops "$(nproc)" "${args[@]}" >"$out/script.log" 2>&1 || status=$?
+          cat "$out/script.log"
+          echo "$status" >"$out/status"
+          cp "$RUNNER_TEMP"/load/*.log "$RUNNER_TEMP"/load/*.xml "$out/" 2>/dev/null || true
+          exit "$status"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ runner.temp }}/out
+          if-no-files-found: warn
+
+  summary:
+    needs: [plan, shard]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools
+          sparse-checkout: plan/bin
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Sum the shards
+        env:
+          SHA: ${{ needs.plan.outputs.sha }}
+        run: |
+          status=0
+          python3 -I tools/plan/bin/ci-load summary artifacts/plan/plan.json artifacts "$SHA" \
+            >summary.md || status=$?
+          cat summary.md
+          cat summary.md >>"$GITHUB_STEP_SUMMARY"
+          exit "$status"
