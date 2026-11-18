@@ -327,6 +327,9 @@ FENCE_SWEEP = [
         "after",
         None,
     ),
+    ("star-marker-line", "* ```\n  inner\n  ```\nafter", "inner", "after", None),
+    ("plus-marker-line", "+ ```\n  inner\n  ```\nafter", "inner", "after", None),
+    ("paren-marker-line", "1) ```\n   inner\n   ```\nafter", "inner", "after", None),
     ("blockquote", "> ```\n> inner\n> ```\nafter", "inner", "after", None),
     ("blockquote-ends-it", "> ```\n> inner\n\nafter", "inner", "", 5),
     (
