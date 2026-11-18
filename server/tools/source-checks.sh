@@ -62,7 +62,7 @@ if [ "${1:-}" = --quick ]; then
   # three of its pipes 19 min later (#414 retro).  Outside a work tree (the
   # tests' copies of this script) there is nothing to list.
   if top="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)"; then
-    untracked="$(git -C "$top" ls-files --others --exclude-standard)"
+    untracked="$(git -C "$top" -c core.quotePath=false ls-files --others --exclude-standard)"
     if [ -n "$untracked" ]; then
       echo "source-checks.sh --quick: these files are untracked, and the" \
            "checks that read tracked files skip them; git add each one" \
