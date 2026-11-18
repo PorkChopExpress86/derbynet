@@ -25,6 +25,8 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
+      # The shell suites and the scripts the shell jobs run (#399).
+      - testing/**
       - .github/workflows/server.yml
   pull_request:
     paths:
@@ -41,6 +43,8 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
+      # The shell suites and the scripts the shell jobs run (#399).
+      - testing/**
       - .github/workflows/server.yml
   workflow_dispatch:
 

@@ -5,11 +5,9 @@
 # timer in that state, so a case can hide the states Django leads with;
 # anything else goes to the next curl on the PATH unchanged.
 
-HERE=$(cd "$(dirname "$0")" && pwd)
-REAL=$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -vxF "$HERE" | paste -sd:) command -v curl)
-case " $* " in
-    *query=poll.coordinator*) [ -n "$TIMER_STATE" ] || exec "$REAL" "$@" ;;
-    *) exec "$REAL" "$@" ;;
-esac
+. "$(dirname "$0")/next-on-path.sh"
+if [ -z "$TIMER_STATE" ] || [[ " $* " != *query=poll.coordinator* ]]; then
+    exec "$REAL" "$@"
+fi
 set -o pipefail
 "$REAL" "$@" | jq -c --argjson s "$TIMER_STATE" '.["timer-state"].state = $s'

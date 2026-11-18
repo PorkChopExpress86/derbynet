@@ -195,6 +195,7 @@ while true; do
         if [ "$RUN" -gt 0 ] || [ "$STATE" = $CONNECTED ] \
                || [ "$STATE" = $STAGING ] || [ "$STATE" = $RUNNING ]; then
             IDENTIFIED_AT=$NOW
+            IDENTIFIED_BY="heats_run=$RUN of $HEATS, timer state $STATE"
             HEAT_START=$NOW
             HEATS_DONE=$RUN
         fi
@@ -214,4 +215,4 @@ done
 
 # A pass that took a dump prints what it caught.
 [ $DUMPS = 0 ] || print_logs
-echo "derby-timer.jar raced every heat of round $ROUNDID in $((SECONDS - START))s, identified after ${IDENTIFIED_AT}s"
+echo "derby-timer.jar raced every heat of round $ROUNDID in $((SECONDS - START))s, identified after ${IDENTIFIED_AT}s at $IDENTIFIED_BY"
