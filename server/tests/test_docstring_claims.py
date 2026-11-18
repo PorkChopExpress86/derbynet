@@ -164,12 +164,14 @@ def test_pasted_output_in_a_details_block_lists_no_claim(tmp_path, fence):
 )
 def test_a_fence_closes_only_on_its_own_mark(tmp_path, fence, inner):
     """A shorter mark, the other mark, or a mark with an info string
-    inside a fence leaves it open, as in CommonMark."""
+    inside a fence leaves it open, as in CommonMark. The inner mark comes
+    twice, so a fence it closed opens again and the block still ends."""
     path = tmp_path / "test_sample.py"
     path.write_text('def test_waits():\n    """A 3 s bound."""\n')
     body = tmp_path / "body.md"
     body.write_text(
-        f"<details>\n{fence}\n{inner}\n- `test_waits`: 3 s\n{fence}\n</details>\n"
+        f"<details>\n{fence}\n{inner}\n- `test_waits`: 3 s\n{inner}\n{fence}\n"
+        "</details>\n"
     )
     assert dc.main(["--check", str(body), str(path)]) == 1
 
