@@ -53,6 +53,8 @@ def test_a_command_a_background_pytest_starts_gets_int_and_quit(tmp_path, worker
     # The job's own mask, then pytest as a job of the same shell.
     script = f"cat /proc/self/status >'{tmp_path}/job' & wait; {pytest_argv} & wait $!"
     env = {**os.environ, PROBE: str(out)}
+    # The nested pytest took 10 to 17 s here at a load average near 25; 240 s
+    # leaves CI's smaller runners over ten times that.
     run = subprocess.run(
         ["bash", "-c", script],
         cwd=SERVER / "tests",

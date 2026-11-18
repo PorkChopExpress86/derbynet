@@ -28,7 +28,9 @@ SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
 # either ignored SIGINT, and so did the scripts it started; bash cannot trap
 # a signal ignored when it starts, so an INT never reached their traps (#407,
 # test_a_command_the_scripts_start_ignores_sigint,
-# test_a_signal_reaches_the_trap_though_pytest_ignores_it).
+# test_a_signal_reaches_the_trap_though_pytest_ignores_it).  conftest.py now
+# puts INT and QUIT back in every server/ pytest (tests/test_signals_at_default.py);
+# the prefix stays for the TERM, INT or HUP a test here ignores itself.
 RESET_NAMES = ("SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ")
 RESET_SIGNALS_ARGV = (
     sys.executable,
