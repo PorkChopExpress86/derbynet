@@ -42,6 +42,9 @@ on:
       - docs/pi-setup.md
       - server/docs/guide-commands.tsv
       - server/tools/guide_commands.py
+      - server/ui/docs/build.py
+      - server/pyproject.toml
+      - server/uv.lock
       - .github/workflows/pi-images.yml
   pull_request:
     paths:
@@ -66,6 +69,9 @@ on:
       - docs/pi-setup.md
       - server/docs/guide-commands.tsv
       - server/tools/guide_commands.py
+      - server/ui/docs/build.py
+      - server/pyproject.toml
+      - server/uv.lock
       - .github/workflows/pi-images.yml
   workflow_dispatch:
 
@@ -237,22 +243,32 @@ jobs:
           ls -la /dev/snd || true
           extras/docker/ci/checks.sh photostand-compose
 
-      # docs/pi-setup.md's timer commands, as written (#414), with
-      # server/docker/ci/guide-commands.sh: its timer image from a registry
-      # of the job's own, the settings in the environment, a simulated timer.
+      # docs/pi-setup.md's timer and photo stand commands, as written
+      # (#414), with server/docker/ci/guide-commands.sh: .env as the guide
+      # writes it, the server at the address it names, the images from a
+      # registry of the job's own.  The timer's port the .env names is a
+      # stand-in like /dev/null (checks.sh timer-serial passes /dev/null the
+      # same way), and TIMER_ARGS runs the jar's simulated timer.
       - uses: astral-sh/setup-uv@v10.3.2
         if: success() || failure()
         with:
           python-version: '3.14'
 
-      - name: docs/pi-setup.md's timer commands, run as written
+      - name: A stand-in for the timer's serial port
+        if: success() || failure()
+        run: |
+          test ! -e /dev/ttyUSB0
+          sudo mknod -m 666 /dev/ttyUSB0 c 1 3
+          ls -l /dev/ttyUSB0
+
+      - name: docs/pi-setup.md's timer and photo stand commands, run as written
         if: success() || failure()
         env:
-          IMAGE: derbynet_server:ci
-          TIMER_IMAGE: derbynet_timer:ci
+          IMAGE: ${{ env.SERVER_IMAGE }}
         run: >-
           server/docker/ci/guide-commands.sh pi-timer-folder pi-timer-env
-          pi-timer pi-timer-update
+          pi-timer pi-timer-update pi-photostand-folder pi-photostand-env
+          pi-photostand
 
       - uses: actions/upload-artifact@v7
         if: always()

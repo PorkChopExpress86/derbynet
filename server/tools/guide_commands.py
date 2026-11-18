@@ -28,7 +28,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from ui.docs.build import SOURCE, fenced_blocks
+from ui.docs.build import SOURCE, fenced_blocks, normalize
 
 SERVER = Path(__file__).resolve().parents[1]
 REGISTRY = SERVER / "docs" / "guide-commands.tsv"
@@ -125,9 +125,10 @@ def split(language: str, code: str, first_line: int) -> list[tuple[int, str]]:
 
 def headings(text: str, blocks: list[tuple[int, int]]) -> list[tuple[int, str]]:
     """(line, title) of each heading outside the fenced blocks, whose
-    (first, last) line spans are `blocks`."""
+    (first, last) line spans are `blocks`. Lines are counted in the text as
+    the docs build normalizes it, as `fenced_blocks` counts them."""
     found = []
-    for number, line in enumerate(text.replace("\r\n", "\n").split("\n"), 1):
+    for number, line in enumerate(normalize(text).split("\n"), 1):
         if any(first <= number <= last for first, last in blocks):
             continue
         if match := HEADING.match(line):
@@ -138,9 +139,7 @@ def headings(text: str, blocks: list[tuple[int, int]]) -> list[tuple[int, str]]:
 def commands(guide: str, text: str) -> list[Command]:
     """Every command of the guide's shell blocks, in order."""
     blocks = list(fenced_blocks(text))
-    spans = [
-        (first - 1, first + code.count("\n")) for _, first, code in blocks
-    ]  # the fences' own lines too
+    spans = [(first, first + code.count("\n")) for _, first, code in blocks]
     titles = headings(text, spans)
     found = []
     for language, first, code in blocks:

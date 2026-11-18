@@ -17,19 +17,19 @@
 #                                holds the command as one of its lines
 #              reason TEXT       why no check can run it
 database.md	Postgres	1	docker compose --profile postgres up -d	stage postgres
-database.md	A whole event with its photos	1	docker cp /path/to/pack42 derbynet:/tmp/pack42	reason `/path/to/pack42` is the reader's own folder of a PHP database; checks.sh exec-database runs the same import with a legacy folder it makes
-database.md	A whole event with its photos	1	docker exec -u derbynet derbynet python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"	reason `/path/to/pack42` is the reader's own folder of a PHP database; checks.sh exec-database runs the same import with a legacy folder it makes
-database.md	A whole event with its photos	1	docker compose cp /path/to/pack42 server:/tmp/pack42	reason `/path/to/pack42` is the reader's own folder of a PHP database; checks.sh exec-database runs the same import with a legacy folder it makes
-database.md	A whole event with its photos	1	docker compose exec -u derbynet server python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"	reason `/path/to/pack42` is the reader's own folder of a PHP database; checks.sh exec-database runs the same import with a legacy folder it makes
+database.md	A whole event with its photos	1	docker cp /path/to/pack42 derbynet:/tmp/pack42	reason `/path/to/pack42` is the reader's own folder of an older DerbyNet's database; stage import-plain copies a folder it makes from transfer/tests/fixtures/legacy the same way, then runs the next command as written
+database.md	A whole event with its photos	1	docker exec -u derbynet derbynet python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"	stage import-plain
+database.md	A whole event with its photos	1	docker compose cp /path/to/pack42 server:/tmp/pack42	reason `/path/to/pack42` is the reader's own folder of an older DerbyNet's database; stage import-compose copies a folder it makes from transfer/tests/fixtures/legacy the same way, then runs the next command as written
+database.md	A whole event with its photos	1	docker compose exec -u derbynet server python manage.py import_derbynet /tmp/pack42/derbynet.sqlite3 --event "Pack 42 2025"	stage import-compose
 developer-guide.md	Set up	1	uv sync	stage dev-setup
 developer-guide.md	Set up	1	uv run python manage.py migrate	stage dev-setup
 developer-guide.md	Set up	1	uv run python manage.py runserver	reason starts the development server in the foreground and never returns; the shell-suite block below runs it with `&` (stage dev-shell-suite)
-developer-guide.md	Run the tests	1	uv run pytest -n auto	reason runs the whole suite; server.yml's pytest job runs `uv run pytest -v -rs -n auto`, and its legacy-api job `uv run pytest -v -rs -n auto legacy_api`
+developer-guide.md	Run the tests	1	uv run pytest -n auto	reason runs the whole suite; in its place server.yml's pytest job runs `uv run pytest -v -rs -n auto`, and its legacy-api job `uv run pytest -v -rs -n auto legacy_api`
 developer-guide.md	Run the tests	1	uv run ruff check	workflow server.yml
 developer-guide.md	Run the tests	1	uv run ruff format --check	workflow server.yml
 developer-guide.md	Run the tests	1	uv run python manage.py makemigrations --check --dry-run	workflow server.yml
-developer-guide.md	The browser tests	1	uv run playwright install chromium	reason installs a browser; server.yml's ui job runs `uv run playwright install --with-deps chromium`
-developer-guide.md	The browser tests	1	uv run pytest -m browser ui	reason runs the whole browser suite; server.yml's ui job runs `uv run pytest -v -rs -n auto -m browser ui`
+developer-guide.md	The browser tests	1	uv run playwright install chromium	stage dev-browser
+developer-guide.md	The browser tests	1	uv run pytest -m browser ui	reason runs the whole browser suite; in its place server.yml's ui job runs `uv run pytest -v -rs -n auto -m browser ui`
 developer-guide.md	Run the shell suite against Django	1	cd server	stage dev-shell-suite
 developer-guide.md	Run the shell suite against Django	1	export DERBYNET_ENABLE_TEST_ENDPOINTS=1	stage dev-shell-suite
 developer-guide.md	Run the shell suite against Django	1	uv run python manage.py migrate	stage dev-shell-suite
@@ -41,7 +41,7 @@ install-docker.md	Start DerbyNet	1	echo "DERBYNET_GID=$(id -g)" >> .env	stage co
 install-docker.md	Start DerbyNet	1	echo "DERBYNET_ADDRESS=$(hostname -I | cut -d' ' -f1)" >> .env	stage compose-env
 install-docker.md	Start DerbyNet	1	echo "TZ=America/Chicago" >> .env	stage compose-env
 install-docker.md	Start DerbyNet	1	echo "DERBYNET_ADDRESS=$(ipconfig getifaddr en0)" >> .env	reason the Mac's block: `ipconfig getifaddr en0` exists only on a Mac
-install-docker.md	Start DerbyNet	2	echo "TZ=America/Chicago" >> .env	reason the Mac's block, and a repeat of the Linux block's TZ line, which stage compose-start runs
+install-docker.md	Start DerbyNet	2	echo "TZ=America/Chicago" >> .env	reason the Mac's block, and a repeat of the Linux block's TZ line, which stage compose-env runs
 install-docker.md	Start DerbyNet	1	docker compose up -d	stage compose-start
 install-docker.md	Plain HTTP with one command	1	docker run -d --name derbynet --restart unless-stopped -p 80:80 -v derbynet:/var/lib/derbynet -e TZ=America/Chicago -e DERBYNET_UID=$(id -u) -e DERBYNET_GID=$(id -g) ghcr.io/porkchopexpress86/derbynet_server	stage plain-http
 install-docker.md	Set the time zone	1	docker rm -f derbynet	stage time-zone
@@ -97,20 +97,20 @@ pi-setup.md	Set up the timer	1	DERBYNET_SERVER='http://192.168.1.20'	stage pi-ti
 pi-setup.md	Set up the timer	1	DERBYNET_TIMER_DEVICE='/dev/ttyUSB0'	stage pi-timer-env
 pi-setup.md	Set up the timer	1	docker compose -f compose.timer.yaml up -d	stage pi-timer
 pi-setup.md	Set up the timer	1	docker compose -f compose.timer.yaml logs -f	reason follows the log until Ctrl-C; stage pi-timer reads the same log with `docker compose logs`
-pi-setup.md	Set up the photo stand	1	mkdir -p ~/derbynet-photostand && cd ~/derbynet-photostand	reason the photo stand's Compose folder: checks.sh photostand-compose builds its own, with a stand-in scanner (extras/docker/ci/checks.sh)
-pi-setup.md	Set up the photo stand	1	curl -fsSLO https://raw.githubusercontent.com/PorkChopExpress86/derbynet/master/extras/docker/compose.photostand.yaml	reason downloads compose.photostand.yaml from master; checks.sh photostand-compose runs the checkout's file from its own folder
+pi-setup.md	Set up the photo stand	1	mkdir -p ~/derbynet-photostand && cd ~/derbynet-photostand	stage pi-photostand-folder
+pi-setup.md	Set up the photo stand	1	curl -fsSLO https://raw.githubusercontent.com/PorkChopExpress86/derbynet/master/extras/docker/compose.photostand.yaml	stage pi-photostand-folder
 pi-setup.md	Set up the photo stand	1	ls /dev/input/by-id/	reason needs the barcode scanner plugged into the Pi
-pi-setup.md	Set up the photo stand	1	DERBYNET_SERVER='http://192.168.1.20'	reason names a scanner the runner lacks; checks.sh photostand-compose writes a .env with a stand-in scanner
-pi-setup.md	Set up the photo stand	1	PHOTO_CAPTURE='gphoto2'	reason part of the same .env as the DERBYNET_SERVER line
-pi-setup.md	Set up the photo stand	1	PHOTO_REPO='head'	reason part of the same .env as the DERBYNET_SERVER line
-pi-setup.md	Set up the photo stand	1	PHOTO_CHECKIN='1'	reason part of the same .env as the DERBYNET_SERVER line
-pi-setup.md	Set up the photo stand	1	BARCODE_SCANNER_DEVS='usb-Your_Scanner_Name-event-kbd'	reason part of the same .env as the DERBYNET_SERVER line
-pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml up -d	reason passes in /dev/snd and the USB bus and waits for a scanner; checks.sh photostand-compose runs the file as the guide runs it, with a stand-in scanner (extras/docker/ci/checks.sh)
-pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml logs -f	reason follows the log until Ctrl-C
+pi-setup.md	Set up the photo stand	1	DERBYNET_SERVER='http://192.168.1.20'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	PHOTO_CAPTURE='gphoto2'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	PHOTO_REPO='head'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	PHOTO_CHECKIN='1'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	BARCODE_SCANNER_DEVS='usb-Your_Scanner_Name-event-kbd'	stage pi-photostand-env
+pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml up -d	stage pi-photostand
+pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml logs -f	reason follows the log until Ctrl-C; stage pi-photostand reads the same log with `docker compose -f compose.photostand.yaml logs`
 pi-setup.md	Cameras	1	systemctl --user stop gvfs-daemon	reason needs the Pi desktop's user session, whose gvfs-daemon holds the camera
 pi-setup.md	Cameras	1	systemctl --user mask gvfs-daemon	reason needs the Pi desktop's user session, whose gvfs-daemon holds the camera
 pi-setup.md	Update	1	docker compose -f compose.timer.yaml pull	stage pi-timer-update
 pi-setup.md	Update	1	docker compose -f compose.timer.yaml up -d	stage pi-timer-update
 timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x http://localhost/	reason needs derby-timer.jar and a timer on a serial port; the jar is built by the timer image (extras/docker/timer.Dockerfile), whose checks run it with -simulate-timer
 timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -n /dev/ttyUSB0 -d FastTrackPSeries http://localhost/	reason needs derby-timer.jar and a timer on /dev/ttyUSB0
-timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -simulate-timer -lanes 4 http://localhost/	reason needs derby-timer.jar, built by the timer image (extras/docker/timer.Dockerfile); checks.sh timer runs the jar with its simulated timer there
+timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -simulate-timer -lanes 4 http://localhost/	reason needs derby-timer.jar, built by the timer image (extras/docker/timer.Dockerfile); in its place pi-images.yml's checks (arm64) job runs `extras/docker/ci/checks.sh timer`, the image's jar with `-t -r -simulate-timer -lanes 4 -pace 1` against a server

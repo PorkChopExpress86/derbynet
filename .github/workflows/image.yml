@@ -448,7 +448,7 @@ jobs:
         run: >-
           server/docker/ci/guide-commands.sh compose-env compose-start
           postgres backup-compose restore plain-http time-zone backup-plain
-          upgrade https-upgrade proxies
+          upgrade https-upgrade proxies import-plain import-compose
 
   phone:
     name: phone check (Chromium 390x844 over HTTPS)

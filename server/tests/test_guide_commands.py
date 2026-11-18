@@ -10,10 +10,13 @@ time a reviewer found it (AGENT-BRIEF.md's Evidence rules).
 """
 
 import itertools
+import os
 import re
+import signal
 import subprocess
 import sys
 import textwrap
+import time
 from pathlib import Path
 
 import pytest
@@ -74,13 +77,24 @@ def test_a_changed_guide_command_fails_by_guide_line_and_command():
     )
 
 
+def shell_commands() -> list[tuple[str, int, str]]:
+    """(guide, line, command) of each command in the guides' blocks of a
+    language bash reads."""
+    return [
+        (path.name, line, command)
+        for path in sorted(DOCS.glob("*.md"))
+        for language, first, code in fenced_blocks(path.read_text())
+        if language in gc.LANGUAGES - {"powershell", "pwsh"}
+        for line, command in gc.split(language, code, first)
+    ]
+
+
 def test_every_command_of_a_shell_block_parses_as_whole_commands():
     """Bash is the oracle for where a command ends: each command the guides
     yield is accepted by `bash -n`, none is a fragment of a construct."""
-    for command in gc.guide_commands():
-        if command.guide == "install-docker.md" and "${PWD}" in command.text:
-            continue  # PowerShell: not parsed as shell
-        assert gc.complete(command.text), command.named()
+    commands = shell_commands()
+    assert commands
+    assert [c for c in commands if not gc.complete(c[2])] == []
 
 
 def test_the_function_in_photo_stand_md_is_one_command():
@@ -264,6 +278,19 @@ def test_a_comment_in_an_earlier_block_is_no_heading():
     assert [(c.heading, c.text) for c in gc.commands("g.md", text)] == [
         ("First", "ls"),
         ("First", "pwd"),
+    ]
+
+
+@pytest.mark.parametrize("newline", ["\r\n", "\r"])
+def test_a_guide_with_carriage_returns_keeps_its_headings_and_lines(newline):
+    """The docs build reads a CR or a CRLF as a newline, and so do the
+    headings, so each command keeps its heading and its line."""
+    text = ("## A\n\n" + fence("sh", "ls") + "\n## B\n\n" + fence("sh", "pwd")).replace(
+        "\n", newline
+    )
+    assert [(c.line, c.heading, c.text) for c in gc.commands("g.md", text)] == [
+        (4, "A", "ls"),
+        (10, "B", "pwd"),
     ]
 
 
@@ -590,3 +617,197 @@ def test_the_workflow_step_finder_reads_a_call_and_skips_a_dead_one():
         """
     )
     assert stages_called(workflow) == {"compose-env", "compose-start", "postgres"}
+
+
+def test_each_stage_a_reason_names_is_an_arm_of_the_script():
+    names = {
+        name
+        for e in gc.parse_registry(gc.REGISTRY.read_text())
+        if e.kind == "reason"
+        for name in re.findall(r"\bstage ([a-z][a-z-]*)", e.detail)
+    }
+    assert names
+    assert sorted(names - set(arms())) == []
+
+
+def test_each_checks_sh_check_a_reason_names_is_a_check_of_that_script():
+    named = [
+        (where or "extras/docker/ci/", check)
+        for e in gc.parse_registry(gc.REGISTRY.read_text())
+        if e.kind == "reason"
+        for where, check in re.findall(
+            r"((?:extras|server)/docker/ci/)?checks\.sh ([a-z][a-z-]*)", e.detail
+        )
+    ]
+    assert named
+    for where, check in named:
+        assert re.search(
+            rf"^ +{re.escape(check)}\) check_\w+ ;;$",
+            (ROOT / where / "checks.sh").read_text(),
+            re.M,
+        ), f"{where}checks.sh has no check {check}"
+
+
+def test_the_script_starts_the_registry_the_workflows_pin():
+    pinned = re.compile(r"registry:3@sha256:[0-9a-f]{64}")
+    script = set(pinned.findall(SCRIPT.read_text()))
+    assert len(script) == 1
+    for workflow in ("image.yml", "pi-images.yml"):
+        assert set(pinned.findall((WORKFLOWS / workflow).read_text())) == script
+
+
+# The guard and the cleanup, against a stand-in `docker` that logs each call
+# and lists what the test gives it.  DOCKER_HOST names no daemon, so a call
+# that slipped past the stand-in reaches nothing.
+
+STUB_DOCKER = r"""#!/bin/bash
+printf '%s\n' "$*" >> "$STUB_LOG"
+case "$1" in
+    info) exit "${STUB_INFO:-0}" ;;
+    ps) [[ " $* " != *" --format "* ]] || printf '%s\n' ${STUB_CONTAINERS:-} ;;
+    volume) [[ "$2 $*" != "ls "*"--format"* ]] || printf '%s\n' ${STUB_VOLUMES:-} ;;
+    network) [[ "$2 $*" != "ls "*"--format"* ]] || printf '%s\n' ${STUB_NETWORKS:-} ;;
+    image) [[ " ${STUB_IMAGES:-} " == *" $3 "* ]]; exit ;;
+    logs) echo 'listening on' ;;
+esac
+exit 0
+"""
+STUB_UV = r"""#!/bin/bash
+printf 'uv %s\n' "$*" >> "$STUB_LOG"
+[ -z "${STUB_UV_FAILS:-}" ] || exit 1
+exec sleep 30
+"""
+GUARD_CALLS = {"info", "ps", "volume ls", "network ls", "image inspect"}
+GHCR_LATEST = "ghcr.io/porkchopexpress86/derbynet_server:latest"
+
+
+def stub_env(tmp_path, **listed: str) -> dict[str, str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    for name, text in (("docker", STUB_DOCKER), ("uv", STUB_UV)):
+        (bin_dir / name).write_text(text)
+        (bin_dir / name).chmod(0o755)
+    (tmp_path / "tmp").mkdir(exist_ok=True)
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("GUIDE_", "STUB_", "DOCKER_"))
+    }
+    env |= {
+        "PATH": f"{bin_dir}:{env['PATH']}",
+        "DOCKER_HOST": f"unix://{tmp_path}/no-daemon.sock",
+        "TMPDIR": str(tmp_path / "tmp"),
+        "STUB_LOG": str(tmp_path / "docker.log"),
+        **{f"STUB_{key.upper()}": value for key, value in listed.items()},
+    }
+    return env
+
+
+def calls(tmp_path) -> list[str]:
+    log = tmp_path / "docker.log"
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def run_script(env, *stages: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["bash", str(SCRIPT), *stages],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize(
+    ("kind", "name"),
+    [
+        ("containers", "derbynet"),
+        ("containers", "derbynet-timer-timer-1"),
+        ("containers", "guide-registry"),
+        ("volumes", "derbynet_data"),
+        ("networks", "traefik"),
+        ("networks", "guide-pi"),
+        ("images", GHCR_LATEST),
+    ],
+)
+def test_the_guard_refuses_a_daemon_holding_a_name_the_guides_use(tmp_path, kind, name):
+    """And changes nothing on it: the cleanup removes only once the guard
+    has passed."""
+    done = run_script(stub_env(tmp_path, **{kind: name}), "plain-http")
+    assert done.returncode == 2, done.stderr
+    assert f"this Docker daemon already holds:\n{name}\n" in done.stderr
+    made = [
+        c
+        for c in calls(tmp_path)
+        if " ".join(c.split()[:2]) not in GUARD_CALLS
+        and c.split()[0] not in GUARD_CALLS
+    ]
+    assert made == []
+
+
+def test_the_guard_refuses_no_daemon(tmp_path):
+    done = run_script(stub_env(tmp_path, info="1"), "plain-http")
+    assert done.returncode == 2
+    assert "no Docker daemon answers" in done.stderr
+    assert calls(tmp_path) == ["info"]
+
+
+def test_names_that_only_contain_a_guide_name_pass_and_the_cleanup_runs(tmp_path):
+    """A failing stage after the guard passed still removes what the guides'
+    commands name, and the script's own folder."""
+    env = stub_env(
+        tmp_path,
+        containers="my-derbynet",
+        networks="bridge mytraefik traefik-proxy",
+        images="ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc3",
+    )
+    done = run_script(env, "restore")
+    assert done.returncode == 1, done.stderr
+    assert "already holds" not in done.stderr
+    logged = calls(tmp_path)
+    assert "ps -aq --filter name=^derbynet" in logged
+    assert "network rm traefik" in logged
+    assert "ps -aq --filter name=^guide-" in logged
+    assert f"rmi {GHCR_LATEST}" in logged
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+
+def test_a_stop_signal_mid_stage_exits_143_after_the_cleanup(tmp_path):
+    """A SIGTERM to the run's process group, as a Ctrl-C or a cancelled job
+    sends, while a stage waits on a command."""
+    process = subprocess.Popen(
+        ["bash", str(SCRIPT), "plain-http"],
+        env=stub_env(tmp_path),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        deadline = time.monotonic() + 30
+        while not any(c.startswith("uv run") for c in calls(tmp_path)):
+            assert process.poll() is None, process.stderr.read()
+            assert time.monotonic() < deadline, calls(tmp_path)
+            time.sleep(0.1)
+        # Our own child leads its own group, so the signal reaches it alone.
+        assert os.getpgid(process.pid) == process.pid != os.getpgid(0)
+        os.killpg(process.pid, signal.SIGTERM)
+        assert process.wait(timeout=30) == 143
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+    logged = calls(tmp_path)
+    after = logged[[c.startswith("uv run") for c in logged].index(True) :]
+    assert "ps -aq --filter name=^derbynet" in after
+    assert f"rmi {GHCR_LATEST}" in " ".join(after)
+
+
+def test_a_failing_dev_stage_asks_no_docker(tmp_path):
+    """The dev stages run on a machine with no Docker: the guard and the
+    failure's diagnostics leave it alone."""
+    done = run_script(stub_env(tmp_path, uv_fails="1"), "dev-setup")
+    assert done.returncode == 1
+    assert "FAILED: no commands for stage dev-setup" in done.stderr
+    assert [c for c in calls(tmp_path) if not c.startswith("uv ")] == []
