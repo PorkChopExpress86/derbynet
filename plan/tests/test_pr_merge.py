@@ -75,6 +75,11 @@ elif args[:2] == ['issue', 'view'] and 'state,body' in args:
     print('## Still open\\n\\n- the screenshots')
 elif args[:2] == ['pr', 'view'] and 'state,mergeCommit' in args:
     print('MERGED abc')
+elif args[:1] == ['api'] and os.environ.get('FAKE_REJECTED'):
+    # rejected-workflows' reads, after their --jq: run 44236545824 on #59's
+    # ff00bbc6 failed with no job.
+    print('0' if args[1].endswith('/jobs') else
+          '44236545824 .github/workflows/pi-images.yml https://example/44236545824')
 elif args[:2] == ['pr', 'merge']:
     if os.environ.get('FAKE_MERGE_HANG'):
         open(os.environ['FAKE_MERGE_HANG'], 'w').close()
@@ -238,6 +243,33 @@ class PrMerge(unittest.TestCase):
         done = self.merge(head)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn('pr merge 7', self.merged())
+
+    def test_a_workflow_github_rejected_refuses(self):
+        """#59's pi-images.yml showed no check on the PR, and every listed
+        check had passed (#59 retro)."""
+        head = self.pr('plan/AGENT-BRIEF.md')
+        self.env['FAKE_REJECTED'] = '1'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn(f'not merging #7; GitHub rejected a workflow file on {head}', done.stderr)
+        self.assertIn('rejected .github/workflows/pi-images.yml https://example/44236545824',
+                      done.stderr)
+        self.assertEqual(self.merged(), '')
+        self.assertEqual(self.ran(), '')
+
+    def test_a_run_list_gh_cannot_read_refuses(self):
+        head = self.pr('plan/AGENT-BRIEF.md')
+        self.env.update(FAKE_REJECTED='1', PR_WAIT_RETRY_SLEEP='0')
+        gh = self.tmp / 'gh'
+        gh.write_text(FAKE_GH.format(python=sys.executable, head=head, log=str(self.log))
+                      .replace("os.environ.get('FAKE_REJECTED'):",
+                               "os.environ.get('FAKE_REJECTED'):\n    sys.exit(1)"))
+        gh.chmod(0o755)
+        done = subprocess.run(['bash', str(PR_MERGE), '7'], cwd=self.work,
+                              env={**self.env, 'GH': str(gh)}, capture_output=True, text=True)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn(f'not merging #7; could not read the workflow runs on {head}', done.stderr)
+        self.assertEqual(self.merged(), '')
 
     def test_each_area_refuses(self):
         for pr, master, area in (

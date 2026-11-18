@@ -1,7 +1,8 @@
 #!/bin/bash
 # Waits until every check on PR <number>'s current head has finished, then prints
 # one "<bucket> <name> <link>" line per check.  Exits 0 only if all passed or
-# were skipped.  On a failure it also prints `plan/bin/ci-failures`: each
+# were skipped, and GitHub rejected no workflow file on the head
+# (plan/bin/rejected-workflows).  On a failure it also prints `plan/bin/ci-failures`: each
 # failing test, and whether it failed on master lately, and for a job that
 # names no test, the step that failed and its error line.  Waits for checks to
 # appear first, because GitHub creates the runs a few seconds after a push.
@@ -84,6 +85,18 @@ while :; do
   if [ "$now_head" != "$head" ]; then
     echo "head moved to $now_head while waiting; rerun pr-wait" >&2
     exit 2
+  fi
+  # A workflow GitHub rejected has a failed run with no job and no check on
+  # the PR, so the checks below never show it (#59 retro).
+  if ! rejected=$(GH="$GH" REPO="$REPO" "$(dirname "$0")/rejected-workflows" "$head"); then
+    echo "could not read the workflow runs on $head" >&2
+    exit 1
+  fi
+  if [ -n "$rejected" ]; then
+    echo "$rejected"
+    echo "GitHub rejected each workflow file above on $head: its run failed with no job," \
+         "so no check of it shows on the PR; the run's page names the error" >&2
+    exit 1
   fi
   # bucket is pass, fail, pending, skipping, or cancel
   all=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,link,workflow,event \
