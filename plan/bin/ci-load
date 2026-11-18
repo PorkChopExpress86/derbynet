@@ -28,9 +28,9 @@ is no load command: the plan lists it as skipped, with the reason.
 each `-n`, for a trial run of the workflow: its run is named a trial, which
 pr-evidence does not accept. `--script PATH` names the head's
 pytest-under-load.sh: a script from before D122 (2026-11-16) has no
-`--flake-ticket`, and no rerun for it to turn off, so the plan leaves it out
-and says so. A plan of more than 256 shards, GitHub's matrix limit, is
-refused.
+`--flake-ticket`, and no rerun for it to turn off, so `plan --flake-ticket`
+refuses it, exits 1 and says to merge master into the branch (#421). A plan
+of more than 256 shards, GitHub's matrix limit, is refused.
 
 `font` checks a shard's font before its run: a command that names no FONT
 (empty) must find FAMILY, what `fc-match sans-serif` gives, to be Noto Sans,

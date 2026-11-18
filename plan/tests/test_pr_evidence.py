@@ -644,6 +644,79 @@ class ClosingKeywords(IssueStandIn, unittest.TestCase):
         self.assertEqual(TOOL.foreign_closes(reopened, {'61'}),
                          ['line 4: Fixes #58', 'line 6: Closes #57'])
 
+    def test_the_gh_prefix_is_read_as_an_issue_reference(self):
+        """GitHub's autolinked references include GH-N; whether its closing
+        keywords honour that form is unverified, so it fails closed."""
+        for words in ('Closes GH-59', 'closes gh-59', 'Fixes: GH-59', 'resolved GH-59'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'Text {words}.\n', {'61'}),
+                                 [f'line 1: {words}'])
+        self.assertEqual(TOOL.foreign_closes('Closes GH-61.\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('Closes `GH-59`, see GH-59.\n', {'61'}), [])
+
+    def test_a_fence_opener_has_no_backtick_in_its_info_string(self):
+        """CommonMark: "```code``` here" is inline code, not a fence, so the
+        prose after it is read."""
+        for line in ('```code``` here', '```Closes #58``` here', '````code``` here'):
+            with self.subTest(line=line):
+                self.assertEqual(TOOL.foreign_closes(f'{line}\nFixes #59\n```\nAfter.\n', {'61'}),
+                                 ['line 2: Fixes #59'])
+        self.assertEqual(TOOL.foreign_closes('```Closes #58``` here\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('```python\nFixes #59\n```\n', {'61'}), [])
+
+    def test_only_a_bare_fence_at_least_as_long_closes_one(self):
+        inside = '```\n```code``` x\nCloses #59\n```\nAfter.\n'
+        self.assertEqual(TOOL.foreign_closes(inside, {'61'}), [])
+        longer = '````\n```\nCloses #59\n````\nFixes #58\n'
+        self.assertEqual(TOOL.foreign_closes(longer, {'61'}), ['line 5: Fixes #58'])
+        titled = '```\n```python\nCloses #59\n```\nAfter.\n'
+        self.assertEqual(TOOL.foreign_closes(titled, {'61'}), [])
+        trailing = '```\nCloses #59\n``` \nFixes #58\n'
+        self.assertEqual(TOOL.foreign_closes(trailing, {'61'}), ['line 4: Fixes #58'])
+
+    def test_a_code_span_ends_at_the_backticks_that_opened_it(self):
+        for words in ('``Closes #59``', '``Closes `x` #59``', 'Closes `x` #59',
+                      'Clo`x`ses #59', '```Closes #59```', '`` Closes #59 ``'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'Text {words} here.\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('`x` Closes #59 `y`\n', {'61'}),
+                         ['line 1: Closes #59'])
+        self.assertEqual(TOOL.foreign_closes('``x` Closes #59\n', {'61'}),
+                         ['line 1: Closes #59'])
+
+    def test_backtick_runs_of_different_lengths_are_no_span(self):
+        for words in ('` Closes #59 ``', '`` Closes #59 `', '```` Closes #59 ``'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'{words}\n', {'61'}),
+                                 ['line 1: Closes #59'])
+
+    def test_a_reference_into_another_repo_is_refused_whatever_its_number(self):
+        for words in ('Closes other/repo#61', 'Closes jeffpiazza/derbynet#61',
+                      'Fixes https://github.com/jeffpiazza/derbynet/issues/61'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'{words}\n', {'61'}),
+                                 [f'line 1: {words}'])
+        for words in ('Closes PorkChopExpress86/derbynet#61', 'closes porkchopexpress86/DerbyNet#61',
+                      'Fixes https://github.com/PorkChopExpress86/derbynet/issues/61'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'{words}\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('Closes PorkChopExpress86/derbynet#59\n', {'61'}),
+                         ['line 1: Closes PorkChopExpress86/derbynet#59'])
+
+    def test_closes_takes_a_positive_issue_number(self):
+        body = evidence(KEYS) + '\nFixes #64.\n'
+        for given in ('64', '#64'):
+            with self.subTest(given=given):
+                done = self.check(body, '--closes', given)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        for given in ('abc', '0', '064', '6 4', '', '##64', '-1', '64a', '#'):
+            with self.subTest(given=given):
+                done = self.check(body, '--closes', given)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertEqual(done.stdout, '')
+                self.assertIn(f'argument --closes: takes an issue number such as 64 or #64, not {given!r}',
+                              done.stderr)
+
     def test_a_prs_number_is_refused_too(self):
         """The limit left: #377's "The fake gh's closed #325" names a PR,
         which GitHub does not close."""

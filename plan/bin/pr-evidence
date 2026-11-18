@@ -36,15 +36,25 @@ in inline code.
 `--check` also refuses a closing keyword outside code that names an issue
 other than <issue> and each `--closes N` (#404 closed #65 and #64): GitHub's
 close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved,
-with any colons, blanks or - between, before #N, owner/repo#N or an issue
-URL. GitHub
-closes that issue on merge. #421's body quoted a test fixture's
+with any colons, blanks or - between, before #N, GH-N, owner/repo#N or an
+issue URL. GitHub closes that issue on merge. `--closes` takes N or #N, a
+positive number, and refuses anything else. A reference into a repo other
+than PorkChopExpress86/derbynet (`$REPO`), by owner/repo#N or by URL, is
+refused whatever its number. GH-N is an autolinked reference form in GitHub's
+docs ("Autolinked references and URLs"); that closing keywords honour it is
+unverified, so it counts, and a PR that needs one quotes it in backticks.
+#421's body quoted a test fixture's
 "Closes #399." in prose, and pr-merge refused it at merge time only because
 #399 had a `## Still open` section; #411's retro body was the first (#415
-retro). Quoted text goes in inline code or a closed code fence, which GitHub
-does not read; the lines of a fence that never closes are checked, as
-pr-merge reads cited decisions. The limit left: a keyword before a PR's
-number is refused too, though GitHub closes only issues.
+retro). Quoted text goes in a code span (a run of backticks and the next run
+of as many, so ``Closes #1`` is one) or a closed code fence, which GitHub
+does not read; a fence opens on a line of three or more backticks with no
+backtick after them, and closes on a bare line of as many or more. The lines
+of a fence that never closes are checked, as pr-merge reads cited decisions.
+A code span breaks a keyword it sits in or between ("Clo`x`ses #1", "Closes
+`x` #1" close nothing). The limits left: a keyword before a PR's number is
+refused too, though GitHub closes only issues; a code span that runs over a
+line end is not read as one.
 
 A list item `- CI load: <run URL>` cites a run of
 .github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
@@ -103,16 +113,27 @@ JOINED = re.compile(
     r"(?![A-Za-z0-9_/-]|\.\w)"
 )
 INLINE_CODE = re.compile(r"`[^`\n]*`")
-# GitHub's closing keywords before an issue reference (#N, owner/repo#N, or
-# an issue URL). Checked against every PR body on the fork: the issues it
-# finds are GitHub's closingIssuesReferences but for one PR number (#377's
-# "closed #325").
+# CommonMark's code span: a run of backticks, then the next run of exactly as
+# many. A run with no such partner is literal text. Used by unquoted_lines;
+# `placeholders` still reads INLINE_CODE, which takes ``X`` as two empty spans.
+CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).+?(?<!`)\1(?!`)")
+# A code fence's line: three or more backticks, then an info string with no
+# backtick (CommonMark). "```code``` here" is inline code, not a fence.
+FENCE = re.compile(r"^\s*(`{3,})([^`]*)$")
+# GitHub's closing keywords before an issue reference (#N, GH-N,
+# owner/repo#N, or an issue URL). Checked against every PR body on the fork:
+# the issues it finds are GitHub's closingIssuesReferences but for one PR
+# number (#377's "closed #325").
 # What lies between the keyword and the reference is read wide (any run of
 # colons, blanks and -, none at all, a letter after the number), since a
 # miss closes an issue and a false refusal costs a pair of backticks.
+# GH-N is one of GitHub's autolinked reference forms
+# (docs.github.com, "Autolinked references and URLs": "GH-26"); that its
+# closing keywords honour it is unverified, so it is read as closing.
 CLOSING = re.compile(
     r"(?<!\w)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[:\s-]*"
-    r"(?:[\w.-]+/[\w.-]+#(\d+)|#(\d+)|https://github\.com/[\w.-]+/[\w.-]+/issues/(\d+))",
+    r"(?:(?:(?P<repo>[\w.-]+/[\w.-]+)#|#|GH-)(?P<number>\d+)"
+    r"|https://github\.com/(?P<url_repo>[\w.-]+/[\w.-]+)/issues/(?P<url_number>\d+))",
     re.IGNORECASE,
 )
 CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
@@ -230,29 +251,38 @@ def placeholders(body: str, defined=defined_names) -> list[str]:
 
 
 def unquoted_lines(body: str) -> list[tuple[int, str]]:
-    """Each line GitHub reads as prose, as (its number, the line with inline
-    code taken out): a closed code fence is left out, and the lines of a
-    fence that never closes are kept, as pr-merge reads cited decisions."""
+    """Each line GitHub reads as prose, as (its number, the line with each
+    code span replaced by a NUL, which breaks a keyword or reference it sits
+    in or between): a closed code fence is left out, and the lines of a fence
+    that never closes are kept, as pr-merge reads cited decisions. Only a
+    bare line of at least as many backticks as the opener closes a fence."""
     kept, fence = [], None
     for n, line in enumerate(body.splitlines(), 1):
-        if line.lstrip().startswith("```"):
-            fence = None if fence is not None else []
-        elif fence is not None:
-            fence.append((n, line))
+        edge = FENCE.match(line)
+        if fence is None:
+            if edge:
+                fence = (len(edge[1]), [])
+            else:
+                kept.append((n, CODE_SPAN.sub("\0", line)))
+        elif edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+            fence = None
         else:
-            kept.append((n, INLINE_CODE.sub("", line)))
-    kept += [(n, INLINE_CODE.sub("", line)) for n, line in fence or []]
+            fence[1].append((n, line))
+    if fence:
+        kept += [(n, CODE_SPAN.sub("\0", line)) for n, line in fence[1]]
     return sorted(kept)
 
 
 def foreign_closes(body: str, closes: set[str]) -> list[str]:
-    """Each closing keyword outside code for an issue not in `closes`, as
-    `line N: <the words>`."""
+    """Each closing keyword outside code for an issue not in `closes`, or in
+    a repo other than the fork, as `line N: <the words>`."""
+    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
     found = []
     for n, line in unquoted_lines(body):
         for m in CLOSING.finditer(line):
-            number = next(g for g in m.groups() if g)
-            if number not in closes:
+            repo = m["repo"] or m["url_repo"]
+            number = m["number"] or m["url_number"]
+            if number not in closes or (repo and repo.casefold() != fork):
                 found.append(f"line {n}: {m[0]}")
     return found
 
@@ -341,6 +371,15 @@ def issue_body(number: str) -> str:
     return done.stdout.replace("\r", "")
 
 
+def issue_number(text: str) -> str:
+    """An issue number as --closes takes it: N or #N, positive, no zeros in front."""
+    found = re.fullmatch(r"#?([1-9]\d*)", text)
+    if not found:
+        raise argparse.ArgumentTypeError(
+            f"takes an issue number such as 64 or #64, not {text!r}")
+    return found[1]
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         sys.exit(f"pr-evidence: {message}\n\n{__doc__}")
@@ -359,7 +398,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--head", metavar="SHA")
     parser.add_argument("--pr", metavar="N")
     parser.add_argument("--flake-ticket", action="store_true")
-    parser.add_argument("--closes", metavar="N", action="append", default=[])
+    parser.add_argument("--closes", metavar="N", type=issue_number, action="append", default=[])
     args = parser.parse_args(argv)
     if (args.head or args.pr or args.flake_ticket or args.closes) and not args.check:
         parser.error("--head, --pr, --flake-ticket and --closes go with --check")
