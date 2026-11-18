@@ -1802,8 +1802,18 @@
         "003 finished-zeroes-on-lanes-2-and-4",
         "004 poll-after-zeroes"
       ],
-      "reason": "PHP's is_all_zeroes() wants a time on every lane up to the lane count, so zero times on lanes 2 and 4, the only lanes in use, are written as heat 1's result and heat 2 is staged. Django reads only the lanes the heat schedules, so it stops racing on heat 1 and writes nothing, places or not (#65).",
+      "reason": "PHP's is_all_zeroes() wants a time on every lane up to the lane count. Django reads only the lanes the heat schedules, or in a timer test the lanes its mask leaves in (#65, Q17). On lanes 2 and 4, the only lanes in use, PHP writes zero times as heat 1's result and stages heat 2; Django stops racing on heat 1 and writes nothing. That is new for zero times with places (001, 002); without places Django already stopped on master, through D42's false-start rule (003, 004). In a timer test that leaves lanes 3 and 4 out, PHP stores zero times on lanes 1 and 2 as the test's result; Django stops the test. Not Q17: that poll's current-heat classid is \"\" in PHP and null in Django, a difference Q17 does not cause, which #406 owns.",
       "expected": "deviations/Q17/zeroes-on-the-lanes-in-use.http"
+    },
+    {
+      "quirk": "Q17",
+      "fixture": "http/timer/zeroes-in-a-timer-test.http",
+      "exchanges": [
+        "001 finished-zeroes-on-the-tested-lanes",
+        "002 timer-test-after-zeroes"
+      ],
+      "reason": "PHP's is_all_zeroes() wants a time on every lane up to the lane count. Django reads only the lanes the heat schedules, or in a timer test the lanes its mask leaves in (#65, Q17). On lanes 2 and 4, the only lanes in use, PHP writes zero times as heat 1's result and stages heat 2; Django stops racing on heat 1 and writes nothing. That is new for zero times with places (001, 002); without places Django already stopped on master, through D42's false-start rule (003, 004). In a timer test that leaves lanes 3 and 4 out, PHP stores zero times on lanes 1 and 2 as the test's result; Django stops the test. Not Q17: that poll's current-heat classid is \"\" in PHP and null in Django, a difference Q17 does not cause, which #406 owns.",
+      "expected": "deviations/Q17/zeroes-in-a-timer-test.http"
     },
     {
       "quirk": "Q18",

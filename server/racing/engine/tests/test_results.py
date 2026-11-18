@@ -77,9 +77,11 @@ def test_all_zeroes_reads_only_the_lanes_the_heat_schedules(body, all_zero):
     assert is_all_zeroes([2, 4], parse(body)) is all_zero
 
 
-def test_a_scheduled_lane_past_the_lane_count_is_left_out():
-    """A scheduled lane past the lanes parsed from the post is left out."""
-    assert is_all_zeroes([2, 5], parse("lane2=0.000")) is True
+def test_a_scheduled_lane_past_the_lane_count_has_no_time():
+    """A scheduled lane past the lanes parsed from the post has no time, so
+    the result is not all zero."""
+    assert is_all_zeroes([2, 5], parse("lane2=0.000")) is False
+    assert is_all_zeroes([2], parse("lane2=0.000")) is True
 
 
 def test_no_scheduled_lane_is_never_all_zero():

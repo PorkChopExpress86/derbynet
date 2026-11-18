@@ -82,6 +82,19 @@ def exchange_text(name: str, exchange: dict, reply: dict) -> str:
     return f"### {name}\n{request}length: {len(body.encode())}\nbody:\n{body}\n"
 
 
+def quirk_of(reply, php_chart: list[str | None] | None) -> str | None:
+    """The quirk that explains a reply that differs from PHP's, or None."""
+    if reply.failure == "notonroster":
+        return "Q25"
+    if php_chart is None:
+        return "Q21"
+    if php_changed_a_kept_heat(php_chart, reply.kept):
+        return "Q20"
+    if reply.chart is not None and len(reply.chart) < len(php_chart):
+        return "Q3"
+    return None
+
+
 def expected_files() -> tuple[dict[Path, str], list[dict]]:
     replies = [((SUITE_FIXTURE, name), r) for name, r in replay(engine(True))]
     replies += replay_quirks(engine(True))
@@ -97,15 +110,8 @@ def expected_files() -> tuple[dict[Path, str], list[dict]]:
         php_chart = body["chart"] if body["outcome"]["code"] == "success" else None
         if reply.failure is None and reply.chart == php_chart:
             continue
-        if reply.failure == "notonroster":
-            quirk = "Q25"
-        elif php_chart is None:
-            quirk = "Q21"
-        elif php_changed_a_kept_heat(php_chart, reply.kept):
-            quirk = "Q20"
-        elif reply.chart is not None and len(reply.chart) < len(php_chart):
-            quirk = "Q3"
-        else:
+        quirk = quirk_of(reply, php_chart)
+        if quirk is None:
             raise SystemExit(
                 f"{fixture} {name}: Django's chart differs from PHP's, and"
                 " PHP kept the running and staged heats, so D34 does not explain it,"

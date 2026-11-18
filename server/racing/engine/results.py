@@ -57,12 +57,13 @@ _NOT_ZERO = re.compile(r"[^0.]")
 
 def is_all_zeroes(lanes: Iterable[int], posted: list[Posted]) -> bool:
     """Every lane in `lanes`, the lanes the heat schedules, has a time made
-    only of `0` and `.`; an empty time counts as zero. A lane with no time
-    makes the result not all zero, so places alone keep racing. False when no
-    lane is scheduled. PHP's `is_all_zeroes()` wants such a time on every lane
-    up to the lane count, bye lanes included, so a timer that reports only
-    the lanes in use never stops racing there (Q17, fixed by #65)."""
-    used = [posted[lane - 1] for lane in lanes if 0 < lane <= len(posted)]
+    only of `0` and `.`; an empty time counts as zero. A lane with no time,
+    a lane past the posted lanes included, makes the result not all zero, so
+    places alone keep racing. False when no lane is scheduled. PHP's
+    `is_all_zeroes()` wants such a time on every lane up to the lane count,
+    bye lanes included, so a timer that reports only the lanes in use never
+    stops racing there (Q17, fixed by #65)."""
+    used = [posted[lane - 1] if 0 < lane <= len(posted) else Posted() for lane in lanes]
     return bool(used) and all(
         r.time is not None and not _NOT_ZERO.search(r.time) for r in used
     )

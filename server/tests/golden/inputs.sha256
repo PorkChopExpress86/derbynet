@@ -15,7 +15,7 @@ dfc661381104edd8cce15b911198ccc39da31f37365ff71ea8bca0cf449836c4  server/tests/g
 4c3d8c381650d74782ba3436499f64ed2ea223c8b587669cdaa27a41eb1a023f  server/tests/golden/capture/scenarios/10-kiosks.sh
 95e621a63e7ce5e100f1cf021b443090ee080b99052f01e261ab21ccfe8e137d  server/tests/golden/capture/scenarios/11-reschedule-quirks.sh
 de198e0a5b4dda095564ba951a0cecf06974d3712d119af35a06a4b16a2f9a42  server/tests/golden/capture/scenarios/12-standings-quirks.sh
-9cd8ac5a5756ddbb7982826bb76bd24c18729014cf7d1379df5bf51415c8d916  server/tests/golden/capture/scenarios/13-heat-state.sh
+da7e638a3f7e950a279bee232faf60777fa2ed7c80ff8d4f7c25a53a5e18c781  server/tests/golden/capture/scenarios/13-heat-state.sh
 69c8d16f23dcbcbc9b5f303ab486c9fdb23f2ad2c94be1436daa76064ab99109  server/tests/golden/capture/scenarios/14-race-day-6-lanes.sh
 36793dd091c0db6e87c8f9925ea26ef2230bacda6d3567a77c2f7416a0f3e138  server/tests/golden/capture/scenarios/15-racers.sh
 81f4c2a3990f73c5cc10b6d16fe6ed0fdc26359e6c2b90509196d125340107fc  server/tests/golden/capture/scenarios/16-poll-results.sh

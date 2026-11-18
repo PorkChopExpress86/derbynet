@@ -126,6 +126,11 @@ class Scenario:
             self.post_as(self._timer_client, "action=role.login&name=Timer&password=")
         return self._timer_client
 
+    def log_in_timer_again(self):
+        """A new Timer session at the next timer message, as a scenario's
+        `user_login_timer` after `reset_database` makes."""
+        self._timer_client = None
+
     def post_as(self, client: Client, body: str) -> bytes:
         return send(client, "POST action.php", body, self.ids).content
 

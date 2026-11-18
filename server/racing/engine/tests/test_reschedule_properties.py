@@ -171,19 +171,17 @@ def parsed(debug):
 
 def dissolvable(chart, usable):
     """The heat indices whose racers could each move to a bye in the same lane
-    of another unraced heat that lacks them, any heat index 0 included."""
+    of another unraced heat that lacks them, any heat index 0 included. A
+    heat with a bye in a usable lane never qualifies, since every heat with a
+    bye there holds a bye, and neither does a heat as its own target."""
     return [
         h
         for h, heat in enumerate(chart)
         if heat is not None
-        and all(heat[lane] is not None for lane in usable)
         and all(
             any(
-                other is not None
-                and o != h
-                and other[lane] is None
-                and heat[lane] not in other
-                for o, other in enumerate(chart)
+                other is not None and other[lane] is None and heat[lane] not in other
+                for other in chart
             )
             for lane in usable
         )
@@ -197,6 +195,21 @@ def racer_lanes(chart):
         for lane, r in enumerate(heat)
         if r is not None
     )
+
+
+def test_the_dissolvable_check_names_the_heat_a_squeeze_could_remove():
+    """The property's own checks, on charts read back from `chart_debug()`:
+    each racer's lane is counted, byes are not, and
+    heat index 2's racers fit the byes at indices 0 and 1; a raced heat,
+    a heat with a bye, and a racer already in the target heat count for
+    nothing."""
+    chart = parsed(["1 -", "- 2", "3 4"])
+    assert chart == [[1, None], [None, 2], [3, 4]]
+    assert dissolvable(chart, [0, 1]) == [2]
+    assert racer_lanes(chart) == Counter({(1, 0): 1, (2, 1): 1, (3, 0): 1, (4, 1): 1})
+    assert dissolvable(parsed([None, "- 2", "3 4"]), [0, 1]) == []
+    assert dissolvable(parsed(["1 -", "- 3", "3 4"]), [0, 1]) == []
+    assert dissolvable(parsed(["1 -", "- 2", "3 -"]), [0, 1]) == []
 
 
 @settings(max_examples=300, deadline=None)
