@@ -222,27 +222,64 @@ def test_a_request_line_the_gate_cannot_parse_is_found(tmp_path):
     ]
 
 
-# The scripts CI runs against Django, as `bash testing/<name>` in a workflow.
+# The scripts CI runs against Django: each `bash testing/<name>` in a
+# workflow, and each script one of those runs, as `dirname $0`/x.sh or as a
+# step of exercise-one-database.sh (`step --resets x.sh`, testing/steps.sh).
 WORKFLOWS = TESTING.parent / ".github" / "workflows"
 CI_RUN = re.compile(r"^[^#\n]*\bbash testing/([A-Za-z0-9._-]+)", re.MULTILINE)
+STEP = re.compile(r"\bstep\s+(?:--resets\s+)?([A-Za-z0-9._-]+\.sh)\b")
+
+
+def ci_script_names(workflows: Path, testing: Path) -> set[str]:
+    names = {
+        found[1]
+        for workflow in sorted(workflows.glob("*.yml"))
+        for found in CI_RUN.finditer(workflow.read_text(encoding="utf-8"))
+    }
+    todo = sorted(names)
+    while todo:
+        called = {
+            found[1]
+            for line in code_lines(testing / todo.pop())
+            for found in [*CALLED.finditer(line), *STEP.finditer(line)]
+        }
+        todo += sorted(called - names)
+        names |= called
+    return names
 
 
 def ci_scripts() -> list[Path]:
-    names = {
-        found[1]
-        for workflow in sorted(WORKFLOWS.glob("*.yml"))
-        for found in CI_RUN.finditer(workflow.read_text(encoding="utf-8"))
-    }
+    names = ci_script_names(WORKFLOWS, TESTING)
     return [path for path in SCRIPTS if path.name in names]
 
 
-# A wait or a bound: a literal sleep, timeout or curl --max-time, or a
-# variable named for a bound.
-WAIT = re.compile(
-    r"\bsleep\s+[0-9.]+|\btimeout\s+(?:-\S+\s+)*[0-9.]+|--max-time\s+[0-9.]+"
-    r"|^\s*(?:export\s+)?\w*(?:SECONDS|AFTER|TIMEOUT|DELAY)=",
-    re.IGNORECASE,
+# A variable named for a bound: a length in seconds or milliseconds, a
+# timeout, a delay, or how long before something happens (DUMP_AFTER).
+BOUND_NAME = r"\w*(?:TIMEOUT\w*|SECONDS|_MS|AFTER|DELAY)"
+# A bound set to a number, or to a default its caller may override, in
+# quotes or not, after export, local or readonly: `NAME=30`,
+# `NAME=${NAME:-30}`, `NAME=${NAME-30}`, `: ${NAME:=30}`.
+BOUND = re.compile(
+    rf"""^\s*(?:(?:export|local|readonly)\s+)?
+    (?:
+      (?P<name>{BOUND_NAME})=(?P<q>"?)
+        (?:[0-9.]+|\$\{{(?P=name):?-(?P<default>[^}}]+)\}})(?P=q)
+    | :\s+(?P<q2>"?)\$\{{(?P<name2>{BOUND_NAME}):?=(?P<default2>[^}}]+)\}}(?P=q2)
+    )""",
+    re.IGNORECASE | re.VERBOSE,
 )
+# Where a shell command starts: a line, or after ; & | ( { ` ! or a keyword.
+AT_COMMAND = r"(?:^|[;&|({`!]|\b(?:do|then|else|if|while|until|exec|time)\s)\s*"
+# A wait: sleep, timeout or read -t as a command, or curl's --max-time,
+# --connect-timeout or -m; its length a number, a variable ("$N", ${N:-3})
+# or a command's output ($(...)).
+WAIT = re.compile(
+    rf"(?:{AT_COMMAND}(?:sleep\s+|timeout\s+(?:-\S+\s+)*|read\s+(?:-\S+\s+)*?-t\s*)"
+    r"|\s--(?:max-time|connect-timeout)[\s=]+|\bcurl\b[^;|&]*?\s-m\s*)"
+    r'(?P<length>"?(?:\$\{?\w+|\$\(|[0-9.]))'
+)
+QUOTED = re.compile(r""""[^"]*"|'[^']*'""")
+EXPANSION = re.compile(r'"\$\{?\w+[^"\s]*"')
 # A source: a measurement with its unit ("the 5 s a heat takes", "250 ms"),
 # a ticket, an owner decision, or a file ("playlist.inc:157").
 SOURCE = re.compile(
@@ -257,22 +294,47 @@ SOURCED_HERE = {
     " ends (playlist.inc:157, PLAYLIST_SCENE_DELAY in"
     " server/racing/services/playlist.py), and 1 s more",
 }
-BOUND_DEFAULT = re.compile(r"^\s*(\w+)=\$\{\1:-[0-9.]+\}", re.MULTILINE)
 
 
-def unsourced_waits(text: str) -> list[str]:
-    """Each wait or bound whose comment names no source: the comment on its
-    line, the comment block right above it, or a comment in the three lines
-    above it."""
+def blank_quotes(line: str) -> str:
+    """The line with each quoted string's text turned to x's, so that
+    `echo "sleep 1"` holds no command; a lone expansion ("$N") stays."""
+    return QUOTED.sub(
+        lambda m: (
+            m[0]
+            if EXPANSION.fullmatch(m[0])
+            else m[0][0] + "x" * (len(m[0]) - 2) + m[0][-1]
+        ),
+        line,
+    )
+
+
+def is_wait(code: str) -> bool:
+    """Whether a line's code sets a bound, or waits for a length that is no
+    variable named for a bound. Such a variable (`--max-time $POLL_SECONDS`)
+    takes its source from the line that sets it, a bound this scan checks
+    where a script CI runs sets it."""
+    if BOUND.search(code):
+        return True
+    found = WAIT.search(blank_quotes(code))
+    if not found:
+        return False
+    var = re.search(r"\$\{?(\w+)", found["length"])
+    return not (var and re.fullmatch(BOUND_NAME, var[1], re.IGNORECASE))
+
+
+def unsourced_waits(text: str) -> list[tuple[int, str]]:
+    """Each wait or bound, as its line number and line, whose comment names
+    no source: the comment on its line, the comment block right above it,
+    or a comment in the three lines above it."""
     lines = text.splitlines()
     found = []
     for n, line in enumerate(lines):
-        if line.lstrip().startswith("#"):
+        hash_at = re.search(r"(?:^|\s)#", blank_quotes(line))
+        cut = hash_at.start() if hash_at else len(line)
+        if not is_wait(line[:cut]):
             continue
-        code, _, trailing = line.partition(" #")
-        if not WAIT.search(code):
-            continue
-        notes = [trailing]
+        notes = [line[cut:]]
         above = n - 1
         while above >= 0 and lines[above].lstrip().startswith("#"):
             notes.append(lines[above])
@@ -281,22 +343,60 @@ def unsourced_waits(text: str) -> list[str]:
             prev for prev in lines[max(0, n - 3) : n] if prev.lstrip().startswith("#")
         ]
         if not any(SOURCE.search(note) for note in notes):
-            found.append(f"{n + 1}: {line.strip()}")
+            found.append((n + 1, line.strip()))
     return found
 
 
 def uncased_bounds(script: Path) -> list[str]:
     """Each bound the script lets its caller set (`NAME=${NAME:-30}`) that
     no case of its `<script>-cases.sh` sets."""
-    bounds = BOUND_DEFAULT.findall(script.read_text(encoding="utf-8"))
+    bounds = [
+        found["name"] or found["name2"]
+        for line in code_lines(script)
+        if (found := BOUND.search(line)) and (found["default"] or found["default2"])
+    ]
     cases = script.with_name(f"{script.stem}-cases.sh")
     text = cases.read_text(encoding="utf-8") if cases.is_file() else ""
     return [name for name in bounds if not re.search(rf"\b{name}=", text)]
 
 
 def test_the_scan_covers_the_scripts_ci_runs():
-    assert {"race-with-derby-timer.sh", "test-playlist.sh"} <= {
-        path.name for path in ci_scripts()
+    """With the steps exercise-one-database.sh runs, which no workflow
+    names (#408 review)."""
+    assert {
+        "race-with-derby-timer.sh",
+        "test-playlist.sh",
+        "test-each-role.sh",
+        "test-racer-query.sh",
+        "common.sh",
+    } <= {path.name for path in ci_scripts()}
+
+
+def test_the_scan_follows_what_a_ci_script_runs(tmp_path):
+    workflows, testing = tmp_path / "workflows", tmp_path / "testing"
+    workflows.mkdir()
+    testing.mkdir()
+    (workflows / "a.yml").write_text(
+        "      run: |\n"
+        "        bash testing/suite.sh http://x\n"
+        "        # bash testing/commented.sh\n"
+    )
+    for name, text in {
+        "suite.sh": "source `dirname $0`/common.sh\nstep one.sh\n"
+        "step --resets two.sh\n",
+        "common.sh": "# step commented.sh\n",
+        "one.sh": "$(dirname $0)/suite.sh\n$(dirname $0)/three.sh\n",
+        "two.sh": "",
+        "three.sh": "",
+    }.items():
+        (testing / name).write_text(text)
+
+    assert ci_script_names(workflows, testing) == {
+        "suite.sh",
+        "common.sh",
+        "one.sh",
+        "two.sh",
+        "three.sh",
     }
 
 
@@ -307,9 +407,7 @@ def test_every_wait_in_a_script_ci_runs_names_its_source(script):
     holds."""
     found = unsourced_waits(script.read_text(encoding="utf-8"))
     assert [
-        line
-        for line in found
-        if (script.name, line.partition(": ")[2]) not in SOURCED_HERE
+        (n, line) for n, line in found if (script.name, line) not in SOURCED_HERE
     ] == []
 
 
@@ -343,19 +441,97 @@ def test_a_wait_with_no_source_is_found():
     )
 
     assert unsourced_waits(text) == [
-        "5: DUMP_AFTER=${DUMP_AFTER:-30}",
-        "7: sleep 1",
-        "9: sleep 2",
-        "10: curl --max-time 10 -s $URL",
-        "22: sleep 0.5",
+        (5, "DUMP_AFTER=${DUMP_AFTER:-30}"),
+        (7, "sleep 1"),
+        (9, "sleep 2"),
+        (10, "curl --max-time 10 -s $URL"),
+        (22, "sleep 0.5"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("line", "found"),
+    [
+        # The #408 review's probes.
+        ("sleep $N", True),
+        ('sleep "$N"', True),
+        ("sleep ${N:-3}", True),
+        ("sleep 1m", True),
+        ("sleep\t1", True),
+        ('curl --max-time "$X" u', True),
+        ("curl -m 10 u", True),
+        ("curl --connect-timeout 5 u", True),
+        ('timeout "$X" cmd', True),
+        ("timeout 5s cmd", True),
+        ('echo "step #2"; sleep 1', True),
+        ("echo ok; sleep 1", True),
+        ("until x; do sleep 2; done", True),
+        ("x && sleep 1", True),
+        ("x | timeout 5 y", True),
+        ("(sleep 1)", True),
+        ("{ sleep 1; }", True),
+        ("`sleep 1`", True),
+        ("! timeout 5 x", True),
+        ("X=$(timeout 5 y)", True),
+        ("if timeout 5 x; then", True),
+        ("while sleep 1; do", True),
+        ("then sleep 1", True),
+        ("else sleep 1", True),
+        ("exec timeout 5 x", True),
+        ("time sleep 1", True),
+        ("timeout -k 5 300 java", True),
+        ("timeout --foreground 5 x", True),
+        ("sleep $((N * 2))", True),
+        ("curl --max-time=5 u", True),
+        ("echo $#; sleep 1", True),
+        ("until timeout 5 x; do", True),
+        ('sleep "${N}"', True),
+        ("TIMEOUT_S=5", True),
+        ("read -t 5 x", True),
+        ("read -r -t 5 x", True),
+        ("local timeout=30", True),
+        ("readonly POLL_SECONDS=10", True),
+        ("X_MS=300", True),
+        ('NAME_SECONDS="${NAME_SECONDS:-30}"', True),
+        ("export NAME_SECONDS=${NAME_SECONDS:-30}", True),
+        (": ${NAME_SECONDS:=30}", True),
+        (': "${NAME_SECONDS=30}"', True),
+        ("NAME_SECONDS=${NAME_SECONDS-30}", True),
+        ("DUMP_AFTER=${DUMP_AFTER:-30}", True),
+        # A variable named for a bound is sourced where it is set.
+        ("curl --max-time $POLL_SECONDS u", False),
+        ('sleep "$HEAT_DELAY"', False),
+        ("sleep ${HEAT_DELAY}", False),
+        # No wait: text in quotes, a comment, a value that is no number.
+        ('echo "sleep 1 minute"', False),
+        ('grep -c "sleep 1" f', False),
+        ("echo timeout 5 reached", False),
+        ('printf "timeout 5\\n"', False),
+        ("grep -m 1 'Notice' f", False),
+        ("curl -s u | grep -m 1 x", False),
+        ("echo 'sleep 1'", False),
+        ("echo 'a; sleep 1'", False),
+        ("echo sleep 1", False),
+        ("LOG_AFTER=$(date)", False),
+        ("LANES=${LANES:-4}", False),
+        ("# sleep 1", False),
+        # Waits the rule leaves out.
+        ("HEAT_LIMIT=30", False),
+        ("ping -w 3 h", False),
+        ("nc -w 3 h p", False),
+        ("wait $PID", False),
+        ("tail --pid=1 -f x", False),
+    ],
+)
+def test_which_lines_are_waits(line, found):
+    assert (unsourced_waits(line + "\n") == [(1, line)]) is found
 
 
 def test_each_wait_sourced_here_is_still_in_its_script_with_no_source():
     for (name, line), source in SOURCED_HERE.items():
         assert SOURCE.search(source)
         found = unsourced_waits((TESTING / name).read_text(encoding="utf-8"))
-        assert line in [f.partition(": ")[2] for f in found], (name, line)
+        assert line in [text for _, text in found], (name, line)
 
 
 def test_where_a_waits_source_may_sit():
@@ -363,11 +539,15 @@ def test_where_a_waits_source_may_sit():
     past the block does not, and a commented-out wait is no wait."""
     long_block = "# About twice that 151 s.\n# a\n# b\n# c\nIDENTIFY_SECONDS=300\n"
     assert unsourced_waits(long_block) == []
-    assert unsourced_waits("source common.sh\nsleep 1\n") == ["2: sleep 1"]
+    assert unsourced_waits("source common.sh\nsleep 1\n") == [(2, "sleep 1")]
     assert unsourced_waits("# Was: sleep 3\n") == []
     assert unsourced_waits("# 5 s\nx\nsleep 1\n") == []
+    assert unsourced_waits("sleep 1  # 5 s\n") == []
+    assert unsourced_waits("sleep 1  # D85\n") == []
+    assert unsourced_waits("sleep 1  # wait\n") == [(1, "sleep 1  # wait")]
+    assert unsourced_waits('echo "#5 s"; sleep 1\n') == [(1, 'echo "#5 s"; sleep 1')]
     # The block ends at the first line, not at the last one, read as -1.
-    assert unsourced_waits("# no source\nsleep 1\nx\ny\nz\n# 5 s\n") == ["2: sleep 1"]
+    assert unsourced_waits("# no source\nsleep 1\nx\ny\nz\n# 5 s\n") == [(2, "sleep 1")]
 
 
 @pytest.mark.parametrize("script", ci_scripts(), ids=lambda path: path.name)
@@ -383,16 +563,28 @@ def test_a_bound_with_no_case_is_found(tmp_path):
     script = tmp_path / "race.sh"
     script.write_text(
         "IDENTIFY_SECONDS=${IDENTIFY_SECONDS:-300}\n"
-        "  RACE_SECONDS=${RACE_SECONDS:-180}\n"
+        '  RACE_SECONDS="${RACE_SECONDS:-180}"\n'
+        "export HEAT_SECONDS=${HEAT_SECONDS-30}\n"
+        ": ${DUMP_AFTER:=30}\n"
         "POLL_SECONDS=10\n"
         "OTHER=${HEAT_SECONDS:-30}\n"
+        "OTHER_SECONDS=${HEAT_SECONDS:-30}\n"
+        "LANES=${LANES:-4}\n"
+        "# JAVA_DELAY=${JAVA_DELAY:-0}\n"
     )
 
-    assert uncased_bounds(script) == ["IDENTIFY_SECONDS", "RACE_SECONDS"]
+    assert uncased_bounds(script) == [
+        "IDENTIFY_SECONDS",
+        "RACE_SECONDS",
+        "HEAT_SECONDS",
+        "DUMP_AFTER",
+    ]
 
     (tmp_path / "race-cases.sh").write_text(
         "identify-1s|IDENTIFY_SECONDS=1|did not complete\n"
         "race-60s|XRACE_SECONDS=60|did not complete\n"
+        "heat-3s|HEAT_SECONDS=3|x\n"
+        "dump|DUMP_AFTER=0|x\n"
     )
 
     assert uncased_bounds(script) == ["RACE_SECONDS"]

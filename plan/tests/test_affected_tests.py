@@ -336,6 +336,14 @@ class TestingCases(unittest.TestCase):
     def test_a_script_no_cases_script_names_prints_none(self):
         self.assertEqual(self.commands_for('testing/common.sh'), [])
 
+    def test_a_name_inside_a_longer_name_is_no_mention(self):
+        # The #408 review: race-with-derby-timer-cases.sh named testing/timer.sh
+        # and testing/derby by substring.
+        for path in ('testing/ace.sh', 'testing/stand-in/java', 'testing/timer-stand',
+                     'testing/r.ce.sh'):
+            with self.subTest(path=path):
+                self.assertEqual(self.commands_for(path), [])
+
 
 class TestFile(unittest.TestCase):
     def test_a_browser_test_runs_itself_under_the_browser_marker(self):

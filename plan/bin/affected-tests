@@ -664,13 +664,14 @@ def cover_testing(plan, tree, path):
 
 
 def cases_scripts(tree, path):
-    """The testing/*-cases.sh that are `path` or name it, as
-    race-with-derby-timer-cases.sh names its script and its stand-in
-    timer-stand-in/java."""
+    """The testing/*-cases.sh that are `path` or name it as a whole word, as
+    Tree.mentions reads one: race-with-derby-timer-cases.sh names its script
+    and its stand-in timer-stand-in/java, not testing/timer.sh."""
     rel = path[len('testing/'):]
+    word = re.compile(rf'(?<![\w-]){re.escape(rel)}(?![\w-])')
     found = []
     for cases in sorted((tree.root / 'testing').glob('*-cases.sh')):
-        if cases.name == rel or rel in cases.read_text(errors='replace'):
+        if cases.name == rel or word.search(cases.read_text(errors='replace')):
             found.append(f'testing/{cases.name}')
     return found
 
