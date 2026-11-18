@@ -71,7 +71,9 @@ trap 'kill $JAR_PID 2>/dev/null || true' EXIT
 thread_dump() {
     local ppid
     ppid=$(awk '/^PPid:/ { print $2 }' /proc/$JAR_PID/status 2>/dev/null) || true
-    if [ "$ppid" = "$$" ] && [ "$(cat /proc/$JAR_PID/comm 2>/dev/null)" = java ]; then
+    # The running executable, not comm, which a script named java shares.
+    if [ "$ppid" = "$$" ] \
+           && [ "$(basename "$(readlink /proc/$JAR_PID/exe 2>/dev/null)")" = java ]; then
         echo "===== $(stamp) thread dump: $1" >> "$TIMER_LOG"
         kill -QUIT $JAR_PID
         sleep 1
@@ -96,7 +98,9 @@ finish() {
     sleep 2
     thread_dump "$1, again"
     cat "$TIMER_LOG"
+    # A jar that never started wrote no log of its own.
     for f in "`dirname $0`"/timer-*.log; do
+        [ -e "$f" ] || continue
         echo "===== $f"
         cat "$f"
     done
