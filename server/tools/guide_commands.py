@@ -251,9 +251,13 @@ def stage_commands(
     return [command for command in found if command.key in names]
 
 
-def main(argv: list[str]) -> int:
-    entries = parse_registry(REGISTRY.read_text())
-    found = guide_commands()
+def main(argv: list[str], registry: Path = REGISTRY, folder: Path = SOURCE) -> int:
+    try:
+        entries = parse_registry(registry.read_text())
+        found = guide_commands(folder)
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 1
     if argv[:1] == ["stage"] and len(argv) == 2:
         run = stage_commands(found, entries, argv[1])
         if not run:

@@ -177,7 +177,7 @@ registry() {
 
 # Read from the registry's own log, since a daemon that is not this machine's
 # publishes its port on its own host.
-registry_up() { docker logs guide-registry 2>&1 | grep -q 'listening on'; }
+registry_up() { grep -q 'listening on' <<<"$(docker logs guide-registry 2>&1)"; }
 
 # The server image as the guides name it, and in the registry.
 server_image() {
@@ -251,7 +251,7 @@ archive_private() {
 
 archive_has_file() {
     archive_private "$1"
-    tar -tzf "$1" | grep -q 'guide-marker$' || fail "$1 does not hold the data volume's file"
+    grep -q 'guide-marker$' <<<"$(tar -tzf "$1")" || fail "$1 does not hold the data volume's file"
 }
 
 serves() { # serves <url> [curl options]
@@ -472,7 +472,7 @@ stage_pi_timer_update() {
     pi_server
     pi_timer_env
     run_guide pi-timer-update
-    docker compose -f compose.timer.yaml ps --status running --format '{{.Service}}' | grep -qx timer \
+    grep -qx timer <<<"$(docker compose -f compose.timer.yaml ps --status running --format '{{.Service}}')" \
         || fail "the timer is not running after the update"
     wait_for "the timer's login" timer_logged_in 1
 }

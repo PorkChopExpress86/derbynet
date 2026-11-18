@@ -120,6 +120,8 @@ def test_a_tilde_fence_and_the_attribute_and_case_forms_are_read():
     assert found(fence("sh", "ls", mark="~~~")) == [(2, "ls")]
     assert found("```{.bash}\nls\n```\n") == [(2, "ls")]
     assert found("```SH\nls\n```\n") == [(2, "ls")]
+    assert found("```{#only-an-id}\nls\n```\n") == []
+    assert found("```{.json .bash}\nls\n```\n") == []
 
 
 def test_the_blocks_are_the_ones_the_docs_build_takes():
@@ -128,7 +130,7 @@ def test_the_blocks_are_the_ones_the_docs_build_takes():
     assert found(text) == [(4, "ls")]
 
 
-# One line, one command.
+# What a line is.
 
 
 def test_blank_lines_and_comments_are_no_commands():
@@ -153,15 +155,16 @@ def test_an_indented_line_and_a_dollar_prompt_in_a_non_console_block_stay_whole(
     assert found(fence(language, "  $ ls")) == [(2, "$ ls")] or language == "sh"
 
 
-def test_a_powershell_line_is_not_parsed_as_bash():
-    text = fence("powershell", 'docker run -v "${PWD}:/backup:ro" x', "if ($x) {")
+@pytest.mark.parametrize("language", ["powershell", "pwsh"])
+def test_a_powershell_line_is_not_parsed_as_bash(language):
+    text = fence(language, 'docker run -v "${PWD}:/backup:ro" x', "if ($x) {")
     assert [t for _, t in found(text)] == [
         'docker run -v "${PWD}:/backup:ro" x',
         "if ($x) {",
     ]
 
 
-# A construct over several lines is one command, found by asking bash.
+# A construct that spans lines is a command of its own, found by asking bash.
 
 CONSTRUCTS = {
     "plain": (["ls -l"], 1),
@@ -204,6 +207,20 @@ def test_a_heredoc_no_line_ends_raises():
         gc.commands("g.md", fence("sh", "cat <<E", "body"))
 
 
+def test_a_prompt_ends_a_console_construct_that_a_shell_block_would_go_on_with():
+    """The next prompt starts a new command, so a quote it closes does not
+    belong to the one before it."""
+    lines = ["$ echo 'a", "$ b'"]
+    with pytest.raises(ValueError, match="line 2"):
+        gc.commands("g.md", fence("console", *lines))
+    assert found(fence("sh", "echo 'a", "$ b'")) == [(2, "echo 'a\n$ b'")]
+    assert found(fence("console", "$ echo 'a", "b'")) == [(2, "echo 'a\nb'")]
+
+
+def test_a_backslash_ends_the_last_line_of_a_block_as_it_is():
+    assert gc.split("sh", "ls \\", 1) == [(1, "ls \\")]
+
+
 def test_a_console_construct_stops_at_the_next_prompt():
     with pytest.raises(ValueError, match="line 2"):
         gc.commands("g.md", fence("console", "$ echo 'a", "$ ls"))
@@ -234,6 +251,19 @@ def test_a_command_is_under_the_nearest_heading_outside_the_blocks():
     assert [(c.heading, c.text) for c in gc.commands("g.md", text)] == [
         ("First", "ls"),
         ("Second", "ls"),
+    ]
+
+
+def test_a_comment_in_an_earlier_block_is_no_heading():
+    text = (
+        "## First\n\n"
+        + fence("sh", "# not a heading", "ls")
+        + "\n"
+        + fence("sh", "pwd")
+    )
+    assert [(c.heading, c.text) for c in gc.commands("g.md", text)] == [
+        ("First", "ls"),
+        ("First", "pwd"),
     ]
 
 
@@ -368,7 +398,7 @@ def test_a_stage_gets_its_commands_in_guide_order_and_no_others():
                 "g.md\tA\t1\tfour\tstage s",
                 "g.md\tA\t1\tone\tstage s",
                 "g.md\tA\t1\ttwo\tstage t",
-                "g.md\tA\t1\tthree\treason x",
+                "g.md\tA\t1\tthree\treason s",
             ]
         )
     )
@@ -413,8 +443,44 @@ def test_the_tool_with_no_argument_is_the_check_and_passes_today():
     assert (done.returncode, done.stdout.strip()) == (0, "")
 
 
-def test_the_tool_refuses_another_argument():
-    assert run_tool("frobnicate").returncode == 2
+@pytest.mark.parametrize(
+    "args", [("frobnicate",), ("frobnicate", "x"), ("stage",), ("stage", "a", "b")]
+)
+def test_the_tool_refuses_another_argument(args):
+    assert run_tool(*args).returncode == 2
+
+
+def stand_in(tmp_path, guide: str, rows: str):
+    (tmp_path / "g.md").write_text(guide)
+    (tmp_path / "t.tsv").write_text(rows)
+    return tmp_path / "t.tsv", tmp_path
+
+
+def test_the_check_exits_1_and_prints_each_problem_when_a_command_has_no_row(
+    tmp_path, capsys
+):
+    registry, folder = stand_in(tmp_path, "## A\n\n" + fence("sh", "ls"), "")
+    assert gc.main([], registry, folder) == 1
+    assert capsys.readouterr().out.startswith("docs/g.md:4: `ls` (under 'A')")
+
+
+def test_the_check_exits_0_and_prints_nothing_when_every_command_has_a_row(
+    tmp_path, capsys
+):
+    registry, folder = stand_in(
+        tmp_path, "## A\n\n" + fence("sh", "ls"), "g.md\tA\t1\tls\treason x"
+    )
+    assert gc.main([], registry, folder) == 0
+    assert capsys.readouterr().out.strip() == ""
+
+
+def test_the_check_names_a_malformed_row_and_an_unclosed_construct(tmp_path, capsys):
+    registry, folder = stand_in(tmp_path, fence("sh", "ls"), "g.md\tA\tls")
+    assert gc.main([], registry, folder) == 1
+    assert "guide-commands.tsv:1" in capsys.readouterr().err
+    registry, folder = stand_in(tmp_path, fence("sh", "f() {"), "")
+    assert gc.main([], registry, folder) == 1
+    assert "docs/g.md: line 2: `f() {`" in capsys.readouterr().err
 
 
 # What runs the stages.
@@ -435,16 +501,23 @@ def registered_stages() -> set[str]:
     return {e.detail for e in entries if e.kind == "stage"}
 
 
+def stages_called(workflow: str) -> set[str]:
+    """The stages a live step of the workflow's text names on a
+    guide-commands.sh line."""
+    return {
+        name
+        for step in steps(workflow)
+        if step.runs
+        for line in step.script.splitlines()
+        if (match := CALL.match(line.strip()))
+        for name in match.group(1).split()
+    }
+
+
 def run_by_workflows() -> set[str]:
-    """The stages a live step of a workflow names on a guide-commands.sh line."""
     names: set[str] = set()
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
-        for step in steps(path.read_text()):
-            if not step.runs:
-                continue
-            for line in step.script.splitlines():
-                if match := CALL.match(line.strip()):
-                    names |= set(match.group(1).split())
+        names |= stages_called(path.read_text())
     return names
 
 
@@ -516,12 +589,4 @@ def test_the_workflow_step_finder_reads_a_call_and_skips_a_dead_one():
                 run: server/docker/ci/guide-commands.sh proxies
         """
     )
-    called = {
-        name
-        for step in steps(workflow)
-        if step.runs
-        for line in step.script.splitlines()
-        if (match := CALL.match(line.strip()))
-        for name in match.group(1).split()
-    }
-    assert called == {"compose-env", "compose-start", "postgres"}
+    assert stages_called(workflow) == {"compose-env", "compose-start", "postgres"}

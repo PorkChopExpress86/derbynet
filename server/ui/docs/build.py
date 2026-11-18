@@ -125,8 +125,9 @@ def fenced_blocks(text: str):
     text = normalize(text)
     for block in FencedBlockPreprocessor.FENCED_BLOCK_RE.finditer(text):
         language = block.group("lang") or ""
-        if not language and block.group("attrs"):
-            first = re.search(r"\.([\w#+-][\w#.+-]*)", block.group("attrs"))
+        # The pattern takes a `lang` or `{attrs}`, never both.
+        if attrs := block.group("attrs"):
+            first = re.search(r"\.([\w#+-][\w#.+-]*)", attrs)
             language = first.group(1) if first else ""
         yield (
             language.lower(),
