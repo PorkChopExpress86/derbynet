@@ -117,7 +117,9 @@ def test_the_summary_names_an_error_as_well_as_a_failure(tmp_path):
 
 # A stub test that holds its run open until the test writes `go` beside it,
 # for at most 60 s, so the first run is still running when the second
-# starts, on any load.
+# starts, on any load.  It writes `started` whole, by a rename: a test
+# that saw the file exist read it empty under load, before the write
+# (#407's push hook, test_a_sigkill_frees_the_lock_though_its_loops_and_pytest_live_on).
 HOLD = """\
 import os
 import time
@@ -128,7 +130,8 @@ HERE = Path(__file__).parent
 
 def test_holds():
     held = os.environ.get("DERBYNET_LOAD_LOCK_HELD")
-    (HERE / "started").write_text(f"{os.getpid()} {held}")
+    (HERE / "started.tmp").write_text(f"{os.getpid()} {held}")
+    os.replace(HERE / "started.tmp", HERE / "started")
     for _ in range(600):
         if (HERE / "go").exists():
             break
@@ -559,10 +562,11 @@ def test_a_signal_during_the_cleanup_after_an_error_still_frees_all(tmp_path):
 
 HOLD_LOCK = Path(__file__).resolve().parents[1] / "tools" / "hold-load-lock.sh"
 
-# A stand-in hand-off: it records the lock it was told it holds, then holds
-# its run open until the test writes `go` beside it, for at most 60 s.
+# A stand-in hand-off: it records the lock it was told it holds, whole by a
+# rename as HOLD does, then holds its run open until the test writes `go`
+# beside it, for at most 60 s.
 HAND_OFF = (
-    'echo "$DERBYNET_LOAD_LOCK_HELD" > started; '
+    'echo "$DERBYNET_LOAD_LOCK_HELD" > started.tmp; mv started.tmp started; '
     "for _ in $(seq 600); do [ -e go ] && exit 0; sleep 0.1; done; exit 1"
 )
 
