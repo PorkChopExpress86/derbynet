@@ -538,6 +538,7 @@ def test_an_unchanged_test_s_claim_is_not_named_and_a_changed_one_s_is(
         edit("    assert page\n\n\ndef test_calls", "    assert 1\n\n\ndef test_calls")
     )
     monkeypatch.setattr(dc, "base_text", lambda f, rev: SCOPED)
+    monkeypatch.setattr(dc, "deleted_tests", lambda near, rev: [])
     body = tmp_path / "body.md"
     body.write_text("<details>\n</details>\n")
     assert dc.main(["--check", str(body), "--base", "origin/master", str(path)]) == 1
@@ -612,6 +613,7 @@ def test_a_new_file_or_one_that_cannot_be_resolved_counts_every_claim(
     path = tmp_path / "test_scoped.py"
     path.write_text(head)
     monkeypatch.setattr(dc, "base_text", lambda f, rev: SCOPED)
+    monkeypatch.setattr(dc, "deleted_tests", lambda near, rev: [])
     body = tmp_path / "body.md"
     body.write_text("<details>\n</details>\n")
     assert dc.main(["--check", str(body), "--base", "HEAD", str(path)]) == 1
@@ -690,3 +692,358 @@ def test_a_decorated_test_or_a_test_case_that_reads_a_change_counts():
         {"race", "test_calls_helper", "test_decorated", "Reach"},
         "",
     )
+
+
+# The sentence of #404's first body that review sent back (#65 retro), and
+# the lines of its last body that say what the lead does after merge.
+ROUND_0_LEAD = (
+    "`racing/tests/test_did_not_finish.py::test_places_with_zero_times_are_"
+    "recorded_as_php_records_them` asserted the old behaviour. It moved to"
+    " `racing/tests/test_all_zero_lanes.py::test_zero_times_with_places_on_the_"
+    "used_lanes_stop_racing` with the new expectation, which the lead confirmed"
+    " for #65."
+)
+AFTER_MERGE = (
+    "Both Scope lines are drafted for the lead to post on #62 after merge, and"
+    " no new docs file is added.\n"
+    "- The #20 quirk-table comment, which the lead posts after merge.\n"
+    "- The release-note lines on #62, which the lead posts after merge.\n"
+)
+
+
+def test_a_ruling_credited_to_the_lead_is_named(tmp_path, capsys):
+    """#404's round-0 sentence is refused by its line; what the lead does
+    next, a ruling that names its decision, a quote and pasted output pass."""
+    path = tmp_path / "test_x.py"
+    path.write_text("def test_x():\n    assert True\n")
+    body = tmp_path / "body.md"
+    body.write_text(f"Intro.\n{ROUND_0_LEAD}\n{AFTER_MERGE}")
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith(f"{body}:2: credits a ruling to the lead")
+    assert "'It moved to `racing/tests/test_all_zero_lanes.py::" in out
+    assert out.count("\n") == 1
+    fine = (
+        ROUND_0_LEAD.replace("for #65", "for #65 under D42"),
+        "#272's docstring said \"the lead's choice B\" until review.",
+        "```\nwhich the lead confirmed\n```",
+        "Per the `lead` column, it is filled.",
+    )
+    exits = []
+    for text in fine:
+        body.write_text(f"{text}\n{AFTER_MERGE}")
+        exits.append(dc.main(["--check", str(body), str(path)]))
+    assert exits == [0, 0, 0, 0]
+    cited = (
+        "This is the lead's choice C.",
+        "The lead approved this reading.",
+        "It stays, per the lead.",
+        "Cost (accepted by the lead).",
+    )
+    assert [dc.lead_cites(text) for text in cited] == [[(1, text)] for text in cited]
+    assert len(cited) == 4
+
+
+# Sentences from merged and open bodies (#65 retro's sweep) that credit the
+# lead with no ruling, or cite where it is recorded.
+NOT_RULINGS = (
+    "CI was green at b46d7af6, as the lead reported.",
+    "The lead decides on them, since this PR changes neither list:",
+    "Whether testing/ belongs in those paths is the lead's call.",
+    "The rest is left to the lead.",
+    "This was the lead's call on the third Scope box, and the docstring cites #378.",
+    "- a changed module-level statement (the lead's choice on #379).",
+    "That is the lead's ruling on #273.",
+    "This is the lead's choice C (#346), plus eight verbs C missed.",
+    "Per the lead (Q17), it is read as the pages of #41 to #50.",
+    "The lead's answer is in ADR-10.",
+    "Cite the lead's answer by the decision it rests on (`D10`, `#272`).",
+    "A value unconfirmed by the lead.",
+)
+RULINGS = (
+    "Cost (accepted by the lead).",
+    "The lead's answer was to fix both rows here.",
+    "`conftest.py` is unchanged here, per the lead.",
+    "The lead said to keep it, and the lead OK'd the rest.",
+    "A third check was dropped at the lead's call.",
+    "Left unfixed, as the lead ruled for this PR.",
+    "It was settled for #65 by the lead's choice, as the lead confirmed for #65.",
+)
+
+
+def test_a_sentence_that_credits_the_lead_no_ruling_is_not_named():
+    """A past ruling is named until the sentence cites a decision, a
+    question, an ADR or a ticket; `for #65` names what it was about, not
+    where it is recorded. What the lead decides next, an open call, a report
+    and a quoted or backticked phrase pass. A citation clears its own
+    sentence only."""
+    assert [dc.lead_cites(text) for text in NOT_RULINGS] == [[]] * len(NOT_RULINGS)
+    assert [bool(dc.lead_cites(text)) for text in RULINGS] == [True] * len(RULINGS)
+    assert dc.lead_cites("The lead chose B. Ticket #5 says so.") == [
+        (1, "The lead chose B.")
+    ]
+    assert dc.lead_cites("The lead chose B for #5.") != []
+    assert dc.lead_cites("The lead chose B (#5).") == []
+    assert dc.lead_cites("The lead's choice on D10.") == []
+    assert dc.lead_cites("The lead's choice on Q2.") == []
+
+
+GONE_BASE = textwrap.dedent(
+    """\
+    import os
+
+
+    def helper():
+        return os.sep
+
+
+    class Helper:
+        pass
+
+
+    def test_old():
+        assert 1
+
+
+    def test_moved():
+        assert 2
+
+
+    class TestBoard:
+        size = 4
+
+        def setup_method(self):
+            pass
+
+        def test_row(self):
+            assert 3
+
+        def test_kept(self):
+            assert 4
+
+
+    class TestGone:
+        def test_a(self):
+            assert 5
+    """
+)
+GONE_HEAD = textwrap.dedent(
+    """\
+    class TestBoard:
+        def test_kept(self):
+            assert 4
+    """
+)
+
+
+def test_a_test_gone_since_the_merge_base_is_named(tmp_path, capsys, monkeypatch):
+    """#404's deleted `test_adjuster.py` test: each test the head no longer
+    defines is named until the body names it; a test moved to another file
+    given counts as kept, and a class that is gone is named once."""
+    path = tmp_path / "test_gone.py"
+    path.write_text(GONE_HEAD)
+    other = tmp_path / "test_other.py"
+    other.write_text("def test_moved():\n    assert 2\n")
+    monkeypatch.setattr(
+        dc, "base_text", lambda f, rev: GONE_BASE if f == path else None
+    )
+    monkeypatch.setattr(dc, "deleted_tests", lambda near, rev: [])
+    body = tmp_path / "body.md"
+    body.write_text("Nothing here.\n")
+    argv = ["--check", str(body), "--base", "origin/master", str(path), str(other)]
+    assert dc.main(argv) == 1
+    out = capsys.readouterr().out
+    gone = [
+        line.split(": ")[1].split(" is gone")[0]
+        for line in out.splitlines()
+        if " is gone since the merge base" in line
+    ]
+    assert gone == ["TestBoard::test_row", "TestGone", "test_old"]
+    # Without --base nothing is compared with the merge base.
+    assert dc.main(["--check", str(body), str(path), str(other)]) == 0
+    capsys.readouterr()
+    body.write_text(
+        "- test_old: its assert is in test_kept.\n"
+        "```\ntest_row\n```\n"
+        "TestGone and test_row moved too.\n"
+    )
+    assert dc.main(argv) == 0
+    # A name only in fenced code names nothing.
+    body.write_text("- test_old, TestGone.\n```\ntest_row\n```\n")
+    assert dc.main(argv) == 1
+    assert "TestBoard::test_row is gone" in capsys.readouterr().out
+
+
+NESTED = textwrap.dedent(
+    """\
+    import sys
+
+    if sys.platform == "linux":
+
+        def test_here():
+            assert 1
+
+    else:
+
+        class TestElse:
+            def test_there(self):
+                assert 2
+
+
+    class TestOuter:
+        class TestInner:
+            def test_deep(self):
+                assert 3
+
+            class TestInnermost:
+                def test_deeper(self):
+                    assert 4
+
+        class Helper:
+            def test_not_collected(self):
+                assert 5
+
+        def test_outer(self):
+            assert 6
+
+        @pytest.mark.parametrize("n", [1, 2, 3])
+        def test_cases(self, n):
+            assert n
+    """
+)
+
+
+def test_the_tests_in_a_nested_class_or_under_an_if_are_listed():
+    """A parametrized test is one name, however many cases it has."""
+    assert dc.test_names(NESTED) == {
+        "test_here",
+        "TestElse",
+        "TestElse::test_there",
+        "TestOuter",
+        "TestOuter::TestInner",
+        "TestOuter::TestInner::test_deep",
+        "TestOuter::TestInner::TestInnermost",
+        "TestOuter::TestInner::TestInnermost::test_deeper",
+        "TestOuter::test_outer",
+        "TestOuter::test_cases",
+    }
+    # A nested test or class that is gone is named, and a class gone with
+    # its methods once; a nested method moved to another class is kept.
+    head = "import sys\n\n\nclass TestOuter:\n    class TestInner:\n        pass\n"
+    lost = dc.test_names(NESTED) - dc.test_names(head)
+    assert "TestOuter::TestInner::TestInnermost::test_deeper" in lost
+    assert "test_here" in lost
+
+
+def test_a_nested_test_gone_since_the_merge_base_is_named_once_per_class(
+    tmp_path, capsys, monkeypatch
+):
+    path = tmp_path / "test_nested.py"
+    path.write_text(
+        "import sys\n\n\nclass TestOuter:\n    class TestInner:\n        pass\n"
+    )
+    monkeypatch.setattr(dc, "base_text", lambda f, rev: NESTED)
+    monkeypatch.setattr(dc, "deleted_tests", lambda near, rev: [])
+    body = tmp_path / "body.md"
+    body.write_text("Nothing here.\n")
+    argv = ["--check", str(body), "--base", "origin/master", str(path)]
+    assert dc.main(argv) == 1
+    gone = [
+        line.split(": ")[1].split(" is gone")[0]
+        for line in capsys.readouterr().out.splitlines()
+        if " is gone since the merge base" in line
+    ]
+    assert gone == [
+        "TestElse",
+        "TestOuter::TestInner::TestInnermost",
+        "TestOuter::TestInner::test_deep",
+        "TestOuter::test_cases",
+        "TestOuter::test_outer",
+        "test_here",
+    ]
+
+
+def repo(tmp_path, monkeypatch):
+    """A git repository in tmp_path with no `GIT_*` of the caller's, and a
+    function that runs git in it."""
+    for name in [k for k in os.environ if k.startswith("GIT_")]:
+        monkeypatch.delenv(name)
+    for name, value in {
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }.items():
+        monkeypatch.setenv(name, value)
+
+    def git(*argv):
+        subprocess.run(["git", *argv], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q", "-b", "master")
+    return git
+
+
+def test_a_deleted_test_file_is_read_from_the_merge_base(tmp_path, capsys, monkeypatch):
+    """A deleted or moved test file is named test by test, whether or not it
+    is on the command line; a test moved to a file given counts as kept, and
+    a path that is nowhere is refused. A deleted file that is no test file is
+    left out."""
+    monkeypatch.setenv("GIT_DIR", str(tmp_path / "a hook's repository"))
+    monkeypatch.setenv("HOME", str(tmp_path / "no home"))
+    git = repo(tmp_path, monkeypatch)
+    assert os.environ["HOME"] == str(tmp_path / "no home")
+    assert "GIT_DIR" not in os.environ
+    old = tmp_path / "tests" / "deep" / "test_old.py"
+    old.parent.mkdir(parents=True)
+    old.write_text(
+        "def test_a():\n    assert 1\n\n\ndef test_b():\n    assert 2\n\n\n"
+        "class TestC:\n    def test_c(self):\n        assert 3\n"
+    )
+    (tmp_path / "tests" / "deep" / "helper.py").write_text("def test_h():\n    pass\n")
+    lane = tmp_path / "tests" / "deep" / "lane_test.py"
+    lane.write_text("def test_z():\n    assert 5\n")
+    keep = tmp_path / "tests" / "test_keep.py"
+    keep.write_text("def test_k():\n    assert 4\n")
+    git("add", ".")
+    git("commit", "-q", "-m", "base")
+    author = subprocess.run(
+        ["git", "log", "-1", "--format=%an"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert author.stdout.strip() == "t"
+    git("checkout", "-q", "-b", "side")
+    git("rm", "-q", "-r", "tests/deep")
+    new = tmp_path / "tests" / "test_new.py"
+    new.write_text("def test_b():\n    assert 2\n")
+    git("add", ".")
+    git("commit", "-q", "-m", "side")
+    assert dc.base_text(old, "master").startswith("def test_a")
+    assert dc.deleted_tests(new, "master") == [lane, old]
+    body = tmp_path / "body.md"
+    body.write_text("Nothing here.\n")
+    for files in ([new], [new, old]):
+        argv = ["--check", str(body), "--base", "master", *map(str, files)]
+        assert dc.main(argv) == 1
+        out = capsys.readouterr().out
+        assert sorted(
+            line.split(" is gone")[0].split(": ")[1]
+            for line in out.splitlines()
+            if " is gone" in line
+        ) == ["TestC", "test_a", "test_z"]
+    body.write_text("test_a, test_z and TestC are covered by test_b.\n")
+    assert dc.main(["--check", str(body), "--base", "master", str(new)]) == 0
+    git("mv", "tests/test_keep.py", "tests/test_kept.py")
+    git("commit", "-q", "-m", "a pure rename")
+    assert dc.deleted_tests(new, "master") == [lane, old, keep]
+    missing = tmp_path / "tests" / "test_never.py"
+    for argv in (
+        ["--check", str(body), str(old)],
+        ["--check", str(body), "--base", "master", str(missing)],
+    ):
+        with pytest.raises(SystemExit):
+            dc.main(argv)
+    assert "no such file" in capsys.readouterr().err
