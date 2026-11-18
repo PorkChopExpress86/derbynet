@@ -193,29 +193,28 @@ class Placeholders(unittest.TestCase):
                 self.assertEqual(TOOL.placeholders(text), ['line 1: LOOP-OUTPUT'])
 
     def test_code_names_and_inline_code_pass(self):
-        # A name joined by _ that the tree holds is a code name: the #408
-        # review found VIEW_RACE_RESULTS (a permission in server/). From
-        # merged bodies: #355's OUTPUT_CURL, #185's MAX_RUNS_PER_LANE, #333's
-        # HEAD_SHA. Each is looked up in this checkout by git grep.
+        # A name joined by _ that server/ or testing/ assigns is a code name:
+        # the #408 review found VIEW_RACE_RESULTS (a permission in server/).
+        # From merged bodies: #355's OUTPUT_CURL, #185's MAX_RUNS_PER_LANE,
+        # #333's HEAD_SHA. Each is looked up in this checkout by git grep.
         body = ('OUTPUT_CURL and MAX_RUNS_PER_LANE, VIEW_RACE_RESULTS_PERMISSION, HEAD_SHA,\n'
                 'The VIEW_RACE_RESULTS permission, see "VIEW_RACE_RESULTS".\n'
                 'HAS_RESULT, RENDER_RACER_RESULTS, PURGE_RESULTS, ROUND_TABLE, DEFAULT_OUTPUT,\n'
                 'TIMER_TEST_RESULT ok, `HANDOFF_RUNS` in code,\n'
                 '`X-RESULT` in code, $LOOP_OUTPUT, ${HANDOFF-RUNS}, path/LOOP-OUTPUT,\n'
                 'LOOP-OUTPUTS, TABLE, OUTPUT, LOOP-OUTPUT.txt, LOOP-OUTPUT/x, DRY-RUN,\n'
-                '$X-OUTPUT, x.X-OUTPUT, a-X-OUTPUT, LOOP-OUTPUT-FILE\n')
+                '$X-OUTPUT, x.X-OUTPUT, a-X-OUTPUT, LOOP-OUTPUT-FILE, a_X_OUTPUT, x.X_OUTPUT\n')
         self.assertEqual(TOOL.placeholders(body), [])
 
     def test_406s_handoff_runs_is_found_in_the_real_tree(self):
-        # #406's draft and #399's held HANDOFF_RUNS; no tracked file but
-        # this tool and this test names it.
+        # #406's draft and #399's held HANDOFF_RUNS; no file under server/
+        # or testing/ assigns it.
         body = 'The hand-off ran HANDOFF_RUNS at the head.\nVIEW_RACE_RESULTS stays.\n'
         self.assertEqual(TOOL.placeholders(body), ['line 1: HANDOFF_RUNS'])
 
     def test_each_joined_placeholder_from_the_drafts_is_found(self):
-        # Every _ token of that shape in the saved drafts that the tree
-        # lacks, from #399's, #407's and retro-65's, and each word of
-        # SUFFIXES.
+        # Tokens from #399's, #407's and retro-65's drafts, one or more for
+        # each word of SUFFIXES.
         tokens = ('HANDOFF_RUNS', 'HANDOFF_RESULTS', 'CLAIMS_TABLE', 'HEAD_PENDING',
                   'LISTED_RESULT', 'LOAD_RUN_PENDING', 'LOAD_RUN_RESULT', 'MUTANT_TABLE',
                   'MUTATIONS_PENDING', 'MUTATION_RESULT', 'PROBE_PENDING', 'NOTES_TBD',
@@ -224,30 +223,30 @@ class Placeholders(unittest.TestCase):
         for token in tokens:
             for text in (f'| R13 | none | ({token}). |', f'**{token}**', f'{token}:'):
                 with self.subTest(text=text):
-                    self.assertEqual(TOOL.placeholders(text, names=lambda t: set()),
+                    self.assertEqual(TOOL.placeholders(text, defined=lambda t: set()),
                                      [f'line 1: {token}'])
 
     def test_a_joined_token_the_tree_names_passes_and_one_it_lacks_is_kept(self):
         asked = []
 
-        def names(tokens):
+        def defined(tokens):
             asked.append(tokens)
             return {'HAS_RESULT'}
 
         body = 'HAS_RESULT and LOOP_OUTPUT, then LOOP-OUTPUT.\nMAX_RUNS_PER_LANE, $X_OUTPUT\n'
-        self.assertEqual(TOOL.placeholders(body, names=names),
+        self.assertEqual(TOOL.placeholders(body, defined=defined),
                          ['line 1: LOOP_OUTPUT', 'line 1: LOOP-OUTPUT'])
         self.assertEqual(asked, [{'HAS_RESULT', 'LOOP_OUTPUT'}])
 
-    def test_in_tree_reads_the_checkout_without_a_hooks_git_dir(self):
+    def test_defined_names_reads_the_checkout_without_a_hooks_git_dir(self):
         # Under a pre-push hook GIT_DIR names the main clone's git folder;
-        # in_tree drops it and reads its own checkout.
+        # defined_names drops it and reads its own checkout.
         with tempfile.TemporaryDirectory() as tmp, \
                 unittest.mock.patch.dict(os.environ, {'GIT_DIR': str(Path(tmp) / 'nowhere')}):
-            self.assertEqual(TOOL.in_tree({'VIEW_RACE_RESULTS', 'HANDOFF_RUNS'}),
+            self.assertEqual(TOOL.defined_names({'VIEW_RACE_RESULTS', 'HANDOFF_RUNS'}),
                              {'VIEW_RACE_RESULTS'})
 
-    def test_in_tree_keeps_the_environment_but_git_s_own(self):
+    def test_defined_names_keeps_the_environment_but_git_s_own(self):
         # git keeps PATH and HOME (its config) and loses only GIT_*.
         seen = []
 
@@ -257,22 +256,22 @@ class Placeholders(unittest.TestCase):
 
         with unittest.mock.patch.dict(os.environ, {'GIT_DIR': '/nowhere', 'HOME': '/home/x'}), \
                 unittest.mock.patch.object(TOOL.subprocess, 'run', run):
-            TOOL.in_tree({'HANDOFF_RUNS'})
+            TOOL.defined_names({'HANDOFF_RUNS'})
         self.assertEqual(seen[0]['HOME'], '/home/x')
         self.assertNotIn('GIT_DIR', seen[0])
 
-    def test_in_tree_with_no_match_is_empty(self):
+    def test_defined_names_with_no_match_is_empty(self):
         # git grep exits 1 when it finds none of the tokens.
-        self.assertEqual(TOOL.in_tree({'HANDOFF_RUNS'}), set())
+        self.assertEqual(TOOL.defined_names({'HANDOFF_RUNS'}), set())
 
-    def test_in_tree_runs_no_git_for_no_tokens(self):
+    def test_defined_names_runs_no_git_for_no_tokens(self):
         with unittest.mock.patch.object(TOOL.subprocess, 'run', side_effect=AssertionError):
-            self.assertEqual(TOOL.in_tree(set()), set())
+            self.assertEqual(TOOL.defined_names(set()), set())
 
     def test_a_tree_git_cannot_read_exits_with_its_message(self):
         with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(TOOL, 'ROOT', tmp):
             with self.assertRaises(SystemExit) as stop:
-                TOOL.in_tree({'HANDOFF_RUNS'})
+                TOOL.defined_names({'HANDOFF_RUNS'})
         self.assertIn('pr-evidence: git grep could not read the tree', str(stop.exception))
 
     def test_the_shapes_it_leaves_out(self):
@@ -282,6 +281,75 @@ class Placeholders(unittest.TestCase):
                      '(paste output here)', 'Loop-Output', 'loop-output'):
             with self.subTest(text=text):
                 self.assertEqual(TOOL.placeholders(text), [])
+
+
+class DefinedNames(unittest.TestCase):
+    """defined_names against a small repository, since the rule is which
+    files and which lines count."""
+
+    FILES = {
+        'plan/README.md': '| `bin/x` | HANDOFF_RUNS |\nHANDOFF_RUNS = 1\n',
+        'plan/bin/tool': 'PLAN_ONLY_RESULT = 1\n',
+        'server/vendor.js': 'var LOG_TABLE = [];\n',
+        'server/notes.md': 'EXP_TABLE is a table\n',
+        'server/a.py': (
+            'TIMER_TEST_RESULT = re.compile("tt")\n'
+            'class Purge:\n'
+            '    PURGE_RESULTS = 90\n'
+            '# COMMENT_RESULT = 1\n'
+            '    SAME_RESULT == 1\n'
+            'x = INLINE_RESULT = 2\n'
+            'def f(): return DEF_OUTPUT\n'
+        ),
+        'testing/c.sh': 'export OUTPUT_CURL=/x\nreadonly HEAD_SHA=\nCI_OUTPUT=$(x)\n',
+    }
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name) / 'repo'
+        # Under a hook GIT_DIR names another repository.
+        patched = unittest.mock.patch.dict(os.environ, {'GIT_DIR': str(Path(tmp.name) / 'hook.git')})
+        patched.start()
+        self.addCleanup(patched.stop)
+        for name, text in self.FILES.items():
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / name).write_text(text)
+        env = dict(os.environ)
+        del env['GIT_DIR']
+        for argv in (['init', '-q'], ['add', '.']):
+            subprocess.run(['git', '-C', str(self.root), *argv], check=True, env=env)
+
+    def defined(self, *tokens):
+        with unittest.mock.patch.object(TOOL, 'ROOT', str(self.root)):
+            return TOOL.defined_names(set(tokens))
+
+    def test_a_name_a_file_under_server_or_testing_assigns_is_defined(self):
+        names = ('TIMER_TEST_RESULT', 'PURGE_RESULTS', 'OUTPUT_CURL', 'HEAD_SHA', 'CI_OUTPUT')
+        self.assertEqual(self.defined(*names), set(names))
+
+    def test_a_name_only_a_longer_name_is_assigned_as_is_not_defined(self):
+        # TEST_RESULT ends TIMER_TEST_RESULT, PURGE_RESULT starts
+        # PURGE_RESULTS, and OUTPUT_CUR starts OUTPUT_CURL.
+        self.assertEqual(self.defined('TEST_RESULT', 'PURGE_RESULT', 'OUTPUT_CUR'), set())
+
+    def test_a_name_only_plan_mentions_or_assigns_is_not_defined(self):
+        # plan/README.md quotes HANDOFF_RUNS, as a row once did.
+        self.assertEqual(self.defined('HANDOFF_RUNS', 'PLAN_ONLY_RESULT'), set())
+
+    def test_a_mention_that_is_no_assignment_is_not_defined(self):
+        # Prose, a comment, a comparison, a use, a name `x = NAME = 2`
+        # assigns second, and a name JavaScript declares with `var`.
+        names = ('EXP_TABLE', 'COMMENT_RESULT', 'SAME_RESULT', 'DEF_OUTPUT',
+                 'INLINE_RESULT', 'LOG_TABLE')
+        self.assertEqual(self.defined(*names), set())
+
+    def test_a_placeholder_these_files_do_not_assign_is_refused_end_to_end(self):
+        body = 'HANDOFF_RUNS, TEST_RESULT, TIMER_TEST_RESULT, PURGE_RESULTS, LOG_TABLE\n'
+        with unittest.mock.patch.object(TOOL, 'ROOT', str(self.root)):
+            found = TOOL.placeholders(body)
+        self.assertEqual(found, ['line 1: HANDOFF_RUNS', 'line 1: TEST_RESULT',
+                                 'line 1: LOG_TABLE'])
 
 
 class CheckRefuses(IssueStandIn, unittest.TestCase):

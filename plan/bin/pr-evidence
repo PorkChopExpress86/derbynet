@@ -21,9 +21,16 @@ for, though the checklist was drafted, until the lead found it (#61 retro).
 capitalised token joined by -, such as LOOP-OUTPUT, that ends in a word of
 SUFFIXES. #399's draft held LOOP-OUTPUT where its text said "all 25 pass",
 and this check passed it (#399 retro). A token joined by _ of that shape is
-one too unless a tracked file other than this tool and its test holds it as
-a word, since code names such as VIEW_RACE_RESULTS share the shape: #406's
-draft held HANDOFF_RUNS, as #399's had, and review found it (#406 retro).
+one too unless a file under server/ or testing/ assigns it (`NAME = ...`,
+`NAME=...`, an enum member), since code names such as VIEW_RACE_RESULTS share
+the shape: #406's draft held HANDOFF_RUNS, as #399's had, and review found it
+(#406 retro). A mention in prose, a README, a comment, a string or plan/ does
+not excuse a token, since #406's review found LOG_TABLE, EXP_TABLE and
+NO_MORE_RESULTS passing on a vendored script and a timer profile, and a plan
+README row once passed HANDOFF_RUNS. The limit left: an assignment of the same
+name anywhere under server/ or testing/ excuses a placeholder written to look
+like it, and a name PHP, Java or JavaScript defines is refused until it is put
+in inline code.
 
 Exits 1 on a key the body gives no evidence for, on a placeholder, or when
 the issue cannot be read.
@@ -52,15 +59,17 @@ PLACEHOLDER = re.compile(
     r"(?![A-Za-z0-9/-]|\.\w)"
 )
 # The same shape joined by _, as #399's and #406's drafts wrote
-# HANDOFF_RUNS. It counts only when no tracked file names it (in_tree).
+# HANDOFF_RUNS. It counts only when no file under CODE_DIRS assigns it
+# (defined_names).
 JOINED = re.compile(
     rf"(?<![A-Za-z0-9$/._-])(?<!\$\{{)[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_(?:{'|'.join(SUFFIXES)})"
     r"(?![A-Za-z0-9_/-]|\.\w)"
 )
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# This tool and its test name the drafts' placeholders as examples.
-OWN_FILES = ("plan/bin/pr-evidence", "plan/tests/test_pr_evidence.py")
+# Where a code name is assigned. plan/ is left out: it holds this tool, its
+# test and the README rows and notes that quote the drafts' placeholders.
+CODE_DIRS = ("server", "testing")
 
 
 def fold(text: str) -> str:
@@ -136,34 +145,35 @@ def has_evidence(key: str, outside: list[str], still_open: list[str]) -> bool:
     return any(item.startswith(k.rstrip(".!?")) for item in still_open)
 
 
-def in_tree(tokens: set[str]) -> set[str]:
-    """The tokens a tracked file of this checkout holds as a word, leaving
-    out OWN_FILES. Git runs without the GIT_* variables a hook sets."""
+def defined_names(tokens: set[str]) -> set[str]:
+    """The tokens a file under CODE_DIRS of this checkout assigns: a line
+    that starts `NAME = x`, `NAME=x` or `export NAME=x`, with no second `=`
+    after it. Git runs without the GIT_* variables a hook sets."""
     if not tokens:
         return set()
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    patterns = [arg for token in sorted(tokens) for arg in ("-e", token)]
-    excluded = [f":(exclude){path}" for path in OWN_FILES]
+    names = "|".join(sorted(tokens))
+    pattern = f"^[[:blank:]]*((export|readonly)[[:blank:]]+)?({names})[[:blank:]]*=([^=]|$)"
     done = subprocess.run(
-        ["git", "-C", ROOT, "grep", "-ohwF", *patterns, "--", ".", *excluded],
+        ["git", "-C", ROOT, "grep", "-ohE", pattern, "--", *CODE_DIRS],
         capture_output=True,
         text=True,
         env=env,
     )
     if done.returncode not in (0, 1):
         sys.exit(f"pr-evidence: git grep could not read the tree:\n{done.stderr.strip()}")
-    return set(done.stdout.split()) & tokens
+    return {line.split("=")[0].split()[-1] for line in done.stdout.splitlines()}
 
 
-def placeholders(body: str, names=in_tree) -> list[str]:
+def placeholders(body: str, defined=defined_names) -> list[str]:
     """Each unfilled placeholder, as `line N: TOKEN`: a token joined by -,
-    or one joined by _ that `names` does not find in the tree."""
+    or one joined by _ that `defined` does not find assigned in the tree."""
     found = []
     for n, line in enumerate(body.splitlines(), 1):
         bare = INLINE_CODE.sub("", line)
         found += [(n, m.start(), m[0]) for m in PLACEHOLDER.finditer(bare)]
         found += [(n, m.start(), m[0]) for m in JOINED.finditer(bare)]
-    code_names = names({token for _n, _at, token in found if "_" in token})
+    code_names = defined({token for _n, _at, token in found if "_" in token})
     return [f"line {n}: {token}" for n, _at, token in sorted(found) if token not in code_names]
 
 
