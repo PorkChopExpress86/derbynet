@@ -11,6 +11,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import k_patterns  # noqa: F401  a -k that matches no test is refused
@@ -192,19 +193,87 @@ class Placeholders(unittest.TestCase):
                 self.assertEqual(TOOL.placeholders(text), ['line 1: LOOP-OUTPUT'])
 
     def test_code_names_and_inline_code_pass(self):
-        # A name joined by _ is a code name, even where a draft used the
-        # shape: the #408 review found VIEW_RACE_RESULTS (a permission in
-        # server/), and the #399 drafts held HANDOFF_RUNS. From merged
-        # bodies: #355's OUTPUT_CURL, #185's MAX_RUNS_PER_LANE, #333's
-        # HEAD_SHA.
+        # A name joined by _ that the tree holds is a code name: the #408
+        # review found VIEW_RACE_RESULTS (a permission in server/). From
+        # merged bodies: #355's OUTPUT_CURL, #185's MAX_RUNS_PER_LANE, #333's
+        # HEAD_SHA. Each is looked up in this checkout by git grep.
         body = ('OUTPUT_CURL and MAX_RUNS_PER_LANE, VIEW_RACE_RESULTS_PERMISSION, HEAD_SHA,\n'
                 'The VIEW_RACE_RESULTS permission, see "VIEW_RACE_RESULTS".\n'
                 'HAS_RESULT, RENDER_RACER_RESULTS, PURGE_RESULTS, ROUND_TABLE, DEFAULT_OUTPUT,\n'
-                'TIMER_TEST_RESULT ok, OUTPUT_PENDING, HANDOFF_RUNS, LISTED_RESULT, NOTES_TBD,\n'
+                'TIMER_TEST_RESULT ok, `HANDOFF_RUNS` in code,\n'
                 '`X-RESULT` in code, $LOOP_OUTPUT, ${HANDOFF-RUNS}, path/LOOP-OUTPUT,\n'
                 'LOOP-OUTPUTS, TABLE, OUTPUT, LOOP-OUTPUT.txt, LOOP-OUTPUT/x, DRY-RUN,\n'
                 '$X-OUTPUT, x.X-OUTPUT, a-X-OUTPUT, LOOP-OUTPUT-FILE\n')
         self.assertEqual(TOOL.placeholders(body), [])
+
+    def test_406s_handoff_runs_is_found_in_the_real_tree(self):
+        # #406's draft and #399's held HANDOFF_RUNS; no tracked file but
+        # this tool and this test names it.
+        body = 'The hand-off ran HANDOFF_RUNS at the head.\nVIEW_RACE_RESULTS stays.\n'
+        self.assertEqual(TOOL.placeholders(body), ['line 1: HANDOFF_RUNS'])
+
+    def test_each_joined_placeholder_from_the_drafts_is_found(self):
+        # Every _ token of that shape in the saved drafts that the tree
+        # lacks, from #399's, #407's and retro-65's, and each word of
+        # SUFFIXES.
+        tokens = ('HANDOFF_RUNS', 'HANDOFF_RESULTS', 'CLAIMS_TABLE', 'HEAD_PENDING',
+                  'LISTED_RESULT', 'LOAD_RUN_PENDING', 'LOAD_RUN_RESULT', 'MUTANT_TABLE',
+                  'MUTATIONS_PENDING', 'MUTATION_RESULT', 'PROBE_PENDING', 'NOTES_TBD',
+                  'X_OUTPUT', 'HANDOFF_TODO')
+        self.assertEqual({t.rsplit('_', 1)[1] for t in tokens}, set(TOOL.SUFFIXES))
+        for token in tokens:
+            for text in (f'| R13 | none | ({token}). |', f'**{token}**', f'{token}:'):
+                with self.subTest(text=text):
+                    self.assertEqual(TOOL.placeholders(text, names=lambda t: set()),
+                                     [f'line 1: {token}'])
+
+    def test_a_joined_token_the_tree_names_passes_and_one_it_lacks_is_kept(self):
+        asked = []
+
+        def names(tokens):
+            asked.append(tokens)
+            return {'HAS_RESULT'}
+
+        body = 'HAS_RESULT and LOOP_OUTPUT, then LOOP-OUTPUT.\nMAX_RUNS_PER_LANE, $X_OUTPUT\n'
+        self.assertEqual(TOOL.placeholders(body, names=names),
+                         ['line 1: LOOP_OUTPUT', 'line 1: LOOP-OUTPUT'])
+        self.assertEqual(asked, [{'HAS_RESULT', 'LOOP_OUTPUT'}])
+
+    def test_in_tree_reads_the_checkout_without_a_hooks_git_dir(self):
+        # Under a pre-push hook GIT_DIR names the main clone's git folder;
+        # in_tree drops it and reads its own checkout.
+        with tempfile.TemporaryDirectory() as tmp, \
+                unittest.mock.patch.dict(os.environ, {'GIT_DIR': str(Path(tmp) / 'nowhere')}):
+            self.assertEqual(TOOL.in_tree({'VIEW_RACE_RESULTS', 'HANDOFF_RUNS'}),
+                             {'VIEW_RACE_RESULTS'})
+
+    def test_in_tree_keeps_the_environment_but_git_s_own(self):
+        # git keeps PATH and HOME (its config) and loses only GIT_*.
+        seen = []
+
+        def run(argv, **kwargs):
+            seen.append(kwargs['env'])
+            return subprocess.CompletedProcess(argv, 1, '', '')
+
+        with unittest.mock.patch.dict(os.environ, {'GIT_DIR': '/nowhere', 'HOME': '/home/x'}), \
+                unittest.mock.patch.object(TOOL.subprocess, 'run', run):
+            TOOL.in_tree({'HANDOFF_RUNS'})
+        self.assertEqual(seen[0]['HOME'], '/home/x')
+        self.assertNotIn('GIT_DIR', seen[0])
+
+    def test_in_tree_with_no_match_is_empty(self):
+        # git grep exits 1 when it finds none of the tokens.
+        self.assertEqual(TOOL.in_tree({'HANDOFF_RUNS'}), set())
+
+    def test_in_tree_runs_no_git_for_no_tokens(self):
+        with unittest.mock.patch.object(TOOL.subprocess, 'run', side_effect=AssertionError):
+            self.assertEqual(TOOL.in_tree(set()), set())
+
+    def test_a_tree_git_cannot_read_exits_with_its_message(self):
+        with tempfile.TemporaryDirectory() as tmp, unittest.mock.patch.object(TOOL, 'ROOT', tmp):
+            with self.assertRaises(SystemExit) as stop:
+                TOOL.in_tree({'HANDOFF_RUNS'})
+        self.assertIn('pr-evidence: git grep could not read the tree', str(stop.exception))
 
     def test_the_shapes_it_leaves_out(self):
         # The #408 review's probes the rule does not take: a placeholder that
@@ -221,6 +290,14 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:],
                          ['unfilled placeholder, line 17: LOOP-OUTPUT'])
+
+    def test_406s_joined_placeholder_is_refused(self):
+        body = evidence(KEYS) + '\n## Hand-off\n\nHANDOFF_RUNS\n'
+        line = body.splitlines().index('HANDOFF_RUNS') + 1
+        done = self.check(body)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:],
+                         [f'unfilled placeholder, line {line}: HANDOFF_RUNS'])
 
     def test_the_draft_with_its_output_filled_in_passes(self):
         # Its "Closes #399." above its "## Still open" passes: the lead
