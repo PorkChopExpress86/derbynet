@@ -316,6 +316,28 @@ def test_a_command_that_ended_before_the_check_still_gets_its_pid(tmp_path):
     assert (tmp_path / "run.log").read_text().splitlines()[-1] == "detach.sh: exit 0"
 
 
+def test_a_header_line_written_after_the_start_form_returns_is_still_read(
+    tmp_path,
+):
+    """A copy whose `--run` shell holds its `cgroup` line until `go` exists:
+    the start form has returned with that line not yet in the log, and
+    `logged()` still reads it once it comes (#412)."""
+    args_line = '  echo "args $*"\n'
+    copy = copy_with(
+        tmp_path,
+        args_line,
+        args_line + "  for _ in $(seq 300); do [ -e go ] && break; sleep 0.1; done\n",
+    )
+    try:
+        started = detach(tmp_path, "true", script=copy)
+        assert started.returncode == 0, started
+        lines = (tmp_path / "run.log").read_text().splitlines()
+        assert not [x for x in lines if x.startswith("cgroup ")], lines
+    finally:
+        release(tmp_path)
+    assert logged(tmp_path, "cgroup").startswith("/")
+
+
 def test_a_log_that_exists_is_refused_and_left_as_it_is(tmp_path):
     (tmp_path / "run.log").write_text("detach.sh: exit 0\n")
     refused = detach(tmp_path, "touch", "ran")
