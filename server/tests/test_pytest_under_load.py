@@ -12,12 +12,38 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "pytest-under-load.sh"
+
+# The prefix each test starts a script through: it puts TERM, INT and HUP,
+# the signals the scripts trap, back to their default, with the two Python
+# ignores (PIPE, XFSZ), then execs the command in the same pid.  A
+# non-interactive bash gives a command it starts with `&` SIGINT ignored, as
+# pytest-under-load.sh and hold-load-lock.sh start theirs, so a pytest under
+# either ignored SIGINT, and so did the scripts it started; bash cannot trap
+# a signal ignored when it starts, so an INT never reached their traps (#407,
+# test_an_int_reaches_the_trap_though_pytest_ignores_it).
+DEFAULT_NAMES = ("SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ")
+DEFAULT_SIGNALS = (
+    sys.executable,
+    "-c",
+    "import os, signal, sys\n"
+    f"for name in {DEFAULT_NAMES!r}:\n"
+    "    signal.signal(getattr(signal, name), signal.SIG_DFL)\n"
+    "os.execvp(sys.argv[1], sys.argv[1:])\n",
+)
+
+
+def ignored(pid):
+    """The names of the signals `pid` ignores, from its SigIgn mask."""
+    status = Path(f"/proc/{pid}/status").read_text()
+    mask = int(re.search(r"^SigIgn:\s*([0-9a-f]+)$", status, re.M).group(1), 16)
+    return {s.name for s in signal.Signals if mask >> (s.value - 1) & 1}
 
 
 def run(
@@ -135,6 +161,7 @@ def start(
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
         [
+            *DEFAULT_SIGNALS,
             *under,
             str(script),
             "--loops",
@@ -553,7 +580,7 @@ def hold(
     env = {**os.environ, "DERBYNET_LOAD_LOCK": str(lock), **(extra_env or {})}
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
-        [str(script), "bash", "-c", command],
+        [*DEFAULT_SIGNALS, str(script), "bash", "-c", command],
         stdout=out,
         stderr=subprocess.STDOUT,
         cwd=folder,
@@ -735,15 +762,36 @@ def held_lock(tmp_path):
     return lock, held
 
 
-def start_waiting(tmp_path, script, lock, extra_env=None, copy=None):
+def start_waiting(tmp_path, script, lock, extra_env=None, copy=None, under=()):
     """`script`, or `copy`, a copy of it, started on `lock`, which the test
-    holds, once it waits in flock: (the run, its flock's pid)."""
+    holds, once it waits in flock: (the run, its flock's pid); `under` is
+    start()'s, for pytest-under-load.sh.  A run that
+    ends first, such as one refused under `timeout`, fails at once with the
+    script's output: #59's runs under a `timeout 300` read "no flock under it
+    within 30 s" (#407)."""
     path = copy or script
     if script == SCRIPT:
-        run = start(tmp_path, "waiter", lock, extra_env=extra_env, go=True, script=path)
+        run = start(
+            tmp_path, "waiter", lock, extra_env, go=True, under=under, script=path
+        )
     else:
         run = hold(tmp_path, lock, name="waiter", extra_env=extra_env, script=path)
-    wait_until(lambda: "flock" in children(run.pid), "flock under it", 30)
+    out = tmp_path / "waiter.out"
+    # Its flock once it has printed "Waiting": before that, the flock under
+    # it may be the `flock -n` that found the lock held.
+    wait_until(
+        lambda: (
+            run.poll() is not None
+            or ("Waiting for" in out.read_text() and "flock" in children(run.pid))
+        ),
+        "flock under it",
+        30,
+    )
+    if run.returncode is not None:
+        raise AssertionError(
+            f"the run exited {run.returncode} before its flock; the script"
+            f" printed:\n{out.read_text()}"
+        )
     # The run is the script asked for.
     assert str(path) in Path(f"/proc/{run.pid}/cmdline").read_text()
     return run, {name: pid for pid, name in child_pids(run.pid)}["flock"]
@@ -865,6 +913,77 @@ def test_a_signal_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script, 
         os.close(held)
         kill_all([waiter])
         finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_an_int_reaches_the_trap_though_pytest_ignores_it(tmp_path, script):
+    """A pytest that a non-interactive shell started with `&`, as
+    pytest-under-load.sh and hold-load-lock.sh start theirs, ignores SIGINT;
+    the scripts it started ignored it too, and an INT left each waiting
+    until the test's 30 s wait ran out (#407)."""
+    before = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        assert "SIGINT" in ignored(os.getpid())
+        lock, held = held_lock(tmp_path)
+        run, waiter = start_waiting(tmp_path, script, lock)
+    finally:
+        signal.signal(signal.SIGINT, before)
+    try:
+        # DEFAULT_SIGNALS left it none of its five ignored, Python's own PIPE
+        # and XFSZ included.
+        five = {"SIGTERM", "SIGINT", "SIGHUP", "SIGPIPE", "SIGXFSZ"}
+        assert not ignored(run.pid) & five, ignored(run.pid)
+        os.kill(run.pid, signal.SIGINT)
+        assert run.wait(timeout=30) == 143
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+# A stand-in flock(1) whose `flock -n` holds for 2 s before it runs the real
+# one, so a flock under the run is the one that found the lock held.
+SLOW_FLOCK_N = """#! /bin/sh
+[ "$1" = -n ] && sleep 2
+exec {flock} "$@"
+"""
+
+
+@SCRIPTS
+def test_the_flock_it_returns_is_the_one_that_waits(tmp_path, script):
+    """Before the run prints "Waiting", the flock under it may be the
+    `flock -n` that found the lock held, here held 2 s by SLOW_FLOCK_N;
+    start_waiting returns the `flock -x 9` that waits (#407)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "flock").write_text(SLOW_FLOCK_N.format(flock=shutil.which("flock")))
+    (bin_dir / "flock").chmod(0o755)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, extra_env=env)
+    try:
+        argv = Path(f"/proc/{waiter}/cmdline").read_bytes().split(b"\0")
+        assert b"-n" not in argv and b"-x" in argv, argv
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+def test_a_run_refused_before_its_flock_is_named_at_once(tmp_path):
+    """Under `timeout` the script refuses before its flock, and the wait for
+    that flock says so at once: #59's runs under a `timeout 300` waited 30 s
+    each and read "no flock under it within 30 s" (#407)."""
+    lock, held = held_lock(tmp_path)
+    began = time.monotonic()
+    try:
+        with pytest.raises(AssertionError, match="it runs under timeout") as error:
+            start_waiting(tmp_path, SCRIPT, lock, under=("timeout", "300"))
+        assert "exited 2 before its flock" in str(error.value)
+        assert time.monotonic() - began < 30
+    finally:
+        os.close(held)
 
 
 @pytest.mark.parametrize(
@@ -1286,7 +1405,15 @@ def start_held_rerun(tmp_path):
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     with open(tmp_path / "held.out", "w") as out:
         run = subprocess.Popen(
-            [str(SCRIPT), "--loops", "2", "-p", "no:cacheprovider", str(folder)],
+            [
+                *DEFAULT_SIGNALS,
+                str(SCRIPT),
+                "--loops",
+                "2",
+                "-p",
+                "no:cacheprovider",
+                str(folder),
+            ],
             stdout=out,
             stderr=subprocess.STDOUT,
             cwd=tmp_path,
