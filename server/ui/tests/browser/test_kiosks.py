@@ -543,15 +543,14 @@ STRETCH_THE_BOUND = """() => {
   Alpine.$data(document.querySelector('[data-kiosk-dashboard]')).pressBound = 3600000;
 }"""
 
-# The Preview link's click, recorded at the window and cancelled there, as
-# the last listener before the browser follows the link: whether the link
-# was still in the page, and where it leads.
+# The Preview link's click, recorded at the window, the last listener
+# before the browser follows the link: whether the link was still in the
+# page, and where it leads.
 FOLLOWED = """() => window.addEventListener('click', (e) => {
   const link = e.target.closest('a[data-action="preview"]');
   if (!link) return;
   const connected = link.isConnected;
   window.boardLog.push({what: 'followed', connected, href: link.href});
-  e.preventDefault();
 })"""
 
 PAGE_BUTTON = '#kiosk-board [data-kiosk="tv"] button[data-action="page"]'
@@ -687,10 +686,10 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
     brings none, and the sheet is open, so the held board is dropped: the
     board swaps with the next poll after the sheet closes, and the focus
     goes back to Page, which nothing replaced (#344 review). The Preview
-    link's navigation is cancelled at the window, the last listener before
-    the browser follows the link, which records that the link was still in
-    the page then: the harness cannot track a popup's navigation request
-    (`InFlight.navigated` reads its frame, which Playwright refuses)."""
+    link opens the kiosk's page in a tab of its own, and the window's last
+    click listener records that the link was still in the page then (#378:
+    the harness tracks the popup's navigation request while the board's
+    frames navigate)."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     racing = scene(event, "Racing")
@@ -708,8 +707,9 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
         with page.expect_response(lambda r: "/kiosks/page/" in r.url and r.ok):
             page.mouse.up()
     else:
-        page.mouse.up()
-        page.wait_for_function("window.boardLog.some((r) => r.what === 'followed')")
+        with page.context.expect_page() as opened:
+            page.mouse.up()
+        preview = opened.value
     log = board_log(page)
     down = after(log, "down")
     click = after(log, "click", down)
@@ -741,7 +741,9 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
         followed = log[after(log, "followed", click)]
         assert followed["connected"], log
         assert "/kiosk.php?page=" in followed["href"], log
+        expect(preview).to_have_url(followed["href"])
         wait_for_a_swap_after(page, click)
+        close_tab(page, preview)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
     polls.end()
 
