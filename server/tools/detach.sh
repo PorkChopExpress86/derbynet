@@ -84,6 +84,8 @@ session_of() {
 # Returns 0 when PID leads its own session as this script's `--run` shell
 # (/proc/PID/stat's session field is PID and its comm is this script's
 # name), 1 when no process has that pid, and 2 when another process has it.
+# comm keeps only the first 15 characters of a longer name
+# (tests/test_detach.py's long-named copy).
 me=${0##*/}
 me=${me:0:15}
 leader_state() {

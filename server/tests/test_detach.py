@@ -44,15 +44,41 @@ def env(tmp_path):
     return {**clean, MARK: str(tmp_path)}
 
 
-def detach(tmp_path, *command, script=SCRIPT):
+def detach(tmp_path, *command, script=SCRIPT, path=None):
     return subprocess.run(
         [str(script), str(tmp_path / "run.log"), *command],
         capture_output=True,
         text=True,
         cwd=tmp_path,
-        env=env(tmp_path),
+        env=env(tmp_path) | ({"PATH": path} if path else {}),
         timeout=30,
     )
+
+
+def start_line(leader, where, log):
+    """The line the start form prints, as its header gives it: the session,
+    where it runs, and the commands that wait on it and stop it."""
+    return (
+        f"session {leader}{where}: wait with `{SCRIPT} --wait {log}`;"
+        f" stop it with `kill -TERM -- -{leader}`\n"
+    )
+
+
+def logged(tmp_path, key):
+    """The value of the log's `key` header line."""
+    lines = (tmp_path / "run.log").read_text().splitlines()
+    return next(x for x in lines if x.startswith(f"{key} ")).removeprefix(f"{key} ")
+
+
+def stubs(tmp_path, **scripts):
+    """A PATH whose first folder holds each named stub, ahead of the real
+    one."""
+    folder = tmp_path / "stubs"
+    folder.mkdir()
+    for name, body in scripts.items():
+        (folder / name).write_text(f"#!/bin/sh\n{body}\n")
+        (folder / name).chmod(0o755)
+    return f"{folder}:{os.environ['PATH']}"
 
 
 def wait(tmp_path, seconds="0"):
@@ -375,14 +401,76 @@ def test_under_job_control_the_pid_setsid_leaves_in_bang_is_gone_and_its_is_not(
         release(tmp_path)
 
 
-def user_systemd():
-    return (
-        shutil.which("systemd-run")
-        and subprocess.run(
-            ["systemctl", "--user", "show-environment"], capture_output=True
-        ).returncode
-        == 0
+NO_MANAGER = (
+    "detach.sh: no user systemd manager: COMMAND stops with this shell's"
+    " scope, as in a Claude Code restart.\n"
+)
+
+
+def test_with_no_user_manager_it_says_so_and_names_no_scope(tmp_path):
+    """CI's runners have no user systemd manager, so `systemctl --user`
+    fails there; a stub that fails stands in for it. The script says so,
+    names no scope on its start line, and COMMAND runs in the starter's own
+    cgroup."""
+    started = detach(
+        tmp_path, "bash", "-c", HELD, path=stubs(tmp_path, systemctl="exit 1")
     )
+    try:
+        leader = session(started)
+        assert (started.returncode, started.stdout, started.stderr) == (
+            0,
+            start_line(leader, ", with no scope of its own", tmp_path / "run.log"),
+            NO_MANAGER,
+        )
+        own = Path("/proc/self/cgroup").read_text().strip().split(":", 2)[2]
+        assert logged(tmp_path, "cgroup") == own
+    finally:
+        release(tmp_path)
+    ended = wait(tmp_path, "20")
+    assert (ended.returncode, ended.stdout) == (0, "ended: exit 0\n")
+
+
+def test_a_copy_under_a_longer_name_still_finds_its_session(tmp_path):
+    """comm holds the first 15 characters of a longer name, and the start
+    form's check compares that much of the script's name."""
+    copy = tmp_path / "detach-under-a-long-name.sh"
+    copy.write_text(SCRIPT.read_text())
+    copy.chmod(0o755)
+    try:
+        started = detach(tmp_path, "bash", "-c", HELD, script=copy)
+        assert started.returncode == 0, started
+        comm = Path(f"/proc/{session(started)}/comm").read_text()
+    finally:
+        release(tmp_path)
+    assert comm == copy.name[:15] + "\n"
+
+
+def user_systemd(timeout=10):
+    """Whether a user systemd manager answers within `timeout` seconds. A
+    bus that hangs reads as none, since this runs as the file is collected,
+    in every server pytest run."""
+    if not shutil.which("systemd-run"):
+        return False
+    try:
+        answer = subprocess.run(
+            ["systemctl", "--user", "show-environment"],
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return False
+    return answer.returncode == 0
+
+
+def test_a_user_bus_that_hangs_reads_as_no_manager(tmp_path, monkeypatch):
+    """The stub systemctl outlasts the bound and would then exit 0, so only
+    the timeout makes the answer False, and well before the stub ends."""
+    monkeypatch.setenv(
+        "PATH", stubs(tmp_path, systemctl="exec sleep 20", **{"systemd-run": ""})
+    )
+    began = time.monotonic()
+    assert user_systemd(timeout=0.5) is False
+    assert time.monotonic() - began < 10
 
 
 @pytest.mark.skipif(not user_systemd(), reason="no user systemd manager")
@@ -404,7 +492,8 @@ def test_a_command_outlives_the_scope_of_the_shell_that_started_it(tmp_path):
             f"--unit={unit}",
             "bash",
             "-c",
-            f"'{SCRIPT}' run.log bash -c '{HELD}' > started; exec sleep 30",
+            f"'{SCRIPT}' run.log bash -c '{HELD}' > started 2> started.err;"
+            " exec sleep 30",
         ],
         cwd=tmp_path,
         env=env(tmp_path),
@@ -421,8 +510,14 @@ def test_a_command_outlives_the_scope_of_the_shell_that_started_it(tmp_path):
         assert cgroup.endswith(f"/{unit}"), cgroup
         subprocess.run(["systemctl", "--user", "stop", unit], check=True, timeout=30)
         assert starter.wait(timeout=20) != 0
-        header = (tmp_path / "run.log").read_text().splitlines()[4]
-        assert re.fullmatch(r"cgroup /.*/derbynet-detach-\d+-\d+\.scope", header)
+        cgroup = logged(tmp_path, "cgroup")
+        assert re.fullmatch(r"/.*/derbynet-detach-\d+-\d+\.scope", cgroup), cgroup
+        # The start line names the unit COMMAND runs in, with no word on
+        # stderr.
+        assert (tmp_path / "started").read_text() == start_line(
+            leader, f" in {cgroup.rsplit('/', 1)[1]}", "run.log"
+        )
+        assert (tmp_path / "started.err").read_text() == ""
         assert wait(tmp_path).stdout == f"running: session {leader}\n"
     finally:
         release(tmp_path)
