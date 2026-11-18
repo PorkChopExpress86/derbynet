@@ -1228,8 +1228,9 @@ def join(tmp_path, script, name, lock, extra_env=None, copy=None):
         run = start(tmp_path, name, lock, extra_env, go=True, script=path)
     else:
         run = hold(tmp_path, lock, ORDER_HAND_OFF, name, extra_env, path)
-    # The run is the script asked for.
-    assert str(path) in Path(f"/proc/{run.pid}/cmdline").read_text()
+    # The run is the script asked for: read from its arguments, since its
+    # cmdline is empty while it execs.
+    assert str(path) in run.args, run.args
     return run
 
 
