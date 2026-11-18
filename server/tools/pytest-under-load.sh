@@ -3,7 +3,8 @@
 # Runs pytest while busy loops load the CPU, the way a flaky browser test is
 # reproduced and a fix proved, and a changed browser test repeated (25 for a
 # flake or a timing test, 5 per font for a deterministic one: owner,
-# 2026-11-11, server/README.md "Browser tests").  It keeps every result:
+# 2026-11-11, server/README.md "Browser tests"; a kiosk file's repeats
+# run in the default font only, D133).  It keeps every result:
 # pytest's whole output goes to a log file and its results to a junit file,
 # with no pipe and no time limit,
 # so a long run is never cut short or filtered.  It stops only the loops it
