@@ -22,8 +22,9 @@ A click, tap or check on a control a toast overlaps, or comes within
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap. When the
 test body returns, the harness stops every tab's timers, closes the other
-tabs, stops the page's fetch and XMLHttpRequest requests, and waits for
-every request still in flight before any fixture tears down (#45 and
+tabs, stops the page's fetch and XMLHttpRequest requests, blocks every
+other request the page sends after that, and waits for every request still
+in flight before any fixture tears down (#45 and
 #53 retros), so a late reply or a late poll never meets a flushed database
 or `settings` already put back. Close a second tab with
 `close_tab(page, tab)`: a tab closed with a request out fails the test.
@@ -462,7 +463,7 @@ def _sent_by(request):
 # seconds (#347). Under the fake clock only its own ids are cleared: the
 # native ones include the clock's own timer. `window.__pwClock` is the
 # global Playwright 1.64's clock sets, private to Playwright and no API. A
-# native timer set before `page.clock.install()` so keeps running; in the
+# native timer set before `page.clock.install()` keeps running; in the
 # settle, STOP_SENDING stops its fetches
 # (`test_the_settle_stops_a_poll_set_before_the_fake_clock`). The fake
 # `clearTimeout` throws on a pending animation frame's id, which shares the
@@ -479,22 +480,16 @@ STOP_TIMERS = """() => {
   for (let id = Math.max(first + SPAN + 1, last - SPAN); id <= last; id++) stop(id);
 }"""
 
-# Makes every later `fetch` a promise that never settles, so no handler of
-# the page runs, and every later XMLHttpRequest send nothing, so no callback
-# of the page sends again: with a URL, it first fetches that URL, in the
-# same task. The stub keeps the real `fetch`, so a second stop of the same
-# page (a test's own `_settle`, then the harness's) still sends its URL.
-# A source the timer clear leaves running then starts no request after the
-# drain: a reply handled after the stop that queues htmx's next request or
-# chains a fetch, an animation-frame loop
-# (`test_a_reply_handled_after_the_stop_starts_no_request`), a native timer
-# under the fake clock. Images, scripts and WebSockets still load; a timer
-# that starts one is cleared by STOP_TIMERS
-# (`test_the_settle_stops_a_timer_that_loads_images`).
+# Makes every later `fetch` a promise that never settles and every later
+# XMLHttpRequest send nothing, so no callback of the page sends again: with
+# a URL, it first fetches that URL, in the same task (as #424 has it). A
+# reply handled after the stop that queues htmx's next request or chains a
+# fetch, an animation-frame loop, a native timer under the fake clock then
+# starts no request, and no handler of theirs runs on a failure
+# (`test_a_reply_handled_after_the_stop_starts_no_request`).
 STOP_SENDING = """(barrier) => {
-  const send = window.fetch.unstopped ?? window.fetch;
-  if (barrier) send(barrier).catch(() => {});
-  window.fetch = Object.assign(() => new Promise(() => {}), { unstopped: send });
+  if (barrier) fetch(barrier).catch(() => {});
+  window.fetch = () => new Promise(() => {});
   XMLHttpRequest.prototype.send = function () {};
 }"""
 
@@ -510,9 +505,12 @@ def stop_timers(tab):
 
 
 def stop_sending(tab):
-    """Stop every frame of `tab` sending fetch and XMLHttpRequest requests;
-    the barrier's stop runs again in the main frame (`_barrier`)."""
+    """Stop every frame of `tab` but the main frame sending fetch and
+    XMLHttpRequest requests; the main frame's stop sends the barrier
+    (`_barrier`)."""
     for frame in tab.frames:
+        if frame == tab.main_frame:
+            continue
         try:
             frame.evaluate(STOP_SENDING, None)
         except Exception:  # noqa: BLE001, S110 - a detached frame sends nothing
@@ -558,9 +556,41 @@ def _barrier(page):
         page.unroute(f"**{SETTLE_BARRIER}")
 
 
+# Playwright's failure texts for a request `block_sending` blocked: by its
+# URL block, and a navigation's by its Fetch block.
+BLOCKED = ("inspector", "net::ERR_BLOCKED_BY_CLIENT")
+
+
+def block_sending(page):
+    """Make Chromium block every later request of `page`, for the rest of
+    its life: an image, a beacon, a frame made after STOP_SENDING, and a
+    navigation, whose own request only the Fetch block stops
+    (`test_the_settle_blocks_what_the_stops_leave`). The block ends with its
+    CDP session (#409, PR #424), so the session stays open on the page and
+    closes with its context. A blocked request fails at once, so every new
+    document and frame gets STOP_SENDING first: a fetch of theirs never
+    fails into a handler that would send again. A page that loads an
+    image again on its error would spin, the block failing each load at
+    once; no script under `ui/static/ui/` sets an image's `onerror`."""
+    page.add_init_script(f"({STOP_SENDING})(null)")
+    blocker = page.context.new_cdp_session(page)
+    blocker.send("Network.enable")
+    blocker.send("Network.setBlockedURLs", {"urls": ["*"]})
+    blocker.on(
+        "Fetch.requestPaused",
+        lambda paused: blocker.send(
+            "Fetch.failRequest",
+            {"requestId": paused["requestId"], "errorReason": "BlockedByClient"},
+        ),
+    )
+    blocker.send("Fetch.enable", {"patterns": [{"resourceType": "Document"}]})
+    page.blocker = blocker
+
+
 def _settle(page) -> list[str]:
     """Stop every tab's polls, close the other tabs, stop the page's fetch
-    and XMLHttpRequest requests, and drain what is out.
+    and XMLHttpRequest requests, block the rest, and drain what is out. A
+    second settle of the page only drains.
     A page that polls more often than the drain's 50 ms check, such as the
     replay page's 250 ms `replay.message`, could otherwise start a request
     after the drain that met the database flush (a Postgres deadlock, #53).
@@ -570,9 +600,11 @@ def _settle(page) -> list[str]:
     for tab in page.context.pages:
         if tab != page:
             close_tab(page, tab)
-    stop_timers(page)
-    stop_sending(page)
-    _barrier(page)
+    if not getattr(page, "blocker", None):
+        stop_timers(page)
+        stop_sending(page)
+        _barrier(page)
+        block_sending(page)
     return page.in_flight.drain(page)
 
 
@@ -648,12 +680,13 @@ def page(browser, live_server, size, page_errors):
             and page_errors.console_error(msg.text, msg.location.get("url", ""))
         ),
     )
-    page.on(
-        "requestfailed",
-        lambda request: page_errors.add(
-            f"request failed: {request.url} {request.failure}"
-        ),
-    )
+
+    def request_failed(request):
+        if request.failure in BLOCKED and getattr(page, "blocker", None):
+            return
+        page_errors.add(f"request failed: {request.url} {request.failure}")
+
+    page.on("requestfailed", request_failed)
 
     def static_status(response):
         if "/static/" in response.url and response.status >= 400:
