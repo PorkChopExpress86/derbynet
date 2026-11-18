@@ -192,6 +192,16 @@ jobs:
           lscpu
           echo "nproc: $(nproc)"
           mapfile -t args < <(python3 -I -c 'import json, os; print("\n".join(json.loads(os.environ["ARGS"])))')
+          # A head from before D122 (2026-11-16) has no --flake-ticket, and
+          # no rerun for it to turn off.
+          if ! grep -q -- '--flake-ticket)' tools/pytest-under-load.sh; then
+            kept=()
+            for a in "${args[@]}"; do [ "$a" = --flake-ticket ] || kept+=("$a"); done
+            if [ "${#kept[@]}" != "${#args[@]}" ]; then
+              echo "This head's pytest-under-load.sh has no --flake-ticket (D122): left out."
+            fi
+            args=("${kept[@]}")
+          fi
           if [ -n "$FONT" ]; then export DERBYNET_BROWSER_FONT="$FONT"; fi
           out="$RUNNER_TEMP/out"
           mkdir -p "$out"

@@ -103,8 +103,16 @@ class Plan(unittest.TestCase):
                          per_shard=1, trial_count=2)
         self.assertEqual([c['count'] for c in plan['commands']], [2, 2, 2])
         self.assertEqual([s['count'] for s in plan['shards']], [1] * 6)
-        self.assertEqual(plan['shards'][0]['args'][4:6], ['--count', '1'])
+        self.assertEqual(plan['shards'][0]['args'],
+                         ['-m', 'browser', '-n', '4', '--count', '1',
+                          'ui/tests/browser/test_kiosks.py'])
         self.assertEqual(plan['shards'][4]['args'], ['-m', 'browser', 'x.py', '--count', '1'])
+
+    def test_a_command_with_no_count_runs_once_in_one_shard(self):
+        plan = TOOL.plan('  tools/pytest-under-load.sh -m browser x.py\n')
+        self.assertEqual([c['count'] for c in plan['commands']], [1])
+        self.assertEqual([(s['count'], s['args']) for s in plan['shards']],
+                         [(1, ['-m', 'browser', 'x.py'])])
 
     def test_a_prose_mention_or_a_quoted_command_is_no_load_command(self):
         text = ('Run tools/pytest-under-load.sh in the background\n'
@@ -147,6 +155,9 @@ class Summary(unittest.TestCase):
         self.assertEqual(text.count('| total | 25 | | 1200 | 0 | 0 | 0 |'), 2)
         self.assertIn('Result: passed', text)
         self.assertIn('until the owner amends D85', text)
+        self.assertNotIn('No load command', text)
+        self.assertIn('Count 25, font default (Noto Sans, as the laptop).', text)
+        self.assertIn('Count 25, font DejaVu Sans.', text)
 
     def test_one_failing_shard_fails_the_run(self):
         self.all_pass()
