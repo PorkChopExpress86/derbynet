@@ -112,12 +112,14 @@ def test_holds():
 """
 
 
-def start(tmp_path, name, lock, extra_env=None, go=False, loops=1, under=()):
-    """The script on a stub of its own in `tmp_path/name`, in a session of
-    its own so the test can kill all it started, with its output in
-    `tmp_path/name.out` (a file, as run_in_background gives it). With `go`
-    its stub passes at once; `under` is a command it runs under, such as
-    `timeout`."""
+def start(
+    tmp_path, name, lock, extra_env=None, go=False, loops=1, under=(), script=SCRIPT
+):
+    """The script (or `script`, a copy of it) on a stub of its own in
+    `tmp_path/name`, in a session of its own so the test can kill all it
+    started, with its output in `tmp_path/name.out` (a file, as
+    run_in_background gives it). With `go` its stub passes at once; `under`
+    is a command it runs under, such as `timeout`."""
     folder = tmp_path / name
     folder.mkdir()
     (folder / f"test_{name}.py").write_text(HOLD)
@@ -134,7 +136,7 @@ def start(tmp_path, name, lock, extra_env=None, go=False, loops=1, under=()):
     run = subprocess.Popen(
         [
             *under,
-            str(SCRIPT),
+            str(script),
             "--loops",
             str(loops),
             "-p",
@@ -538,17 +540,20 @@ HAND_OFF = (
 )
 
 
-def hold(tmp_path, lock, command=HAND_OFF, name="handoff", extra_env=None):
-    """tools/hold-load-lock.sh running `command` through bash in
-    `tmp_path/name`, in a session of its own, with its output in
-    `tmp_path/name.out`, and `extra_env` added to its environment."""
+def hold(
+    tmp_path, lock, command=HAND_OFF, name="handoff", extra_env=None, script=HOLD_LOCK
+):
+    """tools/hold-load-lock.sh (or `script`, a copy of it) running
+    `command` through bash in `tmp_path/name`, in a session of its own,
+    with its output in `tmp_path/name.out`, and `extra_env` added to its
+    environment."""
     folder = tmp_path / name
     folder.mkdir()
     out = open(tmp_path / f"{name}.out", "w")
     env = {**os.environ, "DERBYNET_LOAD_LOCK": str(lock), **(extra_env or {})}
     env.pop("DERBYNET_LOAD_LOCK_HELD", None)
     run = subprocess.Popen(
-        [str(HOLD_LOCK), "bash", "-c", command],
+        [str(script), "bash", "-c", command],
         stdout=out,
         stderr=subprocess.STDOUT,
         cwd=folder,
@@ -719,6 +724,273 @@ def test_a_sigkill_frees_the_lock_though_the_hand_off_s_command_lives_on(tmp_pat
         assert all(alive(p) for p in group)
     finally:
         kill_all(group)
+
+
+def held_lock(tmp_path):
+    """The test's own lock, held by the test: (its path, the held fd)."""
+    lock = tmp_path / "load.lock"
+    lock.write_text("pid 1, since then\n")
+    held = os.open(lock, os.O_RDONLY)
+    fcntl.flock(held, fcntl.LOCK_EX)
+    return lock, held
+
+
+def start_waiting(tmp_path, script, lock, extra_env=None, copy=None):
+    """`script`, or `copy`, a copy of it, started on `lock`, which the test
+    holds, once it waits in flock: (the run, its flock's pid)."""
+    path = copy or script
+    if script == SCRIPT:
+        run = start(tmp_path, "waiter", lock, extra_env=extra_env, go=True, script=path)
+    else:
+        run = hold(tmp_path, lock, name="waiter", extra_env=extra_env, script=path)
+    wait_until(lambda: "flock" in children(run.pid), "flock under it", 30)
+    # The run is the script asked for.
+    assert str(path) in Path(f"/proc/{run.pid}/cmdline").read_text()
+    return run, {name: pid for pid, name in child_pids(run.pid)}["flock"]
+
+
+SCRIPTS = pytest.mark.parametrize("script", [SCRIPT, HOLD_LOCK], ids=lambda p: p.name)
+
+# A `kill` read through BASH_ENV that logs each call's arguments into
+# PAUSE_DIR/kills, then kills as the builtin does.
+LOGGED_KILL = """kill() {
+  echo "$*" >> "$PAUSE_DIR/kills"
+  builtin kill "$@"
+}
+"""
+
+# LOGGED_KILL, and a `pause_at NAME` that writes `at-NAME` into PAUSE_DIR
+# and waits there, for at most 30 s, until the test writes `go-NAME`.
+PAUSE_AT = (
+    LOGGED_KILL
+    + """pause_at() {
+  : > "$PAUSE_DIR/at-$1"
+  for _ in $(seq 300); do [ -e "$PAUSE_DIR/go-$1" ] && break; sleep 0.1; done
+}
+"""
+)
+
+
+def logged_kill(tmp_path):
+    """The environment that gives a script LOGGED_KILL and PAUSE_AT's
+    pause_at, writing into `tmp_path`."""
+    (tmp_path / "hooks.sh").write_text(PAUSE_AT)
+    return {"BASH_ENV": str(tmp_path / "hooks.sh"), "PAUSE_DIR": str(tmp_path)}
+
+
+def kill_calls(tmp_path):
+    """The arguments of each kill LOGGED_KILL logged, a line each."""
+    kills = tmp_path / "kills"
+    return kills.read_text().splitlines() if kills.exists() else []
+
+
+def kill_args(tmp_path):
+    """Every argument of the kills LOGGED_KILL logged, in one list."""
+    return " ".join(kill_calls(tmp_path)).split()
+
+
+def paused_copy(tmp_path, script, after, name):
+    """A copy of `script` in `tmp_path/tools` that runs `pause_at NAME`
+    right after its one line `after` (a regex the whole line matches)."""
+    lines = script.read_text().splitlines(keepends=True)
+    at = [i for i, line in enumerate(lines) if re.fullmatch(after, line.rstrip("\n"))]
+    assert len(at) == 1, at
+    lines.insert(at[0] + 1, f"  pause_at {name}\n")
+    copy = tmp_path / "tools" / script.name
+    copy.parent.mkdir(exist_ok=True)
+    copy.write_text("".join(lines))
+    copy.chmod(0o755)
+    return copy
+
+
+def signal_at_the_pause(tmp_path, run, name):
+    """TERM to `run` once it waits in `pause_at NAME`, then let it go on."""
+    wait_until((tmp_path / f"at-{name}").exists, f"the pause at {name}", 30)
+    os.kill(run.pid, signal.SIGTERM)
+    (tmp_path / f"go-{name}").write_text("")
+
+
+@SCRIPTS
+def test_a_signal_as_it_starts_its_flock_stops_that_flock(tmp_path, script):
+    """A TERM right after `flock -x 9 &`, before its pid is kept, held there
+    by pause_at: the flock was left waiting (#391 review)."""
+    copy = paused_copy(tmp_path, script, r"  flock -x 9 &", "forked")
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
+    try:
+        signal_at_the_pause(tmp_path, run, "forked")
+        status = run.wait(timeout=30)
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        assert status == 143
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_a_signal_as_its_wait_ends_signals_no_ended_flock(tmp_path, script):
+    """A TERM right after the wait for the flock returns, held there by
+    pause_at: that flock has exited, and its pid may be another process's,
+    so the cleanup signals none (#391 review)."""
+    copy = paused_copy(tmp_path, script, r"  wait .*", "waited")
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
+    try:
+        os.close(held)
+        held = None
+        signal_at_the_pause(tmp_path, run, "waited")
+        assert run.wait(timeout=30) == 143
+        assert str(waiter) not in kill_args(tmp_path)
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, run)
+
+
+@pytest.mark.parametrize("sig", ["TERM", "INT", "HUP"])
+@SCRIPTS
+def test_a_signal_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script, sig):
+    """#372's implementer stopped a queued run of each script with TERM,
+    and each left its `flock -x 9` waiting on the lock (#391); INT and HUP
+    reach the same trap."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock)
+    try:
+        os.kill(run.pid, getattr(signal, f"SIG{sig}"))
+        status = run.wait(timeout=30)
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        assert status == 143
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+@pytest.mark.parametrize(
+    "signals", [("TERM", "TERM"), ("TERM", "INT")], ids=["TERM-TERM", "TERM-INT"]
+)
+@SCRIPTS
+def test_a_second_signal_while_it_stops_its_wait_still_stops_its_flock(
+    tmp_path, script, signals
+):
+    """plan/AGENT-BRIEF.md: a second signal during the cleanup, held inside
+    it by PAUSED_KILL, here at the kill of the waiting flock (#391)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, paused_kill(tmp_path))
+    try:
+        second_signal_inside_the_cleanup(tmp_path, run.pid, signals)
+        status = run.wait(timeout=30)
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        assert status == 143
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_a_flock_that_ends_without_the_lock_ends_the_run(tmp_path, script):
+    """The wait's status is the flock's: a flock killed before it takes
+    the lock fails the script, which writes no holder lines and runs no
+    command. Its cleanup then signals no flock: the one it waited on has
+    ended, and its pid may be another process's (#391 review)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path))
+    try:
+        os.kill(waiter, signal.SIGTERM)
+        assert run.wait(timeout=30) == 143
+        assert lock.read_text() == "pid 1, since then\n"
+        assert not (tmp_path / "waiter" / "started").exists()
+        assert str(waiter) not in kill_args(tmp_path)
+    finally:
+        os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_a_run_that_took_the_lock_never_signals_its_ended_flock(tmp_path, script):
+    """Its cleanup kills the waiting flock only while it waits: once that
+    flock has exited, its pid may be another process's (#391)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path))
+    try:
+        os.close(held)
+        held = None
+        (tmp_path / "waiter" / "go").write_text("")
+        assert run.wait(timeout=90) == 0
+        assert str(waiter) not in kill_args(tmp_path)
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, run)
+
+
+@pytest.mark.parametrize("waits", [False, True], ids=["free", "after-a-wait"])
+@SCRIPTS
+def test_a_signal_after_it_took_the_lock_kills_each_child_once(tmp_path, script, waits):
+    """Its cleanup stops the wait's flock only during the wait, though
+    WAITING comes set from its environment, on a free lock or after a wait:
+    once it holds the lock, the cleanup kills each child it started once,
+    from its own list (#391)."""
+    env = {**logged_kill(tmp_path), "WAITING": "1"}
+    lock = tmp_path / "load.lock"
+    held = None
+    if waits:
+        lock, held = held_lock(tmp_path)
+    if script == SCRIPT:
+        run = start(tmp_path, "first", lock, env)
+    else:
+        run = hold(tmp_path, lock, extra_env=env)
+    try:
+        if waits:
+            wait_until(lambda: "flock" in children(run.pid), "flock under it", 30)
+            os.close(held)
+            held = None
+        if script == SCRIPT:
+            wait_started(tmp_path, "first")
+            # Its loop and its pytest.
+            expected = sorted(str(pid) for pid, _ in child_pids(run.pid))
+            assert len(expected) == 2
+        else:
+            wait_until(
+                (tmp_path / "handoff" / "started").exists, "the hand-off's command"
+            )
+            [(command, _)] = child_pids(run.pid)
+            expected = [f"-TERM -- -{command}"]
+        os.kill(run.pid, signal.SIGTERM)
+        assert run.wait(timeout=30) == 143
+        assert sorted(kill_calls(tmp_path)) == expected
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, run)
+
+
+@SCRIPTS
+def test_after_a_sigkill_while_it_waits_the_next_run_takes_the_lock(tmp_path, script):
+    """A SIGKILL skips the trap, so its flock lives on and waits; once the
+    lock frees, that flock takes it and exits, and the next run starts
+    (plan/AGENT-BRIEF.md: a SIGKILL followed by the next run)."""
+    lock, held = held_lock(tmp_path)
+    run, waiter = start_waiting(tmp_path, script, lock)
+    following = None
+    try:
+        os.kill(run.pid, signal.SIGKILL)
+        run.wait(timeout=10)
+        assert alive(waiter)
+        os.close(held)
+        held = None
+        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        following = start(tmp_path, "next", lock)
+        wait_started(tmp_path, "next")
+        assert "Waiting" not in (tmp_path / "next.out").read_text()
+    finally:
+        if held is not None:
+            os.close(held)
+        kill_all([waiter])
+        finish(tmp_path, run, *([following] if following else []))
 
 
 # A stand-in journalctl: it records its arguments and prints three veth
