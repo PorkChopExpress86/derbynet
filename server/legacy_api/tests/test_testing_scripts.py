@@ -238,9 +238,12 @@ def ci_script_names(workflows: Path, testing: Path) -> set[str]:
     }
     todo = sorted(names)
     while todo:
+        path = testing / todo.pop()
+        if not path.is_file():
+            continue
         called = {
             found[1]
-            for line in code_lines(testing / todo.pop())
+            for line in code_lines(path)
             for found in [*CALLED.finditer(line), *STEP.finditer(line)]
         }
         todo += sorted(called - names)
@@ -254,8 +257,9 @@ def ci_scripts() -> list[Path]:
 
 
 # A variable named for a bound: a length in seconds or milliseconds, a
-# timeout, a delay, or how long before something happens (DUMP_AFTER).
-BOUND_NAME = r"\w*(?:TIMEOUT\w*|SECONDS|_MS|AFTER|DELAY)"
+# timeout, a delay, or how long before something happens (DUMP_AFTER). Not
+# bash's own SECONDS.
+BOUND_NAME = r"(?:\w*TIMEOUT\w*|\w+(?:SECONDS|_MS|AFTER|DELAY))"
 # A bound set to a number, or to a default its caller may override, in
 # quotes or not, after export, local or readonly: `NAME=30`,
 # `NAME=${NAME:-30}`, `NAME=${NAME-30}`, `: ${NAME:=30}`.
@@ -274,7 +278,7 @@ AT_COMMAND = r"(?:^|[;&|({`!]|\b(?:do|then|else|if|while|until|exec|time)\s)\s*"
 # --connect-timeout or -m; its length a number, a variable ("$N", ${N:-3})
 # or a command's output ($(...)).
 WAIT = re.compile(
-    rf"(?:{AT_COMMAND}(?:sleep\s+|timeout\s+(?:-\S+\s+)*|read\s+(?:-\S+\s+)*?-t\s*)"
+    rf"(?:{AT_COMMAND}(?:sleep\s+|timeout\s+(?:-[ks]\s*\S+\s+|-\S+\s+)*|read\s+(?:-\S+\s+)*?-t\s*)"
     r"|\s--(?:max-time|connect-timeout)[\s=]+|\bcurl\b[^;|&]*?\s-m\s*)"
     r'(?P<length>"?(?:\$\{?\w+|\$\(|[0-9.]))'
 )
@@ -309,18 +313,18 @@ def blank_quotes(line: str) -> str:
     )
 
 
-def is_wait(code: str) -> bool:
+def is_wait(code: str, bounds: set[str]) -> bool:
     """Whether a line's code sets a bound, or waits for a length that is no
-    variable named for a bound. Such a variable (`--max-time $POLL_SECONDS`)
-    takes its source from the line that sets it, a bound this scan checks
-    where a script CI runs sets it."""
+    variable in `bounds`, the bounds the same script sets. Such a variable
+    (`--max-time $POLL_SECONDS`) takes its source from the line that sets
+    it, which this scan checks as a bound."""
     if BOUND.search(code):
         return True
     found = WAIT.search(blank_quotes(code))
     if not found:
         return False
     var = re.search(r"\$\{?(\w+)", found["length"])
-    return not (var and re.fullmatch(BOUND_NAME, var[1], re.IGNORECASE))
+    return not (var and var[1] in bounds)
 
 
 def unsourced_waits(text: str) -> list[tuple[int, str]]:
@@ -328,11 +332,16 @@ def unsourced_waits(text: str) -> list[tuple[int, str]]:
     no source: the comment on its line, the comment block right above it,
     or a comment in the three lines above it."""
     lines = text.splitlines()
+    bounds = {
+        bound["name"] or bound["name2"]
+        for line in lines
+        if (bound := BOUND.search(line))
+    }
     found = []
     for n, line in enumerate(lines):
         hash_at = re.search(r"(?:^|\s)#", blank_quotes(line))
         cut = hash_at.start() if hash_at else len(line)
-        if not is_wait(line[:cut]):
+        if not is_wait(line[:cut], bounds):
             continue
         notes = [line[cut:]]
         above = n - 1
@@ -379,6 +388,7 @@ def test_the_scan_follows_what_a_ci_script_runs(tmp_path):
     (workflows / "a.yml").write_text(
         "      run: |\n"
         "        bash testing/suite.sh http://x\n"
+        "        bash testing/docker/x.sh\n"
         "        # bash testing/commented.sh\n"
     )
     for name, text in {
@@ -397,6 +407,8 @@ def test_the_scan_follows_what_a_ci_script_runs(tmp_path):
         "one.sh",
         "two.sh",
         "three.sh",
+        # CI_RUN reads testing/docker/x.sh as "docker", no file to follow.
+        "docker",
     }
 
 
@@ -429,7 +441,7 @@ def test_a_wait_with_no_source_is_found():
         "# The scene switches 10 s after the round (playlist.inc:157).\n"
         'echo "Waiting..."\n'
         "sleep 11\n"
-        "curl --max-time $POLL_SECONDS -s $URL\n"
+        "curl --max-time $HEAT_SECONDS -s $URL\n"
         "# See #399.\n"
         "timeout -k 5 300 java -jar x.jar\n"
         "# Up to 5 s.\n"
@@ -465,7 +477,7 @@ def test_a_wait_with_no_source_is_found():
         ("timeout 5s cmd", True),
         ('echo "step #2"; sleep 1', True),
         ("echo ok; sleep 1", True),
-        ("until x; do sleep 2; done", True),
+        ("x; do sleep 2", True),
         ("x && sleep 1", True),
         ("x | timeout 5 y", True),
         ("(sleep 1)", True),
@@ -474,7 +486,7 @@ def test_a_wait_with_no_source_is_found():
         ("! timeout 5 x", True),
         ("X=$(timeout 5 y)", True),
         ("if timeout 5 x; then", True),
-        ("while sleep 1; do", True),
+        ("while sleep 1", True),
         ("then sleep 1", True),
         ("else sleep 1", True),
         ("exec timeout 5 x", True),
@@ -484,7 +496,8 @@ def test_a_wait_with_no_source_is_found():
         ("sleep $((N * 2))", True),
         ("curl --max-time=5 u", True),
         ("echo $#; sleep 1", True),
-        ("until timeout 5 x; do", True),
+        ("until timeout 5 x", True),
+        ("timeout -s KILL 5 x", True),
         ('sleep "${N}"', True),
         ("TIMEOUT_S=5", True),
         ("read -t 5 x", True),
@@ -498,10 +511,9 @@ def test_a_wait_with_no_source_is_found():
         (': "${NAME_SECONDS=30}"', True),
         ("NAME_SECONDS=${NAME_SECONDS-30}", True),
         ("DUMP_AFTER=${DUMP_AFTER:-30}", True),
-        # A variable named for a bound is sourced where it is set.
-        ("curl --max-time $POLL_SECONDS u", False),
-        ('sleep "$HEAT_DELAY"', False),
-        ("sleep ${HEAT_DELAY}", False),
+        # A variable named for a bound but set nowhere in the script.
+        ("curl --max-time $POLL_SECONDS u", True),
+        ('sleep "$HEAT_DELAY"', True),
         # No wait: text in quotes, a comment, a value that is no number.
         ('echo "sleep 1 minute"', False),
         ('grep -c "sleep 1" f', False),
@@ -514,6 +526,7 @@ def test_a_wait_with_no_source_is_found():
         ("echo sleep 1", False),
         ("LOG_AFTER=$(date)", False),
         ("LANES=${LANES:-4}", False),
+        ("SECONDS=0", False),
         ("# sleep 1", False),
         # Waits the rule leaves out.
         ("HEAT_LIMIT=30", False),
@@ -544,6 +557,17 @@ def test_where_a_waits_source_may_sit():
     assert unsourced_waits("# 5 s\nx\nsleep 1\n") == []
     assert unsourced_waits("sleep 1  # 5 s\n") == []
     assert unsourced_waits("sleep 1  # D85\n") == []
+    # A wait on a bound the script sets takes the bound's source; a variable
+    # set any other way needs its own.
+    assert (
+        unsourced_waits("# 10 s\nPOLL_SECONDS=10\ncurl --max-time $POLL_SECONDS u\n")
+        == []
+    )
+    assert unsourced_waits("# 5 s\nHEAT_DELAY=5\nsleep ${HEAT_DELAY}\n") == []
+    assert unsourced_waits("DELAY=$1\nsleep $DELAY\n") == [(2, "sleep $DELAY")]
+    assert unsourced_waits("HEAT_SECONDS=$((6 * 5))\nsleep $HEAT_SECONDS\n") == [
+        (2, "sleep $HEAT_SECONDS")
+    ]
     assert unsourced_waits("sleep 1  # wait\n") == [(1, "sleep 1  # wait")]
     assert unsourced_waits('echo "#5 s"; sleep 1\n') == [(1, 'echo "#5 s"; sleep 1')]
     # The block ends at the first line, not at the last one, read as -1.
