@@ -463,21 +463,15 @@ def _sent_by(request):
 # over ids 0 to SPAN the fake `clearTimeout` built an Error for each and took
 # seconds (#347). Under the fake clock only its own ids are cleared: the
 # native ones include the clock's own timer, and the tests install it
-# before the page loads (`pause_clock_at` refuses a loaded page). The fake `clearTimeout` throws on a pending
-# animation frame's id, so each clear is caught on its own (#347).
+# before the page loads (`pause_clock_at` refuses a loaded page). The fake
+# `clearTimeout` throws on a pending animation frame's id, which shares the
+# clock's ids, so each clear is caught on its own (#347).
 STOP_TIMERS = """(freeze) => {
   const SPAN = 100000;
-  const fake = Boolean(window.__pwClock);
-  const first = fake ? 1e12 : 0;
-  // The fake clock keeps animation frames in its timers' id range.
-  const clears = [
-    (id) => window.clearTimeout(id),
-    fake ? (id) => window.cancelAnimationFrame(id) : (id) => window.clearInterval(id),
-  ];
+  const first = window.__pwClock ? 1e12 : 0;
+  // clearTimeout clears an interval too.
   const stop = (id) => {
-    for (const clear of clears) {
-      try { clear(id); } catch {}
-    }
+    try { clearTimeout(id); } catch {}
   };
   const last = setTimeout(() => {});
   for (let id = first; id <= Math.min(last, first + SPAN); id++) stop(id);

@@ -235,7 +235,9 @@ def test_the_settle_on_a_fake_clock_takes_under_a_second(page, event):
     `clearTimeout`, which builds an Error for each id below its own, and
     blocked the renderer for seconds, during which a resumed fake clock ran
     on toward kiosk.js's give-up (#347). Under the fake clock it now
-    clears only the clock's own ids."""
+    clears only the clock's own ids. The slack is FAKE_CLOCK_SETTLE_S less
+    the settle's own time, which the PR body measures beside a should-pass
+    mutation that makes the stop late."""
     page.clock.install()
     page.route("**/held-request", answer_the_poll)
     page.goto("/login/")
@@ -268,7 +270,8 @@ def test_the_settle_stops_a_poll_set_after_a_pending_animation_frame(page, event
     assert sent == []
 
 
-def test_a_reply_handled_after_the_stop_queues_no_poll(page, event, monkeypatch):
+@pytest.mark.parametrize("queue", ["setTimeout", "setInterval"])
+def test_a_reply_handled_after_the_stop_queues_no_poll(page, event, monkeypatch, queue):
     """A poll whose reply lands after the stop queued its next turn on a
     new timer, and its request went out after the drain came back empty
     (#317's results-by-racer kiosk, #347). The settle now stops the page
@@ -278,10 +281,11 @@ def test_a_reply_handled_after_the_stop_queues_no_poll(page, event, monkeypatch)
     page.route("**/held-request", lambda route: held.append(route))
     page.goto("/login/")
     page.evaluate(
-        """() => {
-          const poll = () => fetch('/held-request').then(() => setTimeout(poll, 0));
+        """(queue) => {
+          const poll = () => fetch('/held-request').then(() => window[queue](poll, 10));
           poll();
-        }"""
+        }""",
+        queue,
     )
     wait_until(page, lambda: held, "the poll's request")
     stop = conftest.stop_timers
@@ -290,15 +294,14 @@ def test_a_reply_handled_after_the_stop_queues_no_poll(page, event, monkeypatch)
         stop(tab, **kwargs)
         held.pop().fulfill(status=204)
 
-    sent = []
-    page.on("request", lambda r: "held-request" in r.url and sent.append(r))
     with monkeypatch.context() as patch:
         patch.setattr(conftest, "stop_timers", stop_then_reply)
         patch.setattr(InFlight, "TIMEOUT_MS", 300)
         assert _settle(page) == []
     page.wait_for_timeout(500)
-    # One read after the wait: the point is that nothing more was sent.
-    assert (sent, held) == ([], [])
+    # One read after the wait: the point is that no poll was sent again,
+    # which the route would hold.
+    assert held == []
 
 
 # kiosk.css's font stack, and the name of the font Chromium draws it in.
