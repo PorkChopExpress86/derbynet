@@ -30,8 +30,11 @@ SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "detach.sh"
 # folder, so `ours()` can tell its sessions from any other process.
 MARK = "DERBYNET_DETACH_TEST"
 
-# Ends 0 once `go` exists beside it, or 1 after 30 s.
-RELEASE = "for _ in $(seq 300); do [ -e go ] && exit 0; sleep 0.1; done; exit 1"
+# Returns once `go` exists beside it, or after 30 s.
+HOLD = "for _ in $(seq 300); do [ -e go ] && break; sleep 0.1; done"
+
+# Ends 0 once `go` exists beside it, or 1 after the same 30 s.
+RELEASE = f"{HOLD}; [ -e go ] && exit 0; exit 1"
 
 # Writes its own session and process group ids to `ids`, whole, then waits
 # for `go`.
@@ -64,10 +67,18 @@ def start_line(leader, where, log):
     )
 
 
-def logged(tmp_path, key):
-    """The value of the log's `key` header line."""
-    lines = (tmp_path / "run.log").read_text().splitlines()
-    return next(x for x in lines if x.startswith(f"{key} ")).removeprefix(f"{key} ")
+def logged(tmp_path, key, seconds=10):
+    """The value of the log's `key` header line, once the `--run` shell has
+    written it. The start form returns as soon as the `session` line is
+    there, while the rest of the header may still be on its way: CI read
+    the log before its `cgroup` line once (#412)."""
+    log = tmp_path / "run.log"
+    lines = until(
+        lambda: [x for x in log.read_text().splitlines() if x.startswith(f"{key} ")],
+        seconds,
+        f"no `{key}` line in {log} after {seconds} s",
+    )
+    return lines[0].removeprefix(f"{key} ")
 
 
 def stubs(tmp_path, **scripts):
@@ -193,11 +204,14 @@ def release(tmp_path):
     (tmp_path / "go").touch()
 
 
-def until(predicate, seconds=10):
+def until(predicate, seconds=10, message=""):
+    """The first truthy value `predicate` returns, or a failure with `message`
+    after `seconds`."""
     deadline = time.monotonic() + seconds
-    while not predicate():
-        assert time.monotonic() < deadline
+    while not (value := predicate()):
+        assert time.monotonic() < deadline, message
         time.sleep(0.05)
+    return value
 
 
 def ids_written(tmp_path):
@@ -314,6 +328,41 @@ def test_a_command_that_ended_before_the_check_still_gets_its_pid(tmp_path):
     leader = session(started)
     assert not Path(f"/proc/{leader}").exists()
     assert (tmp_path / "run.log").read_text().splitlines()[-1] == "detach.sh: exit 0"
+
+
+def test_a_header_line_written_after_the_start_form_returns_is_still_read(
+    tmp_path,
+):
+    """A copy whose `--run` shell holds its `cgroup` line until `go` exists:
+    the start form has returned with that line not yet in the log, and
+    `logged()` still reads it once it comes (#412)."""
+    args_line = '  echo "args $*"\n'
+    copy = copy_with(
+        tmp_path,
+        args_line,
+        args_line + f"  {HOLD}\n",
+    )
+    try:
+        started = detach(tmp_path, "true", script=copy)
+        assert started.returncode == 0, started
+        lines = (tmp_path / "run.log").read_text().splitlines()
+        assert not [x for x in lines if x.startswith("cgroup ")], lines
+    finally:
+        release(tmp_path)
+    assert logged(tmp_path, "cgroup").startswith("/")
+    ended = wait(tmp_path, "20")
+    assert (ended.returncode, ended.stdout) == (0, "ended: exit 0\n")
+
+
+def test_a_header_line_that_never_comes_fails_naming_the_key_and_the_log(tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("session 1\n")
+    start = time.monotonic()
+    with pytest.raises(AssertionError) as failed:
+        logged(tmp_path, "cgroup", seconds=0.2)
+    assert time.monotonic() - start < 5, "gave up after its own `seconds`"
+    message = str(failed.value)
+    assert message.startswith(f"no `cgroup` line in {log} after 0.2 s"), message
 
 
 def test_a_log_that_exists_is_refused_and_left_as_it_is(tmp_path):
