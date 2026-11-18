@@ -1,5 +1,6 @@
 #!/bin/bash
-# Merges PR <number> only if every check on its current head passed, pinning the
+# Merges PR <number> only if every check on its current head passed and GitHub
+# rejected no workflow file there (plan/bin/rejected-workflows), pinning the
 # merge to that head SHA so a push after the check can't slip in. Then prints
 # each issue the PR closes with its state, and exits 1 if one is still open.
 #
@@ -159,6 +160,16 @@ not_passed=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,workflow,ev
 if [ -n "$not_passed" ]; then
   echo "not merging #$PR; checks on $head not passed:" >&2
   echo "$not_passed" >&2
+  exit 1
+fi
+# A workflow GitHub rejected shows no check on the PR (#59 retro).
+if ! rejected=$(GH="$GH" REPO="$REPO" "$(dirname "$0")/rejected-workflows" "$head"); then
+  echo "not merging #$PR; could not read the workflow runs on $head" >&2
+  exit 1
+fi
+if [ -n "$rejected" ]; then
+  echo "not merging #$PR; GitHub rejected a workflow file on $head, so no check of it shows on the PR:" >&2
+  echo "$rejected" >&2
   exit 1
 fi
 # The areas whose change on master since the merge base the PR's CI never saw:

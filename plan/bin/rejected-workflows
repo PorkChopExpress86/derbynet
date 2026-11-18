@@ -1,0 +1,44 @@
+#!/bin/bash
+# Prints one "rejected <workflow file> <run url>" line for each workflow GitHub
+# rejected on commit <sha>: a run that ended in failure with no job.  GitHub
+# makes such a run when it cannot read a workflow file, and since the run has
+# no job, no check of it shows on the PR, so `gh pr checks` lists nothing to
+# fail on.  #59's pi-images.yml put `${{ runner.temp }}` in a job's env;
+# run 44236545824 on ff00bbc6 failed in 0 s with no job, and pr-wait exited 0
+# on that head with every listed check passed (#59 retro).
+#
+# plan/bin/pr-wait and plan/bin/pr-merge fail on any line it prints.  It exits
+# 1 when gh cannot read the runs, so a caller never takes a failed read for
+# "nothing rejected".
+#
+# Usage: plan/bin/rejected-workflows <sha>
+set -euo pipefail
+SHA=${1:?usage: rejected-workflows <sha>}
+GH=${GH:-gh}
+REPO=${REPO:-PorkChopExpress86/derbynet}
+
+# Retried, so one dropped request does not read as a failure.
+api() {
+  local n
+  for n in 1 2 3; do
+    "$GH" api "$@" 2>/dev/null && return
+    sleep "${PR_WAIT_RETRY_SLEEP:-10}"
+  done
+  echo "rejected-workflows: gh could not read $1 after 3 tries" >&2
+  return 1
+}
+
+# A rejected file's run ends as `failure` (run 44236545824) or, by GitHub's
+# docs, as `startup_failure`.
+failed=$(api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+  --jq '.workflow_runs[]
+        | select(.status == "completed"
+                 and (.conclusion == "failure" or .conclusion == "startup_failure"))
+        | "\(.id) \(.path) \(.html_url)"')
+while read -r id path url; do
+  [ -n "$id" ] || continue
+  jobs=$(api "repos/$REPO/actions/runs/$id/jobs" --jq .total_count)
+  if [ "$jobs" = 0 ]; then
+    echo "rejected $path $url"
+  fi
+done <<<"$failed"
