@@ -49,6 +49,7 @@ GUIDES: tuple[str, ...] = (
     "database",
     "live-streaming",
     "photo-stand",
+    "pi-setup",
     "dev-timer-protocol",
     "dev-replay-protocol",
     "developer-guide",
