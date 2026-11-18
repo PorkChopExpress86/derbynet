@@ -395,9 +395,6 @@ class InFlight:
         self.requests = set()
         # Requests a tab still had out when it closed, as "METHOD URL".
         self.closed_with = []
-        # For a tab `close_tab` is closing, the requests it sent before
-        # Chromium blocked its requests.
-        self.sent_before_block = {}
         context.on("request", lambda r: self.requests.add(r))
         context.on("requestfinished", lambda r: self.requests.discard(r))
         context.on("requestfailed", lambda r: self.requests.discard(r))
@@ -415,13 +412,10 @@ class InFlight:
         """Playwright reports no end for the requests of a tab closed with
         them out (the camera tab's POST, PR #205's ui (postgres)), so they
         leave the set and the harness names them: close a tab with
-        `close_tab()`, which waits for them first. Of a tab `close_tab`
-        closed, only the requests sent before the block are named: the
-        others never left the browser."""
+        `close_tab()`, which waits for them first."""
         left = self.of(tab)
         self.requests -= left
-        named = left & self.sent_before_block.pop(tab, left)
-        self.closed_with += sorted(f"{r.method} {r.url}" for r in named)
+        self.closed_with += sorted(f"{r.method} {r.url}" for r in left)
 
     def navigated(self, frame):
         self.requests -= {
@@ -481,8 +475,8 @@ def close_tab(page, tab):
     (camera-signaling.js), and a reply's handler can send again. So
     Chromium then blocks every request the tab sends, and a fetch it blocks
     after that is the barrier: once Playwright reports its end, it has
-    reported every request sent before. Only those reach the server, so the
-    wait is for their replies (#409:
+    reported every request sent before. Only those reach the server; the
+    blocked ones end at once, so the wait is for the server's replies (#409:
     `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
     `test_close_tab_closes_a_tab_that_keeps_sending`)."""
     stop_timers(tab)
@@ -496,10 +490,8 @@ def close_tab(page, tab):
             timeout=InFlight.TIMEOUT_MS,
         ):
             tab.evaluate(f"() => {{ fetch('{SETTLE_BARRIER}').catch(() => {{}}); }}")
-    sent = page.in_flight.of(tab)
-    page.in_flight.sent_before_block[tab] = sent
     waited = 0
-    while waited < InFlight.TIMEOUT_MS and sent & page.in_flight.requests:
+    while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
         tab.wait_for_timeout(50)
         waited += 50
     tab.close()
