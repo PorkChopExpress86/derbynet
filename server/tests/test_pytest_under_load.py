@@ -1024,6 +1024,14 @@ def test_the_flock_it_returns_is_the_one_that_waits(tmp_path, script):
         finish(tmp_path, run)
 
 
+def test_start_waiting_starts_hold_load_lock_sh_under_nothing(tmp_path):
+    """start_waiting's `under` is for pytest-under-load.sh only: hold()
+    takes none, and it refuses one before it starts a run."""
+    with pytest.raises(AssertionError, match="under nothing"):
+        start_waiting(tmp_path, HOLD_LOCK, tmp_path / "load.lock", under=("nice",))
+    assert not (tmp_path / "waiter.out").exists()
+
+
 def test_a_run_refused_before_its_flock_is_named_at_once(tmp_path):
     """Under `timeout` the script refuses before its flock, and the wait for
     that flock says so at once: #59's runs under a `timeout 300` waited 30 s
