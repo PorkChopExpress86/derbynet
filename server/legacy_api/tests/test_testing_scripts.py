@@ -295,15 +295,14 @@ def test_the_scan_covers_the_scripts_ci_runs():
 @pytest.mark.parametrize("script", ci_scripts(), ids=lambda path: path.name)
 def test_every_wait_in_a_script_ci_runs_names_its_source(script):
     """A bound's comment says where its number comes from (AGENT-BRIEF's
-    Evidence rules). #399's review (round 1, finding 6) found DUMP_AFTER=30
-    with "after this long", and a `sleep 1` and a `sleep 2` with no comment,
-    in the script that gates CI's derby-timer.jar race."""
+    Evidence rules); #399's review sent back the waits the next test
+    holds."""
     assert unsourced_waits(script.read_text(encoding="utf-8")) == []
 
 
 def test_a_wait_with_no_source_is_found():
-    # The waits #399's review sent back, as 8726c4ef had them, and ones
-    # that pass beside them.
+    """The first lines are the waits #399's review sent back, as 8726c4ef
+    had them; the rest pass, but for a source comment too far above."""
     text = (
         "# HEAT_SECONDS bounds each heat: six times the 5 s a heat takes.\n"
         "HEAT_SECONDS=${HEAT_SECONDS:-30}\n"
@@ -322,6 +321,12 @@ def test_a_wait_with_no_source_is_found():
         "curl --max-time $POLL_SECONDS -s $URL\n"
         "# See #399.\n"
         "timeout -k 5 300 java -jar x.jar\n"
+        "# Up to 5 s.\n"
+        "for _ in $(seq 10); do\n"
+        "    test -e x && break\n"
+        "    true\n"
+        "    sleep 0.5\n"
+        "done\n"
     )
 
     assert unsourced_waits(text) == [
@@ -329,6 +334,7 @@ def test_a_wait_with_no_source_is_found():
         "7: sleep 1",
         "9: sleep 2",
         "10: curl --max-time 10 -s $URL",
+        "22: sleep 0.5",
     ]
 
 
@@ -336,10 +342,8 @@ def test_a_wait_with_no_source_is_found():
 def test_every_bound_a_caller_can_set_has_a_case(script):
     """Each `NAME=${NAME:-N}` bound is set by a case of the script's
     `-cases.sh` beside it, which runs the script with that bound and checks
-    how the run ends. #399's first two heads replaced one bound with two and
-    no case checked them until after the first push: the dump guard and the
-    missing-log path each failed when the cases first ran (#399 retro), and
-    review found that no bound was left for the whole round."""
+    how the run ends. #399's cases first ran after its first push, and the
+    dump guard and the missing-log path each failed there (#399 retro)."""
     assert uncased_bounds(script) == []
 
 

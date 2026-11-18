@@ -32,8 +32,8 @@ def load_tool():
 
 TOOL = load_tool()
 
-# #399's body draft as the implementer wrote it (2026-11-18 04:16, before
-# the lead's edit), cut to the lines the checks read.
+# #399's body draft as the implementer wrote it, before the lead's edit,
+# cut to the lines the checks read.
 DRAFT_399 = textwrap.dedent('''\
     Closes #399.
 
