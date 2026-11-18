@@ -174,13 +174,15 @@ HEAD = '19fea1fb0000000000000000000000000000beef'
 RUN = 'https://github.com/PorkChopExpress86/derbynet/actions/runs/'
 # The fields pr-evidence reads, as the runs API answers for a ci-load run.
 CI_LOAD_RUN = {'path': '.github/workflows/ci-load.yml', 'event': 'workflow_dispatch',
+               'head_branch': 'master', 'run_attempt': 1,
                'display_title': f'CI load at {HEAD}', 'status': 'completed',
                'conclusion': 'success'}
+PR_HEAD = '0123456789abcdef0123456789abcdef01234567'
 
 
 class CiLoad(IssueStandIn, unittest.TestCase):
     """A `- CI load: <run URL>` item, read through a `gh` that also answers
-    the runs API from runs.json (#415)."""
+    the runs API from runs.json and PR 421's head (#415)."""
 
     def setUp(self):
         super().setUp()
@@ -195,16 +197,21 @@ class CiLoad(IssueStandIn, unittest.TestCase):
                       '        sys.exit("HTTP 404: Not Found")\n'
                       '    print(json.dumps(run))\n'
                       '    sys.exit(0)\n'
+                      'if sys.argv[1:3] == ["pr", "view"]:\n'
+                      '    if sys.argv[3] != "421":\n'
+                      '        sys.exit("no pull requests found")\n'
+                      f'    print(json.dumps({{"headRefOid": {PR_HEAD!r}}}))\n'
+                      '    sys.exit(0)\n'
                       'assert sys.argv[1:4] == ["issue", "view", "61"], sys.argv\n'
                       f'print(open({str(self.tmp / "issue.md")!r}).read(), end="")\n')
 
     def runs(self, **by_id):
         (self.tmp / 'runs.json').write_text(json.dumps(by_id))
 
-    def check_at(self, items, head=HEAD):
+    def check_at(self, items, head=HEAD, pr=None):
         (self.tmp / 'body.md').write_text(evidence(KEYS) + items)
         argv = ['--check', str(self.tmp / 'body.md')] + (['--head', head] if head else [])
-        return self.run_tool(*argv)
+        return self.run_tool(*argv, *(['--pr', pr] if pr else []))
 
     def test_a_passed_run_at_the_head_is_accepted_as_ci_load(self):
         self.runs(**{'101': CI_LOAD_RUN})
@@ -216,6 +223,9 @@ class CiLoad(IssueStandIn, unittest.TestCase):
     def test_each_wrong_field_is_refused_with_its_reason(self):
         cases = {'path': ('.github/workflows/server.yml', 'not a run of'),
                  'event': ('push', 'started by push'),
+                 'head_branch': ('issue-415-ci-load-runs',
+                                 "ran the workflow of issue-415-ci-load-runs, not master's"),
+                 'run_attempt': (2, 'attempt 2, not the first'),
                  'display_title': ('CI load at ' + '0' * 40, "is not at the PR's head"),
                  'conclusion': ('failure', 'completed, failure: not passed'),
                  'status': ('in_progress', 'in_progress, success: not passed')}
@@ -230,7 +240,7 @@ class CiLoad(IssueStandIn, unittest.TestCase):
     def test_no_head_no_url_or_another_repo_is_refused(self):
         self.runs(**{'103': CI_LOAD_RUN})
         for items, head, why in (
-                (f'- CI load: {RUN}103\n', None, 'no --head to check it at'),
+                (f'- CI load: {RUN}103\n', None, 'no --head or --pr to check it at'),
                 ('- CI load: the run below\n', HEAD, 'no run URL'),
                 ('- CI load: https://github.com/jeffpiazza/derbynet/actions/runs/103\n',
                  HEAD, 'a run of jeffpiazza/derbynet')):
@@ -238,6 +248,39 @@ class CiLoad(IssueStandIn, unittest.TestCase):
                 done = self.check_at(items, head)
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 self.assertIn(why, done.stdout)
+
+    def test_a_trial_at_the_head_is_refused(self):
+        """The workflow names a run with any non-default input a trial."""
+        trial = f'CI load trial at {HEAD} (files x.py, base origin/master, flake ticket false)'
+        self.runs(**{'107': {**CI_LOAD_RUN, 'display_title': trial}})
+        done = self.check_at(f'- CI load: {RUN}107\n')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"not load evidence, {trial!r} is not at the PR's head {HEAD}",
+                      done.stdout)
+
+    def test_pr_gives_the_head_and_a_head_that_is_not_the_prs_is_refused(self):
+        self.runs(**{'108': {**CI_LOAD_RUN, 'display_title': f'CI load at {PR_HEAD}'}})
+        for head in (None, PR_HEAD):
+            with self.subTest(head=head):
+                done = self.check_at(f'- CI load: {RUN}108\n', head=head, pr='421')
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn(f'CI load at {PR_HEAD}, passed: {RUN}108', done.stdout)
+        done = self.check_at(f'- CI load: {RUN}108\n', head=HEAD, pr='421')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f'--head {HEAD} is not the head of PR #421, {PR_HEAD}', done.stderr)
+
+    def test_a_pr_gh_cannot_read_exits_with_its_message(self):
+        done = self.check_at('', head=None, pr='999')
+        self.assertEqual(done.returncode, 1)
+        self.assertIn('gh could not read PR #999:\nno pull requests found', done.stderr)
+
+    def test_head_or_pr_without_check_prints_the_usage(self):
+        for option, value in (('--head', HEAD), ('--pr', '421')):
+            with self.subTest(option=option):
+                done = self.run_tool(option, value)
+                self.assertEqual(done.returncode, 1, done.stdout)
+                self.assertIn('--head and --pr go with --check', done.stderr)
+                self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
 
     def test_other_run_links_and_still_open_items_are_not_read(self):
         """This PR's own body cites a failing run for its failing-shard box."""
@@ -255,7 +298,7 @@ class CiLoad(IssueStandIn, unittest.TestCase):
     def test_a_run_gh_cannot_read_exits_with_its_message(self):
         done = self.check_at(f'- CI load: {RUN}106\n')
         self.assertEqual(done.returncode, 1)
-        self.assertIn('HTTP 404', done.stderr)
+        self.assertIn(f'gh could not read {RUN}106:\nHTTP 404', done.stderr)
 
 
 class Placeholders(unittest.TestCase):

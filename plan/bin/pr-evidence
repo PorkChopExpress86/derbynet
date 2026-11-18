@@ -2,7 +2,7 @@
 """Lists each open line of an issue that asks for evidence in the PR, and
 with `--check BODY.md` names each one the PR body gives no evidence for.
 
-Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA]]
+Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N]]
 
 A line asks for evidence in the PR when it says so: "Evidence is ... in the
 PR", "The PR lists", "Record the size in the PR", "Attach" (but not
@@ -34,16 +34,22 @@ in inline code.
 
 A list item `- CI load: <run URL>` cites a run of
 .github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
-run from GitHub and accepts it when it was started by workflow_dispatch at
-`--head`, the PR's head (its name is `CI load at <SHA>`), and passed. It is
-labelled CI load: extra evidence until the owner amends D85, never a local
-load run. Other links to runs in the body are not read.
+run from GitHub and accepts it only when it ran master's workflow
+(workflow_dispatch, head_branch master: `--ref <branch>` runs that branch's
+copy), on its first attempt (a "Re-run failed jobs" turns a failed run green),
+at the PR's head with no trial input (its name is exactly `CI load at <SHA>`;
+the workflow names any other input's run `CI load trial ...`), and passed.
+The head is `--head SHA`, or PR N's head as GitHub reads it with `--pr N`;
+given both, they must match. It is labelled CI load: extra evidence until the
+owner amends D85, never a local load run. Other links to runs in the body are
+not read.
 
 Exits 1 on a key the body gives no evidence for, on a CI load item not
-accepted or given without `--head`, on a placeholder, or when
-the issue cannot be read.
+accepted or given with no head, on a `--head` that is not PR N's head, on a
+placeholder, or when the issue, the PR or a run cannot be read.
 """
 
+import argparse
 import json
 import os
 import re
@@ -204,12 +210,17 @@ def ci_load_items(body: str) -> list[str]:
 
 
 def ci_load_verdict(run: dict, head: str) -> str | None:
-    """None when a run, as GitHub's runs API answers, is a passed CI load
-    run at head, else why not."""
+    """None when a run, as GitHub's runs API answers, is a passed first
+    attempt of master's CI load workflow at head with no trial input, else
+    why not."""
     if run.get("path") != CI_LOAD_WORKFLOW:
         return f"not a run of {CI_LOAD_WORKFLOW} but of {run.get('path')}"
     if run.get("event") != "workflow_dispatch":
         return f"started by {run.get('event')}, not workflow_dispatch"
+    if run.get("head_branch") != "master":
+        return f"ran the workflow of {run.get('head_branch')}, not master's"
+    if run.get("run_attempt") != 1:
+        return f"attempt {run.get('run_attempt')}, not the first"
     if run.get("display_title") != f"CI load at {head}":
         return f"{run.get('display_title')!r} is not at the PR's head {head}"
     if (run.get("status"), run.get("conclusion")) != ("completed", "success"):
@@ -227,13 +238,13 @@ def check_ci_load(body: str, head: str | None) -> list[str]:
             lines.append(f"not load evidence, no run URL: CI load: {text}")
             continue
         if not head:
-            lines.append(f"not load evidence, no --head to check it at: {url[0]}")
+            lines.append(f"not load evidence, no --head or --pr to check it at: {url[0]}")
             continue
         repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
         if url[1].casefold() != repo.casefold():
             lines.append(f"not load evidence, a run of {url[1]}, not {repo}: {url[0]}")
             continue
-        run = gh_json(["api", f"repos/{repo}/actions/runs/{url[2]}"])
+        run = gh_json(["api", f"repos/{repo}/actions/runs/{url[2]}"], url[0])
         why = ci_load_verdict(run, head)
         if why:
             lines.append(f"not load evidence, {why}: {url[0]}")
@@ -243,11 +254,11 @@ def check_ci_load(body: str, head: str | None) -> list[str]:
     return lines
 
 
-def gh_json(args: list[str]) -> dict:
+def gh_json(args: list[str], what: str) -> dict:
     gh = os.environ.get("GH", "gh")
     done = subprocess.run([gh, *args], capture_output=True, text=True)
     if done.returncode:
-        sys.exit(f"pr-evidence: gh could not read {args[-1]}:\n{done.stderr.strip()}")
+        sys.exit(f"pr-evidence: gh could not read {what}:\n{done.stderr.strip()}")
     return json.loads(done.stdout)
 
 
@@ -264,27 +275,46 @@ def issue_body(number: str) -> str:
     return done.stdout.replace("\r", "")
 
 
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.exit(f"pr-evidence: {message}\n\n{__doc__}")
+
+
+def pr_head(number: str) -> str:
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+    return gh_json(["pr", "view", number, "--repo", repo, "--json", "headRefOid"],
+                   f"PR #{number}")["headRefOid"]
+
+
 def main(argv: list[str]) -> int:
-    head = None
-    if len(argv) == 5 and argv[3] == "--head":
-        head = argv[4]
-        argv = argv[:3]
-    if len(argv) not in (1, 3) or (len(argv) == 3 and argv[1] != "--check"):
-        sys.exit(__doc__)
-    asked = keys(issue_body(argv[0]))
-    if len(argv) == 1:
+    parser = Parser(prog="plan/bin/pr-evidence", allow_abbrev=False, add_help=False)
+    parser.add_argument("issue")
+    parser.add_argument("--check", metavar="BODY.md")
+    parser.add_argument("--head", metavar="SHA")
+    parser.add_argument("--pr", metavar="N")
+    args = parser.parse_args(argv)
+    if (args.head or args.pr) and not args.check:
+        parser.error("--head and --pr go with --check")
+    head = args.head
+    if args.pr:
+        real = pr_head(args.pr)
+        if head and head != real:
+            sys.exit(f"pr-evidence: --head {head} is not the head of PR #{args.pr}, {real}")
+        head = real
+    asked = keys(issue_body(args.issue))
+    if not args.check:
         for key in asked:
             print(f"- {key.rstrip('.!?')}: ")
-        print(f"{len(asked)} open lines of #{argv[0]} ask for evidence in the PR")
+        print(f"{len(asked)} open lines of #{args.issue} ask for evidence in the PR")
         return 0
-    with open(argv[2], encoding="utf-8") as f:
+    with open(args.check, encoding="utf-8") as f:
         body = f.read()
     outside, still_open = body_items(body)
     missing = [key for key in asked if not has_evidence(key, outside, still_open)]
     for key in missing:
         print(f"no evidence in the body: {key}")
     print(
-        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{argv[0]} that ask "
+        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{args.issue} that ask "
         "for evidence in the PR have it in the body"
     )
     unfilled = placeholders(body)

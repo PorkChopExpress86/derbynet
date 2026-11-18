@@ -431,7 +431,22 @@ Each test that takes `page` runs on a phone (390x844, touch) and a desktop (1280
 gh workflow run ci-load.yml --repo PorkChopExpress86/derbynet -f sha="$(git rev-parse HEAD)"
 ```
 
-`-f files="server/ui/tests/browser/test_kiosks.py"` feeds those files to `affected-tests --stdin` instead of the diff, for a master head or a head before a fix, `-f base=` names another BASE, `-f flake_ticket=true` passes `--flake-ticket` (D122), left out at a head whose script predates it, `-f per_shard=N` sets the shard size, and `-f count=N`, `-f loops_per_cpu=N` and `-f workers=N` (pytest's `-n`) make the run a trial, named `CI load trial at <SHA> (...)`, which pr-evidence does not accept. The planner and the summary are `plan/bin/ci-load`, from the workflow's own commit; the tests are the head's. Each shard calls the head's `tools/pytest-under-load.sh` with two busy loops per logical CPU (8 on a 4-CPU runner), twice the laptop's 8 loops on 8 threads: at one per CPU, #224's flake at its pre-fix head passed 25 counts on CI where the laptop failed it 2 to 3 times in 50, and at two it failed 8 times in 50 (#415's sweep), with its own lock file, and uploads its `pytest.log`, `junit.xml` and the script's exit code as an artifact named after the shard. A command that names no font draws Noto Sans, the laptop's `system-ui` font: the shard installs `fonts-noto-core` and fails unless `fc-match sans-serif` gives Noto Sans. A line that is no `tools/pytest-under-load.sh` command, such as D133's DejaVu Sans run once under `tools/hold-load-lock.sh`, is listed as skipped in the summary. The summary job adds up the shards, names the head, each command and its count, and fails when any shard's script exited non-zero or left no exit code. The run is named `CI load at <SHA>`. A PR body cites a passed run at its head as `- CI load: <run URL>`, which `plan/bin/pr-evidence N --check BODY.md --head <SHA>` checks against GitHub. CI load is extra evidence until the owner amends D85: it replaces no local load run.
+The run is named `CI load at <SHA>`. Every other input makes it a trial, named `CI load trial at <SHA> (...)`, which `plan/bin/pr-evidence` does not accept, since it did not run what `affected-tests` prints for the head:
+
+- `-f files="server/ui/tests/browser/test_kiosks.py"` feeds those files to `affected-tests --stdin` instead of the diff, for a master head or a head before a fix.
+- `-f base=REV` names another BASE than `origin/master`.
+- `-f flake_ticket=true` passes `--flake-ticket` (D122), left out at a head whose script predates it.
+- `-f count=N`, `-f loops_per_cpu=N` and `-f workers=N` (pytest's `-n`) replace the count, the busy loops per CPU and the workers.
+
+`-f per_shard=N` sets the shard size and keeps the name, since the shards' counts still sum to each command's.
+
+`plan/bin/ci-load`, from the workflow's own commit, checks the inputs, plans the shards, checks each shard's font, samples its load average and sums the run. It runs on Python 3.14, as `affected-tests` must to parse the head's tests. The tests are the head's.
+
+Each shard runs the head's `tools/pytest-under-load.sh` with its own lock file and two busy loops per logical CPU (8 on a 4-CPU runner), twice the laptop's 8 loops on 8 threads. At one per CPU, #224's flake at its pre-fix head passed 25 counts on CI where the laptop failed it 2 to 3 times in 50; at two it failed 8 times in 50 (#415's sweep). The shard uploads its `pytest.log`, `junit.xml` and the script's exit code as an artifact named after the shard, kept 7 days.
+
+A command that names no font draws Noto Sans, the laptop's `system-ui` font: the shard installs `fonts-noto-core` and fails unless `fc-match sans-serif` gives Noto Sans. A line that is no `tools/pytest-under-load.sh` command, such as D133's DejaVu Sans run once under `tools/hold-load-lock.sh`, is listed as skipped in the summary.
+
+The summary job adds up the shards, names the head, each command and its count, and fails when any shard's script exited non-zero or left no exit code. A PR body cites a passed run at its head as `- CI load: <run URL>`, which `plan/bin/pr-evidence N --check BODY.md --pr <PR>` checks against GitHub: master's workflow, its first attempt, the PR's head, no trial. CI load is extra evidence until the owner amends D85: it replaces no local load run.
 
 ### The race dashboard (#41)
 
