@@ -28,7 +28,8 @@ CONTEXT = re.compile(r"(?<![\w.])([A-Za-z_][\w-]*)\s*[.\[]")
 def env_values(text):
     """(line number, allowed contexts, value) for each value under the
     workflow's `env:` (column 0) and under each job's `env:` (column 4,
-    under `jobs:`)."""
+    under `jobs:`).  It reads a value on its key's line, not a block
+    scalar's lines below it; no workflow puts a block scalar in an env."""
     found = []
     allowed = None
     child = None
@@ -73,6 +74,35 @@ def test_the_rule_finds_matrix_in_the_workflow_env():
     text = "on: push\nenv:\n  A: ${{ matrix.x == 'a.b' && github.ref }}\njobs:\n"
     bad = [(n, unavailable(a, v)) for n, a, v in env_values(text) if unavailable(a, v)]
     assert bad == [(3, ["matrix"])]
+
+
+def findings(text):
+    return [(n, unavailable(a, v)) for n, a, v in env_values(text) if unavailable(a, v)]
+
+
+def test_each_context_the_table_allows_passes():
+    text = (
+        "on: push\n"
+        "env:\n"
+        "  A: ${{ github.ref }} ${{ inputs.a }} ${{ secrets.b }} ${{ vars.c }}\n"
+        "jobs:\n  checks:\n    env:\n"
+        "      B: ${{ github.ref }} ${{ inputs.a }} ${{ secrets.b }} ${{ vars.c }}\n"
+        "      C: ${{ matrix.d }} ${{ needs.build.result }} ${{ strategy.job-index }}\n"
+    )
+    assert env_values(text) and findings(text) == []
+
+
+def test_a_blank_line_or_comment_under_jobs_keeps_the_job_env_read():
+    text = (
+        "on: push\njobs:\n\n# the checks\n  checks:\n    env:\n"
+        "      LOGS: ${{ runner.temp }}\n"
+    )
+    assert findings(text) == [(7, ["runner"])]
+
+
+def test_an_env_at_column_4_outside_jobs_is_no_job_env():
+    text = "on:\n  workflow_call:\n    env:\n      A: ${{ runner.temp }}\njobs:\n"
+    assert env_values(text) == []
 
 
 @pytest.mark.parametrize(
