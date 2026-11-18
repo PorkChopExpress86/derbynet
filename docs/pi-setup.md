@@ -3,7 +3,7 @@
 A Raspberry Pi beside the track can run the timer client or the photo stand as a container, so the Pi needs only Docker and one settings file. Each starts again by itself when the Pi starts. The server runs on another computer ([Install with Docker](install-docker.md)); a Pi is not supported as the server (D21).
 
 - The timer image runs `derby-timer.jar`, which talks to the timer over its USB serial cable ([Timer operation](timer-operation.md)). The browser timer is the supported timer client (D4). The jar is for a timer the browser cannot reach, or a Pi left at the track.
-- The photo stand image runs `photostand.sh`: scan a racer's barcode, and the camera takes the photo and sends it to the server ([The automated photo stand](photo-stand.md)).
+- The photo stand image runs `extras/scripts/photostand.sh`: scan a racer's barcode, and the camera takes the photo and sends it to the server ([The automated photo stand](photo-stand.md)).
 - A Pi kiosk needs no image. Point its browser at the kiosk page.
 
 ## What you need
@@ -26,7 +26,7 @@ Log out and in again. The script also sets Docker to start when the Pi starts, w
 
 ## Which image
 
-The images are published next to the server image, as `ghcr.io/porkchopexpress86/derbynet_timer` and `ghcr.io/porkchopexpress86/derbynet_photostand`. The Compose files below use the `latest` tag, which only a full release sets (D89). Until the first one, add a line to `.env` naming the newest test release from the project's [Releases page](https://github.com/PorkChopExpress86/derbynet/releases): `DERBYNET_TIMER_IMAGE=ghcr.io/porkchopexpress86/derbynet_timer:` and the release's tag for the timer, or `DERBYNET_PHOTOSTAND_IMAGE=ghcr.io/porkchopexpress86/derbynet_photostand:` and the tag for the photo stand.
+The images are published next to the server image, as ghcr.io/porkchopexpress86/derbynet_timer and ghcr.io/porkchopexpress86/derbynet_photostand. The Compose files below use the `latest` tag, which only a full release sets (D89). Until the first one, add a line to `.env` naming the newest test release from the project's [Releases page](https://github.com/PorkChopExpress86/derbynet/releases): `DERBYNET_TIMER_IMAGE=ghcr.io/porkchopexpress86/derbynet_timer:` and the release's tag for the timer, or `DERBYNET_PHOTOSTAND_IMAGE=ghcr.io/porkchopexpress86/derbynet_photostand:` and the tag for the photo stand.
 
 ## Set up the timer
 
@@ -105,7 +105,7 @@ The log shows "Successfully logged in". Scan a racer's barcode: the log shows th
 
 - A digital SLR, through `gphoto2`, needs nothing more: the Compose file passes the USB bus in, so a camera plugged in after the start works too.
 - A webcam, through `fswebcam`: set `PHOTO_CAPTURE=fswebcam` in `.env`, and remove the `#` from the two `devices` lines in `compose.photostand.yaml`.
-- A Canon camera running CHDK: `chdkptp` is not in the image. Unpack a build of `chdkptp` for 64-bit Arm into a folder named `chdkptp` beside the Compose file, so that `chdkptp/chdkptp.sh` is there. Remove the `#` from the `./chdkptp` line in `compose.photostand.yaml`, and set `PHOTO_CAPTURE=chdkptp`.
+- A Canon camera running CHDK: `chdkptp` is not in the image. Unpack a build of chdkptp for 64-bit Arm into a folder named chdkptp beside the Compose file, so that its chdkptp.sh is in that folder. Remove the `#` from the chdkptp line in `compose.photostand.yaml`, and set `PHOTO_CAPTURE=chdkptp`.
 
 On a Pi with the desktop, its file manager can take the camera first. Stop that once, as the user who logs in:
 
