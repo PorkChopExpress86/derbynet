@@ -3,7 +3,7 @@
 # The photo stand image (#59): extras/scripts/photostand.sh with gphoto2 and
 # fswebcam, for a Raspberry Pi with a barcode scanner and a camera.  The
 # scanner comes in through /dev/input and the camera through /dev/bus/usb
-# (compose.photostand.yaml).  chdkptp is not in the image: a CHDK camera's
+# (compose.photostand.yaml).  chdkptp is not in the image (#59): a CHDK camera's
 # owner mounts their own copy (docs/pi-setup.md).  The build context is the
 # repository root:
 #

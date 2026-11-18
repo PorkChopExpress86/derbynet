@@ -4,18 +4,19 @@
 On a Pi install, photostand.sh reads its barcodes from the terminal the scanner
 types into.  A container has no such terminal, so the photo stand image runs
 this reader on the scanner's input device and pipes its lines into the
-unchanged photostand.sh.
+unchanged photostand.sh, the design #59 settled.
 
-It picks the device as photostand.sh's find_barcode_scanner does: the first
+It picks the device as find_barcode_scanner in
+extras/scripts/lib/photo-functions.sh does: the first
 name in BARCODE_SCANNER_DEVS found under /dev/input/by-id, else the first
 entry there.  A device BARCODE_SCANNER_DEVS names it takes for itself
 (EVIOCGRAB), so a scan types nowhere else on the Pi; the first entry it only
-reads, since that may be the Pi's own keyboard.  When the device goes away, or
+reads, since that may be the Pi's own keyboard (#59).  When the device goes away, or
 none is there, it looks again every 5 s, so a scanner plugged in late still
 works.
 
 The key tables are extras/scripts/lib/read_barcode.py's.  That reader unpacks
-a 16-byte event, a 32-bit kernel's; this one reads the platform's own
+a shorter event (`2IHHI`), a 32-bit kernel's; this one reads the platform's own
 `struct input_event` (two longs, then u16, u16, s32), 24 bytes on a 64-bit Pi.
 """
 

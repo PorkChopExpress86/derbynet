@@ -10,9 +10,9 @@
 # into the file, it overrides the default as a Pi's own file does.  Each value
 # is quoted with printf %q, so the script reads back exactly the value passed.
 # A variable that is unset or empty is left out, so photostand.sh keeps its
-# default, as compose.photostand.yaml's empty settings expect.
-# A file mounted under /etc/derbynet.d/ is read after it, for the functions a
-# Pi's derbynet.conf can replace, such as prepare_camera_before_shot.
+# default, as compose.photostand.yaml's empty settings expect, so a blank
+# PHOTO_PASSWORD or FSWEBCAM_ARGS cannot be set.  These settings are all the
+# image reads: nothing is mounted at /etc/derbynet.d or /boot.
 #
 # ADJUST_CLOCK is left out: a container cannot set the Pi's clock.
 

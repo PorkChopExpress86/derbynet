@@ -158,7 +158,6 @@ jobs:
       SERVER_IMAGE: derbynet_server:ci
       TIMER_IMAGE: derbynet_timer:ci
       PHOTOSTAND_IMAGE: derbynet_photostand:ci
-      LOGS: ${{ runner.temp }}/logs
     steps:
       - uses: actions/checkout@v7
 
@@ -167,8 +166,11 @@ jobs:
           name: pi-images
           path: ${{ runner.temp }}
 
+      # The runner context is not available in a job's env (GitHub's context
+      # table); run 44236545824 failed on it, so LOGS is set here.
       - name: Load the images the build job made
         run: |
+          echo "LOGS=$RUNNER_TEMP/logs" >> "$GITHUB_ENV"
           command -v skopeo >/dev/null || {
             sudo sh .github/ubuntu-mirror.sh
             sudo apt-get update
@@ -198,6 +200,10 @@ jobs:
         if: success() || failure()
         run: extras/docker/ci/checks.sh timer-serial
 
+      - name: The timer image passes TIMER_PASSWORD and TIMER_ARGS to the jar as given
+        if: success() || failure()
+        run: extras/docker/ci/checks.sh timer-args
+
       - name: compose.timer.yaml, run as docs/pi-setup.md runs it, races the round
         if: success() || failure()
         run: extras/docker/ci/checks.sh timer-compose
@@ -210,10 +216,14 @@ jobs:
         if: success() || failure()
         run: extras/docker/ci/checks.sh photostand-conf
 
-      # The runner has no sound card for the stand to speak through.
+      # compose.photostand.yaml passes in the machine's /dev/snd and USB bus,
+      # so this check runs here and not on a developer's machine, where the
+      # stand would speak through its speakers.  The step lists /dev/snd first.
       - name: compose.photostand.yaml, run as docs/pi-setup.md runs it, uploads on a scan
         if: success() || failure()
-        run: extras/docker/ci/checks.sh photostand-compose
+        run: |
+          ls -la /dev/snd || true
+          extras/docker/ci/checks.sh photostand-compose
 
       - uses: actions/upload-artifact@v7
         if: always()

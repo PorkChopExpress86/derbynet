@@ -79,6 +79,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   tests/test_transactional_tests.py \
   tests/test_docker_checks.py \
   tests/test_pi_images.py \
+  tests/test_workflow_contexts.py \
   tests/test_readme_compose.py \
   tests/test_pipefail_pipes.py \
   tests/test_listing_order.py \

@@ -2,7 +2,9 @@
 # image, started again whenever Docker starts, so after the Pi boots too.
 # docs/pi-setup.md walks through it.  Put the settings in a file named .env
 # beside this one; each is the /etc/derbynet.conf setting of the same name
-# (docs/photo-stand.md), and one left empty keeps photostand.sh's default:
+# (docs/photo-stand.md), and one left empty keeps photostand.sh's default.
+# Put each value in single quotes, so Compose keeps a $ or a ' #' in it as
+# typed (docs/pi-setup.md, "The settings file"):
 #
 #   DERBYNET_SERVER=http://192.168.1.20      the server's address, no slash at the end
 #   PHOTO_CAPTURE=gphoto2                    or fswebcam, or chdkptp
@@ -10,7 +12,7 @@
 #   PHOTO_CHECKIN=0                          1 also checks each racer in
 #   AUTOCROP=0                               1 crops each photo to the face
 #   PHOTO_USER=Photo
-#   PHOTO_PASSWORD=flashbulb
+#   PHOTO_PASSWORD='flashbulb'
 #   BARCODE_SCANNER_DEVS=                    the scanner's name under /dev/input/by-id
 #   FSWEBCAM_ARGS=
 #   DERBYNET_INPUT_DIR=/dev/input            the folder of input devices the scanner is in (the default)
@@ -41,9 +43,6 @@ services:
       - /dev/bus/usb:/dev/bus/usb
       - /dev/snd:/dev/snd
       - photostand-photos:/var/lib/derbynet-photostand
-      # Your own photostand.sh functions, such as prepare_camera_before_shot,
-      # in a .conf file in a derbynet.d folder beside this file.
-      - ./derbynet.d:/etc/derbynet.d:ro
       # A CHDK camera: chdkptp is not in the image.  Unpack an arm64 build
       # of chdkptp into a chdkptp folder beside this file, then remove the #.
       # - ./chdkptp:/opt/chdkptp:ro

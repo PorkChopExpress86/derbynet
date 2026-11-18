@@ -232,8 +232,8 @@ def test_read_once_reads_the_first_device_without_a_grab(tmp_path, capsys):
 
 
 def test_read_once_grabs_a_named_device(tmp_path, capsys):
-    """A plain file refuses the grab, and the refusal names the device: a
-    named device is the one the reader tries to grab."""
+    """A plain file refuses the grab, and the refusal names the device: the
+    reader tries to grab a device BARCODE_SCANNER_DEVS names."""
     (tmp_path / "usb-a-kbd").write_bytes(b"")
     (tmp_path / "usb-b-kbd").write_bytes(PWD101)
     out = read_once(capsys, ["usb-b-kbd"], tmp_path)
@@ -246,3 +246,59 @@ def test_read_once_reports_a_device_it_cannot_open(tmp_path, capsys):
     out = read_once(capsys, [], tmp_path)
     assert out.out == ""
     assert out.err.startswith(f"read-barcodes: {tmp_path}/usb-a-kbd: ")
+
+
+class Stop(Exception):
+    pass
+
+
+def test_main_reads_the_named_scanners_then_waits_and_reads_again(monkeypatch):
+    """main() passes BARCODE_SCANNER_DEVS's names to each pass, and waits
+    RETRY_SECONDS between passes; the second wait stops the test."""
+    passes, waits = [], []
+
+    def wait(seconds):
+        waits.append(seconds)
+        if len(waits) == 2:
+            raise Stop
+
+    monkeypatch.setenv("BARCODE_SCANNER_DEVS", "usb-b-kbd usb-c-kbd")
+    monkeypatch.setattr(reader, "read_once", passes.append)
+    monkeypatch.setattr(reader.time, "sleep", wait)
+    with pytest.raises(Stop):
+        reader.main()
+    assert passes == [["usb-b-kbd", "usb-c-kbd"]] * 2
+    assert waits == [reader.RETRY_SECONDS] * 2
+
+
+def test_the_pi_images_build_on_the_server_image_s_base():
+    """The server image and both Pi images name the same Ubuntu digest, so a
+    base update moves them together."""
+    dockerfiles = [
+        ROOT / "server" / "docker" / "Dockerfile",
+        ROOT / "extras" / "docker" / "timer.Dockerfile",
+        ROOT / "extras" / "docker" / "photostand.Dockerfile",
+    ]
+    bases = {
+        line
+        for path in dockerfiles
+        for line in path.read_text().splitlines()
+        if line.startswith("ARG UBUNTU=")
+    }
+    assert len(bases) == 1, bases
+
+
+def test_push_and_pull_request_watch_the_same_paths():
+    text = WORKFLOW.read_text()
+
+    def paths(event):
+        block = text.split(f"\n  {event}:\n", 1)[1].split("\n  workflow_dispatch:", 1)[
+            0
+        ]
+        block = block.split("\n  pull_request:", 1)[0]
+        return [
+            line.strip() for line in block.splitlines() if line.startswith("      - ")
+        ]
+
+    assert paths("push")
+    assert paths("push") == paths("pull_request")

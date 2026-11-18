@@ -22,17 +22,21 @@
 #   timer-compose     compose.timer.yaml, run from a folder with its .env as
 #                     docs/pi-setup.md runs it, races the round too, with the
 #                     restart policy that starts it at boot
+#   timer-args        TIMER_PASSWORD reaches the jar as one argument, and
+#                     TIMER_ARGS splits at spaces with no file-name matching
 #   photostand        a barcode on a stand-in scanner makes the photo stand
 #                     take a photo with fswebcam's test source, upload it,
 #                     and check the racer in; QUITQUITQUIT leaves it running
 #   photostand-conf   the entrypoint writes each setting into
 #                     /etc/derbynet.conf so the shell reads back what was
-#                     passed, and leaves an empty one out
+#                     passed, and leaves an empty one out; a single-quoted
+#                     .env value comes through compose.photostand.yaml as typed
 #   photostand-compose
 #                     compose.photostand.yaml, run the same way, takes,
 #                     uploads and checks in on a scan.  It passes in the
-#                     machine's sound card and USB bus, and the stand speaks,
-#                     so the workflow runs it on GitHub's runner
+#                     machine's /dev/snd and USB bus, so .github/workflows/
+#                     pi-images.yml runs it on GitHub's runner and not on a
+#                     developer's machine, where the stand would speak
 #
 # The stand-in scanner is a FIFO under a folder mounted at /dev/input, which
 # the photo stand's read-barcodes reads as it reads a real scanner's device;
@@ -51,24 +55,23 @@ SERVER="$PREFIX-server"
 WAIT_SECONDS="${WAIT_SECONDS:-900}"
 SCANNER=usb-Stand-in_Scanner-event-kbd
 BASE=""
-JAR=""
+COOKIES=""
 STAND=""
 ROUND=""
 SCHEDULED=""
-COMPOSE_DOWN=()
+CONTAINER=""
+PROJECTS=()
 
 say() { printf '== %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
 cleanup() {
-    local name each
-    for each in "${COMPOSE_DOWN[@]}"; do
-        read -r folder file project <<<"$each"
-        (cd "$folder" \
-            && { docker compose -p "$project" -f "$file" logs --no-color > "$LOGS/$project-compose.log" 2>&1 || true; } \
-            && docker compose -p "$project" -f "$file" down -v >/dev/null 2>&1) || true
+    local name project
+    for project in "${PROJECTS[@]}"; do
+        docker compose -p "$project" logs --no-color > "$LOGS/$project.log" 2>&1 || true
+        docker compose -p "$project" down -v >/dev/null 2>&1 || true
     done
-    COMPOSE_DOWN=()
+    PROJECTS=()
     for name in "$PREFIX-timer" "$PREFIX-photostand" "$SERVER"; do
         if docker container inspect "$name" >/dev/null 2>&1; then
             docker logs "$name" > "$LOGS/$name.log" 2>&1 || true
@@ -77,14 +80,14 @@ cleanup() {
     done
     docker network rm "$NET" >/dev/null 2>&1 || true
     docker volume rm "$PREFIX-server-data" >/dev/null 2>&1 || true
-    [ -z "$JAR" ] || rm -f "$JAR"
-    JAR=""
+    [ -z "$COOKIES" ] || rm -f "$COOKIES"
+    COOKIES=""
 }
 trap cleanup EXIT
 
 # The coordinator's requests, through the published port.
 coordinator() {
-    curl -sf -b "$JAR" -c "$JAR" "$@"
+    curl -sf -b "$COOKIES" -c "$COOKIES" "$@"
 }
 
 # A server on its own network, with the roster testing/import-roster.sh
@@ -105,7 +108,7 @@ start_server() {
         || fail "the server made no event"
     (cd "$ROOT" && bash testing/reset-database.sh "$BASE" && bash testing/import-roster.sh "$BASE") \
         > "$LOGS/roster.log" 2>&1 || { tail -n 20 "$LOGS/roster.log"; fail "the roster did not import"; }
-    JAR="$(mktemp)"
+    COOKIES="$(mktemp)"
     grep -q success <<<"$(coordinator -d 'action=role.login&name=RaceCoordinator&password=doyourbest' "$BASE/action.php")" \
         || fail "the coordinator cannot log in"
     say "server $SERVER_IMAGE answers at $BASE"
@@ -113,7 +116,7 @@ start_server() {
 
 # Container $1's output, then any log file derby-timer.jar wrote in its
 # working folder: the jar logs a timer loop's exceptions only there.
-output() {
+container_output() {
     docker logs "$1" 2>&1
     docker exec "$1" sh -c 'cat /var/lib/derbynet-timer/timer-*.log 2>/dev/null' 2>/dev/null || true
 }
@@ -122,7 +125,7 @@ output() {
 wait_for_log() {
     local name="$1" pattern="$2" _
     for _ in $(seq "$WAIT_SECONDS"); do
-        grep -qE "$pattern" <<<"$(output "$name")" && return 0
+        grep -qE "$pattern" <<<"$(container_output "$name")" && return 0
         [ "$(docker container inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = true ] \
             || { docker logs "$name" 2>&1 | tail -n 40; fail "$name stopped before: $pattern"; }
         sleep 1
@@ -144,15 +147,14 @@ compose_folder() {
 
 # Runs `docker compose -f $2 up -d` in folder $1 as project $3, as
 # docs/pi-setup.md runs it, and checks the restart policy that starts the
-# container again at boot.  Prints the container's id.
+# container again at boot.  CONTAINER names the container; cleanup takes
+# the project down.  Not in a $(...): PROJECTS must reach cleanup.
 compose_up() {
-    (cd "$1" && docker compose -p "$3" -f "$2" up -d) >&2
-    COMPOSE_DOWN+=("$1 $2 $3")
-    local id
-    id="$(cd "$1" && docker compose -p "$3" -f "$2" ps -q)"
-    [ "$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$id")" = unless-stopped ] \
+    PROJECTS+=("$3")
+    (cd "$1" && docker compose -p "$3" -f "$2" up -d)
+    CONTAINER="$(cd "$1" && docker compose -p "$3" -f "$2" ps -q)"
+    [ "$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER")" = unless-stopped ] \
         || fail "$2's container has no unless-stopped restart policy"
-    printf '%s\n' "$id"
 }
 
 # The address of this machine on its network, as a Pi reaches the server.
@@ -221,7 +223,7 @@ check_timer_serial() {
         "$TIMER_IMAGE" >/dev/null
     wait_for_log "$PREFIX-timer" 'Successful login'
     wait_for_log "$PREFIX-timer" 'Port busy|Port not found|Permission denied|Incorrect serial port|UnsatisfiedLinkError'
-    output "$PREFIX-timer" > "$LOGS/timer-serial.log"
+    container_output "$PREFIX-timer" > "$LOGS/timer-serial.log"
     if grep -m 3 -E 'UnsatisfiedLinkError' "$LOGS/timer-serial.log"; then
         fail "jssc did not load its native library"
     fi
@@ -235,7 +237,7 @@ check_timer_compose() {
     : "${TIMER_IMAGE:?set TIMER_IMAGE}"
     SERVER_ADDRESS="$(lan_address)" start_server
     schedule_round
-    local folder id
+    local folder
     folder="$(compose_folder compose.timer.yaml <<ENV
 DERBYNET_SERVER=$BASE
 DERBYNET_TIMER_DEVICE=/dev/null
@@ -243,8 +245,8 @@ TIMER_ARGS=-simulate-timer -lanes 4 -pace 1
 DERBYNET_TIMER_IMAGE=$TIMER_IMAGE
 ENV
 )"
-    id="$(compose_up "$folder" compose.timer.yaml "$PREFIX-timer-compose")"
-    wait_for_round "$id"
+    compose_up "$folder" compose.timer.yaml "$PREFIX-timer-compose"
+    wait_for_round "$CONTAINER"
 }
 
 # A folder to mount at /dev/input, holding the stand-in scanner.  Prints it.
@@ -352,6 +354,54 @@ check_photostand_conf() {
     grep -qxF "read back: $password|car" <<<"$conf" \
         || fail "the shell did not read back the password, or an empty PHOTO_REPO replaced the default"
     say "/etc/derbynet.conf reads back every setting as passed"
+    # The same through compose.photostand.yaml and a .env written as
+    # docs/pi-setup.md says, each value in single quotes: Compose itself
+    # reads $ and # in an unquoted value (#59 review).  A .env value cannot
+    # hold a single quote.
+    local envpass='pa$sword#x&y "b`c\d e' folder
+    stand_in_input > /dev/null
+    folder="$(compose_folder compose.photostand.yaml <<ENV
+DERBYNET_SERVER='http://example.invalid'
+PHOTO_PASSWORD='$envpass'
+DERBYNET_INPUT_DIR='$LOGS/stand-in-input'
+DERBYNET_PHOTOSTAND_IMAGE='$PHOTOSTAND_IMAGE'
+ENV
+)"
+    sed -n 2p "$folder/.env"
+    PROJECTS+=("$PREFIX-conf")
+    conf="$(cd "$folder" && docker compose -p "$PREFIX-conf" -f compose.photostand.yaml run --rm -T \
+        --entrypoint bash photostand -c \
+        '/usr/local/bin/derbynet-photostand --write-conf-only && . /etc/derbynet.conf && printf "read back: %s\n" "$PHOTO_PASSWORD"')"
+    printf '%s\n' "$conf" | grep 'read back'
+    grep -qxF "read back: $envpass" <<<"$conf" \
+        || fail "the password did not come through compose.photostand.yaml's .env as typed"
+    say "a single-quoted .env value reaches /etc/derbynet.conf as typed"
+}
+
+# TIMER_PASSWORD reaches the jar as one -p argument, spaces and all, and a
+# `?` in TIMER_ARGS as typed, not matched against /usr/bin's files.  The
+# jar logs each argument it got before it logs in; the server refuses the
+# password, and the jar stops.
+check_timer_args() {
+    : "${TIMER_IMAGE:?set TIMER_IMAGE}"
+    start_server
+    docker run -d --name "$PREFIX-timer" --network "$NET" \
+        -e DERBYNET_SERVER="http://$SERVER" -e TIMER_PASSWORD='pa ss*' \
+        -e TIMER_ARGS='-obs-start /usr/bin/derby-time?.jar' \
+        "$TIMER_IMAGE" >/dev/null
+    local _ args
+    for _ in $(seq "$WAIT_SECONDS"); do
+        [ "$(docker container inspect -f '{{.State.Running}}' "$PREFIX-timer")" = true ] || break
+        sleep 1
+    done
+    docker logs "$PREFIX-timer" 2>&1 | tail -n 3
+    args="$( (docker cp "$PREFIX-timer:/var/lib/derbynet-timer" - | tar -xOf - --wildcards '*.log') 2>/dev/null \
+        | sed -n '/Command Line Arguments/,/=====$/p' | awk -F '\t' '{print $NF}')" || true
+    [ -n "$args" ] || fail "the jar wrote no argument list: it refused its command line"
+    printf '%s\n' "$args"
+    grep -qxF 'pa ss*' <<<"$args" || fail "TIMER_PASSWORD did not reach the jar as one argument"
+    grep -qxF '/usr/bin/derby-time?.jar' <<<"$args" || fail "TIMER_ARGS's ? was matched against file names"
+    say "the jar got TIMER_PASSWORD and TIMER_ARGS as given"
 }
 
 check_photostand_compose() {
@@ -369,7 +419,8 @@ DERBYNET_INPUT_DIR=$input
 DERBYNET_PHOTOSTAND_IMAGE=$PHOTOSTAND_IMAGE
 ENV
 )"
-    STAND="$(compose_up "$folder" compose.photostand.yaml "$PREFIX-photostand-compose")"
+    compose_up "$folder" compose.photostand.yaml "$PREFIX-photostand-compose"
+    STAND="$CONTAINER"
     wait_for_log "$STAND" 'Successfully logged in'
     scan_and_upload photostand-compose
     racer="$(car_101)"
@@ -384,6 +435,7 @@ check() {
         timer) check_timer ;;
         timer-serial) check_timer_serial ;;
         timer-compose) check_timer_compose ;;
+        timer-args) check_timer_args ;;
         photostand) check_photostand ;;
         photostand-conf) check_photostand_conf ;;
         photostand-compose) check_photostand_compose ;;
@@ -391,7 +443,7 @@ check() {
     esac
 }
 
-[ $# -gt 0 ] || set -- timer timer-serial timer-compose photostand photostand-conf photostand-compose
+[ $# -gt 0 ] || set -- timer timer-serial timer-compose timer-args photostand photostand-conf photostand-compose
 say "logs in $LOGS"
 for name in "$@"; do
     say "check $name"
