@@ -4,12 +4,15 @@ import os
 import re
 import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from playwright.sync_api import expect
 
+from ui.tests.browser import conftest
 from ui.tests.browser.conftest import (
     InFlight,
     _settle,
@@ -17,6 +20,7 @@ from ui.tests.browser.conftest import (
     close_tab,
     font_config,
 )
+from ui.tests.browser.helpers import pause_clock_at
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -220,6 +224,81 @@ def test_the_settle_stops_the_polls_of_a_page_on_a_fake_clock(page, event):
     page.wait_for_timeout(100)
     # One read after the wait: the point is that nothing more was sent.
     assert sent == []
+
+
+# The settle's bound on a fake-clock page (#347).
+FAKE_CLOCK_SETTLE_S = 1.0
+
+
+def test_the_settle_on_a_fake_clock_takes_under_a_second(page, event):
+    """STOP_TIMERS cleared the native id range through the fake clock's
+    `clearTimeout`, which builds an Error for each id below its own, and
+    blocked the renderer for seconds, during which a resumed fake clock ran
+    on toward kiosk.js's give-up (#347). Under the fake clock it now
+    clears only the clock's own ids."""
+    page.clock.install()
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    start_a_fast_poll(page)
+    started = time.monotonic()
+    assert _settle(page) == []
+    assert time.monotonic() - started < FAKE_CLOCK_SETTLE_S
+
+
+def test_the_settle_stops_a_poll_set_after_a_pending_animation_frame(page, event):
+    """The fake clock's `clearTimeout` throws on the id of a pending
+    `requestAnimationFrame`, so STOP_TIMERS stopped at that id and left
+    every later timer running (#347). Here the frame is requested before
+    the poll, on a paused clock, so it is still pending at the stop."""
+    pause_clock_at(page, datetime(2026, 1, 1, 12, 0))
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    page.evaluate(
+        """() => {
+          requestAnimationFrame(() => {});
+          setInterval(() => fetch('/held-request'), 10);
+        }"""
+    )
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.clock.run_for(1000)
+    page.wait_for_timeout(100)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+def test_a_reply_handled_after_the_stop_queues_no_poll(page, event, monkeypatch):
+    """A poll whose reply lands after the stop queued its next turn on a
+    new timer, and its request went out after the drain came back empty
+    (#317's results-by-racer kiosk, #347). The settle now stops the page
+    setting timers too. Here the reply is released from Python once the
+    stop has run, on no page timer the stop could clear."""
+    held = []
+    page.route("**/held-request", lambda route: held.append(route))
+    page.goto("/login/")
+    page.evaluate(
+        """() => {
+          const poll = () => fetch('/held-request').then(() => setTimeout(poll, 0));
+          poll();
+        }"""
+    )
+    wait_until(page, lambda: held, "the poll's request")
+    stop = conftest.stop_timers
+
+    def stop_then_reply(tab, **kwargs):
+        stop(tab, **kwargs)
+        held.pop().fulfill(status=204)
+
+    sent = []
+    page.on("request", lambda r: "held-request" in r.url and sent.append(r))
+    with monkeypatch.context() as patch:
+        patch.setattr(conftest, "stop_timers", stop_then_reply)
+        patch.setattr(InFlight, "TIMEOUT_MS", 300)
+        assert _settle(page) == []
+    page.wait_for_timeout(500)
+    # One read after the wait: the point is that nothing more was sent.
+    assert (sent, held) == ([], [])
 
 
 # kiosk.css's font stack, and the name of the font Chromium draws it in.

@@ -453,25 +453,47 @@ def _sent_by(request):
     return frame.page if frame is not None else None
 
 
-# Clears every timeout and interval the frame has set. Timer ids count up
+# Clears every timeout and interval the frame has set; with `freeze`, also
+# makes every later setTimeout and setInterval do nothing, so a reply the
+# page handles after the stop queues no poll
+# (`test_a_reply_handled_after_the_stop_queues_no_poll`). Timer ids count up
 # from 1, or from 1e12 under Playwright's clock (`page.clock.install()`), so
-# the loop runs over the first and the last SPAN ids: from 0 it spun the
-# renderer for hours on test_toasts.py's fake clock (#53 retro).
-STOP_TIMERS = """() => {
+# the loop runs over the first and the last SPAN ids from there: from 0 it
+# spun the renderer for hours on test_toasts.py's fake clock (#53 retro), and
+# over ids 0 to SPAN the fake `clearTimeout` built an Error for each and took
+# seconds (#347). Under the fake clock only its own ids are cleared: the
+# native ones include the clock's own timer, and the tests install it
+# before the page loads (`pause_clock_at` refuses a loaded page). The fake `clearTimeout` throws on a pending
+# animation frame's id, so each clear is caught on its own (#347).
+STOP_TIMERS = """(freeze) => {
   const SPAN = 100000;
+  const fake = Boolean(window.__pwClock);
+  const first = fake ? 1e12 : 0;
+  // The fake clock keeps animation frames in its timers' id range.
+  const clears = [
+    (id) => window.clearTimeout(id),
+    fake ? (id) => window.cancelAnimationFrame(id) : (id) => window.clearInterval(id),
+  ];
+  const stop = (id) => {
+    for (const clear of clears) {
+      try { clear(id); } catch {}
+    }
+  };
   const last = setTimeout(() => {});
-  const stop = (id) => { clearTimeout(id); clearInterval(id); };
-  for (let id = 0; id <= Math.min(last, SPAN); id++) stop(id);
-  for (let id = Math.max(SPAN + 1, last - SPAN); id <= last; id++) stop(id);
+  for (let id = first; id <= Math.min(last, first + SPAN); id++) stop(id);
+  for (let id = Math.max(first + SPAN + 1, last - SPAN); id <= last; id++) stop(id);
+  if (freeze) window.setTimeout = window.setInterval = () => 0;
 }"""
 
 
-def stop_timers(tab):
+def stop_timers(tab, freeze: bool = False):
     """Stop every poll in every frame of `tab`, so no request starts after
-    the harness drained them."""
+    the harness drained them. `freeze` also stops the frames setting new
+    timers, for a page no test uses again (the settle's); a test that goes
+    on using the page, as `stop_the_kiosk` does before axe, leaves it off."""
     for frame in tab.frames:
         try:
-            frame.evaluate(STOP_TIMERS)
+            frame.evaluate(STOP_TIMERS, freeze)
         except Exception:  # noqa: BLE001, S110 - a detached frame has no timers
             pass
 
@@ -525,7 +547,7 @@ def _settle(page) -> list[str]:
     for tab in page.context.pages:
         if tab != page:
             close_tab(page, tab)
-    stop_timers(page)
+    stop_timers(page, freeze=True)
     _barrier(page)
     return page.in_flight.drain(page)
 
