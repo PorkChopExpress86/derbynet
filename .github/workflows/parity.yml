@@ -208,6 +208,7 @@ jobs:
         if: failure()
         run: |
           cat testing/derby-timer.log || true
+          cat testing/timer-*.log || true
           cat "$RUNNER_TEMP/timer-server.log" || true
 
   gate:

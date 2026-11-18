@@ -1,0 +1,13 @@
+#! /bin/bash
+#
+# A stand-in for java, first on the PATH in race-with-derby-timer-cases.sh
+# (#399).  Before a -jar run it sleeps JAVA_DELAY seconds, or exits with
+# status JAVA_EXIT; then it becomes the next java on the PATH.
+
+if [ "$1" = -jar ]; then
+    [ -z "$JAVA_EXIT" ] || exit "$JAVA_EXIT"
+    sleep "${JAVA_DELAY:-0}"
+fi
+HERE=$(cd "$(dirname "$0")" && pwd)
+REAL=$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -vxF "$HERE" | paste -sd:) command -v java)
+exec "$REAL" "$@"
