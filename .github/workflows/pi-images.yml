@@ -124,8 +124,14 @@ jobs:
           for image in timer photostand; do
             skopeo copy --all --preserve-digests --dest-tls-verify=false \
               "oci-archive:$RUNNER_TEMP/$image.tar" "docker://localhost:5000/derbynet_$image:ci"
-            docker buildx imagetools inspect "localhost:5000/derbynet_$image:ci" | tee "inspect-$image.txt"
-            grep -q 'linux/arm64' "inspect-$image.txt"
+            docker buildx imagetools inspect "localhost:5000/derbynet_$image:ci"
+            # A one-platform build pushes a plain manifest, with no platform
+            # list for imagetools to print (run 44246355493), so the
+            # platform is read from the image's config.
+            platform="$(skopeo inspect --tls-verify=false --config "docker://localhost:5000/derbynet_$image:ci" \
+              | jq -r '.os + "/" + .architecture')"
+            echo "derbynet_$image: $platform"
+            test "$platform" = linux/arm64
           done
 
       # publish.sh as the publish job runs it, against the job's registry.
