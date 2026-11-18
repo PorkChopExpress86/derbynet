@@ -233,13 +233,11 @@ class Summary(unittest.TestCase):
         self.addCleanup(lambda: subprocess.run(['rm', '-rf', str(self.dir)]))
         self.plan = TOOL.plan(MASTER_KIOSKS)
 
-    def shard(self, name, status, junit_text=None):
+    def shard(self, name, status, junit_text):
         folder = self.dir / name
         folder.mkdir()
-        if status is not None:
-            (folder / 'status').write_text(f'{status}\n')
-        if junit_text:
-            (folder / 'junit.xml').write_text(junit_text)
+        (folder / 'status').write_text(f'{status}\n')
+        (folder / 'junit.xml').write_text(junit_text)
 
     def all_pass(self):
         for s in self.plan['shards']:
