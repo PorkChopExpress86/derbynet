@@ -1277,7 +1277,8 @@ def test_waiters_take_the_lock_in_the_order_they_came(tmp_path, script):
     one, the third naming the lock by a link to it. SLOW_HEAD holds the
     first before it waits on the lock, as the scheduler runs a waiter late
     under load, for SLOW_HEAD_S after the holder lets go; the two behind it
-    wait their turn, and so does a run that comes while the lock is free."""
+    wait their turn, and so does a run that comes while the lock is free.
+    Each prints its place again only when it moves up."""
     (tmp_path / "slow_head.sh").write_text(SLOW_HEAD)
     env = {"BASH_ENV": str(tmp_path / "slow_head.sh"), "PAUSE_DIR": str(tmp_path)}
     lock, held = held_lock(tmp_path)
@@ -1297,6 +1298,11 @@ def test_waiters_take_the_lock_in_the_order_they_came(tmp_path, script):
         assert [run.wait(timeout=90) for run in runs] == [0, 0, 0, 0]
         assert order(tmp_path) == ["first", "second", "third", "late"]
         assert entries(lock) == []
+        # Each printed its place once each time it moved up, up to 1.
+        for name in ("second", "third", "late"):
+            moved = places(tmp_path / f"{name}.out")
+            assert moved == sorted(set(moved), reverse=True), (name, moved)
+            assert moved[-1] == 1, (name, moved)
     finally:
         if held is not None:
             os.close(held)
