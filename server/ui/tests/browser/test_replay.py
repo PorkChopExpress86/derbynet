@@ -556,11 +556,11 @@ def test_closing_the_camera_tab_waits_for_its_post(login, event):
 # The camera posts an ICE candidate through its own `post_action`, and posts
 # it again on each reply, as its message handlers post on no timer.
 POST_ON_EACH_REPLY = """() => {
-  const post = (left) => post_action({action: 'message.send', message: {
+  const post = () => post_action({action: 'message.send', message: {
       recipient: 'viewer-409', type: 'ice-candidate', from: 'camera-replay'}})
     .catch(() => {})
-    .then(() => left && post(left - 1));
-  post(2);
+    .then(post);
+  post();
 }"""
 
 
