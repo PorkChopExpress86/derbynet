@@ -354,10 +354,17 @@ class TestFile(unittest.TestCase):
         self.assertNotIn('uv run pytest -n auto ui/', commands(out))
 
     def test_a_layout_test_repeats_5_per_font(self):
-        out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
-        self.assertIn('test_kiosk_ondeck_labels.py: 5 repeats, deterministic', out)
+        path = 'server/ui/tests/browser/test_layout.py'
+        tree = {**TREE, path: TREE['server/ui/tests/browser/test_kiosk_ondeck_labels.py']}
+        out = run(path, tree=tree)
+        self.assertIn('test_layout.py: 5 repeats, deterministic', out)
         self.assertIn('DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh '
                       '-m browser -n 4 --count 5', out)
+
+    def test_a_kiosk_layout_test_repeats_5_in_the_default_font_only_under_load(self):
+        out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
+        self.assertIn('test_kiosk_ondeck_labels.py: 5 repeats, deterministic', out)
+        self.assertNotIn('DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh', out)
 
     def test_a_test_that_holds_a_request_repeats_25(self):
         out = run('server/ui/tests/browser/test_dashboard.py')
@@ -2535,14 +2542,130 @@ class ReachShapes(unittest.TestCase):
         self.assertEqual(resolved, 252)
 
 
-def lines(head, base=D101_BASE, postgres=False):
+def lines(head, base=D101_BASE, postgres=False, rel=TIMER):
     files = {**TREE, HELPERS: D101_HELPERS}
 
     def module_text(name):
-        rel = 'server/' + name.replace('.', '/')
-        return files.get(f'{rel}.py', files.get(f'{rel}/__init__.py'))
+        path = 'server/' + name.replace('.', '/')
+        return files.get(f'{path}.py', files.get(f'{path}/__init__.py'))
 
-    return '\n'.join(TOOL.load_repeats(TIMER, base, head, module_text, postgres)) + '\n'
+    return '\n'.join(TOOL.load_repeats(rel, base, head, module_text, postgres)) + '\n'
+
+
+MEASURING_BASE = D101_BASE.replace('page.wait_for_timeout(10)', 'page.reload()') \
+    .replace('locator("#board")', 'locator("#board").bounding_box()')
+MEASURING_HEAD = MEASURING_BASE.replace('assert self.n\n', 'assert self.n == 1\n')
+
+
+def dejavu_commands(out, naming=''):
+    """Each printed command that runs with DejaVu Sans, whole line, and that
+    names the test file `naming` (any, by default)."""
+    return [ln.strip() for ln in out.splitlines()
+            if ln.strip().startswith('DERBYNET_BROWSER_FONT="DejaVu Sans"')
+            and naming in ln]
+
+
+class FontUnderLoad(unittest.TestCase):
+    """D133: a kiosk browser file repeats under load in the default font
+    only, and the one DejaVu Sans run it gets is the hand-off's line, which
+    runs under hold-load-lock.sh; any other file that measures text keeps
+    both fonts under load."""
+
+    KIOSK = 'ui/tests/browser/test_kiosk_sheet.py'
+    DEJAVU = 'DERBYNET_BROWSER_FONT="DejaVu Sans"'
+    NOTE = ('      D133: a kiosk file repeats under load in the default font only. '
+            'Its one DejaVu Sans run is the DERBYNET_BROWSER_FONT line under '
+            '"Run from server/" below, with no load and no --count, under '
+            'tools/hold-load-lock.sh.\n')
+    HAND_OFF = ('  DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -n auto -m browser '
+                'ui/tests/browser/test_kiosk_ondeck_labels.py\n')
+    LAYOUT = 'ui/tests/browser/test_layout.py'
+
+    def layout_tree(self):
+        return {**TREE, f'server/{self.LAYOUT}':
+                TREE['server/ui/tests/browser/test_kiosk_ondeck_labels.py']}
+
+    def kiosk_load_lines(self, postgres, pg):
+        out = lines(MEASURING_HEAD, base=MEASURING_BASE, rel=self.KIOSK,
+                    postgres=postgres)
+        self.assertIn(f'{self.KIOSK}: 5 repeats, deterministic', out)
+        self.assertIn(f'      tools/pytest-under-load.sh {pg}-m browser -n 4 '
+                      f'--count 5 {self.KIOSK}::TestBoard::test_one\n', out)
+        self.assertIn(self.NOTE, out)
+        self.assertEqual(dejavu_commands(out), [])
+
+    def test_a_kiosk_file_gets_a_note_and_no_dejavu_command_in_its_load_lines(self):
+        self.kiosk_load_lines(False, '')
+
+    def test_a_kiosk_file_on_postgres_gets_the_note_and_no_dejavu_command(self):
+        self.kiosk_load_lines(True, '--postgres ')
+
+    def test_a_kiosk_files_whole_file_fallback_gets_the_note_and_no_command(self):
+        head = MEASURING_BASE.replace('LANES = 4', 'LANES = 6')
+        out = lines(head, base=MEASURING_BASE, rel=self.KIOSK)
+        self.assertIn('      the whole file (D101): ', out)
+        self.assertIn(self.NOTE, out)
+        self.assertEqual(dejavu_commands(out), [])
+
+    def test_a_file_that_measures_nothing_prints_no_dejavu_run(self):
+        base = D101_BASE
+        out = lines(edit('assert self.n\n', 'assert self.n == 1\n', base), base=base,
+                    rel=self.KIOSK)
+        self.assertNotIn('DejaVu', out)
+        self.assertNotIn('D133', out)
+
+    def test_another_file_that_measures_text_keeps_both_fonts_under_load(self):
+        run = (f'tools/pytest-under-load.sh -m browser -n 4 --count 5 '
+               f'{TIMER}::TestBoard::test_one\n')
+        out = lines(MEASURING_HEAD, base=MEASURING_BASE)
+        self.assertIn(f'      {run}', out)
+        self.assertIn(f'      {self.DEJAVU} {run}', out)
+        self.assertNotIn('hold-load-lock', out)
+        self.assertNotIn('D133', out)
+
+    def test_only_a_test_kiosk_file_of_the_browser_folder_is_a_kiosk_file(self):
+        cases = {
+            'ui/tests/browser/test_kiosk_sheet.py': True,
+            'ui/tests/browser/test_kiosks.py': True,
+            'ui/tests/browser/test_kiosk.py': True,
+            'ui/tests/browser/test_sheet.py': False,
+            'ui/tests/browser/test_a_kiosk.py': False,
+            'ui/tests/browser/kiosk_helpers.py': False,
+            'ui/tests/browser/sub/test_kiosk_sheet.py': False,
+            'ui/tests/browser/test_kiosk_dir/test_sheet.py': False,
+            'ui/tests/test_kiosk_pages.py': False,
+            'ui/tests/browser/test_kiosk_sheet.py.orig': False,
+            'ui/tests/browser/test_kiosk_sheet.pyc': False,
+        }
+        held = {rel: 'D133: a kiosk file' in
+                lines(MEASURING_HEAD, base=MEASURING_BASE, rel=rel) for rel in cases}
+        self.assertEqual(held, cases)
+
+    def test_a_kiosk_file_has_exactly_one_dejavu_command_in_the_whole_output(self):
+        out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
+        file = 'ui/tests/browser/test_kiosk_ondeck_labels.py'
+        self.assertIn(f'{file}: 5 repeats, deterministic', out)
+        self.assertIn(f'      tools/pytest-under-load.sh -m browser -n 4 --count 5 {file}\n', out)
+        self.assertIn(self.NOTE, out)
+        self.assertEqual(dejavu_commands(out), [self.HAND_OFF.strip()])
+        self.assertIn(self.HAND_OFF, commands(out))
+
+    def test_another_measuring_file_still_gets_the_dejavu_load_run_beside_the_hand_off(self):
+        out = run(f'server/{self.LAYOUT}', tree=self.layout_tree())
+        load = f'tools/pytest-under-load.sh -m browser -n 4 --count 5 {self.LAYOUT}'
+        self.assertEqual(dejavu_commands(out), [
+            f'{self.DEJAVU} {load}',
+            f'{self.DEJAVU} uv run pytest -n auto -m browser {self.LAYOUT}'])
+        self.assertNotIn('tools/hold-load-lock.sh', out)
+        self.assertNotIn('D133: a kiosk file', out)
+
+    def test_a_kiosk_file_beside_another_keeps_its_one_dejavu_command(self):
+        kiosk = 'ui/tests/browser/test_kiosk_ondeck_labels.py'
+        out = run(f'server/{kiosk}', f'server/{self.LAYOUT}', tree=self.layout_tree())
+        in_kiosk = dejavu_commands(out, kiosk)
+        self.assertEqual(len(in_kiosk), 1)
+        self.assertNotIn('tools/pytest-under-load.sh', in_kiosk[0])
+        self.assertEqual(len(dejavu_commands(out, self.LAYOUT)), 2)
 
 
 class LoadRepeats(unittest.TestCase):
