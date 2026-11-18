@@ -338,6 +338,17 @@ def test_a_wait_with_no_source_is_found():
     ]
 
 
+def test_where_a_waits_source_may_sit():
+    """A source in a long comment block counts, a code line or a source
+    past the block does not, and a commented-out wait is no wait."""
+    long_block = "# About twice that 151 s.\n# a\n# b\n# c\nIDENTIFY_SECONDS=300\n"
+    assert unsourced_waits(long_block) == []
+    assert unsourced_waits("source common.sh\nsleep 1\n") == ["2: sleep 1"]
+    assert unsourced_waits("# Was: sleep 3\n") == []
+    # The block ends at the first line, not at the last one, read as -1.
+    assert unsourced_waits("# no source\nsleep 1\nx\ny\nz\n# 5 s\n") == ["2: sleep 1"]
+
+
 @pytest.mark.parametrize("script", ci_scripts(), ids=lambda path: path.name)
 def test_every_bound_a_caller_can_set_has_a_case(script):
     """Each `NAME=${NAME:-N}` bound is set by a case of the script's
