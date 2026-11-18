@@ -7,6 +7,7 @@ The scenario's transcripts share one race, so they run in order in one test.
 way, against the Q17 deviation it writes with `WRITE_DEVIATIONS=1` (#65).
 """
 
+import json
 import os
 from urllib.parse import parse_qsl, quote, urlencode
 
@@ -16,10 +17,13 @@ from django.test import Client
 from legacy_api.tests.php_http import as_php_body, translate
 from legacy_api.tests.test_race_control_parity import (
     Scenario,
+    active_event,
     assert_listed,
     listed_claim,
     write_deviations,
 )
+from racing.models import Round
+from roster.models import Group
 
 pytestmark = pytest.mark.django_db
 
@@ -253,9 +257,13 @@ DEVIATIONS = {
         " times with places (001, 002); without places Django already stopped"
         " on master, through D42's false-start rule (003, 004). In a timer test"
         " that leaves lanes 3 and 4 out, PHP stores zero times on lanes 1 and 2"
-        " as the test's result; Django stops the test. Not Q17: that poll's"
-        ' current-heat classid is "" in PHP and null in Django, a difference'
-        " Q17 does not cause, which #406 owns.",
+        " as the test's result; Django stops the test. That poll's current-heat"
+        ' classid is "" in PHP and null in Django: C4, which Q2 fixes. After a'
+        " timer-test result, PHP's advance_heat assigns in its condition"
+        " (website/inc/autoadvance.inc:138), so it writes ClassID from round"
+        ' -100, which has no row, and stores "". Django writes ClassID only on'
+        " next-up or a change of round (Q2), and here never advances, since"
+        " Q17 stops the test (test_classid_through_a_timer_test, #406).",
         "zeroes",
         {
             ZEROES: [
@@ -289,3 +297,94 @@ def test_every_listed_deviation_is_a_reply_these_scenarios_make():
 )
 def test_write_timer_deviations(event):
     write_deviations(DEVIATIONS, SCENARIOS)
+
+
+# ----- current-heat's classid through a timer test (#406) ------------------------
+
+CURRENT_HEAT_POLLS = (
+    "poll.coordinator",
+    "poll.timer.test",
+    "poll&values=current-heat",
+    "poll.results",
+)
+
+
+def current_heats(s: TimerScenario, step: str) -> list[tuple]:
+    """`current-heat`'s classid, round, roundid and heat in each poll that
+    carries it."""
+    rows = []
+    for query in CURRENT_HEAT_POLLS:
+        heat = json.loads(s.client.get(f"/action.php?query={query}").content)[
+            "current-heat"
+        ]
+        rows.append(
+            (step, query, heat["classid"], heat["round"], heat["roundid"], heat["heat"])
+        )
+    return rows
+
+
+def timer_test_case(s: TimerScenario):
+    """Six Wolves checked in on 4 lanes, round 1 scheduled, and an
+    identified timer."""
+    s.reset()
+    for i in range(1, 7):
+        s.import_racer(f"firstname=F{i}&lastname=L{i}&carnumber=10{i}&partition=Wolves")
+    s.post_ok("action=racer.bulk&who=all&what=checkin")
+    s.post_ok("action=settings.write&unused-lane-mask=0&n-lanes=4")
+    s.learn_rows()
+    s.post_ok("action=schedule.generate&roundid=1")
+    s._timer_client = Client(headers={"User-Agent": TIMER_UA})
+    s.post_as(s._timer_client, "action=role.login&name=Timer&password=")
+    s.post_as(s._timer_client, "action=timer-message&message=HELLO")
+    s.post_as(s._timer_client, "action=timer-message&message=IDENTIFIED&lane_count=4")
+
+
+def test_classid_through_a_timer_test(event):
+    """Q2 fixes C4: a timer-test advance is `next` within round -100, so
+    Django leaves ClassID as it was, where PHP's `advance_heat` writes ""
+    (`website/inc/autoadvance.inc:138`) and keeps it after the test ends.
+    Every poll that carries current-heat sends the classid from before the
+    test: the round's class after a heat.select (A), and null with no heat
+    ever selected (B). The test heat moves the heat on, so the advance ran."""
+    s = TimerScenario()
+    got = []
+
+    timer_test_case(s)
+    s.post_ok("action=heat.select&roundid=1&now_racing=1")
+    got += current_heats(s, "A1 heat selected")
+    s.post_ok("action=timer.test&tt-mask=0")
+    got += current_heats(s, "A2 test started")
+    s.timer("message=FINISHED&lane1=3.1&lane2=3.2&lane3=3.3&lane4=3.4")
+    got += current_heats(s, "A3 after a test heat")
+    s.post_ok("action=timer.test&test-mode=0")
+    got += current_heats(s, "A4 test ended")
+    s.post_ok("action=heat.select&heat=next")
+    got += current_heats(s, "A5 next heat")
+    wolves = Group.objects.get(event=active_event(), name="Wolves").pk
+    round1 = Round.objects.get(event=active_event()).pk
+
+    timer_test_case(s)
+    got += current_heats(s, "B1 no heat selected")
+    s.post_ok("action=timer.test&tt-mask=12")
+    got += current_heats(s, "B2 test started")
+    s.timer("message=FINISHED&lane1=3.1&lane2=3.2")
+    got += current_heats(s, "B3 after a test heat")
+    s.post_ok("action=timer.test&test-mode=0")
+    got += current_heats(s, "B4 test ended")
+
+    steps = [
+        ("A1 heat selected", wolves, 1, round1, 1),
+        ("A2 test started", wolves, 1, -100, 2),
+        ("A3 after a test heat", wolves, 1, -100, 3),
+        ("A4 test ended", wolves, 1, round1, 1),
+        ("A5 next heat", wolves, 1, round1, 2),
+        ("B1 no heat selected", None, None, -1, None),
+        ("B2 test started", None, 1, -100, 1),
+        ("B3 after a test heat", None, 1, -100, 2),
+        ("B4 test ended", None, None, -1, None),
+    ]
+    assert got == [
+        (step, query, classid, rnd, roundid, heat)
+        for step, classid, rnd, roundid, heat in steps
+        for query in CURRENT_HEAT_POLLS
+    ]
