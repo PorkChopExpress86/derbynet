@@ -25,9 +25,10 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
-      # The developer guide's shell suite (guide-commands.sh dev-shell-suite).
-      - testing/reset-database.sh
-      - testing/common.sh
+      # The shell suites and the scripts the shell jobs run (#399), the
+      # developer guide's shell suite among them (guide-commands.sh
+      # dev-shell-suite: testing/reset-database.sh, testing/common.sh).
+      - testing/**
       - .github/workflows/server.yml
   pull_request:
     paths:
@@ -44,9 +45,10 @@ on:
       # renders them (#61).
       - docs/*.md
       - docs/img/**
-      # The developer guide's shell suite (guide-commands.sh dev-shell-suite).
-      - testing/reset-database.sh
-      - testing/common.sh
+      # The shell suites and the scripts the shell jobs run (#399), the
+      # developer guide's shell suite among them (guide-commands.sh
+      # dev-shell-suite: testing/reset-database.sh, testing/common.sh).
+      - testing/**
       - .github/workflows/server.yml
   workflow_dispatch:
 
