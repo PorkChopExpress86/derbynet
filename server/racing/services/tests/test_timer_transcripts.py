@@ -101,6 +101,38 @@ def test_race_staging_results_and_the_all_zero_stop():
     assert lanes(round, 5) == {lane: (None, None) for lane in (1, 2, 3, 4)}
 
 
+def test_zeroes_on_the_lanes_in_use_stop_racing():
+    """Q17, fixed (#65): `zeroes-on-the-lanes-in-use`, three racers on lanes 2
+    and 4, each FINISHED from a fresh event: zero times with places, then
+    without. PHP writes heat 1 and its poll shows heat 2 racing; Django
+    replays, stops racing on heat 1 and writes nothing. Zero times without
+    places already stopped before #65, through D42's `is_false_start`."""
+    exchanges = transcript("zeroes-on-the-lanes-in-use")
+    finished = [
+        exchange["request-body"]
+        for exchange in exchanges.values()
+        if "message=FINISHED" in exchange.get("request-body", "")
+    ]
+    polls = [
+        json.loads(exchange["body"])["current-heat"]
+        for exchange in exchanges.values()
+        if "poll.coordinator" in exchange["request"]
+    ]
+    assert [("place2=" in body) for body in finished] == [True, False]
+    for body, php in zip(finished, polls, strict=True):
+        assert (php["heat"], php["now_racing"]) == (2, True)
+        replay_state, round = setup_race(racers=3, mask=5)
+        event = replay_state.event
+        connect_replay(event)
+        select_heat(event, round_id=round.id, now_racing=True)
+        drain(event)
+        recorded = record_timer_result(event, django_ids(fields(body), round))
+        assert recorded.outcome is Outcome.ALL_ZERO
+        assert current(event) == (round.id, 1, False)
+        assert lanes(round, 1) == {2: (None, None), 4: (None, None)}
+        assert drain(event) == ["REPLAY 4000 2 50", "CANCEL"]
+
+
 def test_reverse_lanes_mirrors_the_timers_lanes():
     replay_state, round = setup_race(racers=3, mask=1)
     event = replay_state.event

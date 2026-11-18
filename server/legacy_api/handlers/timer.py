@@ -15,6 +15,13 @@ from racing.services import polls, timer
     "timer-message",
     permission=Perm.TIMER_MESSAGE,
     divergences=(
+        "Q17: FINISHED with a time of only 0 and . on every lane the current"
+        " heat schedules, and none needed on its byes, replays, stops racing"
+        " and writes nothing (#65); PHP needs such a time on every lane up to"
+        " the lane count (write-heat-results.inc:7-20), so there it writes the"
+        " heat and moves on. In a timer test, which schedules no lanes, the"
+        " lanes its mask leaves in stand for them, so zero times on those"
+        " lanes stop the test where PHP and master stored them (#65, Q17).",
         "D74: IDENTIFIED sets the race's lane count only while no heat of the"
         " event is scheduled; afterward it stores the timer's count to show"
         " beside the race's (fixes #64 C26). PHP always writes the timer's"

@@ -1,0 +1,112 @@
+### 001 dry-run-with-a-bye-in-the-first-heat
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&dry-run=1&trace=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+note: deterministic: the request took under 1/2 of its 10 s search deadline
+length: 2497
+body:
+{
+    "action": {
+        "action": "schedule.reschedule",
+        "roundid": 1,
+        "dry-run": 1,
+        "trace": 1
+    },
+    "outcome": {
+        "summary": "success",
+        "code": "success",
+        "description": ""
+    },
+    "adjuster": "<sha256 13cf1ba0a5f103610fd7e0dcf6deb31bd5be3a4bd5f3a80f061b4764bcfa3108 of 3383 bytes>",
+    "chart": [
+        "- 4 - -",
+        "2 5 - -",
+        "3 - - -",
+        "4 2 - -",
+        "5 3 - -"
+    ],
+    "timing": {
+        "load": "<seconds>",
+        "inject": "<seconds>",
+        "update": "<seconds>",
+        "master-heat": "<seconds>",
+        "internal": {
+            "constructed": "<seconds>"
+        }
+    },
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": null,
+        "roundid": -1,
+        "round": null,
+        "tbodyid": -1,
+        "heat": null,
+        "number-of-heats": 0
+    },
+    "racers": [],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "remote-start": false,
+        "message": "NOT CONNECTED"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 5,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Racers",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 5,
+                    "ntrophies": -1,
+                    "name": "Racers"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Racers",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 5,
+            "passed": 4,
+            "unscheduled": 0,
+            "adjustments": [
+                {
+                    "why": "departed",
+                    "racerid": 1,
+                    "lastname": "Racer",
+                    "firstname": "Racers1",
+                    "carnumber": 101
+                }
+            ],
+            "heats_scheduled": 5,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+

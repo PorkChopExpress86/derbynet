@@ -1,0 +1,224 @@
+### 001 finished-zeroes-and-places-on-lanes-2-and-4
+request: POST action.php
+request-body: action=timer-message&message=FINISHED&lane2=0.000&lane4=0.000&place2=1&place4=2
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 295
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane2="0.000" lane4="0.000" place2="1" place4="2">
+  <success/>
+  <heat-ready lane-mask="10" class="Wolves" round="1" roundid="1" heat="1" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 002 poll-after-zeroes-and-places
+request: GET action.php?query=poll.coordinator&roundid=1&heat=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2111
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 3
+    },
+    "racers": [
+        {
+            "lane": 2,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 3,
+            "name": "First103 Last103",
+            "carname": "",
+            "carnumber": 103,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Wolves",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
+### 003 finished-zeroes-on-lanes-2-and-4
+request: POST action.php
+request-body: action=timer-message&message=FINISHED&lane2=0.000&lane4=0.000
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 273
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane2="0.000" lane4="0.000">
+  <success/>
+  <heat-ready lane-mask="10" class="Wolves" round="1" roundid="1" heat="1" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 004 poll-after-zeroes
+request: GET action.php?query=poll.coordinator&roundid=1&heat=1
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 2111
+body:
+{
+    "current-heat": {
+        "now_racing": false,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": 1,
+        "roundid": 1,
+        "round": 1,
+        "tbodyid": 1,
+        "heat": 1,
+        "number-of-heats": 3
+    },
+    "racers": [
+        {
+            "lane": 2,
+            "racerid": 1,
+            "name": "First101 Last101",
+            "carname": "",
+            "carnumber": 101,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        },
+        {
+            "lane": 4,
+            "racerid": 3,
+            "name": "First103 Last103",
+            "carname": "",
+            "carnumber": 103,
+            "note": "",
+            "photo": "",
+            "finishtime": "",
+            "finishplace": ""
+        }
+    ],
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "replay-state": {
+        "last_contact": 0,
+        "state": 1,
+        "icon": "img\/status\/not_connected.png",
+        "connected": false,
+        "message": "NOT CONNECTED"
+    },
+    "last-heat": "none",
+    "refused-results": 0,
+    "heat-results": [],
+    "classes": [
+        {
+            "classid": 1,
+            "count": 3,
+            "nrounds": 0,
+            "ntrophies": -1,
+            "name": "Wolves",
+            "subgroups": [
+                {
+                    "rankid": 1,
+                    "count": 3,
+                    "ntrophies": -1,
+                    "name": "Wolves"
+                }
+            ]
+        }
+    ],
+    "rounds": [
+        {
+            "roundid": 1,
+            "classid": 1,
+            "class": "Wolves",
+            "round": 1,
+            "aggregate": false,
+            "roster_size": 3,
+            "passed": 3,
+            "unscheduled": 0,
+            "adjustments": [],
+            "heats_scheduled": 3,
+            "heats_run": 0,
+            "name": "Round 1"
+        }
+    ],
+    "ready-aggregate": []
+}
+
