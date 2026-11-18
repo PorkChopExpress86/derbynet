@@ -265,12 +265,12 @@ def holder_block(out):
 def lock_waiter(pid):
     """The pid of the `flock -x 9` under `pid` that waits on the load lock,
     or None: the line's own flocks under it come and go."""
-    for child, name in child_pids(pid):
+    for child, _ in child_pids(pid):
         try:
             argv = Path(f"/proc/{child}/cmdline").read_bytes().split(b"\0")[:-1]
         except OSError:
             continue
-        if name == "flock" and argv[1:] == [b"-x", b"9"]:
+        if argv[1:] == [b"-x", b"9"]:
             return child
     return None
 
@@ -816,13 +816,10 @@ def start_waiting(tmp_path, script, lock, extra_env=None, copy=None, under=()):
         assert not under, "hold() starts hold-load-lock.sh under nothing"
         run = hold(tmp_path, lock, name="waiter", extra_env=extra_env, script=path)
     out = tmp_path / "waiter.out"
-    # Its flock once it has printed "Waiting": before that, the flock under
-    # it may be the `flock -n` that found the lock held, or the line's.
+    # Its `flock -x 9`: before that, the flock under it may be the
+    # `flock -n` that found the lock held, or the line's.
     wait_until(
-        lambda: (
-            run.poll() is not None
-            or ("Waiting for" in out.read_text() and lock_waiter(run.pid))
-        ),
+        lambda: run.poll() is not None or lock_waiter(run.pid),
         "flock under it",
         30,
     )
@@ -1226,21 +1223,26 @@ ORDER_HAND_OFF = 'echo "${PWD##*/}" >> ../order'
 def join(tmp_path, script, name, lock, extra_env=None, copy=None):
     """`script`, or `copy`, a copy of it, started on `lock` with a stub or
     a command that adds `name` to `tmp_path/order` and ends at once."""
+    path = copy or script
     if script == SCRIPT:
-        return start(tmp_path, name, lock, extra_env, go=True, script=copy or SCRIPT)
-    return hold(tmp_path, lock, ORDER_HAND_OFF, name, extra_env, copy or HOLD_LOCK)
+        run = start(tmp_path, name, lock, extra_env, go=True, script=path)
+    else:
+        run = hold(tmp_path, lock, ORDER_HAND_OFF, name, extra_env, path)
+    # The run is the script asked for.
+    assert str(path) in Path(f"/proc/{run.pid}/cmdline").read_text()
+    return run
 
 
 def join_at(tmp_path, script, name, lock, place):
     """join(), once the run has printed that it is at `place` in the line."""
     run = join(tmp_path, script, name, lock)
     out = tmp_path / f"{name}.out"
-    wait_until(
-        lambda: run.poll() is not None or f"Place {place} in line" in out.read_text(),
-        f"{name} at place {place}",
-        30,
-    )
-    assert run.returncode is None, out.read_text()
+    try:
+        wait_until(lambda: f"Place {place} in line" in out.read_text(), "", 30)
+    except AssertionError:
+        raise AssertionError(
+            f"{name} not at place {place} within 30 s; it printed:\n{out.read_text()}"
+        ) from None
     return run
 
 
