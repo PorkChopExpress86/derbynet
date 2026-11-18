@@ -245,6 +245,12 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn('CI load', done.stdout)
 
+    def test_a_misspelt_head_option_prints_the_usage(self):
+        (self.tmp / 'body.md').write_text(evidence(KEYS))
+        done = self.run_tool('--check', str(self.tmp / 'body.md'), '--hed', HEAD)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
+
     def test_a_run_gh_cannot_read_exits_with_its_message(self):
         done = self.check_at(f'- CI load: {RUN}106\n')
         self.assertEqual(done.returncode, 1)

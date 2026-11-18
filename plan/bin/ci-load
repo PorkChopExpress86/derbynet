@@ -27,6 +27,7 @@ D122 can pass a run whose junit holds failures; junit gives the counts. It
 exits 1 when any shard failed or left no status, or when no load command ran.
 """
 
+import argparse
 import json
 import re
 import shlex
@@ -151,32 +152,32 @@ def summary(the_plan, shards_dir, sha):
     return '\n'.join(out) + '\n', failed
 
 
+def positive(text):
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f'{value} is not at least 1')
+    return value
+
+
 def main(argv):
-    if argv[:1] == ['plan']:
-        args = argv[1:]
-        per_shard, flake, count = 5, False, None
-        while args:
-            if args[0] == '--per-shard' and len(args) > 1:
-                per_shard = int(args[1])
-                args = args[2:]
-            elif args[0] == '--count' and len(args) > 1:
-                count = int(args[1])
-                args = args[2:]
-            elif args[0] == '--flake-ticket':
-                flake = True
-                args = args[1:]
-            else:
-                sys.exit(__doc__)
-        if per_shard < 1 or (count is not None and count < 1):
-            sys.exit('ci-load: --per-shard and --count must be at least 1')
-        print(json.dumps(plan(sys.stdin.read(), per_shard, flake, count)))
+    parser = argparse.ArgumentParser(prog='plan/bin/ci-load', usage=__doc__.split('\n\n')[1].removeprefix('Usage: '))
+    actions = parser.add_subparsers(dest='action', required=True)
+    # No abbreviations: a misspelt --flake-ticket must not pass as one.
+    planning = actions.add_parser('plan', allow_abbrev=False)
+    planning.add_argument('--per-shard', type=positive, default=5)
+    planning.add_argument('--flake-ticket', action='store_true')
+    planning.add_argument('--count', type=positive)
+    summing = actions.add_parser('summary')
+    summing.add_argument('plan_file', type=Path)
+    summing.add_argument('shards_dir', type=Path)
+    summing.add_argument('sha')
+    args = parser.parse_args(argv)
+    if args.action == 'plan':
+        print(json.dumps(plan(sys.stdin.read(), args.per_shard, args.flake_ticket, args.count)))
         return 0
-    if argv[:1] == ['summary'] and len(argv) == 4:
-        the_plan = json.loads(Path(argv[1]).read_text())
-        text, failed = summary(the_plan, argv[2], argv[3])
-        sys.stdout.write(text)
-        return 1 if failed else 0
-    sys.exit(__doc__)
+    text, failed = summary(json.loads(args.plan_file.read_text()), args.shards_dir, args.sha)
+    sys.stdout.write(text)
+    return 1 if failed else 0
 
 
 if __name__ == '__main__':

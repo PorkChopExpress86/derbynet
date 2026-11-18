@@ -14,7 +14,9 @@ name: ci-load
 # trial: a run with a count of its own or a push's.
 run-name: >-
   ${{ github.event_name == 'push' && format('CI load trial, push of {0}', github.sha)
-  || inputs.count && format('CI load trial at {0} (count {1})', inputs.sha, inputs.count)
+  || (inputs.count || inputs.loops_per_cpu || inputs.workers)
+  && format('CI load trial at {0} (count {1}, loops per CPU {2}, workers {3})', inputs.sha,
+            inputs.count, inputs.loops_per_cpu, inputs.workers)
   || format('CI load at {0}', inputs.sha) }}
 
 on:
@@ -48,6 +50,18 @@ on:
           pr-evidence accepts no trial
         default: ''
         type: string
+      loops_per_cpu:
+        description: >-
+          Busy loops per logical CPU in place of 1, for a trial; pr-evidence
+          accepts no trial
+        default: ''
+        type: string
+      workers:
+        description: >-
+          The pytest -n in place of each command's, for a trial; pr-evidence
+          accepts no trial
+        default: ''
+        type: string
   # Temporary, for the proof runs on scratch branches before this file is on
   # master: removed before #415's PR leaves draft.
   push:
@@ -64,6 +78,8 @@ jobs:
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
       sha: ${{ steps.plan.outputs.sha }}
+      loops_per_cpu: ${{ steps.plan.outputs.loops_per_cpu }}
+      workers: ${{ steps.plan.outputs.workers }}
     env:
       SHA: ${{ inputs.sha }}
       BASE: ${{ inputs.base }}
@@ -71,6 +87,8 @@ jobs:
       FLAKE_TICKET: ${{ inputs.flake_ticket }}
       PER_SHARD: ${{ inputs.per_shard }}
       COUNT: ${{ inputs.count }}
+      LOOPS_PER_CPU: ${{ inputs.loops_per_cpu }}
+      WORKERS: ${{ inputs.workers }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -120,6 +138,12 @@ jobs:
           python3 -I -m json.tool "$RUNNER_TEMP/plan.json"
           echo "shards=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(sys.stdin)["shards"]))' <"$RUNNER_TEMP/plan.json")" >>"$GITHUB_OUTPUT"
           echo "sha=$SHA" >>"$GITHUB_OUTPUT"
+          if ! [[ "${LOOPS_PER_CPU:-1}" =~ ^[1-9][0-9]?$ && "${WORKERS:-1}" =~ ^[1-9][0-9]?$ ]]; then
+            echo "::error::loops_per_cpu and workers must be whole numbers from 1 to 99"
+            exit 1
+          fi
+          echo "loops_per_cpu=${LOOPS_PER_CPU:-1}" >>"$GITHUB_OUTPUT"
+          echo "workers=$WORKERS" >>"$GITHUB_OUTPUT"
           cp "$RUNNER_TEMP/affected.txt" "$RUNNER_TEMP/plan.json" "$GITHUB_WORKSPACE/"
 
       - uses: actions/upload-artifact@v7
@@ -188,6 +212,8 @@ jobs:
         env:
           ARGS: ${{ toJSON(matrix.args) }}
           FONT: ${{ matrix.font }}
+          LOOPS_PER_CPU: ${{ needs.plan.outputs.loops_per_cpu }}
+          WORKERS: ${{ needs.plan.outputs.workers }}
         run: |
           lscpu
           echo "nproc: $(nproc)"
@@ -202,13 +228,24 @@ jobs:
             fi
             args=("${kept[@]}")
           fi
+          if [ -n "$WORKERS" ]; then
+            for i in "${!args[@]}"; do
+              if [ "${args[$i]}" = -n ]; then args[i+1]=$WORKERS; fi
+            done
+          fi
           if [ -n "$FONT" ]; then export DERBYNET_BROWSER_FONT="$FONT"; fi
           out="$RUNNER_TEMP/out"
           mkdir -p "$out"
+          while :; do echo "$(date -u +%T) $(cat /proc/loadavg)"; sleep 10; done >"$out/loadavg.log" &
+          sampler=$!
           status=0
           DERBYNET_LOAD_RUN_DIR="$RUNNER_TEMP/load" DERBYNET_LOAD_LOCK="$RUNNER_TEMP/load.lock" \
-            tools/pytest-under-load.sh --loops "$(nproc)" "${args[@]}" >"$out/script.log" 2>&1 || status=$?
+            tools/pytest-under-load.sh --loops "$(( $(nproc) * LOOPS_PER_CPU ))" "${args[@]}" \
+            >"$out/script.log" 2>&1 || status=$?
+          kill "$sampler"
           cat "$out/script.log"
+          echo "load average every 10 s (1, 5 and 15 min):"
+          cat "$out/loadavg.log"
           echo "$status" >"$out/status"
           cp "$RUNNER_TEMP"/load/*.log "$RUNNER_TEMP"/load/*.xml "$out/" 2>/dev/null || true
           exit "$status"

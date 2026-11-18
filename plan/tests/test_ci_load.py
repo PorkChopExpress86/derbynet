@@ -197,7 +197,41 @@ class Summary(unittest.TestCase):
         self.assertIn('Skipped `DERBYNET_BROWSER_FONT="DejaVu Sans" tools/hold-load-lock.sh', text)
 
 
+def run_tool(*argv, stdin=''):
+    return subprocess.run([sys.executable, '-I', str(CI_LOAD), *argv],
+                          input=stdin, capture_output=True, text=True)
+
+
 class CommandLine(unittest.TestCase):
+    def test_plan_takes_each_option(self):
+        done = run_tool('plan', '--per-shard', '2', '--count', '3', '--flake-ticket',
+                        stdin=MASTER_KIOSKS)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        shards = json.loads(done.stdout)['shards']
+        self.assertEqual([s['count'] for s in shards], [2, 1, 2, 1])
+        self.assertEqual(shards[0]['args'][:1], ['--flake-ticket'])
+        self.assertEqual(run_tool('plan', stdin=MASTER_KIOSKS).returncode, 0)
+
+    def test_a_count_or_shard_size_below_1_and_a_wrong_action_are_refused(self):
+        for argv in (('plan', '--per-shard', '0'), ('plan', '--count', '0'),
+                     ('plan', '--per-shard'), ('summary', 'plan.json', 'dir'), ('sum',),
+                     ('plan', '--flake')):
+            with self.subTest(argv=argv):
+                done = run_tool(*argv, stdin=MASTER_KIOSKS)
+                self.assertEqual(done.returncode, 2, done.stdout)
+                self.assertIn('usage:', done.stderr)
+
+    def test_summary_exits_0_when_every_shard_passed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = TOOL.plan(MASTER_KIOSKS)
+            (Path(tmp) / 'plan.json').write_text(json.dumps(plan))
+            for s in plan['shards']:
+                (Path(tmp) / s['name']).mkdir()
+                (Path(tmp) / s['name'] / 'status').write_text('0\n')
+            done = run_tool('summary', str(Path(tmp) / 'plan.json'), tmp, '0' * 40)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('Result: passed', done.stdout)
+
     def test_plan_reads_stdin_and_summary_exits_1_on_a_failure(self):
         done = subprocess.run([sys.executable, '-I', str(CI_LOAD), 'plan'],
                               input=MASTER_KIOSKS, capture_output=True, text=True, check=True)
