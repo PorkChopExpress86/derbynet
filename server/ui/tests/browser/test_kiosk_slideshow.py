@@ -202,7 +202,10 @@ def change_slide(page):
 
 
 def test_the_slideshow_crossfades_to_one_slide(page, slideshow):
-    change_slide(page)
+    try:
+        change_slide(page)
+    except KeyError, ValueError:
+        raise
     expect(slideshow.locator("img")).to_have_attribute("src", "slide.php/narrow.png")
     page.wait_for_function(NARROW, arg=SLIDES, timeout=FADE_MS)
     shoot(page, "kiosk-slideshow-narrow")
