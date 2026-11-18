@@ -437,12 +437,10 @@ def inset(prefix: str) -> str:
 
 
 def stays_in(line: str, fence: re.Match) -> bool:
-    """A line behind the fence's indent and `>` marks, or blank outside a
-    quote: a line left of them, or a blank line, may end the list item or
-    quote that holds the fence."""
+    """A line behind the fence's indent and `>` marks, or holding only
+    them (a blank line, outside a quote): a line left of them, or a blank
+    line in a quote, may end the list item or quote that holds the fence."""
     text, room = line.expandtabs(4), inset(fence[1])
-    if not text.strip():
-        return ">" not in room
     return text.startswith(room) or text.rstrip() == room.rstrip()
 
 
