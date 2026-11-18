@@ -24,7 +24,8 @@ SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'sour
 # where it ran, the merge's parents and files, then prints what the real tool
 # prints and exits as $STUB_<NAME> says (pass, fail, broken, hang, deaf:
 # hang and ignore SIGTERM, move: push $STUB_PUSH_FROM's HEAD to master
-# once, or cut: move $STUB_ORIGIN away). A hang stops after $STUB_LIMIT seconds (120), so a test run that is
+# once, cut: move $STUB_ORIGIN away, or edit: write $STUB_BODY to
+# $FAKE_BODY_FILE, which the fake gh then answers as the PR's body). A hang stops after $STUB_LIMIT seconds (120), so a test run that is
 # killed leaves no stub looping (#333 review).
 STUB = '''#!/bin/bash
 name=$(basename "$0")
@@ -53,6 +54,9 @@ case $name:${{!var:-}} in
     trap '' TERM
     echo $$ >"$RAN.pid"
     while [ "$SECONDS" -lt "${{STUB_LIMIT:-120}}" ]; do date >>busy; sleep 0.1; done ;;
+  uv:edit)
+    # The PR's body changes while the checks run.
+    printf '%s\\n' "$STUB_BODY" >"$FAKE_BODY_FILE" ;;
   uv:cut)
     # origin goes away while the checks run.
     [ -e "$STUB_ORIGIN" ] && mv "$STUB_ORIGIN" "$STUB_ORIGIN.gone" ;;
@@ -74,7 +78,8 @@ elif args[:2] == ['pr', 'view'] and 'closingIssuesReferences' in args:
 elif args[:2] == ['pr', 'view'] and 'body' in args:
     if os.environ.get('FAKE_BODY_FAILS'):
         sys.exit(1)
-    print(os.environ.get('FAKE_BODY', ''))
+    edited = os.environ.get('FAKE_BODY_FILE', '')
+    print(open(edited).read() if os.path.exists(edited) else os.environ.get('FAKE_BODY', ''))
 elif args[:2] == ['issue', 'view'] and 'state,body' in args:
     print('## Still open\\n\\n- the screenshots')
 elif args[:2] == ['pr', 'view'] and 'state,mergeCommit' in args:
@@ -301,10 +306,66 @@ class PrMerge(unittest.TestCase):
         """A body that only quotes an id, in a code span or a fence, cites
         nothing; neither does an id inside a longer word."""
         head = self.pr('server/ui/kiosk.css')
-        self.env['FAKE_BODY'] = 'the row `D133` is #420\'s\n\n```\nD134 in a log\n```\nAD5 X_D6\n'
+        self.env['FAKE_BODY'] = ('the row `D133` is #420\'s\n\n```\nD134 in a log\n```\n'
+                                 '  ```\nD135 in an indented fence\n  ```\nAD5 X_D6 3D7\n')
         done = self.merge(head)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn('pr merge 7', self.merged())
+
+    def test_a_url_tail_is_not_a_citation(self):
+        """An id after a slash is the end of a URL or a path; one after any
+        other punctuation is cited."""
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_BODY'] = 'see https://example.com/docs/D504 and plan/D505.md\n'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('pr merge 7', self.merged())
+        self.env['FAKE_BODY'] = 'D504, "D505", (D506); D507.\n'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('its body cites D504 D505 D506 D507, which', done.stderr)
+
+    def test_an_unclosed_fence_hides_no_id(self):
+        """A closed fence quotes what it holds and the ids after it are cited;
+        a fence never closed quotes nothing, so a stray one hides no id."""
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_BODY'] = '```\nD134 quoted\n```\nD135 after it\n'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('its body cites D135, which', done.stderr)
+        self.env['FAKE_BODY'] = 'prose\n```\nD134 after a stray fence\nand `D136` quoted, D137\n'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('its body cites D134 D137, which', done.stderr)
+        self.env['FAKE_BODY'] = '```\nD134 quoted\n```\nprose\n```\nD138 after a stray fence\n'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('its body cites D138, which', done.stderr)
+        self.assertEqual(self.merged(), '')
+
+    def test_an_unrecorded_decision_refuses_before_the_source_checks_run(self):
+        """The refusal came after the source checks had run (#432 review)."""
+        head = self.check_pair()
+        self.env['FAKE_BODY'] = 'cites D9999 in prose'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('its body cites D9999, which', done.stderr)
+        self.assertEqual(self.ran(), '')
+        self.assertEqual(self.merged(), '')
+
+    def test_a_body_changed_during_the_source_checks_refuses(self):
+        """The body is read again after the checks: one edited to cite an
+        unrecorded decision while they ran is refused, with the checks' pass
+        kept for the rerun."""
+        head = self.check_pair()
+        self.env.update(FAKE_BODY='cites nothing', STUB_UV='edit', STUB_BODY='now cites D9999',
+                        FAKE_BODY_FILE=str(self.tmp / 'body'))
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('the source checks passed on #7', done.stderr)
+        self.assertIn('its body cites D9999, which', done.stderr)
+        self.assertEqual(self.merged(), '')
+        self.assert_no_worktree()
 
     def test_a_body_it_cannot_read_refuses(self):
         head = self.pr('server/ui/kiosk.css')
