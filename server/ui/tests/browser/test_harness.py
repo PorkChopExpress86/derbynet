@@ -142,8 +142,8 @@ KEEPS_SENDING = {
       };
       go();
     }""",
-    # sendBeacon has no reply to wait on: the tab sends one now and then,
-    # on a MessageChannel loop no stop of timers ends.
+    # sendBeacon has no reply to wait on: the tab sends beacons from a
+    # MessageChannel loop, which no stop of timers ends.
     "beacon": """() => {
       let n = 0;
       const tick = () => {
