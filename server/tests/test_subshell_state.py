@@ -10,9 +10,10 @@ the subshell, so `cleanup` took no Compose project down and a
 A function records state when, outside a quoted string and outside a
 subshell of its own, it appends to a variable it has not declared `local`,
 sets a trap, assigns a global that some code, itself included, reads
-before setting it, or calls a function that does. A function that prints its result for `$(...)`
-takes its state from its caller instead, or the caller runs it bare and
-reads the global it sets, as checks.sh's compose_up now does.
+before setting it, or calls a function that does. A function that prints
+its result for `$(...)` takes its state from its caller instead, or the
+caller runs it bare and reads the global it sets, as checks.sh's compose_up
+now does.
 
 The rule reads the script's text, not a bash parse: a function read across
 files is found only through a `source` or `.` line naming a .sh file by its
@@ -199,7 +200,7 @@ def substitutions(line: str) -> list[str]:
             stack.append(i + 2)
             i += 2
             continue
-        if line[i] == "(" and stack:
+        if line[i] == "(":
             stack.append(None)
         elif line[i] == ")" and stack:
             start = stack.pop()
@@ -471,6 +472,8 @@ def test_the_sweep_reads_each_shell_file_and_its_library(tmp_path, monkeypatch):
         ("'a\\' b=1", "'  ' b=1"),
         ("'a\nb'", "' \n '"),
         ('$(echo ")") c=1', '$(echo " ") c=1'),
+        ('"$(f) x=1"', '"$(f)    "'),
+        ("'$(f) a=1' b", "'        ' b"),
     ],
 )
 def test_unquoted_blanks_what_quotes_hold(text, blanked):
