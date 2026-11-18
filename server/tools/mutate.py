@@ -383,7 +383,14 @@ def listed(args) -> int:
     for (path, why), n in skipped.items():
         print(f"SKIPPED   {path}: {n} listed, {why}", flush=True)
     if not found:
-        print("mutate.py: refused: no mutant listed for the diff", file=sys.stderr)
+        # #367's listing was empty, for a string constant and a test body,
+        # and its dropped marker write died only by a clock race (#367 retro).
+        print(
+            "mutate.py: refused: no mutant listed for the diff. Mutate each step"
+            " the changed tests take by hand, one per call (--file, --old, --new),"
+            " and see each fail on the test's own assert, not on a bound",
+            file=sys.stderr,
+        )
         return REFUSED
     paths = list(dict.fromkeys(root / m.path for m in found))
     locks, saved = [], {}
