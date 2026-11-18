@@ -24,10 +24,16 @@ test or class, or `module` or the file's name, as a row of the table does.
 A `same` row or a wrapped line that names no scope lists for the scope of
 the line above it; any other row that names none lists for none. A module
 claim counts on any line, since its row may name the constant a comment
-sits above, or the test that reads it. A line of fenced code lists nothing
-and names no scope: #367's `<details>` of
-pasted junit and traceback named the test and held `timed out after 3 s`,
-which passed a "3 s" no assert read (#367 retro).
+sits above, or the test that reads it.
+
+A line of fenced code lists nothing and names no scope: #367's `<details>`
+of pasted junit and traceback named the test and held `timed out after
+3 s`, which passed a "3 s" no assert read (#367 retro). A fence opens on a
+run of backticks with no backtick after it, or of tildes, behind any
+indent, `>` marks and list markers, so the tool drops every line a
+CommonMark fence holds, and more where it can't tell a list item's indent
+(`test_the_fence_rule_drops_what_commonmark_fences` sweeps it). A fence
+left open is an error that names its line.
 
 `--check --base REV` asks only for the claims the diff from the merge base
 with REV, to the working tree, adds or changes (D123, #374): those of a
@@ -285,7 +291,9 @@ def scope_names(claim: Claim, file: Path) -> list[str]:
 # whose first cell is `same` (or a ditto mark) continues the one above.
 NEW_ITEM = re.compile(r"\s*(?:\||[-*+]\s|\d+[.)]\s|#)")
 SAME = re.compile(r"\s*\|\s*(?:same\b|〃|\")", re.IGNORECASE)
-FENCE = re.compile(r"\s*(`{3,}|~{3,})")
+# A fence mark behind its indent, blockquote marks and list markers, then
+# its info string.
+FENCE = re.compile(r"((?:[ \t>]|[-*+][ \t]|\d{1,9}[.)][ \t])*)(`{3,}|~{3,})(.*)")
 
 
 def word(text: str) -> re.Pattern:
@@ -397,25 +405,49 @@ def base_text(file: Path, rev: str) -> str | None:
         return None
 
 
+class UnclosedFence(Exception):
+    def __init__(self, line: int):
+        super().__init__(line)
+        self.line = line
+
+
+def opens(mark: re.Match) -> bool:
+    """A backtick fence's info string holds no backtick, or the line is an
+    inline code span (```code``` is a span)."""
+    return mark[2][0] == "~" or "`" not in mark[3]
+
+
+def closes(mark: re.Match, fence: re.Match) -> bool:
+    """The fence's own mark, at least as long, with nothing after it, and
+    indented within the room one container gives both lines' indent."""
+    return (
+        mark[2][0] == fence[2][0]
+        and len(mark[2]) >= len(fence[2])
+        and not mark[3].strip()
+        and abs(width(mark[1]) - width(fence[1])) <= 3
+    )
+
+
+def width(prefix: str) -> int:
+    return len(prefix.expandtabs(4))
+
+
 def details(body: str) -> list[str]:
     """The text of each `<details>` block, less its fenced code: pasted
     output lists no claim (#367 retro), and a `<details>` a fence quotes
-    opens no block."""
-    kept, fence = [], ""
-    for line in body.splitlines():
+    opens no block. Raises UnclosedFence for a fence left open, which
+    would drop the rest of the body."""
+    kept, fence, start = [], None, 0
+    for n, line in enumerate(body.splitlines(), 1):
         mark = FENCE.match(line)
-        if fence:
-            if (
-                mark
-                and mark[1][0] == fence[0]
-                and len(mark[1]) >= len(fence)
-                and not line[mark.end() :].strip()
-            ):
-                fence = ""
-        elif mark:
-            fence = mark[1]
-        else:
+        if fence is None and mark and opens(mark):
+            fence, start = mark, n
+        elif fence is None:
             kept.append(line)
+        elif mark and closes(mark, fence):
+            fence = None
+    if fence is not None:
+        raise UnclosedFence(start)
     return re.findall(r"<details>(.*?)</details>", "\n".join(kept), re.S)
 
 
@@ -430,7 +462,15 @@ def main(argv: list[str] | None = None) -> int:
     found = [(f, c, hits) for f in args.files for c, hits in claims(f)]
     if args.check:
         names = {n for f, c, _ in found for n in scope_names(c, f)}
-        listed = rows(details(args.check.read_text()), names)
+        try:
+            blocks = details(args.check.read_text())
+        except UnclosedFence as e:
+            print(
+                f"{args.check}:{e.line}: this fence never closes, so the rest"
+                " of the body, every <details> block in it, reads as code"
+            )
+            return 1
+        listed = rows(blocks, names)
         scoped = {}
         if args.base:
             for f in dict.fromkeys(args.files):

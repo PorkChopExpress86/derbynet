@@ -383,8 +383,9 @@ def listed(args) -> int:
     for (path, why), n in skipped.items():
         print(f"SKIPPED   {path}: {n} listed, {why}", flush=True)
     if not found:
-        # #367's listing was empty, for a string constant and a test body,
-        # and its dropped marker write died only by a clock race (#367 retro).
+        # #367's diff (PR #392) changed only tests/test_mutate.py, so it
+        # listed no mutant, and its dropped marker write died only by a clock
+        # race (#367 retro).
         print(
             "mutate.py: refused: no mutant listed for the diff. Mutate each step"
             " the changed tests take by hand, one per call (--file, --old, --new),"
