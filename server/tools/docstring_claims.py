@@ -36,8 +36,12 @@ The tool reads one line at a time and can't see the list item or quote
 that holds a fence, so where CommonMark might read a fence otherwise it
 stops with an error naming the line: a fence left open, a line left of
 its fence's indent (a blank one in a quote), or a fence mark off that
-indent. It keeps no line a CommonMark fence holds, and drops more where it
-can't tell the container (`test_the_fence_rule_drops_what_commonmark_fences`).
+indent. In the swept cases, it keeps no line a CommonMark fence holds,
+and drops more where it can't tell the container
+(`test_the_fence_rule_drops_what_commonmark_fences`). It does not read
+HTML blocks: in CommonMark a fence mark inside one, such as straight under
+a `<details>` line, opens no fence, so a fence after the blank line that
+ends the block reads to the tool as a close (PR #402's body).
 
 `--check --base REV` asks only for the claims the diff from the merge base
 with REV, to the working tree, adds or changes (D123, #374): those of a

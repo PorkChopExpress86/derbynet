@@ -372,9 +372,10 @@ FENCE_SWEEP = [
     [pytest.param(*row[1:], id=row[0]) for row in FENCE_SWEEP],
 )
 def test_the_fence_rule_drops_what_commonmark_fences(lines, fenced, kept, error, eol):
-    """details() keeps no word CommonMark fences: where it can't tell the
-    container it drops more, or stops with an error. Each case's outcome
-    is pinned, so a change shows in the table (#402 review)."""
+    """details() keeps no word CommonMark fences in these cases: where it
+    can't tell the container it drops more, or stops with an error. Each
+    case's outcome is pinned, so a change shows in the table (#402
+    review)."""
     body = eol.join(["<details>", "", *lines.split("\n"), "", "</details>", ""])
     try:
         text, line = "\n".join(dc.details(body)), None
