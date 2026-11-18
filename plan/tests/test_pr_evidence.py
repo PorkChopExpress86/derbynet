@@ -224,6 +224,17 @@ class CheckRefuses(PrEvidence):
             '"Part of #399", or move a limit that leaves no box open to "## Left for later"',
             'unfilled placeholder, line 17: LOOP-OUTPUT'])
 
+    def test_each_check_alone_is_refused(self):
+        closing = DRAFT_399.replace('LOOP-OUTPUT', '25 of 25 ok')
+        unfilled = DRAFT_399.replace('Closes', 'Part of')
+        for body, line in ((closing, 'the body closes #399'),
+                           (unfilled, 'unfilled placeholder, line 17: LOOP-OUTPUT')):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + '\n' + body)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertEqual(len(done.stdout.splitlines()), 2, done.stdout)
+                self.assertTrue(done.stdout.splitlines()[1].startswith(line), done.stdout)
+
     def test_the_draft_as_the_lead_fixed_it_passes(self):
         fixed = DRAFT_399.replace('Closes', 'Part of').replace('LOOP-OUTPUT', '25 of 25 ok')
         done = self.check(evidence(KEYS) + '\n' + fixed)
