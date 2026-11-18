@@ -65,9 +65,19 @@ def start_line(leader, where, log):
 
 
 def logged(tmp_path, key):
-    """The value of the log's `key` header line."""
-    lines = (tmp_path / "run.log").read_text().splitlines()
-    return next(x for x in lines if x.startswith(f"{key} ")).removeprefix(f"{key} ")
+    """The value of the log's `key` header line, once the `--run` shell has
+    written it. The start form returns as soon as the `session` line is
+    there, while the rest of the header may still be on its way: CI read
+    the log before its `cgroup` line once (#412)."""
+    found = []
+
+    def written():
+        lines = (tmp_path / "run.log").read_text().splitlines()
+        found[:] = [x for x in lines if x.startswith(f"{key} ")]
+        return found
+
+    until(written)
+    return found[0].removeprefix(f"{key} ")
 
 
 def stubs(tmp_path, **scripts):
