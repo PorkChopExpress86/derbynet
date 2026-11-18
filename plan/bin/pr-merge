@@ -42,6 +42,11 @@
 # plan/bin/affected-tests maps the combined diff to. After that run on the
 # PR merged with origin/master, --base-checked merges anyway.
 #
+# It refuses a PR whose body cites a decision (D133) that
+# plan/owner-decisions.md has no row for on origin/master or on the PR's
+# head: #386 cited D133 and merged before #420, which records it (#378
+# retro). An id in backticks or a code fence is quoted, not cited.
+#
 # Last, it fetches origin/master again and refuses when it moved since the
 # checks read it: a PR merged during the run was never checked with this one
 # (#333 review).
@@ -333,6 +338,23 @@ for n in $("$GH" pr view "$PR" --repo "$REPO" --json closingIssuesReferences \
 done
 if [ ${#held[@]} -gt 0 ]; then
   echo "not merging #$PR; it closes ${held[*]}, whose body has a \"## Still open\" section; write \"Part of #N\" in the PR body instead" >&2
+  exit 1
+fi
+# A decision the PR body cites is a row of plan/owner-decisions.md on
+# origin/master or on the PR's head (#378 retro: #386 cited D133, whose row
+# was still in open PR #420). An id in a code span or fence is quoted.
+if ! body=$("$GH" pr view "$PR" --repo "$REPO" --json body --jq .body); then
+  echo "not merging #$PR; could not read its body, whose cited decisions must be on origin/master or the PR's head" >&2
+  exit 1
+fi
+cited=$(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence { gsub(/`[^`]*`/, ""); print }' <<<"$body" |
+        grep -oE '\bD[0-9]+\b' | LC_ALL=C sort -u || true)
+recorded=$({ git show "$master:plan/owner-decisions.md" 2>/dev/null || true
+             git show "$head:plan/owner-decisions.md" 2>/dev/null || true; } |
+           sed -nE 's/^\| (D[0-9]+) \|.*/\1/p' | LC_ALL=C sort -u)
+unrecorded=$(LC_ALL=C comm -23 <(grep . <<<"$cited" || true) <(echo "$recorded") | tr '\n' ' ')
+if [ -n "$unrecorded" ]; then
+  echo "not merging #$PR; its body cites ${unrecorded% }, which plan/owner-decisions.md has no row for on origin/master ${master:0:8} or on its head ${head:0:8}; merge the PR that records it first, or put the id in backticks if the body only quotes it" >&2
   exit 1
 fi
 # The checks and the area rule read origin/master at $master. A PR that

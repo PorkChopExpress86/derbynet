@@ -71,6 +71,10 @@ if args[:2] == ['pr', 'view'] and 'headRefOid' in args:
     print({head!r})
 elif args[:2] == ['pr', 'view'] and 'closingIssuesReferences' in args:
     print(os.environ.get('FAKE_CLOSES', ''))
+elif args[:2] == ['pr', 'view'] and 'body' in args:
+    if os.environ.get('FAKE_BODY_FAILS'):
+        sys.exit(1)
+    print(os.environ.get('FAKE_BODY', ''))
 elif args[:2] == ['issue', 'view'] and 'state,body' in args:
     print('## Still open\\n\\n- the screenshots')
 elif args[:2] == ['pr', 'view'] and 'state,mergeCommit' in args:
@@ -243,6 +247,72 @@ class PrMerge(unittest.TestCase):
         done = self.merge(head)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn('pr merge 7', self.merged())
+
+    def decisions(self, *ids):
+        """plan/owner-decisions.md text with a row for each of `ids`."""
+        rows = ''.join(f'| {d} | 2026-11-18 | a decision | #1 |\n' for d in ids)
+        return '| ID | Date | Decision | Recorded in |\n|---|---|---|---|\n' + rows
+
+    def write(self, rel, text):
+        path = self.work / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def test_a_decision_the_body_cites_with_no_row_refuses(self):
+        """#386's body cited D133 in prose while #420, which adds its row,
+        was still open, and #386 merged first (#378 retro)."""
+        self.git('switch', '-q', '-C', 'moved', 'origin/master')
+        self.write('plan/owner-decisions.md', self.decisions('D101'))
+        self.commit('D101 recorded')
+        self.git('push', '-q', 'origin', 'HEAD:master')
+        self.git('switch', '-q', 'branch')
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_BODY'] = ("the owner narrowed D101's repeats for `test_kiosk*.py`\r\n"
+                                 'files to one font under load (D133), and D1330 too.\r\n')
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn(f'not merging #7; its body cites D133 D1330, which plan/owner-decisions.md '
+                      f'has no row for on origin/master {self.git("rev-parse", "origin/master")[:8]} '
+                      f'or on its head {head[:8]}', done.stderr)
+        self.assertEqual(self.merged(), '')
+
+    def test_a_decision_recorded_on_master_merges(self):
+        self.git('switch', '-q', '-C', 'moved', 'origin/master')
+        self.write('plan/owner-decisions.md', self.decisions('D101', 'D133'))
+        self.commit('D101 and D133 recorded')
+        self.git('push', '-q', 'origin', 'HEAD:master')
+        self.git('switch', '-q', 'branch')
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_BODY'] = 'D101 as amended by D133.'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('pr merge 7', self.merged())
+
+    def test_a_decision_the_pr_records_merges(self):
+        """#420 cites D133 and adds its row."""
+        self.write('plan/owner-decisions.md', self.decisions('D133'))
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_BODY'] = 'D133 narrows the kiosk repeats to one font.'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('pr merge 7', self.merged())
+
+    def test_a_quoted_decision_is_not_cited(self):
+        """A body that only quotes an id, in a code span or a fence, cites
+        nothing; neither does an id inside a longer word."""
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_BODY'] = 'the row `D133` is #420\'s\n\n```\nD134 in a log\n```\nAD5 X_D6\n'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('pr merge 7', self.merged())
+
+    def test_a_body_it_cannot_read_refuses(self):
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_BODY_FAILS'] = '1'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('not merging #7; could not read its body', done.stderr)
+        self.assertEqual(self.merged(), '')
 
     def test_a_workflow_github_rejected_refuses(self):
         """#59's pi-images.yml showed no check on the PR, and every listed
