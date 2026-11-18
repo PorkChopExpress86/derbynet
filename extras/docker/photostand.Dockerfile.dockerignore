@@ -1,0 +1,9 @@
+# The build context is the repository root (photostand.Dockerfile header).
+# Only what the image copies goes in.
+*
+!extras/scripts/photostand.sh
+!extras/scripts/lib/
+!extras/conf/
+!extras/sounds/
+!extras/docker/read-barcodes.py
+!extras/docker/photostand-entrypoint.sh

@@ -11,7 +11,7 @@ This guide covers:
 
 ## What you need
 
-- A computer with a 64-bit Intel or AMD processor, or an Apple Silicon Mac or other arm64 computer. A Raspberry Pi is not supported as the server (D21). A Pi can still be a kiosk, a timer client, or a photo stand (see [the photo stand guide](photo-stand.md)).
+- A computer with a 64-bit Intel or AMD processor, or an Apple Silicon Mac or other arm64 computer. A Raspberry Pi is not supported as the server (D21). A Pi can still be a kiosk, a timer client, or a photo stand (see [Raspberry Pi timer and photo stand](pi-setup.md)).
 - Docker:
   - On a Mac or a Windows computer, install Docker Desktop from <https://www.docker.com/products/docker-desktop/>. On Windows, keep the default WSL 2 engine. You need no Docker account.
   - On Linux, install Docker Engine for your distribution from <https://docs.docker.com/engine/install/>, with its Compose plugin. Compose 2.23.1 or later reads the Compose file; `docker compose version` prints yours.

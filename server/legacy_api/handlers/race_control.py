@@ -245,6 +245,9 @@ def schedule_unschedule(ctx: LegacyContext) -> None:
     permission=Perm.CONTROL_RACE,
     divergences=PAYLOAD_DIVERGENCES
     + (
+        "Q3: a bye in the round's first heat takes a racer of a heat the"
+        " squeeze removes, so the chart can have one heat fewer than PHP's"
+        " (#65).",
         "Q5: a dry run leaves racing on.",
         "Q20, Q21, Q25: the charts and failures #20 decided.",
         "R6: `trace` adds no `adjuster`; `timing` holds 0 seconds.",

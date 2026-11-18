@@ -1,0 +1,66 @@
+### 001 finished-zeroes-on-the-tested-lanes
+request: POST action.php
+request-body: action=timer-message&message=FINISHED&lane1=0.000&lane2=0.000
+status: 200
+content-type: text/xml; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 279
+body:
+<?xml version="1.0" encoding="UTF-8"?>
+<action-response action="timer-message" message="FINISHED" lane1="0.000" lane2="0.000">
+  <success/>
+  <heat-ready lane-mask="3" class="Timer Test" round="1" roundid="-100" heat="2" lanes="4"/>
+<remote-log send='false'/>
+</action-response>
+
+### 002 timer-test-after-zeroes
+request: GET action.php?query=poll.timer.test
+status: 200
+content-type: application/json; charset=utf-8
+cache-control: no-store, no-cache, must-revalidate
+length: 889
+body:
+{
+    "current-heat": {
+        "now_racing": true,
+        "use_master_sched": false,
+        "use_points": false,
+        "classid": "",
+        "roundid": -100,
+        "round": 1,
+        "tbodyid": -100,
+        "heat": 2,
+        "number-of-heats": 0
+    },
+    "timer-state": {
+        "lanes": 4,
+        "last-contact": "<epoch>",
+        "state": 3,
+        "icon": "img\/status\/ok.png",
+        "remote-start": false,
+        "message": "Staging"
+    },
+    "timer-details": {
+        "type": "",
+        "human": "",
+        "ident": "",
+        "options": ""
+    },
+    "tt": {
+        "heat": 1,
+        "mask": 12,
+        "results": [
+            {
+                "lane": 1,
+                "time": 0,
+                "place": 1
+            },
+            {
+                "lane": 2,
+                "time": 0,
+                "place": 1
+            }
+        ]
+    }
+}
+

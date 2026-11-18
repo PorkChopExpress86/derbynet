@@ -1,0 +1,18 @@
+### 001 dry-run-with-a-bye-in-the-first-heat
+request: POST action.php
+request-body: action=schedule.reschedule&roundid=1&dry-run=1&trace=1
+length: 193
+body:
+{
+    "chart": [
+        "2 4 - -",
+        "3 5 - -",
+        "4 2 - -",
+        "5 3 - -"
+    ],
+    "timing": {
+        "internal": {
+            "constructed": "<seconds>"
+        }
+    }
+}

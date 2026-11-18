@@ -161,6 +161,72 @@ def test_a_squeeze_never_adds_heats(case):
     assert len(adjuster.chart_debug()) <= before
 
 
+def parsed(debug):
+    """`chart_debug()` back into heats, None for a raced heat."""
+    return [
+        None if text is None else [None if r == "-" else int(r) for r in text.split()]
+        for text in debug
+    ]
+
+
+def dissolvable(chart, usable):
+    """The heat indices whose racers could each move to a bye in the same lane
+    of another unraced heat that lacks them, any heat index 0 included. A
+    heat with a bye in a usable lane never qualifies, since every heat with a
+    bye there holds a bye, and neither does a heat as its own target."""
+    return [
+        h
+        for h, heat in enumerate(chart)
+        if heat is not None
+        and all(
+            any(
+                other is not None and other[lane] is None and heat[lane] not in other
+                for other in chart
+            )
+            for lane in usable
+        )
+    ]
+
+
+def racer_lanes(chart):
+    return Counter(
+        (r, lane)
+        for heat in unraced(chart)
+        for lane, r in enumerate(heat)
+        if r is not None
+    )
+
+
+def test_the_dissolvable_check_names_the_heat_a_squeeze_could_remove():
+    """The property's own checks, on charts read back from `chart_debug()`:
+    each racer's lane is counted, byes are not, and
+    heat index 2's racers fit the byes at indices 0 and 1; a raced heat,
+    a heat with a bye, and a racer already in the target heat count for
+    nothing."""
+    chart = parsed(["1 -", "- 2", "3 4"])
+    assert chart == [[1, None], [None, 2], [3, 4]]
+    assert dissolvable(chart, [0, 1]) == [2]
+    assert racer_lanes(chart) == Counter({(1, 0): 1, (2, 1): 1, (3, 0): 1, (4, 1): 1})
+    assert dissolvable(parsed([None, "- 2", "3 4"]), [0, 1]) == []
+    assert dissolvable(parsed(["1 -", "- 3", "3 4"]), [0, 1]) == []
+    assert dissolvable(parsed(["1 -", "- 2", "3 -"]), [0, 1]) == []
+
+
+@settings(max_examples=300, deadline=None)
+@given(cases())
+def test_a_squeeze_may_use_heat_index_0(case):
+    """Q3, fixed (#65): the squeeze stops only when no heat could still move
+    into byes, whichever heat index holds them, and every racer keeps its
+    runs in each lane. PHP's `!$relos[$lane]` passes over a bye in heat
+    index 0, so its squeeze can stop early."""
+    adjuster = run(case, case.adjuster(), squeeze=False)
+    before = parsed(adjuster.chart_debug())
+    adjuster.squeeze_out_byes()
+    after = parsed(adjuster.chart_debug())
+    assert dissolvable(after, case.usable) == []
+    assert racer_lanes(after) == racer_lanes(before)
+
+
 @st.composite
 def race_positions(draw):
     """A case whose raced heats are any of its heats, with the running heat

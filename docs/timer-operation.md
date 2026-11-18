@@ -78,7 +78,7 @@ Turn off Settings, then "Track", then "Warn when no timer is connected". The das
 
 ## derby-timer.jar
 
-`derby-timer.jar` needs Java. Docker Desktop cannot pass a USB device into the container (D3), so on a Mac or Windows laptop it runs outside Docker, like the browser. On a Linux server it runs on the host, beside the container.
+`derby-timer.jar` needs Java. Docker Desktop cannot pass a USB device into the container (D3), so on a Mac or Windows laptop it runs outside Docker, like the browser. On a Linux server it runs on the host, beside the container. On a Raspberry Pi beside the track it can run as a container of its own ([Raspberry Pi timer and photo stand](pi-setup.md)).
 
 Start it with a double-click, or from a command line. With no options it opens a window. Type the server's address on the left, and press "Connect". The right side picks the timer's serial port.
 

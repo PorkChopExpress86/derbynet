@@ -75,6 +75,7 @@ WRITERS = [
     "legacy_api.tests.test_racers_parity",
     "transfer.tests.test_batch_import",
     "legacy_api.tests.test_race_control_parity",
+    "legacy_api.tests.test_timer_parity",
     "legacy_api.tests.test_awards_parity",
     "legacy_api.tests.test_kiosks_parity",
     "legacy_api.tests.test_standings",

@@ -1,10 +1,11 @@
 # Reschedule cases that test-reschedule.sh does not reach (#24): what PHP does
-# with racing state and with a search that runs out of added heats.  Each case
-# starts from an empty database on 4 lanes, with racer ids 1, 2, ... in import
-# order, and races its first heats with the timer.  A reply that fits no racer
-# in, or answers nochart, shows no runs in its timing, so those requests send
-# trace=1, and the reschedule-timing rule of normalize.mjs reads the runs per
-# lane from the adjuster trace.
+# with racing state, with a search that runs out of added heats, and with a
+# bye in a round's first heat.  Each case starts from an empty database on 4
+# lanes, with racer ids 1, 2, ... in import order, and races its first heats,
+# if any, with the timer.  A reply that fits no racer in, or answers nochart,
+# shows no runs in its timing, so those requests send trace=1, and the
+# reschedule-timing rule of normalize.mjs reads the runs per lane from the
+# adjuster trace.
 
 reschedule_case() {   # reschedule_case <racers> <partition>: a fresh event
   use_session coord
@@ -71,3 +72,14 @@ post_ok "action=heat.select&roundid=2&heat=1"
 capture_scenario reschedule/last-added-heat
 capture rounds-before "GET action.php?query=poll.coordinator"
 capture dry-run-runs-out-of-added-heats "POST action.php action=schedule.reschedule&roundid=1&racerid=5&dry-run=1&trace=1"
+
+# Q3: five racers on two lanes (lanes 3 and 4 unused), no heat raced or
+# selected.  Racer 1 leaves, so heat 1 has a bye in lane 1 and heat 3 one in
+# lane 2.  Heat 2's racers fit those byes, but heat 1 is index 0, which PHP's
+# `!$relos[$lane]` takes for no heat, so PHP squeezes out nothing (#65).
+MASK=12 reschedule_case 5 Racers
+post_ok "action=racer.bulk&who=all&what=checkin"
+post_ok "action=schedule.generate&roundid=1"
+post_ok "action=racer.pass&racer=1&value=0"
+capture_scenario reschedule/first-heat-bye
+capture dry-run-with-a-bye-in-the-first-heat "POST action.php action=schedule.reschedule&roundid=1&dry-run=1&trace=1"
