@@ -47,9 +47,11 @@ HEAT_SECONDS=${HEAT_SECONDS:-30}
 # A thread dump after DUMP_AFTER seconds with the timer not identified yet,
 # about three times the 11 s it took at most; the wait goes on.
 DUMP_AFTER=${DUMP_AFTER:-30}
-# The longest a poll may take.  A poll.coordinator answers within a second
-# in these runs (the server logs show one a second); a hung one counts as no
-# progress.
+# The longest one poll may take, so that a hung poll counts as a failed one
+# and the loop goes on.  10 s is far above the polls measured: in run
+# 44181424925's attempt 1, the Django log has 182 polls from 21:40:52 to
+# 21:43:59, 180 of them each after the old loop's 1 s sleep, so a poll took
+# about 0.04 s on average (#399 retro).
 POLL_SECONDS=10
 
 # Django's timer states (TimerStatus.State, server/racing/models.py).
@@ -159,6 +161,10 @@ fail_race() {
 SHOWN=""
 IDENTIFIED_AT=""
 while true; do
+    # Each pass sleeps 1 s and polls, so it takes 1 s plus the poll, up to
+    # POLL_SECONDS more.  The bounds above compare NOW, the wall-clock
+    # seconds since the jar started, so a long pass delays the next check,
+    # not the time a bound measures.
     sleep 1
     NOW=$((SECONDS - START))
     jar_alive || fail_race "derby-timer.jar exited after ${NOW}s"

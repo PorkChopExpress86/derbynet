@@ -13,7 +13,8 @@
 # the first entry of a folder listing taken as it comes (#312 retro),
 # the role page lists of testing/test-permissions.sh against the page gates
 # (#319 retro), a fake clock paused at its install time and a browser test
-# that takes no fixture (#317 retro),
+# that takes no fixture (#317 retro), a shell function that records state
+# called in a subshell (#59 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -82,6 +83,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   tests/test_workflow_contexts.py \
   tests/test_readme_compose.py \
   tests/test_pipefail_pipes.py \
+  tests/test_subshell_state.py \
   tests/test_listing_order.py \
   tests/test_plan_source_checks.py \
   tests/test_role_pages_fixture.py \

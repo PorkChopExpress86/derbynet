@@ -19,9 +19,11 @@ PR_WAIT = Path(__file__).resolve().parent.parent / 'bin' / 'pr-wait'
 FAKE_GH = '''#!{python}
 import subprocess, sys
 args = sys.argv[1:]
+if args[:1] == ['api']:
+    sys.exit()  # no workflow run on the head (plan/bin/rejected-workflows)
 if args[2:3] != [{pr!r}]:
     sys.exit('pr-wait named ' + ' '.join(args[2:3]))
-if args[:2] == ['pr', 'view'] and 'headRefOid' in args:
+if args[:2] == ['pr', 'view'] and 'headRefOid,headRefName' in args:
     print('abc123')
 elif args[:2] == ['pr', 'checks']:
     jq = args[args.index('--jq') + 1]
