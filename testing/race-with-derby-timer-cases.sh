@@ -10,7 +10,9 @@
 # Needs what race-with-derby-timer.sh needs.  The stand-ins go first on the
 # PATH.  In timer-stand-in/java, JAVA_DELAY holds the jar's start and
 # JAVA_EXIT ends it at once.  In timer-stand-in/curl, TIMER_STATE is the
-# timer state every poll.coordinator answer reports.
+# timer state every poll.coordinator answer reports.  In
+# timer-stand-in/sleep, FIRST_SLEEP is how long the race loop's first
+# `sleep 1` lasts.
 # Each case's output is kept in $TMPDIR/race-cases.<case>.log.
 
 BASE_URL=$1
@@ -23,14 +25,18 @@ TESTING=$(cd "$(dirname "$0")" && pwd)
 # which came within 4 s of the jar's start here and about 11 s on CI (the
 # script's bounds), so IDENTIFY_SECONDS=30 is about twice the 16 s.
 #
+# identify-1s and dump-on-pass hold the loop's first poll to FIRST_SLEEP=8,
+# about twice those 4 s, so the jar is already staging at that poll, and
+# each bound must still fire.
+#
 # name | environment | how the run must end, pass or fail | the line it must print
 CASES='
-identify-1s|IDENTIFY_SECONDS=1|fail|did not complete round [0-9]*: the timer was not identified within 1s
+identify-1s|IDENTIFY_SECONDS=1 FIRST_SLEEP=8|fail|did not complete round [0-9]*: the timer was not identified within 1s
 heat-3s|HEAT_SECONDS=3|fail|did not complete round [0-9]*: no heat finished within 3s of the last
 heat-8s|HEAT_SECONDS=8|pass|raced every heat
 race-60s|RACE_SECONDS=60|fail|did not complete round [0-9]*: the round did not finish within 60s
 race-120s|RACE_SECONDS=120|pass|raced every heat
-dump-on-pass|DUMP_AFTER=0|pass|^Full thread dump
+dump-on-pass|DUMP_AFTER=0 FIRST_SLEEP=8|pass|^Full thread dump
 slow-start|JAVA_DELAY=151|pass|raced every heat
 slow-start-identify-120s|JAVA_DELAY=151 IDENTIFY_SECONDS=120|fail|did not complete round [0-9]*: the timer was not identified within 120s
 jar-exits|JAVA_EXIT=1|fail|did not complete round [0-9]*: derby-timer.jar exited
@@ -45,6 +51,7 @@ while IFS='|' read -r name env want expect; do
     fi
     log="${TMPDIR:-/tmp}/race-cases.$name.log"
     started=$SECONDS
+    rm -f "${TMPDIR:-/tmp}"/race-first-sleep.*
     env $env PATH="$TESTING/timer-stand-in:$PATH" \
         bash "$TESTING/race-with-derby-timer.sh" "$BASE_URL" < /dev/null > "$log" 2>&1
     code=$?

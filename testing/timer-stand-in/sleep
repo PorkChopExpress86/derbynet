@@ -1,0 +1,17 @@
+#! /bin/bash
+#
+# A stand-in for sleep, first on the PATH in race-with-derby-timer-cases.sh
+# (#399).  With FIRST_SLEEP set, the first `sleep 1` of
+# race-with-derby-timer.sh, its race loop's, lasts FIRST_SLEEP seconds, so
+# the jar is already staging at the loop's first poll; every other sleep
+# goes to the next sleep on the PATH unchanged.
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+REAL=$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -vxF "$HERE" | paste -sd:) command -v sleep)
+MARK="${TMPDIR:-/tmp}/race-first-sleep.$PPID"
+if [ -n "$FIRST_SLEEP" ] && [ "$*" = 1 ] && [ ! -e "$MARK" ] \
+       && grep -q race-with-derby-timer.sh "/proc/$PPID/cmdline" 2>/dev/null; then
+    : > "$MARK"
+    set -- "$FIRST_SLEEP"
+fi
+exec "$REAL" "$@"
