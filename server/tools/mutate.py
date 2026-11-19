@@ -39,8 +39,10 @@ narrowed to each `--file` given, one after another against the same tests:
 #336's mutants were picked by hand, mostly one way, and 21 of 98 survived
 on branches no test reached; the listing's every condition and operand,
 each made true and made false, is what "each condition is mutated" means
-(#336 retro). It prints a row per mutant as it runs (`KILLED`, `SURVIVED`,
-or `REFUSED` or `ERROR` with pytest's last lines), then the count of each,
+(#336 retro). It prints a row per mutant as it runs (`KILLED` with
+pytest's short summary lines, the test and the error that killed it,
+`SURVIVED`, or `REFUSED` or `ERROR` with pytest's last lines), then the
+count of each,
 and exits 0 when every one is KILLED, 1 when one survived, and 2 when one
 was refused or errored, or none is listed. It mutates `.py`, `.js` and
 `.css` files and Python scripts, and names each other file whose mutants
@@ -264,6 +266,22 @@ def _result(run, output: str, expect: str) -> tuple[str, str]:
     return outcome, ""
 
 
+def killed_by(output: str) -> list[str]:
+    """The `FAILED` and `ERROR` lines of pytest's short test summary: the
+    test that killed a mutant and its error. #347's KILLED rows named no
+    test, so a kill by a bound or a flake read as one by an assert, and a
+    row was rerun by hand to see which (#347 retro)."""
+    lines = output.splitlines()
+    starts = [i for i, line in enumerate(lines) if "short test summary info" in line]
+    if not starts:
+        return []
+    return [
+        line
+        for line in lines[starts[-1] + 1 :]
+        if line.startswith(("FAILED ", "ERROR "))
+    ]
+
+
 def _listing():
     try:
         return importlib.import_module("operand_mutants")
@@ -416,6 +434,10 @@ def listed(args) -> int:
                 print(f"{word:<8}  {m}" + (f"  ({why})" if why else ""), flush=True)
                 if word in ("REFUSED", "ERROR") and output:
                     for line in output.splitlines()[-15:]:
+                        print(f"    {line}")
+                else:
+                    # Only a failed run has a short summary: a KILLED one.
+                    for line in killed_by(output):
                         print(f"    {line}")
         except (SystemExit, Changed) as stop:
             left = found[len(rows) :]

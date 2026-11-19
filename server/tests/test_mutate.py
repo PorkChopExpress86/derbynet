@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.mutate import counts, main, stopped_on_error
+from tools.mutate import counts, killed_by, main, stopped_on_error
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "mutate.py"
 MODULE = "def bound(a, b):\n    return a < b\n\n\ndef twice():\n    return 1 + 1\n"
@@ -436,6 +436,11 @@ def listed(project, *pytest_args, tool=(), wait=False):
     return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
 
 
+def rows(run):
+    """The listed run's rows, without the pytest lines indented under them."""
+    return [line for line in run.stdout.splitlines() if not line.startswith(" ")]
+
+
 def commit(project, module, tests=""):
     (project / "mod.py").write_text(module)
     (project / "test_mod.py").write_text(TESTS + tests)
@@ -447,7 +452,7 @@ def test_listed_runs_each_mutant_and_names_each_survivor(project):
     has b at 0 or below."""
     commit(project, MODULE + PICK, PICK_TESTS)
     run = listed(project, "test_mod.py::test_pick")
-    assert run.stdout.splitlines()[:6] == [
+    assert rows(run)[:6] == [
         "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  True",
         "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  False",
         "KILLED    mod.py:10  operand  a > 0  ->  True",
@@ -461,6 +466,42 @@ def test_listed_runs_each_mutant_and_names_each_survivor(project):
     )
     assert run.returncode == 1
     assert (project / "mod.py").read_text() == MODULE + PICK
+
+
+def test_listed_names_the_test_and_error_under_each_killed_row(project):
+    """#347's KILLED rows named no test: a kill by a bound or a flake read
+    as one by the test's assert, and the row was rerun by hand (#347 retro).
+    `pick(1, 1) == 1` fails each mutant that makes the condition false, and
+    `pick(0, 1) == 0` each that makes it true."""
+    commit(project, MODULE + PICK, PICK_TESTS)
+    run = listed(project, "test_mod.py::test_pick")
+    lines = run.stdout.splitlines()
+    assert lines[:2] == [
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  True",
+        "    FAILED test_mod.py::test_pick - assert 1 == 0",
+    ], run.stdout
+    assert lines[2:4] == [
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  False",
+        "    FAILED test_mod.py::test_pick - assert 0 == 1",
+    ], run.stdout
+    survivor = lines.index("SURVIVED  mod.py:10  operand  b > 0  ->  True")
+    assert not lines[survivor + 1].startswith(" "), run.stdout
+
+
+def test_killed_by_reads_only_the_short_summary():
+    """A captured log's `ERROR` line above the summary is no test."""
+    output = (
+        "ERROR    asyncio:base_events.py:1893 Exception in callback\n"
+        "=========================== short test summary info ============================\n"
+        "FAILED t.py::test_a - assert 1 == 2\n"
+        "ERROR t.py::test_b - RuntimeError: an environment problem\n"
+        "========================= 1 failed, 1 error in 0.10s ==========================\n"
+    )
+    assert killed_by(output) == [
+        "FAILED t.py::test_a - assert 1 == 2",
+        "ERROR t.py::test_b - RuntimeError: an environment problem",
+    ]
+    assert killed_by("1 failed in 0.1s\n") == []
 
 
 def test_listed_exits_0_when_every_mutant_is_killed(project):
@@ -547,12 +588,11 @@ def test_listed_mutates_a_guard_in_a_test_file_named_by_file(project):
     (PR #364's review found both counted as helpers)."""
     commit(project, MODULE, GUARD_TESTS)
     run = listed(project, "test_mod.py::test_ends", tool=("--file", "test_mod.py"))
-    rows = run.stdout.splitlines()
-    assert rows[1:3] == [
+    assert rows(run)[1:3] == [
         'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  True',
         'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  False',
     ], run.stdout
-    assert "SKIPPED   test_mod.py: 8 listed, in a test function" in rows, run.stdout
+    assert "SKIPPED   test_mod.py: 8 listed, in a test function" in rows(run)
     assert run.returncode == 0, run.stdout + run.stderr
     assert (project / "test_mod.py").read_text() == TESTS + GUARD_TESTS
 
@@ -564,7 +604,9 @@ def test_listed_skips_a_test_file_it_is_not_named(project):
         "SKIPPED   test_mod.py: 10 listed, in a test file"
         " (name it with --file to mutate its helpers)" in run.stdout
     ), run.stdout
-    assert "test_mod.py:" not in run.stdout.replace("SKIPPED   test_mod.py:", "")
+    # No row names a mutant in it; a KILLED row's pytest line names its test.
+    listed_rows = "\n".join(rows(run)).replace("SKIPPED   test_mod.py:", "")
+    assert "test_mod.py:" not in listed_rows, run.stdout
 
 
 def test_listed_takes_no_old_or_new(project):
@@ -622,7 +664,7 @@ def test_listed_narrows_to_each_file_given_and_lists_scripts_and_stylesheets(pro
     subprocess.run([*GIT, "add", "tool", "a.css"], cwd=project, check=True)
     commit(project, MODULE + PICK, PICK_TESTS)
     run = listed(project, "test_mod.py::test_the_bound", tool=("--file", "tool"))
-    assert [line.split()[1] for line in run.stdout.splitlines()[:2]] == [
+    assert [line.split()[1] for line in rows(run)[:2]] == [
         "tool:2",
         "tool:2",
     ], run.stdout
