@@ -73,8 +73,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # A receiver of dotted names, `Math.` or `self.items.`, is part of the call,
-# so `Math.max(a, b)` becomes `a`, not `Math.a`; a call after any other
-# receiver, `f().max(`, is no match (#449).
+# so a `Math.` call becomes its operand `a`, not `Math.a`; a call after
+# any other receiver, `f().` or `xs[0].`, is no match (#449).
 CALL = re.compile(r"(?<![\w.$-])((?:[A-Za-z_$][\w$]*\.)*)(min|max|clamp)\(")
 JS_IF = re.compile(r"\b(?:if|else if)\s*\(")
 FILTER = re.compile(r"\.filter\(\s*(\(?[\w, ]*\)?)\s*=>\s*")
