@@ -7,6 +7,7 @@ This module imports no Django, so a tool run outside pytest imports it too.
 
 from datetime import timedelta
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import expect
 
 
@@ -36,12 +37,18 @@ BOUND = """root => [root, ...root.querySelectorAll('[hx-get], [hx-post]')]
   .filter((e) => e.matches('[hx-get], [hx-post]'))
   .every((e) => (e['htmx-internal-data'] || {}).initHash)"""
 
-# 'bound' once BOUND holds for `root`, 'gone' once a swap has taken `root`
-# out of the page: htmx's cleanup of a swapped-out element deletes its
-# internal data but `firstInitCompleted` (htmx 2.0.4 `deInitNode`), so BOUND
-# never holds for it again (#425).
-BOUND_OR_GONE = f"""root => !root.isConnected ? 'gone'
-  : ({BOUND})(root) && 'bound'"""
+# GONE once a swap has taken `root` out of the page, true once BOUND holds
+# for it: htmx's cleanup of a swapped-out element deletes its internal data
+# but `firstInitCompleted` (htmx 2.0.4 `deInitNode`), so BOUND never holds
+# for it again (#425).
+GONE = "gone"
+BOUND_OR_GONE = f"""root => !root.isConnected ? '{GONE}' : ({BOUND})(root)"""
+
+# How many swaps `bound()` follows. A poll swaps a control once per answer
+# that changes what it shows; a locator swapped out more often than this
+# keeps resolving to elements something replaces before htmx binds them,
+# and waiting on more of them binds nothing (#466 review).
+MAX_SWAPS = 5
 
 
 def bound(page, locator):
@@ -53,11 +60,24 @@ def bound(page, locator):
     such swap, so `htmx_settled()` alone does not cover it. A poll's swap
     during the wait takes out the element `locator` showed, and the wait
     follows `locator` to the element swapped in
-    (`test_a_tap_follows_a_card_a_poll_swaps_while_bound_waits`)."""
-    while True:
-        found = page.wait_for_function(BOUND_OR_GONE, arg=locator.element_handle())
-        if found.json_value() == "bound":
+    (`test_a_tap_follows_a_card_a_poll_swaps_while_bound_waits`), for up to
+    MAX_SWAPS swaps. Each wait takes Playwright's timeout. Past the timeout
+    or the swaps, it fails naming `locator` and which bound it hit
+    (`test_bound_follows_swaps_up_to_its_cap`,
+    `test_bound_names_the_control_it_timed_out_on`)."""
+    for swaps in range(MAX_SWAPS + 1):
+        try:
+            found = page.wait_for_function(BOUND_OR_GONE, arg=locator.element_handle())
+        except PlaywrightTimeout as timeout:
+            raise AssertionError(
+                f"bound(): {locator} showed no element htmx bound within "
+                f"Playwright's timeout, after {swaps} swaps"
+            ) from timeout
+        if found.json_value() != GONE:
             return
+    raise AssertionError(
+        f"bound(): {locator} was swapped out {MAX_SWAPS + 1} times and never bound"
+    )
 
 
 def ready(page, body):

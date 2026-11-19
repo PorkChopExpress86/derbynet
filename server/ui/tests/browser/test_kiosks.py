@@ -6,6 +6,7 @@ slideshow Configure sheet showing what was saved (C20), the parity boxes of
 
 import json
 import re
+from contextlib import nullcontext
 from datetime import timedelta
 
 import pytest
@@ -24,7 +25,7 @@ from ui.tests.browser.conftest import (
     htmx_settled,
     shoot,
 )
-from ui.tests.browser.helpers import bound, ready
+from ui.tests.browser.helpers import MAX_SWAPS, bound, ready
 
 ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
 ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
@@ -503,46 +504,122 @@ def test_a_tap_follows_a_card_a_poll_swaps_while_bound_waits(login, event):
     The control stands in for the locator and lets the held poll through
     the first time `bound()` asks it for an element, so the swap lands
     inside the real `tap()` on every run. htmx binds a swapped-in button
-    at once (`defaultSettleDelay` 0), so the test unbinds the new one and
-    has htmx bind it again a moment later, and records whether the click
-    found it bound."""
+    at once (`defaultSettleDelay` 0), so the test unbinds the new one, has
+    htmx bind it again only when `bound()` asks for the button again, and
+    records whether the click found it bound."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     page_button = card(page, "tv").locator('[data-action="page"]')
-    swapped = []
-    bound_late = """() => {
+    unbind_and_watch_the_click = """() => {
       const button = document.querySelector(
         '#kiosk-board [data-kiosk="tv"] [data-action="page"]');
       delete button['htmx-internal-data'].initHash;
-      setTimeout(() => htmx.process(button), 2000);
       document.addEventListener('click', (e) => {
         const control = e.target.closest('[hx-get]');
         window.clickedBound = !!(control['htmx-internal-data'] || {}).initHash;
       }, {capture: true, once: true});
     }"""
 
-    class SwapAfterFirstResolve:
+    class SwapThenRebind:
+        resolves = 0
+
         def __getattr__(self, name):
             return getattr(page_button, name)
 
         def element_handle(self):
+            self.resolves += 1
             handle = page_button.element_handle()
-            if not swapped:
+            if self.resolves == 1:
                 polls = hold_the_polls(page, stretch=False)
                 Kiosk.objects.filter(address="tv").update(name="Lobby")
                 polls.wait_for(1)
                 polls.answer(0)
                 polls.end()
                 assert not handle.evaluate("e => e.isConnected"), "no swap"
-                page.evaluate(bound_late)
-                swapped.append(handle)
+                page.evaluate(unbind_and_watch_the_click)
+            elif self.resolves == 2:
+                handle.evaluate("e => htmx.process(e)")
             return handle
 
-    tap(page, SwapAfterFirstResolve())
-    assert swapped, "bound() never resolved the control"
+    control = SwapThenRebind()
+    tap(page, control)
     assert page.evaluate("window.clickedBound") is True, "clicked before the bind"
+    assert control.resolves == 2, "bound() took the button before and after the swap"
     expect(page.locator("#sheet-kiosks-title")).to_have_text("Page for Lobby")
     ready(page, sheet(page, "kiosks").locator("[data-page-sheet]"))
+
+
+# A control outside the board, so no poll swaps it; htmx binds it only when
+# a test asks.
+STAND_IN = """() => {
+  const control = document.createElement('button');
+  control.id = 'stand-in';
+  control.setAttribute('hx-get', '/');
+  document.body.append(control);
+}"""
+
+
+@pytest.mark.parametrize(
+    ("swaps", "outcome"),
+    [
+        (MAX_SWAPS, nullcontext()),
+        (
+            MAX_SWAPS + 1,
+            pytest.raises(
+                AssertionError,
+                match=f"swapped out {MAX_SWAPS + 1} times and never bound",
+            ),
+        ),
+    ],
+    ids=["at-the-cap", "past-the-cap"],
+)
+def test_bound_follows_swaps_up_to_its_cap(login, event, swaps, outcome):
+    """`bound()` takes a control's element again after each swap, up to
+    MAX_SWAPS swaps, and past them fails naming the swaps (#466 review).
+    The control swaps the stand-in out each time `bound()` takes its
+    element, `swaps` times, and then has htmx bind the element it gives."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    stand_in = page.locator("#stand-in")
+
+    class SwapEachResolve:
+        resolves = 0
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = stand_in.element_handle()
+            handle.evaluate(
+                "e => e.replaceWith(e.cloneNode(true))"
+                if self.resolves <= swaps
+                else "e => htmx.process(e)"
+            )
+            return handle
+
+    control = SwapEachResolve()
+    with outcome:
+        bound(page, control)
+    assert control.resolves == MAX_SWAPS + 1, "bound() stopped taking elements"
+
+
+@pytest.mark.parametrize(
+    "selector", ["#stand-in", "#no-such-control"], ids=["never-bound", "never-shown"]
+)
+def test_bound_names_the_control_it_timed_out_on(login, event, selector):
+    """A control htmx never binds, or one the page never shows, fails
+    `bound()` with a message naming the control once Playwright's timeout
+    passes, not Playwright's own (#466 review). Nothing here binds later,
+    so the test shortens Playwright's timeout and the outcome does not
+    depend on its length."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    page.set_default_timeout(1_000)
+    with pytest.raises(
+        AssertionError,
+        match=rf"bound\(\): .*'{selector}'.* showed no element htmx bound "
+        "within Playwright's timeout, after 0 swaps",
+    ):
+        bound(page, page.locator(selector))
+    page.set_default_timeout(30_000)  # Playwright's default
 
 
 # ----- a press that spans a board swap (D102, #344) --------------------------
