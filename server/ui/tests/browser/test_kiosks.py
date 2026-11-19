@@ -492,6 +492,59 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     expect(scene_button(page, welcome)).to_have_attribute("aria-pressed", "true")
 
 
+def test_a_tap_follows_a_card_a_poll_swaps_while_bound_waits(login, event):
+    """A poll's reply swaps the board just after `bound()` first resolves a
+    card's Page button to an element (#425). htmx's cleanup of the
+    swapped-out button deletes its `initHash`, so a wait on that element
+    alone never ends; `tap()` follows the button to the card swapped in,
+    clicks it only once htmx has bound it, and opens its Page sheet, under
+    the new name.
+
+    The control stands in for the locator and lets the held poll through
+    the first time `bound()` asks it for an element, so the swap lands
+    inside the real `tap()` on every run. htmx binds a swapped-in button
+    at once (`defaultSettleDelay` 0), so the test unbinds the new one and
+    has htmx bind it again a moment later, and records whether the click
+    found it bound."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    page_button = card(page, "tv").locator('[data-action="page"]')
+    swapped = []
+    bound_late = """() => {
+      const button = document.querySelector(
+        '#kiosk-board [data-kiosk="tv"] [data-action="page"]');
+      delete button['htmx-internal-data'].initHash;
+      setTimeout(() => htmx.process(button), 2000);
+      document.addEventListener('click', (e) => {
+        const control = e.target.closest('[hx-get]');
+        window.clickedBound = !!(control['htmx-internal-data'] || {}).initHash;
+      }, {capture: true, once: true});
+    }"""
+
+    class SwapAfterFirstResolve:
+        def __getattr__(self, name):
+            return getattr(page_button, name)
+
+        def element_handle(self):
+            handle = page_button.element_handle()
+            if not swapped:
+                polls = hold_the_polls(page, stretch=False)
+                Kiosk.objects.filter(address="tv").update(name="Lobby")
+                polls.wait_for(1)
+                polls.answer(0)
+                polls.end()
+                assert not handle.evaluate("e => e.isConnected"), "no swap"
+                page.evaluate(bound_late)
+                swapped.append(handle)
+            return handle
+
+    tap(page, SwapAfterFirstResolve())
+    assert swapped, "bound() never resolved the control"
+    assert page.evaluate("window.clickedBound") is True, "clicked before the bind"
+    expect(page.locator("#sheet-kiosks-title")).to_have_text("Page for Lobby")
+    ready(page, sheet(page, "kiosks").locator("[data-page-sheet]"))
+
+
 # ----- a press that spans a board swap (D102, #344) --------------------------
 
 # The page's own record of a press, in the order the page saw it: each
