@@ -44,10 +44,8 @@ BOUND = """root => [root, ...root.querySelectorAll('[hx-get], [hx-post]')]
 GONE = "gone"
 BOUND_OR_GONE = f"""root => !root.isConnected ? '{GONE}' : ({BOUND})(root)"""
 
-# How many swaps `bound()` follows. A poll swaps a control once per answer
-# that changes what it shows; a locator swapped out more often than this
-# keeps resolving to elements something replaces before htmx binds them,
-# and waiting on more of them binds nothing (#466 review).
+# How many swaps `bound()` follows before it fails, so a locator that
+# resolves to a new element each time cannot keep it waiting (#466 review).
 MAX_SWAPS = 5
 
 

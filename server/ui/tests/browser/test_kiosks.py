@@ -601,6 +601,36 @@ def test_bound_follows_swaps_up_to_its_cap(login, event, swaps, outcome):
     assert control.resolves == MAX_SWAPS + 1, "bound() stopped taking elements"
 
 
+def test_bound_waits_on_the_element_swapped_in(login, event):
+    """After a swap, `bound()` waits on the element swapped in, and a
+    timeout there names the swap (#466 review). The control swaps the
+    stand-in out the first time `bound()` takes its element and shortens
+    Playwright's timeout the next time; htmx never binds the element
+    swapped in, so the outcome does not depend on the timeout's length."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    stand_in = page.locator("#stand-in")
+
+    class SwapOnce:
+        resolves = 0
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = stand_in.element_handle()
+            if self.resolves == 1:
+                handle.evaluate("e => e.replaceWith(e.cloneNode(true))")
+            else:
+                page.set_default_timeout(1_000)
+            return handle
+
+    with pytest.raises(
+        AssertionError,
+        match="showed no element htmx bound within Playwright's timeout, after 1 swaps",
+    ):
+        bound(page, SwapOnce())
+    page.set_default_timeout(30_000)  # Playwright's default
+
+
 @pytest.mark.parametrize(
     "selector", ["#stand-in", "#no-such-control"], ids=["never-bound", "never-shown"]
 )
