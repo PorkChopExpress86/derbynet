@@ -17,18 +17,10 @@ import pytest
 from legacy_api.handlers.testing import MANAGED
 from legacy_api.registry import DEFERRED, REGISTRY
 from legacy_api.tests.test_registry import php_endpoints
+from tests.file_kinds import testing_scripts
 
 TESTING = Path(__file__).resolve().parents[3] / "testing"
-# The `.sh` scripts, and the helpers with no suffix such as `queryj`.
-SCRIPTS = sorted(
-    path
-    for path in TESTING.iterdir()
-    if path.is_file()
-    and (
-        path.suffix == ".sh"
-        or (not path.suffix and path.read_bytes().startswith(b"#!"))
-    )
-)
+SCRIPTS = testing_scripts()
 COMMON = TESTING / "common.sh"
 # `action=role.login` in a curl argument, `-F action=snapshot.put` in a form.
 # A name made of a shell variable is not checked.

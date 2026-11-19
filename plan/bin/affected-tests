@@ -108,7 +108,10 @@ every changed browser test file keeps its count, of the whole file.
 
 import ast
 import collections
+import importlib.util
 import io
+import itertools
+import os
 import re
 import subprocess
 import sys
@@ -244,6 +247,7 @@ class Tree:
         self._graph = None
         self._website = None
         self._names = None
+        self._listed = {}
         self._users = {}
         self._texts = {}
 
@@ -251,15 +255,27 @@ class Tree:
         return (self.server / rel).exists()
 
     def tracked_names(self):
-        """How many files git tracks under each file name. A root that is no
-        git repository, such as a test's stand-in, counts none, so no name
-        collides there."""
+        """How many files git tracks under each file name. A root with no
+        `.git`, such as a test's stand-in, counts none, so no name collides
+        there; in a repository a failed `git ls-files` stops the tool."""
         if self._names is None:
-            out = subprocess.run(['git', 'ls-files', '-z'], cwd=self.root,
-                                 capture_output=True, text=True)
-            self._names = collections.Counter(
-                Path(f).name for f in out.stdout.split('\0'))
+            listed = (git(self.root, 'ls-files', '-z').split('\0')
+                      if (self.root / '.git').exists() else [])
+            self._names = collections.Counter(Path(f).name for f in listed if f)
         return self._names
+
+    def listed(self, rel, selector):
+        """The repository paths `selector()` of server/`rel` lists, once. The
+        module runs from the tree, so it lists the tree's files; it is loaded
+        by its path, so it imports no package of server/."""
+        if (rel, selector) not in self._listed:
+            found = getattr(load_module(self.server / rel), selector)()
+            if isinstance(found, dict):  # name -> [paths]
+                found = itertools.chain.from_iterable(found.values())
+            self._listed[rel, selector] = {
+                str(Path(p).relative_to(self.root) if Path(p).is_absolute() else Path(p))
+                for p in found}
+        return self._listed[rel, selector]
 
     def text(self, rel):
         if rel not in self._texts:
@@ -379,17 +395,18 @@ class Tree:
         return ([rel for rel in found if Path(rel).name.startswith('test_')],
                 [rel for rel in found if Path(rel).name == 'conftest.py'])
 
-    def mentions(self, words, after_slash=True):
-        """The test files whose text names one of `words`, as a whole word:
-        kiosk.js is not named by kiosk.json. With `after_slash` false, a word
-        after a `/` is no mention: server/docker/Dockerfile is no cite of
-        testing/'s docker/Dockerfile (#431)."""
+    def mentions(self, words, allow_after_slash=True, files=None):
+        """The test files, or else `files`, whose text names one of `words`,
+        as a whole word: kiosk.js is not named by kiosk.json. With
+        `allow_after_slash` false, a word after a `/` is no mention:
+        server/docker/Dockerfile is no cite of testing/'s docker/Dockerfile
+        (#431)."""
         # The plain `in` first: a pattern that opens on a lookbehind scans
         # slowly, and every template in RealTree's test pays it (#312 retro).
-        before = r'[\w-]' if after_slash else r'[\w/-]'
+        before = r'[\w-]' if allow_after_slash else r'[\w/-]'
         found = [(w, re.compile(rf'(?<!{before}){re.escape(w)}(?![\w-])'))
                  for w in words if w]
-        return sorted(rel for rel in self.test_files()
+        return sorted(rel for rel in (self.test_files() if files is None else files)
                       if any(w in self.text(rel) and f.search(self.text(rel))
                              for w, f in found))
 
@@ -449,6 +466,14 @@ class Tree:
 
 PATCH_CALLS = {'patch', 'setattr', 'delattr'}
 DOTTED = re.compile(r'[A-Za-z_]\w*(\.[A-Za-z_]\w*)+')
+
+
+def load_module(path):
+    """The module at `path`, run apart from sys.modules."""
+    spec = importlib.util.spec_from_file_location(f'_{path.stem}', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def call_name(func):
@@ -667,16 +692,46 @@ def match_testing(path):
     return path.startswith('testing/')
 
 
+# The tests that read every file of a kind, listed, rather than the files
+# they name: the test, and the module and function it takes its files from
+# (#431). A changed testing/ file the function lists maps to the test.
+KIND_READERS = (
+    ('legacy_api/tests/test_testing_scripts.py', 'tests/file_kinds.py', 'testing_scripts'),
+    ('media/tests/test_faces.py', 'tests/file_kinds.py', 'headshots'),
+    ('tests/test_docker_checks.py', 'tests/file_kinds.py', 'exec_files'),
+    ('tests/test_golden_inputs.py', 'tools/golden_inputs.py', 'inputs'),
+    ('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'sources'),
+    ('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'php_files'),
+    ('tests/test_pipefail_pipes.py', 'tests/file_kinds.py', 'shell_files'),
+    ('tests/test_subshell_state.py', 'tests/file_kinds.py', 'shell_files'),
+    ('tests/test_transcript_diff_live.py', 'tests/file_kinds.py', 'top_of_testing'),
+)
+
+
+def kind_readers(tree, path):
+    """The tests of KIND_READERS in the tree whose function, the tree's own,
+    lists `path`."""
+    return sorted({test for test, rel, selector in KIND_READERS
+                   if tree.exists(test) and path in tree.listed(rel, selector)})
+
+
 def cover_testing(plan, tree, path):
-    targets = testing_citers(tree, path)
-    note = ('a shell suite or its data: the tests that name it. CI runs the '
-            'shell suites against Django; testing/README.md runs one locally')
-    if not targets:
-        targets = ['legacy_api/tests/test_testing_scripts.py',
-                   'tests/test_golden_inputs.py']
-        note = ('no test names it: the tests that read testing/ as a whole. CI '
-                'runs the shell suites against Django')
-    plan.add(path, 'testing', note, targets)
+    citers, readers = testing_citers(tree, path), kind_readers(tree, path)
+    if '.' in citers:
+        plan.everything.append(f'{path}: the root conftest names it, or imports '
+                               'what names it')
+        citers.remove('.')
+    if citers:
+        plan.add(path, 'testing', 'a shell suite or its data: the tests that name '
+                 'it. CI runs the shell suites against Django; testing/README.md '
+                 'runs one locally', citers)
+    if readers:
+        plan.add(path, 'testing', 'a source check that reads every file of its '
+                 'kind (KIND_READERS)', readers)
+    if not citers + readers:
+        plan.add(path, 'testing', 'no test names it: the tests that read testing/ '
+                 'as a whole. CI runs the shell suites against Django',
+                 ['legacy_api/tests/test_testing_scripts.py', 'tests/test_golden_inputs.py'])
     # A -cases.sh runs its script once per bound against a live server, and
     # CI does not run it. #399's cases first ran after the first push, and
     # the dump guard and the missing-log path each took a second push (#399
@@ -687,19 +742,43 @@ def cover_testing(plan, tree, path):
 
 
 def testing_citers(tree, path):
-    """The test files that cite testing/`path`: by its bare name, which
-    every cite of the path holds too, when the name holds a `.` or a `-`
-    and no other tracked file has it; otherwise by the path, or by the path
-    relative to testing/ with no `/` before it when that holds a folder.
+    """What runs the test-folder files that cite testing/`path` (runners):
+    by its bare name, which every cite of the path holds too, when the name
+    holds a `.` or a `-` and no other tracked file has it; otherwise by the
+    path, or by the path relative to testing/ with no `/` before it when
+    that holds a folder.
     Tests say `sleep` and `curl` as words, not as #399's stand-ins under
     testing/timer-stand-in/, and README.md is the name of a file in several
-    folders: such a file maps only through a cite of its path, and to the
-    fallback when no test cites it (#431)."""
+    folders: such a file maps only through a cite of its path (#431)."""
     name, rel = Path(path).name, path[len('testing/'):]
+    files = tree.python_in_tests()
     if ('.' in name or '-' in name) and tree.tracked_names()[name] <= 1:
-        return tree.mentions([name])
+        return runners(tree, tree.mentions([name], files=files))
     nested = [rel] if '/' in rel else []
-    return sorted({*tree.mentions([path]), *tree.mentions(nested, after_slash=False)})
+    return runners(tree, {*tree.mentions([path], files=files),
+                          *tree.mentions(nested, allow_after_slash=False, files=files)})
+
+
+def runners(tree, citing):
+    """What runs the code of each test-folder file in `citing`: a test file
+    itself, a conftest's folder, and the plain test files and conftest
+    folders that import one. test_finalists.py reads
+    testing/data/outlaw-class.csv through test_round_scenarios.py, which
+    names it (#431). A browser test maps only through its own cite: the
+    kiosk tests import open_kiosk from test_kiosk_pages.py, where one test
+    copies a headshot, and #431 is about browser reruns for files they never
+    read."""
+    found = set()
+    for rel in citing:
+        tests, conftests = tree.importers(module_name(rel))
+        found.update(t for t in tests if not is_browser_test(tree, t))
+        found.update(str(Path(c).parent) for c in conftests
+                     if not c.startswith(BROWSER_DIR))
+        if Path(rel).name.startswith('test_'):
+            found.add(rel)
+        if Path(rel).name == 'conftest.py':
+            found.add(str(Path(rel).parent))
+    return sorted(found)
 
 
 def cases_scripts(tree, path):
@@ -1221,7 +1300,10 @@ def map_file(plan, tree, path):
 # --- git -------------------------------------------------------------------
 
 def git(root, *argv):
-    return subprocess.run(['git', *argv], cwd=root, check=True,
+    """git's output in `root`, the repository `root` holds: no GIT_* variable
+    of a hook's or a caller's environment points it elsewhere (#431)."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    return subprocess.run(['git', *argv], cwd=root, env=env, check=True,
                           capture_output=True, text=True).stdout
 
 
@@ -2480,9 +2562,15 @@ def main(argv):
     if files is None:
         files = changed_files(plan)
     tree = Tree(root)
-    for path in files:
-        map_file(plan, tree, path)
-    sys.stdout.write(report(plan, tree))
+    try:
+        for path in files:
+            map_file(plan, tree, path)
+        sys.stdout.write(report(plan, tree))
+    except subprocess.CalledProcessError as failed:
+        # A git command no rule expects to fail, such as `ls-files` on a
+        # broken index, stops the tool with git's own message (#431).
+        sys.exit(f'affected-tests: {" ".join(failed.cmd)} failed in {root}:\n'
+                 f'{failed.stderr}')
     return 0
 
 
