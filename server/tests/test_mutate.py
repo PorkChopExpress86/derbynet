@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.mutate import counts, main, stopped_on_error
+from tools.mutate import counts, failed_in_helper, main, stopped_on_error
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "mutate.py"
 MODULE = "def bound(a, b):\n    return a < b\n\n\ndef twice():\n    return 1 + 1\n"
@@ -90,6 +90,168 @@ def test_a_killed_mutant_exits_0_and_the_file_is_restored(project):
     assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
     assert run.stdout.count("test session starts") == 1, "pytest's output once"
     assert (project / "mod.py").read_text() == MODULE
+
+
+HELPER_TESTS = """\
+from mod import bound
+
+
+def check(a, b):
+    assert bound(a, b)
+
+
+def test_through_a_helper():
+    check(1, 2)
+
+
+def test_in_its_body():
+    assert bound(1, 2)
+"""
+
+
+@pytest.mark.parametrize(
+    ("new", "test", "note"),
+    [
+        (
+            "a > b",
+            "test_through_a_helper",
+            "  (failed in helper check at test_helper.py:5, not a test)",
+        ),
+        ("a > b", "test_in_its_body", ""),
+        # Raised in the code under test, called from the test's body.
+        ("[][1]", "test_in_its_body", ""),
+        (
+            "[][1]",
+            "test_through_a_helper",
+            "  (failed in helper check at test_helper.py:5, not a test)",
+        ),
+    ],
+)
+def test_a_mutant_killed_in_a_helper_names_it(project, new, test, note):
+    """#417's M3, M10 and M11 read KILLED, killed by join_at's check that a
+    run still waited, not by the order assert they aimed at (#417 retro)."""
+    (project / "test_helper.py").write_text(HELPER_TESTS)
+    run = mutate(project, "a < b", new, f"test_helper.py::{test}")
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1] == f"KILLED  mod.py: 'a < b' -> {new!r}{note}"
+
+
+HELPERS = """\
+import pytest
+
+
+def check(a, b):
+    assert a < b
+
+
+def test_outer():
+    def inner():
+        assert False
+
+    inner()
+
+
+class TestKind:
+    def test_method(self):
+        assert False
+
+
+AT_MODULE_LEVEL = 1
+"""
+
+
+def failures(*places, after=""):
+    """pytest's output for one failure whose traceback passes `places`."""
+    lines = [
+        "=" * 10 + " test session starts " + "=" * 10,
+        "",
+        "=" * 10 + " FAILURES " + "=" * 10,
+    ]
+    lines += ["_" * 5 + " test_x " + "_" * 5]
+    for place in places:
+        lines += ["    code", ">   raise", f"{place}"]
+    return "\n".join(lines) + "\n" + after
+
+
+@pytest.mark.parametrize(
+    ("output", "found"),
+    [
+        (
+            failures("test_h.py:12: ", "test_h.py:5: AssertionError"),
+            "failed in helper check at test_h.py:5, not a test",
+        ),
+        # A library or the code under test below the helper.
+        (
+            failures("test_h.py:5: in check", "/usr/lib/python3/x.py:9: TimeoutError"),
+            "failed in helper check at test_h.py:5, not a test",
+        ),
+        (
+            failures("test_h.py:5: in check", "lib/helpers.py:2: ValueError"),
+            "failed in helper check at test_h.py:5, not a test",
+        ),
+        (
+            failures("test_h.py:5: in check", "conftest.py:2: AssertionError"),
+            "failed in helper fixture at conftest.py:2, not a test",
+        ),
+        (failures("test_h.py:12: AssertionError"), ""),
+        (
+            failures("test_h.py:12: in test_outer", "test_h.py:10: AssertionError"),
+            "failed in helper inner at test_h.py:10, not a test",
+        ),
+        (failures("test_h.py:17: AssertionError"), ""),
+        (failures("test_h.py:20: AssertionError"), ""),
+        (failures("test_gone.py:5: AssertionError"), ""),
+        (failures("test_broken.py:1: AssertionError"), ""),
+        (failures("lib/helpers.py:2: ValueError"), ""),
+        # A place after the section, such as a warning's, is no frame.
+        (
+            failures(
+                "test_h.py:12: AssertionError",
+                after="=" * 5
+                + " warnings summary "
+                + "=" * 5
+                + "\ntest_h.py:5: Warn\n",
+            ),
+            "",
+        ),
+        (failures("test_h.py:5: AssertionError").replace(" FAILURES ", " ERRORS "), ""),
+        ("test_h.py:5: AssertionError\n", ""),
+    ],
+    # Ids by case, not by the output, which a mutant of failures() changes
+    # (mutate.py's run then finds no such node id).
+    ids=[
+        "helper",
+        "library-below",
+        "code-below",
+        "conftest",
+        "test-body",
+        "nested",
+        "method",
+        "module-level",
+        "missing-file",
+        "unparsable",
+        "no-test-file",
+        "after-section",
+        "errors-section",
+        "no-section",
+    ],
+)
+def test_failed_in_helper_names_the_test_side_function_that_raised(
+    tmp_path, monkeypatch, output, found
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "test_h.py").write_text(HELPERS)
+    (tmp_path / "conftest.py").write_text("def fixture():\n    assert False\n")
+    (tmp_path / "test_broken.py").write_text("def check(:\n")
+    (tmp_path / "lib").mkdir()
+    (tmp_path / "lib" / "helpers.py").write_text("def run():\n    raise ValueError\n")
+    assert failed_in_helper(output) == found
+
+
+def test_an_absolute_place_is_no_frame(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "test_h.py").write_text(HELPERS)
+    assert failed_in_helper(failures(f"{tmp_path}/test_h.py:5: AssertionError")) == ""
 
 
 def test_a_surviving_mutant_exits_1(project):

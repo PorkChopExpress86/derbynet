@@ -33,6 +33,15 @@
 set -euo pipefail
 PR=${1:?usage: pr-wait <pr or branch> [--timeout-min N]}
 TIMEOUT_MIN=${3:-90}
+PUSH_MIN=${PR_WAIT_PUSH_MIN:-5}
+# Bash drops a command whose arithmetic fails and goes on with no failed
+# status, so a bound like `5m` must stop here (#417 retro).
+case "$TIMEOUT_MIN" in
+  '' | *[!0-9]*) echo "pr-wait: --timeout-min takes a whole number of minutes, not '$TIMEOUT_MIN'" >&2; exit 1 ;;
+esac
+case "$PUSH_MIN" in
+  '' | *[!0-9]*) echo "pr-wait: PR_WAIT_PUSH_MIN takes a whole number of minutes, not '$PUSH_MIN'" >&2; exit 1 ;;
+esac
 GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 
@@ -64,7 +73,7 @@ read -r head branch <<<"$head_branch"
 deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
 # The wait for GitHub to show the push has a bound of its own: a PR reset to an
 # older commit than origin/<branch> would otherwise wait out all of TIMEOUT_MIN.
-push_min=$(( TIMEOUT_MIN < ${PR_WAIT_PUSH_MIN:-5} ? TIMEOUT_MIN : ${PR_WAIT_PUSH_MIN:-5} ))
+push_min=$(( TIMEOUT_MIN < PUSH_MIN ? TIMEOUT_MIN : PUSH_MIN ))
 push_deadline=$(( $(date +%s) + push_min * 60 ))
 if behind_the_push "$head" "$branch"; then
   echo "waiting for PR #$PR to show origin/$branch $(git rev-parse "origin/$branch");" \

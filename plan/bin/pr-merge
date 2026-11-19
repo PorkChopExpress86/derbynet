@@ -88,6 +88,15 @@ REPO=${REPO:-PorkChopExpress86/derbynet}
 CLOSE_WAIT=${CLOSE_WAIT:-30}
 # Seconds a source-check run that ignores TERM gets before SIGKILL.
 KILL_WAIT=${KILL_WAIT:-10}
+# Bash drops a command whose arithmetic fails and goes on with no failed
+# status, and a failed `-ge` reads as false: CLOSE_WAIT=30s waited for ever
+# (#417 retro).
+case "$CLOSE_WAIT" in
+  '' | *[!0-9]*) echo "pr-merge: CLOSE_WAIT takes a whole number of seconds, not '$CLOSE_WAIT'" >&2; exit 1 ;;
+esac
+case "$KILL_WAIT" in
+  '' | *[!0-9]*) echo "pr-merge: KILL_WAIT takes a whole number of seconds, not '$KILL_WAIT'" >&2; exit 1 ;;
+esac
 
 # The source-check run's worktree, and its process group while it runs. The
 # run has a session of its own, so a Ctrl-C reaches only this script, whose
