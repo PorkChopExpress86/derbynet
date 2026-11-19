@@ -492,10 +492,10 @@ def test_killed_by_reads_only_the_short_summary():
     """A captured log's `ERROR` line above the summary is no test."""
     output = (
         "ERROR    asyncio:base_events.py:1893 Exception in callback\n"
-        "=========================== short test summary info ============================\n"
+        "==================== short test summary info ====================\n"
         "FAILED t.py::test_a - assert 1 == 2\n"
         "ERROR t.py::test_b - RuntimeError: an environment problem\n"
-        "========================= 1 failed, 1 error in 0.10s ==========================\n"
+        "=================== 1 failed, 1 error in 0.10s ===================\n"
     )
     assert killed_by(output) == [
         "FAILED t.py::test_a - assert 1 == 2",
