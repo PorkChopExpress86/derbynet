@@ -24,6 +24,19 @@ test name, and pytest deselected the test without a word. This refuses:
   git directory named for the file. A SIGKILL leaves the lock behind too,
   and the refusal names it.
 
+Every pytest run it starts loads `tools/kill_guard.py` (`-p kill_guard`), so
+`os.kill` and `os.killpg` refuse a process the run did not start: a mutant
+that turns a parsed pid into the wrong one, as retro-391's `$PPID` named
+`systemd --user` and ended the desktop session, fails its test instead of
+signalling it. A run in which the guard refused a signal reads `KILLED`
+(`BROKE` with `--expect pass`) with the refusal in its parentheses (#448).
+The guard covers the Python tests' own calls, not a `kill` a script under
+test runs. Before a mutant of code whose tests signal a pid, run those tests
+once with `--kill-guard-print`, which sends nothing and lists each refusal:
+
+    PYTHONPATH=tools uv run python -m pytest -p kill_guard --kill-guard-print \\
+        tests/test_detach.py
+
 Run it from server/, in the worktree under test, for one mutant:
 
     uv run python tools/mutate.py --file ui/views.py --old 'a < b' --new 'a <= b' \\
@@ -83,9 +96,11 @@ import hashlib
 import importlib
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REFUSED = 2
@@ -97,6 +112,11 @@ OUTCOMES = {
     "pass": {0: "PASSED", 1: "BROKE"},
 }
 EXPECTED = {"fail": "KILLED", "pass": "PASSED"}
+# The summary line tools/kill_guard.py prints for each signal it refused.
+GUARD_REFUSAL = re.compile(r"^kill_guard refused .*$", re.M)
+GUARD = Path(__file__).resolve().with_name("kill_guard.py")
+# The folder holding the copy of GUARD that each pytest run loads; main() sets it.
+_guard_folder: str | None = None
 # What --listed mutates: a `min()` a Markdown file quotes is no code.
 SOURCES = (".py", ".js", ".css")
 
@@ -236,14 +256,29 @@ def _pytest(pytest_args: list[str], timeout: float):
     return run, output
 
 
+def _pythonpath() -> list[str]:
+    return [os.environ["PYTHONPATH"]] if os.environ.get("PYTHONPATH") else []
+
+
 def _pytest_once(pytest_args: list[str], timeout: float):
     """pytest's run, or None and what it printed when it passes `timeout`."""
     # A mutant's .pyc goes with each write (_drop_bytecode). An empty
     # pycache prefix, tried first, recompiled every module each run, and the
     # tool's timing tests missed their bounds (#370 review round).
+
+    # tools/kill_guard.py refuses a signal to a process outside the run. Its
+    # copy from before the first mutant is what each run loads, so a mutant of
+    # the guard is judged by the tests and not by itself (#448).
+    assert _guard_folder, "main() copies the guard before a mutant is written"
+    env = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join([_guard_folder, *_pythonpath()]),
+    }
     try:
         run = subprocess.run(
-            [sys.executable, "-m", "pytest", "-p", "no:xdist", *pytest_args],
+            [sys.executable, "-m", "pytest", "-p", "no:xdist", "-p", "kill_guard"]
+            + pytest_args,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -257,7 +292,12 @@ def _pytest_once(pytest_args: list[str], timeout: float):
 
 def _result(run, output: str, expect: str) -> tuple[str, str]:
     """The result word for a finished run, and why when it shows nothing,
-    or for a failed run, the helper that raised (failed_in_helper())."""
+    or for a failed run, the helper that raised (failed_in_helper()). A run
+    in which tools/kill_guard.py refused a signal reads KILLED (BROKE for
+    `--expect pass`) with its first refusal, ahead of the counts: a refusal in
+    a fixture's teardown is an error with no failure beside it (#448)."""
+    if run.returncode == 1 and (refused := GUARD_REFUSAL.search(output)):
+        return OUTCOMES[expect][1], refused.group(0)
     # Exit status 5: pytest collected no test, or deselected every one.
     if run.returncode in (0, 1, 5) and (why := refusal(counts(output))):
         return "REFUSED", why
@@ -502,6 +542,17 @@ def listed(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global _guard_folder
+    _guard_folder = tempfile.mkdtemp(prefix="mutate-guard-")
+    try:
+        shutil.copy(GUARD, Path(_guard_folder) / "kill_guard.py")
+        return _main(argv)
+    finally:
+        shutil.rmtree(_guard_folder, ignore_errors=True)
+        _guard_folder = None
+
+
+def _main(argv: list[str] | None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
         "--file",
