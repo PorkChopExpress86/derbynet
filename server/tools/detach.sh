@@ -104,7 +104,7 @@ if [ "${1:-}" = "--wait" ]; then
   log=$2
   seconds=${3:-160}
   # A leading 0 reads as octal, and `08` dropped the deadline (#417 retro).
-  case "$seconds" in '' | *[!0-9]* | 0?*) usage ;; esac
+  case "$seconds" in *[!0-9]* | 0?*) usage ;; esac
   leader=$(session_of "$log")
   if [ -z "$leader" ]; then
     echo "detach.sh: $log does not start with a detach.sh session line." >&2

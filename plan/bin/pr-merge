@@ -92,10 +92,10 @@ KILL_WAIT=${KILL_WAIT:-10}
 # status, and a failed `-ge` reads as false: CLOSE_WAIT=1s waited for ever.
 # A leading 0 reads as octal, so `08` fails the same way (#417 retro).
 case "$CLOSE_WAIT" in
-  '' | *[!0-9]* | 0?*) echo "pr-merge: CLOSE_WAIT takes a whole number of seconds, not '$CLOSE_WAIT'" >&2; exit 1 ;;
+  *[!0-9]* | 0?*) echo "pr-merge: CLOSE_WAIT takes a whole number of seconds, not '$CLOSE_WAIT'" >&2; exit 1 ;;
 esac
 case "$KILL_WAIT" in
-  '' | *[!0-9]* | 0?*) echo "pr-merge: KILL_WAIT takes a whole number of seconds, not '$KILL_WAIT'" >&2; exit 1 ;;
+  *[!0-9]* | 0?*) echo "pr-merge: KILL_WAIT takes a whole number of seconds, not '$KILL_WAIT'" >&2; exit 1 ;;
 esac
 
 # The source-check run's worktree, and its process group while it runs. The

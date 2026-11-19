@@ -24,7 +24,7 @@ MINUTES="${1:-30}"
 # status: `load-run.sh 1m` ran no load test and exited 0, and so did `08`,
 # which reads as octal (#417 retro).
 case "$MINUTES" in
-  '' | *[!0-9]* | 0?*)
+  *[!0-9]* | 0?*)
     echo "usage: load-run.sh [minutes] [report dir]; minutes is a whole number, not '$MINUTES'" >&2
     exit 2
     ;;

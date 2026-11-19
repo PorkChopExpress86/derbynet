@@ -106,12 +106,15 @@ class PrWait(unittest.TestCase):
         for timeout, push, named in [('5m', '5', "--timeout-min takes a whole number of minutes, not '5m'"),
                                      ('-1', '5', "--timeout-min takes a whole number of minutes, not '-1'"),
                                      ('08', '5', "--timeout-min takes a whole number of minutes, not '08'"),
-                                     ('0', '1m', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '1m'")]:
+                                     ('0', '1m', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '1m'"),
+                                     ('0', '-1', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '-1'"),
+                                     ('0', '08', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '08'")]:
             with self.subTest(timeout=timeout, push=push):
                 done = subprocess.run(['bash', str(PR_WAIT), '7', '--timeout-min', timeout],
                                       env={**os.environ, 'GH': str(gh), 'PR_WAIT_PUSH_MIN': push},
                                       capture_output=True, text=True, timeout=60)
-                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                # 4, not 1: a caller reads 1 as a red check.
+                self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
                 self.assertEqual(done.stderr, f'pr-wait: {named}\n')
 
 

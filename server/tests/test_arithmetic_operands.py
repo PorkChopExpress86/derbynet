@@ -19,7 +19,12 @@ for a whole number with no leading zero, which bash reads as octal
 (`case "$X" in '' | *[!0-9]* | 0?*)`, or `[[ $X =~ ^(0|[1-9][0-9]*)$ ]]`).  Any
 other value read as a number has a row in KNOWN saying why it is one; a row
 that matches no read fails, and a row whose reason is a line of code holds
-only while REASON_IN_CODE finds that line in the file.
+only while REASON_IN_CODE finds that line in the file.  A positional
+parameter, `$1` or `${1:-30}`, is read as the name `1`, and passes only when
+the file checks it, since no assignment makes it.
+
+The rule reads one line at a time, so an expression split over lines,
+`x=$((` then `N + 1` then `))`, is not read.  None of the scripts writes one.
 
 The rule covers the scripts that run or gate this repo's agents' work:
 locks, waits, hand-offs, hooks and CI steps.  The PHP suite's scripts under
@@ -68,6 +73,8 @@ KNOWN = {
     ("server/docker/entrypoint.sh", "gid"): "checked as `value` by =~ ^[0-9]{1,10}$",
 }
 NAME = r"[A-Za-z_]\w*"
+# A name, or a positional parameter's digit: `$1` reads the command line.
+PARAM = rf"(?:{NAME}|\d)"
 # A value that is a number whatever the script's input: the whole word.
 MADE = re.compile(
     r"""^(["']?)(?:\d+|\$\(\(.*\)\)|\$\(date \+%s%?N?\)|\$SECONDS|\$\{SECONDS\}"""
@@ -76,7 +83,7 @@ MADE = re.compile(
 SPECIAL = {"SECONDS"}
 # `${NAME}` or `${NAME:-7}`: the name itself, or the name with a number for
 # its default.  Any other operator, `${x%%.*}`, makes a new value.
-PLAIN_EXPANSION = re.compile(rf"\$\{{({NAME})(?::?-\d+)?\}}|\$({NAME})")
+PLAIN_EXPANSION = re.compile(rf"\$\{{({PARAM})(?::?-\d+)?\}}|\$({PARAM})")
 INTEGER_TEST = re.compile(
     r"""("[^"]*"|'[^']*'|\S+)\s+-(?:eq|ne|lt|le|gt|ge)\s+("[^"]*"|'[^']*'|\S+)"""
 )
@@ -190,7 +197,7 @@ def _operands_of(expression: str, bare: bool) -> list[str]:
     )
     read = []
     for m in re.finditer(
-        r"\$\{[^}]*\}|\$\([^)]*\)?|`[^`]*`|\$" + NAME + "|" + NAME, expression
+        r"\$\{[^}]*\}|\$\([^)]*\)?|`[^`]*`|\$" + PARAM + "|" + NAME, expression
     ):
         word = m.group(0)
         plain = PLAIN_EXPANSION.fullmatch(word)
@@ -265,12 +272,12 @@ def checked(text: str) -> set[str]:
     names = set()
     lines = [code for _, code in lines_of(text)]
     for i, code in enumerate(lines):
-        if m := re.search(rf"\bcase\s+\"?\$\{{?({NAME})\}}?\"?\s+in\b", code):
+        if m := re.search(rf"\bcase\s+\"?\$\{{?({PARAM})\}}?\"?\s+in\b", code):
             block = " ".join(lines[i : i + 6])
             if "[!0-9]" in block and "0?*" in block:
                 names.add(m.group(1))
         pattern = r"\s*=~\s*['\"]?\^(?:\(0\|)?\[1-9\]"
-        for m in re.finditer(rf"\$\{{?({NAME})\}}?\"?{pattern}", code):
+        for m in re.finditer(rf"\$\{{?({PARAM})\}}?\"?{pattern}", code):
             names.add(m.group(1))
     return names
 
@@ -378,6 +385,12 @@ def test_each_known_row_names_a_read_that_is_there():
         ("for f in *.txt; do echo $((f + 1)); done\n", [(1, "f")]),
         ('if [ $# -eq 0 ]; then :; fi\n[ "${#a[@]}" -gt 0 ]\n', []),
         ("let LANE+=1\necho $((LANE))\n", []),
+        # A positional parameter is read as the name of its digit.
+        ("echo $(( $1 * 60 ))\n", [(1, "1")]),
+        ('[ "$1" -gt 5 ]\n', [(1, "1")]),
+        ("(( $2 > 3 ))\n", [(1, "2")]),
+        ("echo $(( ${1:-30} * 60 ))\n", [(1, "1")]),
+        ('case "$1" in *[!0-9]* | 0?*) exit 2 ;; esac\necho $(( $1 * 60 ))\n', []),
         ('x="a"\n[ "$x" = 1 ]\n', []),
         ('echo "it\'s $((n))"\n', [(1, "n")]),
         ("echo \\' $((n))\n", [(1, "n")]),
