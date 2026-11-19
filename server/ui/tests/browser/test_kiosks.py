@@ -917,7 +917,9 @@ def test_a_press_during_a_taps_request_still_taps(login, event):
     (D102). Welcome's POST still goes out. The release Identify's click
     defers runs only after Welcome's pointerdown (`LATE_CLICK_TIMERS`), and
     leaves Welcome's press holding: before #455 it ended that press, and
-    Identify's board swapped in under it."""
+    Identify's board swapped in under it. The test sets a timer of its own
+    outside a click, which the forcing must leave alone, as it leaves the
+    board poll's."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     welcomed = scene(event, "Welcome")
@@ -929,6 +931,7 @@ def test_a_press_during_a_taps_request_still_taps(login, event):
     page.mouse.up()
     wait_for_held(page, posts, "Identify POST")
     press(page, welcome)
+    # one read: mouse.down() returns once the page has handled its pointerdown.
     log = board_log(page)
     second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
     late = page.evaluate("window.lateTimers")
