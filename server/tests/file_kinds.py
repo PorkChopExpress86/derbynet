@@ -66,7 +66,7 @@ def exec_files() -> list[str]:
     return [name for name in tracked() if command_file(name)]
 
 
-def testing_scripts() -> list[Path]:
+def suite_scripts() -> list[Path]:
     """The `.sh` scripts at the top of testing/, and the helpers with no
     suffix such as `queryj`."""
     return sorted(

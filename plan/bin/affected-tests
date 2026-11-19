@@ -696,7 +696,7 @@ def match_testing(path):
 # they name: the test, and the module and function it takes its files from
 # (#431). A changed testing/ file the function lists maps to the test.
 KIND_READERS = (
-    ('legacy_api/tests/test_testing_scripts.py', 'tests/file_kinds.py', 'testing_scripts'),
+    ('legacy_api/tests/test_testing_scripts.py', 'tests/file_kinds.py', 'suite_scripts'),
     ('media/tests/test_faces.py', 'tests/file_kinds.py', 'headshots'),
     ('tests/test_docker_checks.py', 'tests/file_kinds.py', 'exec_files'),
     ('tests/test_golden_inputs.py', 'tools/golden_inputs.py', 'inputs'),
