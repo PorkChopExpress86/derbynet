@@ -28,10 +28,9 @@ def card(page, event_name: str):
     )
 
 
+@pytest.mark.sizes("phone", reason="the acceptance flow is at 390x844")
 def test_copy_an_event_switch_to_it_and_see_the_old_one_read_only(login, event):
     page = login("RaceCoordinator")
-    if page.size != "phone":
-        pytest.skip("the acceptance flow is at 390x844")
     add_racers(event, "Lions", 3, 101)
     page.goto("/setup/")
     page.locator('[data-link="events"]').click()
