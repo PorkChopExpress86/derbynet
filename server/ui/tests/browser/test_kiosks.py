@@ -883,17 +883,45 @@ def move_off(page):
     page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
 
 
+# The timers kiosks.js sets with no delay in a click's listeners wait until
+# the next pointerdown has been handled, then run, as on a main thread too
+# busy to run them before that input (#455). Once only: later clicks' timers
+# run as usual. `window.lateTimers` counts those parked and when each ran.
+LATE_CLICK_TIMERS = """() => {
+  const real = window.setTimeout;
+  const late = window.lateTimers = {parked: 0, ran: []};
+  const parked = [];
+  window.setTimeout = function (fn, ms, ...rest) {
+    if (!ms && window.event && window.event.type === 'click'
+        && new Error().stack.includes('/static/ui/kiosks.js')) {
+      parked.push(() => fn(...rest));
+      late.parked += 1;
+      return 0;
+    }
+    return real.call(window, fn, ms, ...rest);
+  };
+  window.addEventListener('pointerdown', () => {
+    window.setTimeout = real;
+    for (const run of parked) real(() => { late.ran.push(performance.now()); run(); });
+  }, {once: true});
+}"""
+
+
 def test_a_press_during_a_taps_request_still_taps(login, event):
     """The mouse taps Identify while a poll's reply is held, so the held
     board waits for Identify's POST, which its route holds. While that POST
     is out, the mouse goes down on Welcome, and Identify's reply then comes:
     its board waits under the new press, and so does the board held before
-    (D102). Welcome's POST still goes out."""
+    (D102). Welcome's POST still goes out. The release Identify's click
+    defers runs only after Welcome's pointerdown (`LATE_CLICK_TIMERS`), and
+    leaves Welcome's press holding: before #455 it ended that press, and
+    Identify's board swapped in under it."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
     welcome = scene_button(page, scene(event, "Welcome"))
     posts = held_at_route(page, "**/kiosks/identify/**")
     polls = a_press_spans_a_swap(page, event, page.locator(IDENTIFY_BUTTON))
+    page.evaluate(LATE_CLICK_TIMERS)
     page.mouse.up()
     wait_for_held(page, posts, "Identify POST")
     press(page, welcome)
@@ -901,6 +929,10 @@ def test_a_press_during_a_taps_request_still_taps(login, event):
     wait_for_done(page, "/kiosks/identify/")
     log = board_log(page)
     second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
+    late = page.evaluate("window.lateTimers")
+    assert late["parked"] >= 1, late
+    assert len(late["ran"]) == late["parked"], late
+    assert min(late["ran"]) > log[second]["at"], (late, log)
     assert swaps_since(log, second) == [], log
     with htmx_post(page, "/kiosks/scene/"):
         page.mouse.up()
