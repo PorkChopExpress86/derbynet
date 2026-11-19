@@ -57,4 +57,5 @@ markers = [
     "full: the whole schedule parity sweep; run with -m full",
     "golden: replays the PHP golden fixtures (#7); the parity gate runs them",
     "browser: drives the pages in Chromium with Playwright (#40); run with -m browser",
+    "sizes(*names, reason): runs a browser test at these sizes only, and deselects its other sizes at collection (#366)",
 ]

@@ -55,9 +55,8 @@ def test_a_toast_waits_while_it_has_focus(gallery):
     expect(toast).to_have_count(0)
 
 
+@pytest.mark.sizes("desktop", reason="a phone has no hover")
 def test_a_toast_waits_while_the_pointer_is_on_it(gallery):
-    if gallery.size == "phone":
-        pytest.skip("a phone has no hover")
     toast = pass_ben(gallery)
 
     toast.locator("[data-message]").hover()

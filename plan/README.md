@@ -51,6 +51,6 @@ A row that cites another decision names which part of it applies (D130). D123's 
 ## Ship a PR
 
 ```bash
-plan/bin/pr-wait 82     # exits 1 if any check pr-merge counts failed
+plan/bin/pr-wait 82     # exits 1 if any check pr-merge counts failed; 2 head moved, 3 timed out, 4 a bad bound
 plan/bin/pr-merge 82     # squashes and deletes the branch unless given a method
 ```
