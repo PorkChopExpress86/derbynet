@@ -522,6 +522,33 @@ class TestingReaders(unittest.TestCase):
         files['testing/timer-stand-in/curl'] = 'no script\n'
         self.assertEqual(testing_targets(files, 'timer-stand-in/curl'), TESTING_FALLBACK)
 
+    def test_each_way_a_file_maps_is_one_entry(self):
+        """A top-level script maps only through the rows that list it, a
+        `.sh` with no shebang included; a file no row lists and no test
+        names maps to the fallback alone; no rule adds an empty entry."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel, text in {'server/tests/file_kinds.py': self.KINDS,
+                              'server/tests/test_pipefail_pipes.py': '',
+                              'server/legacy_api/tests/test_testing_scripts.py': '',
+                              'testing/queryj': '#!/bin/bash\n',
+                              'testing/steps.sh': 'echo\n',
+                              'testing/notes': 'plain\n'}.items():
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text(text)
+            for argv in (['init', '-q'], ['add', '-A']):
+                subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+            tree, got = TOOL.Tree(root), {}
+            for name in ('queryj', 'steps.sh', 'notes'):
+                plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+                TOOL.cover_testing(plan, tree, f'testing/{name}')
+                got[name] = [(note.split(':')[0], targets)
+                             for _r, note, targets in plan.covers[f'testing/{name}']]
+        scripts = ['legacy_api/tests/test_testing_scripts.py', 'tests/test_pipefail_pipes.py']
+        reader = 'a source check that reads every file of its kind (KIND_READERS)'
+        self.assertEqual(got, {'queryj': [(reader, scripts)], 'steps.sh': [(reader, scripts)],
+                               'notes': [('no test names it', TESTING_FALLBACK)]})
+
     def test_a_kind_reader_the_tree_lacks_maps_nothing(self):
         files = {'server/tests/file_kinds.py': self.KINDS,
                  'testing/timer-stand-in/curl': '#!/bin/bash\n'}
@@ -568,6 +595,8 @@ class TestingReaders(unittest.TestCase):
             TOOL.cover_testing(plan, TOOL.Tree(root), 'testing/faces')
         self.assertEqual(plan.everything, ['testing/faces: the root conftest names it, '
                                            'or imports what names it'])
+        self.assertEqual([t for _r, _n, ts in plan.covers['testing/faces'] for t in ts],
+                         TESTING_FALLBACK)
 
 
 class TestFile(unittest.TestCase):
@@ -3630,7 +3659,9 @@ class RealTree(unittest.TestCase):
         """The readers #431's review confirmed with a mutant or a trace:
         test_docker_checks.py scans testing/README.md for exec'd manage.py,
         and the pipe linters read #399's stand-ins, which `sleep` had never
-        mapped to; and one file each that only a row's function lists."""
+        mapped to; a file each other row's function lists; and a file
+        each of two rows leaves out: the stand-in has no suffix
+        test_docker_checks.py reads, and README.md is no script."""
         tree = TOOL.Tree(REPO)
 
         def targets(path):
@@ -3639,6 +3670,10 @@ class RealTree(unittest.TestCase):
             return {t for _r, _n, ts in plan.covers[path] for t in ts}
 
         self.assertIn('tests/test_docker_checks.py', targets('testing/README.md'))
+        self.assertIn('tests/test_docker_checks.py',
+                      targets('testing/data/carphotos/make-pattern-o6.py'))
+        self.assertNotIn('tests/test_docker_checks.py', targets('testing/timer-stand-in/curl'))
+        self.assertNotIn('tests/test_pipefail_pipes.py', targets('testing/README.md'))
         for stand_in in ('testing/timer-stand-in/curl', 'testing/timer-stand-in/sleep'):
             for test in ('tests/test_pipefail_pipes.py', 'tests/test_subshell_state.py'):
                 self.assertIn(test, targets(stand_in), stand_in)
