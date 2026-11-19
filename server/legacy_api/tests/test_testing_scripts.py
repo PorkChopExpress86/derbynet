@@ -609,10 +609,10 @@ def test_a_bound_with_no_case_is_found(tmp_path):
     ]
 
     (tmp_path / "race-cases.sh").write_text(
-        "identify-1s|IDENTIFY_SECONDS=1|did not complete\n"
-        "race-60s|XRACE_SECONDS=60|did not complete\n"
-        "heat-3s|HEAT_SECONDS=3|x\n"
-        "dump|DUMP_AFTER=0|x\n"
+        "identify-1s|IDENTIFY_SECONDS=1|fail|did not complete\n"
+        "race-60s|XRACE_SECONDS=60|fail|did not complete\n"
+        "heat-3s|HEAT_SECONDS=3|fail|x\n"
+        "dump|DUMP_AFTER=0|pass|x|8\n"
     )
 
     assert uncased_bounds(script) == ["RACE_SECONDS"]

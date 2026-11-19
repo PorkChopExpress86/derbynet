@@ -45,6 +45,8 @@ on:
       - server/ui/docs/build.py
       - server/pyproject.toml
       - server/uv.lock
+      # The apt mirror fallback the setup steps run (test_workflow_paths.py).
+      - .github/ubuntu-mirror.sh
       - .github/workflows/pi-images.yml
   pull_request:
     paths:
@@ -72,6 +74,8 @@ on:
       - server/ui/docs/build.py
       - server/pyproject.toml
       - server/uv.lock
+      # The apt mirror fallback the setup steps run (test_workflow_paths.py).
+      - .github/ubuntu-mirror.sh
       - .github/workflows/pi-images.yml
   workflow_dispatch:
 
