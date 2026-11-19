@@ -379,6 +379,21 @@ class TestingNames(unittest.TestCase):
         self.assertEqual(testing_targets(files, 'timer-stand-in/sleep'),
                          ['tests/test_stand_in.py'])
 
+    def test_a_nested_word_maps_through_its_path_relative_to_testing(self):
+        # As race-with-derby-timer-cases.sh writes its stand-ins (#431's scope).
+        files = {'server/tests/test_curl.py': 'subprocess.run(["curl", URL])\n',
+                 'server/tests/test_stand_in.py': 'STAND_IN = "timer-stand-in/curl"\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/curl'),
+                         ['tests/test_stand_in.py'])
+
+    def test_a_relative_path_after_a_slash_is_no_cite(self):
+        files = {'server/tests/test_other.py': 'OTHER = "server/timer-stand-in/curl"\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/curl'), TESTING_FALLBACK)
+
+    def test_a_word_at_the_top_of_testing_maps_through_its_path_alone(self):
+        files = {'server/tests/test_query.py': 'QUERY = "queryj"\n'}
+        self.assertEqual(testing_targets(files, 'queryj'), TESTING_FALLBACK)
+
     def test_a_name_with_a_dot_or_a_dash_maps_by_itself(self):
         # The scenario replays cite their suites by name (#431's scope).
         for path, cite in (('test-groups.sh', 'SCRIPT = "test-groups.sh"\n'),
@@ -413,12 +428,15 @@ class TestingNames(unittest.TestCase):
 
     def test_each_kind_of_name_against_each_style_of_cite(self):
         """Every kind of testing/ name against every way a test can write
-        it, in one repository: a word, a dotted or dashed name, a nested
-        one, and a name another tracked file has. The expected styles are
-        #431's words: the path always, and the bare name, however it is
-        prefixed, only when it holds a `.` or a `-` and is unique."""
+        it, in one repository: a word, nested or at the top of testing/, a
+        dotted or dashed name, a nested one, and a name another tracked file
+        has. The expected styles are #431's words: the path always; the bare
+        name, however it is prefixed, only when it holds a `.` or a `-` and
+        is unique; and otherwise the path relative to testing/ when that
+        holds a folder and no `/` comes before it."""
         kinds = {
             'word': ('timer-stand-in/sleep', ()),
+            'top-word': ('queryj', ()),
             'dotted': ('steps.sh', ()),
             'dashed': ('demo-multi', ()),
             'nested': ('data/sample-names.csv', ()),
@@ -433,8 +451,9 @@ class TestingNames(unittest.TestCase):
             'longer-name': lambda rel: f'pre-{Path(rel).name}x',
         }
         unique = {'path', 'bare', 'relative', 'longer-path'}
-        expected = {'word': {'path'}, 'dotted': unique, 'dashed': unique,
-                    'nested': unique, 'shared': {'path'}, 'shared-nested': {'path'}}
+        expected = {'word': {'path', 'relative'}, 'top-word': {'path'}, 'dotted': unique,
+                    'dashed': unique, 'nested': unique, 'shared': {'path'},
+                    'shared-nested': {'path', 'relative'}}
         files = {f'server/tests/test_{kind}_{style}.py'.replace('-', '_'): f'X = "{cite(rel)}"\n'
                  for kind, (rel, _) in kinds.items() for style, cite in styles.items()}
         with tempfile.TemporaryDirectory() as tmp:
@@ -453,7 +472,7 @@ class TestingNames(unittest.TestCase):
                 got[kind] = {style for style in styles
                              if f'tests/test_{kind}_{style}.py'.replace('-', '_') in targets}
         self.assertEqual(got, expected)
-        self.assertEqual((len(kinds), len(styles)), (6, 5))
+        self.assertEqual((len(kinds), len(styles)), (7, 5))
 
 
 class TestFile(unittest.TestCase):
@@ -3488,7 +3507,7 @@ class RealTree(unittest.TestCase):
     def test_each_testing_file_maps_to_every_test_that_cites_its_path(self):
         """#431 narrowed testing/ names to their cites: a test that writes a
         tracked file's `testing/<rel>` keeps it, and #399's stand-ins map
-        to the fallback pair alone."""
+        only to the fallback pair and to tests that write their path."""
         files = subprocess.run(['git', 'ls-files', 'testing/'], cwd=REPO, env=git_env(),
                                check=True, capture_output=True, text=True).stdout.split()
         tree, misses = TOOL.Tree(REPO), []
@@ -3505,7 +3524,9 @@ class RealTree(unittest.TestCase):
                        if path in tree.text(t) and cite.search(tree.text(t))
                        and t not in targets]
             if path.startswith('testing/timer-stand-in/'):
-                self.assertEqual(sorted(targets), TESTING_FALLBACK, path)
+                rel = path[len('testing/'):]
+                self.assertEqual([t for t in sorted(targets) if t not in TESTING_FALLBACK
+                                  and rel not in tree.text(t)], [], path)
         self.assertEqual(misses, [])
 
     def test_every_command_and_server_tool_maps(self):

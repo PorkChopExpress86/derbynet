@@ -379,12 +379,15 @@ class Tree:
         return ([rel for rel in found if Path(rel).name.startswith('test_')],
                 [rel for rel in found if Path(rel).name == 'conftest.py'])
 
-    def mentions(self, words):
+    def mentions(self, words, after_slash=True):
         """The test files whose text names one of `words`, as a whole word:
-        kiosk.js is not named by kiosk.json."""
+        kiosk.js is not named by kiosk.json. With `after_slash` false, a word
+        after a `/` is no mention: server/docker/Dockerfile is no cite of
+        testing/'s docker/Dockerfile (#431)."""
         # The plain `in` first: a pattern that opens on a lookbehind scans
         # slowly, and every template in RealTree's test pays it (#312 retro).
-        found = [(w, re.compile(rf'(?<![\w-]){re.escape(w)}(?![\w-])'))
+        before = r'[\w-]' if after_slash else r'[\w/-]'
+        found = [(w, re.compile(rf'(?<!{before}){re.escape(w)}(?![\w-])'))
                  for w in words if w]
         return sorted(rel for rel in self.test_files()
                       if any(w in self.text(rel) and f.search(self.text(rel))
@@ -665,7 +668,7 @@ def match_testing(path):
 
 
 def cover_testing(plan, tree, path):
-    targets = tree.mentions(testing_cites(tree, path))
+    targets = testing_citers(tree, path)
     note = ('a shell suite or its data: the tests that name it. CI runs the '
             'shell suites against Django; testing/README.md runs one locally')
     if not targets:
@@ -683,17 +686,20 @@ def cover_testing(plan, tree, path):
                      '(testing/README.md); before the first push')
 
 
-def testing_cites(tree, path):
-    """The words a test cites testing/`path` by: its bare name, which every
-    cite of the path holds too, when the name holds a `.` or a `-` and no
-    other tracked file has it, and the path itself otherwise. Tests say
-    `sleep` and `curl` as words, not as #399's stand-ins under
+def testing_citers(tree, path):
+    """The test files that cite testing/`path`: by its bare name, which
+    every cite of the path holds too, when the name holds a `.` or a `-`
+    and no other tracked file has it; otherwise by the path, or by the path
+    relative to testing/ with no `/` before it when that holds a folder.
+    Tests say `sleep` and `curl` as words, not as #399's stand-ins under
     testing/timer-stand-in/, and README.md is the name of a file in several
-    folders: such a file maps through its path alone, and to the fallback
-    when no test cites the path (#431)."""
-    name = Path(path).name
-    distinct = ('.' in name or '-' in name) and tree.tracked_names()[name] <= 1
-    return [name] if distinct else [path]
+    folders: such a file maps only through a cite of its path, and to the
+    fallback when no test cites it (#431)."""
+    name, rel = Path(path).name, path[len('testing/'):]
+    if ('.' in name or '-' in name) and tree.tracked_names()[name] <= 1:
+        return tree.mentions([name])
+    nested = [rel] if '/' in rel else []
+    return sorted({*tree.mentions([path]), *tree.mentions(nested, after_slash=False)})
 
 
 def cases_scripts(tree, path):
