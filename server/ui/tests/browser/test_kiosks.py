@@ -883,25 +883,27 @@ def move_off(page):
     page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
 
 
-# The timers kiosks.js sets with no delay in a click's listeners wait until
-# the next pointerdown has been handled, then run, as on a main thread too
-# busy to run them before that input (#455). Once only: later clicks' timers
-# run as usual. `window.lateTimers` counts those parked and when each ran.
+# The timers a click's listeners set wait until the next pointerdown has been
+# handled, then run: the order a click's timer that runs late gives (#455).
+# Once only: later clicks' timers run as usual, and so does a timer set
+# outside a click, such as the board poll's. `window.lateTimers` counts those
+# parked, records when each ran, and the pointerdown that let them go: its
+# timeStamp and its button's scene.
 LATE_CLICK_TIMERS = """() => {
   const real = window.setTimeout;
-  const late = window.lateTimers = {parked: 0, ran: []};
+  const late = window.lateTimers = {parked: 0, ran: [], down: null};
   const parked = [];
   window.setTimeout = function (fn, ms, ...rest) {
-    if (!ms && window.event && window.event.type === 'click'
-        && new Error().stack.includes('/static/ui/kiosks.js')) {
+    if (window.event?.type === 'click') {
       parked.push(() => fn(...rest));
       late.parked += 1;
       return 0;
     }
     return real.call(window, fn, ms, ...rest);
   };
-  window.addEventListener('pointerdown', () => {
+  window.addEventListener('pointerdown', (e) => {
     window.setTimeout = real;
+    late.down = {at: e.timeStamp, scene: e.target.closest('button')?.dataset.scene};
     for (const run of parked) real(() => { late.ran.push(performance.now()); run(); });
   }, {once: true});
 }"""
@@ -918,21 +920,29 @@ def test_a_press_during_a_taps_request_still_taps(login, event):
     Identify's board swapped in under it."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
-    welcome = scene_button(page, scene(event, "Welcome"))
+    welcomed = scene(event, "Welcome")
+    welcome = scene_button(page, welcomed)
     posts = held_at_route(page, "**/kiosks/identify/**")
     polls = a_press_spans_a_swap(page, event, page.locator(IDENTIFY_BUTTON))
     page.evaluate(LATE_CLICK_TIMERS)
+    page.evaluate("setTimeout(() => {})")
     page.mouse.up()
     wait_for_held(page, posts, "Identify POST")
     press(page, welcome)
-    posts[0].continue_()
-    wait_for_done(page, "/kiosks/identify/")
     log = board_log(page)
     second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
     late = page.evaluate("window.lateTimers")
-    assert late["parked"] >= 1, late
-    assert len(late["ran"]) == late["parked"], late
-    assert min(late["ran"]) > log[second]["at"], (late, log)
+    assert late["down"] == {"at": log[second]["at"], "scene": str(welcomed.pk)}, (
+        late,
+        log,
+    )
+    assert late["parked"] == 1, late
+    posts[0].continue_()
+    wait_for_done(page, "/kiosks/identify/")
+    log = board_log(page)
+    late = page.evaluate("window.lateTimers")
+    assert len(late["ran"]) == 1, late
+    assert late["ran"][0] > log[second]["at"], (late, log)
     assert swaps_since(log, second) == [], log
     with htmx_post(page, "/kiosks/scene/"):
         page.mouse.up()
