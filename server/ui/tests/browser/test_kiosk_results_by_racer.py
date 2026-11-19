@@ -237,10 +237,14 @@ def test_the_page_gives_a_poll_up_between_14_and_16_s(page, event, day, page_err
     # One read: what had failed by 14 s, before the allowance below.
     at_14_s = list(page_errors.errors)
     page_errors.allow(r"request failed: \S*/results/rounds/\S* net::ERR_ABORTED$")
+    # The second poll's reply is in before the count (#434).
     with page.expect_event(
-        "requestfailed", lambda r: "/results/rounds/" in r.url, timeout=10_000
-    ) as failed:
-        page.clock.run_for(PAST_GIVE_UP_MS - 14_000)
+        "requestfinished", lambda r: "/results/rounds/" in r.url, timeout=10_000
+    ):
+        with page.expect_event(
+            "requestfailed", lambda r: "/results/rounds/" in r.url, timeout=10_000
+        ) as failed:
+            page.clock.run_for(PAST_GIVE_UP_MS - 14_000)
     page.clock.run_for(1_100)
     for _ in range(100):
         if len(seen) > 1:
