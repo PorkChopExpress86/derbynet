@@ -367,7 +367,7 @@ def testing_targets(files, path):
 
 class TestingNames(unittest.TestCase):
     """#431: #399's stand-ins testing/timer-stand-in/curl and sleep mapped to
-    9 and 14 test files that say `curl` or `sleep` as words."""
+    the test files that say `curl` or `sleep` as words."""
 
     def test_a_name_that_is_a_word_maps_to_the_tests_that_read_testing(self):
         files = {'server/tests/test_detach.py': 'subprocess.run(["sleep", "5"])\n'}
