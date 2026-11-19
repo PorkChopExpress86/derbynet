@@ -219,12 +219,27 @@ def test_the_page_gives_a_poll_up_between_14_and_16_s(page, event, day, page_err
     (`PAST_GIVE_UP_MS`, past kiosk.js's `GIVE_UP_MS`), and the poll's next
     turn goes out after it, and only that turn: the clock stops with its
     reply in, before the turn the reply queues (#434)."""
-    # kiosk.js's `GIVE_UP_MS`, and kiosk-results.js's re-poll after a reply
-    # or a failure (`Kiosk.poll(poll, 1000, 'after')`).
-    give_up_ms, re_poll_ms = 15_000, 1_000
+    import re
+    from pathlib import Path
+
+    static = Path(__file__).resolve().parents[2] / "static" / "ui"
+    give_up = re.search(r"var GIVE_UP_MS = (\d+);", (static / "kiosk.js").read_text())
+    re_poll = re.search(
+        r"Kiosk\.poll\(poll, (\d+), 'after'\)",
+        (static / "kiosk-results.js").read_text(),
+    )
+    assert give_up, "kiosk.js no longer has `var GIVE_UP_MS = <ms>;`"
+    assert re_poll, "kiosk-results.js no longer has `Kiosk.poll(poll, <ms>, 'after')`"
+    give_up_ms, re_poll_ms = int(give_up[1]), int(re_poll[1])
     # `run_for` fires a timer due at its last tick, so the next turn, due at
     # the sum, goes out in the run to `PAST_GIVE_UP_MS`.
-    assert give_up_ms + re_poll_ms <= PAST_GIVE_UP_MS < give_up_ms + 2 * re_poll_ms
+    assert give_up_ms + re_poll_ms <= PAST_GIVE_UP_MS < give_up_ms + 2 * re_poll_ms, (
+        f"the page gives up at {give_up_ms} ms and re-polls {re_poll_ms} ms later:"
+        f" the run to {PAST_GIVE_UP_MS} ms must reach that turn and not the next"
+    )
+    assert 14_000 < give_up_ms, (
+        f"the page gives up at {give_up_ms} ms: the check at 14 s would see the abort"
+    )
     seen = []
 
     def hold_the_first(route):
