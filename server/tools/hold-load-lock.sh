@@ -4,7 +4,7 @@
 # hand-off's runs without load queue behind a load run and keep the next
 # one out until they end.
 #
-# Usage: server/tools/hold-load-lock.sh COMMAND [ARGUMENT ...]
+# Usage: server/tools/hold-load-lock.sh [-h | --help] | COMMAND [ARGUMENT ...]
 #
 #   server/tools/hold-load-lock.sh bash ~/.cache/derbynet-drafts/N/handoff.sh
 #
@@ -15,7 +15,11 @@
 # (#348, #350 retro).  This script waits in the same line as the load runs
 # instead, and takes the lock in the order it came, ahead of any run that
 # starts waiting after it (tools/load-lock-line.sh, #417).  Whatever fails on
-# the way to the lock, it exits 2 with a message and runs no COMMAND.
+# the way to the lock, it exits 2 with a message and runs no COMMAND.  It takes
+# no option: -h or --help alone prints the Usage line and exits 0, and a first
+# argument that starts with any other - is refused with 2, since no COMMAND
+# starts with - and #434's `--help` once waited in the lock's line to run one
+# (#434 retro).
 #
 # It takes the lock as pytest-under-load.sh does (DERBYNET_LOAD_LOCK, or
 # ~/.cache/derbynet/load-run.lock), prints its place in the line as that
@@ -32,21 +36,21 @@
 
 set -e -E -o pipefail
 
+usage() {
+  sed -n 's/^# \(Usage: .*\)/\1/p' "$0"
+}
 if [ $# -eq 0 ]; then
-  echo "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]" >&2
+  usage >&2
   exit 2
 fi
-# It takes no option, and no COMMAND starts with -: #434's
-# `hold-load-lock.sh --help` waited in the lock's line to run `--help`
-# (#434 retro).
 case "$1" in
   -h|--help)
-    echo "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]"
-    echo "Runs COMMAND while it holds the load lock; the comment at the top of $0 says more."
+    usage
+    echo "The comment at the top of $0 says more."
     exit 0 ;;
   -*)
     echo "hold-load-lock.sh: it takes no option, and no COMMAND starts with -: $1" >&2
-    echo "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]" >&2
+    usage >&2
     exit 2 ;;
 esac
 if ! command -v flock >/dev/null; then

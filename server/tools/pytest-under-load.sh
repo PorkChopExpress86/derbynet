@@ -10,11 +10,14 @@
 # so a long run is never cut short or filtered.  It stops only the loops it
 # started.
 #
-# Usage: server/tools/pytest-under-load.sh [--postgres] [--loops N] [--flake-ticket] [pytest argument ...]
+# Usage: server/tools/pytest-under-load.sh [-h | --help] [--postgres] [--loops N] [--flake-ticket] [pytest argument ...]
 #
 #   server/tools/pytest-under-load.sh --postgres -m browser -n 4 --count 25 -k phone ui/tests/browser/test_photos.py
 #
-# --postgres runs through tools/pytest-postgres.sh, and starts the loops once
+# -h or --help among its own options, which are read first, prints the Usage
+# line and exits 0 before any refusal and before the lock; given after the
+# first pytest argument it reaches pytest.  --postgres runs through
+# tools/pytest-postgres.sh, and starts the loops once
 # its Postgres is ready: started under load, it once missed a 300 s wait
 # (#54 retro).  --loops sets the number
 # of busy loops (default 8).  Results go to var/load-runs/<time>/ under
@@ -58,25 +61,28 @@
 
 set -e -E -o pipefail
 
-# -h or --help among its own options prints the usage and takes no lock:
-# hold-load-lock.sh --help once queued on the lock as a COMMAND, and this
-# script would run `pytest --help` under load (#434 retro).
+# Its own options come first, and -h or --help among them prints the usage
+# and takes no lock: hold-load-lock.sh --help once queued on the lock as a
+# COMMAND, and this script would run `pytest --help` under load (#434 retro).
+# They are read before the refusals below, so --help works through a pipe.
+SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+RUNNER=(uv run pytest)
+ALL_ARGS="$*"
+LOOPS=8
+FLAKE_TICKET=
 usage() {
   sed -n 's/^# \(Usage: .*\)/\1/p' "$0"
   echo "The comment at the top of $0 says more."
-  exit 0
 }
-asks_help() {
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      -h|--help) usage ;;
-      --postgres|--flake-ticket) shift ;;
-      --loops) shift 2 || return 0 ;;
-      *) return 0 ;;
-    esac
-  done
-}
-asks_help "$@"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --postgres) RUNNER=("$SERVER_DIR/tools/pytest-postgres.sh"); shift ;;
+    --loops) LOOPS="$2"; shift 2 ;;
+    --flake-ticket) FLAKE_TICKET=--flake-ticket; shift ;;
+    *) break ;;
+  esac
+done
 
 # It refuses to start through a pipe or under `timeout`: #47 and #48 each
 # lost a 25-repeat run to `timeout 3000 ... | grep`, killed with nothing
@@ -98,20 +104,6 @@ if ! command -v flock >/dev/null; then
        "load run at a time: install util-linux, or on macOS \`brew install flock\`." >&2
   exit 2
 fi
-
-SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-RUNNER=(uv run pytest)
-ALL_ARGS="$*"
-LOOPS=8
-FLAKE_TICKET=
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --postgres) RUNNER=("$SERVER_DIR/tools/pytest-postgres.sh"); shift ;;
-    --loops) LOOPS="$2"; shift 2 ;;
-    --flake-ticket) FLAKE_TICKET=--flake-ticket; shift ;;
-    *) break ;;
-  esac
-done
 
 OUT="${DERBYNET_LOAD_RUN_DIR:-$SERVER_DIR/var/load-runs/$(date +%Y%m%d-%H%M%S)-$$}"
 # A folder that already holds files is refused: #220 reused one, and a wait

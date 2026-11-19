@@ -127,6 +127,12 @@ CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).+?(?<!`)\1(?!`)")
 # A code fence's line: three or more backticks, then an info string with no
 # backtick (CommonMark). "```code``` here" is inline code, not a fence.
 FENCE = re.compile(r"^\s*(`{3,})([^`]*)$")
+# The same for a ~~~ fence, which `unquoted_lines` reads only strictly, and an
+# indented code block's line (four spaces or a tab) and an HTML comment's
+# edges, which GitHub's renderer draws as code or not at all.
+TILDE_FENCE = re.compile(r"^\s*(~{3,})(.*)$")
+INDENTED = re.compile(r"^(?: {4}|\t)")
+COMMENT = re.compile(r"<!--.*?-->")
 # GitHub's closing keywords before an issue reference (#N, GH-N,
 # owner/repo#N, or an issue URL). Checked against every PR body on the fork:
 # the issues it finds are GitHub's closingIssuesReferences but for one PR
@@ -257,56 +263,83 @@ def placeholders(body: str, defined=defined_names) -> list[str]:
     return [f"line {n}: {token}" for n, _at, token in sorted(found) if token not in code_names]
 
 
-def unquoted_lines(body: str) -> list[tuple[int, str]]:
+def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
     """Each line GitHub reads as prose, as (its number, the line with each
     code span replaced by a NUL, which breaks a keyword or reference it sits
     in or between): a closed code fence is left out, and the lines of a fence
     that never closes are kept, as pr-merge reads cited decisions. Only a
-    bare line of at least as many backticks as the opener closes a fence."""
-    kept, fence = [], None
+    bare line of at least as many backticks as the opener closes a fence.
+
+    `strict` also leaves out whatever GitHub may read as code or hide: the
+    lines of a fence that never closes, a ~~~ fence, an HTML comment, and a
+    line indented four spaces or a tab (a lazy continuation line or a nested
+    list item too, which costs a false refusal, not a missed one). A refusal
+    of a close reads the default, since it must see all GitHub may act on;
+    a check that a link is there reads `strict`, since it must accept only
+    what GitHub surely reads. `gh api markdown` drew "Part of #61" as code or
+    not at all in each of these (the #434 retro's PR body pastes the runs);
+    that GitHub's closing keywords follow the renderer is assumed, since
+    they act on a merge and cannot be read without one."""
+    kept, fence, comment = [], None, False
     for n, line in enumerate(body.splitlines(), 1):
+        if comment:
+            if "-->" not in line:
+                continue
+            comment, line = False, line.split("-->", 1)[1]
         edge = FENCE.match(line)
+        tilde = TILDE_FENCE.match(line) if strict else None
         if fence is None:
             if edge:
-                fence = (len(edge[1]), [])
+                fence = (len(edge[1]), [], "`")
+            elif tilde:
+                fence = (len(tilde[1]), [], "~")
+            elif strict and INDENTED.match(line):
+                continue
             else:
-                kept.append((n, CODE_SPAN.sub("\0", line)))
-        elif edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+                text = CODE_SPAN.sub("\0", line)
+                if strict:
+                    text = COMMENT.sub("\0", text)
+                    if "<!--" in text:
+                        text, comment = text.split("<!--", 1)[0], True
+                kept.append((n, text))
+        elif fence[2] == "`" and edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+            fence = None
+        elif fence[2] == "~" and tilde and not tilde[2].strip() and len(tilde[1]) >= fence[0]:
             fence = None
         else:
             fence[1].append((n, line))
-    if fence:
+    if fence and not strict:
         kept += [(n, CODE_SPAN.sub("\0", line)) for n, line in fence[1]]
     return sorted(kept)
+
+
+def closing_refs(body: str, strict: bool = False) -> list[tuple[int, str, str, bool]]:
+    """Each closing keyword outside code, as (its line number, the words, the
+    issue number, whether the reference is into this repo, the fork)."""
+    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
+    found = []
+    for n, line in unquoted_lines(body, strict):
+        for m in CLOSING.finditer(line):
+            repo = m["repo"] or m["url_repo"]
+            found.append((n, m[0], m["number"] or m["url_number"],
+                          not repo or repo.casefold() == fork))
+    return found
 
 
 def foreign_closes(body: str, closes: set[str]) -> list[str]:
     """Each closing keyword outside code for an issue not in `closes`, or in
     a repo other than the fork, as `line N: <the words>`."""
-    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
-    found = []
-    for n, line in unquoted_lines(body):
-        for m in CLOSING.finditer(line):
-            repo = m["repo"] or m["url_repo"]
-            number = m["number"] or m["url_number"]
-            if number not in closes or (repo and repo.casefold() != fork):
-                found.append(f"line {n}: {m[0]}")
-    return found
+    return [f"line {n}: {words}" for n, words, number, in_fork in closing_refs(body)
+            if number not in closes or not in_fork]
 
 
 def links_ticket(body: str, issue: str) -> bool:
-    """Whether a line outside code closes `issue` in this repo or says
-    "Part of #<issue>"."""
-    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
+    """Whether a line GitHub surely reads as prose (`unquoted_lines` strict)
+    closes `issue` in this repo or says "Part of #<issue>"."""
     part_of = re.compile(rf"(?<!\w)part of #{issue}(?!\w)", re.IGNORECASE)
-    for _n, line in unquoted_lines(body):
-        if part_of.search(line):
-            return True
-        for m in CLOSING.finditer(line):
-            repo = m["repo"] or m["url_repo"]
-            if (m["number"] or m["url_number"]) == issue and (not repo or repo.casefold() == fork):
-                return True
-    return False
+    return (any(part_of.search(line) for _n, line in unquoted_lines(body, strict=True))
+            or any(number == issue and in_fork
+                   for _n, _words, number, in_fork in closing_refs(body, strict=True)))
 
 
 def ci_load_items(body: str) -> list[str]:
@@ -461,7 +494,8 @@ def main(argv: list[str]) -> int:
     unlinked = bool(args.issue) and not links_ticket(body, args.issue)
     if unlinked:
         print(f"no \"Closes #{args.issue}\" or \"Part of #{args.issue}\" outside code: the "
-              f"merge leaves #{args.issue} open with no link to the PR")
+              f"merge leaves #{args.issue} open with no link to the PR (an HTML comment, "
+              "a ~~~ fence and an indented line count as code)")
     loads = check_ci_load(body, head, args.flake_ticket)
     for line in loads:
         print(line)
