@@ -143,7 +143,15 @@ ARGUMENT_LISTS = [
     "{s}, z, **kw",
 ]
 # CALL takes `-max(` for a CSS name such as `x-max(`, so the minus is spaced.
-HOSTS = ["x = {}", "x = - {}", "x = {} ** 2", "x = {}.real", "x = {}[0]", "x = {}(0)"]
+HOSTS = [
+    "x = {}",
+    "x = - {}",
+    "x = {} ** 2",
+    "x = {}.real",
+    "x = {}[0]",
+    "x = {}(0)",
+    "x = g({})",
+]
 
 
 def test_the_samples_hold_each_expression_ast_has():
