@@ -45,6 +45,8 @@ on:
       - docs/img/**
       # The Compose example checks.sh readme-compose runs as written (D107).
       - README.md
+      # The apt mirror fallback the setup steps run (test_workflow_paths.py).
+      - .github/ubuntu-mirror.sh
       - .github/workflows/image.yml
   pull_request:
     paths:
@@ -63,6 +65,8 @@ on:
       - docs/img/**
       # The Compose example checks.sh readme-compose runs as written (D107).
       - README.md
+      # The apt mirror fallback the setup steps run (test_workflow_paths.py).
+      - .github/ubuntu-mirror.sh
       - .github/workflows/image.yml
   workflow_dispatch:
 
