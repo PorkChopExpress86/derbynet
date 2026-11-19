@@ -98,8 +98,8 @@ def every_item(*items, count=None):
 FIRST_ITEM = REQUEST_FAILED.removeprefix("Left contains one more item: ")
 SECOND_ITEM = f"'{SECOND} net::ERR_NETWORK_CHANGED'"
 # Chromium's console error for each resource that failed, which names no
-# URL: #366's load runs listed one after each failed request
-# (~/.cache/derbynet-drafts/second-lead/queue/366-load-11/junit.xml).
+# URL: a load run of #366 listed one after each failed request (REAL_366
+# below).
 CONSOLE_ITEM = "'console: Failed to load resource: net::ERR_NETWORK_CHANGED'"
 
 
@@ -389,8 +389,8 @@ def test_the_harness_teardown_with_a_later_item_not_a_changed_network_starts_no_
     assert reason.startswith("1 of 1 failures and errors are not")
 
 
-# The page errors of #366's load run 11 (366-load-11/junit.xml): each
-# failed request beside Chromium's console line for it.
+# The page errors one teardown of #366's load run 11 listed: each failed
+# request beside Chromium's console line for it.
 REAL_366 = [
     "request failed: http://localhost:45757/static/ui/kiosk/derbynet-300.png"
     " net::ERR_NETWORK_CHANGED",
@@ -405,10 +405,9 @@ PAGE_ERROR = "pageerror: Cannot read properties of undefined (reading 'modal')"
 
 def test_the_real_teardown_with_console_lines_beside_its_requests_reruns(tmp_path):
     """#366's runs 07, 11 and 15 listed a console line after each failed
-    request, so no teardown of theirs could start a rerun (#366 retro): the
-    real teardown, run by pytest on run 11's page errors alone, now does.
-    Run 11 itself still starts none, since its call failures are no changed
-    network (test_the_refusal_names_each_failure_by_its_test)."""
+    request: the real teardown, run by pytest on run 11's page errors
+    alone, reruns. Run 11 itself starts none, since its call failures are
+    no changed network (test_the_refusal_names_each_failure_by_its_test)."""
     found, log = teardown_junit(tmp_path, REAL_366)
     args, reason = nc.rerun_args(found, log, [])
     assert reason == ""
@@ -427,10 +426,9 @@ def test_the_real_teardown_with_a_page_error_names_it(tmp_path):
 
 
 def test_the_refusal_names_each_failure_by_its_test():
-    """The refusal named only a count, "N of N are not a changed network",
-    which #366's triage had to read past: it now names each failure that
-    is not one, and says when its test also failed on a changed network,
-    which pytest writes as a second <testcase> of the same name."""
+    """The refusal names each failure that is not a changed network, and
+    says when its test also failed on one, which pytest writes as a second
+    <testcase> of the same name."""
     call = '<failure message="AssertionError: count 0&#10;Actual value: 0"/>'
     found = (
         "<testsuites><testsuite>"
@@ -457,6 +455,24 @@ def test_the_refusal_names_each_failure_by_its_test():
         '  error k::test_u: failed on teardown with "AssertionError: assert'
         " ['request fai...WORK_CHANGED'] == []; first item not a changed"
         " network: none, but more console lines than failed requests",
+    ]
+
+
+def test_a_changed_network_in_no_testcase_shares_no_test_with_another_failure():
+    """A failure outside every <testcase> has no test to share, so a
+    changed network there leaves another such failure named alone."""
+    found = (
+        "<testsuites><testsuite>"
+        f"{failure(message=PAGE_LOAD)}{failure(message='Error: y')}"
+        "</testsuite></testsuites>"
+    )
+    args, reason = nc.rerun_args(found, SUMMARY, [])
+    assert args is None
+    assert reason.splitlines() == [
+        "1 of 2 failures and errors are not a changed network (a Playwright"
+        " net::ERR_NETWORK_CHANGED, or the browser harness's teardown naming"
+        " one): no rerun, and the status stays pytest's.",
+        "  failure (no test): Error: y",
     ]
 
 
