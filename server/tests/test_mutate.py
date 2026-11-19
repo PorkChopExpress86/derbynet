@@ -186,7 +186,7 @@ def failures(*places, after=""):
             "failed in helper check at test_h.py:5, not a test",
         ),
         (
-            failures("test_h.py:5: in check", "lib/helpers.py:2: ValueError"),
+            failures("test_h.py:5: in check", "helpers.py:2: ValueError"),
             "failed in helper check at test_h.py:5, not a test",
         ),
         (
@@ -202,7 +202,7 @@ def failures(*places, after=""):
         (failures("test_h.py:20: AssertionError"), ""),
         (failures("test_gone.py:5: AssertionError"), ""),
         (failures("test_broken.py:1: AssertionError"), ""),
-        (failures("lib/helpers.py:2: ValueError"), ""),
+        (failures("helpers.py:2: ValueError"), ""),
         # A place after the section, such as a warning's, is no frame.
         (
             failures(
@@ -243,8 +243,7 @@ def test_failed_in_helper_names_the_test_side_function_that_raised(
     (tmp_path / "test_h.py").write_text(HELPERS)
     (tmp_path / "conftest.py").write_text("def fixture():\n    assert False\n")
     (tmp_path / "test_broken.py").write_text("def check(:\n")
-    (tmp_path / "lib").mkdir()
-    (tmp_path / "lib" / "helpers.py").write_text("def run():\n    raise ValueError\n")
+    (tmp_path / "helpers.py").write_text("def run():\n    raise ValueError\n")
     assert failed_in_helper(output) == found
 
 

@@ -366,9 +366,9 @@ def test_each_known_row_names_a_read_that_is_there():
         ("python3 - <<'EOF'\nre.search(r'((x))', s)\nEOF\necho $((n))\n", [(4, "n")]),
         ('x=$(tr a b <<<"$y")\necho $((x))\n', [(2, "x")]),
         (
-            'pid=$PPID\nwhile [ "${pid:-0}" -gt 1 ]; do\n'
+            'pid=$PPID\nfor _ in 1 2 3; do\n  [ "${pid:-0}" -gt 1 ] || break\n'
             '  pid=$(ps -o ppid= -p "$pid")\ndone\n',
-            [(2, "pid")],
+            [(3, "pid")],
         ),
         (
             "for _ in $(seq 60); do :; done\n"

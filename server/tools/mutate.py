@@ -267,8 +267,8 @@ def _result(run, output: str, expect: str) -> tuple[str, str]:
     return outcome, failed_in_helper(output)
 
 
-# A traceback entry's place in pytest's output: `tests/x.py:12: AssertionError`
-# for the entry that raised, `tests/x.py:9: in join` or `tests/x.py:9: ` for
+# A traceback entry's place in pytest's output: `test_x.py:12: AssertionError`
+# for the entry that raised, `test_x.py:9: in join` or `test_x.py:9: ` for
 # one on the way to it.
 PLACE = re.compile(r"^(\S+\.py):(\d+): ", re.M)
 FAILURES = re.compile(r"^=+ FAILURES =+$", re.M)
