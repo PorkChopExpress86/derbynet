@@ -575,8 +575,8 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
 BODY_444 = ('## Why\n\n`test_kiosk_results_by_racer.py`\'s give-up test should pass every '
             'run, on CI and under load (#61).\n\n## What changed\n\nThe test only.\n')
 UNLINKED = ('no "Closes #61" or "Part of #61" outside code: the merge leaves #61 open '
-            'with no link to the PR (an HTML comment, a ~~~ fence and an indented line '
-            'count as code)')
+            'with no link to the PR (an HTML comment, <pre>, <code>, a ~~~ fence and an '
+            'indented line count as code)')
 
 
 class TicketLink(IssueStandIn, unittest.TestCase):
@@ -608,25 +608,43 @@ class TicketLink(IssueStandIn, unittest.TestCase):
                 self.assertFalse(TOOL.links_ticket(BODY_444 + line + '\n', '61'))
 
     def test_a_link_github_draws_as_code_or_not_at_all_is_refused(self):
-        """`gh api markdown` drew "Part of #61" in each as code or as nothing
-        (an HTML comment, a ~~~ fence, an indented block, a fence with no
-        end); the PR body pastes the runs."""
+        """`gh api markdown` linked #61 in none of these (an HTML comment, a
+        ~~~ fence, an indented block, a fence with no end, <pre> and <code>,
+        a quoted fence); the PR body pastes the runs."""
         for lines in ('<!-- Part of #61 -->', 'a <!-- Part of #61 --> b',
-                      '<!--\nPart of #61\n-->', '<!--\nCloses #61', 'x <!-- Closes #61',
+                      '<!--\nPart of #61\n-->', '<!--\nCloses #61', 'a <!-- Part of #61\ny --> b',
                       '~~~\nPart of #61\n~~~', '~~~~\nCloses #61\n~~~~', '~~~\nCloses #61',
                       '```\nPart of #61', '    Part of #61', '\tCloses #61',
                       '- item\n\n      Part of #61',
-                      '~~~\nx\n~~~ y\nPart of #61\n~~~', '~~~\n```\nPart of #61\n```\n~~~', '```\n~~~\nPart of #61\n~~~\n```'):
+                      '~~~\nx\n~~~ y\nPart of #61\n~~~', '~~~\n```\nPart of #61\n```\n~~~',
+                      '```\n~~~\nPart of #61\n~~~\n```',
+                      '<pre>Part of #61</pre>', '<PRE>\nPart of #61\n</PRE>',
+                      '<code>Part of #61</code>', 'x <pre>Part of #61', 'x <code>Part of #61',
+                      '> ```\n> Part of #61\n> ```', '> quote\n>\n>     Part of #61'):
             with self.subTest(lines=lines):
                 self.assertFalse(TOOL.links_ticket(BODY_444 + lines + '\n', '61'))
 
     def test_a_link_after_such_code_ends_passes(self):
+        """`gh api markdown` linked #61 in each of these too."""
         for lines in ('<!-- note -->\nPart of #61', '<!-- note --> Part of #61',
                       '<!--\nnote\n--> Closes #61', '~~~\nx\n~~~\nPart of #61',
                       '~~~~\n~~~\nx\n~~~~\nPart of #61', '~~~\nx\n~~~~\nPart of #61',
-                      '   Part of #61', '- Part of #61', '<!--\n```\n-->\nPart of #61'):
+                      '   Part of #61', '- Part of #61', '<!--\n```\n-->\nPart of #61',
+                      '<!-- a --> Part of #61 <!-- b -->', 'a <!-- x\ny --> Part of #61',
+                      '<pre>x</pre> Part of #61', '<code>x</code>\nPart of #61',
+                      '<precious>Part of #61</precious>', '<script>Part of #61</script>',
+                      '> Part of #61', '> ```\n> x\n> ```\n\nPart of #61'):
             with self.subTest(lines=lines):
                 self.assertTrue(TOOL.links_ticket(BODY_444 + lines + '\n', '61'))
+
+    def test_the_limit_left_is_a_false_refusal_never_a_missed_one(self):
+        """`gh api markdown` linked #61 in each of these, and the strict
+        reading refuses them: it leaves out a lazy continuation line, which
+        it cannot tell from a code block without parsing the paragraph above,
+        and a comment opened mid-line and never closed."""
+        for lines in ('text\n    Part of #61', 'x <!-- Closes #61'):
+            with self.subTest(lines=lines):
+                self.assertFalse(TOOL.links_ticket(BODY_444 + lines + '\n', '61'))
 
     def test_a_close_foreign_closes_must_refuse_is_still_read_in_that_code(self):
         """The default view keeps what GitHub might act on: only a closed

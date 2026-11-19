@@ -16,10 +16,10 @@
 # instead, and takes the lock in the order it came, ahead of any run that
 # starts waiting after it (tools/load-lock-line.sh, #417).  Whatever fails on
 # the way to the lock, it exits 2 with a message and runs no COMMAND.  It takes
-# no option: -h or --help alone prints the Usage line and exits 0, and a first
-# argument that starts with any other - is refused with 2, since no COMMAND
-# starts with - and #434's `--help` once waited in the lock's line to run one
-# (#434 retro).
+# no option: -h or --help as its first argument prints the Usage line and
+# exits 0, and a first argument that starts with any other - is refused with
+# 2, since no COMMAND starts with - and #434's `--help` once waited in the
+# lock's line to run one (#434 retro).
 #
 # It takes the lock as pytest-under-load.sh does (DERBYNET_LOAD_LOCK, or
 # ~/.cache/derbynet/load-run.lock), prints its place in the line as that

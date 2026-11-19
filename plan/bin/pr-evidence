@@ -61,6 +61,11 @@ keyword (as above, into this repo) and no "Part of #<issue>", outside code.
 #444's body named #434 only in prose, so its merge left #434 open, and the
 lead closed it by hand (#434 retro). A ticket the PR leaves open writes
 "Part of #N" beside its `## Still open` section, which pr-merge asks of it.
+Here "outside code" is stricter than for the check above: it leaves out
+whatever GitHub may draw as code or hide, so an HTML comment, <pre> and
+<code>, a ~~~ fence, a fence that never closes, a quoted fence and an
+indented line hold no link (`unquoted_lines(strict=True)`; the limit left and
+GitHub's rendering are in its docstring).
 
 A list item `- CI load: <run URL>` cites a run of
 .github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
@@ -127,12 +132,15 @@ CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).+?(?<!`)\1(?!`)")
 # A code fence's line: three or more backticks, then an info string with no
 # backtick (CommonMark). "```code``` here" is inline code, not a fence.
 FENCE = re.compile(r"^\s*(`{3,})([^`]*)$")
-# The same for a ~~~ fence, which `unquoted_lines` reads only strictly, and an
-# indented code block's line (four spaces or a tab) and an HTML comment's
-# edges, which GitHub's renderer draws as code or not at all.
+# The same for a ~~~ fence, which `unquoted_lines` reads only strictly, an
+# indented code block's line (four spaces or a tab), a blockquote's marker,
+# and the HTML that GitHub's renderer draws as code or not at all: a comment,
+# <pre> and <code>, each with the tag that ends it.
 TILDE_FENCE = re.compile(r"^\s*(~{3,})(.*)$")
 INDENTED = re.compile(r"^(?: {4}|\t)")
-COMMENT = re.compile(r"<!--.*?-->")
+QUOTE = re.compile(r"^\s{0,3}(?:>\s?)+")
+RAW_OPEN = re.compile(r"<!--|<(pre|code)\b", re.IGNORECASE)
+RAW_CLOSE = {"<!--": "-->", "<pre": "</pre>", "<code": "</code>"}
 # GitHub's closing keywords before an issue reference (#N, GH-N,
 # owner/repo#N, or an issue URL). Checked against every PR body on the fork:
 # the issues it finds are GitHub's closingIssuesReferences but for one PR
@@ -271,21 +279,30 @@ def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
     bare line of at least as many backticks as the opener closes a fence.
 
     `strict` also leaves out whatever GitHub may read as code or hide: the
-    lines of a fence that never closes, a ~~~ fence, an HTML comment, and a
-    line indented four spaces or a tab (a lazy continuation line or a nested
-    list item too, which costs a false refusal, not a missed one). A refusal
-    of a close reads the default, since it must see all GitHub may act on;
-    a check that a link is there reads `strict`, since it must accept only
-    what GitHub surely reads. `gh api markdown` drew "Part of #61" as code or
-    not at all in each of these (the #434 retro's PR body pastes the runs);
-    that GitHub's closing keywords follow the renderer is assumed, since
-    they act on a merge and cannot be read without one."""
-    kept, fence, comment = [], None, False
+    lines of a fence that never closes, a ~~~ fence, an HTML comment, <pre>
+    and <code> (each to its closing tag, or to the end), and a line indented
+    four spaces or a tab, after a blockquote's `>` markers are taken off. A
+    lazy continuation line, a nested list item and an unclosed comment that
+    starts mid-line are left out too, though GitHub links in them: a false
+    refusal costs a move of the line, a missed one costs an open ticket. A
+    refusal of a close reads the default, since it must see all GitHub may
+    act on; a check that a link is there reads `strict`, since it must accept
+    only what GitHub surely reads. The limit left: other raw HTML, such as a
+    table cell or a reference-link definition, is read as prose. `gh api
+    markdown` drew "Part of #61" as code or not at all in each form the
+    strict reading leaves out, and linked it in each it keeps (the #434
+    retro's PR body pastes the runs); that GitHub's closing keywords follow
+    the renderer is assumed, since they act on a merge and cannot be read
+    without one."""
+    kept, fence, raw_end = [], None, None
     for n, line in enumerate(body.splitlines(), 1):
-        if comment:
-            if "-->" not in line:
+        if strict:
+            line = QUOTE.sub("", line)
+        if raw_end:
+            at = line.lower().find(raw_end)
+            if at < 0:
                 continue
-            comment, line = False, line.split("-->", 1)[1]
+            raw_end, line = None, line[at + len(raw_end):]
         edge = FENCE.match(line)
         tilde = TILDE_FENCE.match(line) if strict else None
         if fence is None:
@@ -297,10 +314,13 @@ def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
                 continue
             else:
                 text = CODE_SPAN.sub("\0", line)
-                if strict:
-                    text = COMMENT.sub("\0", text)
-                    if "<!--" in text:
-                        text, comment = text.split("<!--", 1)[0], True
+                while strict and (opener := RAW_OPEN.search(text)):
+                    end = RAW_CLOSE[opener[0].lower()]
+                    at = text.lower().find(end, opener.end())
+                    if at < 0:
+                        text, raw_end = text[: opener.start()], end
+                    else:
+                        text = text[: opener.start()] + "\0" + text[at + len(end):]
                 kept.append((n, text))
         elif fence[2] == "`" and edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
             fence = None
@@ -495,7 +515,7 @@ def main(argv: list[str]) -> int:
     if unlinked:
         print(f"no \"Closes #{args.issue}\" or \"Part of #{args.issue}\" outside code: the "
               f"merge leaves #{args.issue} open with no link to the PR (an HTML comment, "
-              "a ~~~ fence and an indented line count as code)")
+              "<pre>, <code>, a ~~~ fence and an indented line count as code)")
     loads = check_ci_load(body, head, args.flake_ticket)
     for line in loads:
         print(line)
