@@ -172,7 +172,7 @@ KEEPS_SENDING = {
 
 def keep_sending(tab, how):
     """Start the tab sending `/login/?again` on each end, as `how` names,
-    and wait until the server has answered it."""
+    wait until the server has answered it, and return that request."""
     frame = tab.main_frame
     if how == "iframe":
         # No src: XFrameOptionsMiddleware keeps the login page out of a
@@ -180,8 +180,11 @@ def keep_sending(tab, how):
         with tab.expect_event("frameattached") as attached:
             tab.evaluate("() => document.body.append(document.createElement('iframe'))")
         frame = attached.value
-    with tab.expect_event("requestfinished", lambda r: r.url.endswith("/login/?again")):
+    with tab.expect_event(
+        "requestfinished", lambda r: r.url.endswith("/login/?again")
+    ) as finished:
         frame.evaluate(KEEPS_SENDING["fetch" if how == "iframe" else how])
+    return finished.value
 
 
 # The slowest `close_tab` of these tests under load (PR #424's timed run).
@@ -222,7 +225,10 @@ def test_close_tab_closes_a_tab_that_keeps_sending(page, event, how):
     with at_the_server(
         lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
     ) as server:
-        keep_sending(tab, how)
+        sent_from = keep_sending(tab, how).frame
+        assert sent_from.parent_frame == (
+            tab.main_frame if how in ("iframe", "new-frame") else None
+        )
         close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
     assert page.in_flight.closed_with == []

@@ -587,6 +587,7 @@ def test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop(login, 
     with at_the_server(is_a_post_to_action_php) as server:
         close_tab(page, camera)
         assert server.after_close(page) == (0, 0)
+    assert server.started, "the server counted no POST of the camera's"
     assert page.in_flight.closed_with == []
     assert [body for body in sent if "viewer-409" in body]
 
