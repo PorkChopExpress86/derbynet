@@ -20,9 +20,11 @@ from ui.tests.browser.conftest import (
     check_harness,
     close_tab,
     font_config,
+    stop_sending,
     stop_timers,
 )
 from ui.tests.browser.helpers import pause_clock_at
+from ui.tests.browser.tab_closing import after_the_stop, at_the_server
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -121,6 +123,308 @@ def test_close_tab_waits_for_the_request_out(page, event):
         tab.wait_for_timeout(20)
     held[0].fulfill(status=204)
     close_tab(page, tab)
+    assert page.in_flight.closed_with == []
+
+
+# Each sends `/login/?again` and, once it ends, sends it again: by fetch,
+# by XMLHttpRequest, by fetch from an iframe of the tab (`keep_sending`), by
+# an image, and by fetch from a new iframe each time.
+KEEPS_SENDING = {
+    "fetch": "() => { const go = () => fetch('/login/?again').finally(go); go(); }",
+    "xhr": """() => {
+      const go = () => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/login/?again');
+        xhr.onloadend = go;
+        xhr.send();
+      };
+      go();
+    }""",
+    "image": """() => {
+      const go = () => {
+        const img = new Image();
+        img.onload = img.onerror = go;
+        img.src = '/login/?again';
+      };
+      go();
+    }""",
+    # sendBeacon has no reply to wait on: the tab sends beacons from a
+    # MessageChannel loop, which no stop of timers ends.
+    "beacon": """() => {
+      let n = 0;
+      const tick = () => {
+        if (n++ % 200 == 0) navigator.sendBeacon('/login/?again');
+        const channel = new MessageChannel();
+        channel.port1.onmessage = tick;
+        channel.port2.postMessage(null);
+      };
+      tick();
+    }""",
+    "new-frame": """() => {
+      const go = () => {
+        const frame = document.createElement('iframe');
+        document.body.append(frame);
+        frame.contentWindow.fetch('/login/?again').finally(go);
+      };
+      go();
+    }""",
+}
+
+
+def keep_sending(tab, how):
+    """Start the tab sending `/login/?again` on each end, as `how` names,
+    wait until the server has answered it, and return that request."""
+    frame = tab.main_frame
+    if how == "iframe":
+        # No src: XFrameOptionsMiddleware keeps the login page out of a
+        # frame, and a blank frame takes the tab's origin and base URL.
+        with tab.expect_event("frameattached") as attached:
+            tab.evaluate("() => document.body.append(document.createElement('iframe'))")
+        frame = attached.value
+    with tab.expect_event(
+        "requestfinished", lambda r: r.url.endswith("/login/?again")
+    ) as finished:
+        frame.evaluate(KEEPS_SENDING["fetch" if how == "iframe" else how])
+    return finished.value
+
+
+# The slowest `close_tab` of these tests under load (PR #424's timed run).
+SLOWEST_CLOSE_S = 0.66
+CLOSE_SLACK_S = InFlight.TIMEOUT_MS / 1000 - SLOWEST_CLOSE_S
+
+
+def close_tab_in_time(page, tab):
+    """`close_tab`, asserted to end before its wait gives up: a tab that
+    still sends keeps a request out, and the wait then ends only at
+    `InFlight.TIMEOUT_MS`, with nothing out at that moment in the beacon
+    case. The bound is `SLOWEST_CLOSE_S + CLOSE_SLACK_S`."""
+    started = time.monotonic()
+    close_tab(page, tab)
+    assert time.monotonic() - started < SLOWEST_CLOSE_S + CLOSE_SLACK_S
+
+
+# The server holds each request, so that a tab that keeps sending, a
+# beacon's included, always has one out, and the reply to the one out at
+# the stop lands after `close_tab` has stopped the tab.
+HOLD_S = 0.1
+
+
+@pytest.mark.parametrize(
+    "how", ["fetch", "xhr", "iframe", "image", "beacon", "new-frame"]
+)
+def test_close_tab_closes_a_tab_that_keeps_sending(page, event, how):
+    """A reply's handler can send again on no timer, so a tab that does so
+    always has a request out, and waiting until it has none never ends.
+    `close_tab` makes every send of the tab's frames, of frames made after
+    too, do nothing once it has stopped the timers, waits for the server's
+    reply to the ones sent before, and names none of them (#409). When it
+    returns, the server has no request of the tab in hand, and none arrives
+    after."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
+    ) as server:
+        sent_from = keep_sending(tab, how).frame
+        assert server.started
+        assert sent_from.parent_frame == (
+            tab.main_frame if how in ("iframe", "new-frame") else None
+        )
+        close_tab_in_time(page, tab)
+        assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+
+
+# An image a handler loads after the stop by a route no stub reaches: by
+# `setAttribute('src')`, as kiosk-now-racing.js's `photo()` sets one, and
+# in reply markup put in `innerHTML`, as kiosk-check-in.js's `refresh()`
+# puts its list.
+IMAGE_AFTER_THE_STOP = {
+    "set-attribute": """() => {
+      const img = document.body.appendChild(document.createElement('img'));
+      if (img.getAttribute('src') !== '/login/?image') {
+        img.setAttribute('src', '/login/?image');
+      }
+    }""",
+    "inner-html": """() => {
+      const root = document.body.appendChild(document.createElement('div'));
+      root.innerHTML = '<img alt="" src="/login/?image">';
+    }""",
+}
+
+
+@pytest.mark.parametrize("how", IMAGE_AFTER_THE_STOP)
+def test_close_tab_blocks_an_image_loaded_after_the_stop(page, event, monkeypatch, how):
+    """The stubs stop no image a handler loads by `setAttribute` or by
+    markup, and both reviews of PR #424 saw such a load close a tab with a
+    GET out. `close_tab` puts the tab under the block: here the image loads
+    once the block is on, the tab tries it, Chromium fails it, and the
+    server never starts it (#409)."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    failed = []
+    tab.on("requestfailed", lambda r: r.url.endswith("?image") and failed.append(r))
+    block = conftest.block_sending
+
+    def block_then_load(tab):
+        block(tab)
+        with tab.expect_event("request", lambda r: r.url.endswith("?image")):
+            tab.evaluate(IMAGE_AFTER_THE_STOP[how])
+
+    with (
+        at_the_server(lambda environ: environ["QUERY_STRING"] == "image") as server,
+        monkeypatch.context() as patch,
+    ):
+        patch.setattr(conftest, "block_sending", block_then_load)
+        close_tab_in_time(page, tab)
+        assert server.after_close(page) == (0, 0)
+        assert server.started == 0
+    assert [r.failure for r in failed] == [BLOCKED[0]]
+    assert page.in_flight.closed_with == []
+
+
+def test_an_image_keeps_its_src_after_the_stop(page, event):
+    """STOP_SENDING stubs only the setter of an image's `src`: a handler
+    that reads `img.src` after the stop still reads the URL set before."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    tab.evaluate("() => { window.img = new Image(); img.src = '/login/?before'; }")
+    stop_sending(tab)
+    assert tab.evaluate("() => img.src").endswith("/login/?before")
+    close_tab(page, tab)
+
+
+# In a document loaded at `?nav`: fetch `?again` on each reply, until the
+# first reply after the stop, which reloads the page or loads `?nav` again.
+NAVIGATES_AFTER_THE_STOP = """if (location.search == '?nav') {
+  addEventListener('DOMContentLoaded', () => {
+    const go = () => fetch('/login/?again').finally(() => {
+      if (!window.stopped) return go();
+      console.log('navigates');
+      if ('%s' == 'reload') location.reload(); else location.href = '/login/?nav';
+    });
+    go();
+  });
+}"""
+
+
+@pytest.mark.parametrize("how", ["href", "reload"])
+def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
+    """A reply's handler can reload the page or set `location.href`, as
+    kiosk.js does on a `poll.kiosk` reply (kiosk.js:103, kiosk.js:116), and
+    the new document sends afresh. Here the reply to the fetch out at the
+    stop navigates, and each new document keeps sending. When `close_tab`
+    returns, the server has no request of the tab in hand, and none arrives
+    after (#409)."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.add_init_script(NAVIGATES_AFTER_THE_STOP % how)
+    navigated = []
+    tab.on("console", lambda message: navigated.append(message.text))
+    with tab.expect_event("requestfinished", lambda r: r.url.endswith("/login/?again")):
+        tab.goto("/login/?nav")
+    after_the_stop(tab, "() => { window.stopped = true; }")
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] in ("again", "nav"), hold=HOLD_S
+    ) as server:
+        close_tab_in_time(page, tab)
+        assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+    # one read: the tab is closed, so no later message can join the list.
+    assert navigated == ["navigates"]
+
+
+# In a document loaded at `?nav`: load `?nav` again on each tick of a
+# Worker's timer, which no stop of the page's timers reaches.
+NAVIGATES_ON_A_WORKER_TIMER = """if (location.search == '?nav') {
+  const worker = new Worker(URL.createObjectURL(new Blob(
+    ['setInterval(() => postMessage(null), 20)'])));
+  worker.onmessage = () => { location.href = '/login/?nav'; };
+}"""
+
+
+def test_close_tab_closes_a_tab_that_keeps_navigating(page, event):
+    """A tab can navigate on no reply and no timer of its page, here a
+    Worker's, and each new document navigates again. `close_tab` stops
+    the navigations themselves. When it returns, the server has no request
+    of the tab in hand, and none arrives after (#409)."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.add_init_script(NAVIGATES_ON_A_WORKER_TIMER)
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] == "nav", hold=HOLD_S
+    ) as server:
+        tab.goto("/login/?nav", wait_until="commit")
+        # The Worker's first navigation.
+        with tab.expect_event("request", lambda r: r.url.endswith("/login/?nav")):
+            pass
+        close_tab_in_time(page, tab)
+        assert server.after_close(page) == (0, 0)
+    assert page.in_flight.closed_with == []
+
+
+def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch):
+    """A request sent in the task that stops the timers, whose `request`
+    event reaches Python late (a route holds it, as in
+    `test_the_settle_drains_a_request_sent_as_it_stops`), is still one
+    `close_tab` waits for: it waits until it gives up, and names it."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.route("**/held-request", lambda route: None)
+    tab.goto("/login/")
+    tab.evaluate(
+        """() => {
+          const clear = window.clearTimeout;
+          window.clearTimeout = (id) => {
+            window.clearTimeout = clear;
+            fetch('/held-request');
+            clear(id);
+          };
+        }"""
+    )
+    monkeypatch.setattr(InFlight, "TIMEOUT_MS", 300)
+    started = time.monotonic()
+    close_tab(page, tab)
+    assert time.monotonic() - started >= InFlight.TIMEOUT_MS / 1000
+    assert page.in_flight.closed_with == [
+        f"GET {page.url.rsplit('/', 2)[0]}/held-request"
+    ]
+    page.in_flight.closed_with.clear()
+
+
+@pytest.mark.parametrize("freeze", [False, True])
+def test_a_cdp_block_ends_with_its_session(page, event, freeze):
+    """Why `close_tab` keeps its block's CDP session open until the tab
+    closes (#409): a tab that keeps sending, under Chromium's block of
+    every request through a CDP session, sends to the server again once
+    that session detaches, and so it does with the page frozen through the
+    session first."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    keep_sending(tab, "fetch")
+    blocker = tab.context.new_cdp_session(tab)
+    blocker.send("Network.enable")
+    blocker.send("Network.setBlockedURLs", {"urls": ["*"]})
+    with tab.expect_event("requestfailed", lambda r: r.url.endswith("/login/?again")):
+        pass
+    if freeze:
+        blocker.send("Page.setWebLifecycleState", {"state": "frozen"})
+    blocker.detach()
+    with tab.expect_event("requestfinished", lambda r: r.url.endswith("/login/?again")):
+        pass
+    close_tab(page, tab)
+    assert page.in_flight.closed_with == []
+
+
+def test_close_tab_closes_a_tab_that_never_loaded(page, event):
+    """`close_tab` closes a tab still on `about:blank`, as the settle does
+    every other tab of the context."""
+    page.goto("/login/")
+    close_tab(page, page.context.new_page())
     assert page.in_flight.closed_with == []
 
 
@@ -277,8 +581,8 @@ def test_stop_timers_stops_a_poll_set_after_a_pending_animation_frame(page, even
 
 
 def test_the_settle_stops_a_timer_that_loads_images(page, event):
-    """The settle's request freeze stops fetch and XMLHttpRequest only; a
-    timer that loads an image is stopped by clearing the timers."""
+    """A timer that loads images sends none after the settle: clearing the
+    timers stops it."""
     page.route("**/held-request*", answer_the_poll)
     page.goto("/login/")
     with page.expect_request("**/held-request*"):
@@ -388,7 +692,8 @@ def test_a_reply_handled_after_the_stop_starts_no_request(
     the drain came back empty: on a new timer (#317's results-by-racer
     kiosk, #347), from the reply's own handler, from an animation frame,
     and from htmx's queue, with no timer at all (#347 review). The settle
-    now also stops the page's fetch and XMLHttpRequest. Here the reply is
+    now also stops the page's fetch, XMLHttpRequest, beacons and
+    navigations (STOP_SENDING), and blocks the rest. Here the reply is
     released from Python after the barrier, the settle's last stop."""
     held = []
     page.route("**/held-request", lambda route: held.append(route))
@@ -415,18 +720,28 @@ def test_a_reply_handled_after_the_stop_starts_no_request(
     assert page_errors.errors == []
 
 
-# What a reply handled after the stops can send by neither the page's fetch
-# nor its XMLHttpRequest, each to /held-request (#409's review of PR #424,
-# its probes; kiosk-awards.js sets an image in a reply's handler, kiosk.js
-# navigates on one): an image, a beacon, a fetch from a frame made then,
-# and a navigation to a document that polls.
+# A stylesheet of /held-request, the `%s` its query.
+STYLESHEET = """const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = '/held-request?%s';
+  document.head.append(link);"""
+
+# What a reply handled after the stops can send that no stub stops, each to
+# /held-request but the last: a stylesheet, a script, a frame made then, by
+# its `fetch` and by its own document, and a step back in history, which the
+# `navigate` guard cannot cancel (PR #424's r4 probe).
 LEAKS = {
-    "image": "new Image().src = '/held-request?image';",
-    "beacon": "navigator.sendBeacon('/held-request');",
+    "stylesheet": STYLESHEET % "stylesheet",
+    "script": """const script = document.createElement('script');
+      script.src = '/held-request?script';
+      document.head.append(script);""",
     "new-frame": """const frame = document.createElement('iframe');
       document.body.append(frame);
       frame.contentWindow.fetch('/held-request');""",
-    "navigation": "location.href = '/login/?nav';",
+    "frame-document": """const frame = document.createElement('iframe');
+      frame.src = '/held-request?frame';
+      document.body.append(frame);""",
+    "back": "history.back();",
 }
 
 
@@ -434,20 +749,16 @@ LEAKS = {
 def test_the_settle_blocks_what_the_stops_leave(
     page, page_errors, event, monkeypatch, source
 ):
-    """The stubs of the page's own fetch and XMLHttpRequest leave an image,
-    a beacon, a frame made after them and a new document free to send; the
-    settle then has Chromium block every request of the page. A frame or
-    document made after the block gets the stubs too, so no fetch of its
-    fails into a handler (a `pageerror` here). The reply is held until the
-    block is on."""
+    """STOP_SENDING leaves a stylesheet, a script, a frame's own document
+    and a step back in history free to send; the settle then has Chromium
+    block every request of the page. A frame made after the block gets the
+    stubs too, so no fetch of its fails into a handler (a `pageerror` here).
+    The reply is held until the block is on."""
     page.route("**/held-request*", answer_the_poll)
     first = []
     page.route(lambda url: url.endswith("?first"), lambda route: first.append(route))
-    page.add_init_script(
-        """if (location.search === '?nav') addEventListener('DOMContentLoaded', () => {
-          fetch('/held-request');
-        });"""
-    )
+    # The entry the back case steps back to.
+    page.goto("/login/?before")
     page.goto("/login/")
     with page.expect_request(lambda r: r.url.endswith("?first")):
         page.evaluate(
@@ -493,14 +804,14 @@ def test_a_blocked_request_before_the_settle_is_a_page_error(page, page_errors, 
 
 def test_the_block_outlasts_the_settle(page, event):
     """The block ends with its CDP session (#409, PR #424), so the session
-    stays open after the settle returns: an image the page asks for later
-    is still blocked."""
+    stays open after the settle returns: a stylesheet the page asks for
+    later is still blocked."""
     page.route("**/held-request*", answer_the_poll)
     page.goto("/login/")
     assert _settle(page) == []
     page.wait_for_timeout(100)
     with page.expect_event("requestfailed") as failed:
-        page.evaluate("() => { new Image().src = '/held-request?later'; }")
+        page.evaluate(f"() => {{ {STYLESHEET % 'later'} }}")
     assert failed.value.failure == BLOCKED[0]
 
 

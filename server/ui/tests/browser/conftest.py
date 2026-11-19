@@ -26,11 +26,11 @@ A click, tap or check on a control a toast overlaps, or comes within
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap. When the
 test body returns, the harness stops every tab's timers, closes the other
-tabs, stops the page's fetch and XMLHttpRequest requests, blocks every
-other request the page sends after that, and waits for every request still
-in flight before any fixture tears down (#45 and
-#53 retros), so a late reply or a late poll never meets a flushed database
-or `settings` already put back. Close a second tab with
+tabs, stops the page's fetch, XMLHttpRequest, beacons and navigations,
+blocks every other request the page sends after that, and waits for every
+request still in flight before any fixture tears down (#45 and #53
+retros), so a late reply or a late poll never meets a flushed database or
+`settings` already put back. Close a second tab with
 `close_tab(page, tab)`: a tab closed with a request out fails the test.
 `wait_for_load_state("networkidle")` waits for a page load only, and returns
 at once after an htmx request. A swap that leaves an `hx-get` or `hx-post`
@@ -515,17 +515,30 @@ STOP_TIMERS = """() => {
   for (let id = Math.max(first + SPAN + 1, last - SPAN); id <= last; id++) stop(id);
 }"""
 
-# Makes every later `fetch` a promise that never settles and every later
-# XMLHttpRequest send nothing, so no callback of the page sends again: with
-# a URL, it first fetches that URL, in the same task (as #424 has it). A
-# reply handled after the stop that queues htmx's next request or chains a
+# Makes every later `fetch` a promise that never settles, and every later
+# XMLHttpRequest send, beacon, image `src` set and navigation but a step
+# through history do nothing, so no callback of the page sends again
+# (#409): with a URL, it first fetches that URL, in the same task. A reply
+# handled after the stop that queues htmx's next request or chains a
 # fetch, an animation-frame loop, a native timer under the fake clock then
 # starts no request, and no handler of theirs runs on a failure
-# (`test_a_reply_handled_after_the_stop_starts_no_request`).
+# (`test_a_reply_handled_after_the_stop_starts_no_request`). An image's
+# `src` still reads as before: `defineProperty` keeps the getter it is not
+# given (`test_an_image_keeps_its_src_after_the_stop`). Under the block alone, an
+# image that loads again on its error would try again at once, and
+# `close_tab`'s wait would find one out at each check
+# (`test_close_tab_closes_a_tab_that_keeps_sending`, its `image` case).
+# An image set by any other route, a stylesheet, a script, a frame's own
+# document and a step through history still load: the block stops those
+# (`block_sending`).
 STOP_SENDING = """(barrier) => {
   if (barrier) fetch(barrier).catch(() => {});
   window.fetch = () => new Promise(() => {});
   XMLHttpRequest.prototype.send = function () {};
+  navigator.sendBeacon = () => true;
+  Object.defineProperty(HTMLImageElement.prototype, 'src', {
+    set() {}, configurable: true});
+  navigation.addEventListener('navigate', (event) => event.preventDefault());
 }"""
 
 
@@ -539,24 +552,44 @@ def stop_timers(tab):
             pass
 
 
-def stop_sending(tab):
-    """Stop every frame of `tab` but the main frame sending fetch and
-    XMLHttpRequest requests; the main frame's stop sends the barrier
+def stop_sending(tab, but=None):
+    """Run STOP_SENDING in every frame of `tab` but the frame `but`. The
+    settle passes the main frame, whose stop sends the barrier
     (`_barrier`)."""
     for frame in tab.frames:
-        if frame == tab.main_frame:
+        if frame == but:
             continue
         try:
             frame.evaluate(STOP_SENDING, None)
-        except Exception:  # noqa: BLE001, S110 - a detached frame sends nothing
+        except Exception:  # noqa: BLE001, S110
+            # A frame gone or navigating: the block and its init script
+            # cover its next document.
             pass
 
 
 def close_tab(page, tab):
     """Close a second tab of `page`'s context, such as the camera or a
     kiosk, once its polls have stopped and its requests are answered. A tab
-    closed with a request out fails the test (`InFlight.page_closed`)."""
+    closed with a request out fails the test (`InFlight.page_closed`).
+
+    Stopping the timers leaves the callbacks that send on no timer: the
+    camera's `onicecandidate` and `onnegotiationneeded` post a message
+    (camera-signaling.js), and a reply's handler can send again, load an
+    image by any route, such as `photo()`'s `setAttribute('src')` in
+    kiosk-now-racing.js or the reply markup kiosk-check-in.js puts in
+    `innerHTML`, or navigate (kiosk.js, kiosk-awards.js). So `STOP_SENDING`
+    runs in every frame of the tab, and the settle's block
+    (`block_sending`) then fails every request the tab makes, of every
+    frame and document, until it closes. The block ends with its CDP
+    session (`test_a_cdp_block_ends_with_its_session`), which stays open
+    until `tab.close()`. The wait is for the server's replies to the
+    requests sent before (#409:
+    `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
+    `test_close_tab_closes_a_tab_that_keeps_sending`,
+    `test_close_tab_closes_a_tab_whose_reply_navigates`)."""
     stop_timers(tab)
+    stop_sending(tab)
+    block_sending(tab)
     waited = 0
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
         tab.wait_for_timeout(50)
@@ -576,7 +609,7 @@ def _barrier(page):
     `test_the_settle_drains_a_request_sent_as_it_stops`). The barrier is a
     fetch sent after the stop, answered 204 here; its end is reported after
     the earlier fetch's start (the same test). STOP_SENDING sends it, and
-    then stops the main frame's fetch and XMLHttpRequest in the same task."""
+    then stops the main frame sending in the same task."""
     if not page.url.startswith("http"):
         return
     page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
@@ -597,16 +630,20 @@ BLOCKED = ("inspector", "net::ERR_BLOCKED_BY_CLIENT")
 
 
 def block_sending(page):
-    """Make Chromium block every later request of `page`, for the rest of
-    its life: an image, a beacon, a frame made after STOP_SENDING, and a
-    navigation, whose own request only the Fetch block stops
-    (`test_the_settle_blocks_what_the_stops_leave`). The block ends with its
-    CDP session (#409, PR #424), so the session stays open on the page and
-    closes with its context. A blocked request fails at once, so every new
-    document and frame gets STOP_SENDING first: a fetch of theirs never
-    fails into a handler that would send again. A page that loads an
-    image again on its error would spin, the block failing each load at
-    once; no script under `ui/static/ui/` sets an image's `onerror`."""
+    """Make Chromium block every later request of `page`, the settle's
+    page or a tab `close_tab` closes, for the rest of its life: what
+    STOP_SENDING leaves, an image by any route, a stylesheet, a script,
+    and a frame's own document or a step back in history, whose request
+    only the Fetch block stops (`test_the_settle_blocks_what_the_stops_leave`;
+    the images in `test_close_tab_closes_a_tab_that_keeps_sending`). The
+    block ends with its CDP session (#409, PR #424), so the session stays
+    open on the page and closes with it. A blocked request fails at once,
+    so every new document and frame gets STOP_SENDING first: a fetch of
+    theirs never fails into a handler that would send again. A page that
+    loads an image, a stylesheet or a script again on its error would
+    spin, the block failing each load at once; no script under
+    `ui/static/ui/` does (app.js's `loadScript` rejects on a script's
+    error)."""
     page.add_init_script(f"({STOP_SENDING})(null)")
     blocker = page.context.new_cdp_session(page)
     blocker.send("Network.enable")
@@ -623,9 +660,9 @@ def block_sending(page):
 
 
 def _settle(page) -> list[str]:
-    """Stop every tab's polls, close the other tabs, stop the page's fetch
-    and XMLHttpRequest requests, block the rest, and drain what is out. A
-    second settle of the page only drains.
+    """Stop every tab's polls, close the other tabs, stop the page sending
+    (STOP_SENDING), block the rest, and drain what is out. A second settle
+    of the page only drains.
     A page that polls more often than the drain's 50 ms check, such as the
     replay page's 250 ms `replay.message`, could otherwise start a request
     after the drain that met the database flush (a Postgres deadlock, #53).
@@ -637,7 +674,7 @@ def _settle(page) -> list[str]:
             close_tab(page, tab)
     if not getattr(page, "blocker", None):
         stop_timers(page)
-        stop_sending(page)
+        stop_sending(page, but=page.main_frame)
         _barrier(page)
         block_sending(page)
     return page.in_flight.drain(page)
