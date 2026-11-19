@@ -682,8 +682,9 @@ def test_a_run_under_a_holder_of_its_lock_is_refused(tmp_path, script, held):
     (tmp_path / "sub").mkdir()
     lock = str(tmp_path / "load.lock")
     result = subprocess.run(
-        # No such file, so a run that is not refused ends at once.
-        [str(script), "--loops", "0", "no_such_test.py"],
+        # No such file, so a run that is not refused ends at once; the
+        # hand-off's `true` ends at once too, and it takes no option.
+        [str(script), *(["true"] if script == HOLD_LOCK else ["--loops", "0", "x.py"])],
         # A file, not a pipe, as run_in_background gives it.
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
