@@ -217,7 +217,14 @@ def test_the_page_gives_a_poll_up_between_14_and_16_s(page, event, day, page_err
     """On the paused clock, a results/rounds/ poll with no reply: no error
     once the clock has run 14 s, `net::ERR_ABORTED` from the page by 16 s
     (`PAST_GIVE_UP_MS`, past kiosk.js's `GIVE_UP_MS`), and the poll's next
-    turn goes out after it."""
+    turn goes out after it, and only that turn: the clock stops with its
+    reply in, before the turn the reply queues (#434)."""
+    # kiosk.js's `GIVE_UP_MS`, and kiosk-results.js's re-poll after a reply
+    # or a failure (`Kiosk.poll(poll, 1000, 'after')`).
+    give_up_ms, re_poll_ms = 15_000, 1_000
+    # `run_for` fires a timer due at its last tick, so the next turn, due at
+    # the sum, goes out in the run to `PAST_GIVE_UP_MS`.
+    assert give_up_ms + re_poll_ms <= PAST_GIVE_UP_MS < give_up_ms + 2 * re_poll_ms
     seen = []
 
     def hold_the_first(route):
@@ -245,11 +252,6 @@ def test_the_page_gives_a_poll_up_between_14_and_16_s(page, event, day, page_err
             "requestfailed", lambda r: "/results/rounds/" in r.url, timeout=10_000
         ) as failed:
             page.clock.run_for(PAST_GIVE_UP_MS - 14_000)
-    page.clock.run_for(1_100)
-    for _ in range(100):
-        if len(seen) > 1:
-            break
-        page.wait_for_timeout(50)
     assert at_14_s == []
     assert failed.value.failure == "net::ERR_ABORTED"
     assert len(seen) == 2
