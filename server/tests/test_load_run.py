@@ -3,7 +3,8 @@ starts anything.
 
 Bash drops a command whose arithmetic fails and goes on with no failed
 status: `load-run.sh 1m` dropped the load test, whose `--duration` is
-`$((MINUTES * 60))`, and exited 0 under `Report:` (#417 retro).  The run's
+`$((MINUTES * 60))`, and exited 0 under `Report:`, and so did `08`, which
+bash reads as octal (#417 retro).  The run's
 `uv` and `curl` are stand-ins here, so no server starts.
 """
 
@@ -56,7 +57,7 @@ def run(tmp_path, *args):
     return done, calls.read_text()
 
 
-@pytest.mark.parametrize("minutes", ["1m", "-1", "1.5"])
+@pytest.mark.parametrize("minutes", ["1m", "-1", "1.5", "08", "00"])
 def test_minutes_that_are_no_whole_number_are_refused_before_anything_runs(
     tmp_path, minutes
 ):

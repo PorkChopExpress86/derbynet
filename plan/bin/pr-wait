@@ -35,12 +35,13 @@ PR=${1:?usage: pr-wait <pr or branch> [--timeout-min N]}
 TIMEOUT_MIN=${3:-90}
 PUSH_MIN=${PR_WAIT_PUSH_MIN:-5}
 # Bash drops a command whose arithmetic fails and goes on with no failed
-# status, so a bound like `5m` must stop here (#417 retro).
+# status, so a bound like `5m`, or `08`, which reads as octal, must stop
+# here (#417 retro).
 case "$TIMEOUT_MIN" in
-  '' | *[!0-9]*) echo "pr-wait: --timeout-min takes a whole number of minutes, not '$TIMEOUT_MIN'" >&2; exit 1 ;;
+  '' | *[!0-9]* | 0?*) echo "pr-wait: --timeout-min takes a whole number of minutes, not '$TIMEOUT_MIN'" >&2; exit 1 ;;
 esac
 case "$PUSH_MIN" in
-  '' | *[!0-9]*) echo "pr-wait: PR_WAIT_PUSH_MIN takes a whole number of minutes, not '$PUSH_MIN'" >&2; exit 1 ;;
+  '' | *[!0-9]* | 0?*) echo "pr-wait: PR_WAIT_PUSH_MIN takes a whole number of minutes, not '$PUSH_MIN'" >&2; exit 1 ;;
 esac
 GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}

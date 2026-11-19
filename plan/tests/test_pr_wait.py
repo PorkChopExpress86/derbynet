@@ -105,6 +105,7 @@ class PrWait(unittest.TestCase):
         gh.chmod(0o755)
         for timeout, push, named in [('5m', '5', "--timeout-min takes a whole number of minutes, not '5m'"),
                                      ('-1', '5', "--timeout-min takes a whole number of minutes, not '-1'"),
+                                     ('08', '5', "--timeout-min takes a whole number of minutes, not '08'"),
                                      ('0', '1m', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '1m'")]:
             with self.subTest(timeout=timeout, push=push):
                 done = subprocess.run(['bash', str(PR_WAIT), '7', '--timeout-min', timeout],

@@ -202,7 +202,7 @@ class PrMerge(unittest.TestCase):
         issues fail, which reads as false, so it waited for ever (#417 retro)."""
         head = self.pr('server/ui/kiosk.css')
         for name in ('CLOSE_WAIT', 'KILL_WAIT'):
-            for value in ('1s', '-1'):
+            for value in ('1s', '-1', '08'):
                 with self.subTest(name=name, value=value):
                     self.env[name] = value
                     done = self.merge(head)

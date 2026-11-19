@@ -377,7 +377,15 @@ def test_a_log_that_exists_is_refused_and_left_as_it_is(tmp_path):
 
 @pytest.mark.parametrize(
     "args",
-    [[], ["only.log"], ["--wait"], ["--wait", "a", "1", "b"], ["--wait", "a", "x"]],
+    [
+        [],
+        ["only.log"],
+        ["--wait"],
+        ["--wait", "a", "1", "b"],
+        ["--wait", "a", "x"],
+        # A leading 0 reads as octal: `08` dropped the deadline (#417 retro).
+        ["--wait", "a", "08"],
+    ],
 )
 def test_a_wrong_command_line_prints_the_usage(tmp_path, args):
     result = subprocess.run(

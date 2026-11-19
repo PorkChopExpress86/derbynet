@@ -15,7 +15,8 @@ A name read in `$(( ))`, `(( ))`, `let`, an array subscript, or beside
 `-eq`, `-ne`, `-lt`, `-le`, `-gt` or `-ge` passes when each assignment to it
 in the file is a number the script made (digits, `$(( ))`, `$(date +%s)`,
 `$SECONDS`, `$!`, `$$`, `$?`, `$#`, `${#...}`) or when the file checks it
-for digits (`case "$X" in ... *[!0-9]*`, or `[[ $X =~ ^[0-9]+$ ]]`).  Any
+for a whole number with no leading zero, which bash reads as octal
+(`case "$X" in '' | *[!0-9]* | 0?*)`, or `[[ $X =~ ^(0|[1-9][0-9]*)$ ]]`).  Any
 other value read as a number has a row in KNOWN saying why it is one; a row
 that matches no read fails, and a row whose reason is a line of code holds
 only while REASON_IN_CODE finds that line in the file.
@@ -60,6 +61,9 @@ KNOWN = {
         "server/docker/ci/guide-commands.sh",
         "before",
     ): "events prints Event.objects.count()",
+    ("server/docker/entrypoint.sh", "value"): (
+        "=~ ^[0-9]{1,10}$ above it, and each read is 10#$value, so no octal"
+    ),
     ("server/docker/entrypoint.sh", "uid"): "checked as `value` by =~ ^[0-9]{1,10}$",
     ("server/docker/entrypoint.sh", "gid"): "checked as `value` by =~ ^[0-9]{1,10}$",
 }
@@ -257,14 +261,17 @@ def assignments(text: str) -> dict[str, list[str]]:
 
 
 def checked(text: str) -> set[str]:
-    """The names the file checks for digits."""
+    """The names the file checks for a whole number: digits, and no leading
+    zero, since `08` is no octal number (#417's `10#`)."""
     names = set()
     lines = [code for _, code in lines_of(text)]
     for i, code in enumerate(lines):
         if m := re.search(rf"\bcase\s+\"?\$\{{?({NAME})\}}?\"?\s+in\b", code):
-            if "[!0-9]" in " ".join(lines[i : i + 6]):
+            block = " ".join(lines[i : i + 6])
+            if "[!0-9]" in block and "0?*" in block:
                 names.add(m.group(1))
-        for m in re.finditer(rf"\$\{{?({NAME})\}}?\"?\s*=~\s*['\"]?\^\[0-9\]", code):
+        pattern = r"\s*=~\s*['\"]?\^(?:\(0\|)?\[1-9\]"
+        for m in re.finditer(rf"\$\{{?({NAME})\}}?\"?{pattern}", code):
             names.add(m.group(1))
     return names
 
@@ -304,7 +311,8 @@ def test_every_number_a_tool_script_reads_is_one_it_made_or_checked(path):
     assert not found, (
         f"{path.relative_to(ROOT)} reads these as numbers with no check that they"
         f" are: {found}.  A bad value drops the whole command with no failed"
-        " status (#417 retro).  Check each for digits (`case \"$X\" in ''|*[!0-9]*)"
+        ' status (#417 retro).  Check each for a whole number (`case "$X" in'
+        " '' | *[!0-9]* | 0?*)"
         " usage ;; esac`), or say why it is one in a KNOWN row."
     )
 
@@ -339,11 +347,19 @@ def test_each_known_row_names_a_read_that_is_there():
         ("read -r n rest\necho $((n + 1))\n", [(2, "n")]),
         ("(( count++ ))\necho $((count + 1))\n", []),
         (
-            "s=${3:-160}\ncase \"$s\" in\n  '' | *[!0-9]*) usage ;;\nesac\n"
+            "s=${3:-160}\ncase \"$s\" in\n  '' | *[!0-9]* | 0?*) usage ;;\nesac\n"
             "d=$((s + 1))\n",
             [],
         ),
-        ("[[ $n =~ ^[0-9]+$ ]] || exit 2\necho $((n * 2))\n", []),
+        ("[[ $n =~ ^(0|[1-9][0-9]*)$ ]] || exit 2\necho $((n * 2))\n", []),
+        ("[[ $n =~ ^[1-9][0-9]*$ ]] || exit 2\necho $((n * 2))\n", []),
+        # `08` passes these, and is no octal number.
+        ("[[ $n =~ ^[0-9]+$ ]] || exit 2\necho $((n * 2))\n", [(2, "n")]),
+        (
+            "s=${3:-160}\ncase \"$s\" in\n  '' | *[!0-9]*) usage ;;\nesac\n"
+            "d=$((s + 1))\n",
+            [(5, "s")],
+        ),
         ('since=$(date +%s)\necho "$(( $(date +%s) - since )) s"\n', []),
         ("started=$SECONDS\necho $((SECONDS - started))\n", []),
         ("n=$(f)\necho $((n + 1))\n", [(2, "n")]),
