@@ -345,6 +345,34 @@ class TestingCases(unittest.TestCase):
                 self.assertEqual(self.commands_for(path), [])
 
 
+TESTING_FALLBACK = ['legacy_api/tests/test_testing_scripts.py', 'tests/test_golden_inputs.py']
+
+
+def testing_targets(files, path):
+    """What cover_testing maps testing/`path` to in a git repository of
+    `files`, repository path -> text, and testing/`path`."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for rel, text in {f'testing/{path}': '', **files}.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text)
+        for argv in (['init', '-q'], ['add', '-A']):
+            subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+        plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+        TOOL.cover_testing(plan, TOOL.Tree(root), f'testing/{path}')
+        return [t for _rule, _note, targets in plan.covers[f'testing/{path}']
+                for t in targets]
+
+
+class TestingNames(unittest.TestCase):
+    """#431: #399's stand-ins testing/timer-stand-in/curl and sleep mapped to
+    9 and 14 test files that say `curl` or `sleep` as words."""
+
+    def test_a_name_that_is_a_word_maps_to_the_tests_that_read_testing(self):
+        files = {'server/tests/test_detach.py': 'subprocess.run(["sleep", "5"])\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/sleep'), TESTING_FALLBACK)
+
+
 class TestFile(unittest.TestCase):
     def test_a_browser_test_runs_itself_under_the_browser_marker(self):
         out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
