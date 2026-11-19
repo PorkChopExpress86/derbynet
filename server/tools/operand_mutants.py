@@ -20,7 +20,9 @@ that line of the new file. For each added line it lists:
   are none, so `max(xs, key=f)` lists nothing, and an operand that is no
   atom keeps its own parentheses, `(a + b)`, so it stands where the call
   stood (#449: `key=lambda ...` made `return key=...`). A JavaScript or
-  CSS call takes no named argument, so each of its operands is one;
+  CSS call takes no named argument, so each of its operands is one. A
+  call on a receiver of dotted names, `Math.max(...)`, is replaced with
+  its receiver; one on any other receiver, `f().max(...)`, lists nothing;
 - `clamp(lo, x, hi)`: `x` alone, `max(lo, x)` (no upper bound) and
   `min(x, hi)` (no lower bound);
 - a nested call's own mutants too, so `clamp(1rem, min(9vh, 11vw), 8rem)`
@@ -70,7 +72,10 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-CALL = re.compile(r"(?<![\w-])(min|max|clamp)\(")
+# A receiver of dotted names, `Math.` or `self.items.`, is part of the call,
+# so `Math.max(a, b)` becomes `a`, not `Math.a`; a call after any other
+# receiver, `f().max(`, is no match (#449).
+CALL = re.compile(r"(?<![\w.$-])((?:[A-Za-z_$][\w$]*\.)*)(min|max|clamp)\(")
 JS_IF = re.compile(r"\b(?:if|else if)\s*\(")
 FILTER = re.compile(r"\.filter\(\s*(\(?[\w, ]*\)?)\s*=>\s*")
 LISTENER = re.compile(r"(?:\baddEventListener|\.on)\(\s*(['\"`])([^'\"`]+)\1")
@@ -180,7 +185,7 @@ def call_mutants(text: str, python: bool = False) -> list[tuple[str, str, str]]:
         end = closing(text, m.end())
         if end is None:
             continue
-        name, inner = m.group(1), text[m.end() : end]
+        name, inner = m.group(2), text[m.end() : end]
         call = text[m.start() : end + 1]
         args = split_top(inner, [","])
         if name == "clamp" and len(args) == 3:

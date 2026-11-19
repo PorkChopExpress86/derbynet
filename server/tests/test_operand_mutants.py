@@ -69,6 +69,22 @@ def test_a_python_call_lists_only_its_positional_operands(call, news):
     ]
 
 
+@pytest.mark.parametrize(
+    ("path", "line", "olds"),
+    [
+        ("a.js", "x = Math.max(a, b);", ["Math.max(a, b)"] * 2),
+        ("t.py", "x = self.items.max(a + b, c)", ["self.items.max(a + b, c)"] * 2),
+        ("a.js", "x = f().max(a, b);", []),
+        ("t.py", "x = xs[0].min(a, b)", []),
+    ],
+)
+def test_a_call_on_a_receiver_is_replaced_with_its_receiver(path, line, olds):
+    """`Math.max(a, b)` with `max(a, b)` replaced read `Math.a`, and
+    `obj.max(a + b, c)` read `obj.(a + b)`, which does not parse (#449)."""
+    diff = f"+++ b/{path}\n@@ -1 +1 @@\n+{line}\n"
+    assert [m.old for m in om.mutants(diff)] == olds
+
+
 def test_a_call_in_a_python_string_that_is_no_python_lists_each_operand():
     """CSS in a Python string, as a browser test keeps it."""
     diff = '+++ b/t.py\n@@ -1 +1 @@\n+CSS = ".t { width: min(1em, 2vw); }"\n'
@@ -151,6 +167,8 @@ HOSTS = [
     "x = {}[0]",
     "x = {}(0)",
     "x = g({})",
+    "x = obj.{}",
+    "x = obj.items.{}",
 ]
 
 
@@ -162,6 +180,14 @@ def test_the_samples_hold_each_expression_ast_has():
         assert type(ast.parse(f"f({sample})", mode="eval").body.args[0]) is cls
 
 
+def is_max(node: ast.AST) -> bool:
+    """`max(...)`, or `max` called on a receiver."""
+    return isinstance(node, ast.Call) and (
+        getattr(node.func, "id", None) == "max"
+        or getattr(node.func, "attr", None) == "max"
+    )
+
+
 class Stand(ast.NodeTransformer):
     """The tree with the `max()` call replaced by one of its arguments."""
 
@@ -169,7 +195,7 @@ class Stand(ast.NodeTransformer):
         self.arg = arg
 
     def visit_Call(self, node):
-        if isinstance(node.func, ast.Name) and node.func.id == "max":
+        if is_max(node):
             return self.arg
         return self.generic_visit(node)
 
@@ -188,11 +214,7 @@ def test_each_python_operand_stands_where_the_call_stood():
             for host in HOSTS:
                 line = host.format(call)
                 tree = ast.parse(line)
-                node = next(
-                    n
-                    for n in ast.walk(tree)
-                    if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "max"
-                )
+                node = next(n for n in ast.walk(tree) if is_max(n))
                 operands = [a for a in node.args if not isinstance(a, ast.Starred)]
                 expected = operands if len(operands) > 1 else []
                 found = [
@@ -208,7 +230,7 @@ def test_each_python_operand_stands_where_the_call_stood():
                         got = ast.dump(ast.parse(mutated))
                     except SyntaxError:
                         got = "SyntaxError"
-                    if old != call or got != want:
+                    if old != ast.get_source_segment(line, node) or got != want:
                         wrong.append((line, mutated))
     assert wrong == [], f"{len(wrong)} wrong, first: {wrong[:5]}"
 
