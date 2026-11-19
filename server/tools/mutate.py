@@ -56,7 +56,9 @@ still mutated by hand, one per call.
 
 Each run stops at its first failure (`-x`; a `--maxfail` given after it
 wins), since one failure kills the mutant (#344 retro). It prints
-pytest's output, then one line: `KILLED` (a test failed),
+pytest's output, then one line: `KILLED` (a test failed; with
+`failed in helper NAME` when a helper in a test file raised, not the test
+itself, so read whether the assert the mutant aims at failed),
 `SURVIVED` (every test passed), or with `--expect pass`, for a should-pass
 mutant, `PASSED` or `BROKE`. It exits 0 when the result is the one
 expected, 1 when it is not, and 2 when it refuses, when pytest errors (an
@@ -254,14 +256,69 @@ def _pytest_once(pytest_args: list[str], timeout: float):
 
 
 def _result(run, output: str, expect: str) -> tuple[str, str]:
-    """The result word for a finished run, and why when it shows nothing."""
+    """The result word for a finished run, and why when it shows nothing,
+    or for a failed run, the helper that raised (failed_in_helper())."""
     # Exit status 5: pytest collected no test, or deselected every one.
     if run.returncode in (0, 1, 5) and (why := refusal(counts(output))):
         return "REFUSED", why
     outcome = OUTCOMES[expect].get(run.returncode)
     if outcome is None:
         return "ERROR", f"pytest exit status {run.returncode}"
-    return outcome, ""
+    return outcome, failed_in_helper(output)
+
+
+# A traceback entry's place in pytest's output: `test_x.py:12: AssertionError`
+# for the entry that raised, `test_x.py:9: in join` or `test_x.py:9: ` for
+# one on the way to it.
+PLACE = re.compile(r"^(\S+\.py):(\d+): ", re.M)
+FAILURES = re.compile(r"^=+ FAILURES =+$", re.M)
+SECTION_END = re.compile(r"^={3,} ", re.M)
+# The test side of a traceback: below it, in the code under test or a
+# library, a raise is the mutant's effect, not the test's check.
+TEST_FILE = re.compile(r"^(?:test_\w*|\w+_test|conftest)\.py$")
+
+
+def failed_in_helper(output: str) -> str:
+    """`failed in helper NAME at FILE:LINE, not a test` when pytest's first
+    failure was raised outside a test function: in the last entry of its
+    traceback that lies in a test file (test_*.py, *_test.py or
+    conftest.py) under the working directory, the innermost function is
+    not named `test*`. Empty otherwise. #417's M3, M10 and M11 read KILLED,
+    killed by join_at's check that a run was still waiting, not by the
+    order assert they aimed at (#417 retro)."""
+    failures = FAILURES.search(output)
+    if failures is None:
+        return ""
+    end = SECTION_END.search(output, failures.end())
+    section = output[failures.end() : end.start() if end else len(output)]
+    place = None
+    for m in PLACE.finditer(section):
+        path = Path(m.group(1))
+        if TEST_FILE.match(path.name) and not path.is_absolute() and path.is_file():
+            place = (m.group(1), int(m.group(2)))
+    if place is None:
+        return ""
+    name = _function_at(Path(place[0]), place[1])
+    if name is None or name.startswith("test"):
+        return ""
+    return f"failed in helper {name} at {place[0]}:{place[1]}, not a test"
+
+
+def _function_at(path: Path, line: int) -> str | None:
+    """The innermost function whose lines hold `line`, or None."""
+    try:
+        tree = ast.parse(path.read_bytes())
+    except SyntaxError:
+        return None
+    holders = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.lineno <= line <= node.end_lineno
+    ]
+    # Each function that holds the line starts inside the one before it.
+    holders.sort(key=lambda node: node.lineno)
+    return holders[-1].name if holders else None
 
 
 def _listing():
@@ -529,7 +586,7 @@ def main(argv: list[str] | None = None) -> int:
     if outcome in ("REFUSED", "ERROR"):
         print(f"{outcome}  {mutant}  ({why})")
         return REFUSED
-    print(f"{outcome}  {mutant}")
+    print(f"{outcome}  {mutant}" + (f"  ({why})" if why else ""))
     return 0 if outcome == EXPECTED[args.expect] else 1
 
 
