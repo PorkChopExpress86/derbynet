@@ -941,16 +941,28 @@ def test_a_change_from_a_sheet_swaps_its_board_at_once(login, event):
     """With no press on, a change's board out of band swaps in with its
     reply (#344): the kiosk named from its sheet shows on the board while
     every poll is held. Held to the request's end instead, the board never
-    showed the name (#344's round-5 mutant)."""
+    showed the name (#344's round-5 mutant).
+
+    The board polls while no sheet is open (`derbynet.pollable`), so a poll
+    goes out before the tap and again once the sheet closes; the test waits
+    for each. The hold starts once the sheet is open, and nothing after the
+    reply waits for htmx to settle, which waits on the held poll's
+    `.htmx-request` (#437)."""
     kiosk(event, "tv")
     page = open_dashboard(login("RaceCoordinator"))
-    polls = hold_the_polls(page)
+    with page.expect_request(lambda r: "/kiosks/board/" in r.url, timeout=10_000):
+        pass
     tap(page, card(page, "tv").locator('[data-action="name"]'))
     form = ready(page, sheet(page, "kiosks").locator("[data-name-sheet]"))
+    polls = hold_the_polls(page)
     form.locator('[data-name-chips] button[data-value="Main"]').click()
     expect(form.get_by_label("Name for this kiosk")).to_have_value("Main")
-    with htmx_post(page, "/kiosks/name/"):
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and "/kiosks/name/" in r.url
+    ) as reply:
         form.locator("[data-submit]").click()
+    assert reply.value.ok, reply.value.status
+    polls.wait_for(1)
     expect(sheet(page, "kiosks")).to_be_hidden()
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Main")
     assert polls.answered() == 0, board_log(page)
