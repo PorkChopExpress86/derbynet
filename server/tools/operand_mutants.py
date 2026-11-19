@@ -22,7 +22,10 @@ that line of the new file. For each added line it lists:
   stood (#449: `key=lambda ...` made `return key=...`). A JavaScript or
   CSS call takes no named argument, so each of its operands is one. A
   call on a receiver of dotted names, `Math.max(...)`, is replaced with
-  its receiver; one on any other receiver, `f().max(...)`, lists nothing;
+  its receiver; one on any other receiver, `f().max(...)`, lists nothing.
+  A JavaScript spread, `...xs`, is no operand, so `Math.max(0, ...xs)`
+  lists nothing. A call written right after a minus, `-max(a, b)`, lists
+  nothing either (`x-max(` in CSS is a name, not a call);
 - `clamp(lo, x, hi)`: `x` alone, `max(lo, x)` (no upper bound) and
   `min(x, hi)` (no lower bound);
 - a nested call's own mutants too, so `clamp(1rem, min(9vh, 11vw), 8rem)`
@@ -196,9 +199,13 @@ def call_mutants(text: str, python: bool = False) -> list[tuple[str, str, str]]:
         elif name in ("min", "max"):
             operands = python_operands(call) if python else None
             if operands is None:
-                operands = args if len(args) > 1 else []
-            for a in operands:
-                out.append((name, call, a))
+                operands = args
+            # A spread, `...xs`, is no operand, as `*xs` is none in Python:
+            # `Math.max(0, ...xs)` has one (#449). `...[a, b]` in a Python
+            # string parses as Python, so this runs on both readers.
+            operands = [a for a in operands if not a.startswith("...")]
+            if len(operands) > 1:
+                out += [(name, call, a) for a in operands]
     return out
 
 

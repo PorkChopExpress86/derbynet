@@ -92,18 +92,47 @@ def test_a_call_in_a_python_string_that_is_no_python_lists_each_operand():
 
 
 @pytest.mark.parametrize(
+    ("line", "news"),
+    [
+        # race_day_screens.py's SCROLL_TO, as it reads there.
+        ('S = "Math.max(0, ...stuck.map(x => x.top))"', []),
+        ('S = "Math.max(0, ...[a, b])"', []),
+        ('S = "Math.max(a, b, ...xs)"', ["a", "b"]),
+    ],
+)
+def test_a_spread_in_a_python_string_is_no_operand(line, news):
+    """JavaScript in a Python string, as `server/tools/race_day_screens.py`
+    keeps it: `...stuck.map(...)` is no JavaScript expression, and its
+    mutant would read as KILLED for want of parsing (#449). `...[a, b]`
+    parses as a Python subscript of `...`, so it is skipped there too."""
+    diff = f"+++ b/t.py\n@@ -1 +1 @@\n+{line}\n"
+    assert [m.new for m in om.mutants(diff)] == news
+
+
+@pytest.mark.parametrize("path", ["a.js", "t.py", "a.css"])
+def test_a_call_right_after_a_minus_lists_nothing(path):
+    """`CALL` skips a call after `-`, so `x-max(` in CSS is no call; so is
+    `-max(a, b)` (#449)."""
+    diff = f"+++ b/{path}\n@@ -1 +1 @@\n+x = -max(a, b)\n"
+    assert om.mutants(diff) == []
+
+
+@pytest.mark.parametrize(
     ("path", "line", "news"),
     [
         ("a.js", "x = Math.max(a, key = f);", ["a", "key = f"]),
         ("a.css", ".t { width: max(1em, 2vw); }", ["1em", "2vw"]),
         ("a.css", ".t { width: min(1em); }", []),
         ("a.css", ".t { width: clamp(1em, 2vw); }", []),
+        ("a.js", "x = Math.max(0, ...xs);", []),
+        ("a.js", "x = Math.max(a, b, ...xs);", ["a", "b"]),
     ],
 )
 def test_a_javascript_or_css_call_lists_each_operand_of_two_or_more(path, line, news):
     """Neither language has a named argument, so each operand counts:
     JavaScript's `key = f` is an assignment, which stands where the call
-    stood (#449). A clamp() with no three operands lists nothing."""
+    stood (#449). A clamp() with no three operands lists nothing, and a
+    spread is no operand."""
     diff = f"+++ b/{path}\n@@ -1 +1 @@\n+{line}\n"
     assert [m.new for m in om.mutants(diff)] == news
 
@@ -206,7 +235,8 @@ def test_each_python_operand_stands_where_the_call_stood():
     `**`, under each host, the listing offers exactly the call's
     positional arguments when it has two or more, and the line with the
     call replaced by each parses to the tree with the call replaced by
-    that argument."""
+    that argument. An argument led by `...` is none, since no max() can
+    order an Ellipsis (a spread has its own test)."""
     wrong = []
     for _, sample in SAMPLES:
         for args in ARGUMENT_LISTS:
@@ -215,7 +245,12 @@ def test_each_python_operand_stands_where_the_call_stood():
                 line = host.format(call)
                 tree = ast.parse(line)
                 node = next(n for n in ast.walk(tree) if is_max(n))
-                operands = [a for a in node.args if not isinstance(a, ast.Starred)]
+                operands = [
+                    a
+                    for a in node.args
+                    if not isinstance(a, ast.Starred)
+                    and not ast.get_source_segment(line, a).startswith("...")
+                ]
                 expected = operands if len(operands) > 1 else []
                 found = [
                     m for m in om.line_mutants("t.py", line, True) if m[0] == "max"
