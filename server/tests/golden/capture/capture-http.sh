@@ -377,12 +377,15 @@ record_import_page() {
   node "$HERE/import-page.cjs" "http://localhost:$RECORDER_PORT/$tag" "$file" "$@" \
        >"$RAW/.script.log" 2>&1 || status=$?
   curl -sf "http://127.0.0.1:$RECORDER_PORT/__control/end?tag=$tag" >/dev/null
+  # Each launch import-page.cjs tried again, from its "launch failed" line
+  # through puppeteer's closing TROUBLESHOOTING line (#442), printed before the
+  # status test so a later failure's tail cannot hide it.
+  sed -n '/^launch failed/,/^TROUBLESHOOTING: /p' "$RAW/.script.log" >&2
   if [ $status -ne 0 ]; then
     echo "import-page.cjs failed ($status):" >&2
     tail -n 30 "$RAW/.script.log" >&2
     return 1
   fi
-  grep -A 40 '^launch failed' "$RAW/.script.log" >&2 || true
 }
 
 # run_script <script> [args...]: a script from testing/, not recorded.

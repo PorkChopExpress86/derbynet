@@ -35,11 +35,12 @@ async function drag(page, from, to) {
   await page.mouse.up();
 }
 
-// Chrome 148 now and then dies as it starts, with signal 11 in glibc's getenv
-// (#442).  A launch whose browser a signal ended (puppeteer's "Code: null",
-// since some of these crashes print no "Received signal 11") is tried again,
-// and each one prints a line starting "launch failed", which record_import_page
-// copies to the job log.
+// Chrome now and then dies as it starts (#442); most of these crashes print
+// "Received signal 11" with a fault in glibc's getenv.  A launch whose browser
+// a signal ended (puppeteer's "Code: null") is tried again.  One crash in 63
+// printed no signal line, so the rule matches the exit code, not that line.
+// Each failed launch prints a line starting "launch failed", which
+// record_import_page copies to the job log.
 async function launch() {
   for (let tries = 1; ; ++tries) {
     try {
