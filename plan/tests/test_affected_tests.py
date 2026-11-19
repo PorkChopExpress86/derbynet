@@ -392,7 +392,7 @@ class TestingNames(unittest.TestCase):
     def test_a_name_another_tracked_file_has_maps_through_its_path_alone(self):
         """A colliding bare name maps only through `testing/<rel>`, and to the
         fallback when no test cites that: README.md names a file in several
-        folders (the lead, #431). A longer path that holds `docker/Dockerfile`
+        folders (#431). A longer path that holds `docker/Dockerfile`
         is no cite of testing/docker/Dockerfile."""
         files = {'README.md': '', 'server/README.md': '',
                  'server/tests/test_readme.py': 'README = ROOT / "README.md"\n',
