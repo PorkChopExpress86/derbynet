@@ -1,6 +1,7 @@
 """tools/operand_mutants.py lists the operand mutations of a diff's
 `min()`, `max()`, `clamp()` and conditions (#283 retro)."""
 
+import ast
 import subprocess
 
 import pytest
@@ -39,6 +40,167 @@ def test_a_clamp_lists_each_bound_dropped_and_its_nested_call():
         "9vh",
         "11vw",
     ]
+
+
+@pytest.mark.parametrize(
+    ("call", "news"),
+    [
+        ("max(xs, key=f)", []),
+        ("max(a, b, key=f)", ["a", "b"]),
+        ("min(a, b)", ["a", "b"]),
+        # A comma in the key's lambda splits no operand.
+        ("max(xs, key=lambda a, b: a)", []),
+        ("min(a, b, default=0)", ["a", "b"]),
+        ("max(a, *xs)", []),
+        ("max(a, b, *xs)", ["a", "b"]),
+        ("max(a, b, **kw)", ["a", "b"]),
+        ("min(a + b, c)", ["(a + b)", "c"]),
+        ("min(a.b, c[0], f(d), 's', None)", ["a.b", "c[0]", "f(d)", "'s'", "None"]),
+        ("max(1, [2])", ["(1)", "([2])"]),
+    ],
+)
+def test_a_python_call_lists_only_its_positional_operands(call, news):
+    """#417 retro's `max(holders, key=lambda node: node.lineno)` listed
+    `key=lambda node: node.lineno`, and `return key=...` did not parse
+    (#449)."""
+    diff = f"+++ b/t.py\n@@ -1 +1 @@\n+x = {call}\n"
+    assert [(m.kind, m.old, m.new) for m in om.mutants(diff)] == [
+        (call[:3], call, new) for new in news
+    ]
+
+
+def test_a_call_in_a_python_string_that_is_no_python_lists_each_operand():
+    """CSS in a Python string, as a browser test keeps it."""
+    diff = '+++ b/t.py\n@@ -1 +1 @@\n+CSS = ".t { width: min(1em, 2vw); }"\n'
+    assert [m.new for m in om.mutants(diff)] == ["1em", "2vw"]
+
+
+@pytest.mark.parametrize(
+    ("path", "line", "news"),
+    [
+        ("a.js", "x = Math.max(a, key = f);", ["a", "key = f"]),
+        ("a.css", ".t { width: max(1em, 2vw); }", ["1em", "2vw"]),
+    ],
+)
+def test_a_javascript_or_css_call_takes_no_named_argument(path, line, news):
+    """Neither language has a named argument, so each operand counts:
+    JavaScript's `key = f` is an assignment, which stands where the call
+    stood (#449)."""
+    diff = f"+++ b/{path}\n@@ -1 +1 @@\n+{line}\n"
+    assert [m.new for m in om.mutants(diff)] == news
+
+
+# One sample of each expression ast has, as a call takes it for an argument.
+SAMPLES = [
+    (ast.BoolOp, "a or b"),
+    (ast.NamedExpr, "y := 1"),
+    (ast.BinOp, "a + b"),
+    (ast.UnaryOp, "-a"),
+    (ast.Lambda, "lambda p, q=1: p"),
+    (ast.IfExp, "a if c else b"),
+    (ast.Dict, "{1: 2, **d}"),
+    (ast.Set, "{1, 2}"),
+    (ast.ListComp, "[i for i in xs]"),
+    (ast.SetComp, "{i for i in xs}"),
+    (ast.DictComp, "{i: j for i, j in xs}"),
+    (ast.GeneratorExp, "(i for i in xs)"),
+    (ast.Await, "await a"),
+    (ast.Yield, "(yield a)"),
+    (ast.YieldFrom, "(yield from xs)"),
+    (ast.Compare, "a < b < c"),
+    (ast.Call, "f(a, *b, k=1)"),
+    (ast.JoinedStr, 'f"{a!r:>{w}}, b"'),
+    (ast.TemplateStr, 't"{a}"'),
+    (ast.Constant, "1"),
+    (ast.Constant, "1.5"),
+    (ast.Constant, "'s, t'"),
+    (ast.Constant, "'s' 't'"),
+    (ast.Constant, "None"),
+    (ast.Constant, "..."),
+    (ast.Attribute, "a.b"),
+    (ast.Subscript, "a[1:2, ::3]"),
+    (ast.Name, "a"),
+    (ast.List, "[1, *xs]"),
+    (ast.Tuple, "(1, 2)"),
+]
+NO_ARGUMENT = {
+    ast.Starred: "each argument list below takes `*xs`",
+    ast.Slice: "only in a subscript",
+    ast.FormattedValue: "only in an f-string",
+    ast.Interpolation: "only in a t-string",
+}
+ARGUMENT_LISTS = [
+    "{s}, z",
+    "z, {s}",
+    "z, {s}, w",
+    "{s}, key=f",
+    "{s}, z, key=lambda p, q: p",
+    "{s}, *zs",
+    "{s}, z, *zs",
+    "*zs, {s}, z",
+    "{s}, z, **kw",
+]
+# CALL takes `-max(` for a CSS name such as `x-max(`, so the minus is spaced.
+HOSTS = ["x = {}", "x = - {}", "x = {} ** 2", "x = {}.real", "x = {}[0]", "x = {}(0)"]
+
+
+def test_the_samples_hold_each_expression_ast_has():
+    assert {cls for cls, _ in SAMPLES} | set(NO_ARGUMENT) == set(
+        ast.expr.__subclasses__()
+    )
+    for cls, sample in SAMPLES:
+        assert type(ast.parse(f"f({sample})", mode="eval").body.args[0]) is cls
+
+
+class Stand(ast.NodeTransformer):
+    """The tree with the `max()` call replaced by one of its arguments."""
+
+    def __init__(self, arg: ast.expr):
+        self.arg = arg
+
+    def visit_Call(self, node):
+        if isinstance(node.func, ast.Name) and node.func.id == "max":
+            return self.arg
+        return self.generic_visit(node)
+
+
+def test_each_python_operand_stands_where_the_call_stood():
+    """Python's own parser is the oracle (#449): for each expression
+    form, at each place in an argument list beside a keyword, `*` and
+    `**`, under each host, the listing offers exactly the call's
+    positional arguments when it has two or more, and the line with the
+    call replaced by each parses to the tree with the call replaced by
+    that argument."""
+    wrong = []
+    for _, sample in SAMPLES:
+        for args in ARGUMENT_LISTS:
+            call = "max(" + args.format(s=sample) + ")"
+            for host in HOSTS:
+                line = host.format(call)
+                tree = ast.parse(line)
+                node = next(
+                    n
+                    for n in ast.walk(tree)
+                    if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "max"
+                )
+                operands = [a for a in node.args if not isinstance(a, ast.Starred)]
+                expected = operands if len(operands) > 1 else []
+                found = [
+                    m for m in om.line_mutants("t.py", line, True) if m[0] == "max"
+                ]
+                if len(found) != len(expected):
+                    wrong.append((line, [m[2] for m in found]))
+                    continue
+                for (_, old, new), arg in zip(found, expected, strict=True):
+                    mutated = line.replace(old, new)
+                    want = ast.dump(Stand(arg).visit(ast.parse(line)))
+                    try:
+                        got = ast.dump(ast.parse(mutated))
+                    except SyntaxError:
+                        got = "SyntaxError"
+                    if old != call or got != want:
+                        wrong.append((line, mutated))
+    assert wrong == [], f"{len(wrong)} wrong, first: {wrong[:5]}"
 
 
 def test_conditions_and_each_top_level_operand():

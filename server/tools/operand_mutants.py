@@ -15,7 +15,12 @@ Each output line is `path:line  kind  old  ->  new`, where `old` occurs on
 that line of the new file. For each added line it lists:
 
 - `min(a, b, ...)` and `max(...)` (CSS, `Math.min`, Python): the call
-  replaced by each operand alone;
+  replaced by each operand alone. In Python an operand is a positional
+  argument, and a call needs two: `key=`, `default=`, `*xs` and `**kw`
+  are none, so `max(xs, key=f)` lists nothing, and an operand that is no
+  atom keeps its own parentheses, `(a + b)`, so it stands where the call
+  stood (#449: `key=lambda ...` made `return key=...`). A JavaScript or
+  CSS call takes no named argument, so each of its operands is one;
 - `clamp(lo, x, hi)`: `x` alone, `max(lo, x)` (no upper bound) and
   `min(x, hi)` (no lower bound);
 - a nested call's own mutants too, so `clamp(1rem, min(9vh, 11vw), 8rem)`
@@ -142,7 +147,34 @@ def split_top(text: str, seps: list[str]) -> list[str]:
     return parts
 
 
-def call_mutants(text: str) -> list[tuple[str, str, str]]:
+# Operands that stand where a call stood with no parentheses added; any
+# other keeps its own. An int is no atom here: `max(1, 2).real` would make
+# `1.real`.
+ATOMS = (ast.Name, ast.Attribute, ast.Subscript, ast.Call)
+
+
+def python_operands(call: str) -> list[str] | None:
+    """A Python `min()` or `max()` call's operands, each as it can stand
+    for the call, or [] when it has fewer than two; None when `call` is no
+    Python, such as CSS in a Python string."""
+    try:
+        node = ast.parse(call, mode="eval").body
+    except SyntaxError:
+        return None
+    args = [a for a in node.args if not isinstance(a, ast.Starred)]
+    if len(args) < 2:
+        return []
+    out = []
+    for a in args:
+        text = ast.get_source_segment(call, a)
+        atom = isinstance(a, ATOMS) or (
+            isinstance(a, ast.Constant) and type(a.value) is not int
+        )
+        out.append(text if atom else f"({text})")
+    return out
+
+
+def call_mutants(text: str, python: bool = False) -> list[tuple[str, str, str]]:
     out = []
     for m in CALL.finditer(text):
         end = closing(text, m.end())
@@ -156,8 +188,11 @@ def call_mutants(text: str) -> list[tuple[str, str, str]]:
             out.append(("clamp", call, x))
             out.append(("clamp", call, f"max({lo}, {x})"))
             out.append(("clamp", call, f"min({x}, {hi})"))
-        elif name in ("min", "max") and len(args) > 1:
-            for a in args:
+        elif name in ("min", "max"):
+            operands = python_operands(call) if python else None
+            if operands is None:
+                operands = args if len(args) > 1 else []
+            for a in operands:
                 out.append((name, call, a))
     return out
 
@@ -216,7 +251,7 @@ def line_mutants(
 ) -> list[tuple[str, str, str]]:
     """The mutants one line holds; with `by_ast`, its Python conditions are
     left to python_conditions()."""
-    found = call_mutants(text)
+    found = call_mutants(text, python)
     py_if = None
     if python and (m := PY_IF.match(text)):
         if not by_ast:

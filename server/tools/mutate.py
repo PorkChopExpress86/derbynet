@@ -50,7 +50,10 @@ conditions, since `affected-tests` prints this line with no `--file` and
 `--file` names has the mutants of its helpers run, outside its test
 functions, for a guard that lives beside its tests, such as #345's scanner
 in `tests/test_docker_checks.py` (#345 retro). A mutant whose text occurs
-more than once on its line is refused, to be run by hand. A stop restores each
+more than once on its line is refused, to be run by hand, and so is one
+that no longer parses where its file did, with the line Python stops at:
+its tests would fail at collection, an ERROR that names no line (#449).
+A stop restores each
 file and names the mutants not run. The cases the listing reads past are
 still mutated by hand, one per call.
 
@@ -284,11 +287,7 @@ def _unparsed(path: Path, saved: bytes, mutated: bytes) -> str | None:
     try:
         ast.parse(mutated)
     except SyntaxError as err:
-        return (
-            f"the mutant does not parse as Python (line {err.lineno}: {err.msg});"
-            " build --old and --new from a file or a heredoc, since $(...) drops"
-            " trailing newlines"
-        )
+        return f"the mutant does not parse as Python (line {err.lineno}: {err.msg})"
     return None
 
 
@@ -322,6 +321,10 @@ def _one(path: Path, data: bytes, m, args) -> tuple[str, str, str]:
         return "REFUSED", "not once on its line: run it by hand", ""
     start, end = m.span
     mutated = (text[:start] + m.new + text[end:]).encode()
+    # A mutant that does not parse fails at collection, which reads as ERROR
+    # with no line named (#449).
+    if why := _unparsed(path, data, mutated):
+        return "REFUSED", why, ""
     try:
         _swap(path, data, mutated)
         run, output = _pytest(args.pytest_args, args.timeout)
@@ -501,7 +504,10 @@ def main(argv: list[str] | None = None) -> int:
             )
         mutated = text.replace(args.old, args.new).encode()
         if why := _unparsed(path, saved, mutated):
-            raise Refused(why)
+            raise Refused(
+                f"{why}; build --old and --new from a file or a heredoc, since"
+                " $(...) drops trailing newlines"
+            )
         try:
             _swap(path, saved, mutated)
             run, output = _pytest(args.pytest_args, args.timeout)
