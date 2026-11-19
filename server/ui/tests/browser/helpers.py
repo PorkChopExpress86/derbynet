@@ -36,15 +36,28 @@ BOUND = """root => [root, ...root.querySelectorAll('[hx-get], [hx-post]')]
   .filter((e) => e.matches('[hx-get], [hx-post]'))
   .every((e) => (e['htmx-internal-data'] || {}).initHash)"""
 
+# 'bound' once BOUND holds for `root`, 'gone' once a swap has taken `root`
+# out of the page: htmx's cleanup of a swapped-out element deletes its
+# internal data but `firstInitCompleted` (htmx 2.0.4 `deInitNode`), so BOUND
+# never holds for it again (#425).
+BOUND_OR_GONE = f"""root => !root.isConnected ? 'gone'
+  : ({BOUND})(root) && 'bound'"""
+
 
 def bound(page, locator):
     """Wait until htmx has bound the requests of what `locator` shows. Alpine
     shows swapped-in content at once, but htmx binds its `hx-*` attributes
-    only when the swap settles, 20 ms later or more under load, and a
-    control used before then sends nothing (#46 CI: the award sheet's "For"
+    only when the swap settles, and a control used before then sends
+    nothing (#46 CI: the award sheet's "For"
     select never fetched the partition list). No settling class marks every
-    such swap, so `htmx_settled()` alone does not cover it."""
-    page.wait_for_function(BOUND, arg=locator.element_handle())
+    such swap, so `htmx_settled()` alone does not cover it. A poll's swap
+    during the wait takes out the element `locator` showed, and the wait
+    follows `locator` to the element swapped in
+    (`test_a_tap_follows_a_card_a_poll_swaps_while_bound_waits`)."""
+    while True:
+        found = page.wait_for_function(BOUND_OR_GONE, arg=locator.element_handle())
+        if found.json_value() == "bound":
+            return
 
 
 def ready(page, body):
