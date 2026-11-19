@@ -4,6 +4,7 @@ Run: python3 -I -m unittest discover -s plan/tests
 """
 import importlib.machinery
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -110,9 +111,9 @@ class IssueStandIn:
         return subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '61', *argv],
                               capture_output=True, text=True, env=self.env)
 
-    def check(self, body):
+    def check(self, body, *argv):
         (self.tmp / 'body.md').write_text(body)
-        return self.run_tool('--check', str(self.tmp / 'body.md'))
+        return self.run_tool('--check', str(self.tmp / 'body.md'), *argv)
 
 
 class PrEvidence(IssueStandIn, unittest.TestCase):
@@ -167,6 +168,189 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
         done = self.run_tool('--body', 'x.md')
         self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
         self.assertNotEqual(done.returncode, 0)
+
+
+HEAD = '19fea1fb0000000000000000000000000000beef'
+RUN = 'https://github.com/PorkChopExpress86/derbynet/actions/runs/'
+# The fields pr-evidence reads, as the runs API answers for a ci-load run.
+CI_LOAD_RUN = {'path': '.github/workflows/ci-load.yml', 'event': 'workflow_dispatch',
+               'head_branch': 'master', 'run_attempt': 1,
+               'display_title': f'CI load at {HEAD}', 'status': 'completed',
+               'conclusion': 'success'}
+PR_HEAD = '0123456789abcdef0123456789abcdef01234567'
+
+
+class CiLoad(IssueStandIn, unittest.TestCase):
+    """A `- CI load: <run URL>` item, read through a `gh` that also answers
+    the runs API from runs.json and PR 421's head (#415)."""
+
+    def setUp(self):
+        super().setUp()
+        (self.tmp / 'runs.json').write_text('{}')
+        gh = self.tmp / 'gh'
+        gh.write_text(f'#!{sys.executable}\n'
+                      'import json, sys\n'
+                      'if sys.argv[1] == "api":\n'
+                      f'    runs = json.load(open({str(self.tmp / "runs.json")!r}))\n'
+                      '    run = runs.get(sys.argv[2].rsplit("/", 1)[1])\n'
+                      '    if run is None:\n'
+                      '        sys.exit("HTTP 404: Not Found")\n'
+                      '    print(json.dumps(run))\n'
+                      '    sys.exit(0)\n'
+                      'if sys.argv[1:3] == ["pr", "view"]:\n'
+                      '    if sys.argv[3] != "421":\n'
+                      '        sys.exit("no pull requests found")\n'
+                      f'    print(json.dumps({{"headRefOid": {PR_HEAD!r}}}))\n'
+                      '    sys.exit(0)\n'
+                      'assert sys.argv[1:4] == ["issue", "view", "61"], sys.argv\n'
+                      f'print(open({str(self.tmp / "issue.md")!r}).read(), end="")\n')
+
+    def runs(self, **by_id):
+        (self.tmp / 'runs.json').write_text(json.dumps(by_id))
+
+    def check_at(self, items, head=HEAD, pr=None, flake_ticket=False):
+        (self.tmp / 'body.md').write_text(evidence(KEYS) + items)
+        argv = ['--check', str(self.tmp / 'body.md')] + (['--head', head] if head else [])
+        return self.run_tool(*argv, *(['--pr', pr] if pr else []),
+                             *(['--flake-ticket'] if flake_ticket else []))
+
+    def test_a_passed_run_at_the_head_is_accepted_as_ci_load(self):
+        self.runs(**{'101': CI_LOAD_RUN})
+        done = self.check_at(f'- CI load: {RUN}101\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn(f'CI load at {HEAD}, passed: {RUN}101 (extra evidence until the '
+                      'owner amends D85', done.stdout)
+
+    def test_each_wrong_field_is_refused_with_its_reason(self):
+        cases = {'path': ('.github/workflows/server.yml', 'not a run of'),
+                 'event': ('push', 'started by push'),
+                 'head_branch': ('issue-415-ci-load-runs',
+                                 "ran the workflow of issue-415-ci-load-runs, not master's"),
+                 'run_attempt': (2, 'attempt 2, not the first'),
+                 'display_title': ('CI load at ' + '0' * 40, "is not at the PR's head"),
+                 'conclusion': ('failure', 'completed, failure: not passed'),
+                 'status': ('in_progress', 'in_progress, success: not passed')}
+        for field, (value, why) in cases.items():
+            with self.subTest(field=field):
+                self.runs(**{'102': {**CI_LOAD_RUN, field: value}})
+                done = self.check_at(f'- CI load: {RUN}102\n')
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('not load evidence, ', done.stdout)
+                self.assertIn(why, done.stdout)
+
+    def test_no_head_no_url_or_another_repo_is_refused(self):
+        self.runs(**{'103': CI_LOAD_RUN})
+        for items, head, why in (
+                (f'- CI load: {RUN}103\n', None, 'no --head or --pr to check it at'),
+                ('- CI load: the run below\n', HEAD, 'no run URL'),
+                ('- CI load: https://github.com/jeffpiazza/derbynet/actions/runs/103\n',
+                 HEAD, 'a run of jeffpiazza/derbynet')):
+            with self.subTest(why=why):
+                done = self.check_at(items, head)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(why, done.stdout)
+
+    def test_a_trial_at_the_head_is_refused(self):
+        """The workflow names a run with any non-default input a trial."""
+        trial = f'CI load trial at {HEAD} (files x.py, base origin/master, flake ticket false)'
+        self.runs(**{'107': {**CI_LOAD_RUN, 'display_title': trial}})
+        done = self.check_at(f'- CI load: {RUN}107\n')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"not load evidence, {trial!r} is not at the PR's head {HEAD}",
+                      done.stdout)
+
+    def test_a_flake_ticket_run_at_the_head_is_accepted_for_any_ticket(self):
+        """D101 and D122 ask a flake ticket for its whole-file repeats with
+        --flake-ticket; the workflow names that run `(flake ticket)`, and a
+        ticket not said to be a flake ticket takes it too."""
+        title = f'CI load at {HEAD} (flake ticket)'
+        self.runs(**{'109': {**CI_LOAD_RUN, 'display_title': title}})
+        for flake_ticket in (False, True):
+            with self.subTest(flake_ticket=flake_ticket):
+                done = self.check_at(f'- CI load: {RUN}109\n', flake_ticket=flake_ticket)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn(f'{title}, passed: {RUN}109 (extra evidence until the owner '
+                              'amends D85', done.stdout)
+
+    def test_a_plain_run_is_refused_for_a_flake_ticket_with_the_reason(self):
+        self.runs(**{'110': CI_LOAD_RUN})
+        done = self.check_at(f'- CI load: {RUN}110\n', flake_ticket=True)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"not load evidence, 'CI load at {HEAD}' ran without flake_ticket, and "
+                      'this ticket is a flake ticket: D101 asks its whole-file 25 with '
+                      f'--flake-ticket (D122): {RUN}110', done.stdout)
+
+    def test_a_flake_ticket_run_must_still_be_at_the_head_and_no_trial(self):
+        """The `(flake ticket)` name opens no other door: the head, the
+        trial name and every other field are checked as for a plain run, and
+        the verdict is the same whether or not the ticket is a flake ticket."""
+        trial = f'CI load trial at {HEAD} (files x.py; base origin/master; flake ticket true)'
+        flake = f'CI load at {HEAD} (flake ticket)'
+        for fields, why in (
+                ({'display_title': f'CI load at {"0" * 40} (flake ticket)'}, "is not at the PR's head"),
+                ({'display_title': trial}, "is not at the PR's head"),
+                ({'display_title': flake + ' '}, "is not at the PR's head"),
+                ({'display_title': flake, 'run_attempt': 2}, 'attempt 2, not the first'),
+                ({'display_title': flake, 'conclusion': 'failure'}, 'completed, failure: not passed'),
+                ({'display_title': flake, 'status': 'in_progress'}, 'in_progress, success: not passed')):
+            for flake_ticket in (False, True):
+                with self.subTest(fields=fields, flake_ticket=flake_ticket):
+                    verdict = TOOL.ci_load_verdict({**CI_LOAD_RUN, **fields}, HEAD, flake_ticket)
+                    self.assertIn(why, verdict)
+
+    def test_the_verdict_names_the_run_each_kind_of_ticket_takes(self):
+        flake = f'CI load at {HEAD} (flake ticket)'
+        for title, flake_ticket, verdict in (
+                (f'CI load at {HEAD}', False, None),
+                (flake, False, None),
+                (flake, True, None),
+                (f'CI load at {HEAD}', True, 'ran without flake_ticket')):
+            with self.subTest(title=title, flake_ticket=flake_ticket):
+                got = TOOL.ci_load_verdict({**CI_LOAD_RUN, 'display_title': title}, HEAD,
+                                           flake_ticket)
+                self.assertTrue(got is None if verdict is None else verdict in got, got)
+
+    def test_pr_gives_the_head_and_a_head_that_is_not_the_prs_is_refused(self):
+        self.runs(**{'108': {**CI_LOAD_RUN, 'display_title': f'CI load at {PR_HEAD}'}})
+        for head in (None, PR_HEAD):
+            with self.subTest(head=head):
+                done = self.check_at(f'- CI load: {RUN}108\n', head=head, pr='421')
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn(f'CI load at {PR_HEAD}, passed: {RUN}108', done.stdout)
+        done = self.check_at(f'- CI load: {RUN}108\n', head=HEAD, pr='421')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f'--head {HEAD} is not the head of PR #421, {PR_HEAD}', done.stderr)
+
+    def test_a_pr_gh_cannot_read_exits_with_its_message(self):
+        done = self.check_at('', head=None, pr='999')
+        self.assertEqual(done.returncode, 1)
+        self.assertIn('gh could not read PR #999:\nno pull requests found', done.stderr)
+
+    def test_head_or_pr_without_check_prints_the_usage(self):
+        for option, value in (('--head', [HEAD]), ('--pr', ['421']), ('--flake-ticket', [])):
+            with self.subTest(option=option):
+                done = self.run_tool(option, *value)
+                self.assertEqual(done.returncode, 1, done.stdout)
+                self.assertIn('--head, --pr, --flake-ticket and --closes go with --check', done.stderr)
+                self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
+
+    def test_other_run_links_and_still_open_items_are_not_read(self):
+        """This PR's own body cites a failing run for its failing-shard box."""
+        done = self.check_at(f'- A failing shard: {RUN}104 failed, as it should\n'
+                             f'\n## Still open\n\n- CI load: {RUN}105 waits on D85\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn('CI load', done.stdout)
+
+    def test_a_misspelt_head_option_prints_the_usage(self):
+        (self.tmp / 'body.md').write_text(evidence(KEYS))
+        done = self.run_tool('--check', str(self.tmp / 'body.md'), '--hed', HEAD)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
+
+    def test_a_run_gh_cannot_read_exits_with_its_message(self):
+        done = self.check_at(f'- CI load: {RUN}106\n')
+        self.assertEqual(done.returncode, 1)
+        self.assertIn(f'gh could not read {RUN}106:\nHTTP 404', done.stderr)
 
 
 class Placeholders(unittest.TestCase):
@@ -354,7 +538,7 @@ class DefinedNames(unittest.TestCase):
 
 class CheckRefuses(IssueStandIn, unittest.TestCase):
     def test_399s_draft_is_refused_for_its_placeholder(self):
-        done = self.check(evidence(KEYS) + '\n' + DRAFT_399)
+        done = self.check(evidence(KEYS) + '\n' + DRAFT_399, '--closes', '399')
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:],
                          ['unfilled placeholder, line 17: LOOP-OUTPUT'])
@@ -371,7 +555,7 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
         # Its "Closes #399." above its "## Still open" passes: the lead
         # dropped that check (AGENT-BRIEF puts undecided divergences there).
         filled = DRAFT_399.replace('LOOP-OUTPUT', '25 of 25 ok')
-        done = self.check(evidence(KEYS) + '\n' + filled)
+        done = self.check(evidence(KEYS) + '\n' + filled, '--closes', '399')
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_a_body_with_crlf_line_ends_is_refused_for_its_placeholder(self):
@@ -382,6 +566,183 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:],
                          ['unfilled placeholder, line 11: LOOP-OUTPUT'])
+
+
+# The line of #421's body draft that pr-merge refused at merge time, since
+# GitHub read it as closing #399 (#415 retro), and the line as it merged.
+LINE_421 = ('- `test_pr_evidence.py::CheckRefuses` "Closes #399." and "## Still open": '
+            'DRAFT_399 holds both lines, and the class\'s tests check that draft.')
+MERGED_421 = LINE_421.replace('"Closes #399."', '"`Closes #399.`"').replace(
+    '"## Still open"', '"`## Still open`"')
+NO_ISSUE = "no issue given: no ticket's evidence lines were checked"
+CLOSES_421 = ('closes another issue, line {n}: Closes #399: GitHub closes it on merge; '
+              'put a quote in backticks, or write "Part of #N"')
+
+
+class ClosingKeywords(IssueStandIn, unittest.TestCase):
+    """A closing keyword for an issue other than the PR's own, outside code."""
+
+    def body(self, *lines):
+        """The #61 stand-in's evidence, `Closes #61.` and `lines`, and the
+        number of the first of `lines`."""
+        head = 'Closes #61.\n\n' + evidence(KEYS) + '\n'
+        return head + ''.join(f'{line}\n' for line in lines), head.count('\n') + 1
+
+    def test_421s_quoted_fixture_line_is_refused(self):
+        body, n = self.body(LINE_421)
+        done = self.check(body)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [CLOSES_421.format(n=n)])
+
+    def test_421s_line_as_it_merged_passes(self):
+        body, _n = self.body(MERGED_421)
+        done = self.check(body)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [])
+
+    def test_the_prs_own_issue_and_each_closes_option_pass(self):
+        body, _n = self.body('Fixes #64 C5 (Q3), as #404 did.', 'Resolves: #65')
+        done = self.check(body, '--closes', '64', '--closes', '65')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        done = self.check(body, '--closes', '64')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual([line.split(':')[0] for line in done.stdout.splitlines()[1:]],
+                         [f'closes another issue, line {_n + 1}'])
+
+    def test_each_form_github_reads_is_found(self):
+        for words in ('close #59', 'closes #59', 'closed #59', 'fix #59', 'fixes #59',
+                      'fixed #59', 'resolve #59', 'resolves #59', 'resolved #59',
+                      'CLOSES #59', 'Closes: #59', 'Closes\t#59', 'Closes owner/repo#59',
+                      'Closes https://github.com/PorkChopExpress86/derbynet/issues/59',
+                      '(closes #59)', 'see "Fixes #59."', 'closes#59', 'closes-#59',
+                      'closes #59a', 'closes #59-b', 'closes - #59', '-fixes #59'):
+            with self.subTest(words=words):
+                found = TOOL.foreign_closes(f'Text {words} here.\n', {'61'})
+                self.assertEqual(len(found), 1, found)
+                self.assertTrue(found[0].startswith('line 1: '), found)
+                self.assertTrue(found[0].endswith('59'), found)
+
+    def test_the_shapes_that_close_nothing_pass(self):
+        for words in ('disclosed #59', 'prefixes #59', 'closes the #59 thread', 'closes #61',
+                      'closes #61a', 'see #59', 'Closes `#59`', '`Closes #59`', 'Part of #59'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'Text {words} here.\n', {'61'}), [])
+
+    def test_a_longer_number_is_another_issue(self):
+        self.assertEqual(TOOL.foreign_closes('Closes #610.\nCloses #6.\n', {'61'}),
+                         ['line 1: Closes #610', 'line 2: Closes #6'])
+
+    def test_a_closed_fence_is_quoted_and_an_open_one_is_read(self):
+        closed = 'Before.\n```\nCloses #59\n```\nAfter.\n'
+        self.assertEqual(TOOL.foreign_closes(closed, {'61'}), [])
+        indented = '- a log:\n\n  ```\n  Fixes #59\n  ```\n'
+        self.assertEqual(TOOL.foreign_closes(indented, {'61'}), [])
+        unclosed = 'Closes #58.\n```\nFixes #59\nCloses #57\n'
+        self.assertEqual(TOOL.foreign_closes(unclosed, {'61'}),
+                         ['line 1: Closes #58', 'line 3: Fixes #59', 'line 4: Closes #57'])
+        reopened = '```\nCloses #59\n```\nFixes #58\n```\nCloses #57\n'
+        self.assertEqual(TOOL.foreign_closes(reopened, {'61'}),
+                         ['line 4: Fixes #58', 'line 6: Closes #57'])
+
+    def test_the_gh_prefix_is_read_as_an_issue_reference(self):
+        """GitHub's autolinked references include GH-N; whether its closing
+        keywords honour that form is unverified, so it fails closed."""
+        for words in ('Closes GH-59', 'closes gh-59', 'Fixes: GH-59', 'resolved GH-59'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'Text {words}.\n', {'61'}),
+                                 [f'line 1: {words}'])
+        self.assertEqual(TOOL.foreign_closes('Closes GH-61.\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('Closes `GH-59`, see GH-59.\n', {'61'}), [])
+
+    def test_a_fence_opener_has_no_backtick_in_its_info_string(self):
+        """CommonMark: "```code``` here" is inline code, not a fence, so the
+        prose after it is read."""
+        for line in ('```code``` here', '```Closes #58``` here', '````code``` here'):
+            with self.subTest(line=line):
+                self.assertEqual(TOOL.foreign_closes(f'{line}\nFixes #59\n```\nAfter.\n', {'61'}),
+                                 ['line 2: Fixes #59'])
+        self.assertEqual(TOOL.foreign_closes('```Closes #58``` here\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('```python\nFixes #59\n```\n', {'61'}), [])
+
+    def test_only_a_bare_fence_at_least_as_long_closes_one(self):
+        inside = '```\n```code``` x\nCloses #59\n```\nAfter.\n'
+        self.assertEqual(TOOL.foreign_closes(inside, {'61'}), [])
+        longer = '````\n```\nCloses #59\n````\nFixes #58\n'
+        self.assertEqual(TOOL.foreign_closes(longer, {'61'}), ['line 5: Fixes #58'])
+        titled = '```\n```python\nCloses #59\n```\nAfter.\n'
+        self.assertEqual(TOOL.foreign_closes(titled, {'61'}), [])
+        trailing = '```\nCloses #59\n``` \nFixes #58\n'
+        self.assertEqual(TOOL.foreign_closes(trailing, {'61'}), ['line 4: Fixes #58'])
+
+    def test_a_code_span_ends_at_the_backticks_that_opened_it(self):
+        for words in ('``Closes #59``', '``Closes `x` #59``', 'Closes `x` #59',
+                      'Clo`x`ses #59', '```Closes #59```', '`` Closes #59 ``'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'Text {words} here.\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('`x` Closes #59 `y`\n', {'61'}),
+                         ['line 1: Closes #59'])
+        self.assertEqual(TOOL.foreign_closes('``x` Closes #59\n', {'61'}),
+                         ['line 1: Closes #59'])
+
+    def test_backtick_runs_of_different_lengths_are_no_span(self):
+        for words in ('` Closes #59 ``', '`` Closes #59 `', '```` Closes #59 ``'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'{words}\n', {'61'}),
+                                 ['line 1: Closes #59'])
+
+    def test_a_reference_into_another_repo_is_refused_whatever_its_number(self):
+        for words in ('Closes other/repo#61', 'Closes jeffpiazza/derbynet#61',
+                      'Fixes https://github.com/jeffpiazza/derbynet/issues/61'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'{words}\n', {'61'}),
+                                 [f'line 1: {words}'])
+        for words in ('Closes PorkChopExpress86/derbynet#61', 'closes porkchopexpress86/DerbyNet#61',
+                      'Fixes https://github.com/PorkChopExpress86/derbynet/issues/61'):
+            with self.subTest(words=words):
+                self.assertEqual(TOOL.foreign_closes(f'{words}\n', {'61'}), [])
+        self.assertEqual(TOOL.foreign_closes('Closes PorkChopExpress86/derbynet#59\n', {'61'}),
+                         ['line 1: Closes PorkChopExpress86/derbynet#59'])
+
+    def test_closes_takes_a_positive_issue_number(self):
+        body = evidence(KEYS) + '\nFixes #64.\n'
+        for given in ('64', '#64'):
+            with self.subTest(given=given):
+                done = self.check(body, '--closes', given)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        for given in ('abc', '0', '064', '6 4', '', '##64', '-1', '64a', '#'):
+            with self.subTest(given=given):
+                done = self.check(body, '--closes', given)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertEqual(done.stdout, '')
+                self.assertIn(f'argument --closes: takes an issue number such as 64 or #64, not {given!r}',
+                              done.stderr)
+
+    def test_a_prs_number_is_refused_too(self):
+        """The limit left: #377's "The fake gh's closed #325" names a PR,
+        which GitHub does not close."""
+        line = "- The fake gh's closed #325 makes the claim, and the run gives 0 findings."
+        self.assertEqual(TOOL.foreign_closes(line, {'346'}), ['line 1: closed #325'])
+
+    def test_a_body_with_no_issue_refuses_any_close(self):
+        (self.tmp / 'body.md').write_text('## Summary\n\nA retro.\n\n' + LINE_421 + '\n')
+        done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '--check',
+                               str(self.tmp / 'body.md')],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines(), [NO_ISSUE, CLOSES_421.format(n=5)])
+        (self.tmp / 'body.md').write_text('## Summary\n\nA retro.\n\n' + MERGED_421 + '\n')
+        done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '--check',
+                               str(self.tmp / 'body.md'), '--closes', '61'],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, NO_ISSUE + '\n', ''))
+
+    def test_no_issue_and_no_check_or_closes_without_check_prints_the_usage(self):
+        for argv in ([], ['61', '--closes', '64']):
+            with self.subTest(argv=argv):
+                done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), *argv],
+                                      capture_output=True, text=True, env=self.env)
+                self.assertEqual(done.returncode, 1)
+                self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
 
 
 if __name__ == '__main__':

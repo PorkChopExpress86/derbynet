@@ -252,6 +252,24 @@ checks that PHP has every endpoint a script in `testing/` names and that Django
 serves it or defers it to a backlog ticket, that every script a script runs is
 there, and that each parses.
 
+## Race a round with derby-timer.jar
+
+`race-with-derby-timer.sh` races one round with the real `derby-timer.jar` and
+its simulated timer, as the `server` workflow does, and fails unless every heat
+gets a result.  It needs `java`, and the jar built first.  Start the Django
+server as `server/README.md` ("Run the shell suites against Django") does, then
+from the repository's top folder:
+
+    ant -noinput -buildfile timer/build.xml
+    bash testing/race-with-derby-timer.sh http://127.0.0.1:8000
+
+`race-with-derby-timer-cases.sh` runs it once for each case in its table, with
+the stand-ins in `timer-stand-in/` first on the PATH, and prints `ok` or
+`WRONG` for each.  Run it after changing the script.  Each case takes one to
+five minutes and resets the database.  Name cases to run only those:
+
+    bash testing/race-with-derby-timer-cases.sh http://127.0.0.1:8000 heat-result dump-on-pass
+
 ## Compare two runs
 
 `common.sh` appends every request and its response to `output.curl`, next to

@@ -1,0 +1,13 @@
+#! /bin/bash
+#
+# A stand-in for curl, first on the PATH in race-with-derby-timer-cases.sh
+# (#399).  With TIMER_STATE set, each poll.coordinator answer reports the
+# timer in that state, so a case can hide the states Django leads with;
+# anything else goes to the next curl on the PATH unchanged.
+
+. "$(dirname "$0")/next-on-path.sh"
+if [ -z "$TIMER_STATE" ] || [[ " $* " != *query=poll.coordinator* ]]; then
+    exec "$REAL" "$@"
+fi
+set -o pipefail
+"$REAL" "$@" | jq -c --argjson s "$TIMER_STATE" '.["timer-state"].state = $s'
