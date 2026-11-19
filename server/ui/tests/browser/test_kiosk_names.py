@@ -209,13 +209,12 @@ TOO_WIDE = """() => [...document.querySelectorAll('[data-now-racing] .k-names > 
 WORD = "Wolfeschlegelsteinhausenberger"
 
 
+@pytest.mark.sizes("desktop", reason="the phone breaks a long word at the floor")
 def test_a_word_too_wide_for_its_box_shrinks_the_font(page, event, long_names):
     """At 1920x1080 a racer with a 30-letter word in the name: the font
     ends below the starting size with the word whole, as PHP shrinks a
     table too wide (now-racing-adjust-fonts.js:53-61), rather than break
     it."""
-    if page.size == "phone":
-        pytest.skip("the phone breaks a long word at the floor")
     Racer.objects.filter(event=event, car_number=103).update(last_name=WORD)
     page.set_viewport_size(TV)
     open_kiosk(page, event, "kiosks/now-racing.kiosk")
@@ -254,6 +253,9 @@ WIDE_WINDOWS = [
 ]
 
 
+@pytest.mark.sizes(
+    "desktop", reason="the phone's photos are capped (test_long_names_show_whole)"
+)
 @pytest.mark.parametrize("window", WIDE_WINDOWS)
 def test_on_a_wide_window_each_photo_keeps_its_full_size(
     page, event, long_names, window
@@ -262,8 +264,6 @@ def test_on_a_wide_window_each_photo_keeps_its_full_size(
     1920x1080, 1280x800, 1024x768 and 800x600, each photo is the row height
     x 0.8 tall (kiosk.css `.k-lane .k-who img`), as on master, and as wide
     as its shape makes it."""
-    if page.size == "phone":
-        pytest.skip("the phone's photos are capped (test_long_names_show_whole)")
     page.set_viewport_size(window)
     open_kiosk(page, event, "kiosks/now-racing.kiosk")
     expect(page.locator("[data-lane] img")).to_have_count(4)
@@ -275,13 +275,12 @@ def test_on_a_wide_window_each_photo_keeps_its_full_size(
     )
 
 
+@pytest.mark.sizes("desktop", reason="the phone's long names fit at the starting size")
 def test_the_next_lineup_starts_again_from_the_full_size(page, event, long_names):
     """Short names after long ones get the full starting size back, as
     PHP's `reset()` goes back to the original size for a new heat
     (now-racing.js:132, now-racing-adjust-fonts.js:13-17). At 1920x1080,
     where the long names shrink the font (test_long_names_show_whole)."""
-    if page.size == "phone":
-        pytest.skip("the phone's long names fit at the starting size")
     open_rows(page, event)
     page.wait_for_function(f"({START_PX})() - {LANE_PX} >= 1", timeout=5000)
 
@@ -292,12 +291,11 @@ def test_the_next_lineup_starts_again_from_the_full_size(page, event, long_names
     assert_fits(page)
 
 
+@pytest.mark.sizes("desktop", reason="the phone's long names fit at the starting size")
 def test_the_font_shrinks_again_when_the_window_narrows(page, event, long_names):
     """A resize from 1920x1080 to 1440x1080 fits the names again from the
     new starting size, below it, as PHP sizes its table again on a resize
     (now-racing.js:359)."""
-    if page.size == "phone":
-        pytest.skip("the phone's long names fit at the starting size")
     open_rows(page, event)
     assert_fits(page)
 
@@ -309,14 +307,13 @@ def test_the_font_shrinks_again_when_the_window_narrows(page, event, long_names)
     )
 
 
+@pytest.mark.sizes("phone", reason="eight lanes cut a name only on the phone")
 def test_at_the_floor_a_name_taller_than_its_row_is_cut_at_its_foot(page, event):
     """The limit of the floor (D10, ADR-10). With eight lanes at 390x844, a name of
     four 30-letter words needs more lines than its row holds at 14.4 px. The
     font stops at the floor, the name still wraps so no line is cut
     sideways, and the lines past the row's foot are hidden by the lane
     (kiosk.css `.k-lane { overflow: hidden }`). The other seven lanes fit."""
-    if page.size != "phone":
-        pytest.skip("eight lanes cut a name only on the phone")
     rounds = race_setup(event, groups=(("Lions", 8),), lanes=8)
     word = "Delaughter" * 3
     Racer.objects.filter(event=event, car_number=101).update(

@@ -289,14 +289,13 @@ def test_a_scene_reaches_the_kiosk_within_one_poll_with_no_stream(page, event, d
     )
 
 
+@pytest.mark.sizes("desktop", reason="one size is enough for a 15 s wait")
 def test_a_poll_that_never_answers_is_given_up_after_15_s(
     page, page_errors, event, day
 ):
     """now-racing-poller.js's watchdog queues a new request when none has
     gone out for 15 s. A reply that never comes would otherwise leave the
     chain waiting forever, and kioskNudge() with it."""
-    if page.size != "desktop":
-        pytest.skip("one size is enough for a 15 s wait")
     page_errors.allow(r"query=poll&\S* net::ERR_ABORTED$")
     held = []
 
