@@ -13,7 +13,8 @@
 # the first entry of a folder listing taken as it comes (#312 retro),
 # the role page lists of testing/test-permissions.sh against the page gates
 # (#319 retro), a fake clock paused at its install time and a browser test
-# that takes no fixture (#317 retro), a shell function that records state
+# that takes no fixture (#317 retro), a browser test that skips on its size
+# in its body (#366), a shell function that records state
 # called in a subshell (#59 retro), a guide's command with no row in
 # docs/guide-commands.tsv (#414),
 # and plan/tests, the plan tools' tests
@@ -115,6 +116,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   ui/tests/test_browser_empty_fulfill.py \
   ui/tests/test_browser_missing_allowance.py \
   ui/tests/test_browser_clock_pause.py \
+  ui/tests/test_browser_size_skips.py \
   ui/tests/test_browser_source_only.py \
   ui/tests/test_php_libraries.py \
   legacy_api/tests/test_registry.py \
