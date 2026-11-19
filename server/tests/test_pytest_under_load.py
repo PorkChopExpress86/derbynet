@@ -2211,6 +2211,65 @@ def test_a_hand_off_with_no_command_is_refused(tmp_path):
     assert not (tmp_path / "load.lock").exists()
 
 
+def run_for_help(tmp_path, script, args):
+    """`script` run with `args`, its lock in tmp_path: (exit code, stdout,
+    stderr). Its output goes to pipes, which pytest-under-load.sh refuses
+    only after it reads its options for -h and --help."""
+    folder = tmp_path / "work"
+    folder.mkdir(exist_ok=True)
+    result = subprocess.run(
+        [str(script), *args],
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        timeout=60,
+        cwd=folder,
+        env={
+            "PATH": os.environ["PATH"],
+            "HOME": str(tmp_path),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+            "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+        },
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+@pytest.mark.parametrize(
+    "script, args",
+    [
+        (HOLD_LOCK, ["--help"]),
+        (HOLD_LOCK, ["-h", "true"]),
+        (SCRIPT, ["--help"]),
+        (SCRIPT, ["-h"]),
+        (
+            SCRIPT,
+            ["--postgres", "--loops", "4", "--flake-ticket", "--help", "-m", "browser"],
+        ),
+    ],
+)
+def test_help_prints_the_usage_and_takes_no_lock(tmp_path, script, args):
+    """#434's `hold-load-lock.sh --help` waited in the lock's line to run a
+    command named --help (#434 retro)."""
+    code, out, err = run_for_help(tmp_path, script, args)
+    assert (code, err) == (0, ""), out + err
+    first = out.splitlines()[0]
+    assert first.casefold().startswith("usage: ") and script.name in first, out
+    assert f"comment at the top of {script} says more" in out, out
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["work"]
+
+
+@pytest.mark.parametrize("option", ["-x", "--", "--help-me", "-hv"])
+def test_a_hand_off_whose_command_starts_with_a_dash_is_refused(tmp_path, option):
+    code, out, err = run_for_help(tmp_path, HOLD_LOCK, [option, "true"])
+    assert (code, out) == (2, ""), err
+    assert err == (
+        "hold-load-lock.sh: it takes no option, and no COMMAND starts with -: "
+        f"{option}\n"
+        "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]\n"
+    )
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["work"]
+
+
 def test_a_hand_off_with_no_flock_is_refused_with_how_to_install_it(tmp_path):
     """macOS has no `flock(1)` (#354 review)."""
     bin_dir = tmp_path / "bin"

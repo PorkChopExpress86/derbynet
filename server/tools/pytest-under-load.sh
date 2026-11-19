@@ -58,6 +58,26 @@
 
 set -e -E -o pipefail
 
+# -h or --help among its own options prints the usage and takes no lock:
+# hold-load-lock.sh --help once queued on the lock as a COMMAND, and this
+# script would run `pytest --help` under load (#434 retro).
+usage() {
+  sed -n 's/^# \(Usage: .*\)/\1/p' "$0"
+  echo "The comment at the top of $0 says more."
+  exit 0
+}
+asks_help() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -h|--help) usage ;;
+      --postgres|--flake-ticket) shift ;;
+      --loops) shift 2 || return 0 ;;
+      *) return 0 ;;
+    esac
+  done
+}
+asks_help "$@"
+
 # It refuses to start through a pipe or under `timeout`: #47 and #48 each
 # lost a 25-repeat run to `timeout 3000 ... | grep`, killed with nothing
 # kept (#48 retro).

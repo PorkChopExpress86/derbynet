@@ -36,6 +36,19 @@ if [ $# -eq 0 ]; then
   echo "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]" >&2
   exit 2
 fi
+# It takes no option, and no COMMAND starts with -: #434's
+# `hold-load-lock.sh --help` waited in the lock's line to run `--help`
+# (#434 retro).
+case "$1" in
+  -h|--help)
+    echo "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]"
+    echo "Runs COMMAND while it holds the load lock; the comment at the top of $0 says more."
+    exit 0 ;;
+  -*)
+    echo "hold-load-lock.sh: it takes no option, and no COMMAND starts with -: $1" >&2
+    echo "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]" >&2
+    exit 2 ;;
+esac
 if ! command -v flock >/dev/null; then
   echo "hold-load-lock.sh: it needs flock(1): install util-linux, or on macOS" \
        "\`brew install flock\`." >&2

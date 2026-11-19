@@ -56,6 +56,12 @@ A code span breaks a keyword it sits in or between ("Clo`x`ses #1", "Closes
 refused too, though GitHub closes only issues; a code span that runs over a
 line end is not read as one.
 
+Given <issue>, `--check` also refuses a body that names it in no closing
+keyword (as above, into this repo) and no "Part of #<issue>", outside code.
+#444's body named #434 only in prose, so its merge left #434 open, and the
+lead closed it by hand (#434 retro). A ticket the PR leaves open writes
+"Part of #N" beside its `## Still open` section, which pr-merge asks of it.
+
 A list item `- CI load: <run URL>` cites a run of
 .github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
 run from GitHub and accepts it only when it ran master's workflow
@@ -77,7 +83,8 @@ read.
 
 Exits 1 on a key the body gives no evidence for, on a CI load item not
 accepted or given with no head, on a `--head` that is not PR N's head, on a
-placeholder, on a closing keyword for another issue, or when the issue, the
+placeholder, on a closing keyword for another issue, on a body that names
+<issue> in no closing keyword and no "Part of", or when the issue, the
 PR or a run cannot be read.
 """
 
@@ -287,6 +294,21 @@ def foreign_closes(body: str, closes: set[str]) -> list[str]:
     return found
 
 
+def links_ticket(body: str, issue: str) -> bool:
+    """Whether a line outside code closes `issue` in this repo or says
+    "Part of #<issue>"."""
+    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
+    part_of = re.compile(rf"(?<!\w)part of #{issue}(?!\w)", re.IGNORECASE)
+    for _n, line in unquoted_lines(body):
+        if part_of.search(line):
+            return True
+        for m in CLOSING.finditer(line):
+            repo = m["repo"] or m["url_repo"]
+            if (m["number"] or m["url_number"]) == issue and (not repo or repo.casefold() == fork):
+                return True
+    return False
+
+
 def ci_load_items(body: str) -> list[str]:
     """The evidence text of each `CI load:` item outside `## Still open`."""
     found, section, chunk = [], None, []
@@ -436,11 +458,15 @@ def main(argv: list[str]) -> int:
     for found in closes:
         print(f"closes another issue, {found}: GitHub closes it on merge; put a quote in "
               "backticks, or write \"Part of #N\"")
+    unlinked = bool(args.issue) and not links_ticket(body, args.issue)
+    if unlinked:
+        print(f"no \"Closes #{args.issue}\" or \"Part of #{args.issue}\" outside code: the "
+              f"merge leaves #{args.issue} open with no link to the PR")
     loads = check_ci_load(body, head, args.flake_ticket)
     for line in loads:
         print(line)
     refused = [line for line in loads if line.startswith("not load evidence")]
-    return 1 if missing or unfilled or closes or refused else 0
+    return 1 if missing or unfilled or closes or unlinked or refused else 0
 
 
 if __name__ == "__main__":

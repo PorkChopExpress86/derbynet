@@ -111,8 +111,10 @@ class IssueStandIn:
         return subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '61', *argv],
                               capture_output=True, text=True, env=self.env)
 
-    def check(self, body, *argv):
-        (self.tmp / 'body.md').write_text(body)
+    def check(self, body, *argv, link=True):
+        """The tool's --check on `body`, with a last line `Part of #61.`
+        unless `link` is false (TicketLink)."""
+        (self.tmp / 'body.md').write_text(body + ('\nPart of #61.\n' if link else ''))
         return self.run_tool('--check', str(self.tmp / 'body.md'), *argv)
 
 
@@ -209,7 +211,7 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         (self.tmp / 'runs.json').write_text(json.dumps(by_id))
 
     def check_at(self, items, head=HEAD, pr=None, flake_ticket=False):
-        (self.tmp / 'body.md').write_text(evidence(KEYS) + items)
+        (self.tmp / 'body.md').write_text('Part of #61.\n\n' + evidence(KEYS) + items)
         argv = ['--check', str(self.tmp / 'body.md')] + (['--head', head] if head else [])
         return self.run_tool(*argv, *(['--pr', pr] if pr else []),
                              *(['--flake-ticket'] if flake_ticket else []))
@@ -561,11 +563,63 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
     def test_a_body_with_crlf_line_ends_is_refused_for_its_placeholder(self):
         # The #408 review's crlf.md, as bytes.
         (self.tmp / 'body.md').write_bytes(
-            (evidence(KEYS) + 'x\n- Manual check\nLOOP-OUTPUT\n').replace('\n', '\r\n').encode())
+            (evidence(KEYS) + 'x\n- Manual check\nLOOP-OUTPUT\nPart of #61.\n').replace('\n', '\r\n').encode())
         done = self.run_tool('--check', str(self.tmp / 'body.md'))
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:],
                          ['unfilled placeholder, line 11: LOOP-OUTPUT'])
+
+
+# The lines of #444's body that named #434, which its merge left open (#434
+# retro), with #434 as the stand-in's #61.
+BODY_444 = ('## Why\n\n`test_kiosk_results_by_racer.py`\'s give-up test should pass every '
+            'run, on CI and under load (#61).\n\n## What changed\n\nThe test only.\n')
+UNLINKED = ('no "Closes #61" or "Part of #61" outside code: the merge leaves #61 open '
+            'with no link to the PR')
+
+
+class TicketLink(IssueStandIn, unittest.TestCase):
+    """A body names #61 in a closing keyword or "Part of #61"."""
+
+    def test_444s_body_naming_the_ticket_in_prose_is_refused(self):
+        done = self.check(evidence(KEYS) + BODY_444, link=False)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [UNLINKED])
+
+    def test_each_link_outside_code_passes(self):
+        for line in ('Closes #61.', 'Fixes: #61', 'resolves #61', 'Part of #61.',
+                     'This is part of #61, as its Still open says.',
+                     'Closes PorkChopExpress86/derbynet#61',
+                     'Closes https://github.com/PorkChopExpress86/derbynet/issues/61'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + BODY_444 + line + '\n', link=False)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertEqual(done.stdout.splitlines()[1:], [])
+
+    def test_a_link_in_code_another_number_or_repo_or_a_bare_mention_is_refused(self):
+        for line in ('`Closes #61`', '```\nPart of #61\n```', 'Part of #610', 'Part of #6',
+                     'Part of `#61`', 'Refs #61', 'Issue #61.', 'counterpart of #61',
+                     'Closes jeffpiazza/derbynet#61', 'Closes #610', 'Fixes #59',
+                     'Closes https://github.com/jeffpiazza/derbynet/issues/61'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + BODY_444 + line + '\n', link=False)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(UNLINKED, done.stdout.splitlines())
+
+    def test_still_open_alone_is_no_link(self):
+        body = evidence(KEYS[1:]) + '\n## Still open\n\n- ' + KEYS[0] + '\n'
+        done = self.check(body, link=False)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [UNLINKED])
+        done = self.check(body)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_body_with_no_issue_needs_no_link(self):
+        (self.tmp / 'body.md').write_text('## Summary\n\nA retro.\n')
+        done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '--check',
+                               str(self.tmp / 'body.md')],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, NO_ISSUE + '\n', ''))
 
 
 # The line of #421's body draft that pr-merge refused at merge time, since
