@@ -111,6 +111,31 @@ FENCE_LINE = re.compile(r"^\s*(?:`{3,}(?!.*`)|~{3,})")
 PRE = re.compile(r"<pre[^>]*><code[^>]*>(.*?)</code></pre>", re.DOTALL)
 
 
+def normalize(text: str) -> str:
+    """The renderer's own clean-up of the text, before the extensions run."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").expandtabs(4)
+
+
+def fenced_blocks(text: str):
+    """Yields (language, first line, code) for each block the `fenced_code`
+    extension finds, with its own pattern: the language is its `lang`, else
+    the first class of its `{.class}` attributes, in lower case, or ''; the
+    line is that of the first line of code, from 1 (#414's check of the
+    guides' commands reads the blocks here)."""
+    text = normalize(text)
+    for block in FencedBlockPreprocessor.FENCED_BLOCK_RE.finditer(text):
+        language = block.group("lang") or ""
+        # The pattern takes a `lang` or `{attrs}`, never both.
+        if attrs := block.group("attrs"):
+            first = re.search(r"\.([\w#+-][\w#.+-]*)", attrs)
+            language = first.group(1) if first else ""
+        yield (
+            language.lower(),
+            text.count("\n", 0, block.start("code")) + 1,
+            block.group("code"),
+        )
+
+
 def fence_slips(text: str, html: str):
     """Yields (line number, line) for each line written as a fence that the
     renderer does not take as one. The blocks are the ones the `fenced_code`
@@ -122,8 +147,7 @@ def fence_slips(text: str, html: str):
     install-docker.md's PowerShell restore open over the Upgrade section,
     and fences indented under list items in dev-timer-protocol.md and
     photo-stand.md became inline code (#61 retro)."""
-    # The renderer's own clean-up before the extension runs.
-    text = text.replace("\r\n", "\n").replace("\r", "\n").expandtabs(4)
+    text = normalize(text)
     shown = [unescape(code) for code in PRE.findall(html)]
     taken = []
     for block in FencedBlockPreprocessor.FENCED_BLOCK_RE.finditer(text):

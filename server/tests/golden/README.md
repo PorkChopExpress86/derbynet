@@ -6,7 +6,7 @@ Do not edit a fixture by hand. Regenerate them all with one command.
 
 ## Regenerate
 
-You need `docker` and `bash`, and a regular git clone (not a `git worktree`, because the server image build reads the git directory). A fresh `git clone` into a scratch directory counts as a regular clone, and a full `--http-only` run takes about 10 minutes.
+You need `docker` and `bash`, and a regular git clone (not a `git worktree`, because the server image build reads the git directory). A fresh `git clone` into a scratch directory counts as a regular clone, and a full `--http-only` run takes about 10 minutes on an idle machine. #65's two full runs took 55 and 45 minutes at a load average of 20 to 25, with that agent's own property and suite runs beside the first (#65 retro), so start one with nothing else of yours running.
 
     server/tests/golden/capture.sh
 
