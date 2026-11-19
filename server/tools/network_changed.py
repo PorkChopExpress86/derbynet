@@ -144,7 +144,7 @@ def named(element: ET.Element, test: str, beside: bool) -> str:
     """One line naming a failure that is not a changed network: its test,
     its first message line, the first item of a harness teardown that is
     not one, and whether its test also failed on a changed network."""
-    first = element.get("message", "").split("\n", 1)[0][:120]
+    first = element.get("message", "").split("\n", 1)[0]
     line = f"  {element.tag} {test}: {first}"
     items = listed_items(harness_raised(element) or [])
     if items is not None:

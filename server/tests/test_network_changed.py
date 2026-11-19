@@ -405,8 +405,10 @@ PAGE_ERROR = "pageerror: Cannot read properties of undefined (reading 'modal')"
 
 def test_the_real_teardown_with_console_lines_beside_its_requests_reruns(tmp_path):
     """#366's runs 07, 11 and 15 listed a console line after each failed
-    request, and none of them reran (#366 retro): the real teardown, run by
-    pytest on run 11's page errors, now does."""
+    request, so no teardown of theirs could start a rerun (#366 retro): the
+    real teardown, run by pytest on run 11's page errors alone, now does.
+    Run 11 itself still starts none, since its call failures are no changed
+    network (test_the_refusal_names_each_failure_by_its_test)."""
     found, log = teardown_junit(tmp_path, REAL_366)
     args, reason = nc.rerun_args(found, log, [])
     assert reason == ""

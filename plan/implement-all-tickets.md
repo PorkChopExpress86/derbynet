@@ -73,7 +73,7 @@ Run `git worktree remove ../derbynet-wt-N`, `git branch -D issue-N-<slug>`, and 
 When the loop must stop inside a ticket (a reboot, a stop condition), write `~/.claude/projects/-home-specter-dev-projects-derbynet/resume-N.md` from the implementer's last report, and a memory note pointing at it. After #237's reboot, its file gave a skip count without the skips, which the second implementer guessed wrong in the PR body; listed full-suite commands without a `DERBYNET_TEST_PREFIX`; and called a load run unstarted that had begun (`server/var/load-runs/20261108-120936-2056795`). The file holds:
 
 - the worktree, the branch, the pushed head, and each commit that holds real work;
-- each local commit no remote has, as `git -C <worktree> log --oneline @{u}..` prints it: #366's merge of master (743255ea) was left unpushed across the 2026-11-18 reboot, and only its resume file's line brought it back;
+- each local commit no remote has, as `git -C <worktree> log --oneline HEAD --not --remotes` prints it (on a branch with no upstream too): #366's merge of master (743255ea) was left unpushed across the 2026-11-18 reboot, and only its resume file's line brought it back;
 - each finished step with its result, every skip named (`25 skipped: <test ids or the reason>`);
 - each step left, as the exact command to run, with its folder and its `DERBYNET_TEST_PREFIX`;
 - each folder under `server/var/load-runs/` or elsewhere that a stopped run left half-written, marked to ignore or remove;
