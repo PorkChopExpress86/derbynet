@@ -4,19 +4,25 @@ import os
 import re
 import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from playwright.sync_api import expect
 
+from ui.tests.browser import conftest
 from ui.tests.browser.conftest import (
+    BLOCKED,
     InFlight,
     _settle,
     check_harness,
     close_tab,
     font_config,
+    stop_timers,
 )
+from ui.tests.browser.helpers import pause_clock_at
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -220,6 +226,310 @@ def test_the_settle_stops_the_polls_of_a_page_on_a_fake_clock(page, event):
     page.wait_for_timeout(100)
     # One read after the wait: the point is that nothing more was sent.
     assert sent == []
+
+
+# The settle's bound on a fake-clock page (#347).
+FAKE_CLOCK_SETTLE_S = 1.0
+
+
+def test_the_settle_on_a_fake_clock_takes_under_a_second(page, event):
+    """STOP_TIMERS cleared the native id range through the fake clock's
+    `clearTimeout`, which builds an Error for each id below its own, and
+    blocked the renderer for seconds, during which a resumed fake clock ran
+    on toward kiosk.js's give-up (#347). Under the fake clock it now
+    clears only the clock's own ids. The slack is FAKE_CLOCK_SETTLE_S less
+    the settle's own time (`slack`), which the PR body measures beside a
+    should-pass mutation that makes the stop late."""
+    page.clock.install()
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    start_a_fast_poll(page)
+    started = time.monotonic()
+    assert _settle(page) == []
+    took = time.monotonic() - started
+    slack = FAKE_CLOCK_SETTLE_S - took
+    assert slack > 0, f"the settle took {took:.3f} s, over FAKE_CLOCK_SETTLE_S"
+
+
+def test_stop_timers_stops_a_poll_set_after_a_pending_animation_frame(page, event):
+    """The fake clock's `clearTimeout` throws on the id of a pending
+    `requestAnimationFrame`, so STOP_TIMERS stopped at that id and left
+    every later timer running (#347). Here the frame is requested before
+    the poll, on a paused clock, so it is still pending at the stop.
+    `stop_timers` runs alone, as `close_tab` and `stop_the_kiosk` run it:
+    the settle's request freeze would hide a timer left running."""
+    pause_clock_at(page, datetime(2026, 1, 1, 12, 0))
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    page.evaluate(
+        """() => {
+          requestAnimationFrame(() => {});
+          setInterval(() => fetch('/held-request'), 10);
+        }"""
+    )
+    stop_timers(page)
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.clock.run_for(1000)
+    page.wait_for_timeout(100)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+def test_the_settle_stops_a_timer_that_loads_images(page, event):
+    """The settle's request freeze stops fetch and XMLHttpRequest only; a
+    timer that loads an image is stopped by clearing the timers."""
+    page.route("**/held-request*", answer_the_poll)
+    page.goto("/login/")
+    with page.expect_request("**/held-request*"):
+        page.evaluate(
+            """() => {
+              let n = 0;
+              setInterval(() => { new Image().src = '/held-request?' + n++; }, 10);
+            }"""
+        )
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.wait_for_timeout(200)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+def test_the_settle_stops_a_poll_set_before_the_fake_clock(page, event):
+    """A poll set before `page.clock.install()` runs on a native timer,
+    which STOP_TIMERS leaves running under the clock. The settle's request
+    freeze stops its requests (#347 review)."""
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    start_a_fast_poll(page)
+    page.clock.install()
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.wait_for_timeout(200)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+# Polls that send their next request only once the last reply is handled,
+# each to /held-request, a frame's among them, and when each has its next
+# request ready: htmx's `every` queues a trigger that comes while its
+# request is out.
+REPLY_POLLS = {
+    "setTimeout": (
+        """() => {
+          const poll = () => fetch('/held-request').then(() => setTimeout(poll, 10));
+          poll();
+        }""",
+        "() => true",
+    ),
+    "setInterval": (
+        """() => {
+          const poll = () => fetch('/held-request').then(() => setInterval(poll, 10));
+          poll();
+        }""",
+        "() => true",
+    ),
+    "fetch-chain": (
+        """() => {
+          const poll = () => fetch('/held-request').then((r) => r.text()).then(poll);
+          poll();
+        }""",
+        "() => true",
+    ),
+    "animation-frame": (
+        """() => {
+          let out = false;
+          const loop = () => {
+            if (!out) {
+              out = true;
+              fetch('/held-request').then(() => { out = false; });
+            }
+            requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+        }""",
+        "() => true",
+    ),
+    "frame-fetch-chain": (
+        """() => {
+          const frame = document.createElement('iframe');
+          document.body.append(frame);
+          const w = frame.contentWindow;
+          const poll = () => w.fetch('/held-request').then((r) => r.text()).then(poll);
+          poll();
+        }""",
+        "() => true",
+    ),
+    "htmx-every": (
+        """() => {
+          const poll = document.createElement('div');
+          poll.id = 'poll';
+          poll.setAttribute('hx-get', '/held-request');
+          poll.setAttribute('hx-trigger', 'every 20ms');
+          poll.setAttribute('hx-swap', 'none');
+          document.body.append(poll);
+          htmx.process(poll);
+        }""",
+        # htmx's private queue on the element (htmx-2.0.4.min.js,
+        # `queuedRequests`).
+        "() => document.getElementById('poll')['htmx-internal-data']"
+        ".queuedRequests?.length > 0",
+    ),
+}
+
+
+@pytest.mark.parametrize("source", REPLY_POLLS)
+def test_a_reply_handled_after_the_stop_starts_no_request(
+    page, page_errors, event, monkeypatch, source
+):
+    """A poll whose reply lands after the stop sent its next request after
+    the drain came back empty: on a new timer (#317's results-by-racer
+    kiosk, #347), from the reply's own handler, from an animation frame,
+    and from htmx's queue, with no timer at all (#347 review). The settle
+    now also stops the page's fetch and XMLHttpRequest. Here the reply is
+    released from Python after the barrier, the settle's last stop."""
+    held = []
+    page.route("**/held-request", lambda route: held.append(route))
+    page.goto("/login/")
+    start, ready = REPLY_POLLS[source]
+    page.evaluate(start)
+    wait_until(page, lambda: held, "the poll's request")
+    page.wait_for_function(ready, timeout=InFlight.TIMEOUT_MS)
+    barrier = conftest._barrier
+
+    def barrier_then_reply(tab):
+        barrier(tab)
+        held.pop().fulfill(status=204)
+
+    sent = []
+    page.on("request", lambda r: r.url.endswith("/held-request") and sent.append(r))
+    with monkeypatch.context() as patch:
+        patch.setattr(conftest, "_barrier", barrier_then_reply)
+        assert _settle(page) == []
+    page.wait_for_timeout(500)
+    # One read after the wait: the point is that no request was tried
+    # again, blocked or not.
+    assert sent == []
+    assert page_errors.errors == []
+
+
+# What a reply handled after the stops can send by neither the page's fetch
+# nor its XMLHttpRequest, each to /held-request (#409's review of PR #424,
+# its probes; kiosk-awards.js sets an image in a reply's handler, kiosk.js
+# navigates on one): an image, a beacon, a fetch from a frame made then,
+# and a navigation to a document that polls.
+LEAKS = {
+    "image": "new Image().src = '/held-request?image';",
+    "beacon": "navigator.sendBeacon('/held-request');",
+    "new-frame": """const frame = document.createElement('iframe');
+      document.body.append(frame);
+      frame.contentWindow.fetch('/held-request');""",
+    "navigation": "location.href = '/login/?nav';",
+}
+
+
+@pytest.mark.parametrize("source", LEAKS)
+def test_the_settle_blocks_what_the_stops_leave(
+    page, page_errors, event, monkeypatch, source
+):
+    """The stubs of the page's own fetch and XMLHttpRequest leave an image,
+    a beacon, a frame made after them and a new document free to send; the
+    settle then has Chromium block every request of the page. A frame or
+    document made after the block gets the stubs too, so no fetch of its
+    fails into a handler (a `pageerror` here). The reply is held until the
+    block is on."""
+    page.route("**/held-request*", answer_the_poll)
+    first = []
+    page.route(lambda url: url.endswith("?first"), lambda route: first.append(route))
+    page.add_init_script(
+        """if (location.search === '?nav') addEventListener('DOMContentLoaded', () => {
+          fetch('/held-request');
+        });"""
+    )
+    page.goto("/login/")
+    with page.expect_request(lambda r: r.url.endswith("?first")):
+        page.evaluate(
+            """(leak) => {
+              fetch('/held-request?first').then(() => new Function(leak)());
+            }""",
+            LEAKS[source],
+        )
+    block = conftest.block_sending
+    reached = []
+
+    def block_then_reply(tab):
+        block(tab)
+        page.on(
+            "requestfinished",
+            lambda r: not r.url.endswith("?first") and reached.append(r),
+        )
+        first.pop().fulfill(status=204)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(conftest, "block_sending", block_then_reply)
+        assert _settle(page) == []
+    page.wait_for_timeout(300)
+    # One read after the wait: the point is that nothing reached a reply.
+    assert reached == []
+    assert page_errors.errors == []
+
+
+def test_a_blocked_request_before_the_settle_is_a_page_error(page, page_errors, event):
+    """The page errors drop a request the settle's block failed, and only
+    after the settle: the same failure before it still counts."""
+    page.goto("/login/")
+    session = page.context.new_cdp_session(page)
+    session.send("Network.enable")
+    session.send("Network.setBlockedURLs", {"urls": ["*held-request"]})
+    with page.expect_event("requestfailed"):
+        page.evaluate("() => { fetch('/held-request').catch(() => {}); }")
+    session.detach()
+    url = f"{page.url.rsplit('/', 2)[0]}/held-request"
+    assert page_errors.errors == [f"request failed: {url} {BLOCKED[0]}"]
+    page_errors.errors.clear()
+
+
+def test_the_block_outlasts_the_settle(page, event):
+    """The block ends with its CDP session (#409, PR #424), so the session
+    stays open after the settle returns: an image the page asks for later
+    is still blocked."""
+    page.route("**/held-request*", answer_the_poll)
+    page.goto("/login/")
+    assert _settle(page) == []
+    page.wait_for_timeout(100)
+    with page.expect_event("requestfailed") as failed:
+        page.evaluate("() => { new Image().src = '/held-request?later'; }")
+    assert failed.value.failure == BLOCKED[0]
+
+
+def test_another_failure_after_the_settle_is_a_page_error(
+    page, page_errors, event, monkeypatch
+):
+    """After the settle the page errors drop the block's failures only: a
+    request sent before the block that fails otherwise still counts."""
+    held = []
+    page.route("**/held-request", lambda route: held.append(route))
+    page.goto("/login/")
+    with page.expect_request("**/held-request"):
+        page.evaluate("() => { fetch('/held-request').catch(() => {}); }")
+    block = conftest.block_sending
+
+    def block_then_abort(tab):
+        block(tab)
+        held.pop().abort()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(conftest, "block_sending", block_then_abort)
+        assert _settle(page) == []
+    url = f"{page.url.rsplit('/', 2)[0]}/held-request"
+    wait_until(page, lambda: len(page_errors.errors) > 1, "the console error")
+    assert sorted(page_errors.errors) == [
+        "console: Failed to load resource: net::ERR_FAILED",
+        f"request failed: {url} net::ERR_FAILED",
+    ]
+    page_errors.errors.clear()
 
 
 # kiosk.css's font stack, and the name of the font Chromium draws it in.

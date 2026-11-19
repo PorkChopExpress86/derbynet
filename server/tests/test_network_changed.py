@@ -44,7 +44,7 @@ HARNESS_TRACEBACK = (
     f"E         {REQUEST_FAILED}\n"
     "E         Use -v to get more diff\n"
     "\n"
-    "ui/tests/browser/conftest.py:614: AssertionError"
+    "ui/tests/browser/conftest.py:708: AssertionError"
 )
 SUMMARY = (
     "=== short test summary info ===\n"
@@ -90,7 +90,7 @@ def every_item(*items, count=None):
         f" first extra item: {items[0]}\n"
         "E         Use -v to get more diff\n"
         "\n"
-        "ui/tests/browser/conftest.py:614: AssertionError"
+        "ui/tests/browser/conftest.py:708: AssertionError"
     )
 
 
@@ -194,7 +194,7 @@ def harness(**change):
         harness(
             text="E       AssertionError: 3 page errors, one per line:\n"
             f"E         {FIRST_ITEM}\nE         {SECOND_ITEM}\n\n"
-            "ui/tests/browser/conftest.py:614: AssertionError"
+            "ui/tests/browser/conftest.py:708: AssertionError"
         ),
         harness(text=every_item(FIRST_ITEM, count=0)),
         harness(

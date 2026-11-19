@@ -53,7 +53,7 @@ PAGE_LOAD = re.compile(
 # The harness's own teardown assert, `assert page_errors.final() == []` in
 # ui/tests/browser/conftest.py, which pytest writes as an <error> with the
 # message "failed on teardown with ...", a traceback that ends at that file,
-#   ui/tests/browser/conftest.py:614: AssertionError
+#   ui/tests/browser/conftest.py:708: AssertionError
 # and every item it lists ("request failed: {request.url}
 # {request.failure}") as a changed network. Since #373 the assert prints
 # every item, one per line, in raised lines:
