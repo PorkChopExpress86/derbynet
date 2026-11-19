@@ -605,7 +605,7 @@ def test_bound_follows_swaps_up_to_its_cap(login, event, swaps, outcome):
     "selector", ["#stand-in", "#no-such-control"], ids=["never-bound", "never-shown"]
 )
 def test_bound_names_the_control_it_timed_out_on(login, event, selector):
-    """A control htmx never binds, or one the page never shows, fails
+    """A control htmx never binds, or a control the page never shows, fails
     `bound()` with a message naming the control once Playwright's timeout
     passes, not Playwright's own (#466 review). Nothing here binds later,
     so the test shortens Playwright's timeout and the outcome does not
