@@ -7,7 +7,8 @@ changing as another project's container joins or leaves a Docker bridge
   junit.xml carries the error as a page load or a failed request does, the
   pytest arguments that rerun each failed file alone, with no xdist: the
   run's own `-m`, `-k` and `-p` options, then `-n 0` and the files the
-  summary names. Otherwise `None` and the reason.
+  summary names. Otherwise `None` and the reason: a count line, then one
+  line for each failure that is not one, by its test.
 - `outcome(status, veth, rerun_status, flake_ticket)`: the script's exit
   status and the line that says why. A clean rerun with veth lines in the
   run's window passes the run for D101's repeats only; a flake ticket's
@@ -33,6 +34,7 @@ from __future__ import annotations
 import re
 import sys
 import xml.etree.ElementTree as ET
+from typing import Literal
 
 MARKER = "net::ERR_NETWORK_CHANGED"
 
@@ -54,12 +56,20 @@ PAGE_LOAD = re.compile(
 # ui/tests/browser/conftest.py, which pytest writes as an <error> with the
 # message "failed on teardown with ...", a traceback that ends at that file,
 #   ui/tests/browser/conftest.py:708: AssertionError
-# and every item it lists ("request failed: {request.url}
-# {request.failure}") as a changed network. Since #373 the assert prints
-# every item, one per line, in raised lines:
-#   E       AssertionError: 2 page errors, one per line:
-#   E         'request failed: http://localhost:47905/a.js net::ERR_NETWORK_CHANGED'
-#   E         'request failed: http://localhost:47905/b.css net::ERR_NETWORK_CHANGED'
+# and every item it lists as a changed network: a failed request
+# ("request failed: {request.url} {request.failure}"), and the console
+# error Chromium logs for each failed resource, which names no URL. Since
+# #373 the assert prints every item, one per line, in raised lines, each
+# request beside its console line, as a load run of #366 wrote them:
+#   E       AssertionError: 4 page errors, one per line:
+#   E         'request failed: http://localhost:45757/static/ui/kiosk/derbynet-300.png
+#              net::ERR_NETWORK_CHANGED'
+#   E         'console: Failed to load resource: net::ERR_NETWORK_CHANGED'
+#   E         'request failed: http://localhost:45757/static/ui/kiosk-now-racing.js
+#              net::ERR_NETWORK_CHANGED'
+#   E         'console: Failed to load resource: net::ERR_NETWORK_CHANGED'
+# A console line counts only beside as many failed requests: one with none
+# names no request that failed.
 # Before it, pytest's diff alone named one item in full only when it was
 # the only one; "Left contains 8 more items, first extra item: ..." names
 # the first of several, and starts no rerun.
@@ -72,6 +82,7 @@ SETUP_OR_TEARDOWN = re.compile(r'^failed on (?:setup|teardown) with "')
 HARNESS_END = re.compile(r"ui/tests/browser/conftest\.py:\d+: AssertionError")
 REQUEST_FAILED = re.compile(r"'request failed: https?://\S+ " + MARKER + "'")
 EVERY_ITEM = re.compile(r"AssertionError: (\d+) page errors, one per line:")
+CONSOLE_FAILED = re.compile("'console: Failed to load resource: " + MARKER + "'")
 ONE_ITEM = re.compile("Left contains one more item: " + REQUEST_FAILED.pattern)
 
 # A failed test or error in the -rfE summary, by the file pytest names.
@@ -82,26 +93,97 @@ SUMMARY_FILE = re.compile(r"^(?:FAILED|ERROR) ([^: ]*\.py)", re.M)
 CARRIED = ("-m", "-k", "-p")
 
 
-def changed_network(element: ET.Element) -> bool:
-    """Whether a junit <failure> or <error> is a raised Playwright error
-    naming a changed network, or the harness's teardown <error> naming a
-    changed network as every request that failed."""
-    message = element.get("message", "")
-    if PAGE_LOAD.match(SETUP_OR_TEARDOWN.sub("", message, count=1)):
-        return True
-    if element.tag != "error" or not message.startswith(TEARDOWN):
-        return False
+def harness_raised(element: ET.Element) -> list[str] | None:
+    """The raised lines of the harness's teardown <error>, or None for any
+    other element."""
+    if element.tag != "error" or not element.get("message", "").startswith(TEARDOWN):
+        return None
     lines = [line for line in (element.text or "").splitlines() if line.strip()]
     if not lines or not HARNESS_END.fullmatch(lines[-1]):
-        return False
-    raised = [line[2:].strip() for line in lines if line.startswith("E ")]
+        return None
+    return [line[2:].strip() for line in lines if line.startswith("E ")]
+
+
+def listed_items(raised: list[str]) -> list[str] | None:
+    """The items the harness's assert lists one per line, or None when it
+    lists none or fewer than it counts."""
     for n, line in enumerate(raised):
         if header := EVERY_ITEM.fullmatch(line):
             items = raised[n + 1 : n + 1 + int(header[1])]
-            return len(items) == int(header[1]) > 0 and all(
-                REQUEST_FAILED.fullmatch(item) for item in items
-            )
+            return items if len(items) == int(header[1]) > 0 else None
+    return None
+
+
+def item_kind(item: str) -> Literal["request", "console", "other"]:
+    """How the harness's teardown item reads: a failed request, Chromium's
+    console line for a failed resource, or anything else."""
+    if REQUEST_FAILED.fullmatch(item):
+        return "request"
+    if CONSOLE_FAILED.fullmatch(item):
+        return "console"
+    return "other"
+
+
+def items_are_changed_network(items: list[str]) -> bool:
+    """Whether every item is a failed request or Chromium's console line
+    for one, with no more console lines than requests, so at least one
+    request: `listed_items` gives no empty list."""
+    kinds = [item_kind(item) for item in items]
+    return "other" not in kinds and kinds.count("request") >= kinds.count("console")
+
+
+def changed_network(element: ET.Element) -> bool:
+    """Whether a junit <failure> or <error> is a raised Playwright error
+    naming a changed network, or the harness's teardown <error> whose
+    every item is a changed network."""
+    message = element.get("message", "")
+    if PAGE_LOAD.match(SETUP_OR_TEARDOWN.sub("", message, count=1)):
+        return True
+    raised = harness_raised(element)
+    if raised is None:
+        return False
+    if any(EVERY_ITEM.fullmatch(line) for line in raised):
+        items = listed_items(raised)
+        return items is not None and items_are_changed_network(items)
     return any(ONE_ITEM.fullmatch(line) for line in raised)
+
+
+def failure_line(element: ET.Element, test: str | None, changed_tests: set[str]) -> str:
+    """One line naming a failure that is not a changed network: its test
+    (None when no <testcase> holds it), its first message line, the first
+    item of a harness teardown that is not one, and whether its test is in
+    `changed_tests`, those that also failed on a changed network."""
+    first = element.get("message", "").split("\n", 1)[0]
+    line = f"  {element.tag} {test or '(no test)'}: {first}"
+    items = listed_items(harness_raised(element) or [])
+    if items is not None:
+        other = next((item for item in items if item_kind(item) == "other"), None)
+        line += "; first item not a changed network: " + (
+            other or "none, but more console lines than failed requests"
+        )
+    if test in changed_tests:
+        line += "; its test also failed on a changed network"
+    return line
+
+
+def refusal(
+    failures: list[ET.Element], changed: set[ET.Element], test_of: dict[ET.Element, str]
+) -> str:
+    """The reason for no rerun: how many of `failures` are not a changed
+    network, then a line for each, by its test."""
+    others = [element for element in failures if element not in changed]
+    changed_tests = {test_of[element] for element in changed if element in test_of}
+    return "\n".join(
+        [
+            f"{len(others)} of {len(failures)} failures and errors are not a"
+            f" changed network (a Playwright {MARKER}, or the browser harness's"
+            " teardown naming one): no rerun, and the status stays pytest's.",
+            *(
+                failure_line(element, test_of.get(element), changed_tests)
+                for element in others
+            ),
+        ]
+    )
 
 
 def carried_options(args: list[str]) -> list[str]:
@@ -127,7 +209,8 @@ def rerun_args(
 ) -> tuple[list[str] | None, str]:
     """(the rerun's pytest arguments, "") when every failure and error in
     `junit` carries the error and the summary in `log` names a file, else
-    (None, the reason)."""
+    (None, the reason: several lines when a failure is not a changed
+    network, see `refusal`)."""
     if junit is None:
         return None, "no junit.xml to read: no rerun."
     try:
@@ -137,13 +220,16 @@ def rerun_args(
     failures = [*root.iter("failure"), *root.iter("error")]
     if not failures:
         return None, NO_FILE
-    others = sum(1 for element in failures if not changed_network(element))
-    if others:
-        return None, (
-            f"{others} of {len(failures)} failures and errors are not a"
-            f" changed network (a Playwright {MARKER}, or the browser harness's"
-            " teardown naming one): no rerun, and the status stays pytest's."
-        )
+    # pytest writes a teardown's <error> in a <testcase> of its own, beside
+    # the call's, under the same name.
+    test_of = {
+        child: f"{case.get('classname')}::{case.get('name')}"
+        for case in root.iter("testcase")
+        for child in case
+    }
+    changed = {element for element in failures if changed_network(element)}
+    if len(changed) < len(failures):
+        return None, refusal(failures, changed, test_of)
     summary = log.split("short test summary info", 1)
     files = sorted(set(SUMMARY_FILE.findall(summary[1]))) if len(summary) > 1 else []
     if not files:
