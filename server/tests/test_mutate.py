@@ -652,8 +652,8 @@ def test_listed_names_an_error_with_pytests_last_lines_and_exits_2(project):
 def test_listed_refuses_a_mutant_that_does_not_parse_and_names_its_line(project):
     """#417 retro's listing offered `key=lambda node: node.lineno` for a
     `max()`, which made `return key=...`: its tests failed at collection,
-    and the row read ERROR (pytest exit status 4) with no line named
-    (#449). The listing no longer offers it, so a stand-in listing does."""
+    and the row read ERROR with no line named (#449). The listing no
+    longer offers it, so a stand-in listing does."""
     module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
     commit(project, module)
     patch = (
