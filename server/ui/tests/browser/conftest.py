@@ -634,15 +634,16 @@ def block_sending(page):
     page or a tab `close_tab` closes, for the rest of its life: what
     STOP_SENDING leaves, an image by any route, a stylesheet, a script,
     and a frame's own document or a step back in history, whose request
-    only the Fetch block stops (`test_the_settle_blocks_what_the_stops_leave`,
-    `test_close_tab_closes_a_tab_that_keeps_sending`). The block ends with
-    its CDP session (#409, PR #424), so the session stays open on the page
-    and closes with it. A blocked request fails at once, so every new
-    document and frame gets STOP_SENDING first: a fetch of theirs never
-    fails into a handler that would send again. A page that loads an
-    image, a stylesheet or a script again on its error would spin, the
-    block failing each load at once; no script under `ui/static/ui/` does
-    (app.js's `loadScript` rejects on a script's error)."""
+    only the Fetch block stops (`test_the_settle_blocks_what_the_stops_leave`;
+    the images in `test_close_tab_closes_a_tab_that_keeps_sending`). The
+    block ends with its CDP session (#409, PR #424), so the session stays
+    open on the page and closes with it. A blocked request fails at once,
+    so every new document and frame gets STOP_SENDING first: a fetch of
+    theirs never fails into a handler that would send again. A page that
+    loads an image, a stylesheet or a script again on its error would
+    spin, the block failing each load at once; no script under
+    `ui/static/ui/` does (app.js's `loadScript` rejects on a script's
+    error)."""
     page.add_init_script(f"({STOP_SENDING})(null)")
     blocker = page.context.new_cdp_session(page)
     blocker.send("Network.enable")

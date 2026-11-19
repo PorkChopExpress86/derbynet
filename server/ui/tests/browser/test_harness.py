@@ -398,10 +398,11 @@ def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch
 
 @pytest.mark.parametrize("freeze", [False, True])
 def test_a_cdp_block_ends_with_its_session(page, event, freeze):
-    """Why `close_tab` stops the sends in the page itself (#409): a tab
-    that keeps sending, under Chromium's block of every request through a
-    CDP session, sends to the server again once that session detaches, and
-    so it does with the page frozen through the session first."""
+    """Why `close_tab` keeps its block's CDP session open until the tab
+    closes (#409): a tab that keeps sending, under Chromium's block of
+    every request through a CDP session, sends to the server again once
+    that session detaches, and so it does with the page frozen through the
+    session first."""
     page.goto("/login/")
     tab = page.context.new_page()
     tab.goto("/login/")
