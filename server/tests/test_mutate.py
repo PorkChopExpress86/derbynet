@@ -379,6 +379,7 @@ def test_a_python_mutant_that_does_not_parse_is_refused(project):
     run = mutate(project, "a < b", "a < b)", "test_mod.py::test_runs_lazily")
     assert run.returncode == 2, run.stdout + run.stderr
     assert "the mutant does not parse as Python (line 2" in run.stderr
+    assert "build --old and --new from a file or a heredoc" in run.stderr
     assert "passed" not in run.stdout and "failed" not in run.stdout, "no test runs"
     assert (project / "mod.py").read_text() == MODULE
 
@@ -672,6 +673,7 @@ def test_listed_refuses_a_mutant_that_does_not_parse_and_names_its_line(project)
         "REFUSED   mod.py:10  min  min(a, b)  ->  key=lambda node: node.lineno"
         "  (the mutant does not parse as Python (line 10: "
     ), out
+    assert "heredoc" not in row, "a listed mutant's text comes from no shell"
     assert "1 listed: 0 KILLED, 0 SURVIVED, 1 REFUSED, 0 ERROR" in out
     assert len(out.splitlines()) == 3, f"no pytest output: {out}"
     assert (project / "mod.py").read_text() == module
