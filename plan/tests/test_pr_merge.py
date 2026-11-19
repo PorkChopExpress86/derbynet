@@ -197,6 +197,22 @@ class PrMerge(unittest.TestCase):
         left = list(self.cache.glob('derbynet-pr-merge.*')) if self.cache.exists() else []
         self.assertEqual(left, [])
 
+    def test_a_wait_that_is_no_whole_number_is_refused_before_the_merge(self):
+        """CLOSE_WAIT=1s made the `-ge` that ends the wait for the closed
+        issues fail, which reads as false, so it waited for ever (#417 retro)."""
+        head = self.pr('server/ui/kiosk.css')
+        for name in ('CLOSE_WAIT', 'KILL_WAIT'):
+            for value in ('1s', '-1', '08'):
+                with self.subTest(name=name, value=value):
+                    self.env[name] = value
+                    done = self.merge(head)
+                    self.env.update(CLOSE_WAIT='0', KILL_WAIT='3')
+                    self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                    self.assertEqual(done.stderr, f"pr-merge: {name} takes a whole number"
+                                                  f" of seconds, not '{value}'\n")
+                    self.assertEqual(self.merged(), '')
+                    self.assertEqual(self.ran(), '')
+
     def passed(self):
         path = self.work / '.git' / 'pr-merge-source-checks'
         return path.read_text() if path.exists() else ''
