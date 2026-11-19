@@ -1887,6 +1887,7 @@ def test_another_failure_beside_a_network_change_starts_no_rerun(tmp_path):
         "1 of 2 failures and errors are not a changed network"
         " (a Playwright net::ERR_NETWORK_CHANGED, or the browser harness's"
         " teardown naming one): no rerun, and the status stays pytest's.\n"
+        "  failure test_other::test_other: assert False\n"
     ) in out
     assert not (tmp_path / "run" / "rerun.log").exists()
     assert "Rerunning" not in out
