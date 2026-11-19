@@ -16,6 +16,7 @@ const puppeteer = require('puppeteer');
 const [base, file, codepage, fieldList, sheet = '0'] = process.argv.slice(2);
 const fields = fieldList.split(',');
 const TIMEOUT = 120000;
+const LAUNCH_TRIES = 3;
 
 // A real drag, so jQuery UI's draggable and droppable run as they do for a user.
 // Both boxes are measured just before the drag; the page shows the file's
@@ -33,8 +34,22 @@ async function drag(page, from, to) {
   await page.mouse.up();
 }
 
+// Chrome 148 now and then dies as it starts, with signal 11 in glibc's getenv
+// (#442).  A launch that dies that way is tried again, and each one prints a
+// line starting "launch failed", which record_import_page copies to the job log.
+async function launch() {
+  for (let tries = 1; ; ++tries) {
+    try {
+      return await puppeteer.launch();
+    } catch (e) {
+      if (tries === LAUNCH_TRIES || !e.message.includes('Received signal 11')) throw e;
+      console.error(`launch failed, try ${tries} of ${LAUNCH_TRIES}: ${e.message}`);
+    }
+  }
+}
+
 (async () => {
-  const browser = await puppeteer.launch();
+  const browser = await launch();
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(TIMEOUT);

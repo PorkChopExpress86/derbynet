@@ -382,6 +382,7 @@ record_import_page() {
     tail -n 30 "$RAW/.script.log" >&2
     return 1
   fi
+  grep -A 40 '^launch failed' "$RAW/.script.log" >&2 || true
 }
 
 # run_script <script> [args...]: a script from testing/, not recorded.
