@@ -105,16 +105,14 @@ def unexplained(name: str, text: str) -> list[tuple[int, str]]:
 
 
 def _unquoted(line: str) -> str:
-    """The line with each single-quoted string emptied: bash expands
-    nothing in one, so `jq '((.a))'` reads no number.  A `'` inside double
-    quotes, or after a backslash, opens none."""
+    """The line with each single-quoted string's text and closing quote
+    taken out: bash expands nothing in one, so `jq '((.a))'` reads no
+    number.  A `'` inside double quotes, or after a backslash, opens none."""
     out, single, double, i = [], False, False, 0
     while i < len(line):
         c = line[i]
         if single:
             single = c != "'"
-            if not single:
-                out.append(c)
         elif c == "\\":
             out.append(line[i : i + 2])
             i += 1
@@ -218,7 +216,7 @@ def _word_after(code: str, start: int) -> str:
     i, double = start, False
     while i < len(code):
         c = code[i]
-        if not double and code.startswith("$(", i):
+        if code.startswith("$(", i):
             i = _closing(code, i + 1, "(", ")")
             continue
         if not double and (c.isspace() or c in ";&|)"):
@@ -230,18 +228,16 @@ def _word_after(code: str, start: int) -> str:
 
 def assignments(text: str) -> dict[str, list[str]]:
     """Each name's assigned values in the file; `None` stands for a value no
-    word shows (`read`, a `for` over words, `+=`)."""
+    word shows (`read`, a `for` over words).  `n+=x` and `n[2]=x` count as
+    the word they assign."""
     found: dict[str, list] = {}
     for _, code in lines_of(text):
         for m in re.finditer(
-            rf"(?:^|[\s;&|({{]|\blocal\s|\bexport\s|\breadonly\s)({NAME})(\[[^]]*\])?(\+?)=",
+            rf"(?:^|[\s;&|({{]|\blocal\s|\bexport\s|\breadonly\s)({NAME})(?:\[[^]]*\])?\+?=",
             code,
         ):
             before = code[: m.start(1)].rstrip()
             if before.endswith(("let", "((")):
-                continue
-            if m.group(3) or m.group(2):
-                found.setdefault(m.group(1), []).append(None)
                 continue
             found.setdefault(m.group(1), []).append(_word_after(code, m.end()))
         for m in re.finditer(rf"\bfor\s+({NAME})\s+in\s+(.*?)(?:;|$)", code):

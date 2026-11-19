@@ -317,7 +317,8 @@ def _function_at(path: Path, line: int) -> str | None:
         and node.lineno <= line <= node.end_lineno
     ]
     # Each function that holds the line starts inside the one before it.
-    return max(holders, key=lambda node: node.lineno).name if holders else None
+    holders.sort(key=lambda node: node.lineno)
+    return holders[-1].name if holders else None
 
 
 def _listing():
