@@ -612,7 +612,8 @@ class TicketLink(IssueStandIn, unittest.TestCase):
         ~~~ fence, an indented block, a fence with no end, <pre> and <code>,
         a quoted fence); the PR body pastes the runs."""
         for lines in ('<!-- Part of #61 -->', 'a <!-- Part of #61 --> b',
-                      '<!--\nPart of #61\n-->', '<!--\nCloses #61', 'a <!-- Part of #61\ny --> b',
+                      '<!--\nPart of #61\n-->', '<!--\nxxPart of #61\nxx\n-->', '<!--\nCloses #61',
+                      'a <!-- Part of #61\ny --> b', '<pre>\nxxCloses #61\n</pre>',
                       '~~~\nPart of #61\n~~~', '~~~~\nCloses #61\n~~~~', '~~~\nCloses #61',
                       '```\nPart of #61', '    Part of #61', '\tCloses #61',
                       '- item\n\n      Part of #61',
@@ -650,7 +651,7 @@ class TicketLink(IssueStandIn, unittest.TestCase):
         """The default view keeps what GitHub might act on: only a closed
         backtick fence and a code span are quoted."""
         for lines in ('<!-- Closes #59 -->', '~~~\nCloses #59\n~~~', '    Closes #59',
-                      '```\nCloses #59'):
+                      '```\nCloses #59', '> ```\n> Closes #59\n> ```'):
             with self.subTest(lines=lines):
                 self.assertEqual(len(TOOL.foreign_closes(lines + '\n', {'61'})), 1)
 
