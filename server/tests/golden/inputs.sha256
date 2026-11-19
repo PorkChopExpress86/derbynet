@@ -1,5 +1,5 @@
 2d395fbb421cf2dd7764545c849526f170b1a9804bf8f4e75da19f4306764da7  server/tests/golden/capture/capture-http.sh
-093e205fa2d90e7a1826dfd8bf394a2c1f26a62395ec0bde4fa16ece2b20ae41  server/tests/golden/capture/import-page.cjs
+c8e73118482c98829474f6e2c9cade402ee5dc109dde0595cc0a17d31c0c5c0e  server/tests/golden/capture/import-page.cjs
 2e361ad008d5122d8d58e731f9ada17d38188634778278036d2788953e78a4b6  server/tests/golden/capture/normalize.mjs
 dd840e3915aa115c67b0bafda5e0be6ceee1ed61d537e830006467c184f66d9f  server/tests/golden/capture/recorder.mjs
 fef3a20b72ee7b9ebd579b498564b767386d5b8ed99e9b71da43827c2f458961  server/tests/golden/capture/scenarios/00-setup.sh
