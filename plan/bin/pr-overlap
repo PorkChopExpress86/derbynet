@@ -20,6 +20,12 @@ it anyway. It fetches origin/master and each PR's head (refs/pull/<n>/head).
 Exits 0 when no other open PR changes a file this one changes, 1 when one
 does, 2 when gh or git fails or the PR is not open.
 
+Limits of `gh pr list --json files`, which lists at most the first 100 files
+of a PR (#76 has 337 changed files and 100 listed) and only a renamed file's
+new path (#182 renamed sheets/closed.html and lists sheet_closed.html alone):
+an overlap on a file past the 100th, or on a renamed file's old path, is not
+named.
+
 Usage: plan/bin/pr-overlap <pr>
 """
 import json
@@ -29,6 +35,15 @@ import sys
 
 GH = os.environ.get('GH', 'gh')
 REPO = os.environ.get('REPO', 'PorkChopExpress86/derbynet')
+# Every git call drops the GIT_* vars: under a hook's GIT_DIR git would read
+# the hook's repository, not the one the tool runs in (memory git-dir-in-hooks).
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+# The merge commits no ref names need an author, which a fresh clone lacks
+# (pr-merge's commit-tree sets the same).
+COMMIT_ENV = {**GIT_ENV, 'GIT_AUTHOR_NAME': 'pr-overlap',
+              'GIT_AUTHOR_EMAIL': 'pr-overlap@localhost',
+              'GIT_COMMITTER_NAME': 'pr-overlap',
+              'GIT_COMMITTER_EMAIL': 'pr-overlap@localhost'}
 
 
 def fail(why):
@@ -52,7 +67,7 @@ def merge(ours, theirs):
     run = subprocess.run(
         ['git', 'merge-tree', '--write-tree', '--name-only', '--no-messages',
          ours, theirs],
-        capture_output=True, text=True)
+        capture_output=True, text=True, env=GIT_ENV)
     # It prints the tree, then each path it can't merge. git 2.53 exits 1 on
     # a conflict and on an error alike ("not something we can merge", for a
     # blob), and only a merge prints a tree.
@@ -62,8 +77,8 @@ def merge(ours, theirs):
     return lines[0], set(lines[1:])
 
 
-def git(*args):
-    run = subprocess.run(['git', *args], capture_output=True, text=True)
+def git(*args, env=GIT_ENV):
+    run = subprocess.run(['git', *args], capture_output=True, text=True, env=env)
     if run.returncode:
         fail(f'git {" ".join(args)}: {run.stderr.strip()}')
     return run.stdout.strip()
@@ -75,7 +90,8 @@ def on_master(master, head):
     tree, clash = merge(master, head)
     if clash:
         return None
-    return git('commit-tree', tree, '-p', master, '-p', head, '-m', 'pr-overlap')
+    return git('commit-tree', '--no-gpg-sign', tree, '-p', master, '-p', head,
+               '-m', 'pr-overlap', env=COMMIT_ENV)
 
 
 def main(argv):
@@ -107,7 +123,11 @@ def main(argv):
         theirs = on_master(master, pr['headRefOid'])
         clash = set()
         if ours is None or theirs is None:
-            verdict = 'not merged, since a head conflicts with origin/master'
+            heads = ((number, ours), (pr['number'], theirs))
+            clashing = [f'#{n}' for n, merged in heads if merged is None]
+            verb = 'conflict' if len(clashing) == 2 else 'conflicts'
+            verdict = (f'not merged, since {" and ".join(clashing)} {verb}'
+                       ' with origin/master')
         elif clash := merge(ours, theirs)[1]:
             verdict = f'git cannot merge the two ({len(clash)} conflicts)'
         else:

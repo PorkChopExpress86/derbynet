@@ -52,6 +52,13 @@ class PrOverlap(unittest.TestCase):
         self.git(self.clone, 'push', '-q', 'origin', 'master')
         self.base = self.git(self.clone, 'rev-parse', 'HEAD')
         self.prs = {}
+        # The tool's env: no GIT_* var and no git identity, as in a fresh
+        # clone. useConfigOnly stops git guessing one from the host name.
+        home = self.tmp / 'home'
+        home.mkdir()
+        (home / '.gitconfig').write_text('[user]\n\tuseConfigOnly = true\n')
+        self.tool_env = {k: v for k, v in self.env.items() if not k.startswith('GIT_')}
+        self.tool_env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / 'xdg'))
 
     def git(self, cwd, *args):
         return subprocess.run(['git', *args], cwd=cwd, env=self.env, check=True,
@@ -81,13 +88,13 @@ class PrOverlap(unittest.TestCase):
         self.git(self.clone, 'commit', '-qam', 'master moves')
         self.git(self.clone, 'push', '-q', 'origin', 'HEAD:master')
 
-    def overlap(self, number, fail=False):
+    def overlap(self, number, fail=False, **env):
         gh = self.tmp / 'gh'
         gh.write_text(FAKE_GH.format(python=sys.executable, fail=fail,
                                      prs=json.dumps(list(self.prs.values()))))
         gh.chmod(0o755)
         return subprocess.run([sys.executable, '-I', str(PR_OVERLAP), str(number)],
-                              cwd=self.clone, env={**self.env, 'GH': str(gh)},
+                              cwd=self.clone, env={**self.tool_env, 'GH': str(gh), **env},
                               capture_output=True, text=True, timeout=60)
 
     def test_two_prs_editing_one_line_conflict(self):
@@ -130,7 +137,9 @@ class PrOverlap(unittest.TestCase):
         self.pr(424, {'e.txt': (1, 'e 424')})
         run = self.overlap(424)
         self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
-        self.assertIn('not merged, since a head conflicts with origin/master', run.stdout)
+        self.assertEqual(run.stdout.splitlines()[0].partition(': ')[2],
+                         "changes 1 of #424's files; not merged,"
+                         ' since #393 conflicts with origin/master')
         self.assertNotIn('conflict  ', run.stdout)
         self.assertNotIn('b.txt', run.stdout)
 
@@ -144,9 +153,56 @@ class PrOverlap(unittest.TestCase):
         self.assertEqual(run.stdout.splitlines(), [
             '#5 conflicts with origin/master; update it, then rerun',
             f"#6 issue-6 {head}: changes 1 of #5's files;"
-            ' not merged, since a head conflicts with origin/master',
+            ' not merged, since #5 conflicts with origin/master',
             '  both      a.txt',
         ])
+
+    def test_both_heads_that_conflict_with_master_are_named(self):
+        self.pr(5, {'b.txt': (1, 'b 5'), 'a.txt': (1, 'a 5')})
+        self.pr(6, {'b.txt': (1, 'b 6'), 'a.txt': (5, 'a 6')})
+        self.master_moves({'b.txt': (1, 'b master')})
+        run = self.overlap(5)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn('; not merged, since #5 and #6 conflict with origin/master',
+                      run.stdout.splitlines()[1])
+
+    def test_git_vars_in_the_environment_are_dropped(self):
+        """Under a hook, GIT_DIR names the hook's repository; the tool works
+        in the repository it runs in."""
+        self.pr(1, {'a.txt': (1, 'one')})
+        self.pr(2, {'a.txt': (5, 'two')})
+        run = self.overlap(2, GIT_DIR=str(self.tmp / 'nonexistent'),
+                           GIT_WORK_TREE=str(self.tmp / 'nonexistent'))
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertTrue(run.stdout.splitlines()[0].endswith('; git merges the two'),
+                        run.stdout)
+
+    def test_the_rest_of_the_environment_is_kept(self):
+        """Only GIT_* goes: git still reads the HOME config, here an
+        insteadOf that gives the clone's remote its address."""
+        self.pr(1, {'a.txt': (1, 'one')})
+        self.pr(2, {'a.txt': (5, 'two')})
+        self.git(self.clone, 'remote', 'set-url', 'origin', 'alias:origin')
+        with (Path(self.tool_env['HOME']) / '.gitconfig').open('a') as config:
+            config.write(f'[url "{self.origin}"]\n\tinsteadOf = alias:origin\n')
+        run = self.overlap(2)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertTrue(run.stdout.splitlines()[0].endswith('; git merges the two'),
+                        run.stdout)
+
+    def test_a_clone_with_no_git_identity_merges_the_heads(self):
+        """The merge commits need an author, which a fresh clone has not
+        set."""
+        self.pr(1, {'a.txt': (1, 'one')})
+        self.pr(2, {'a.txt': (5, 'two')})
+        probe = subprocess.run(['git', 'commit-tree', '-m', 'x', 'HEAD^{tree}'],
+                               cwd=self.clone, env=self.tool_env, capture_output=True,
+                               text=True)
+        self.assertNotEqual(probe.returncode, 0, 'the env must lack an identity')
+        run = self.overlap(2)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertTrue(run.stdout.splitlines()[0].endswith('; git merges the two'),
+                        run.stdout)
 
     def test_a_head_merged_cleanly_with_master_still_conflicts_with_the_other(self):
         """A PR behind master that merges with it cleanly is compared, not
