@@ -50,10 +50,10 @@ MARKER = "net::ERR_NETWORK_CHANGED"
 PAGE_LOAD = re.compile(
     r"playwright\._impl\._errors\.\w+: \w+\.\w+: " + MARKER + r" at https?://"
 )
-# The harness's own teardown assert, `assert page_errors.final() == []` in
-# ui/tests/browser/conftest.py, which pytest writes as an <error> with the
-# message "failed on teardown with ...", a traceback that ends at that file,
-#   ui/tests/browser/conftest.py:734: AssertionError
+# The harness's own teardown assert, the `page` fixture's
+# `assert errors == []` in ui/tests/browser/conftest.py, which pytest writes
+# as an <error> with the message "failed on teardown with ...", a traceback
+# whose last line names that file and the assert's line (`HARNESS_END`),
 # and every item it lists ("request failed: {request.url}
 # {request.failure}") as a changed network. Since #373 the assert prints
 # every item, one per line, in raised lines:

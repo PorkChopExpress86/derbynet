@@ -32,6 +32,8 @@ TEARDOWN = (
     " ['request fai...WORK_CHANGED']"
     " == []&#10;  &#10;  " + REQUEST_FAILED.replace("'", "&apos;") + "&quot;"
 )
+# The traceback's last line at the `page` fixture's teardown assert.
+TEARDOWN_END = "ui/tests/browser/conftest.py:744: AssertionError"
 HARNESS_TRACEBACK = (
     "        yield page\n"
     "        try:\n"
@@ -43,8 +45,7 @@ HARNESS_TRACEBACK = (
     "E         \n"
     f"E         {REQUEST_FAILED}\n"
     "E         Use -v to get more diff\n"
-    "\n"
-    "ui/tests/browser/conftest.py:734: AssertionError"
+    "\n" + TEARDOWN_END
 )
 SUMMARY = (
     "=== short test summary info ===\n"
@@ -89,8 +90,7 @@ def every_item(*items, count=None):
         f"E         Left contains {len(items)} more items,"
         f" first extra item: {items[0]}\n"
         "E         Use -v to get more diff\n"
-        "\n"
-        "ui/tests/browser/conftest.py:734: AssertionError"
+        "\n" + TEARDOWN_END
     )
 
 
@@ -193,8 +193,7 @@ def harness(**change):
         harness(text=every_item(FIRST_ITEM, SECOND_ITEM, count=3)),
         harness(
             text="E       AssertionError: 3 page errors, one per line:\n"
-            f"E         {FIRST_ITEM}\nE         {SECOND_ITEM}\n\n"
-            "ui/tests/browser/conftest.py:734: AssertionError"
+            f"E         {FIRST_ITEM}\nE         {SECOND_ITEM}\n\n" + TEARDOWN_END
         ),
         harness(text=every_item(FIRST_ITEM, count=0)),
         harness(

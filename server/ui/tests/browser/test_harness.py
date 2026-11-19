@@ -20,6 +20,7 @@ from ui.tests.browser.conftest import (
     check_harness,
     close_tab,
     font_config,
+    stop_sending,
     stop_timers,
 )
 from ui.tests.browser.helpers import pause_clock_at
@@ -125,9 +126,50 @@ def test_close_tab_waits_for_the_request_out(page, event):
     assert page.in_flight.closed_with == []
 
 
+# A MessageChannel loop, which no stop of timers ends, that calls SEND with
+# a count once every PERIOD ms.
+TICKER = """() => {
+  let n = 0;
+  let next = 0;
+  const send = SEND;
+  const tick = () => {
+    if (performance.now() >= next) {
+      next = performance.now() + PERIOD;
+      send(n++);
+    }
+    const channel = new MessageChannel();
+    channel.port1.onmessage = tick;
+    channel.port2.postMessage(null);
+  };
+  tick();
+}"""
+
+
+# The server holds each request, so that a tab that keeps sending, a
+# beacon's included, always has one out, and the reply to the one out at
+# the stop lands after `close_tab` has stopped the tab.
+HOLD_S = 0.1
+# A ticker sends several times while the server holds one, so with
+# nothing to stop it the tab has one out unless the ticker stalls for a
+# whole hold. Stopped, it sends nothing; blocked, each send fails at once,
+# and `close_tab`'s wait finds none out at a check between sends.
+SEND_PERIOD_MS = HOLD_S * 1000 / 5
+
+
+def on_a_ticker(send: str, period_ms: float) -> str:
+    assert period_ms < HOLD_S * 1000, "the ticker must send within a hold"
+    return TICKER.replace("SEND", send).replace("PERIOD", str(period_ms))
+
+
 # Each sends `/login/?again` and, once it ends, sends it again: by fetch,
 # by XMLHttpRequest, by fetch from an iframe of the tab (`keep_sending`), by
-# an image, and by fetch from a new iframe each time.
+# an image, and by fetch from a new iframe each time. The rest send on a
+# ticker: a beacon, which has no reply to wait on, and an image at a new
+# `/login/?again&N`, by `setAttribute` as kiosk-now-racing.js's `photo()`
+# sets one, and in markup put in `innerHTML` as kiosk-check-in.js puts a
+# reply's. Each image is a new element, kept in the page, so each load
+# runs to the server's reply: a new `src` on the same element aborted the
+# load before it, which the server still held at the close.
 KEEPS_SENDING = {
     "fetch": "() => { const go = () => fetch('/login/?again').finally(go); go(); }",
     "xhr": """() => {
@@ -147,18 +189,23 @@ KEEPS_SENDING = {
       };
       go();
     }""",
-    # sendBeacon has no reply to wait on: the tab sends beacons from a
-    # MessageChannel loop, which no stop of timers ends.
-    "beacon": """() => {
-      let n = 0;
-      const tick = () => {
-        if (n++ % 200 == 0) navigator.sendBeacon('/login/?again');
-        const channel = new MessageChannel();
-        channel.port1.onmessage = tick;
-        channel.port2.postMessage(null);
-      };
-      tick();
-    }""",
+    "beacon": on_a_ticker(
+        "() => navigator.sendBeacon('/login/?again')", SEND_PERIOD_MS
+    ),
+    "set-attribute": on_a_ticker(
+        """(n) => {
+          const img = document.body.appendChild(document.createElement('img'));
+          img.setAttribute('src', '/login/?again&' + n);
+        }""",
+        SEND_PERIOD_MS,
+    ),
+    "inner-html": on_a_ticker(
+        """(n) => {
+          const root = document.body.appendChild(document.createElement('div'));
+          root.innerHTML = `<img alt="" src="/login/?again&${n}">`;
+        }""",
+        SEND_PERIOD_MS,
+    ),
     "new-frame": """() => {
       const go = () => {
         const frame = document.createElement('iframe');
@@ -181,7 +228,7 @@ def keep_sending(tab, how):
             tab.evaluate("() => document.body.append(document.createElement('iframe'))")
         frame = attached.value
     with tab.expect_event(
-        "requestfinished", lambda r: r.url.endswith("/login/?again")
+        "requestfinished", lambda r: "/login/?again" in r.url
     ) as finished:
         frame.evaluate(KEEPS_SENDING["fetch" if how == "iframe" else how])
     return finished.value
@@ -202,20 +249,24 @@ def close_tab_in_time(page, tab):
     assert time.monotonic() - started < SLOWEST_CLOSE_S + CLOSE_SLACK_S
 
 
-# The server holds each request, so that a tab that keeps sending, a
-# beacon's included, always has one out, and the reply to the one out at
-# the stop lands after `close_tab` has stopped the tab.
-HOLD_S = 0.1
-
-
 @pytest.mark.parametrize(
-    "how", ["fetch", "xhr", "iframe", "image", "beacon", "new-frame"]
+    "how",
+    [
+        "fetch",
+        "xhr",
+        "iframe",
+        "image",
+        "beacon",
+        "new-frame",
+        "set-attribute",
+        "inner-html",
+    ],
 )
 def test_close_tab_closes_a_tab_that_keeps_sending(page, event, how):
     """A reply's handler can send again on no timer, so a tab that does so
     always has a request out, and waiting until it has none never ends.
-    `close_tab` makes every send of the tab's frames, of frames made after
-    too, do nothing once it has stopped the timers, waits for the server's
+    `close_tab` stops or blocks every send of the tab's frames, of frames
+    made after too, once it has stopped the timers, waits for the server's
     reply to the ones sent before, and names none of them (#409). When it
     returns, the server has no request of the tab in hand, and none arrives
     after."""
@@ -223,15 +274,28 @@ def test_close_tab_closes_a_tab_that_keeps_sending(page, event, how):
     tab = page.context.new_page()
     tab.goto("/login/")
     with at_the_server(
-        lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
+        lambda environ: environ["QUERY_STRING"].startswith("again"), hold=HOLD_S
     ) as server:
         sent_from = keep_sending(tab, how).frame
+        assert server.started
         assert sent_from.parent_frame == (
             tab.main_frame if how in ("iframe", "new-frame") else None
         )
         close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
     assert page.in_flight.closed_with == []
+
+
+def test_an_image_keeps_its_src_after_the_stop(page, event):
+    """STOP_SENDING stubs only the setter of an image's `src`: a handler
+    that reads `img.src` after the stop still reads the URL set before."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    tab.evaluate("() => { window.img = new Image(); img.src = '/login/?before'; }")
+    stop_sending(tab)
+    assert tab.evaluate("() => img.src").endswith("/login/?before")
+    close_tab(page, tab)
 
 
 # In a document loaded at `?nav`: fetch `?again` on each reply, until the
@@ -270,6 +334,7 @@ def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
         close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
     assert page.in_flight.closed_with == []
+    # one read: the tab is closed, so no later message can join the list.
     assert navigated == ["navigates"]
 
 
@@ -627,7 +692,8 @@ def test_a_reply_handled_after_the_stop_starts_no_request(
     the drain came back empty: on a new timer (#317's results-by-racer
     kiosk, #347), from the reply's own handler, from an animation frame,
     and from htmx's queue, with no timer at all (#347 review). The settle
-    now also stops the page's fetch and XMLHttpRequest. Here the reply is
+    now also stops the page's fetch, XMLHttpRequest, beacons and
+    navigations (STOP_SENDING), and blocks the rest. Here the reply is
     released from Python after the barrier, the settle's last stop."""
     held = []
     page.route("**/held-request", lambda route: held.append(route))

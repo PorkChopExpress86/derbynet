@@ -22,11 +22,11 @@ A click, tap or check on a control a toast overlaps, or comes within
 After a control posts, wrap the click in `with htmx_post(page, path):` before
 reading the database: it waits for the POST's reply and htmx's swap. When the
 test body returns, the harness stops every tab's timers, closes the other
-tabs, stops the page's fetch, XMLHttpRequest, beacons, image loads and
-navigations, blocks every other request the page sends after that, and
-waits for every request still in flight before any fixture tears down (#45
-and #53 retros), so a late reply or a late poll never meets a flushed database
-or `settings` already put back. Close a second tab with
+tabs, stops the page's fetch, XMLHttpRequest, beacons and navigations,
+blocks every other request the page sends after that, and waits for every
+request still in flight before any fixture tears down (#45 and #53
+retros), so a late reply or a late poll never meets a flushed database or
+`settings` already put back. Close a second tab with
 `close_tab(page, tab)`: a tab closed with a request out fails the test.
 `wait_for_load_state("networkidle")` waits for a page load only, and returns
 at once after an htmx request. A swap that leaves an `hx-get` or `hx-post`
@@ -481,15 +481,21 @@ STOP_TIMERS = """() => {
 }"""
 
 # Makes every later `fetch` a promise that never settles, and every later
-# XMLHttpRequest send, beacon, image `src` and navigation but a step through
-# history do nothing, so no callback of the page sends again (#409): with a
-# URL, it first fetches that URL, in the same task. A reply handled after
-# the stop that queues htmx's next request or chains a fetch, an
-# animation-frame loop, a native timer under the fake clock then starts no
-# request, and no handler of theirs runs on a failure
-# (`test_a_reply_handled_after_the_stop_starts_no_request`).
-# A stylesheet, a script, a frame's own document and a step through history
-# still load: the settle's block stops those (`block_sending`).
+# XMLHttpRequest send, beacon, image `src` set and navigation but a step
+# through history do nothing, so no callback of the page sends again
+# (#409): with a URL, it first fetches that URL, in the same task. A reply
+# handled after the stop that queues htmx's next request or chains a
+# fetch, an animation-frame loop, a native timer under the fake clock then
+# starts no request, and no handler of theirs runs on a failure
+# (`test_a_reply_handled_after_the_stop_starts_no_request`). An image's
+# `src` still reads as before: `defineProperty` keeps the getter it is not
+# given (`test_an_image_keeps_its_src_after_the_stop`). Under the block alone, an
+# image that loads again on its error would try again at once, and
+# `close_tab`'s wait would find one out at each check
+# (`test_close_tab_closes_a_tab_that_keeps_sending`, its `image` case).
+# An image set by any other route, a stylesheet, a script, a frame's own
+# document and a step through history still load: the block stops those
+# (`block_sending`).
 STOP_SENDING = """(barrier) => {
   if (barrier) fetch(barrier).catch(() => {});
   window.fetch = () => new Promise(() => {});
@@ -521,8 +527,8 @@ def stop_sending(tab, but=None):
         try:
             frame.evaluate(STOP_SENDING, None)
         except Exception:  # noqa: BLE001, S110
-            # A frame gone or navigating: the init script, or the settle's
-            # block, covers its next document.
+            # A frame gone or navigating: the block and its init script
+            # cover its next document.
             pass
 
 
@@ -534,18 +540,21 @@ def close_tab(page, tab):
     Stopping the timers leaves the callbacks that send on no timer: the
     camera's `onicecandidate` and `onnegotiationneeded` post a message
     (camera-signaling.js), and a reply's handler can send again, load an
-    image or navigate (kiosk.js, kiosk-awards.js). So `STOP_SENDING` then
-    runs in every frame of the tab, and in each document or frame the tab
-    makes after, in the page itself: a tab under a CDP block sent again
-    once the block's session detached, frozen through that session or not
-    (`test_a_cdp_block_ends_with_its_session`). The wait is for the
-    server's replies to the requests sent before (#409:
+    image by any route, such as `photo()`'s `setAttribute('src')` in
+    kiosk-now-racing.js or the reply markup kiosk-check-in.js puts in
+    `innerHTML`, or navigate (kiosk.js, kiosk-awards.js). So `STOP_SENDING`
+    runs in every frame of the tab, and the settle's block
+    (`block_sending`) then fails every request the tab makes, of every
+    frame and document, until it closes. The block ends with its CDP
+    session (`test_a_cdp_block_ends_with_its_session`), which stays open
+    until `tab.close()`. The wait is for the server's replies to the
+    requests sent before (#409:
     `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
     `test_close_tab_closes_a_tab_that_keeps_sending`,
     `test_close_tab_closes_a_tab_whose_reply_navigates`)."""
     stop_timers(tab)
-    tab.add_init_script(f"({STOP_SENDING})(null)")
     stop_sending(tab)
+    block_sending(tab)
     waited = 0
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
         tab.wait_for_timeout(50)
@@ -586,18 +595,19 @@ BLOCKED = ("inspector", "net::ERR_BLOCKED_BY_CLIENT")
 
 
 def block_sending(page):
-    """Make Chromium block every later request of `page`, for the rest of
-    its life: what STOP_SENDING leaves, a stylesheet, a script, and a
-    frame's own document or a step back in history, whose request only the
-    Fetch block stops
-    (`test_the_settle_blocks_what_the_stops_leave`). The block ends with its
-    CDP session (#409, PR #424), so the session stays open on the page and
-    closes with its context. A blocked request fails at once, so every new
+    """Make Chromium block every later request of `page`, the settle's
+    page or a tab `close_tab` closes, for the rest of its life: what
+    STOP_SENDING leaves, an image by any route, a stylesheet, a script,
+    and a frame's own document or a step back in history, whose request
+    only the Fetch block stops (`test_the_settle_blocks_what_the_stops_leave`,
+    `test_close_tab_closes_a_tab_that_keeps_sending`). The block ends with
+    its CDP session (#409, PR #424), so the session stays open on the page
+    and closes with it. A blocked request fails at once, so every new
     document and frame gets STOP_SENDING first: a fetch of theirs never
-    fails into a handler that would send again. A page that loads a
-    stylesheet or a script again on its error would spin, the block failing
-    each load at once; no script under `ui/static/ui/` sets an `onerror`
-    on one."""
+    fails into a handler that would send again. A page that loads an
+    image, a stylesheet or a script again on its error would spin, the
+    block failing each load at once; no script under `ui/static/ui/` does
+    (app.js's `loadScript` rejects on a script's error)."""
     page.add_init_script(f"({STOP_SENDING})(null)")
     blocker = page.context.new_cdp_session(page)
     blocker.send("Network.enable")
