@@ -626,7 +626,7 @@ def press(page, control):
 
 def touch(page):
     """A CDP session for touches, which Playwright sends only whole
-    (`tap()`). At the phone's size, where the context has touch."""
+    (`tap()`)."""
     return page.context.new_cdp_session(page)
 
 
@@ -744,7 +744,7 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
     polls.end()
 
 
-@pytest.mark.sizes("phone", reason="only the phone's context has touch")
+@pytest.mark.sizes("phone", reason="touch input is checked at the phone's size only")
 def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
     """A touch on a scene button across the same reply. Chromium hit-tests
     a touch's click again, so the unheld board loses no touch (the PR's
@@ -781,7 +781,7 @@ def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
             "pointercancel",
             marks=pytest.mark.sizes(
                 "phone",
-                reason="a pointercancel is a real touch's, at the phone only",
+                reason="touch input is checked at the phone's size only",
             ),
         ),
     ],
@@ -791,8 +791,9 @@ def test_a_cancelled_press_applies_only_the_newest_held_board(login, event, canc
     first renaming the kiosk Lobby and the second Hall. The press is then
     cancelled, by moving the mouse off the button or by a pointercancel (a
     touch the browser takes for a scroll), and the board swaps once, to
-    Hall (D102). No scene is posted. The pointercancel is a real touch's,
-    so it runs at the phone's size only."""
+    Hall (D102). No scene is posted. The `moved off` case runs at both
+    sizes; the `pointercancel` case, a touch, is marked to the phone's size
+    only."""
     page = login("RaceCoordinator")
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
@@ -1114,13 +1115,13 @@ def test_a_second_tap_that_aborts_a_taps_request_still_posts(
     polls.end()
 
 
-@pytest.mark.sizes("phone", reason="only the phone's context has touch")
+@pytest.mark.sizes("phone", reason="touch input is checked at the phone's size only")
 def test_a_second_finger_keeps_the_hold(login, event):
     """A finger is down on Racing when a poll's reply (Lobby) comes, and a
     second finger then goes down on Welcome. The second pointerdown keeps
     the board held for the newer press (#344 review); the touch's cancel
-    then releases it, and the board swaps once, to Lobby. At the phone's
-    size, where the context has touch."""
+    then releases it, and the board swaps once, to Lobby. Checked at the
+    phone's size only."""
     page = login("RaceCoordinator")
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
