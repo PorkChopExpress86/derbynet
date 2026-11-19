@@ -215,17 +215,16 @@ def numbers_read(code: str) -> list[str]:
 
 
 def _word_after(code: str, start: int) -> str:
-    """The shell word that starts at `start`, double quotes and `$(...)`
-    kept whole (lines_of() has emptied each single-quoted string)."""
-    i, double = start, False
+    """The shell word that starts at `start`, with `$(...)` kept whole.  A
+    space inside double quotes ends it too, which leaves the word with an
+    open `"` that MADE never matches."""
+    i = start
     while i < len(code):
-        c = code[i]
         if code.startswith("$(", i):
             i = _closing(code, i + 1, "(", ")")
             continue
-        if not double and (c.isspace() or c in ";&|)"):
+        if code[i].isspace() or code[i] in ";&|)":
             break
-        double ^= c == '"'
         i += 1
     return code[start:i]
 
@@ -394,6 +393,8 @@ def test_each_known_row_names_a_read_that_is_there():
         ("for i in $(seq 3); do echo $((i)); done\n", []),
         ("n=1\nread -r n\necho $((n))\n", [(3, "n")]),
         ('case "$n" in\n  start) ;;\nesac\necho $((n))\n', [(4, "n")]),
+        ('case "$n" in\n  0?*) usage ;;\nesac\necho $((n))\n', [(4, "n")]),
+        ('n="1 2"\necho $((n))\n', [(2, "n")]),
     ],
 )
 def test_offenders_are_the_numbers_read_with_no_check(text, found):
